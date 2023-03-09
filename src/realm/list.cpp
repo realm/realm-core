@@ -38,76 +38,6 @@
 
 namespace realm {
 
-// FIXME: This method belongs in obj.cpp.
-LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
-{
-    auto attr = get_table()->get_column_attr(col_key);
-    REALM_ASSERT(attr.test(col_attr_List));
-    bool nullable = attr.test(col_attr_Nullable);
-
-    switch (get_table()->get_column_type(col_key)) {
-        case type_Int: {
-            if (nullable)
-                return std::make_unique<Lst<util::Optional<Int>>>(*this, col_key);
-            else
-                return std::make_unique<Lst<Int>>(*this, col_key);
-        }
-        case type_Bool: {
-            if (nullable)
-                return std::make_unique<Lst<util::Optional<Bool>>>(*this, col_key);
-            else
-                return std::make_unique<Lst<Bool>>(*this, col_key);
-        }
-        case type_Float: {
-            if (nullable)
-                return std::make_unique<Lst<util::Optional<Float>>>(*this, col_key);
-            else
-                return std::make_unique<Lst<Float>>(*this, col_key);
-        }
-        case type_Double: {
-            if (nullable)
-                return std::make_unique<Lst<util::Optional<Double>>>(*this, col_key);
-            else
-                return std::make_unique<Lst<Double>>(*this, col_key);
-        }
-        case type_String: {
-            return std::make_unique<Lst<String>>(*this, col_key);
-        }
-        case type_Binary: {
-            return std::make_unique<Lst<Binary>>(*this, col_key);
-        }
-        case type_Timestamp: {
-            return std::make_unique<Lst<Timestamp>>(*this, col_key);
-        }
-        case type_Decimal: {
-            return std::make_unique<Lst<Decimal128>>(*this, col_key);
-        }
-        case type_ObjectId: {
-            if (nullable)
-                return std::make_unique<Lst<util::Optional<ObjectId>>>(*this, col_key);
-            else
-                return std::make_unique<Lst<ObjectId>>(*this, col_key);
-        }
-        case type_UUID: {
-            if (nullable)
-                return std::make_unique<Lst<util::Optional<UUID>>>(*this, col_key);
-            else
-                return std::make_unique<Lst<UUID>>(*this, col_key);
-        }
-        case type_TypedLink: {
-            return std::make_unique<Lst<ObjLink>>(*this, col_key);
-        }
-        case type_Mixed: {
-            return std::make_unique<Lst<Mixed>>(*this, col_key);
-        }
-        case type_LinkList:
-            return get_linklist_ptr(col_key);
-        case type_Link:
-            break;
-    }
-    REALM_TERMINATE("Unsupported column type");
-}
-
 /****************************** Lst aggregates *******************************/
 
 namespace {
@@ -197,12 +127,12 @@ void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_or
 template <>
 void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
 {
-    auto origin_table = m_obj.get_table();
+    auto origin_table = m_parent->get_table();
     auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
     ObjKey old_key = this->get(ndx);
     CascadeState state(CascadeState::Mode::Strong);
     bool recurse =
-        m_obj.replace_backlink(m_col_key, {target_table_key, old_key}, {target_table_key, target_key}, state);
+        m_parent->replace_backlink(m_col_key, {target_table_key, old_key}, {target_table_key, target_key}, state);
 
     m_tree->set(ndx, target_key);
 
@@ -222,9 +152,9 @@ void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
 template <>
 void Lst<ObjKey>::do_insert(size_t ndx, ObjKey target_key)
 {
-    auto origin_table = m_obj.get_table();
+    auto origin_table = m_parent->get_table();
     auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
-    m_obj.set_backlink(m_col_key, {target_table_key, target_key});
+    m_parent->set_backlink(m_col_key, {target_table_key, target_key});
     m_tree->insert(ndx, target_key);
     if (target_key.is_unresolved()) {
         m_tree->set_context_flag(true);
@@ -234,12 +164,12 @@ void Lst<ObjKey>::do_insert(size_t ndx, ObjKey target_key)
 template <>
 void Lst<ObjKey>::do_remove(size_t ndx)
 {
-    auto origin_table = m_obj.get_table();
+    auto origin_table = m_parent->get_table();
     auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
     ObjKey old_key = get(ndx);
     CascadeState state(old_key.is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
 
-    bool recurse = m_obj.remove_backlink(m_col_key, {target_table_key, old_key}, state);
+    bool recurse = m_parent->remove_backlink(m_col_key, {target_table_key, old_key}, state);
 
     m_tree->erase(ndx);
 
@@ -255,8 +185,8 @@ void Lst<ObjKey>::do_remove(size_t ndx)
 template <>
 void Lst<ObjKey>::do_clear()
 {
-    auto origin_table = m_obj.get_table();
-    TableRef target_table = m_obj.get_target_table(m_col_key);
+    auto origin_table = m_parent->get_table();
+    TableRef target_table = m_parent->get_object().get_target_table(m_col_key);
 
     size_t sz = size();
     if (!target_table->is_embedded()) {
@@ -278,7 +208,7 @@ void Lst<ObjKey>::do_clear()
     for (size_t ndx = 0; ndx < sz; ++ndx) {
         ObjKey target_key = m_tree->get(ndx);
         Obj target_obj = target_table->get_object(target_key);
-        target_obj.remove_one_backlink(backlink_col, m_obj.get_key()); // Throws
+        target_obj.remove_one_backlink(backlink_col, m_parent->get_object().get_key()); // Throws
         // embedded objects should only have one incoming link
         REALM_ASSERT_EX(target_obj.get_backlink_count() == 0, target_obj.get_backlink_count());
         state.m_to_be_deleted.emplace_back(target_table_key, target_key);
@@ -295,12 +225,12 @@ void Lst<ObjLink>::do_set(size_t ndx, ObjLink target_link)
 {
     ObjLink old_link = get(ndx);
     CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
-    bool recurse = m_obj.replace_backlink(m_col_key, old_link, target_link, state);
+    bool recurse = m_parent->replace_backlink(m_col_key, old_link, target_link, state);
 
     m_tree->set(ndx, target_link);
 
     if (recurse) {
-        auto origin_table = m_obj.get_table();
+        auto origin_table = m_parent->get_table();
         _impl::TableFriend::remove_recursive(*origin_table, state); // Throws
     }
 }
@@ -308,7 +238,7 @@ void Lst<ObjLink>::do_set(size_t ndx, ObjLink target_link)
 template <>
 void Lst<ObjLink>::do_insert(size_t ndx, ObjLink target_link)
 {
-    m_obj.set_backlink(m_col_key, target_link);
+    m_parent->set_backlink(m_col_key, target_link);
     m_tree->insert(ndx, target_link);
 }
 
@@ -318,12 +248,12 @@ void Lst<ObjLink>::do_remove(size_t ndx)
     ObjLink old_link = get(ndx);
     CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
 
-    bool recurse = m_obj.remove_backlink(m_col_key, old_link, state);
+    bool recurse = m_parent->remove_backlink(m_col_key, old_link, state);
 
     m_tree->erase(ndx);
 
     if (recurse) {
-        auto table = m_obj.get_table();
+        auto table = m_parent->get_table();
         _impl::TableFriend::remove_recursive(*table, state); // Throws
     }
 }
@@ -340,16 +270,16 @@ void Lst<Mixed>::do_set(size_t ndx, Mixed value)
     }
     if (value.is_type(type_TypedLink)) {
         target_link = value.get<ObjLink>();
-        m_obj.get_table()->get_parent_group()->validate(target_link);
+        m_parent->get_table()->get_parent_group()->validate(target_link);
     }
 
     CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
-    bool recurse = m_obj.replace_backlink(m_col_key, old_link, target_link, state);
+    bool recurse = m_parent->replace_backlink(m_col_key, old_link, target_link, state);
 
     m_tree->set(ndx, value);
 
     if (recurse) {
-        auto origin_table = m_obj.get_table();
+        auto origin_table = m_parent->get_table();
         _impl::TableFriend::remove_recursive(*origin_table, state); // Throws
     }
 }
@@ -358,7 +288,7 @@ template <>
 void Lst<Mixed>::do_insert(size_t ndx, Mixed value)
 {
     if (value.is_type(type_TypedLink)) {
-        m_obj.set_backlink(m_col_key, value.get<ObjLink>());
+        m_parent->set_backlink(m_col_key, value.get<ObjLink>());
     }
     m_tree->insert(ndx, value);
 }
@@ -371,12 +301,12 @@ void Lst<Mixed>::do_remove(size_t ndx)
 
         CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All
                                                                   : CascadeState::Mode::Strong);
-        bool recurse = m_obj.remove_backlink(m_col_key, old_link, state);
+        bool recurse = m_parent->remove_backlink(m_col_key, old_link, state);
 
         m_tree->erase(ndx);
 
         if (recurse) {
-            auto table = m_obj.get_table();
+            auto table = m_parent->get_table();
             _impl::TableFriend::remove_recursive(*table, state); // Throws
         }
     }

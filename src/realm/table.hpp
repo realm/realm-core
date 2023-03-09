@@ -158,19 +158,49 @@ public:
     ///
     static const size_t max_column_name_length = 63;
     static const uint64_t max_num_columns = 0xFFFFUL; // <-- must be power of two -1
-    ColKey add_column(DataType type, StringData name, bool nullable = false);
-    ColKey add_column(Table& target, StringData name);
-    ColKey add_column_list(DataType type, StringData name, bool nullable = false);
-    ColKey add_column_list(Table& target, StringData name);
-    ColKey add_column_set(DataType type, StringData name, bool nullable = false);
-    ColKey add_column_set(Table& target, StringData name);
+    ColKey add_column(DataType type, StringData name, bool nullable = false, std::vector<CollectionType> = {},
+                      DataType key_type = DataType(0));
+    ColKey add_column(Table& target, StringData name, std::vector<CollectionType> = {},
+                      DataType key_type = DataType(0));
+    ColKey add_column_list(DataType type, StringData name, bool nullable = false)
+    {
+        return add_column(type, name, nullable, {CollectionType::List});
+    }
+    ColKey add_column_list(Table& target, StringData name)
+    {
+        return add_column(target, name, {CollectionType::List});
+    }
+    ColKey add_column_set(DataType type, StringData name, bool nullable = false)
+    {
+        return add_column(type, name, nullable, {CollectionType::Set});
+    }
+    ColKey add_column_set(Table& target, StringData name)
+    {
+        return add_column(target, name, {CollectionType::Set});
+    }
     ColKey add_column_dictionary(DataType type, StringData name, bool nullable = false,
-                                 DataType key_type = type_String);
-    ColKey add_column_dictionary(Table& target, StringData name, DataType key_type = type_String);
+                                 DataType key_type = type_String)
+    {
+        return add_column(type, name, nullable, {CollectionType::Dictionary}, key_type);
+    }
+    ColKey add_column_dictionary(Table& target, StringData name, DataType key_type = type_String)
+    {
+        return add_column(target, name, {CollectionType::Dictionary}, key_type);
+    }
 
-    [[deprecated("Use add_column(Table&) or add_column_list(Table&) instead.")]] //
-    ColKey
-    add_column_link(DataType type, StringData name, Table& target);
+    CollectionType get_nested_column_type(ColKey col_key, size_t level) const
+    {
+        auto spec_ndx = colkey2spec_ndx(col_key);
+        REALM_ASSERT_3(spec_ndx, <, get_column_count());
+        return m_spec.get_nested_column_type(spec_ndx, level);
+    }
+
+    size_t get_nesting_levels(ColKey col_key) const
+    {
+        auto spec_ndx = colkey2spec_ndx(col_key);
+        REALM_ASSERT_3(spec_ndx, <, get_column_count());
+        return m_spec.get_nesting_levels(spec_ndx);
+    }
 
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);
@@ -860,6 +890,7 @@ private:
     friend class ClusterTree;
     friend class ColKeyIterator;
     friend class Obj;
+    friend class CollectionParent;
     friend class LnkLst;
     friend class Dictionary;
     friend class IncludeDescriptor;

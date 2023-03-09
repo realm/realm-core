@@ -53,7 +53,21 @@ public:
     using iterator = CollectionIterator<Set<T>>;
 
     Set() = default;
-    Set(const Obj& owner, ColKey col_key);
+    Set(const Obj& owner, ColKey col_key)
+        : Set<T>(col_key)
+    {
+        this->set_owner(owner, col_key);
+    }
+
+    Set(ColKey col_key)
+        : Base(col_key)
+    {
+        if (!col_key.is_set()) {
+            throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a set");
+        }
+
+        check_column_type<value_type>(m_col_key);
+    }
     Set(const Set& other);
     Set(Set&& other) noexcept;
     Set& operator=(const Set& other);
@@ -208,14 +222,15 @@ private:
     mutable std::unique_ptr<BPlusTree<T>> m_tree;
 
     using Base::bump_content_version;
+    using Base::m_alloc;
     using Base::m_col_key;
     using Base::m_nullable;
-    using Base::m_obj;
+    using Base::m_parent;
 
     bool init_from_parent(bool allow_create) const
     {
         if (!m_tree) {
-            m_tree.reset(new BPlusTree<T>(m_obj.get_alloc()));
+            m_tree.reset(new BPlusTree<T>(*m_alloc));
             const ArrayParent* parent = this;
             m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
         }
@@ -284,6 +299,11 @@ public:
         : m_set(owner, col_key)
     {
     }
+    LnkSet(ColKey col_key)
+        : m_set(col_key)
+    {
+    }
+
 
     LnkSet(const LnkSet&) = default;
     LnkSet(LnkSet&&) = default;
@@ -311,7 +331,7 @@ public:
 
     // Overriding members of CollectionBase:
     using CollectionBase::get_owner_key;
-    CollectionBasePtr clone_collection() const
+    CollectionBasePtr clone_collection() const override
     {
         return clone_linkset();
     }
@@ -331,7 +351,7 @@ public:
     ColKey get_col_key() const noexcept final;
 
     // Overriding members of SetBase:
-    SetBasePtr clone() const
+    SetBasePtr clone() const override
     {
         return clone_linkset();
     }
@@ -384,6 +404,16 @@ public:
     iterator end() const noexcept
     {
         return iterator{this, size()};
+    }
+
+    void set_owner(const Obj& obj, CollectionParent::Index index) override
+    {
+        m_set.set_owner(obj, index);
+    }
+
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        m_set.set_owner(std::move(parent), index);
     }
 
 private:
@@ -506,17 +536,6 @@ struct SetElementEquals<Mixed> {
         return a.compare(b) == 0;
     }
 };
-
-template <class T>
-inline Set<T>::Set(const Obj& obj, ColKey col_key)
-    : Base(obj, col_key)
-{
-    if (!col_key.is_set()) {
-        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a set");
-    }
-
-    check_column_type<value_type>(m_col_key);
-}
 
 template <class T>
 inline Set<T>::Set(const Set& other)
@@ -649,7 +668,7 @@ std::pair<size_t, bool> Set<T>::insert(T value)
         return {it.index(), false};
     }
 
-    if (Replication* repl = m_obj.get_replication()) {
+    if (Replication* repl = m_parent->get_replication()) {
         // FIXME: We should emit an instruction regardless of element presence for the purposes of conflict
         // resolution in synchronized databases. The reason is that the new insertion may come at a later time
         // than an interleaving erase instruction, so emitting the instruction ensures that last "write" wins.
@@ -686,7 +705,7 @@ std::pair<size_t, bool> Set<T>::erase(T value)
         return {npos, false};
     }
 
-    if (Replication* repl = m_obj.get_replication()) {
+    if (Replication* repl = m_parent->get_replication()) {
         this->erase_repl(repl, it.index(), value);
     }
     do_erase(it.index());
@@ -738,7 +757,7 @@ template <class T>
 inline void Set<T>::clear()
 {
     if (size() > 0) {
-        if (Replication* repl = this->m_obj.get_replication()) {
+        if (Replication* repl = this->m_parent->get_replication()) {
             this->clear_repl(repl);
         }
         do_clear();

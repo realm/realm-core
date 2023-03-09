@@ -29,21 +29,23 @@
 #include "realm/array_fixed_bytes.hpp"
 #include "realm/array_backlink.hpp"
 #include "realm/array_typed_link.hpp"
+#include "realm/collection_list.hpp"
 #include "realm/cluster_tree.hpp"
 #include "realm/column_type_traits.hpp"
+#include "realm/list.hpp"
+#include "realm/set.hpp"
 #include "realm/dictionary.hpp"
 #include "realm/link_translator.hpp"
 #include "realm/index_string.hpp"
 #include "realm/object_converter.hpp"
 #include "realm/replication.hpp"
-#include "realm/set.hpp"
 #include "realm/spec.hpp"
 #include "realm/table_view.hpp"
 #include "realm/util/base64.hpp"
 
 namespace realm {
 
-/********************************* Obj **********************************/
+/*********************************** Obj *************************************/
 
 Obj::Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx)
     : m_table(table)
@@ -1914,76 +1916,6 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
     get_alloc().bump_content_version();
 }
 
-void Obj::set_backlink(ColKey col_key, ObjLink new_link) const
-{
-    if (new_link && new_link.get_obj_key()) {
-        auto target_table = m_table->get_parent_group()->get_table(new_link.get_table_key());
-        ColKey backlink_col_key;
-        auto type = col_key.get_type();
-        if (type == col_type_TypedLink || type == col_type_Mixed || col_key.is_dictionary()) {
-            // This may modify the target table
-            backlink_col_key = target_table->find_or_add_backlink_column(col_key, get_table_key());
-            // it is possible that this was a link to the same table and that adding a backlink column has
-            // caused the need to update this object as well.
-            update_if_needed();
-        }
-        else {
-            backlink_col_key = m_table->get_opposite_column(col_key);
-        }
-        auto obj_key = new_link.get_obj_key();
-        auto target_obj = obj_key.is_unresolved() ? target_table->try_get_tombstone(obj_key)
-                                                  : target_table->try_get_object(obj_key);
-        if (!target_obj) {
-            throw InvalidArgument(ErrorCodes::KeyNotFound, "Target object not found");
-        }
-        target_obj.add_backlink(backlink_col_key, m_key);
-    }
-}
-
-bool Obj::replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const
-{
-    bool recurse = remove_backlink(col_key, old_link, state);
-    set_backlink(col_key, new_link);
-
-    return recurse;
-}
-
-bool Obj::remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const
-{
-    if (old_link && old_link.get_obj_key()) {
-        REALM_ASSERT(m_table->valid_column(col_key));
-        ObjKey old_key = old_link.get_obj_key();
-        auto target_obj = m_table->get_parent_group()->get_object(old_link);
-        TableRef target_table = target_obj.get_table();
-        ColKey backlink_col_key;
-        auto type = col_key.get_type();
-        if (type == col_type_TypedLink || type == col_type_Mixed || col_key.is_dictionary()) {
-            backlink_col_key = target_table->find_or_add_backlink_column(col_key, get_table_key());
-        }
-        else {
-            backlink_col_key = m_table->get_opposite_column(col_key);
-        }
-
-        bool strong_links = target_table->is_embedded();
-        bool is_unres = old_key.is_unresolved();
-
-        bool last_removed = target_obj.remove_one_backlink(backlink_col_key, m_key); // Throws
-        if (is_unres) {
-            if (last_removed) {
-                // Check is there are more backlinks
-                if (!target_obj.has_backlinks(false)) {
-                    // Tombstones can be erased right away - there is no cascading effect
-                    target_table->m_tombstones->erase(old_key, state);
-                }
-            }
-        }
-        else {
-            return state.enqueue_for_cascade(target_obj, strong_links, last_removed);
-        }
-    }
-
-    return false;
-}
 
 struct EmbeddedObjectLinkMigrator : public LinkTranslator {
     EmbeddedObjectLinkMigrator(Obj origin, ColKey origin_col, Obj dest_orig, Obj dest_replace)
@@ -2081,6 +2013,20 @@ void Obj::handle_multiple_backlinks_during_schema_migration()
     m_table->for_each_backlink_column(copy_links);
 }
 
+LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
+{
+    auto list = CollectionParent::get_listbase_ptr(col_key);
+    list->set_owner(*this, col_key);
+    return list;
+}
+
+SetBasePtr Obj::get_setbase_ptr(ColKey col_key) const
+{
+    auto set = CollectionParent::get_setbase_ptr(col_key);
+    set->set_owner(*this, col_key);
+    return set;
+}
+
 Dictionary Obj::get_dictionary(ColKey col_key) const
 {
     REALM_ASSERT(col_key.is_dictionary());
@@ -2090,13 +2036,23 @@ Dictionary Obj::get_dictionary(ColKey col_key) const
 
 DictionaryPtr Obj::get_dictionary_ptr(ColKey col_key) const
 {
-    return std::make_unique<Dictionary>(Obj(*this), col_key);
+    auto dict = CollectionParent::get_dictionary_ptr(col_key);
+    dict->set_owner(*this, col_key);
+    return dict;
 }
 
 Dictionary Obj::get_dictionary(StringData col_name) const
 {
     return get_dictionary(get_column_key(col_name));
 }
+
+CollectionListPtr Obj::get_collection_list(ColKey col_key) const
+{
+    REALM_ASSERT(m_table->get_nesting_levels(col_key) > 0);
+    auto coll_type = m_table->get_nested_column_type(col_key, 0);
+    return CollectionList::create(std::make_shared<Obj>(*this), col_key, col_key, coll_type);
+}
+
 
 CollectionBasePtr Obj::get_collection_ptr(ColKey col_key) const
 {
@@ -2378,6 +2334,16 @@ ColKey Obj::get_primary_key_column() const
 ref_type Obj::Internal::get_ref(const Obj& obj, ColKey col_key)
 {
     return to_ref(obj._get<int64_t>(col_key.get_index()));
+}
+
+ref_type Obj::get_collection_ref(Index index) const noexcept
+{
+    return _get<int64_t>(mpark::get<ColKey>(index).get_index());
+}
+
+void Obj::set_collection_ref(Index index, ref_type ref)
+{
+    set_int(mpark::get<ColKey>(index), ref);
 }
 
 } // namespace realm

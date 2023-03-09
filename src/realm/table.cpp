@@ -390,20 +390,40 @@ Table::Table(Replication* const* repl, Allocator& alloc)
     m_cookie = cookie_created;
 }
 
-ColKey Table::add_column(DataType type, StringData name, bool nullable)
+ColKey Table::add_column(DataType type, StringData name, bool nullable, std::vector<CollectionType> collection_types,
+                         DataType key_type)
 {
     REALM_ASSERT(!is_link_type(ColumnType(type)));
 
-    Table* invalid_link = nullptr;
     ColumnAttrMask attr;
+    if (!collection_types.empty()) {
+        switch (collection_types.back()) {
+            case CollectionType::List:
+                attr.set(col_attr_List);
+                break;
+            case CollectionType::Set:
+                attr.set(col_attr_Set);
+                break;
+            case CollectionType::Dictionary:
+                attr.set(col_attr_Dictionary);
+                break;
+        }
+    }
     if (nullable || type == type_Mixed)
         attr.set(col_attr_Nullable);
     ColKey col_key = generate_col_key(ColumnType(type), attr);
 
-    return do_insert_column(col_key, type, name, invalid_link); // Throws
+    Table* invalid_link = nullptr;
+    col_key = do_insert_column(col_key, type, name, invalid_link, key_type); // Throws
+    if (collection_types.size() > 1) {
+        collection_types.pop_back();
+        m_spec.set_nested_column_types(m_leaf_ndx2spec_ndx[col_key.get_index().val], collection_types);
+    }
+    return col_key;
 }
 
-ColKey Table::add_column(Table& target, StringData name)
+ColKey Table::add_column(Table& target, StringData name, std::vector<CollectionType> collection_types,
+                         DataType key_type)
 {
     // Both origin and target must be group-level tables, and in the same group.
     Group* origin_group = get_parent_group();
@@ -421,132 +441,33 @@ ColKey Table::add_column(Table& target, StringData name)
 
     m_has_any_embedded_objects.reset();
 
+    DataType data_type = type_Link;
     ColumnAttrMask attr;
-    attr.set(col_attr_Nullable);
-    ColKey col_key = generate_col_key(col_type_Link, attr);
-
-    auto retval = do_insert_column(col_key, type_Link, name, &target); // Throws
-    return retval;
-}
-
-ColKey Table::add_column_list(DataType type, StringData name, bool nullable)
-{
-    Table* invalid_link = nullptr;
-    ColumnAttrMask attr;
-    attr.set(col_attr_List);
-    if (nullable || type == type_Mixed)
-        attr.set(col_attr_Nullable);
-    ColKey col_key = generate_col_key(ColumnType(type), attr);
-    return do_insert_column(col_key, type, name, invalid_link); // Throws
-}
-
-ColKey Table::add_column_set(DataType type, StringData name, bool nullable)
-{
-    Table* invalid_link = nullptr;
-    ColumnAttrMask attr;
-    attr.set(col_attr_Set);
-    if (nullable || type == type_Mixed)
-        attr.set(col_attr_Nullable);
-    ColKey col_key = generate_col_key(ColumnType(type), attr);
-    return do_insert_column(col_key, type, name, invalid_link); // Throws
-}
-
-ColKey Table::add_column_list(Table& target, StringData name)
-{
-    // Both origin and target must be group-level tables, and in the same group.
-    Group* origin_group = get_parent_group();
-    Group* target_group = target.get_parent_group();
-    REALM_ASSERT_RELEASE(origin_group && target_group);
-    REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Only links to embedded objects are allowed.
-    if (is_asymmetric() && !target.is_embedded()) {
-        throw IllegalOperation("List of objects not supported in asymmetric table");
-    }
-    // Incoming links from an asymmetric table are not allowed.
-    if (target.is_asymmetric()) {
-        throw IllegalOperation("List of ephemeral objects not supported");
-    }
-
-    m_has_any_embedded_objects.reset();
-
-    ColumnAttrMask attr;
-    attr.set(col_attr_List);
-    ColKey col_key = generate_col_key(col_type_LinkList, attr);
-
-    return do_insert_column(col_key, type_LinkList, name, &target); // Throws
-}
-
-ColKey Table::add_column_set(Table& target, StringData name)
-{
-    // Both origin and target must be group-level tables, and in the same group.
-    Group* origin_group = get_parent_group();
-    Group* target_group = target.get_parent_group();
-    REALM_ASSERT_RELEASE(origin_group && target_group);
-    REALM_ASSERT_RELEASE(origin_group == target_group);
-    if (target.is_embedded())
-        throw IllegalOperation("Set of embedded objects not supported");
-    // Outgoing links from an asymmetric table are not allowed.
-    if (is_asymmetric()) {
-        throw IllegalOperation("Set of objects not supported in asymmetric table");
-    }
-    // Incoming links from an asymmetric table are not allowed.
-    if (target.is_asymmetric()) {
-        throw IllegalOperation("Set of ephemeral objects not supported");
-    }
-
-    ColumnAttrMask attr;
-    attr.set(col_attr_Set);
-    ColKey col_key = generate_col_key(col_type_Link, attr);
-    return do_insert_column(col_key, type_Link, name, &target); // Throws
-}
-
-ColKey Table::add_column_link(DataType type, StringData name, Table& target)
-{
-    REALM_ASSERT(is_link_type(ColumnType(type)));
-
-    if (type == type_LinkList) {
-        return add_column_list(target, name);
+    if (!collection_types.empty()) {
+        switch (collection_types.back()) {
+            case CollectionType::List:
+                attr.set(col_attr_List);
+                data_type = type_LinkList;
+                break;
+            case CollectionType::Set:
+                attr.set(col_attr_Set);
+                break;
+            case CollectionType::Dictionary:
+                attr.set(col_attr_Dictionary);
+                attr.set(col_attr_Nullable);
+                break;
+        }
+        if (collection_types.size() > 1) {
+            // FIXME
+        }
     }
     else {
-        REALM_ASSERT(type == type_Link);
-        return add_column(target, name);
-    }
-}
-
-ColKey Table::add_column_dictionary(DataType type, StringData name, bool nullable, DataType key_type)
-{
-    Table* invalid_link = nullptr;
-    ColumnAttrMask attr;
-    REALM_ASSERT(key_type != type_Mixed);
-    attr.set(col_attr_Dictionary);
-    if (nullable || type == type_Mixed)
         attr.set(col_attr_Nullable);
-    ColKey col_key = generate_col_key(ColumnType(type), attr);
-    return do_insert_column(col_key, type, name, invalid_link, key_type); // Throws
-}
-
-ColKey Table::add_column_dictionary(Table& target, StringData name, DataType key_type)
-{
-    // Both origin and target must be group-level tables, and in the same group.
-    Group* origin_group = get_parent_group();
-    Group* target_group = target.get_parent_group();
-    REALM_ASSERT_RELEASE(origin_group && target_group);
-    REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Only links to embedded objects are allowed.
-    if (is_asymmetric() && !target.is_embedded()) {
-        throw IllegalOperation("Dictionary of objects not supported in asymmetric table");
     }
-    // Incoming links from an asymmetric table are not allowed.
-    if (target.is_asymmetric()) {
-        throw IllegalOperation("Dictionary of ephemeral objects not supported");
-    }
+    ColKey col_key = generate_col_key(ColumnType(data_type), attr);
 
-    ColumnAttrMask attr;
-    attr.set(col_attr_Dictionary);
-    attr.set(col_attr_Nullable);
-
-    ColKey col_key = generate_col_key(ColumnType(col_type_Link), attr);
-    return do_insert_column(col_key, type_Link, name, &target, key_type); // Throws
+    auto retval = do_insert_column(col_key, data_type, name, &target, key_type); // Throws
+    return retval;
 }
 
 void Table::remove_recursive(CascadeState& cascade_state)

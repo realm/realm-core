@@ -25,6 +25,7 @@
 #include <realm/list.hpp>
 #include <realm/set.hpp>
 #include <realm/dictionary.hpp>
+#include <realm/collection_list.hpp>
 #include <realm/table_view.hpp>
 #include <realm/query.hpp>
 #include <realm/query_engine.hpp>
