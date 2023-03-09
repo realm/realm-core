@@ -16,6 +16,7 @@
  *
  **************************************************************************/
 
+#include <array>
 #include <cstddef>
 #include <memory>
 #include <realm/util/features.h>
@@ -78,8 +79,8 @@ private:
     EVP_CIPHER_CTX* m_ctx;
 #endif
 
-    uint8_t m_aesKey[32];
-    uint8_t m_hmacKey[32];
+    std::array<uint8_t, 32> m_aesKey;
+    std::array<uint8_t, 32> m_hmacKey;
     std::vector<iv_table> m_iv_buffer;
     std::unique_ptr<char[]> m_rw_buffer;
     std::unique_ptr<char[]> m_dst_buffer;
