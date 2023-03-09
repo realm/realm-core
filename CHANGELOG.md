@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* The OpenSSL dependency is included only exactly where needed. Where OpenSSL is not available and the target system doesn't provide them, we now bundle public domain implementations of the SHA1 and SHA2 hashes. Common hashing operations are exposed by `util/sha_crypto.hpp` so that call sites don't need to reason about the exact hash provider. ([PR #6308](https://github.com/realm/realm-core/pull/6308))
 
 ----------------------------------------------
 
