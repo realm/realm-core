@@ -346,7 +346,7 @@ public:
         auto status = m_parent->update_if_needed_with_status();
         switch (status) {
             case UpdateStatus::Detached: {
-                m_refs.detach();
+                m_top.detach();
                 return UpdateStatus::Detached;
             }
             case UpdateStatus::NoChange:

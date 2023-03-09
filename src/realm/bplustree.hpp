@@ -144,11 +144,6 @@ public:
         return bool(m_root);
     }
 
-    void detach()
-    {
-        m_root = nullptr;
-    }
-
     bool get_context_flag() const noexcept
     {
         return m_root->get_context_flag();

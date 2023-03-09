@@ -664,4 +664,13 @@ TEST(List_NestedList)
     tr->commit_and_continue_as_read();
     CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection.get())->get(0), 5);
     CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection2.get())->get(0), 100);
+
+    tr->promote_to_write();
+    obj.remove();
+    tr->commit_and_continue_as_read();
+    CHECK_EQUAL(list.size(), 0);
+    CHECK_EQUAL(dict.size(), 0);
+    CHECK_EQUAL(list2.size(), 0);
+    CHECK_EQUAL(collection->size(), 0);
+    CHECK_EQUAL(collection2->size(), 0);
 }
