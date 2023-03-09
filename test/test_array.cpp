@@ -1519,32 +1519,33 @@ TEST(Array_get_sum)
     // test multiple chunks w=2
     c.clear();
     for (uint64_t i = 0; i < size; ++i)
-        c.add(3);
-    CHECK_EQUAL(c.get_sum(), 3 * size);
+        c.add(0x3);
+    CHECK_EQUAL(c.get_sum(), 0x3 * size);
 
     // test multiple chunks w=4
     c.clear();
     for (uint64_t i = 0; i < size; ++i)
-        c.add(13);
-    CHECK_EQUAL(c.get_sum(), 13 * size);
+        c.add(0x13);
+    CHECK_EQUAL(c.get_sum(), 0x13 * size);
 
     // test multiple chunks w=8
     c.clear();
     for (uint64_t i = 0; i < size; ++i)
-        c.add(100);
-    CHECK_EQUAL(c.get_sum(), 100 * size);
+        c.add(0x100);
+    CHECK_EQUAL(c.get_sum(), 0x100 * size);
 
     // test multiple chunks w=16
     c.clear();
-    for (uint64_t i = 0; i < size; ++i)
-        c.add(10000);
-    CHECK_EQUAL(c.get_sum(), int64_t(10000) * size);
+    for (uint64_t i = 0; i < size; ++i) {
+        c.add(0x10000);
+    }
+    CHECK_EQUAL(c.get_sum(), 0x10000 * size);
 
     // test multiple chunks w=32
     c.clear();
     for (uint64_t i = 0; i < size; ++i)
-        c.add(100000);
-    CHECK_EQUAL(c.get_sum(), 100000 * size);
+        c.add(0x100000);
+    CHECK_EQUAL(c.get_sum(), 0x100000 * size);
 
     // test multiple chunks w=64
     c.clear();
@@ -1554,9 +1555,12 @@ TEST(Array_get_sum)
 
     // test generic case
     c.clear();
-    for (uint64_t i = 0; i < 0x30000; ++i)
+    uint64_t expected = 0;
+    for (uint64_t i = 0; i < 0x30000; ++i) {
         c.add(i);
-    CHECK_EQUAL(c.get_sum(), 0x47FFE8000);
+        expected += i;
+    }
+    CHECK_EQUAL(c.get_sum(), expected);
 
     c.destroy();
 }
