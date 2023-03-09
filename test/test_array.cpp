@@ -1580,48 +1580,52 @@ TEST(Array_count)
 
     TestArray c(Allocator::get_default());
     c.create(Array::type_Normal);
+    const size_t size = realm::max_array_size;
 
     // test multiple chunks w=1
     c.clear();
-    for (uint64_t i = 0; i < 10; ++i)
-        c.add(1);
-    CHECK_EQUAL(c.count(1), 10);
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x1);
+    CHECK_EQUAL(c.count(0x1), size);
 
     // test multiple chunks w=2
     c.clear();
-    for (uint64_t i = 0; i < realm::max_array_size; ++i)
-        c.add(3);
-    CHECK_EQUAL(c.count(3), realm::max_array_size);
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x3);
+    CHECK_EQUAL(c.count(0x3), size);
 
     // test multiple chunks w=4
     c.clear();
-    for (uint64_t i = 0; i < realm::max_array_size; ++i)
-        c.add(13);
-    CHECK_EQUAL(c.count(13), realm::max_array_size);
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x13);
+    CHECK_EQUAL(c.count(0x13), size);
 
     // test multiple chunks w=8
     c.clear();
-    for (uint64_t i = 0; i < realm::max_array_size; ++i)
-        c.add(100);
-    CHECK_EQUAL(c.count(100), realm::max_array_size);
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x100);
+    CHECK_EQUAL(c.count(0x100), size);
 
     // test multiple chunks w=16
     c.clear();
-    for (uint64_t i = 0; i < realm::max_array_size; ++i)
-        c.add(10000);
-    CHECK_EQUAL(c.count(10000), realm::max_array_size);
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x10000);
+    CHECK_EQUAL(c.count(0x10000), size);
 
     // test w=32 (number of chunks does not matter)
     c.clear();
-    for (uint64_t i = 0; i < 10; ++i)
+    const size_t size_32_64_bit = 10;
+    for (uint64_t i = 0; i < size_32_64_bit; ++i)
         c.add(100000);
-    CHECK_EQUAL(c.count(100000), 10);
+    CHECK_EQUAL(c.count(100000), size_32_64_bit);
 
     // test w=64 (number of chunks does not matter)
     c.clear();
-    for (uint64_t i = 0; i < 10; ++i)
+    for (uint64_t i = 0; i < size_32_64_bit; ++i)
         c.add(8000000000LL);
-    CHECK_EQUAL(c.count(8000000000LL), 10);
+    CHECK_EQUAL(c.count(8000000000LL), size_32_64_bit);
+
+    c.destroy();
 }
 
 #endif // TEST_ARRAY
