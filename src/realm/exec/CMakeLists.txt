@@ -22,6 +22,16 @@ set_target_properties(RealmTrawler PROPERTIES
 )
 target_link_libraries(RealmTrawler Storage)
 
+include(FetchContent)
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.11.2/json.tar.xz)
+FetchContent_MakeAvailable(json)
+add_executable(RealmDataRecover EXCLUDE_FROM_ALL realm_data_recover.cpp )
+set_target_properties(RealmDataRecover PROPERTIES
+    OUTPUT_NAME "realm-data-recover"
+    DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
+)
+target_link_libraries(RealmDataRecover PRIVATE Storage nlohmann_json::nlohmann_json)
+
 add_executable(RealmEnumerate EXCLUDE_FROM_ALL realm_enumerate.cpp )
 set_target_properties(RealmEnumerate PROPERTIES
     OUTPUT_NAME "realm-enumerate"
