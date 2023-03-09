@@ -101,7 +101,7 @@ public:
     void for_all_values(T&& f)
     {
         if (update()) {
-            BPlusTree<Mixed> values(m_obj.get_alloc());
+            BPlusTree<Mixed> values(*m_alloc);
             values.init_from_ref(m_dictionary_top->get_as_ref(1));
             auto func = [&f](BPlusTreeNode* node, size_t) {
                 auto leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
@@ -120,7 +120,7 @@ public:
     void for_all_keys(Func&& f)
     {
         if (update()) {
-            BPlusTree<T> keys(m_obj.get_alloc());
+            BPlusTree<T> keys(*m_alloc);
             keys.init_from_ref(m_dictionary_top->get_as_ref(0));
             auto func = [&f](BPlusTreeNode* node, size_t) {
                 auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);
@@ -396,7 +396,7 @@ inline std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, const
 
 inline std::unique_ptr<CollectionBase> Dictionary::clone_collection() const
 {
-    return m_obj.get_dictionary_ptr(m_col_key);
+    return m_obj_mem.get_dictionary_ptr(this->get_col_key());
 }
 
 

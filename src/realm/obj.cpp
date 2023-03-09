@@ -43,7 +43,269 @@
 
 namespace realm {
 
-/********************************* Obj **********************************/
+/***************************** CollectionParent ******************************/
+CollectionList::CollectionList(std::shared_ptr<CollectionParent> parent, ColKey col_key, Index index,
+                               CollectionType coll_type)
+    : m_parent(parent)
+    , m_index(index)
+    , m_level(parent->get_level() + 1)
+    , m_table(m_parent->get_table())
+    , m_alloc(&m_parent->get_object().get_alloc())
+    , m_col_key(col_key)
+    , m_top(*m_alloc)
+    , m_refs(*m_alloc)
+    , m_key_type(coll_type == CollectionType::List ? type_Int : type_String)
+{
+    m_top.set_parent(this, 0);
+    m_refs.set_parent(&m_top, 1);
+}
+
+CollectionList::CollectionList(const CollectionList& other)
+    : m_parent(other.m_parent)
+    , m_index(other.m_index)
+    , m_level(other.m_level)
+    , m_alloc(other.m_alloc)
+    , m_col_key(other.m_col_key)
+    , m_top(*m_alloc)
+    , m_refs(*m_alloc)
+    , m_key_type(other.m_key_type)
+{
+    m_top.set_parent(this, 0);
+    m_refs.set_parent(&m_top, 1);
+}
+
+CollectionList::~CollectionList() {}
+
+bool CollectionList::init_from_parent(bool allow_create) const
+{
+    auto ref = m_parent->get_collection_ref(m_index);
+    if ((ref || allow_create) && !m_keys) {
+        switch (m_key_type) {
+            case type_String: {
+                m_keys.reset(new BPlusTree<StringData>(*m_alloc));
+                break;
+            }
+            case type_Int: {
+                m_keys.reset(new BPlusTree<Int>(*m_alloc));
+                break;
+            }
+            default:
+                break;
+        }
+        m_keys->set_parent(&m_top, 0);
+    }
+    if (ref) {
+        m_top.init_from_ref(ref);
+        m_keys->init_from_parent();
+        m_refs.init_from_parent();
+        // All is well
+        return true;
+    }
+
+    if (!allow_create) {
+        m_top.detach();
+        return false;
+    }
+
+    m_top.create(Array::type_HasRefs, false, 2, 0);
+    m_keys->create();
+    m_refs.create();
+    m_top.update_parent();
+
+    return true;
+}
+
+ref_type CollectionList::get_child_ref(size_t) const noexcept
+{
+    return m_parent->get_collection_ref(m_col_key);
+}
+
+void CollectionList::update_child_ref(size_t, ref_type ref)
+{
+    m_parent->set_collection_ref(m_index, ref);
+}
+
+CollectionBasePtr CollectionList::insert_collection(size_t ndx)
+{
+    ensure_created();
+    REALM_ASSERT(m_key_type == type_Int);
+    auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
+    size_t key = 0;
+    if (auto max = bptree_maximum(*int_keys, nullptr)) {
+        key = *max + 1;
+    }
+    int_keys->insert(ndx, key);
+    m_refs.insert(ndx, 0);
+    return std::make_unique<Lst<Int>>(std::move(clone()), key, get_col_key());
+}
+
+CollectionBasePtr CollectionList::insert_collection(StringData key)
+{
+    ensure_created();
+    REALM_ASSERT(m_key_type == type_String);
+    auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
+    StringData actual;
+    IteratorAdapter help(string_keys);
+    auto it = std::lower_bound(help.begin(), help.end(), key);
+    if (it.index() < string_keys->size()) {
+        actual = *it;
+    }
+    if (actual != key) {
+        string_keys->insert(it.index(), key);
+        m_refs.insert(it.index(), 0);
+    }
+    return std::make_unique<Lst<Int>>(std::move(clone()), key, get_col_key());
+}
+
+CollectionBasePtr CollectionList::get_collection_ptr(size_t ndx) const
+{
+    auto sz = size();
+    if (ndx >= sz) {
+        throw OutOfBounds("CollectionList::get_collection_ptr()", ndx, sz);
+    }
+    if (m_key_type == type_Int) {
+        auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
+        return std::make_unique<Lst<Int>>(std::move(clone()), int_keys->get(ndx), get_col_key());
+    }
+    auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
+    return std::make_unique<Lst<Int>>(std::move(clone()), std::string(string_keys->get(ndx)), get_col_key());
+}
+
+CollectionList CollectionList::insert_collection_list(size_t ndx)
+{
+    ensure_created();
+    REALM_ASSERT(m_key_type == type_Int);
+    auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
+    size_t key = 0;
+    if (auto max = bptree_maximum(*int_keys, nullptr)) {
+        key = *max + 1;
+    }
+    int_keys->insert(ndx, key);
+    m_refs.insert(ndx, 0);
+    auto coll_type = get_table()->get_nested_column_type(m_col_key, m_level);
+    return CollectionList{std::move(clone()), m_col_key, key, coll_type};
+}
+
+CollectionList CollectionList::insert_collection_list(StringData key)
+{
+    ensure_created();
+    REALM_ASSERT(m_key_type == type_String);
+    auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
+    StringData actual;
+    IteratorAdapter help(string_keys);
+    auto it = std::lower_bound(help.begin(), help.end(), key);
+    if (it.index() < string_keys->size()) {
+        actual = *it;
+    }
+    if (actual != key) {
+        string_keys->insert(it.index(), key);
+        m_refs.insert(it.index(), 0);
+    }
+    auto coll_type = get_table()->get_nested_column_type(m_col_key, m_level);
+    return CollectionList{std::move(clone()), m_col_key, key, coll_type};
+}
+
+
+ref_type CollectionList::get_collection_ref(Index index) const noexcept
+{
+    if (m_key_type == type_Int) {
+        auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
+        auto ndx = int_keys->find_first(mpark::get<int64_t>(index));
+        return m_refs.get(ndx);
+    }
+    auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
+    auto ndx = string_keys->find_first(StringData(mpark::get<std::string>(index)));
+    return m_refs.get(ndx);
+}
+
+void CollectionList::set_collection_ref(Index index, ref_type ref)
+{
+    if (m_key_type == type_Int) {
+        auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
+        auto ndx = int_keys->find_first(mpark::get<int64_t>(index));
+        return m_refs.set(ndx, ref);
+    }
+    auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
+    auto ndx = string_keys->find_first(StringData(mpark::get<std::string>(index)));
+    return m_refs.set(ndx, ref);
+}
+
+CollectionParent::~CollectionParent() {}
+
+void CollectionParent::set_backlink(ColKey col_key, ObjLink new_link) const
+{
+    if (new_link && new_link.get_obj_key()) {
+        auto t = get_table();
+        auto target_table = t->get_parent_group()->get_table(new_link.get_table_key());
+        ColKey backlink_col_key;
+        auto type = col_key.get_type();
+        if (type == col_type_TypedLink || type == col_type_Mixed || col_key.is_dictionary()) {
+            // This may modify the target table
+            backlink_col_key = target_table->find_or_add_backlink_column(col_key, t->get_key());
+            // it is possible that this was a link to the same table and that adding a backlink column has
+            // caused the need to update this object as well.
+            update_if_needed();
+        }
+        else {
+            backlink_col_key = t->get_opposite_column(col_key);
+        }
+        auto obj_key = new_link.get_obj_key();
+        auto target_obj = obj_key.is_unresolved() ? target_table->try_get_tombstone(obj_key)
+                                                  : target_table->try_get_object(obj_key);
+        if (!target_obj) {
+            throw InvalidArgument(ErrorCodes::KeyNotFound, "Target object not found");
+        }
+        target_obj.add_backlink(backlink_col_key, get_object().get_key());
+    }
+}
+
+bool CollectionParent::replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const
+{
+    bool recurse = remove_backlink(col_key, old_link, state);
+    set_backlink(col_key, new_link);
+
+    return recurse;
+}
+
+bool CollectionParent::remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const
+{
+    if (old_link && old_link.get_obj_key()) {
+        auto t = get_table();
+        REALM_ASSERT(t->valid_column(col_key));
+        ObjKey old_key = old_link.get_obj_key();
+        auto target_obj = t->get_parent_group()->get_object(old_link);
+        TableRef target_table = target_obj.get_table();
+        ColKey backlink_col_key;
+        auto type = col_key.get_type();
+        if (type == col_type_TypedLink || type == col_type_Mixed || col_key.is_dictionary()) {
+            backlink_col_key = target_table->find_or_add_backlink_column(col_key, t->get_key());
+        }
+        else {
+            backlink_col_key = t->get_opposite_column(col_key);
+        }
+
+        bool strong_links = target_table->is_embedded();
+        bool is_unres = old_key.is_unresolved();
+
+        bool last_removed = target_obj.remove_one_backlink(backlink_col_key, get_object().get_key()); // Throws
+        if (is_unres) {
+            if (last_removed) {
+                // Check is there are more backlinks
+                if (!target_obj.has_backlinks(false)) {
+                    // Tombstones can be erased right away - there is no cascading effect
+                    target_table->m_tombstones->erase(old_key, state);
+                }
+            }
+        }
+        else {
+            return state.enqueue_for_cascade(target_obj, strong_links, last_removed);
+        }
+    }
+
+    return false;
+}
+
+/*********************************** Obj *************************************/
 
 Obj::Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx)
     : m_table(table)
@@ -1914,76 +2176,6 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
     get_alloc().bump_content_version();
 }
 
-void Obj::set_backlink(ColKey col_key, ObjLink new_link) const
-{
-    if (new_link && new_link.get_obj_key()) {
-        auto target_table = m_table->get_parent_group()->get_table(new_link.get_table_key());
-        ColKey backlink_col_key;
-        auto type = col_key.get_type();
-        if (type == col_type_TypedLink || type == col_type_Mixed || col_key.is_dictionary()) {
-            // This may modify the target table
-            backlink_col_key = target_table->find_or_add_backlink_column(col_key, get_table_key());
-            // it is possible that this was a link to the same table and that adding a backlink column has
-            // caused the need to update this object as well.
-            update_if_needed();
-        }
-        else {
-            backlink_col_key = m_table->get_opposite_column(col_key);
-        }
-        auto obj_key = new_link.get_obj_key();
-        auto target_obj = obj_key.is_unresolved() ? target_table->try_get_tombstone(obj_key)
-                                                  : target_table->try_get_object(obj_key);
-        if (!target_obj) {
-            throw InvalidArgument(ErrorCodes::KeyNotFound, "Target object not found");
-        }
-        target_obj.add_backlink(backlink_col_key, m_key);
-    }
-}
-
-bool Obj::replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const
-{
-    bool recurse = remove_backlink(col_key, old_link, state);
-    set_backlink(col_key, new_link);
-
-    return recurse;
-}
-
-bool Obj::remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const
-{
-    if (old_link && old_link.get_obj_key()) {
-        REALM_ASSERT(m_table->valid_column(col_key));
-        ObjKey old_key = old_link.get_obj_key();
-        auto target_obj = m_table->get_parent_group()->get_object(old_link);
-        TableRef target_table = target_obj.get_table();
-        ColKey backlink_col_key;
-        auto type = col_key.get_type();
-        if (type == col_type_TypedLink || type == col_type_Mixed || col_key.is_dictionary()) {
-            backlink_col_key = target_table->find_or_add_backlink_column(col_key, get_table_key());
-        }
-        else {
-            backlink_col_key = m_table->get_opposite_column(col_key);
-        }
-
-        bool strong_links = target_table->is_embedded();
-        bool is_unres = old_key.is_unresolved();
-
-        bool last_removed = target_obj.remove_one_backlink(backlink_col_key, m_key); // Throws
-        if (is_unres) {
-            if (last_removed) {
-                // Check is there are more backlinks
-                if (!target_obj.has_backlinks(false)) {
-                    // Tombstones can be erased right away - there is no cascading effect
-                    target_table->m_tombstones->erase(old_key, state);
-                }
-            }
-        }
-        else {
-            return state.enqueue_for_cascade(target_obj, strong_links, last_removed);
-        }
-    }
-
-    return false;
-}
 
 struct EmbeddedObjectLinkMigrator : public LinkTranslator {
     EmbeddedObjectLinkMigrator(Obj origin, ColKey origin_col, Obj dest_orig, Obj dest_replace)
@@ -2097,6 +2289,13 @@ Dictionary Obj::get_dictionary(StringData col_name) const
 {
     return get_dictionary(get_column_key(col_name));
 }
+
+CollectionList Obj::get_collection_list(ColKey col_key) const
+{
+    auto coll_type = m_table->get_nested_column_type(col_key, 0);
+    return CollectionList(std::make_shared<Obj>(*this), col_key, col_key, coll_type);
+}
+
 
 CollectionBasePtr Obj::get_collection_ptr(ColKey col_key) const
 {
@@ -2378,6 +2577,16 @@ ColKey Obj::get_primary_key_column() const
 ref_type Obj::Internal::get_ref(const Obj& obj, ColKey col_key)
 {
     return to_ref(obj._get<int64_t>(col_key.get_index()));
+}
+
+ref_type Obj::get_collection_ref(Index index) const noexcept
+{
+    return _get<int64_t>(mpark::get<ColKey>(index).get_index());
+}
+
+void Obj::set_collection_ref(Index index, ref_type ref)
+{
+    set_int(mpark::get<ColKey>(index), ref);
 }
 
 } // namespace realm

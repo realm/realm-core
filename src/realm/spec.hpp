@@ -64,6 +64,8 @@ public:
     ColumnAttrMask get_column_attr(size_t column_ndx) const noexcept;
     void set_dictionary_key_type(size_t column_ndx, DataType key_type);
     DataType get_dictionary_key_type(size_t column_ndx) const;
+    void set_nested_column_types(size_t column_ndx, const std::vector<CollectionType>& types);
+    CollectionType get_nested_column_type(size_t column_ndx, size_t level);
 
     // Auto Enumerated string columns
     void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref);
@@ -92,7 +94,7 @@ private:
     Array m_types;            // 1st slot in m_top
     ArrayStringShort m_names; // 2nd slot in m_top
     Array m_attr;             // 3rd slot in m_top
-    // 4th slot in m_top is vacant
+                              // 4th slot in m_top not cached
     Array m_enumkeys; // 5th slot in m_top
     Array m_keys;     // 6th slot in m_top
     size_t m_num_public_columns;

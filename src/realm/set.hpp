@@ -208,14 +208,15 @@ private:
     mutable std::unique_ptr<BPlusTree<T>> m_tree;
 
     using Base::bump_content_version;
+    using Base::m_alloc;
     using Base::m_col_key;
     using Base::m_nullable;
-    using Base::m_obj;
+    using Base::m_parent;
 
     bool init_from_parent(bool allow_create) const
     {
         if (!m_tree) {
-            m_tree.reset(new BPlusTree<T>(m_obj.get_alloc()));
+            m_tree.reset(new BPlusTree<T>(*m_alloc));
             const ArrayParent* parent = this;
             m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
         }
@@ -649,7 +650,7 @@ std::pair<size_t, bool> Set<T>::insert(T value)
         return {it.index(), false};
     }
 
-    if (Replication* repl = m_obj.get_replication()) {
+    if (Replication* repl = m_parent->get_replication()) {
         // FIXME: We should emit an instruction regardless of element presence for the purposes of conflict
         // resolution in synchronized databases. The reason is that the new insertion may come at a later time
         // than an interleaving erase instruction, so emitting the instruction ensures that last "write" wins.
@@ -686,7 +687,7 @@ std::pair<size_t, bool> Set<T>::erase(T value)
         return {npos, false};
     }
 
-    if (Replication* repl = m_obj.get_replication()) {
+    if (Replication* repl = m_parent->get_replication()) {
         this->erase_repl(repl, it.index(), value);
     }
     do_erase(it.index());
@@ -738,7 +739,7 @@ template <class T>
 inline void Set<T>::clear()
 {
     if (size() > 0) {
-        if (Replication* repl = this->m_obj.get_replication()) {
+        if (Replication* repl = this->m_parent->get_replication()) {
             this->clear_repl(repl);
         }
         do_clear();

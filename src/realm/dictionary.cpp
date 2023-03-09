@@ -41,25 +41,6 @@ void validate_key_value(const Mixed& key)
     }
 }
 
-template <class T>
-class SortedKeys {
-public:
-    SortedKeys(T* keys)
-        : m_list(keys)
-    {
-    }
-    CollectionIterator<T> begin() const
-    {
-        return CollectionIterator<T>(m_list, 0);
-    }
-    CollectionIterator<T> end() const
-    {
-        return CollectionIterator<T>(m_list, m_list->size());
-    }
-
-private:
-    T* m_list;
-};
 } // namespace
 
 
@@ -67,7 +48,7 @@ private:
 
 Dictionary::Dictionary(const Obj& obj, ColKey col_key)
     : Base(obj, col_key)
-    , m_key_type(m_obj.get_table()->get_dictionary_key_type(m_col_key))
+    , m_key_type(obj.get_table()->get_dictionary_key_type(m_col_key))
 {
     if (!col_key.is_dictionary()) {
         throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a dictionary");
@@ -80,6 +61,7 @@ Dictionary::Dictionary(Allocator& alloc, ColKey col_key, ref_type ref)
     : Base(Obj{}, col_key)
     , m_key_type(type_String)
 {
+    this->m_alloc = &alloc;
     REALM_ASSERT(ref);
     m_dictionary_top.reset(new Array(alloc));
     m_dictionary_top->init_from_ref(ref);
@@ -405,13 +387,13 @@ void Dictionary::sort_keys(std::vector<size_t>& indices, bool ascending) const
         // We rely in the design that the keys are already sorted
         switch (m_key_type) {
             case type_String: {
-                SortedKeys help(static_cast<BPlusTree<StringData>*>(m_keys.get()));
+                IteratorAdapter help(static_cast<BPlusTree<StringData>*>(m_keys.get()));
                 auto is_sorted = std::is_sorted(help.begin(), help.end());
                 REALM_ASSERT(is_sorted);
                 break;
             }
             case type_Int: {
-                SortedKeys help(static_cast<BPlusTree<Int>*>(m_keys.get()));
+                IteratorAdapter help(static_cast<BPlusTree<Int>*>(m_keys.get()));
                 auto is_sorted = std::is_sorted(help.begin(), help.end());
                 REALM_ASSERT(is_sorted);
                 break;
@@ -488,7 +470,7 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     }
     else {
         if (m_col_key.get_type() == col_type_Link && value.get_type() == type_TypedLink) {
-            if (m_obj.get_table()->get_opposite_table_key(m_col_key) != value.get<ObjLink>().get_table_key()) {
+            if (m_parent->get_table()->get_opposite_table_key(m_col_key) != value.get<ObjLink>().get_table_key()) {
                 throw InvalidArgument(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Wrong object type");
             }
         }
@@ -504,10 +486,10 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     if (value.is_type(type_TypedLink)) {
         new_link = value.get<ObjLink>();
         if (!new_link.is_unresolved())
-            m_obj.get_table()->get_parent_group()->validate(new_link);
+            m_parent->get_table()->get_parent_group()->validate(new_link);
     }
     else if (value.is_type(type_Link)) {
-        auto target_table = m_obj.get_table()->get_opposite_table(m_col_key);
+        auto target_table = m_parent->get_table()->get_opposite_table(m_col_key);
         auto key = value.get<ObjKey>();
         if (!key.is_unresolved() && !target_table->is_valid(key)) {
             throw InvalidArgument(ErrorCodes::KeyNotFound, "Target object not found");
@@ -540,7 +522,7 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         old_entry = true;
     }
 
-    if (Replication* repl = this->m_obj.get_replication()) {
+    if (Replication* repl = this->m_parent->get_replication()) {
         if (old_entry) {
             repl->dictionary_set(*this, ndx, key, value);
         }
@@ -562,9 +544,9 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
 
     if (new_link != old_link) {
         CascadeState cascade_state(CascadeState::Mode::Strong);
-        bool recurse = m_obj.replace_backlink(m_col_key, old_link, new_link, cascade_state);
+        bool recurse = m_parent->replace_backlink(m_col_key, old_link, new_link, cascade_state);
         if (recurse)
-            _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
+            _impl::TableFriend::remove_recursive(*m_parent->get_table(), cascade_state); // Throws
     }
 
     return {Iterator(this, ndx), !old_entry};
@@ -694,7 +676,7 @@ void Dictionary::nullify(Mixed key)
     auto ndx = do_find_key(key);
     REALM_ASSERT(ndx != realm::npos);
 
-    if (Replication* repl = this->m_obj.get_replication()) {
+    if (Replication* repl = m_parent->get_replication()) {
         repl->dictionary_set(*this, ndx, key, Mixed());
     }
 
@@ -712,7 +694,7 @@ void Dictionary::clear()
 {
     if (size() > 0) {
         // TODO: Should we have a "dictionary_clear" instruction?
-        Replication* repl = m_obj.get_replication();
+        Replication* repl = m_parent->get_replication();
         bool recurse = false;
         CascadeState cascade_state(CascadeState::Mode::Strong);
         for (auto&& elem : *this) {
@@ -731,31 +713,31 @@ void Dictionary::clear()
         update_child_ref(0, 0);
 
         if (recurse)
-            _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
+            _impl::TableFriend::remove_recursive(*m_parent->get_table(), cascade_state); // Throws
     }
 }
 
 bool Dictionary::init_from_parent(bool allow_create) const
 {
-    auto ref = m_obj._get<int64_t>(m_col_key.get_index());
+    auto ref = get_collection_ref();
 
     if ((ref || allow_create) && !m_dictionary_top) {
-        m_dictionary_top.reset(new Array(m_obj.get_alloc()));
-        m_dictionary_top->set_parent(const_cast<Dictionary*>(this), m_obj.get_row_ndx());
+        m_dictionary_top.reset(new Array(*m_alloc));
+        m_dictionary_top->set_parent(const_cast<Dictionary*>(this), m_parent->get_object().get_row_ndx());
         switch (m_key_type) {
             case type_String: {
-                m_keys.reset(new BPlusTree<StringData>(m_obj.get_alloc()));
+                m_keys.reset(new BPlusTree<StringData>(*m_alloc));
                 break;
             }
             case type_Int: {
-                m_keys.reset(new BPlusTree<Int>(m_obj.get_alloc()));
+                m_keys.reset(new BPlusTree<Int>(*m_alloc));
                 break;
             }
             default:
                 break;
         }
         m_keys->set_parent(m_dictionary_top.get(), 0);
-        m_values.reset(new BPlusTree<Mixed>(m_obj.get_alloc()));
+        m_values.reset(new BPlusTree<Mixed>(*m_alloc));
         m_values->set_parent(m_dictionary_top.get(), 1);
     }
 
@@ -799,7 +781,7 @@ std::pair<size_t, Mixed> Dictionary::find_impl(Mixed key) const noexcept
             case type_String: {
                 auto keys = static_cast<BPlusTree<StringData>*>(m_keys.get());
                 StringData val = key.get<StringData>();
-                SortedKeys help(keys);
+                IteratorAdapter help(keys);
                 auto it = std::lower_bound(help.begin(), help.end(), val);
                 if (it.index() < sz) {
                     actual = *it;
@@ -810,7 +792,7 @@ std::pair<size_t, Mixed> Dictionary::find_impl(Mixed key) const noexcept
             case type_Int: {
                 auto keys = static_cast<BPlusTree<Int>*>(m_keys.get());
                 Int val = key.get<Int>();
-                SortedKeys help(keys);
+                IteratorAdapter help(keys);
                 auto it = std::lower_bound(help.begin(), help.end(), val);
                 if (it.index() < sz) {
                     actual = *it;
@@ -848,9 +830,9 @@ void Dictionary::do_erase(size_t ndx, Mixed key)
     CascadeState cascade_state(CascadeState::Mode::Strong);
     bool recurse = clear_backlink(old_value, cascade_state);
     if (recurse)
-        _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
+        _impl::TableFriend::remove_recursive(*m_parent->get_table(), cascade_state); // Throws
 
-    if (Replication* repl = this->m_obj.get_replication()) {
+    if (Replication* repl = this->m_parent->get_replication()) {
         repl->dictionary_erase(*this, ndx, key);
     }
 
@@ -884,7 +866,7 @@ std::pair<Mixed, Mixed> Dictionary::do_get_pair(size_t ndx) const
 bool Dictionary::clear_backlink(Mixed value, CascadeState& state) const
 {
     if (value.is_type(type_TypedLink)) {
-        return m_obj.remove_backlink(m_col_key, value.get_link(), state);
+        return m_parent->remove_backlink(m_col_key, value.get_link(), state);
     }
     return false;
 }
@@ -895,7 +877,7 @@ void Dictionary::swap_content(Array& fields1, Array& fields2, size_t index1, siz
 
     // Swap keys
     REALM_ASSERT(m_key_type == type_String);
-    ArrayString keys(m_obj.get_alloc());
+    ArrayString keys(*m_alloc);
     keys.set_parent(&fields1, 1);
     keys.init_from_parent();
     buf1 = keys.get(index1);
@@ -910,7 +892,7 @@ void Dictionary::swap_content(Array& fields1, Array& fields2, size_t index1, siz
     keys.set(index1, buf2);
 
     // Swap values
-    ArrayMixed values(m_obj.get_alloc());
+    ArrayMixed values(*m_alloc);
     values.set_parent(&fields1, 2);
     values.init_from_parent();
     Mixed val1 = values.get(index1);
@@ -960,15 +942,15 @@ void Dictionary::migrate()
         ArrayParent* m_owner;
     };
 
-    if (auto dict_ref = m_obj._get<int64_t>(get_col_key().get_index())) {
-        DictionaryClusterTree cluster_tree(this, m_obj.get_alloc(), m_obj.get_row_ndx());
+    if (auto dict_ref = get_collection_ref()) {
+        DictionaryClusterTree cluster_tree(this, *m_alloc, m_parent->get_object().get_row_ndx());
         if (cluster_tree.init_from_parent()) {
             // Create an empty dictionary in the old ones place
-            m_obj.set_int(get_col_key(), 0);
+            set_collection_ref(0);
             ensure_created();
 
-            ArrayString keys(m_obj.get_alloc()); // We only support string type keys.
-            ArrayMixed values(m_obj.get_alloc());
+            ArrayString keys(*m_alloc); // We only support string type keys.
+            ArrayMixed values(*m_alloc);
             constexpr ColKey key_col(ColKey::Idx{0}, col_type_String, ColumnAttrMask(), 0);
             constexpr ColKey value_col(ColKey::Idx{1}, col_type_Mixed, ColumnAttrMask(), 0);
             size_t nb_elements = cluster_tree.size();
@@ -989,7 +971,7 @@ void Dictionary::migrate()
                 return IteratorControl::AdvanceToNext;
             });
             REALM_ASSERT(size() == nb_elements);
-            Array::destroy_deep(to_ref(dict_ref), m_obj.get_alloc());
+            Array::destroy_deep(to_ref(dict_ref), *m_alloc);
         }
         else {
             REALM_UNREACHABLE();

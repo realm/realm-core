@@ -5,6 +5,7 @@
 #include <realm/bplustree.hpp>
 #include <realm/obj_list.hpp>
 #include <realm/table.hpp>
+#include <realm/array_ref.hpp>
 
 #include <iosfwd>      // std::ostream
 #include <type_traits> // std::void_t
@@ -323,6 +324,134 @@ struct AverageHelper<T, std::void_t<ColumnSumType<T>>> {
     }
 };
 
+class CollectionList : public CollectionParent, protected ArrayParent {
+public:
+    CollectionList(std::shared_ptr<CollectionParent> parent, ColKey col_key, Index index, CollectionType coll_type);
+    CollectionList(const CollectionList&);
+
+    ~CollectionList();
+
+    bool init_from_parent(bool allow_create) const;
+
+    Replication* get_replication() const override
+    {
+        return m_parent->get_replication();
+    }
+    size_t get_level() const noexcept
+    {
+        return m_level;
+    }
+    UpdateStatus update_if_needed_with_status() const override
+    {
+        auto status = m_parent->update_if_needed_with_status();
+        switch (status) {
+            case UpdateStatus::Detached: {
+                m_refs.detach();
+                return UpdateStatus::Detached;
+            }
+            case UpdateStatus::NoChange:
+                if (m_top.is_attached()) {
+                    return UpdateStatus::NoChange;
+                }
+                // The tree has not been initialized yet for this accessor, so
+                // perform lazy initialization by treating it as an update.
+                [[fallthrough]];
+            case UpdateStatus::Updated: {
+                bool attached = init_from_parent(false);
+                return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
+            }
+        }
+        REALM_UNREACHABLE();
+    }
+    bool update_if_needed() const override
+    {
+        return update_if_needed_with_status() != UpdateStatus::Detached;
+    }
+    int_fast64_t bump_content_version() override
+    {
+        return m_parent->bump_content_version();
+    }
+    void bump_both_versions() override
+    {
+        m_parent->bump_both_versions();
+    }
+    TableRef get_table() const noexcept override
+    {
+        return m_table;
+    }
+    ColKey get_col_key() const noexcept final
+    {
+        return m_col_key;
+    }
+    const Obj& get_object() const noexcept override
+    {
+        return m_parent->get_object();
+    }
+
+    ref_type get_collection_ref(Index index) const noexcept override;
+    void set_collection_ref(Index index, ref_type ref) override;
+
+    bool is_empty() const
+    {
+        return size() == 0;
+    }
+
+    size_t size() const
+    {
+        return update_if_needed() ? m_refs.size() : 0;
+    }
+    CollectionBasePtr insert_collection(size_t ndx);
+    CollectionBasePtr insert_collection(StringData key);
+    CollectionBasePtr get_collection_ptr(size_t ndx) const;
+
+    CollectionList insert_collection_list(size_t ndx);
+    CollectionList insert_collection_list(StringData key);
+
+    ref_type get_child_ref(size_t child_ndx) const noexcept override;
+    void update_child_ref(size_t child_ndx, ref_type new_ref) override;
+
+    std::unique_ptr<CollectionParent> clone() const override
+    {
+        return std::move(std::make_unique<CollectionList>(*this));
+    }
+
+private:
+    std::shared_ptr<CollectionParent> m_parent;
+    CollectionParent::Index m_index;
+    size_t m_level;
+    TableRef m_table;
+    Allocator* m_alloc;
+    ColKey m_col_key;
+    mutable Array m_top;
+    mutable std::unique_ptr<BPlusTreeBase> m_keys;
+    mutable BPlusTree<ref_type> m_refs;
+    DataType m_key_type;
+
+    UpdateStatus ensure_created()
+    {
+        auto status = m_parent->update_if_needed_with_status();
+        switch (status) {
+            case UpdateStatus::Detached:
+                break; // Not possible (would have thrown earlier).
+            case UpdateStatus::NoChange: {
+                if (m_top.is_attached()) {
+                    return UpdateStatus::NoChange;
+                }
+                // The tree has not been initialized yet for this accessor, so
+                // perform lazy initialization by treating it as an update.
+                [[fallthrough]];
+            }
+            case UpdateStatus::Updated: {
+                bool attached = init_from_parent(true);
+                REALM_ASSERT(attached);
+                return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
+            }
+        }
+
+        REALM_UNREACHABLE();
+    }
+};
+
 /// Convenience base class for collections, which implements most of the
 /// relevant interfaces for a collection that is bound to an object accessor and
 /// representable as a BPlusTree<T>.
@@ -339,9 +468,23 @@ public:
 
     const Obj& get_obj() const noexcept final
     {
-        return m_obj;
+        return m_obj_mem;
     }
 
+    ref_type get_collection_ref() const noexcept
+    {
+        try {
+            return m_parent->get_collection_ref(m_index);
+        }
+        catch (const KeyNotFound&) {
+            return ref_type(0);
+        }
+    }
+
+    void set_collection_ref(ref_type ref)
+    {
+        m_parent->set_collection_ref(m_index, ref);
+    }
 
     /// Returns true if the accessor has changed since the last time
     /// `has_changed()` was called.
@@ -369,7 +512,11 @@ public:
     using Interface::get_target_table;
 
 protected:
-    Obj m_obj;
+    Obj m_obj_mem;
+    std::unique_ptr<CollectionParent> m_col_parent;
+    CollectionParent* m_parent = nullptr;
+    CollectionParent::Index m_index;
+    Allocator* m_alloc = nullptr;
     ColKey m_col_key;
     bool m_nullable = false;
 
@@ -379,18 +526,57 @@ protected:
     mutable uint_fast64_t m_last_content_version = 0;
 
     CollectionBaseImpl() = default;
-    CollectionBaseImpl(const CollectionBaseImpl& other) = default;
-    CollectionBaseImpl(CollectionBaseImpl&& other) = default;
-
-    CollectionBaseImpl(const Obj& obj, ColKey col_key) noexcept
-        : m_obj(obj)
-        , m_col_key(col_key)
-        , m_nullable(col_key.is_nullable())
+    CollectionBaseImpl(const CollectionBaseImpl& other)
+        : m_obj_mem(other.m_obj_mem)
+        , m_col_parent(other.m_col_parent ? std::move(other.m_col_parent->clone()) : nullptr)
+        , m_parent(m_col_parent ? m_col_parent.get() : &m_obj_mem)
+        , m_index(other.m_index)
+        , m_alloc(other.m_alloc)
+        , m_col_key(other.m_col_key)
+        , m_nullable(other.m_nullable)
     {
     }
 
-    CollectionBaseImpl& operator=(const CollectionBaseImpl& other) = default;
-    CollectionBaseImpl& operator=(CollectionBaseImpl&& other) = default;
+    CollectionBaseImpl(const Obj& obj, ColKey col_key) noexcept
+        : m_obj_mem(obj)
+        , m_parent(&m_obj_mem)
+        , m_index(col_key)
+        , m_col_key(col_key)
+        , m_nullable(col_key.is_nullable())
+    {
+        if (obj) {
+            m_alloc = &m_obj_mem.get_alloc();
+        }
+    }
+
+    CollectionBaseImpl(std::unique_ptr<CollectionParent> parent, CollectionParent::Index index,
+                       ColKey col_key) noexcept
+        : m_obj_mem(parent->get_object())
+        , m_col_parent(std::move(parent))
+        , m_parent(m_col_parent.get())
+        , m_index(index)
+        , m_col_key(col_key)
+        , m_nullable(col_key.is_nullable())
+    {
+        if (m_obj_mem) {
+            m_alloc = &m_obj_mem.get_alloc();
+        }
+    }
+
+    CollectionBaseImpl& operator=(const CollectionBaseImpl& other)
+    {
+        if (this != &other) {
+            m_obj_mem = other.m_obj_mem;
+            m_col_parent = other.m_col_parent ? std::move(other.m_col_parent->clone()) : nullptr;
+            m_parent = m_col_parent ? m_col_parent.get() : &m_obj_mem;
+            m_alloc = other.m_alloc;
+            m_index = other.m_index;
+            m_col_key = other.m_col_key;
+            m_nullable = other.m_nullable;
+        }
+
+        return *this;
+    }
 
     bool operator==(const Derived& other) const noexcept
     {
@@ -420,10 +606,10 @@ protected:
     /// `UpdateStatus::NoChange`, and the caller is allowed to not do anything.
     virtual UpdateStatus update_if_needed() const
     {
-        UpdateStatus status = m_obj.update_if_needed_with_status();
+        UpdateStatus status = m_parent ? m_parent->update_if_needed_with_status() : UpdateStatus::Detached;
 
         if (status != UpdateStatus::Detached) {
-            auto content_version = m_obj.get_alloc().get_content_version();
+            auto content_version = m_alloc->get_content_version();
             if (content_version != m_content_version) {
                 m_content_version = content_version;
                 status = UpdateStatus::Updated;
@@ -445,8 +631,8 @@ protected:
     /// method will never return `UpdateStatus::Detached`.
     virtual UpdateStatus ensure_created()
     {
-        bool changed = m_obj.update_if_needed(); // Throws if the object does not exist.
-        auto content_version = m_obj.get_alloc().get_content_version();
+        bool changed = m_parent->update_if_needed(); // Throws if the object does not exist.
+        auto content_version = m_alloc->get_content_version();
 
         if (changed || content_version != m_content_version) {
             m_content_version = content_version;
@@ -457,7 +643,7 @@ protected:
 
     void bump_content_version()
     {
-        m_content_version = m_obj.bump_content_version();
+        m_content_version = m_parent->bump_content_version();
     }
 
     /// Reset the accessor's tracking of the content version. Derived classes
@@ -474,18 +660,13 @@ protected:
     ref_type get_child_ref(size_t child_ndx) const noexcept final
     {
         static_cast<void>(child_ndx);
-        try {
-            return to_ref(m_obj._get<int64_t>(m_col_key.get_index()));
-        }
-        catch (const KeyNotFound&) {
-            return ref_type(0);
-        }
+        return get_collection_ref();
     }
 
     void update_child_ref(size_t child_ndx, ref_type new_ref) final
     {
         static_cast<void>(child_ndx);
-        m_obj.set_int(m_col_key, from_ref(new_ref));
+        set_collection_ref(new_ref);
     }
 };
 
@@ -763,6 +944,26 @@ private:
     mutable value_type m_val;
     const L* m_list;
     size_t m_ndx = size_t(-1);
+};
+
+template <class T>
+class IteratorAdapter {
+public:
+    IteratorAdapter(T* keys)
+        : m_list(keys)
+    {
+    }
+    CollectionIterator<T> begin() const
+    {
+        return CollectionIterator<T>(m_list, 0);
+    }
+    CollectionIterator<T> end() const
+    {
+        return CollectionIterator<T>(m_list, m_list->size());
+    }
+
+private:
+    T* m_list;
 };
 
 } // namespace realm
