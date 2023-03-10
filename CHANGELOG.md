@@ -2,10 +2,31 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Add logging at the Storage level. (PR [#6339](https://github.com/realm/realm-core/pull/6339))
+* None.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.7.0 Release notes
+
+### Enhancements
+* Add logging at the Storage level. (PR [#6339](https://github.com/realm/realm-core/pull/6339))
+
+### Fixed
 * None.
 
 ### Breaking changes
