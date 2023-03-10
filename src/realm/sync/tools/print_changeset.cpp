@@ -178,13 +178,14 @@ int main(int argc, const char** argv)
     }
 
     try {
-    if (as_logs) {
-        print_changesets_in_log_file(*changeset_input);
+        if (as_logs) {
+            print_changesets_in_log_file(*changeset_input);
+        }
+        else {
+            print_changeset_in_file(*changeset_input, static_cast<bool>(hex), static_cast<bool>(compressed));
+        }
     }
-    else {
-        print_changeset_in_file(*changeset_input, static_cast<bool>(hex), static_cast<bool>(compressed));
-    }
-    } catch(const std::exception& e) {
+    catch (const std::exception& e) {
         util::format(std::cerr, "Error parsing/printing changesets: %1", e.what());
         return EXIT_FAILURE;
     }
