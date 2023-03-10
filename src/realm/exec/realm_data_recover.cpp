@@ -456,7 +456,7 @@ std::vector<slab_entry> realm_group::get_allocated_nodes() const
         });
         return sz;
     };
-    
+
     std::cout << "State size: " << human_readable(get_size(all_nodes)) << std::endl;
 
     if (size() > 3) {
@@ -516,7 +516,6 @@ void realm_group::print_schema() const
             std::cout << "    " << i << ": " << get_table_name(i) << " - size: " << table->get_size(m_alloc)
                       << " datasize: " << human_readable(table->mem_usage(m_alloc)) << std::endl;
             table->print_columns(*this);
-            
         }
     }
 }
@@ -640,7 +639,7 @@ realm_table::realm_table(realm::Allocator& alloc, uint64_t ref)
                 m_leaf_ndx2spec_ndx[leaf_ndx] = spec_ndx;
             }
         }
-        //TODO: more magic numbers, this stuff needs to be documented.
+        // TODO: more magic numbers, this stuff needs to be documented.
         else if (spec.size() > 3) {
             // In pre Core-6, the subspecs array is optional
             // Not used in Core-6
@@ -668,7 +667,7 @@ std::string realm_table::get_column_name(realm::ColKey col_key) const
 }
 void realm_table::print_columns(const realm_group& group) const
 {
-    //TODO add JSON sturcture.
+    // TODO add JSON sturcture.
     std::cout << "        <" << m_table_type << ">" << std::endl;
     for (unsigned i = 0; i < m_column_names.size(); i++) {
         auto type = realm::ColumnType(m_column_types.get_val(i) & 0xFFFF);
@@ -799,7 +798,6 @@ static void dump_realm(const realm_handle& handle)
 {
     std::cout << "File format: " << handle.m_file_format_version << std::endl;
     handle.m_group->print_schema();
-
 }
 
 // main program
