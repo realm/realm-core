@@ -450,9 +450,6 @@ struct BenchmarkWithType : Benchmark {
         WriteTransaction tr(group);
         TableRef t = tr.add_table(name());
         m_col = t->add_column(Type::data_type, name(), Type::is_nullable);
-        if constexpr (Type::is_indexed) {
-            t->add_search_index(m_col);
-        }
         Random r;
         for (size_t i = 0; i < BASE_SIZE; ++i) {
             int64_t randomness = r.draw_int<int64_t>(0, 1000000);
@@ -468,6 +465,9 @@ struct BenchmarkWithType : Benchmark {
                 needle = t->get_object(r.draw_int<size_t>(0, t->size())).get_any(m_col);
             }
             needles.push_back(needle);
+        }
+        if constexpr (Type::is_indexed) {
+            t->add_search_index(m_col);
         }
         tr.commit();
     }
@@ -2014,6 +2014,8 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkWithType<Prop<ObjectId>>);
     BENCH(BenchmarkWithType<Indexed<Timestamp>>);
     BENCH(BenchmarkWithType<Prop<Timestamp>>);
+    BENCH(BenchmarkWithType<Indexed<Bool>>);
+    BENCH(BenchmarkWithType<Prop<Bool>>);
 
     BENCH(BenchmarkQueryTimestampGreaterOverLinks);
     BENCH(BenchmarkQueryTimestampGreater);

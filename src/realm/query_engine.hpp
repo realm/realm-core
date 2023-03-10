@@ -952,7 +952,39 @@ public:
     BoolNode(const BoolNode& from)
         : ParentNode(from)
         , m_value(from.m_value)
+        , m_index_evaluator(from.m_index_evaluator)
     {
+    }
+
+    void init(bool will_query_ranges) override
+    {
+        ParentNode::init(will_query_ranges);
+
+        if constexpr (std::is_same_v<TConditionFunction, Equal>) {
+            if (m_index_evaluator) {
+                StringIndex* index = m_table->get_search_index(m_condition_column_key);
+                m_index_evaluator->init(index, m_value);
+                this->m_dT = 0;
+            }
+        }
+    }
+
+    void table_changed() override
+    {
+        if constexpr (std::is_same_v<TConditionFunction, Equal>) {
+            const bool has_index = m_table->search_index_type(m_condition_column_key) == IndexType::General;
+            m_index_evaluator = has_index ? std::make_optional(IndexEvaluator{}) : std::nullopt;
+        }
+    }
+
+    const IndexEvaluator* index_based_keys() override
+    {
+        return m_index_evaluator ? &(*m_index_evaluator) : nullptr;
+    }
+
+    bool has_search_index() const override
+    {
+        return bool(m_index_evaluator);
     }
 
     void cluster_changed() override
@@ -965,6 +997,12 @@ public:
 
     size_t find_first_local(size_t start, size_t end) override
     {
+        if constexpr (std::is_same_v<TConditionFunction, Equal>) {
+            if (m_index_evaluator) {
+                return m_index_evaluator->do_search_index(m_cluster, start, end);
+            }
+        }
+
         TConditionFunction condition;
         bool m_value_is_null = !m_value;
         for (size_t s = start; s < end; ++s) {
@@ -993,6 +1031,7 @@ private:
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
     const ArrayBoolNull* m_leaf_ptr = nullptr;
+    std::optional<IndexEvaluator> m_index_evaluator;
 };
 
 class TimestampNodeBase : public ParentNode {
@@ -1040,8 +1079,46 @@ class TimestampNode : public TimestampNodeBase {
 public:
     using TimestampNodeBase::TimestampNodeBase;
 
+    void init(bool will_query_ranges) override
+    {
+        TimestampNodeBase::init(will_query_ranges);
+
+        if constexpr (std::is_same_v<TConditionFunction, Equal>) {
+            if (m_index_evaluator) {
+                StringIndex* index =
+                    TimestampNodeBase::m_table->get_search_index(TimestampNodeBase::m_condition_column_key);
+                m_index_evaluator->init(index, TimestampNodeBase::m_value);
+                this->m_dT = 0;
+            }
+        }
+    }
+
+    void table_changed() override
+    {
+        if constexpr (std::is_same_v<TConditionFunction, Equal>) {
+            const bool has_index =
+                this->m_table->search_index_type(TimestampNodeBase::m_condition_column_key) == IndexType::General;
+            m_index_evaluator = has_index ? std::make_optional(IndexEvaluator{}) : std::nullopt;
+        }
+    }
+
+    const IndexEvaluator* index_based_keys() override
+    {
+        return m_index_evaluator ? &(*m_index_evaluator) : nullptr;
+    }
+
+    bool has_search_index() const override
+    {
+        return bool(m_index_evaluator);
+    }
+
     size_t find_first_local(size_t start, size_t end) override
     {
+        if constexpr (std::is_same_v<TConditionFunction, Equal>) {
+            if (m_index_evaluator) {
+                return m_index_evaluator->do_search_index(this->m_cluster, start, end);
+            }
+        }
         return m_leaf_ptr->find_first<TConditionFunction>(m_value, start, end);
     }
 
@@ -1062,6 +1139,7 @@ protected:
         : TimestampNodeBase(from, tr)
     {
     }
+    std::optional<IndexEvaluator> m_index_evaluator;
 };
 
 class DecimalNodeBase : public ParentNode {
