@@ -12,7 +12,7 @@
 #include <realm/sync/changeset_parser.hpp>
 
 using namespace realm;
-
+#if REALM_DEBUG
 namespace {
 
 sync::Changeset changeset_binary_to_sync_changeset(const std::string& changeset_binary)
@@ -72,6 +72,12 @@ std::string changeset_compressed_to_binary(const std::string& changeset_compress
     return decompressed;
 }
 
+void parse_and_print_changeset(const std::string& changeset_binary)
+{
+    sync::Changeset changeset = changeset_binary_to_sync_changeset(changeset_binary);
+    changeset.print(std::cout);
+}
+
 void print_changeset_in_file(std::istream& input_file, bool hex, bool compressed)
 {
     std::stringstream input_file_ss;
@@ -87,8 +93,7 @@ void print_changeset_in_file(std::istream& input_file, bool hex, bool compressed
     else {
         changeset_binary = file_contents;
     }
-    sync::Changeset changeset = changeset_binary_to_sync_changeset(changeset_binary);
-    changeset.print(std::cout);
+    parse_and_print_changeset(changeset_binary);
 }
 
 void print_changesets_in_log_file(std::istream& input_file)
@@ -109,9 +114,8 @@ void print_changesets_in_log_file(std::istream& input_file)
             prev_line = line;
             continue;
         }
-        sync::Changeset changeset = changeset_binary_to_sync_changeset(changeset_contents);
         std::cout << prev_line << std::endl;
-        changeset.print(std::cout);
+        parse_and_print_changeset(changeset_contents);
     }
 }
 
@@ -132,14 +136,16 @@ void print_help(std::string_view prog_name)
 }
 
 } // namespace
+#endif
 
 int main(int argc, const char** argv)
 {
 #if !REALM_DEBUG
+    static_cast<void>(argc);
+    static_cast<void>(argv);
     util::format(std::cerr, "changeset printing is disabled in Release mode, build in Debug mode to use this tool\n");
     return EXIT_FAILURE;
-#endif
-
+#else
     util::CliArgumentParser arg_parser;
     util::CliFlag hex(arg_parser, "hex", 'H');
     util::CliFlag compressed(arg_parser, "compressed", 'C');
@@ -182,4 +188,5 @@ int main(int argc, const char** argv)
         util::format(std::cerr, "Error parsing/printing changesets: %1", e.what());
         return EXIT_FAILURE;
     }
+#endif
 }
