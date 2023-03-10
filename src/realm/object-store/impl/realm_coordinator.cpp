@@ -305,7 +305,7 @@ std::shared_ptr<Realm> RealmCoordinator::freeze_realm(const Realm& source_realm)
     auto config = source_realm.config();
     config.scheduler = scheduler;
     realm = Realm::make_shared_realm(std::move(config), version, shared_from_this());
-    Realm::Internal::copy_schema(*realm, source_realm);
+//    Realm::Internal::copy_schema(*realm, source_realm);
     m_weak_realm_notifiers.emplace_back(realm, config.cache);
     return realm;
 }
