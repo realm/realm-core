@@ -154,11 +154,11 @@ int main(int argc, const char** argv)
             throw std::runtime_error(
                 util::format("Expected one input argument, got %1", arg_result.unmatched_arguments.size()));
         }
-        const auto& arg = arg_result.unmatched_arguments.front();
-        if (arg.empty() || arg.front() == '-') {
-            throw std::runtime_error(util::format("Expected path to file, got \"%1\"", arg));
+        std::string file_path(arg_result.unmatched_arguments.front());
+        if (file_path.empty() || file_path.front() == '-') {
+            throw std::runtime_error(util::format("Expected path to file, got \"%1\"", file_path));
         }
-        changeset_input_file.open(arg);
+        changeset_input_file.open(file_path);
         changeset_input = &changeset_input_file;
     }
     catch (const std::runtime_error& e) {
