@@ -362,18 +362,15 @@ std::string StringNode<Equal>::describe(util::serializer::SerialisationState& st
         return StringNodeEqualBase::describe(state);
     }
 
-    // FIXME: once the parser supports it, print something like "column IN {s1, s2, s3}"
-    std::string desc;
+    std::string list_contents;
     bool is_first = true;
     for (auto it : m_needles) {
         StringData sd(it.data(), it.size());
-        desc += (is_first ? "" : " or ") + state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
-                Equal::description() + " " + util::serializer::print_value(sd);
+        list_contents += util::format("%1%2", is_first ? "" : ", ", util::serializer::print_value(sd));
         is_first = false;
     }
-    if (!is_first) {
-        desc = "(" + desc + ")";
-    }
+    std::string col_descr = state.describe_column(ParentNode::m_table, m_condition_column_key);
+    std::string desc = util::format("%1 IN {%2}", col_descr, list_contents);
     return desc;
 }
 

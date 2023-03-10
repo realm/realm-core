@@ -619,17 +619,14 @@ public:
                    util::serializer::print_value(IntegerNodeBase<LeafType>::m_value);
         }
 
-        // FIXME: once the parser supports it, print something like "column IN {n1, n2, n3}"
-        std::string desc = "(";
+        std::string list_contents;
         bool is_first = true;
         for (auto it : m_needles) {
-            if (!is_first)
-                desc += " or ";
-            desc +=
-                col_descr + " " + Equal::description() + " " + util::serializer::print_value(it); // "it" may be null
+            list_contents +=
+                util::format("%1%2", is_first ? "" : ", ", util::serializer::print_value(it)); // "it" may be null
             is_first = false;
         }
-        desc += ")";
+        std::string desc = util::format("%1 IN {%2}", col_descr, list_contents);
         return desc;
     }
 
