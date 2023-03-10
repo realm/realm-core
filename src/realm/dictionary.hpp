@@ -34,7 +34,12 @@ public:
     Dictionary() {}
     ~Dictionary();
 
-    Dictionary(const Obj& obj, ColKey col_key);
+    Dictionary(const Obj& obj, ColKey col_key)
+        : Dictionary(col_key)
+    {
+        this->set_owner(obj, col_key);
+    }
+    Dictionary(ColKey col_key);
     Dictionary(const Dictionary& other)
         : Base(static_cast<const Base&>(other))
         , m_key_type(other.m_key_type)
@@ -141,6 +146,18 @@ public:
 
     void migrate();
 
+    void set_owner(const Obj& obj, CollectionParent::Index index) override
+    {
+        Base::set_owner(obj, index);
+        get_key_type();
+    }
+
+    void set_owner(std::unique_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        Base::set_owner(std::move(parent), index);
+        get_key_type();
+    }
+
 private:
     template <typename T, typename Op>
     friend class CollectionColumnAggregate;
@@ -183,6 +200,7 @@ private:
         return update_if_needed() != UpdateStatus::Detached;
     }
     void verify() const;
+    void get_key_type();
 };
 
 class Dictionary::Iterator {
@@ -382,6 +400,16 @@ public:
         // the same way as for LnkSet and LnkLst. This means that the functions
         // that call get_mutable_tree do not need to do anything for dictionaries.
         return nullptr;
+    }
+
+    void set_owner(const Obj& obj, CollectionParent::Index index) override
+    {
+        m_source.set_owner(obj, index);
+    }
+
+    void set_owner(std::unique_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        m_source.set_owner(std::move(parent), index);
     }
 
 private:

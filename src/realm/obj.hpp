@@ -123,6 +123,12 @@ public:
     bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const;
     // Used when removing a backlink, return true if CascadeState contains objects to remove
     bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const;
+
+protected:
+    LstBasePtr get_listbase_ptr(ColKey col_key) const;
+    SetBasePtr get_setbase_ptr(ColKey col_key) const;
+    DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
+    CollectionBasePtr get_collection_ptr(ColKey col_key) const;
 };
 
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
@@ -137,19 +143,19 @@ public:
     }
     Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
 
-    size_t get_level() const noexcept
+    size_t get_level() const noexcept final
     {
         return 0;
     }
     ref_type get_collection_ref(Index index) const noexcept override;
     void set_collection_ref(Index index, ref_type ref) override;
 
-    TableRef get_table() const noexcept override
+    TableRef get_table() const noexcept final
     {
         return m_table.cast_away_const();
     }
 
-    const Obj& get_object() const noexcept override
+    const Obj& get_object() const noexcept final
     {
         return *this;
     }

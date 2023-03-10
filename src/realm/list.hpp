@@ -79,10 +79,19 @@ public:
     using value_type = T;
 
     Lst() = default;
-    Lst(const Obj& owner, ColKey col_key);
-    Lst(std::unique_ptr<CollectionParent> parent, CollectionParent::Index index, ColKey col_key)
-        : Base(std::move(parent), index, col_key)
+    Lst(const Obj& owner, ColKey col_key)
+        : Lst<T>(col_key)
     {
+        this->set_owner(owner, col_key);
+    }
+    Lst(ColKey col_key)
+        : Base(col_key)
+    {
+        if (!col_key.is_list()) {
+            throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a list");
+        }
+
+        check_column_type<T>(m_col_key);
     }
     Lst(const Lst& other);
     Lst(Lst&&) noexcept;
@@ -361,6 +370,10 @@ public:
         : m_list(owner, col_key)
     {
     }
+    LnkLst(ColKey col_key)
+        : m_list(col_key)
+    {
+    }
 
     LnkLst(const LnkLst& other) = default;
     LnkLst(LnkLst&& other) = default;
@@ -496,6 +509,16 @@ public:
         return m_list.get_tree();
     }
 
+    void set_owner(const Obj& obj, CollectionParent::Index index) override
+    {
+        m_list.set_owner(obj, index);
+    }
+
+    void set_owner(std::unique_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        m_list.set_owner(std::move(parent), index);
+    }
+
 private:
     friend class TableView;
     friend class Query;
@@ -525,17 +548,6 @@ inline void LstBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) cons
     repl->list_move(*this, ndx2, ndx1);
     if (ndx1 + 1 != ndx2)
         repl->list_move(*this, ndx1 + 1, ndx2);
-}
-
-template <class T>
-inline Lst<T>::Lst(const Obj& obj, ColKey col_key)
-    : Base(obj, col_key)
-{
-    if (!col_key.is_list()) {
-        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a list");
-    }
-
-    check_column_type<T>(m_col_key);
 }
 
 template <class T>

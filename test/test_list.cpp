@@ -637,6 +637,8 @@ TEST(List_NestedList)
         table->add_column(type_Int, "int_list_list", false, {CollectionType::List, CollectionType::List});
     auto list_col2 = table->add_column(type_Int, "int_dict_list_list", false,
                                        {CollectionType::Dictionary, CollectionType::List, CollectionType::List});
+    CHECK_EQUAL(table->get_nesting_levels(list_col1), 1);
+    CHECK_EQUAL(table->get_nesting_levels(list_col2), 2);
     Obj obj = table->create_object();
 
     auto list = obj.get_collection_list(list_col1);

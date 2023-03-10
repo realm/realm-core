@@ -36,6 +36,7 @@
 #include "realm/index_string.hpp"
 #include "realm/object_converter.hpp"
 #include "realm/replication.hpp"
+#include "realm/list.hpp"
 #include "realm/set.hpp"
 #include "realm/spec.hpp"
 #include "realm/table_view.hpp"
@@ -49,7 +50,6 @@ CollectionList::CollectionList(std::shared_ptr<CollectionParent> parent, ColKey 
     : m_parent(parent)
     , m_index(index)
     , m_level(parent->get_level() + 1)
-    , m_table(m_parent->get_table())
     , m_alloc(&m_parent->get_object().get_alloc())
     , m_col_key(col_key)
     , m_top(*m_alloc)
@@ -127,6 +127,7 @@ void CollectionList::update_child_ref(size_t, ref_type ref)
 
 CollectionBasePtr CollectionList::insert_collection(size_t ndx)
 {
+    REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) == m_level);
     ensure_created();
     REALM_ASSERT(m_key_type == type_Int);
     auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
@@ -136,11 +137,14 @@ CollectionBasePtr CollectionList::insert_collection(size_t ndx)
     }
     int_keys->insert(ndx, key);
     m_refs.insert(ndx, 0);
-    return std::make_unique<Lst<Int>>(std::move(clone()), key, get_col_key());
+    CollectionBasePtr coll = CollectionParent::get_collection_ptr(get_col_key());
+    coll->set_owner(std::move(clone()), key);
+    return coll;
 }
 
 CollectionBasePtr CollectionList::insert_collection(StringData key)
 {
+    REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) == m_level);
     ensure_created();
     REALM_ASSERT(m_key_type == type_String);
     auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
@@ -154,21 +158,30 @@ CollectionBasePtr CollectionList::insert_collection(StringData key)
         string_keys->insert(it.index(), key);
         m_refs.insert(it.index(), 0);
     }
-    return std::make_unique<Lst<Int>>(std::move(clone()), key, get_col_key());
+    CollectionBasePtr coll = CollectionParent::get_collection_ptr(get_col_key());
+    coll->set_owner(std::move(clone()), key);
+    return coll;
 }
 
 CollectionBasePtr CollectionList::get_collection_ptr(size_t ndx) const
 {
+    REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) == m_level);
+    CollectionBasePtr coll = CollectionParent::get_collection_ptr(get_col_key());
+    Index index;
     auto sz = size();
     if (ndx >= sz) {
         throw OutOfBounds("CollectionList::get_collection_ptr()", ndx, sz);
     }
     if (m_key_type == type_Int) {
         auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
-        return std::make_unique<Lst<Int>>(std::move(clone()), int_keys->get(ndx), get_col_key());
+        index = int_keys->get(ndx);
     }
-    auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
-    return std::make_unique<Lst<Int>>(std::move(clone()), std::string(string_keys->get(ndx)), get_col_key());
+    else {
+        auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
+        index = std::string(string_keys->get(ndx));
+    }
+    coll->set_owner(std::move(clone()), index);
+    return coll;
 }
 
 CollectionList CollectionList::insert_collection_list(size_t ndx)
@@ -182,8 +195,7 @@ CollectionList CollectionList::insert_collection_list(size_t ndx)
     }
     int_keys->insert(ndx, key);
     m_refs.insert(ndx, 0);
-    auto coll_type = get_table()->get_nested_column_type(m_col_key, m_level);
-    return CollectionList{std::move(clone()), m_col_key, key, coll_type};
+    return get_collection_list(ndx);
 }
 
 CollectionList CollectionList::insert_collection_list(StringData key)
@@ -201,10 +213,28 @@ CollectionList CollectionList::insert_collection_list(StringData key)
         string_keys->insert(it.index(), key);
         m_refs.insert(it.index(), 0);
     }
-    auto coll_type = get_table()->get_nested_column_type(m_col_key, m_level);
-    return CollectionList{std::move(clone()), m_col_key, key, coll_type};
+    return get_collection_list(it.index());
 }
 
+CollectionList CollectionList::get_collection_list(size_t ndx) const
+{
+    REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) > m_level);
+    Index index;
+    auto sz = size();
+    if (ndx >= sz) {
+        throw OutOfBounds("CollectionList::get_collection_ptr()", ndx, sz);
+    }
+    if (m_key_type == type_Int) {
+        auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
+        index = int_keys->get(ndx);
+    }
+    else {
+        auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
+        index = std::string(string_keys->get(ndx));
+    }
+    auto coll_type = get_table()->get_nested_column_type(m_col_key, m_level);
+    return CollectionList{std::move(clone()), m_col_key, index, coll_type};
+}
 
 ref_type CollectionList::get_collection_ref(Index index) const noexcept
 {
@@ -303,6 +333,167 @@ bool CollectionParent::remove_backlink(ColKey col_key, ObjLink old_link, Cascade
     }
 
     return false;
+}
+
+// FIXME: This method belongs in obj.cpp.
+LstBasePtr CollectionParent::get_listbase_ptr(ColKey col_key) const
+{
+    auto table = get_table();
+    auto attr = table->get_column_attr(col_key);
+    REALM_ASSERT(attr.test(col_attr_List));
+    bool nullable = attr.test(col_attr_Nullable);
+
+    switch (table->get_column_type(col_key)) {
+        case type_Int: {
+            if (nullable)
+                return std::make_unique<Lst<util::Optional<Int>>>(col_key);
+            else
+                return std::make_unique<Lst<Int>>(col_key);
+        }
+        case type_Bool: {
+            if (nullable)
+                return std::make_unique<Lst<util::Optional<Bool>>>(col_key);
+            else
+                return std::make_unique<Lst<Bool>>(col_key);
+        }
+        case type_Float: {
+            if (nullable)
+                return std::make_unique<Lst<util::Optional<Float>>>(col_key);
+            else
+                return std::make_unique<Lst<Float>>(col_key);
+        }
+        case type_Double: {
+            if (nullable)
+                return std::make_unique<Lst<util::Optional<Double>>>(col_key);
+            else
+                return std::make_unique<Lst<Double>>(col_key);
+        }
+        case type_String: {
+            return std::make_unique<Lst<String>>(col_key);
+        }
+        case type_Binary: {
+            return std::make_unique<Lst<Binary>>(col_key);
+        }
+        case type_Timestamp: {
+            return std::make_unique<Lst<Timestamp>>(col_key);
+        }
+        case type_Decimal: {
+            return std::make_unique<Lst<Decimal128>>(col_key);
+        }
+        case type_ObjectId: {
+            if (nullable)
+                return std::make_unique<Lst<util::Optional<ObjectId>>>(col_key);
+            else
+                return std::make_unique<Lst<ObjectId>>(col_key);
+        }
+        case type_UUID: {
+            if (nullable)
+                return std::make_unique<Lst<util::Optional<UUID>>>(col_key);
+            else
+                return std::make_unique<Lst<UUID>>(col_key);
+        }
+        case type_TypedLink: {
+            return std::make_unique<Lst<ObjLink>>(col_key);
+        }
+        case type_Mixed: {
+            return std::make_unique<Lst<Mixed>>(col_key);
+        }
+        case type_LinkList:
+            return std::make_unique<LnkLst>(col_key);
+        case type_Link:
+            break;
+    }
+    REALM_TERMINATE("Unsupported column type");
+}
+
+SetBasePtr CollectionParent::get_setbase_ptr(ColKey col_key) const
+{
+    auto table = get_table();
+    auto attr = table->get_column_attr(col_key);
+    REALM_ASSERT(attr.test(col_attr_Set));
+    bool nullable = attr.test(col_attr_Nullable);
+
+    switch (table->get_column_type(col_key)) {
+        case type_Int: {
+            if (nullable)
+                return std::make_unique<Set<util::Optional<Int>>>(col_key);
+            else
+                return std::make_unique<Set<Int>>(col_key);
+        }
+        case type_Bool: {
+            if (nullable)
+                return std::make_unique<Set<util::Optional<Bool>>>(col_key);
+            else
+                return std::make_unique<Set<Bool>>(col_key);
+        }
+        case type_Float: {
+            if (nullable)
+                return std::make_unique<Set<util::Optional<Float>>>(col_key);
+            else
+                return std::make_unique<Set<Float>>(col_key);
+        }
+        case type_Double: {
+            if (nullable)
+                return std::make_unique<Set<util::Optional<Double>>>(col_key);
+            else
+                return std::make_unique<Set<Double>>(col_key);
+        }
+        case type_String: {
+            return std::make_unique<Set<String>>(col_key);
+        }
+        case type_Binary: {
+            return std::make_unique<Set<Binary>>(col_key);
+        }
+        case type_Timestamp: {
+            return std::make_unique<Set<Timestamp>>(col_key);
+        }
+        case type_Decimal: {
+            return std::make_unique<Set<Decimal128>>(col_key);
+        }
+        case type_ObjectId: {
+            if (nullable)
+                return std::make_unique<Set<util::Optional<ObjectId>>>(col_key);
+            else
+                return std::make_unique<Set<ObjectId>>(col_key);
+        }
+        case type_UUID: {
+            if (nullable)
+                return std::make_unique<Set<util::Optional<UUID>>>(col_key);
+            else
+                return std::make_unique<Set<UUID>>(col_key);
+        }
+        case type_TypedLink: {
+            return std::make_unique<Set<ObjLink>>(col_key);
+        }
+        case type_Mixed: {
+            return std::make_unique<Set<Mixed>>(col_key);
+        }
+        case type_Link: {
+            return std::make_unique<LnkSet>(col_key);
+        }
+        case type_LinkList:
+            break;
+    }
+    REALM_TERMINATE("Unsupported column type.");
+}
+
+DictionaryPtr CollectionParent::get_dictionary_ptr(ColKey col_key) const
+{
+    return std::make_unique<Dictionary>(col_key);
+}
+
+CollectionBasePtr CollectionParent::get_collection_ptr(ColKey col_key) const
+{
+    if (col_key.is_list()) {
+        return get_listbase_ptr(col_key);
+    }
+    else if (col_key.is_set()) {
+        return get_setbase_ptr(col_key);
+    }
+    else if (col_key.is_dictionary()) {
+        return get_dictionary_ptr(col_key);
+    }
+    return {};
 }
 
 /*********************************** Obj *************************************/
@@ -2273,6 +2464,20 @@ void Obj::handle_multiple_backlinks_during_schema_migration()
     m_table->for_each_backlink_column(copy_links);
 }
 
+LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
+{
+    auto list = CollectionParent::get_listbase_ptr(col_key);
+    list->set_owner(*this, col_key);
+    return list;
+}
+
+SetBasePtr Obj::get_setbase_ptr(ColKey col_key) const
+{
+    auto set = CollectionParent::get_setbase_ptr(col_key);
+    set->set_owner(*this, col_key);
+    return set;
+}
+
 Dictionary Obj::get_dictionary(ColKey col_key) const
 {
     REALM_ASSERT(col_key.is_dictionary());
@@ -2282,7 +2487,9 @@ Dictionary Obj::get_dictionary(ColKey col_key) const
 
 DictionaryPtr Obj::get_dictionary_ptr(ColKey col_key) const
 {
-    return std::make_unique<Dictionary>(Obj(*this), col_key);
+    auto dict = CollectionParent::get_dictionary_ptr(col_key);
+    dict->set_owner(*this, col_key);
+    return dict;
 }
 
 Dictionary Obj::get_dictionary(StringData col_name) const
@@ -2292,6 +2499,7 @@ Dictionary Obj::get_dictionary(StringData col_name) const
 
 CollectionList Obj::get_collection_list(ColKey col_key) const
 {
+    REALM_ASSERT(m_table->get_nesting_levels(col_key) > 0);
     auto coll_type = m_table->get_nested_column_type(col_key, 0);
     return CollectionList(std::make_shared<Obj>(*this), col_key, col_key, coll_type);
 }

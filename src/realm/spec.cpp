@@ -396,7 +396,7 @@ void Spec::set_nested_column_types(size_t column_ndx, const std::vector<Collecti
     arr.update_parent();
 }
 
-CollectionType Spec::get_nested_column_type(size_t column_ndx, size_t level)
+CollectionType Spec::get_nested_column_type(size_t column_ndx, size_t level) const
 {
     ref_type ref2 = 0;
     if (auto ref = m_top.get_as_ref(3)) {
@@ -415,6 +415,21 @@ CollectionType Spec::get_nested_column_type(size_t column_ndx, size_t level)
     }
 
     return CollectionType(arr.get(level));
+}
+
+size_t Spec::get_nesting_levels(size_t column_ndx) const
+{
+    if (auto ref = m_top.get_as_ref(3)) {
+        Array coll_types(m_top.get_alloc());
+        coll_types.init_from_ref(ref);
+        if (auto ref = coll_types.get_as_ref(column_ndx)) {
+            Array arr(m_top.get_alloc());
+            arr.init_from_ref(ref);
+            return arr.size();
+        }
+    }
+
+    return 0;
 }
 
 

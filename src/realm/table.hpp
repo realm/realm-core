@@ -188,9 +188,19 @@ public:
         return col_key;
     }
 
-    [[deprecated("Use add_column(Table&) or add_column_list(Table&) instead.")]] //
-    ColKey
-    add_column_link(DataType type, StringData name, Table& target);
+    CollectionType get_nested_column_type(ColKey col_key, size_t level) const
+    {
+        auto spec_ndx = colkey2spec_ndx(col_key);
+        REALM_ASSERT_3(spec_ndx, <, get_column_count());
+        return m_spec.get_nested_column_type(spec_ndx, level);
+    }
+
+    size_t get_nesting_levels(ColKey col_key) const
+    {
+        auto spec_ndx = colkey2spec_ndx(col_key);
+        REALM_ASSERT_3(spec_ndx, <, get_column_count());
+        return m_spec.get_nesting_levels(spec_ndx);
+    }
 
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);
@@ -655,12 +665,6 @@ public:
     bool links_to_self(ColKey col_key) const;
     ColKey get_opposite_column(ColKey col_key) const;
     ColKey find_opposite_column(ColKey col_key) const;
-    CollectionType get_nested_column_type(ColKey col_key, size_t level)
-    {
-        auto spec_ndx = colkey2spec_ndx(col_key);
-        REALM_ASSERT_3(spec_ndx, <, get_column_count());
-        return m_spec.get_nested_column_type(spec_ndx, level);
-    }
 
     class DisableReplication {
     public:

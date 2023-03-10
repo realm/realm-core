@@ -65,7 +65,8 @@ public:
     void set_dictionary_key_type(size_t column_ndx, DataType key_type);
     DataType get_dictionary_key_type(size_t column_ndx) const;
     void set_nested_column_types(size_t column_ndx, const std::vector<CollectionType>& types);
-    CollectionType get_nested_column_type(size_t column_ndx, size_t level);
+    CollectionType get_nested_column_type(size_t column_ndx, size_t level) const;
+    size_t get_nesting_levels(size_t column_ndx) const;
 
     // Auto Enumerated string columns
     void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref);

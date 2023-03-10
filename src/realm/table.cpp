@@ -470,19 +470,6 @@ ColKey Table::add_column(Table& target, StringData name, std::vector<CollectionT
     return retval;
 }
 
-ColKey Table::add_column_link(DataType type, StringData name, Table& target)
-{
-    REALM_ASSERT(is_link_type(ColumnType(type)));
-
-    if (type == type_LinkList) {
-        return add_column_list(target, name);
-    }
-    else {
-        REALM_ASSERT(type == type_Link);
-        return add_column(target, name);
-    }
-}
-
 void Table::remove_recursive(CascadeState& cascade_state)
 {
     Group* group = get_parent_group();

@@ -53,7 +53,21 @@ public:
     using iterator = CollectionIterator<Set<T>>;
 
     Set() = default;
-    Set(const Obj& owner, ColKey col_key);
+    Set(const Obj& owner, ColKey col_key)
+        : Set<T>(col_key)
+    {
+        this->set_owner(owner, col_key);
+    }
+
+    Set(ColKey col_key)
+        : Base(col_key)
+    {
+        if (!col_key.is_set()) {
+            throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a set");
+        }
+
+        check_column_type<value_type>(m_col_key);
+    }
     Set(const Set& other);
     Set(Set&& other) noexcept;
     Set& operator=(const Set& other);
@@ -285,6 +299,11 @@ public:
         : m_set(owner, col_key)
     {
     }
+    LnkSet(ColKey col_key)
+        : m_set(col_key)
+    {
+    }
+
 
     LnkSet(const LnkSet&) = default;
     LnkSet(LnkSet&&) = default;
@@ -385,6 +404,16 @@ public:
     iterator end() const noexcept
     {
         return iterator{this, size()};
+    }
+
+    void set_owner(const Obj& obj, CollectionParent::Index index) override
+    {
+        m_set.set_owner(obj, index);
+    }
+
+    void set_owner(std::unique_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        m_set.set_owner(std::move(parent), index);
     }
 
 private:
@@ -507,17 +536,6 @@ struct SetElementEquals<Mixed> {
         return a.compare(b) == 0;
     }
 };
-
-template <class T>
-inline Set<T>::Set(const Obj& obj, ColKey col_key)
-    : Base(obj, col_key)
-{
-    if (!col_key.is_set()) {
-        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a set");
-    }
-
-    check_column_type<value_type>(m_col_key);
-}
 
 template <class T>
 inline Set<T>::Set(const Set& other)

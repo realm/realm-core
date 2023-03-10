@@ -46,15 +46,12 @@ void validate_key_value(const Mixed& key)
 
 /******************************** Dictionary *********************************/
 
-Dictionary::Dictionary(const Obj& obj, ColKey col_key)
-    : Base(obj, col_key)
-    , m_key_type(obj.get_table()->get_dictionary_key_type(m_col_key))
+Dictionary::Dictionary(ColKey col_key)
+    : Base(col_key)
 {
     if (!col_key.is_dictionary()) {
         throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a dictionary");
     }
-    if (!(m_key_type == type_String || m_key_type == type_Int))
-        throw Exception(ErrorCodes::InvalidDictionaryKey, "Dictionary keys can only be strings or integers");
 }
 
 Dictionary::Dictionary(Allocator& alloc, ColKey col_key, ref_type ref)
@@ -920,6 +917,13 @@ void Dictionary::verify() const
     m_keys->verify();
     m_values->verify();
     REALM_ASSERT(m_keys->size() == m_values->size());
+}
+
+void Dictionary::get_key_type()
+{
+    m_key_type = m_parent->get_table()->get_dictionary_key_type(m_col_key);
+    if (!(m_key_type == type_String || m_key_type == type_Int))
+        throw Exception(ErrorCodes::InvalidDictionaryKey, "Dictionary keys can only be strings or integers");
 }
 
 void Dictionary::migrate()

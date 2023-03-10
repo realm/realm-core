@@ -120,6 +120,10 @@ public:
         return ndx;
     }
 
+    virtual void set_owner(const Obj& obj, CollectionParent::Index index) = 0;
+    virtual void set_owner(std::unique_ptr<CollectionParent> parent, CollectionParent::Index index) = 0;
+
+
     StringData get_property_name() const
     {
         return get_table()->get_column_name(get_col_key());
@@ -377,7 +381,7 @@ public:
     }
     TableRef get_table() const noexcept override
     {
-        return m_table;
+        return m_parent->get_table();
     }
     ColKey get_col_key() const noexcept final
     {
@@ -406,6 +410,10 @@ public:
 
     CollectionList insert_collection_list(size_t ndx);
     CollectionList insert_collection_list(StringData key);
+    CollectionList get_collection_list(size_t ndx) const;
+
+    void remove(size_t ndx);     // TODO
+    void remove(StringData key); // TODO
 
     ref_type get_child_ref(size_t child_ndx) const noexcept override;
     void update_child_ref(size_t child_ndx, ref_type new_ref) override;
@@ -419,7 +427,6 @@ private:
     std::shared_ptr<CollectionParent> m_parent;
     CollectionParent::Index m_index;
     size_t m_level;
-    TableRef m_table;
     Allocator* m_alloc;
     ColKey m_col_key;
     mutable Array m_top;
@@ -507,6 +514,27 @@ public:
         return false;
     }
 
+    void set_owner(const Obj& obj, CollectionParent::Index index) override
+    {
+        m_obj_mem = obj;
+        m_parent = &m_obj_mem;
+        m_index = index;
+        if (obj) {
+            m_alloc = &obj.get_alloc();
+        }
+    }
+
+    void set_owner(std::unique_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        m_obj_mem = parent->get_object();
+        m_col_parent = std::move(parent);
+        m_parent = m_col_parent.get();
+        m_index = index;
+        if (m_obj_mem) {
+            m_alloc = &m_obj_mem.get_alloc();
+        }
+    }
+
     using Interface::get_owner_key;
     using Interface::get_table;
     using Interface::get_target_table;
@@ -549,18 +577,10 @@ protected:
         }
     }
 
-    CollectionBaseImpl(std::unique_ptr<CollectionParent> parent, CollectionParent::Index index,
-                       ColKey col_key) noexcept
-        : m_obj_mem(parent->get_object())
-        , m_col_parent(std::move(parent))
-        , m_parent(m_col_parent.get())
-        , m_index(index)
-        , m_col_key(col_key)
+    CollectionBaseImpl(ColKey col_key) noexcept
+        : m_col_key(col_key)
         , m_nullable(col_key.is_nullable())
     {
-        if (m_obj_mem) {
-            m_alloc = &m_obj_mem.get_alloc();
-        }
     }
 
     CollectionBaseImpl& operator=(const CollectionBaseImpl& other)
