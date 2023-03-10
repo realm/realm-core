@@ -1,11 +1,9 @@
-# NEXT RELEASE
+# 13.7.0 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Add logging at the Storage level. (PR [#6339](https://github.com/realm/realm-core/pull/6339))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
 
 ### Breaking changes
