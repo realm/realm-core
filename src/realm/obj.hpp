@@ -38,6 +38,7 @@ class CascadeState;
 class LstBase;
 class SetBase;
 class ObjList;
+class CollectionList;
 struct GlobalKey;
 
 template <class>
@@ -52,6 +53,7 @@ using SetPtr = std::unique_ptr<Set<T>>;
 using SetBasePtr = std::unique_ptr<SetBase>;
 using CollectionBasePtr = std::unique_ptr<CollectionBase>;
 using LinkCollectionPtr = std::unique_ptr<ObjList>;
+using CollectionListPtr = std::shared_ptr<CollectionList>;
 
 class LnkLst;
 using LnkLstPtr = std::unique_ptr<LnkLst>;
@@ -112,10 +114,6 @@ public:
     virtual const Obj& get_object() const noexcept = 0;
     virtual ref_type get_collection_ref(Index) const noexcept = 0;
     virtual void set_collection_ref(Index, ref_type ref) = 0;
-    virtual std::unique_ptr<CollectionParent> clone() const
-    {
-        return {};
-    }
 
     // Used when inserting a new link. You will not remove existing links in this process
     void set_backlink(ColKey col_key, ObjLink new_link) const;
@@ -371,7 +369,7 @@ public:
     DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
     Dictionary get_dictionary(StringData col_name) const;
 
-    CollectionList get_collection_list(ColKey col_key) const;
+    CollectionListPtr get_collection_list(ColKey col_key) const;
     CollectionBasePtr get_collection_ptr(ColKey col_key) const;
     CollectionBasePtr get_collection_ptr(StringData col_name) const;
     LinkCollectionPtr get_linkcollection_ptr(ColKey col_key) const;

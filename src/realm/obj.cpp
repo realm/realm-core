@@ -138,7 +138,7 @@ CollectionBasePtr CollectionList::insert_collection(size_t ndx)
     int_keys->insert(ndx, key);
     m_refs.insert(ndx, 0);
     CollectionBasePtr coll = CollectionParent::get_collection_ptr(get_col_key());
-    coll->set_owner(std::move(clone()), key);
+    coll->set_owner(shared_from_this(), key);
     return coll;
 }
 
@@ -159,7 +159,7 @@ CollectionBasePtr CollectionList::insert_collection(StringData key)
         m_refs.insert(it.index(), 0);
     }
     CollectionBasePtr coll = CollectionParent::get_collection_ptr(get_col_key());
-    coll->set_owner(std::move(clone()), key);
+    coll->set_owner(shared_from_this(), key);
     return coll;
 }
 
@@ -180,11 +180,11 @@ CollectionBasePtr CollectionList::get_collection_ptr(size_t ndx) const
         auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
         index = std::string(string_keys->get(ndx));
     }
-    coll->set_owner(std::move(clone()), index);
+    coll->set_owner(const_cast<CollectionList*>(this)->shared_from_this(), index);
     return coll;
 }
 
-CollectionList CollectionList::insert_collection_list(size_t ndx)
+CollectionListPtr CollectionList::insert_collection_list(size_t ndx)
 {
     ensure_created();
     REALM_ASSERT(m_key_type == type_Int);
@@ -198,7 +198,7 @@ CollectionList CollectionList::insert_collection_list(size_t ndx)
     return get_collection_list(ndx);
 }
 
-CollectionList CollectionList::insert_collection_list(StringData key)
+CollectionListPtr CollectionList::insert_collection_list(StringData key)
 {
     ensure_created();
     REALM_ASSERT(m_key_type == type_String);
@@ -216,7 +216,7 @@ CollectionList CollectionList::insert_collection_list(StringData key)
     return get_collection_list(it.index());
 }
 
-CollectionList CollectionList::get_collection_list(size_t ndx) const
+CollectionListPtr CollectionList::get_collection_list(size_t ndx) const
 {
     REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) > m_level);
     Index index;
@@ -233,7 +233,8 @@ CollectionList CollectionList::get_collection_list(size_t ndx) const
         index = std::string(string_keys->get(ndx));
     }
     auto coll_type = get_table()->get_nested_column_type(m_col_key, m_level);
-    return CollectionList{std::move(clone()), m_col_key, index, coll_type};
+    return std::make_shared<CollectionList>(const_cast<CollectionList*>(this)->shared_from_this(), m_col_key, index,
+                                            coll_type);
 }
 
 ref_type CollectionList::get_collection_ref(Index index) const noexcept
@@ -2497,11 +2498,11 @@ Dictionary Obj::get_dictionary(StringData col_name) const
     return get_dictionary(get_column_key(col_name));
 }
 
-CollectionList Obj::get_collection_list(ColKey col_key) const
+CollectionListPtr Obj::get_collection_list(ColKey col_key) const
 {
     REALM_ASSERT(m_table->get_nesting_levels(col_key) > 0);
     auto coll_type = m_table->get_nested_column_type(col_key, 0);
-    return CollectionList(std::make_shared<Obj>(*this), col_key, col_key, coll_type);
+    return std::make_shared<CollectionList>(std::make_shared<Obj>(*this), col_key, col_key, coll_type);
 }
 
 

@@ -152,7 +152,7 @@ public:
         get_key_type();
     }
 
-    void set_owner(std::unique_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
     {
         Base::set_owner(std::move(parent), index);
         get_key_type();
@@ -391,7 +391,7 @@ public:
     {
         return m_source.update_if_needed();
     }
-    BPlusTree<ObjKey>* get_mutable_tree() const
+    BPlusTree<ObjKey>* get_mutable_tree() const final
     {
         // We are faking being an ObjList because the underlying storage is not
         // actually a BPlusTree<ObjKey> for dictionaries it is all mixed values.
@@ -407,7 +407,7 @@ public:
         m_source.set_owner(obj, index);
     }
 
-    void set_owner(std::unique_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
     {
         m_source.set_owner(std::move(parent), index);
     }

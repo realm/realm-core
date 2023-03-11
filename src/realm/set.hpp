@@ -331,7 +331,7 @@ public:
 
     // Overriding members of CollectionBase:
     using CollectionBase::get_owner_key;
-    CollectionBasePtr clone_collection() const
+    CollectionBasePtr clone_collection() const override
     {
         return clone_linkset();
     }
@@ -351,7 +351,7 @@ public:
     ColKey get_col_key() const noexcept final;
 
     // Overriding members of SetBase:
-    SetBasePtr clone() const
+    SetBasePtr clone() const override
     {
         return clone_linkset();
     }
@@ -411,7 +411,7 @@ public:
         m_set.set_owner(obj, index);
     }
 
-    void set_owner(std::unique_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
     {
         m_set.set_owner(std::move(parent), index);
     }

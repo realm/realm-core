@@ -417,7 +417,7 @@ public:
     ColKey get_col_key() const noexcept final;
 
     // Overriding members of LstBase:
-    std::unique_ptr<LstBase> clone() const
+    std::unique_ptr<LstBase> clone() const override
     {
         if (get_obj().is_valid()) {
             return std::make_unique<LnkLst>(get_obj(), get_col_key());
@@ -427,7 +427,7 @@ public:
         }
     }
     // Overriding members of ObjList:
-    LinkCollectionPtr clone_obj_list() const
+    LinkCollectionPtr clone_obj_list() const override
     {
         if (get_obj().is_valid()) {
             return std::make_unique<LnkLst>(get_obj(), get_col_key());
@@ -514,7 +514,7 @@ public:
         m_list.set_owner(obj, index);
     }
 
-    void set_owner(std::unique_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
     {
         m_list.set_owner(std::move(parent), index);
     }

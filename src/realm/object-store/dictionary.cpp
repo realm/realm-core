@@ -112,7 +112,7 @@ public:
     {
         m_dictionary->set_owner(obj, index);
     }
-    void set_owner(std::unique_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
     {
         m_dictionary->set_owner(std::move(parent), index);
     }

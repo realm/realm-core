@@ -121,7 +121,7 @@ public:
     }
 
     virtual void set_owner(const Obj& obj, CollectionParent::Index index) = 0;
-    virtual void set_owner(std::unique_ptr<CollectionParent> parent, CollectionParent::Index index) = 0;
+    virtual void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) = 0;
 
 
     StringData get_property_name() const
@@ -328,7 +328,10 @@ struct AverageHelper<T, std::void_t<ColumnSumType<T>>> {
     }
 };
 
-class CollectionList : public CollectionParent, protected ArrayParent {
+using CollectionListPtr = std::shared_ptr<CollectionList>;
+class CollectionList : public CollectionParent,
+                       protected ArrayParent,
+                       public std::enable_shared_from_this<CollectionList> {
 public:
     CollectionList(std::shared_ptr<CollectionParent> parent, ColKey col_key, Index index, CollectionType coll_type);
     CollectionList(const CollectionList&);
@@ -337,15 +340,15 @@ public:
 
     bool init_from_parent(bool allow_create) const;
 
-    Replication* get_replication() const override
+    Replication* get_replication() const final
     {
         return m_parent->get_replication();
     }
-    size_t get_level() const noexcept
+    size_t get_level() const noexcept final
     {
         return m_level;
     }
-    UpdateStatus update_if_needed_with_status() const override
+    UpdateStatus update_if_needed_with_status() const final
     {
         auto status = m_parent->update_if_needed_with_status();
         switch (status) {
@@ -367,11 +370,11 @@ public:
         }
         REALM_UNREACHABLE();
     }
-    bool update_if_needed() const override
+    bool update_if_needed() const final
     {
         return update_if_needed_with_status() != UpdateStatus::Detached;
     }
-    int_fast64_t bump_content_version() override
+    int_fast64_t bump_content_version() final
     {
         return m_parent->bump_content_version();
     }
@@ -379,7 +382,7 @@ public:
     {
         m_parent->bump_both_versions();
     }
-    TableRef get_table() const noexcept override
+    TableRef get_table() const noexcept final
     {
         return m_parent->get_table();
     }
@@ -387,13 +390,13 @@ public:
     {
         return m_col_key;
     }
-    const Obj& get_object() const noexcept override
+    const Obj& get_object() const noexcept final
     {
         return m_parent->get_object();
     }
 
-    ref_type get_collection_ref(Index index) const noexcept override;
-    void set_collection_ref(Index index, ref_type ref) override;
+    ref_type get_collection_ref(Index index) const noexcept final;
+    void set_collection_ref(Index index, ref_type ref) final;
 
     bool is_empty() const
     {
@@ -408,20 +411,15 @@ public:
     CollectionBasePtr insert_collection(StringData key);
     CollectionBasePtr get_collection_ptr(size_t ndx) const;
 
-    CollectionList insert_collection_list(size_t ndx);
-    CollectionList insert_collection_list(StringData key);
-    CollectionList get_collection_list(size_t ndx) const;
+    CollectionListPtr insert_collection_list(size_t ndx);
+    CollectionListPtr insert_collection_list(StringData key);
+    CollectionListPtr get_collection_list(size_t ndx) const;
 
     void remove(size_t ndx);     // TODO
     void remove(StringData key); // TODO
 
-    ref_type get_child_ref(size_t child_ndx) const noexcept override;
-    void update_child_ref(size_t child_ndx, ref_type new_ref) override;
-
-    std::unique_ptr<CollectionParent> clone() const override
-    {
-        return std::move(std::make_unique<CollectionList>(*this));
-    }
+    ref_type get_child_ref(size_t child_ndx) const noexcept final;
+    void update_child_ref(size_t child_ndx, ref_type new_ref) final;
 
 private:
     std::shared_ptr<CollectionParent> m_parent;
@@ -524,7 +522,7 @@ public:
         }
     }
 
-    void set_owner(std::unique_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
     {
         m_obj_mem = parent->get_object();
         m_col_parent = std::move(parent);
@@ -541,7 +539,7 @@ public:
 
 protected:
     Obj m_obj_mem;
-    std::unique_ptr<CollectionParent> m_col_parent;
+    std::shared_ptr<CollectionParent> m_col_parent;
     CollectionParent* m_parent = nullptr;
     CollectionParent::Index m_index;
     Allocator* m_alloc = nullptr;
@@ -556,7 +554,7 @@ protected:
     CollectionBaseImpl() = default;
     CollectionBaseImpl(const CollectionBaseImpl& other)
         : m_obj_mem(other.m_obj_mem)
-        , m_col_parent(other.m_col_parent ? std::move(other.m_col_parent->clone()) : nullptr)
+        , m_col_parent(other.m_col_parent)
         , m_parent(m_col_parent ? m_col_parent.get() : &m_obj_mem)
         , m_index(other.m_index)
         , m_alloc(other.m_alloc)
@@ -587,7 +585,7 @@ protected:
     {
         if (this != &other) {
             m_obj_mem = other.m_obj_mem;
-            m_col_parent = other.m_col_parent ? std::move(other.m_col_parent->clone()) : nullptr;
+            m_col_parent = other.m_col_parent;
             m_parent = m_col_parent ? m_col_parent.get() : &m_obj_mem;
             m_alloc = other.m_alloc;
             m_index = other.m_index;
