@@ -5,8 +5,9 @@
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed a crash when querying a mixed property with a string operator (contains/like/beginswith/endswith) or with case insensitivity. ([6376](https://github.com/realm/realm-core/issues/6376) since introduction of Mixed)
+* Querying for equality of a string on a mixed property was returning case insensitive matches. ([6376](https://github.com/realm/realm-core/issues/6376) since introduction of Mixed)
+* Adding an index to a Mixed property on a non-empty table would crash with an assertion. ([6376](https://github.com/realm/realm-core/issues/6376) since introduction of Mixed)
 
 ### Breaking changes
 * None.
@@ -17,7 +18,11 @@
 -----------
 
 ### Internals
-* None.
+* Performance improvement for the following queries ([6376](https://github.com/realm/realm-core/issues/6376)):
+    * Reduced constant factor and memory use in Query::count() on simple equality queries for string/int/UUID/ObjectID when using an index. This is due to using `StringIndex::find_all_no_copy` instead of copying out all the result object keys into a buffer.
+    * Significant improvement on Timestamp equality queries when using an index.
+    * Moderate improvement on Bool equality queries when using an index.
+    * Moderate improvement on Mixed case insensitive equality queries.
 
 ----------------------------------------------
 
