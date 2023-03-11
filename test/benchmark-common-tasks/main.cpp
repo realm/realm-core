@@ -440,8 +440,12 @@ struct BenchmarkWithType : Benchmark {
     BenchmarkWithType()
         : Benchmark()
     {
+        set_name_with_prefix("QueryEqual");
+    }
+    void set_name_with_prefix(std::string_view prefix)
+    {
         benchmark_name =
-            util::format("QueryEqual<%1><%2><%3>", get_data_type_name(Type::data_type),
+            util::format("%1<%2><%3><%4>", prefix, get_data_type_name(Type::data_type),
                          Type::is_nullable ? "Nullable" : "NonNullable", Type::is_indexed ? "Indexed" : "NonIndexed");
     }
     void before_all(DBRef group)
@@ -451,7 +455,7 @@ struct BenchmarkWithType : Benchmark {
         TableRef t = tr.add_table(name());
         m_col = t->add_column(Type::data_type, name(), Type::is_nullable);
         Random r;
-        for (size_t i = 0; i < BASE_SIZE; ++i) {
+        for (size_t i = 0; i < BASE_SIZE / 2; ++i) {
             int64_t randomness = r.draw_int<int64_t>(0, 1000000);
             auto value = gen.convert_for_test<underlying_type>(randomness);
             // a hand full of duplicates
@@ -492,6 +496,34 @@ struct BenchmarkWithType : Benchmark {
     }
 };
 
+template <typename Type>
+struct BenchmarkMixedCaseInsensitiveEqual : public BenchmarkWithType<Type> {
+    using Base = BenchmarkWithType<Type>;
+    using underlying_type = typename Type::underlying_type;
+    BenchmarkMixedCaseInsensitiveEqual<Type>()
+        : BenchmarkWithType<Type>()
+    {
+        BenchmarkWithType<Type>::set_name_with_prefix("QueryInsensitiveEqual");
+    }
+
+    void operator()(DBRef)
+    {
+        constexpr bool insensitive_matching = false;
+        for (Mixed needle : Base::needles) {
+            if constexpr (std::is_same_v<underlying_type, Mixed>) {
+                TableView results =
+                    Base::m_table->where().equal(Base::m_col, needle, insensitive_matching).find_all();
+                static_cast<void>(results);
+            }
+            else {
+                TableView results = Base::m_table->where()
+                                        .equal(Base::m_col, needle.get<underlying_type>(), insensitive_matching)
+                                        .find_all();
+                static_cast<void>(results);
+            }
+        }
+    }
+};
 
 struct BenchmarkWithTimestamps : Benchmark {
     std::multiset<Timestamp> values;
@@ -2016,6 +2048,10 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkWithType<Prop<Timestamp>>);
     BENCH(BenchmarkWithType<Indexed<Bool>>);
     BENCH(BenchmarkWithType<Prop<Bool>>);
+    BENCH(BenchmarkMixedCaseInsensitiveEqual<Prop<Mixed>>);
+    BENCH(BenchmarkMixedCaseInsensitiveEqual<Indexed<Mixed>>);
+    BENCH(BenchmarkMixedCaseInsensitiveEqual<Prop<String>>);
+    BENCH(BenchmarkMixedCaseInsensitiveEqual<Indexed<String>>);
 
     BENCH(BenchmarkQueryTimestampGreaterOverLinks);
     BENCH(BenchmarkQueryTimestampGreater);

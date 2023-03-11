@@ -1583,6 +1583,64 @@ protected:
     }
 };
 
+template <>
+class MixedNode<EqualIns> : public MixedNodeBase {
+public:
+    MixedNode(Mixed v, ColKey column)
+        : MixedNodeBase(v, column)
+    {
+    }
+    MixedNode(const MixedNode<EqualIns>& other)
+        : MixedNodeBase(other)
+        , m_index_evaluator(other.m_index_evaluator)
+    {
+    }
+    void init(bool will_query_ranges) override;
+
+    size_t find_first_local(size_t start, size_t end) override;
+
+    void cluster_changed() override
+    {
+        // If we use searchindex, we do not need further access to clusters
+        if (!has_search_index()) {
+            MixedNodeBase::cluster_changed();
+        }
+    }
+
+    void table_changed() override
+    {
+        const bool has_index =
+            m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General;
+        m_index_evaluator = has_index ? std::make_optional(IndexEvaluator{}) : std::nullopt;
+    }
+
+    bool has_search_index() const override
+    {
+        return bool(m_index_evaluator);
+    }
+
+    virtual std::string describe_condition() const override
+    {
+        return EqualIns::description();
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new MixedNode<EqualIns>(*this));
+    }
+
+protected:
+    std::string m_ucase;
+    std::string m_lcase;
+    std::optional<IndexEvaluator> m_index_evaluator;
+    std::vector<ObjKey> m_index_matches;
+
+    const IndexEvaluator* index_based_keys() override
+    {
+        return m_index_evaluator ? &(*m_index_evaluator) : nullptr;
+    }
+};
+
 class StringNodeBase : public ParentNode {
 public:
     using TConditionValue = StringData;

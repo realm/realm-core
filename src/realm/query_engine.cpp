@@ -200,6 +200,81 @@ size_t MixedNode<Equal>::find_first_local(size_t start, size_t end)
     return not_found;
 }
 
+void MixedNode<EqualIns>::init(bool will_query_ranges)
+{
+    MixedNodeBase::init(will_query_ranges);
+
+    StringData val_as_string;
+    if (m_value.is_type(type_String)) {
+        val_as_string = m_value.get<StringData>();
+    }
+    else if (m_value.is_type(type_Binary)) {
+        BinaryData bin = m_value.get<BinaryData>();
+        val_as_string = StringData(bin.data(), bin.size());
+    }
+    REALM_ASSERT(bool(m_index_evaluator) ==
+                 (m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General));
+    if (m_index_evaluator) {
+        auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+        if (!val_as_string.is_null()) {
+            m_index_matches.clear();
+            constexpr bool case_insensitive = true;
+            index->find_all(m_index_matches, val_as_string, case_insensitive);
+            m_index_evaluator->init(&m_index_matches);
+        }
+        else {
+            // search for non string can use exact match
+            m_index_evaluator->init(index, m_value);
+        }
+        m_dT = 0.0;
+    }
+    else {
+        m_dT = 10.0;
+        if (!val_as_string.is_null()) {
+            auto upper = case_map(val_as_string, true);
+            auto lower = case_map(val_as_string, false);
+            if (!upper || !lower) {
+                throw query_parser::InvalidQueryError(util::format("Malformed UTF-8: %1", val_as_string));
+            }
+            else {
+                m_ucase = std::move(*upper);
+                m_lcase = std::move(*lower);
+            }
+        }
+    }
+}
+
+size_t MixedNode<EqualIns>::find_first_local(size_t start, size_t end)
+{
+    REALM_ASSERT(m_table);
+
+    EqualIns cond;
+    if (m_value.is_type(type_String)) {
+        for (size_t i = start; i < end; i++) {
+            QueryValue val(m_leaf_ptr->get(i));
+            StringData val_as_str;
+            if (val.is_type(type_String)) {
+                val_as_str = val.get<StringData>();
+            }
+            else if (val.is_type(type_Binary)) {
+                val_as_str = StringData(val.get<BinaryData>().data(), val.get<BinaryData>().size());
+            }
+            if (!val_as_str.is_null() &&
+                cond(m_value.get<StringData>(), m_ucase.c_str(), m_lcase.c_str(), val_as_str))
+                return i;
+        }
+    }
+    else {
+        for (size_t i = start; i < end; i++) {
+            QueryValue val(m_leaf_ptr->get(i));
+            if (cond(val, m_value))
+                return i;
+        }
+    }
+
+    return not_found;
+}
+
 void StringNodeEqualBase::init(bool will_query_ranges)
 {
     StringNodeBase::init(will_query_ranges);
