@@ -140,7 +140,7 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
                                       Query(table).equal(table->get_column_key("realm_id"), StringData{partition2}));
             auto subs = std::move(mut_subs).commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
-            
+
             wait_for_advance(*flx_realm); // wait for subscription bootstrap
 
             auto flx_table = flx_realm->read_group().get_table("class_Dog");
