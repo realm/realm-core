@@ -98,13 +98,12 @@ struct std::hash<chunk> {
 
 struct encoding_entry {
     uint32_t expansion;
-    uint16_t symbol;
-    bool valid = false;
+    uint16_t symbol = 0; // unused symbol 0.
 };
 
 int hash(uint32_t expansion)
 {
-    // range must match size of encoding table
+    // range of return value must match size of encoding table
     uint32_t tmp = (expansion >> 16) + 3;
     tmp *= expansion + 7;
     return (tmp ^ (tmp >> 16)) & 0xFFFF;
@@ -116,75 +115,67 @@ public:
     std::unordered_map<chunk, int> map;
     std::vector<encoding_entry> encoding_table;
     std::vector<uint32_t> decoding_table;
+    bool separators[256];
     string_compressor()
     {
         encoding_table.resize(65536);
+        for (int j = 0; j < 0x20; ++j)
+            separators[j] = true;
+        for (int j = 0x20; j < 0x100; ++j)
+            separators[j] = false;
+        separators['/'] = true;
+        separators[':'] = true;
+        separators['?'] = true;
+        separators['<'] = true;
+        separators['>'] = true;
+        separators['['] = true;
+        separators[']'] = true;
+        separators['{'] = true;
+        separators['}'] = true;
     }
-    int compress_symbols(uint16_t symbols[], int size)
+    int compress_symbols(uint16_t symbols[], int size, int max_runs, int breakout_limit = 1)
     {
-        // std::cout << "compress ";
-        // for (int i = 0; i < size; ++i)
-        //     std::cout << symbols[i] << " ";
-        for (int runs = 0; runs < 5; ++runs) {
-            uint16_t* from = symbols;
+        for (int runs = 0; runs < max_runs; ++runs) {
             uint16_t* to = symbols;
             int p;
-            for (p = 0; p < size - 1; p += 2) {
+            bool table_full = decoding_table.size() >= 65536 - 256;
+            uint16_t* from = symbols;
+            for (p = 0; p < size - 1;) {
+                from = symbols + p;
                 uint32_t pair = (from[0] << 16) | from[1];
                 auto index = hash(pair);
                 auto& e = encoding_table[index];
-                if (e.valid && e.expansion == pair) {
-                    // existing matching entry
+                if (e.symbol && e.expansion == pair) {
+                    // existing matching entry -> compress
                     *to++ = e.symbol;
+                    p += 2;
                 }
-                else if (e.valid || decoding_table.size() >= 65536 - 256) {
-                    // existing conflicting entry or at capacity
+                else if (e.symbol || table_full) {
+                    // existing conflicting entry or at capacity -> don't compress
                     *to++ = from[0];
-                    *to++ = from[1];
+                    p++;
+                    // trying to stay aligned yields slightly worse results, so disable for now:
+                    // *to++ = from[1];
+                    // p++;
                 }
                 else {
-                    // no entry yet, creating new one
+                    // no matching entry yet, create new one -> compress
                     e.symbol = decoding_table.size() + 256;
                     decoding_table.push_back(pair);
+                    table_full = decoding_table.size() >= 65536 - 256;
                     e.expansion = pair;
-                    e.valid = true;
                     *to++ = e.symbol;
+                    p += 2;
                 }
-
-                /*
-
-                                    auto it = encoding_table.find(pair);
-                                if (it == encoding_table.end()) {
-                                    bool learning = encoding_table.size() < 65535 - 256;
-                                    if (learning) {
-                                        uint16_t symbol = encoding_table.size() + 256;
-                                        encoding_table[pair] = symbol;
-                                        decoding_table.push_back(pair);
-                                        *to++ = symbol;
-                                    }
-                                    else {
-                                        // retain old symbols
-                                        *to++ = from[0];
-                                        *to++ = from[1];
-                                    }
-                                }
-                                else {
-                                    *to++ = it->second;
-                                }
-                                */
-                from += 2;
             }
             if (p < size) {
                 *to++ = *from;
             }
-            *to = 0;
             size = to - symbols;
+            if (size <= breakout_limit)
+                break; // early out, gonna use at least one chunk anyway
             if (from == to)
-                break; // early out, no change
-            //    std::cout << std::endl << " ---> ";
-            //    for (int i = 0; i < size; ++i)
-            //        std::cout << symbols[i] << " ";
-            //    std::cout << std::endl;
+                break; // early out, no symbols were compressed on last run
         }
         return size;
     }
@@ -223,18 +214,35 @@ public:
             assert((0xFF & *first++) == *checked++);
         }
     }
-    int handle(const char* _first, const char* _past)
+    int compress(uint16_t symbols[], const char* first, const char* past)
     {
         // expand into 16 bit symbols:
-        int size = _past - _first;
+        int size = past - first;
         total_chars += size;
         assert(size < 8180);
-        uint16_t symbols[8192];
         uint16_t* to = symbols;
-        for (const char* p = _first; p < _past; ++p)
-            *to++ = *p & 0xFF;
-        *to++ = 0;
-        size = compress_symbols(symbols, size);
+        int out_size = 0;
+        for (const char* p = first; p < past;) {
+            // form group from !seps followed by seps
+            uint16_t* group_start = to;
+            while (p < past && !separators[0xFFUL & *p])
+                *to++ = *p++ & 0xFF;
+            while (p < past && separators[0xFFUL & *p])
+                *to++ = *p++ & 0xFF;
+            int group_size = to - group_start;
+            // compress the group
+            group_size = compress_symbols(group_start, group_size, 5);
+            to = group_start + group_size;
+            out_size += group_size;
+        }
+        // compress all groups together
+        size = compress_symbols(symbols, out_size, 4, 10);
+        return size;
+    }
+    int handle(const char* _first, const char* _past)
+    {
+        uint16_t symbols[8192];
+        auto size = compress(symbols, _first, _past);
         // decompress_and_verify(symbols, size, _first, _past);
         uint16_t* first = symbols;
         uint16_t* past = symbols + size;
@@ -426,7 +434,7 @@ int main(int argc, char* argv[])
     void* file_start = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
     assert(file_start != (void*)-1);
     long step_size = 5000000;
-    int num_work_packages = 12;
+    int num_work_packages = 8;
     concurrent_queue<results*> to_reader;
     for (int i = 0; i < num_work_packages; ++i)
         to_reader.put(new results(step_size, max_fields));
@@ -554,7 +562,6 @@ int main(int argc, char* argv[])
 
     std::thread compressor([&]() {
         std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
-        start = std::chrono::high_resolution_clock::now();
         while (1) {
             std::shared_ptr<driver_workload> drivers;
             try {
@@ -564,6 +571,7 @@ int main(int argc, char* argv[])
                 to_writer.close();
                 break;
             }
+            start = std::chrono::high_resolution_clock::now();
             std::vector<std::unique_ptr<std::thread>> threads;
             for (int j = 0; j < 105; j++) {
                 if (compressible[j] == 's') {
@@ -580,7 +588,6 @@ int main(int argc, char* argv[])
             end = std::chrono::high_resolution_clock::now();
             auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
             std::cout << "   ...compressed in " << ms.count() << " millisecs" << std::endl;
-            start = end;
         }
     });
     // now populate dataset
@@ -588,7 +595,7 @@ int main(int argc, char* argv[])
         std::cout << std::endl << "Ingesting data.... " << std::endl;
         std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
         long num_line = 0;
-        for (int k = 0; k < 2; k++) {
+        for (int k = 0; k < 4; k++) {
             auto drivers = std::make_shared<driver_workload>(105);
             for (int j = 0; j < 105; j++) {
                 if (compressible[j] == 's') {
@@ -639,9 +646,8 @@ int main(int argc, char* argv[])
         to_compressor.close();
         compressor.join();
         // destroy drivers...
-        {
+        for (int k = 0; k < 4; k++) {
             auto p = free_drivers.get();
-            p = free_drivers.get();
         }
         uint64_t from_size = 0;
         uint64_t to_size = 0;
