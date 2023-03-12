@@ -114,14 +114,15 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
         auto flx_realm = Realm::get_shared_realm(flx_config);
         auto table = flx_realm->read_group().get_table("class_Dog");
 
-        CHECK(!wait_for_download(*flx_realm));
+        wait_for_advance(*flx_realm); // wait for initial bootstrap
         {
-            auto mut_subs = flx_realm->get_latest_subscription_set().make_mutable_copy();
+            auto mut_subs = flx_realm->get_active_subscription_set().make_mutable_copy();
             mut_subs.insert_or_assign("flx_migrated_Dog_1",
                                       Query(table).equal(table->get_column_key("realm_id"), StringData{partition1}));
             auto subs = std::move(mut_subs).commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
-            wait_for_advance(*flx_realm);
+
+            wait_for_advance(*flx_realm); // wait for subscription bootstrap
 
             auto flx_table = flx_realm->read_group().get_table("class_Dog");
             auto partition_col = table->get_column_key("realm_id");
@@ -139,7 +140,8 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
                                       Query(table).equal(table->get_column_key("realm_id"), StringData{partition2}));
             auto subs = std::move(mut_subs).commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
-            wait_for_advance(*flx_realm);
+            
+            wait_for_advance(*flx_realm); // wait for subscription bootstrap
 
             auto flx_table = flx_realm->read_group().get_table("class_Dog");
             auto partition_col = table->get_column_key("realm_id");
