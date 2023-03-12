@@ -80,7 +80,7 @@ static std::vector<ObjectId> fill_test_data(SyncTestFile& config, std::string pa
 
 TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
     std::shared_ptr<util::Logger> logger_ptr =
-        std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+        std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
     const std::string base_url = get_base_url();
     const std::string partition1 = "migration-test";
