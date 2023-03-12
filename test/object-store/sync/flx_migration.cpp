@@ -143,8 +143,8 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
             auto subs = flx_realm->get_latest_subscription_set();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 
-            wait_for_upload(*flx_realm);
-            wait_for_download(*flx_realm);
+            CHECK(!wait_for_upload(*flx_realm));
+            CHECK(!wait_for_download(*flx_realm));
 
             check_data(flx_realm, false, false);
         }
@@ -158,8 +158,9 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
             auto subs = std::move(mut_subs).commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 
-            wait_for_upload(*flx_realm);
-            wait_for_download(*flx_realm);
+            CHECK(!wait_for_upload(*flx_realm));
+            CHECK(!wait_for_download(*flx_realm));
+            wait_for_advance(*flx_realm);
 
             check_data(flx_realm, true, false);
         }
@@ -173,8 +174,9 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
             auto subs = std::move(mut_subs).commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 
-            wait_for_upload(*flx_realm);
-            wait_for_download(*flx_realm);
+            CHECK(!wait_for_upload(*flx_realm));
+            CHECK(!wait_for_download(*flx_realm));
+            wait_for_advance(*flx_realm);
 
             check_data(flx_realm, true, true);
         }
