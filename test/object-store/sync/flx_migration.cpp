@@ -94,14 +94,41 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
     auto objects1 = fill_test_data(config1, partition1, 1, 5);
     auto objects2 = fill_test_data(config2, partition2, 6, 5);
 
+    auto check_data = [&](SharedRealm& realm, bool check_set1, bool check_set2) {
+        auto table = realm->read_group().get_table("class_Dog");
+        auto partition_col = table->get_column_key("realm_id");
+        auto breed_col = table->get_column_key("breed");
+
+        size_t table_size = [check_set1, check_set2] {
+            if (check_set1 && check_set2)
+                return 10;
+            if (check_set1 || check_set2)
+                return 5;
+            return 0;
+        }();
+
+        REQUIRE(table->size() == table_size);
+        REQUIRE(bool(table->find_first(partition_col, StringData(partition1))) == check_set1);
+        REQUIRE(bool(table->find_first(breed_col, StringData("breed-5"))) == check_set1);
+        REQUIRE(bool(table->find_first(partition_col, StringData(partition2))) == check_set2);
+        REQUIRE(bool(table->find_first(breed_col, StringData("breed-6"))) == check_set2);
+    };
+
     // Wait for the two partition sets to upload
     {
         auto realm1 = Realm::get_shared_realm(config1);
+
         CHECK(!wait_for_upload(*realm1));
         CHECK(!wait_for_download(*realm1));
+
+        check_data(realm1, true, false);
+
         auto realm2 = Realm::get_shared_realm(config2);
+
         CHECK(!wait_for_upload(*realm2));
         CHECK(!wait_for_download(*realm2));
+
+        check_data(realm2, false, true);
     }
 
     // Migrate to FLX
@@ -112,56 +139,44 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
                                 SyncConfig::FLXSyncEnabled{});
 
         auto flx_realm = Realm::get_shared_realm(flx_config);
-
-        wait_for_upload(*flx_realm);
-        wait_for_download(*flx_realm);
-        wait_for_advance(*flx_realm); // wait for initial bootstrap
         {
-            auto mut_subs = flx_realm->get_latest_subscription_set().make_mutable_copy();
-            auto flx_table = flx_realm->read_group().get_table("class_Dog");
-            auto partition_col = flx_table->get_column_key("realm_id");
-            auto breed_col = flx_table->get_column_key("breed");
-
-            REQUIRE(flx_table->size() == 0);
-            REQUIRE_FALSE(flx_table->find_first(partition_col, StringData(partition1)));
-            REQUIRE_FALSE(flx_table->find_first(breed_col, StringData("breed-5")));
-
-            mut_subs.insert_or_assign("flx_migrated_Dog_1",
-                                      Query(flx_table).equal(partition_col, StringData{partition1}));
-            auto subs = std::move(mut_subs).commit();
+            auto subs = flx_realm->get_latest_subscription_set();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 
             wait_for_upload(*flx_realm);
             wait_for_download(*flx_realm);
-            wait_for_advance(*flx_realm); // wait for subscription bootstrap
 
-            REQUIRE(flx_table->size() == 5);
-            REQUIRE(flx_table->find_first(partition_col, StringData(partition1)));
-            REQUIRE(flx_table->find_first(breed_col, StringData("breed-5")));
-            REQUIRE_FALSE(flx_table->find_first(partition_col, StringData(partition2)));
-            REQUIRE_FALSE(flx_table->find_first(breed_col, StringData("breed-6")));
+            check_data(flx_realm, false, false);
         }
 
         {
-            auto mut_subs = flx_realm->get_latest_subscription_set().make_mutable_copy();
             auto flx_table = flx_realm->read_group().get_table("class_Dog");
-            auto partition_col = flx_table->get_column_key("realm_id");
-            auto breed_col = flx_table->get_column_key("breed");
-
-            mut_subs.insert_or_assign("flx_migrated_Dog_2",
-                                      Query(flx_table).equal(partition_col, StringData{partition2}));
+            auto mut_subs = flx_realm->get_latest_subscription_set().make_mutable_copy();
+            mut_subs.insert_or_assign(
+                "flx_migrated_Dog_1",
+                Query(flx_table).equal(flx_table->get_column_key("realm_id"), StringData{partition1}));
             auto subs = std::move(mut_subs).commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 
             wait_for_upload(*flx_realm);
             wait_for_download(*flx_realm);
-            wait_for_advance(*flx_realm); // wait for subscription bootstrap
 
-            REQUIRE(flx_table->size() == 10);
-            REQUIRE(flx_table->find_first(partition_col, StringData(partition1)));
-            REQUIRE(flx_table->find_first(breed_col, StringData("breed-5")));
-            REQUIRE(flx_table->find_first(partition_col, StringData(partition2)));
-            REQUIRE(flx_table->find_first(breed_col, StringData("breed-6")));
+            check_data(flx_realm, true, false);
+        }
+
+        {
+            auto flx_table = flx_realm->read_group().get_table("class_Dog");
+            auto mut_subs = flx_realm->get_latest_subscription_set().make_mutable_copy();
+            mut_subs.insert_or_assign(
+                "flx_migrated_Dog_2",
+                Query(flx_table).equal(flx_table->get_column_key("realm_id"), StringData{partition2}));
+            auto subs = std::move(mut_subs).commit();
+            subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+
+            wait_for_upload(*flx_realm);
+            wait_for_download(*flx_realm);
+
+            check_data(flx_realm, true, true);
         }
     }
 
@@ -172,17 +187,10 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
         SyncTestFile pbs_config(session.app(), partition1, server_app_config.schema);
         auto pbs_realm = Realm::get_shared_realm(pbs_config);
 
-        CHECK(!wait_for_download(*pbs_realm));
         CHECK(!wait_for_upload(*pbs_realm));
+        CHECK(!wait_for_download(*pbs_realm));
 
-        auto table = pbs_realm->read_group().get_table("class_Dog");
-        auto partition_col = table->get_column_key("realm_id");
-        auto breed_col = table->get_column_key("breed");
-        REQUIRE(table->size() == 5);
-        REQUIRE(table->find_first(partition_col, StringData(partition1)));
-        REQUIRE(table->find_first(breed_col, StringData("breed-5")));
-        REQUIRE_FALSE(table->find_first(partition_col, StringData(partition2)));
-        REQUIRE_FALSE(table->find_first(breed_col, StringData("breed-6")));
+        check_data(pbs_realm, true, false);
     }
 }
 
