@@ -650,20 +650,40 @@ int main(int argc, char* argv[])
             auto p = free_drivers.get();
         }
         uint64_t from_size = 0;
-        uint64_t to_size = 0;
+        uint64_t dict_size = 0;
+        uint64_t symbol_size = 0;
+        uint64_t ref_size = 0;
         for (int i = 0; i < max_fields; ++i) {
             if (compressors[i]) {
-                from_size += compressors[i]->total_chars;
-                to_size += compressors[i]->map.size() * sizeof(chunk);
-                std::cout << "Field " << i << " with " << compressors[i]->map.size() << " chunks ("
-                          << compressors[i]->map.size() * sizeof(chunk) << " bytes) from total "
-                          << compressors[i]->total_chars << " chars"
-                          << " (symbol table: " << compressors[i]->symbol_table_size() << " )" << std::endl;
+                uint64_t col_from_size = compressors[i]->total_chars;
+                // add one byte to each for zero termination:
+                col_from_size += num_line;
+                auto chunks = compressors[i]->map.size();
+                int ref_cost =
+                    chunks >= 32768
+                        ? 32
+                        : (chunks >= 128
+                               ? 16
+                               : (chunks >= 8 ? 8 : (chunks >= 4 ? 4 : (chunks >= 2 ? 2 : (chunks >= 1 ? 1 : 0)))));
+                uint64_t col_ref_size = (ref_cost * num_line) / 8;
+                uint64_t col_dict_size = chunks * sizeof(chunk);
+                uint64_t col_symbol_size = compressors[i]->symbol_table_size() * sizeof(encoding_entry);
+                uint64_t col_total = col_ref_size + col_dict_size + col_symbol_size;
+                std::cout << "Field " << i << " from " << compressors[i]->total_chars << " chars -> " << col_ref_size
+                          << " (refs) + " << col_dict_size << " (dict) + " << col_symbol_size
+                          << " (symbol table) = " << col_total << " or " << (col_total * 100) / col_from_size << " %"
+                          << std::endl;
                 compressors[i].reset();
+                dict_size += col_dict_size;
+                symbol_size += col_symbol_size;
+                ref_size += col_ref_size;
+                from_size += col_from_size;
             }
         }
-        std::cout << "Total effect: from " << from_size << " to " << to_size << " bytes ("
-                  << 100 - (to_size * 100) / from_size << " pct reduction)" << std::endl;
+        std::cout << "Total effect: from " << from_size << " -> " << ref_size << " (refs) + " << dict_size
+                  << " (dict) + " << symbol_size << " (symbol table) = ";
+        auto total = ref_size + dict_size + symbol_size;
+        std::cout << total << " or " << (total * 100) / from_size << " %" << std::endl;
 
         compressors.clear();
         for (int i = 0; i < num_work_packages; ++i)
