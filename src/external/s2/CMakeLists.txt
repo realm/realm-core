@@ -62,15 +62,19 @@ add_library(s2geometry OBJECT
 
 add_library(Realm::external::s2geometry ALIAS s2geometry)
 
-target_compile_options(s2geometry PRIVATE
-    -Wno-macro-redefined
-    -Wno-deprecated-declarations
-    -Wno-unused-local-typedef
-    -Wno-unknown-pragmas
-    -Wno-shorten-64-to-32
-    -Wno-unused-parameter
-    -Wno-undefined-var-template
-    -Wno-missing-prototypes
-    -Wno-unused-const-variable
-    -Wno-unused-function
-)
+# suppress s2 specific warnings (lib is very noisy)
+if (NOT MSVC)
+    set(CMAKE_REQUIRED_QUIET ON)
+    add_target_option_if_supported(s2geometry PRIVATE
+        -Wno-macro-redefined
+        -Wno-deprecated-declarations
+        -Wno-unused-local-typedef
+        -Wno-unknown-pragmas
+        -Wno-shorten-64-to-32
+        -Wno-unused-parameter
+        -Wno-undefined-var-template
+        -Wno-missing-prototypes
+        -Wno-unused-const-variable
+        -Wno-unused-function
+    )
+endif()
