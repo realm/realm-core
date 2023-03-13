@@ -2574,7 +2574,7 @@ class LinksToNode : public LinksToNodeBase {
 public:
     using LinksToNodeBase::LinksToNodeBase;
 
-    virtual std::string describe_condition() const override
+    std::string describe_condition() const override
     {
         return TConditionFunction::description();
     }
