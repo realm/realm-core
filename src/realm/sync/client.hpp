@@ -46,7 +46,11 @@ public:
     /// See run().
     ///
     /// Thread-safe.
-    void stop() noexcept;
+    void shutdown() noexcept;
+
+    /// Forces all connections to close and waits for any pending work on the event
+    /// loop to complete. All sessions must be destroyed before calling shutdown_and_wait.
+    void shutdown_and_wait();
 
     /// \brief Cancel current or next reconnect delay for all servers.
     ///
@@ -350,7 +354,7 @@ public:
     Session(Session&&) noexcept;
 
     /// Create a detached session object (see detach()).
-    Session() noexcept;
+    Session() noexcept = default;
 
     /// Implies detachment. See "Thread safety" section under detach().
     ~Session() noexcept;
@@ -746,11 +750,11 @@ std::ostream& operator<<(std::ostream& os, SyncConfig::ProxyConfig::Type);
 
 // Implementation
 
-class BadServerUrl : public std::exception {
+class BadServerUrl : public Exception {
 public:
-    const char* what() const noexcept override
+    BadServerUrl(std::string_view url)
+        : Exception(ErrorCodes::BadServerUrl, util::format("Unable to parse server URL '%1'", url))
     {
-        return "Bad server URL";
     }
 };
 
@@ -759,8 +763,6 @@ inline Session::Session(Session&& sess) noexcept
 {
     sess.m_impl = nullptr;
 }
-
-inline Session::Session() noexcept {}
 
 inline Session::~Session() noexcept
 {

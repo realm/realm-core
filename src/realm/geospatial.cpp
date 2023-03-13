@@ -59,7 +59,10 @@ Geospatial Geospatial::from_obj(const Obj& obj, ColKey type_col, ColKey coords_c
     }
 
     String geo_type = obj.get<String>(type_col);
-    REALM_ASSERT_EX(type_is_valid(geo_type), geo_type); // FIXME: better error handling
+    if (!type_is_valid(geo_type)) {
+        throw IllegalOperation("The only Geospatial type currently supported is 'point'");
+    }
+
     Lst<double> coords = obj.get_list<double>(coords_col);
     GeoPoint geo;
     if (coords.size() >= 1) {
@@ -104,18 +107,23 @@ void Geospatial::assign_to(Obj& link) const
 {
     REALM_ASSERT(link);
     ColKey type_col = link.get_table()->get_column_key(Geospatial::c_geo_point_type_col_name);
+    if (!type_col) {
+        throw InvalidArgument(ErrorCodes::TypeMismatch,
+                              util::format("Property %1 doesn't exist", c_geo_point_type_col_name));
+    }
     ColKey coords_col = link.get_table()->get_column_key(Geospatial::c_geo_point_coords_col_name);
-    if (!type_col || !coords_col) {
-        throw LogicError(LogicError::illegal_type);
+    if (!coords_col) {
+        throw InvalidArgument(ErrorCodes::TypeMismatch,
+                              util::format("Property %1 doesn't exist", c_geo_point_coords_col_name));
     }
     if (!type_is_valid(get_type())) {
-        throw std::runtime_error("The only Geospatial type currently supported is 'point'");
+        throw IllegalOperation("The only Geospatial type currently supported is 'point'");
     }
     if (m_points.size() > 1) {
-        throw std::runtime_error("Only one Geospatial point is currently supported");
+        throw IllegalOperation("Only one Geospatial point is currently supported");
     }
     if (m_points.size() == 0) {
-        throw std::runtime_error("Geospatial value must have one point");
+        throw InvalidArgument("Geospatial value must have one point");
     }
     link.set(type_col, m_type);
     Lst<double> coords = link.get_list<double>(coords_col);

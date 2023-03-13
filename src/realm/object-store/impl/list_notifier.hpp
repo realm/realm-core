@@ -25,8 +25,8 @@
 
 #include <realm/collection.hpp>
 
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
+// Despite the name, this also supports Set and index-based notifications on Dictionary
 class ListNotifier : public CollectionNotifier {
 public:
     ListNotifier(std::shared_ptr<Realm> realm, CollectionBase const& list, PropertyType type);
@@ -50,7 +50,6 @@ private:
     void release_data() noexcept override;
     bool do_add_required_change_info(TransactionChangeInfo& info) override;
 };
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif // REALM_LIST_NOTIFIER_HPP

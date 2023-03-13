@@ -103,6 +103,30 @@ void SyncSession::become_active()
     }
 }
 
+void SyncSession::restart_session()
+{
+    util::CheckedLockGuard lock(m_state_mutex);
+    // Nothing to do if the sync session is currently paused
+    // It will be resumed when resume() is called
+    if (m_state == State::Paused)
+        return;
+
+    // Go straight to inactive so the progress completion waiters will
+    // continue to wait until the session restarts and completes the
+    // upload/download sync
+    m_state = State::Inactive;
+
+    if (m_session) {
+        m_session.reset();
+    }
+
+    // Create a new session and re-register the completion callbacks
+    // The latest server path will be retrieved from sync_manager when
+    // the new session is created by create_sync_session() in become
+    // active.
+    become_active();
+}
+
 void SyncSession::become_dying(util::CheckedUniqueLock lock)
 {
     REALM_ASSERT(m_state != State::Dying);
@@ -127,12 +151,12 @@ void SyncSession::become_dying(util::CheckedUniqueLock lock)
     m_state_mutex.unlock(lock);
 }
 
-void SyncSession::become_inactive(util::CheckedUniqueLock lock, std::error_code ec)
+void SyncSession::become_inactive(util::CheckedUniqueLock lock, Status status)
 {
     REALM_ASSERT(m_state != State::Inactive);
     m_state = State::Inactive;
 
-    do_become_inactive(std::move(lock), ec);
+    do_become_inactive(std::move(lock), status);
 }
 
 void SyncSession::become_paused(util::CheckedUniqueLock lock)
@@ -147,10 +171,10 @@ void SyncSession::become_paused(util::CheckedUniqueLock lock)
         return;
     }
 
-    do_become_inactive(std::move(lock), {});
+    do_become_inactive(std::move(lock), Status::OK());
 }
 
-void SyncSession::do_become_inactive(util::CheckedUniqueLock lock, std::error_code ec)
+void SyncSession::do_become_inactive(util::CheckedUniqueLock lock, Status status)
 {
     // Manually set the disconnected state. Sync would also do this, but
     // since the underlying SyncSession object already have been destroyed,
@@ -174,12 +198,12 @@ void SyncSession::do_become_inactive(util::CheckedUniqueLock lock, std::error_co
         m_connection_change_notifier.invoke_callbacks(old_state, connection_state());
     }
 
-    if (!ec)
-        ec = make_error_code(util::error::operation_aborted);
+    if (!status.get_std_error_code())
+        status = Status(ErrorCodes::OperationAborted, "Sync session became inactive");
 
     // Inform any queued-up completion handlers that they were cancelled.
     for (auto& [id, callback] : waits)
-        callback.second(ec);
+        callback.second(status);
 }
 
 void SyncSession::become_waiting_for_access_token()
@@ -188,8 +212,8 @@ void SyncSession::become_waiting_for_access_token()
     m_state = State::WaitingForAccessToken;
 }
 
-void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::error_code error_code,
-                                  const std::string& context_message)
+void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status error_code,
+                                  std::string_view context_message)
 {
     // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
     {
@@ -210,8 +234,8 @@ static bool check_for_auth_failure(const app::AppError& error)
 {
     using namespace realm::sync;
     // Auth failure is returned as a 401 (unauthorized) or 403 (forbidden) response
-    if (error.http_status_code) {
-        auto status_code = HTTPStatus(*error.http_status_code);
+    if (error.additional_status_code) {
+        auto status_code = HTTPStatus(*error.additional_status_code);
         if (status_code == HTTPStatus::Unauthorized || status_code == HTTPStatus::Forbidden)
             return true;
     }
@@ -223,8 +247,8 @@ static bool check_for_redirect_response(const app::AppError& error)
 {
     using namespace realm::sync;
     // Check for unhandled 301/308 permanent redirect response
-    if (error.http_status_code) {
-        auto status_code = HTTPStatus(*error.http_status_code);
+    if (error.additional_status_code) {
+        auto status_code = HTTPStatus(*error.additional_status_code);
         if (status_code == HTTPStatus::MovedPermanently || status_code == HTTPStatus::PermanentRedirect)
             return true;
     }
@@ -233,36 +257,37 @@ static bool check_for_redirect_response(const app::AppError& error)
 }
 
 util::UniqueFunction<void(util::Optional<app::AppError>)>
-SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session)
+SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool restart_session)
 {
-    return [session](util::Optional<app::AppError> error) {
+    return [session, restart_session](util::Optional<app::AppError> error) {
         auto session_user = session->user();
         if (!session_user) {
             util::CheckedUniqueLock lock(session->m_state_mutex);
-            session->cancel_pending_waits(std::move(lock), error ? error->error_code : std::error_code());
+            session->cancel_pending_waits(std::move(lock), error ? error->to_status() : Status::OK());
         }
         else if (error) {
-            if (error->error_code == app::make_client_error_code(app::ClientErrorCode::app_deallocated)) {
+            if (error->code() == ErrorCodes::ClientAppDeallocated) {
                 return; // this response came in after the app shut down, ignore it
             }
-            else if (error->error_code.category() == app::client_error_category()) {
+            else if (ErrorCodes::error_categories(error->code()).test(ErrorCategory::client_error)) {
                 // any other client errors other than app_deallocated are considered fatal because
                 // there was a problem locally before even sending the request to the server
                 // eg. ClientErrorCode::user_not_found, ClientErrorCode::user_not_logged_in,
                 // ClientErrorCode::too_many_redirects
-                session->handle_bad_auth(session_user, error->error_code, error->message);
+                session->handle_bad_auth(session_user, error->to_status(), error->reason());
             }
             else if (check_for_auth_failure(*error)) {
                 // A 401 response on a refresh request means that the token cannot be refreshed and we should not
                 // retry. This can be because an admin has revoked this user's sessions, the user has been disabled,
                 // or the refresh token has expired according to the server's clock.
-                session->handle_bad_auth(session_user, error->error_code, "Unable to refresh the user access token.");
+                session->handle_bad_auth(session_user, error->to_status(),
+                                         "Unable to refresh the user access token.");
             }
             else if (check_for_redirect_response(*error)) {
                 // A 301 or 308 response is an unhandled permanent redirect response (which should not happen) - if
                 // this is received, fail the request with an appropriate error message.
                 // Temporary redirect responses (302, 307) are not supported
-                session->handle_bad_auth(session_user, error->error_code,
+                session->handle_bad_auth(session_user, error->to_status(),
                                          "Unhandled redirect response when trying to reach the server.");
             }
             else {
@@ -285,7 +310,16 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session)
             }
         }
         else {
-            session->update_access_token(session_user->access_token());
+            // If the session needs to be restarted, then restart the session now
+            // The latest access token and server url will be pulled from the sync
+            // manager when the new session is started.
+            if (restart_session) {
+                session->restart_session();
+            }
+            // Otherwise, update the access token and reconnect
+            else {
+                session->update_access_token(session_user->access_token());
+            }
         }
     };
 }
@@ -472,22 +506,12 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
             });
     }
     else { // pbs
-        fresh_sync_session->wait_for_download_completion([=, weak_self = weak_from_this()](std::error_code ec) {
+        fresh_sync_session->wait_for_download_completion([=, weak_self = weak_from_this()](Status s) {
             // Keep the sync session alive while it's downloading, but then close
             // it immediately
             fresh_sync_session->force_close();
             if (auto strong_self = weak_self.lock()) {
-                if (ec == util::error::operation_aborted) {
-                    strong_self->handle_fresh_realm_downloaded(nullptr, {ErrorCodes::OperationAborted, ec.message()},
-                                                               server_requests_action);
-                }
-                else if (ec) {
-                    strong_self->handle_fresh_realm_downloaded(nullptr, {ErrorCodes::RuntimeError, ec.message()},
-                                                               server_requests_action);
-                }
-                else {
-                    strong_self->handle_fresh_realm_downloaded(db, Status::OK(), server_requests_action);
-                }
+                strong_self->handle_fresh_realm_downloaded(db, s, server_requests_action);
             }
         });
     }
@@ -561,7 +585,7 @@ void SyncSession::handle_error(SyncError error)
 {
     enum class NextStateAfterError { none, inactive, error };
     auto next_state = error.is_fatal ? NextStateAfterError::error : NextStateAfterError::none;
-    auto error_code = error.error_code;
+    auto error_code = error.get_system_error();
     util::Optional<ShouldBackup> delete_file;
     bool log_out_user = false;
 
@@ -657,20 +681,27 @@ void SyncSession::handle_error(SyncError error)
                 break;
         }
     }
-    else {
+    else if (error_code.category() == sync::websocket::websocket_error_category()) {
         // The server replies with '401: unauthorized' if the access token is invalid, expired, revoked, or the user
         // is disabled. In this scenario we attempt an automatic token refresh and if that succeeds continue as
         // normal. If the refresh request also fails with 401 then we need to stop retrying and pass along the error;
         // see handle_refresh().
-        if (error_code.category() == sync::websocket::websocket_close_status_category() &&
-            (error_code.value() == ErrorCodes::WebSocket_Unauthorized ||
-             error_code.value() == ErrorCodes::WebSocket_AbnormalClosure ||
-             error_code.value() == ErrorCodes::WebSocket_MovedPermanently)) {
+        bool restart_session = error_code == sync::websocket::WebSocketError::websocket_moved_permanently;
+        if (restart_session || error_code == sync::websocket::WebSocketError::websocket_unauthorized ||
+            error_code == sync::websocket::WebSocketError::websocket_abnormal_closure) {
             if (auto u = user()) {
-                u->refresh_custom_data(handle_refresh(shared_from_this()));
+                u->refresh_custom_data(handle_refresh(shared_from_this(), restart_session));
                 return;
             }
         }
+
+        // Surface a simplified websocket error to the user.
+        auto simplified_error = sync::websocket::get_simplified_websocket_error(
+            static_cast<sync::websocket::WebSocketError>(error_code.value()));
+        std::error_code new_error_code(simplified_error, sync::websocket::websocket_error_category());
+        error = SyncError(new_error_code, error.reason(), error.is_fatal);
+    }
+    else {
         // Unrecognized error code.
         error.is_unrecognized_by_client = true;
     }
@@ -693,15 +724,15 @@ void SyncSession::handle_error(SyncError error)
     switch (next_state) {
         case NextStateAfterError::none:
             if (config(&SyncConfig::cancel_waits_on_nonfatal_error)) {
-                cancel_pending_waits(std::move(lock), error.error_code); // unlocks the mutex
+                cancel_pending_waits(std::move(lock), error.to_status()); // unlocks the mutex
             }
             break;
         case NextStateAfterError::inactive: {
-            become_inactive(std::move(lock), error.error_code);
+            become_inactive(std::move(lock), error.to_status());
             break;
         }
         case NextStateAfterError::error: {
-            cancel_pending_waits(std::move(lock), error.error_code);
+            cancel_pending_waits(std::move(lock), error.to_status());
             break;
         }
     }
@@ -716,7 +747,7 @@ void SyncSession::handle_error(SyncError error)
     }
 }
 
-void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, std::error_code error)
+void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, Status error)
 {
     CompletionCallbacks callbacks;
     std::swap(callbacks, m_completion_callbacks);
@@ -799,7 +830,7 @@ void SyncSession::create_sync_session()
         if (!m_client.decompose_server_url(sync_route, session_config.protocol_envelope,
                                            session_config.server_address, session_config.server_port,
                                            session_config.service_identifier)) {
-            throw sync::BadServerUrl();
+            throw sync::BadServerUrl(sync_route);
         }
         // FIXME: Java needs the fully resolved URL for proxy support, but we also need it before
         // the session is created. How to resolve this?
@@ -1087,7 +1118,7 @@ void SyncSession::initiate_access_token_refresh()
     }
 }
 
-void SyncSession::add_completion_callback(util::UniqueFunction<void(std::error_code)> callback,
+void SyncSession::add_completion_callback(util::UniqueFunction<void(Status)> callback,
                                           _impl::SyncProgressNotifier::NotifierType direction)
 {
     bool is_download = (direction == _impl::SyncProgressNotifier::NotifierType::download);
@@ -1111,18 +1142,19 @@ void SyncSession::add_completion_callback(util::UniqueFunction<void(std::error_c
         util::CheckedUniqueLock lock(self->m_state_mutex);
         auto callback_node = self->m_completion_callbacks.extract(id);
         lock.unlock();
-        if (callback_node)
-            callback_node.mapped().second(ec);
+        if (callback_node) {
+            callback_node.mapped().second(Status(ec, ""));
+        }
     });
 }
 
-void SyncSession::wait_for_upload_completion(util::UniqueFunction<void(std::error_code)>&& callback)
+void SyncSession::wait_for_upload_completion(util::UniqueFunction<void(Status)>&& callback)
 {
     util::CheckedUniqueLock lock(m_state_mutex);
     add_completion_callback(std::move(callback), ProgressDirection::upload);
 }
 
-void SyncSession::wait_for_download_completion(util::UniqueFunction<void(std::error_code)>&& callback)
+void SyncSession::wait_for_download_completion(util::UniqueFunction<void(Status)>&& callback)
 {
     util::CheckedUniqueLock lock(m_state_mutex);
     add_completion_callback(std::move(callback), ProgressDirection::download);

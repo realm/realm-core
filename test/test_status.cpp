@@ -19,6 +19,7 @@
 #include "test.hpp"
 
 #include "realm/status.hpp"
+#include "realm/status_with.hpp"
 
 namespace realm {
 namespace {
@@ -28,7 +29,9 @@ TEST(Status)
     auto ok_status = Status::OK();
     CHECK_EQUAL(ok_status.code(), ErrorCodes::OK);
     CHECK(ok_status.is_ok());
-    CHECK_EQUAL(ok_status.code_string(), ErrorCodes::error_string(ok_status.code()));
+    auto code_string = ErrorCodes::error_string(ok_status.code());
+    CHECK_EQUAL(ok_status.code_string(), code_string);
+    CHECK_EQUAL(ErrorCodes::from_string(code_string), ErrorCodes::OK);
     CHECK(ok_status.reason().empty());
 
     const auto err_status_reason = "runtime error 1";
@@ -44,7 +47,7 @@ TEST(Status)
 
     auto caught_status = Status::OK();
     try {
-        throw ExceptionForStatus(err_status);
+        throw Exception(err_status);
     }
     catch (...) {
         caught_status = exception_to_status();
@@ -65,6 +68,34 @@ TEST(Status)
     }
     CHECK_EQUAL(caught_status, ErrorCodes::UnknownError);
     CHECK_NOT_EQUAL(caught_status.reason().find(exotic_error_reason), std::string::npos);
+}
+
+TEST(StatusWith)
+{
+    auto result = StatusWith<int>(5);
+    CHECK(result.is_ok());
+    CHECK_EQUAL(result.get_value(), 5);
+
+    const char* err_status_reason = "runtime error 1";
+    result = StatusWith<int>(ErrorCodes::RuntimeError, err_status_reason);
+    CHECK_EQUAL(result.get_status().code(), ErrorCodes::RuntimeError);
+    CHECK(!result.is_ok());
+}
+
+TEST(ErrorCodes)
+{
+    auto all_codes = ErrorCodes::get_all_codes();
+    auto all_names = ErrorCodes::get_all_names();
+    for (auto code : all_codes) {
+        auto code_string = ErrorCodes::error_string(code);
+        CHECK_EQUAL(ErrorCodes::from_string(code_string), code);
+    }
+    for (auto name : all_names) {
+        auto code = ErrorCodes::from_string(name);
+        CHECK_EQUAL(ErrorCodes::error_string(code), name);
+    }
+    CHECK_EQUAL(ErrorCodes::from_string("InvalidDictionary"), ErrorCodes::UnknownError);
+    CHECK_EQUAL(ErrorCodes::from_string("Zzzzz"), ErrorCodes::UnknownError);
 }
 
 } // namespace

@@ -24,7 +24,6 @@
 #include <string>
 
 #include "realm/error_codes.hpp"
-#include "realm/string_data.hpp"
 #include "realm/util/bind_ptr.hpp"
 #include "realm/util/features.h"
 
@@ -38,11 +37,27 @@ public:
     static inline Status OK();
 
     /*
-     * You can construct a Status from strings, C strings, and StringData's.
+     * You can construct a Status from anything that can construct a std::string_view.
      */
-    Status(ErrorCodes::Error code, StringData reason);
-    Status(ErrorCodes::Error code, const std::string& reason);
-    Status(ErrorCodes::Error code, const char* reason);
+    template <typename Reason, std::enable_if_t<std::is_constructible_v<std::string_view, Reason>, int> = 0>
+    Status(ErrorCodes::Error code, Reason&& reason)
+        : m_error(ErrorInfo::create(code, std::string_view{reason}))
+    {
+    }
+
+    template <typename Reason, std::enable_if_t<std::is_constructible_v<std::string_view, Reason>, int> = 0>
+    Status(std::error_code code, Reason&& reason)
+    {
+        if (code) {
+            m_error = ErrorInfo::create(ErrorCodes::SystemError, std::string_view{reason});
+            m_error->m_std_error_code = code;
+        }
+    }
+
+    std::error_code get_std_error_code() const
+    {
+        return m_error ? m_error->m_std_error_code : std::error_code{};
+    }
 
     /*
      * Copying a Status is just copying an intrusive pointer - i.e. very cheap. Moving them is similarly cheap.
@@ -56,7 +71,7 @@ public:
     inline bool is_ok() const noexcept;
     inline const std::string& reason() const noexcept;
     inline ErrorCodes::Error code() const noexcept;
-    inline StringData code_string() const noexcept;
+    inline std::string_view code_string() const noexcept;
 
     /*
      * This class is marked nodiscard so that we always handle errors. If there is a place where we need
@@ -65,14 +80,23 @@ public:
     void ignore() const noexcept {}
 
 private:
+    friend struct SystemError;
+    void set_std_error_code(std::error_code code)
+    {
+        m_error->m_std_error_code = code;
+    }
+
     Status() = default;
 
     struct ErrorInfo {
         mutable std::atomic<uint32_t> m_refs;
         const ErrorCodes::Error m_code;
         const std::string m_reason;
+        // The addition of this system error code may be temporary if we ever get all use of
+        // std::error_code migrated to the unified exception system
+        std::error_code m_std_error_code;
 
-        static util::bind_ptr<ErrorInfo> create(ErrorCodes::Error code, StringData reason);
+        static util::bind_ptr<ErrorInfo> create(ErrorCodes::Error code, std::string_view reason);
 
     protected:
         template <typename>
@@ -91,61 +115,12 @@ private:
         }
 
     private:
-        ErrorInfo(ErrorCodes::Error code, StringData reason);
+        ErrorInfo(ErrorCodes::Error code, std::string_view reason);
     };
 
     util::bind_ptr<ErrorInfo> m_error = {};
 };
 
-class ExceptionForStatus : public std::exception {
-public:
-    const char* what() const noexcept final
-    {
-        return reason().c_str();
-    }
-
-    const Status& to_status() const
-    {
-        return m_status;
-    }
-
-    const std::string& reason() const noexcept
-    {
-        return m_status.reason();
-    }
-
-    ErrorCodes::Error code() const noexcept
-    {
-        return m_status.code();
-    }
-
-    StringData code_string() const noexcept
-    {
-        return m_status.code_string();
-    }
-
-    ExceptionForStatus(ErrorCodes::Error err, StringData str)
-        : m_status(err, str)
-    {
-    }
-
-    explicit ExceptionForStatus(Status status)
-        : m_status(std::move(status))
-    {
-    }
-
-private:
-    Status m_status;
-};
-
-/*
- * This will convert an exception in a catch(...) block into a Status. For ExceptionForStatus's, it returns the
- * status held in the exception directly. Otherwise it returns a status with an UnknownError error code and a
- * reason string holding the exception type and message.
- *
- * Currently this works for exceptions that derive from std::exception or ExceptionForStatus only.
- */
-Status exception_to_status() noexcept;
 
 std::ostream& operator<<(std::ostream& out, const Status& val);
 
@@ -213,7 +188,7 @@ inline ErrorCodes::Error Status::code() const noexcept
     return m_error ? m_error->m_code : ErrorCodes::OK;
 }
 
-inline StringData Status::code_string() const noexcept
+inline std::string_view Status::code_string() const noexcept
 {
     return ErrorCodes::error_string(code());
 }
