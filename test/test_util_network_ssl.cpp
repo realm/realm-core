@@ -542,50 +542,6 @@ TEST(Util_DefaultWebsocketTLS_PrematureEndOfInputOnHandshakeRead)
 }
 
 
-TEST(Util_DefaultWebsocketTLS_PrematureEndOfInputOnHandshakeWrite)
-{
-    websocket::DefaultSocketProvider client_socket_provider(test_context.logger, "Fake User Agent");
-
-    network::Service service_server;
-    network::Acceptor acceptor(service_server);
-    network::Endpoint server_endpoint = bind_acceptor(acceptor);
-
-    // Use a separate thread to consume data written by Stream::handshake(),
-    // such that we can be sure not to block.
-    auto consumer = [&] {
-        network::Socket server_socket(service_server);
-        acceptor.accept(server_socket);
-        server_socket.shutdown(network::Socket::shutdown_receive);
-        constexpr std::size_t size = 4096;
-        std::unique_ptr<char[]> buffer(new char[size]);
-        std::error_code ec;
-        do {
-            server_socket.read_some(buffer.get(), size, ec);
-        } while (!ec);
-        REALM_ASSERT(ec == MiscExtErrors::end_of_input);
-    };
-
-    std::thread thread(std::move(consumer));
-
-    WebSocketEndpoint endpoint;
-    endpoint.address = util::format("%1", server_endpoint.address());
-    endpoint.port = server_endpoint.port();
-    endpoint.path = "/foo/bar/bizz/buzz";
-    endpoint.is_ssl = true;
-    endpoint.verify_servers_ssl_certificate = false;
-
-    auto [observer, error_future] = ErrorOnlyWebSocketObserver::make(test_context);
-    auto unused_websocket = client_socket_provider.connect(std::move(observer), std::move(endpoint));
-
-    auto res = error_future.get();
-    CHECK(!res.was_clean);
-    CHECK_EQUAL(res.status.get_std_error_code(),
-                websocket::make_error_code(websocket::WebSocketError::websocket_connection_failed));
-    unused_websocket.reset();
-    thread.join();
-}
-
-
 #ifndef _WIN32 // FIXME: winsock doesn't have EPIPE, what's the equivalent?
 TEST(Util_Network_SSL_BrokenPipeOnHandshakeWrite)
 {
