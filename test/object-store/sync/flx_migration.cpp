@@ -1,11 +1,11 @@
-#include <catch2/catch_all.hpp>
-#include <chrono>
-
-#include "flx_sync_harness.hpp"
+#include "sync/flx_sync_harness.hpp"
 #include "sync/sync_test_utils.hpp"
 #include "util/baas_admin_api.hpp"
 
-#include "realm/object-store/impl/object_accessor_impl.hpp"
+#include <realm/object-store/impl/object_accessor_impl.hpp>
+
+#include <catch2/catch_all.hpp>
+#include <chrono>
 
 
 #if REALM_ENABLE_SYNC
@@ -25,6 +25,12 @@ static void trigger_server_migration(const AppSession& app_session, bool switch_
     // is complete. migrated with be populated with the 'isMigrated' value from the complete response
     AdminAPISession::MigrationStatus status;
     std::string last_status;
+    std::string op_stg = [switch_to_flx] {
+        if (switch_to_flx)
+            return "PBS->FLX Migration";
+        else
+            return "FLX->PBS Rollback";
+    }();
     const int duration = 90;
     try {
         timed_sleeping_wait_for(
@@ -32,32 +38,29 @@ static void trigger_server_migration(const AppSession& app_session, bool switch_
                 status = app_session.admin_api.get_migration_status(app_session.server_app_id);
                 if (logger && last_status != status.statusMessage) {
                     last_status = status.statusMessage;
-                    logger->debug("PBS->FLX Migration status: %1", last_status);
+                    logger->debug("%1 status: %2", op_stg, last_status);
                 }
-                return status.complete;
+                return status.errorMessage || status.complete;
             },
+            // Query the migration status every 0.5 seconds for up to 90 seconds
             std::chrono::seconds(duration), std::chrono::milliseconds(500));
     }
-    catch (std::runtime_error) {
+    catch (const std::runtime_error&) {
         if (logger)
-            logger->debug("PBS->FLX Migration timed out after %1 seconds", duration);
+            logger->debug("%1 timed out after %2 seconds", op_stg, duration);
         REQUIRE(false);
     }
-    REQUIRE(switch_to_flx == status.isMigrated);
     if (logger) {
-        if (!status.errorMessage.empty())
-            logger->debug("PBS->FLX Migration returned error: %1", status.errorMessage);
+        if (status.errorMessage)
+            logger->debug("%1 returned error: %2", op_stg, *status.errorMessage);
         else
-            logger->debug("PBS->FLX %1 complete", switch_to_flx ? "Migration" : "Rollback");
+            logger->debug("%1 complete", op_stg);
     }
-    REQUIRE(status.errorMessage.empty());
+    REQUIRE(!status.errorMessage);
+    REQUIRE(switch_to_flx == status.isMigrated);
 }
 
-// Populates a FLXSyncTestHarness with the g_large_array_schema with objects that are large enough that
-// they are guaranteed to fill multiple bootstrap download messages. Currently this means generating 5
-// objects each with 1024 array entries of 1024 bytes each.
-//
-// Returns a list of the _id values for the objects created.
+// Add a set of count number of Dog objects to the realm
 static std::vector<ObjectId> fill_test_data(SyncTestFile& config, std::string partition, int start = 1, int count = 5)
 {
     std::vector<ObjectId> ret;
@@ -193,6 +196,15 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
         CHECK(!wait_for_download(*pbs_realm));
 
         check_data(pbs_realm, true, false);
+    }
+    {
+        SyncTestFile pbs_config(session.app(), partition2, server_app_config.schema);
+        auto pbs_realm = Realm::get_shared_realm(pbs_config);
+
+        CHECK(!wait_for_upload(*pbs_realm));
+        CHECK(!wait_for_download(*pbs_realm));
+
+        check_data(pbs_realm, false, true);
     }
 }
 

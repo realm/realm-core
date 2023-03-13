@@ -718,18 +718,29 @@ AdminAPISession::MigrationStatus AdminAPISession::get_migration_status(const std
 {
     MigrationStatus status;
     auto progress_endpoint = apps()[app_id]["sync"]["migration"];
-    auto progress_result = progress_endpoint.get_json();
-    if (progress_result["statusMessage"].is_string() && progress_result["isMigrated"].is_boolean()) {
-        status.statusMessage = progress_result["statusMessage"].get<std::string>();
-        status.errorMessage = progress_result["errorMessage"].get<std::string>();
-        status.isMigrated = progress_result["isMigrated"].get<bool>();
-        status.isCancelable = progress_result["isCancelable"].get<bool>();
-        status.isRevertible = progress_result["isRevertible"].get<bool>();
+    auto progress_result = [&] {
+        try {
+            return progress_endpoint.get_json();
+        }
+        catch (const std::exception& e) {
+            return nlohmann::json({{"errorMessage", e.what()}});
+        }
+    }();
+    auto errorMessage = progress_result["errorMessage"];
+    if (errorMessage.is_string() && !errorMessage.get<std::string>().empty()) {
+        status.errorMessage.emplace(errorMessage.get<std::string>());
+        return status;
     }
-    else {
-        status.errorMessage = "Empty result returned from migration status request";
+    if (!progress_result["statusMessage"].is_string() || !progress_result["isMigrated"].is_boolean()) {
+        status.errorMessage.emplace("Invalid result returned from migration status request");
+        return status;
     }
-    status.complete = status.statusMessage.empty() || !status.errorMessage.empty();
+
+    status.statusMessage = progress_result["statusMessage"].get<std::string>();
+    status.isMigrated = progress_result["isMigrated"].get<bool>();
+    status.isCancelable = progress_result["isCancelable"].get<bool>();
+    status.isRevertible = progress_result["isRevertible"].get<bool>();
+    status.complete = status.statusMessage.empty();
     return status;
 }
 
