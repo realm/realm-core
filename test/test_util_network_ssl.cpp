@@ -464,6 +464,10 @@ public:
 
     void websocket_connected_handler(const std::string&) override
     {
+        if (promise_filled) {
+            return;
+        }
+        promise_filled = true;
         result_promise.set_error({ErrorCodes::RuntimeError, "connected?"});
     }
 
@@ -471,16 +475,25 @@ public:
 
     bool websocket_binary_message_received(util::Span<const char>) override
     {
+        if (promise_filled) {
+            return false;
+        }
+        promise_filled = true;
         result_promise.set_error({ErrorCodes::RuntimeError, "got a binary message"});
         return false;
     }
 
     bool websocket_closed_handler(bool was_clean, Status status) override
     {
+        if (promise_filled) {
+            return false;
+        }
         result_promise.emplace_value(WebSocketErrorResult{was_clean, status});
+        promise_filled = true;
         return false;
     }
 
+    bool promise_filled = false;
     util::Promise<WebSocketErrorResult> result_promise;
     unit_test::TestContext& test_context;
 };
