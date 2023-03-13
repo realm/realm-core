@@ -82,7 +82,7 @@ public:
     Geospatial(GeoCenterSphere centerSphere)
         : m_type(Type::CenterSphere)
         , m_points({centerSphere.center})
-        , m_radius_radians(centerSphere.radius_km / RadiusKm)
+        , m_radius_radians(centerSphere.radius_km / c_radius_km)
     {
     }
 
@@ -104,7 +104,7 @@ public:
 
     std::string get_type() const noexcept
     {
-        return is_valid() ? std::string(types[static_cast<size_t>(m_type)]) : m_invalid_type.value();
+        return is_valid() ? std::string(c_types[static_cast<size_t>(m_type)]) : m_invalid_type.value();
     }
 
     bool is_valid() const noexcept
@@ -134,9 +134,9 @@ public:
 
     constexpr static std::string_view c_geo_point_type_col_name = "type";
     constexpr static std::string_view c_geo_point_coords_col_name = "coordinates";
-    constexpr static std::string_view types[] = {"Point", "Box", "Polygon", "CenterSphere"};
+    constexpr static std::string_view c_types[] = {"Point", "Box", "Polygon", "CenterSphere"};
 
-    static const double RadiusKm;
+    static const double c_radius_km;
 
 private:
     Type m_type;
