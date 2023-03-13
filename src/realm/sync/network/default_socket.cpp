@@ -431,9 +431,20 @@ void DefaultWebSocketImpl::handle_ssl_handshake(std::error_code ec)
     if (ec) {
         REALM_ASSERT(ec != util::error::operation_aborted);
         constexpr bool was_clean = false;
-        websocket_error_and_close_handler(
-            was_clean,
-            Status{make_error_code(WebSocketError::websocket_tls_handshake_failed), ec.message()}); // Throws
+        auto error_code = WebSocketError::websocket_connection_failed;
+        // We only want to treat error codes specific to TLS handshakes as TLS handshake failures.
+        // If we just had a premature-end-of-input or something, we should surface that to the
+        // sync client as a connection failed so we can retry quickly with a backoff.
+#if REALM_HAVE_SECURE_TRANSPORT
+        if (ec.category() == network::secure_transport_error_category) {
+            error_code = WebSocketError::websocket_tls_handshake_failed;
+        }
+#elif REALM_HAVE_OPENSSL
+        if (ec.category() == network::openssl_error_category) {
+            error_code = WebSocketError::websocket_tls_handshake_failed;
+        }
+#endif
+        websocket_error_and_close_handler(was_clean, Status{make_error_code(error_code), ec.message()}); // Throws
         return;
     }
 

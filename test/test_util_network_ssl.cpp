@@ -1,6 +1,8 @@
 #include <thread>
 
 #include <realm/sync/network/network_ssl.hpp>
+#include <realm/sync/network/default_socket.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/util/future.hpp>
 
 #include "test.hpp"
@@ -438,6 +440,91 @@ TEST(Util_Network_SSL_PrematureEndOfInputOnHandshakeRead)
 #endif
 
     socket_2.close();
+    thread.join();
+}
+
+class ErrorOnlyWebSocketObserver : public WebSocketObserver {
+public:
+    struct WebSocketErrorResult {
+        bool was_clean;
+        Status status;
+    };
+    static std::pair<std::unique_ptr<WebSocketObserver>, util::Future<WebSocketErrorResult>>
+    make(unit_test::TestContext& context)
+    {
+        auto pf = util::make_promise_future<WebSocketErrorResult>();
+        return {std::make_unique<ErrorOnlyWebSocketObserver>(std::move(pf.promise), context), std::move(pf.future)};
+    }
+
+    ErrorOnlyWebSocketObserver(util::Promise<WebSocketErrorResult>&& promise, unit_test::TestContext& context)
+        : result_promise(std::move(promise))
+        , test_context(context)
+    {
+    }
+
+    void websocket_connected_handler(const std::string&) override
+    {
+        result_promise.set_error({ErrorCodes::RuntimeError, "connected?"});
+    }
+
+    void websocket_error_handler() override {}
+
+    bool websocket_binary_message_received(util::Span<const char>) override
+    {
+        result_promise.set_error({ErrorCodes::RuntimeError, "got a binary message"});
+        return false;
+    }
+
+    bool websocket_closed_handler(bool was_clean, Status status) override
+    {
+        result_promise.emplace_value(WebSocketErrorResult{was_clean, status});
+        return false;
+    }
+
+    util::Promise<WebSocketErrorResult> result_promise;
+    unit_test::TestContext& test_context;
+};
+
+TEST(Util_DefaultWebsocket_PrematureEndOfInputOnHandshakeRead)
+{
+    websocket::DefaultSocketProvider client_socket_provider(test_context.logger, "Fake User Agent");
+
+    network::Service service_server;
+    network::Acceptor acceptor(service_server);
+    network::Endpoint server_endpoint = bind_acceptor(acceptor);
+
+    // Use a separate thread to consume data written by Stream::handshake(),
+    // such that we can be sure not to block.
+    auto consumer = [&] {
+        network::Socket server_socket(service_server);
+        acceptor.accept(server_socket);
+        server_socket.shutdown(network::Socket::shutdown_send);
+        constexpr std::size_t size = 4096;
+        std::unique_ptr<char[]> buffer(new char[size]);
+        std::error_code ec;
+        do {
+            server_socket.read_some(buffer.get(), size, ec);
+        } while (!ec);
+        REALM_ASSERT(ec == MiscExtErrors::end_of_input);
+    };
+
+    std::thread thread(std::move(consumer));
+
+    WebSocketEndpoint endpoint;
+    endpoint.address = util::format("%1", server_endpoint.address());
+    endpoint.port = server_endpoint.port();
+    endpoint.path = "/foo/bar/bizz/buzz";
+    endpoint.is_ssl = true;
+    endpoint.verify_servers_ssl_certificate = false;
+
+    auto [observer, error_future] = ErrorOnlyWebSocketObserver::make(test_context);
+    auto unused_websocket = client_socket_provider.connect(std::move(observer), std::move(endpoint));
+
+    auto res = error_future.get();
+    CHECK(!res.was_clean);
+    CHECK_EQUAL(res.status.get_std_error_code(),
+                websocket::make_error_code(websocket::WebSocketError::websocket_connection_failed));
+    unused_websocket.reset();
     thread.join();
 }
 
