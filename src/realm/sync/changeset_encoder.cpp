@@ -414,14 +414,19 @@ void ChangesetEncoder::reset() noexcept
 
 void ChangesetEncoder::encode_single(const Changeset& log)
 {
-    add_string_range(log.string_data());
-    const auto& strings = log.interned_strings();
-    for (size_t i = 0; i < strings.size(); ++i) {
-        set_intern_string(uint32_t(i), strings[i]); // Throws
-    }
-    for (auto instr : log) {
-        if (!instr)
-            continue;
-        (*this)(*instr); // Throws
+    // Checking if the log is empty avoids serialized interned strings in a
+    // changeset where all meaningful instructions have been discarded due to
+    // merge or compaction.
+    if (!log.empty()) {
+        add_string_range(log.string_data());
+        const auto& strings = log.interned_strings();
+        for (size_t i = 0; i < strings.size(); ++i) {
+            set_intern_string(uint32_t(i), strings[i]); // Throws
+        }
+        for (auto instr : log) {
+            if (!instr)
+                continue;
+            (*this)(*instr); // Throws
+        }
     }
 }
