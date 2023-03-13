@@ -191,7 +191,7 @@ S2Region& Geospatial::get_region() const
             REALM_ASSERT(m_radius_radians && m_radius_radians > 0.0);
             auto&& p = m_points.front();
             auto center = S2LatLng::FromDegrees(p.latitude, p.longitude).ToPoint();
-            auto radius = S1Angle::Radians(m_radius_radians.value());
+            auto radius = S1Angle::Radians(*m_radius_radians);
             m_region.reset(S2Cap::FromAxisAngle(center, radius).Clone()); // FIXME without extra copy
         } break;
         default:

@@ -104,7 +104,7 @@ public:
 
     std::string get_type() const noexcept
     {
-        return is_valid() ? std::string(c_types[static_cast<size_t>(m_type)]) : m_invalid_type.value();
+        return is_valid() ? std::string(c_types[static_cast<size_t>(m_type)]) : *m_invalid_type;
     }
 
     bool is_valid() const noexcept
