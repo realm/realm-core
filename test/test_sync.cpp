@@ -6760,7 +6760,7 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
     if (is_compressed) {
         size_t total_size;
         auto decompressed = util::compression::decompress_nonportable_input_stream(in, total_size);
-        REALM_ASSERT(decompressed);
+        CHECK(decompressed);
         sync::parse_changeset(*decompressed, reciprocal_changeset); // Throws
     }
     else {
