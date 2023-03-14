@@ -410,24 +410,13 @@ struct SharedStateImpl final : public SharedStateBase {
         transition_to_finished();
     }
 
-    void set_from(StatusOrStatusWith<T> roe)
+    void set_from(StatusWith<T> roe)
     {
-        if constexpr (std::is_same_v<decltype(roe), StatusWith<T>>) {
-            if (roe.is_ok()) {
-                if constexpr (std::is_same_v<T, FakeVoid>) {
-                    emplace_value();
-                }
-                else {
-                    emplace_value(std::move(roe.get_value()));
-                }
-            }
-            else {
-                set_status(roe.get_status());
-            }
+        if (roe.is_ok()) {
+            emplace_value(std::move(roe.get_value()));
         }
         else {
-            static_assert(std::is_same_v<decltype(roe), Status>);
-            set_status(roe);
+            set_status(roe.get_status());
         }
     }
 
@@ -503,9 +492,22 @@ public:
 
     void set_from_status_with(StatusOrStatusWith<T> sw) noexcept
     {
-        set_impl([&] {
-            m_shared_state->set_from(std::move(sw));
-        });
+        if constexpr (std::is_same_v<decltype(sw), Status>) {
+            static_assert(std::is_void_v<T>);
+            set_impl([&] {
+                if (sw.is_ok()) {
+                    m_shared_state->set_from(FakeVoid{});
+                }
+                else {
+                    m_shared_state->set_from(std::move(sw));
+                }
+            });
+        }
+        else {
+            set_impl([&] {
+                m_shared_state->set_from(std::move(sw));
+            });
+        }
     }
 
     template <typename... Args>
