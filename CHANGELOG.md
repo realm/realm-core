@@ -10,7 +10,7 @@
 
 ### Fixed
 * Fixed a crash when querying a mixed property with a string operator (contains/like/beginswith/endswith) or with case insensitivity. ([6376](https://github.com/realm/realm-core/issues/6376) since introduction of Mixed)
-* Querying for equality of a string on a mixed property was returning case insensitive matches. ([6376](https://github.com/realm/realm-core/issues/6376) since introduction of Mixed)
+* Querying for equality of a string on an indexed mixed property was returning case insensitive matches. For example querying for `myIndexedMixed == "Foo"` would incorrectly match on values of "foo" or "FOO" etc. ([6376](https://github.com/realm/realm-core/issues/6376) since introduction of Mixed)
 * Adding an index to a Mixed property on a non-empty table would crash with an assertion. ([6376](https://github.com/realm/realm-core/issues/6376) since introduction of Mixed)
 
 ### Breaking changes
