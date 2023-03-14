@@ -2,11 +2,6 @@ cmake_minimum_required(VERSION 3.15)
 
 project(s2geometry)
 
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/../
-    ${CMAKE_CURRENT_SOURCE_DIR}
-)
-
 set(S2_SOURCES
     s1angle.cc
     s2.cc
@@ -60,21 +55,25 @@ add_library(s2geometry OBJECT
     ${S2_UTIL_MATH_SOURCES}
 )
 
-add_library(Realm::external::s2geometry ALIAS s2geometry)
+target_include_directories(s2geometry PRIVATE "." "..")
 
 # suppress s2 specific warnings (lib is very noisy)
+target_compile_options(s2geometry PRIVATE
+    $<$<CXX_COMPILER_ID:MSVC>: /wd4068 /wd4244 /wd4267 /wd4305>
+)
 if (NOT MSVC)
     set(CMAKE_REQUIRED_QUIET ON)
     add_target_option_if_supported(s2geometry PRIVATE
-        -Wno-macro-redefined
         -Wno-deprecated-declarations
-        -Wno-unused-local-typedef
-        -Wno-unknown-pragmas
-        -Wno-shorten-64-to-32
-        -Wno-unused-parameter
-        -Wno-undefined-var-template
+        -Wno-ignored-qualifiers
+        -Wno-macro-redefined
         -Wno-missing-prototypes
+        -Wno-shorten-64-to-32
+        -Wno-undefined-var-template
+        -Wno-unknown-pragmas
         -Wno-unused-const-variable
         -Wno-unused-function
+        -Wno-unused-local-typedefs
+        -Wno-unused-parameter
     )
 endif()

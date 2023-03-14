@@ -18,22 +18,28 @@
 
 #include <realm/geospatial.hpp>
 
-#ifndef _WIN32
+#ifdef _WIN32
+#pragma warning(push)
+#pragma warning(disable : 4068)
+#pragma warning(disable : 4244)
+#pragma warning(disable : 4267)
+#else
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-local-typedef"
+#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wshorten-64-to-32"
 #pragma GCC diagnostic ignored "-Wundefined-var-template"
 #endif
 
-#include "s2/s2cap.h"
-#include "s2/s2latlng.h"
-#include "s2/s2polygon.h"
+#include <s2/s2cap.h>
+#include <s2/s2latlng.h>
+#include <s2/s2polygon.h>
 
-#ifndef _WIN32
+#ifdef _WIN32
+#pragma warning(pop)
+#else
 #pragma GCC diagnostic pop
 #endif
 
