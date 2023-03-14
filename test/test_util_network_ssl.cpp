@@ -537,10 +537,12 @@ TEST(Util_DefaultWebsocketTLS_PrematureEndOfInputOnHandshakeRead)
     CHECK(!res.was_clean);
     CHECK_EQUAL(res.status.get_std_error_code(),
                 websocket::make_error_code(websocket::WebSocketError::websocket_connection_failed));
-    client_socket_provider.post_with_completion([websocket = std::move(websocket)](Status status) mutable {
-        REALM_ASSERT(status.is_ok());
-        websocket.reset();
-    }).get();
+    client_socket_provider
+        .post_with_completion([websocket = std::move(websocket)](Status status) mutable {
+            REALM_ASSERT(status.is_ok());
+            websocket.reset();
+        })
+        .get();
 
     client_socket_provider.stop(true);
     thread.join();
@@ -586,10 +588,12 @@ TEST(Util_DefaultWebsocketTLS_PrematureEndOfInputOnHandshakeWrite)
     CHECK(!res.was_clean);
     CHECK_EQUAL(res.status.get_std_error_code(),
                 websocket::make_error_code(websocket::WebSocketError::websocket_connection_failed));
-    client_socket_provider.post_with_completion([websocket = std::move(websocket)](Status status) mutable {
-        REALM_ASSERT(status.is_ok());
-        websocket.reset();
-    }).get();
+    client_socket_provider
+        .post_with_completion([websocket = std::move(websocket)](Status status) mutable {
+            REALM_ASSERT(status.is_ok());
+            websocket.reset();
+        })
+        .get();
 
     client_socket_provider.stop(true);
     thread.join();
