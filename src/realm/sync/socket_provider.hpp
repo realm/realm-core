@@ -27,6 +27,7 @@
 #include <realm/sync/config.hpp>
 
 #include <realm/util/functional.hpp>
+#include <realm/util/future.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/span.hpp>
 
@@ -123,6 +124,18 @@ public:
     ///
     /// @param handler The handler function to be queued on the event loop.
     virtual void post(FunctionHandler&& handler) = 0;
+
+    /// Helper function to post a callback onto the event loop and return a future
+    /// that will be complete after the function has been called.
+    virtual util::Future<void> post_with_completion(FunctionHandler&& handler)
+    {
+        auto pf = util::make_promise_future<void>();
+        post([handler = std::move(handler), promise = std::move(pf.promise)](Status status) mutable {
+            handler(status);
+            promise.set_from_status_with(status);
+        });
+        return std::move(pf.future);
+    }
 
     /// Create and register a new timer whose handler function will be posted
     /// to the event loop when the provided delay expires.

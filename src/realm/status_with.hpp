@@ -74,6 +74,7 @@ public:
     StatusWith(Status status)
         : m_status(std::move(status))
     {
+        REALM_ASSERT(!is_ok());
     }
 
     StatusWith(T value)

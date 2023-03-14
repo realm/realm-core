@@ -412,11 +412,22 @@ struct SharedStateImpl final : public SharedStateBase {
 
     void set_from(StatusOrStatusWith<T> roe)
     {
-        if (roe.is_ok()) {
-            emplace_value(std::move(roe.get_value()));
+        if constexpr (std::is_same_v<decltype(roe), StatusWith<T>>) {
+            if (roe.is_ok()) {
+                if constexpr (std::is_same_v<T, FakeVoid>) {
+                    emplace_value();
+                }
+                else {
+                    emplace_value(std::move(roe.get_value()));
+                }
+            }
+            else {
+                set_status(roe.get_status());
+            }
         }
         else {
-            set_status(roe.get_status());
+            static_assert(std::is_same_v<decltype(roe), Status>);
+            set_status(roe);
         }
     }
 
@@ -490,7 +501,7 @@ public:
      */
     void set_from(Future<T>&& future) noexcept;
 
-    void set_from_status_with(StatusWith<T> sw) noexcept
+    void set_from_status_with(StatusOrStatusWith<T> sw) noexcept
     {
         set_impl([&] {
             m_shared_state->set_from(std::move(sw));
