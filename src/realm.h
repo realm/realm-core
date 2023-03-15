@@ -101,7 +101,7 @@ typedef enum realm_schema_subset_mode {
     RLM_SCHEMA_SUBSET_MODE_ALL_CLASSES,
     RLM_SCHEMA_SUBSET_MODE_ALL_PROPERTIES,
     RLM_SCHEMA_SUBSET_MODE_COMPLETE
-}realm_schema_subset_mode_e;
+} realm_schema_subset_mode_e;
 
 /* Key types */
 typedef uint32_t realm_class_key_t;
@@ -696,8 +696,8 @@ RLM_API realm_schema_subset_mode_e realm_config_get_schema_subset_mode(const rea
 
 /**
  * Set schema subset mode
- * 
- * This function cannot fail 
+ *
+ * This function cannot fail
  */
 RLM_API void realm_config_set_schema_subset_mode(realm_config_t*, realm_schema_subset_mode_e);
 
