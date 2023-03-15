@@ -627,7 +627,7 @@ TEST(List_AggOps)
     test_lists_numeric_agg<Decimal128>(test_context, sg, type_Decimal, Decimal128(realm::null()), true);
 }
 
-TEST(List_NestedList)
+TEST(List_NestedList_Insert)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(make_in_realm_history(), path);
@@ -675,4 +675,42 @@ TEST(List_NestedList)
     CHECK_EQUAL(list2->size(), 0);
     CHECK_EQUAL(collection->size(), 0);
     CHECK_EQUAL(collection2->size(), 0);
+}
+
+ONLY(List_NestedList_Remove)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(make_in_realm_history(), path);
+    auto tr = db->start_write();
+    auto table = tr->add_table("table");
+    auto list_col = table->add_column(type_Int, "int_list_list", false, {CollectionType::List, CollectionType::List});
+    CHECK_EQUAL(table->get_nesting_levels(list_col), 1);
+    Obj obj = table->create_object();
+    auto list = obj.get_collection_list(list_col);
+    CHECK(list->is_empty());
+    auto collection = list->insert_collection(0);
+    dynamic_cast<Lst<Int>*>(collection.get())->add(5);
+    tr->commit_and_continue_as_read();
+    CHECK_NOT(list->is_empty());
+    CHECK_EQUAL(obj.get_collection_list(list_col)->get_collection_ptr(0)->get_any(0).get_int(), 5);
+    tr->promote_to_write();
+    {
+        auto lst = list->get_collection_ptr(0);
+        dynamic_cast<Lst<Int>*>(lst.get())->add(47);
+    }
+    tr->commit_and_continue_as_read();
+    CHECK(collection->size() != 0);
+    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection.get())->get(0), 5);
+    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection.get())->get(1), 47);
+
+    tr->promote_to_write();
+    list->remove(0);
+    list->remove(1);
+    tr->commit_and_continue_as_read();
+    CHECK_EQUAL(list->size(), 0);
+    CHECK_EQUAL(collection->size(), 2);
+
+    tr->promote_to_write();
+    obj.remove();
+    tr->commit_and_continue_as_read();
 }
