@@ -248,9 +248,29 @@ public:
         return str;
     }
 
+    size_t mem_usage(realm::Allocator& alloc) const
+    {
+        size_t mem = 0;
+        _mem_usage(alloc, mem);
+        return mem;
+    }
+
 private:
     char* m_data;
     bool m_has_refs = false;
+
+    void _mem_usage(realm::Allocator& alloc, size_t& mem) const
+    {
+        if (m_has_refs) {
+            for (size_t i = 0; i < m_size; ++i) {
+                if (uint64_t ref = get_ref(i)) {
+                    Array subarray(alloc, ref);
+                    subarray._mem_usage(alloc, mem);
+                }
+            }
+        }
+        mem += size_in_bytes();
+    }
 };
 
 class Group;
@@ -560,6 +580,7 @@ std::ostream& operator<<(std::ostream& ostr, const Group& g)
         if (g.size() > 8) {
             ostr << "History type: " << g.get_history_type() << std::endl;
             ostr << "History schema version: " << g.get_history_schema_version() << std::endl;
+            ostr << "History size: " << human_readable(g.m_history.mem_usage(g.m_alloc)) << std::endl;
         }
         if (g.size() > 10) {
             ostr << "File ident: " << g.get_file_ident() << std::endl;
@@ -632,7 +653,7 @@ void Group::print_schema() const
         for (unsigned i = 0; i < get_nb_tables(); i++) {
             Table* table = get_table(i);
             std::cout << "    " << i << ": " << get_table_name(i) << " - size: " << table->get_size(m_alloc)
-                      << std::endl;
+                      << " datasize: " << human_readable(table->mem_usage(m_alloc)) << std::endl;
             table->print_columns(*this);
         }
     }
