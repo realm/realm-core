@@ -237,6 +237,31 @@ CollectionListPtr CollectionList::get_collection_list(size_t ndx) const
                                             coll_type);
 }
 
+void CollectionList::remove(size_t ndx)
+{
+    REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) == m_level);
+    ensure_created();
+    REALM_ASSERT(m_key_type == type_Int);
+    auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
+    int_keys->erase(ndx);
+    m_refs.erase(ndx);
+}
+
+void CollectionList::remove(StringData key)
+{
+    REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) == m_level);
+    ensure_created();
+    REALM_ASSERT(m_key_type == type_String);
+    auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
+    IteratorAdapter help(string_keys);
+    auto it = std::lower_bound(help.begin(), help.end(), key);
+    if (it.index() < string_keys->size()) {
+        string_keys->erase(it.index());
+        m_refs.erase(it.index());
+    }
+    // TODO: shoud I throw here in order to signal that the element has not been found.
+}
+
 ref_type CollectionList::get_collection_ref(Index index) const noexcept
 {
     if (m_key_type == type_Int) {
