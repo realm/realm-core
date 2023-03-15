@@ -122,7 +122,6 @@ public:
 
     struct MigrationStatus {
         std::string statusMessage;
-        std::optional<std::string> errorMessage;
         bool isMigrated = false;
         bool isCancelable = false;
         bool isRevertible = false;

@@ -1,6 +1,6 @@
-#include "sync/flx_sync_harness.hpp"
-#include "sync/sync_test_utils.hpp"
-#include "util/baas_admin_api.hpp"
+#include <sync/flx_sync_harness.hpp>
+#include <sync/sync_test_utils.hpp>
+#include <util/baas_admin_api.hpp>
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 
@@ -14,7 +14,7 @@
 using namespace realm;
 
 static void trigger_server_migration(const AppSession& app_session, bool switch_to_flx,
-                                     const std::shared_ptr<util::Logger>& logger = nullptr)
+                                     const std::shared_ptr<util::Logger>& logger)
 {
     auto baas_sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
 
@@ -40,7 +40,7 @@ static void trigger_server_migration(const AppSession& app_session, bool switch_
                     last_status = status.statusMessage;
                     logger->debug("%1 status: %2", op_stg, last_status);
                 }
-                return status.errorMessage || status.complete;
+                return status.complete;
             },
             // Query the migration status every 0.5 seconds for up to 90 seconds
             std::chrono::seconds(duration), std::chrono::milliseconds(500));
@@ -51,17 +51,13 @@ static void trigger_server_migration(const AppSession& app_session, bool switch_
         REQUIRE(false);
     }
     if (logger) {
-        if (status.errorMessage)
-            logger->debug("%1 returned error: %2", op_stg, *status.errorMessage);
-        else
-            logger->debug("%1 complete", op_stg);
+        logger->debug("%1 complete", op_stg);
     }
-    REQUIRE(!status.errorMessage);
     REQUIRE(switch_to_flx == status.isMigrated);
 }
 
 // Add a set of count number of Dog objects to the realm
-static std::vector<ObjectId> fill_test_data(SyncTestFile& config, std::string partition, int start = 1, int count = 5)
+static std::vector<ObjectId> fill_test_data(SyncTestFile& config, std::string partition, int start, int count)
 {
     std::vector<ObjectId> ret;
     auto realm = Realm::get_shared_realm(config);
@@ -70,10 +66,9 @@ static std::vector<ObjectId> fill_test_data(SyncTestFile& config, std::string pa
     // Add some objects with the provided partition value
     for (int i = 0; i < count; i++, ++start) {
         auto id = ObjectId::gen();
-        auto obj = Object::create(c, realm, "Dog",
+        auto obj = Object::create(c, realm, "Object",
                                   std::any(AnyDict{{"_id", std::any(id)},
-                                                   {"breed", util::format("breed-%1", start)},
-                                                   {"name", util::format("dog-%1", start)},
+                                                   {"string_field", util::format("value-%1", start)},
                                                    {"realm_id", partition}}));
         ret.push_back(id);
     }
@@ -88,7 +83,12 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
     const std::string base_url = get_base_url();
     const std::string partition1 = "migration-test";
     const std::string partition2 = "another-value";
-    auto server_app_config = default_app_config(base_url);
+    const Schema mig_schema{
+        ObjectSchema("Object", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                {"string_field", PropertyType::String | PropertyType::Nullable},
+                                {"realm_id", PropertyType::String | PropertyType::Nullable}}),
+    };
+    auto server_app_config = minimal_app_config(base_url, "server_migrate_rollback", mig_schema);
     TestAppSession session(create_app(server_app_config));
     SyncTestFile config1(session.app(), partition1, server_app_config.schema);
     SyncTestFile config2(session.app(), partition2, server_app_config.schema);
@@ -98,9 +98,9 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
     auto objects2 = fill_test_data(config2, partition2, 6, 5);
 
     auto check_data = [&](SharedRealm& realm, bool check_set1, bool check_set2) {
-        auto table = realm->read_group().get_table("class_Dog");
+        auto table = realm->read_group().get_table("class_Object");
         auto partition_col = table->get_column_key("realm_id");
-        auto breed_col = table->get_column_key("breed");
+        auto string_col = table->get_column_key("string_field");
 
         size_t table_size = [check_set1, check_set2] {
             if (check_set1 && check_set2)
@@ -112,9 +112,9 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
 
         REQUIRE(table->size() == table_size);
         REQUIRE(bool(table->find_first(partition_col, StringData(partition1))) == check_set1);
-        REQUIRE(bool(table->find_first(breed_col, StringData("breed-5"))) == check_set1);
+        REQUIRE(bool(table->find_first(string_col, StringData("value-5"))) == check_set1);
         REQUIRE(bool(table->find_first(partition_col, StringData(partition2))) == check_set2);
-        REQUIRE(bool(table->find_first(breed_col, StringData("breed-6"))) == check_set2);
+        REQUIRE(bool(table->find_first(string_col, StringData("value-6"))) == check_set2);
     };
 
     // Wait for the two partition sets to upload
@@ -153,10 +153,10 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
         }
 
         {
-            auto flx_table = flx_realm->read_group().get_table("class_Dog");
+            auto flx_table = flx_realm->read_group().get_table("class_Object");
             auto mut_subs = flx_realm->get_latest_subscription_set().make_mutable_copy();
             mut_subs.insert_or_assign(
-                "flx_migrated_Dog_1",
+                "flx_migrated_Objects_1",
                 Query(flx_table).equal(flx_table->get_column_key("realm_id"), StringData{partition1}));
             auto subs = std::move(mut_subs).commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
@@ -169,10 +169,10 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
         }
 
         {
-            auto flx_table = flx_realm->read_group().get_table("class_Dog");
+            auto flx_table = flx_realm->read_group().get_table("class_Object");
             auto mut_subs = flx_realm->get_latest_subscription_set().make_mutable_copy();
             mut_subs.insert_or_assign(
-                "flx_migrated_Dog_2",
+                "flx_migrated_Objects_2",
                 Query(flx_table).equal(flx_table->get_column_key("realm_id"), StringData{partition2}));
             auto subs = std::move(mut_subs).commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
