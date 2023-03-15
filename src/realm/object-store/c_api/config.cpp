@@ -82,6 +82,16 @@ RLM_API void realm_config_set_schema_mode(realm_config_t* config, realm_schema_m
     config->schema_mode = from_capi(mode);
 }
 
+RLM_API realm_schema_subset_mode_e realm_config_get_schema_subset_mode(const realm_config_t* config)
+{
+    return to_capi(config->schema_subset_mode);
+}
+
+RLM_API void realm_config_set_schema_subset_mode(realm_config_t* config, realm_schema_subset_mode_e subset_mode)
+{
+    config->schema_subset_mode = from_capi(subset_mode);
+}
+
 RLM_API void realm_config_set_migration_function(realm_config_t* config, realm_migration_func_t func,
                                                  realm_userdata_t userdata, realm_free_userdata_func_t callback)
 {
