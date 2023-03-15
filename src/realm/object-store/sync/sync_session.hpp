@@ -361,8 +361,7 @@ private:
 
     // Create a subscription store pointer based on the flexible based sync configuration or return
     // null if not using flexible sync.
-    void update_subscription_store() REQUIRES(m_config_mutex, m_state_mutex);
-    void update_sync_config(bool is_migrated) REQUIRES(m_config_mutex);
+    void update_subscription_store() REQUIRES(!m_config_mutex, !m_state_mutex);
 
     void download_fresh_realm(sync::ProtocolErrorInfo::Action server_requests_action)
         REQUIRES(!m_config_mutex, !m_state_mutex, !m_connection_state_mutex);
@@ -392,6 +391,9 @@ private:
         REQUIRES(!m_connection_state_mutex);
     void become_paused(util::CheckedUniqueLock) RELEASE(m_state_mutex) REQUIRES(!m_connection_state_mutex);
     void become_waiting_for_access_token() REQUIRES(m_state_mutex);
+
+    // do restart session restarts the session without freeing any of the waiters
+    void do_restart_session() REQUIRES(m_state_mutex, !m_connection_state_mutex, !m_config_mutex);
 
     // do_become_inactive is called from both become_paused()/become_inactive() and does all the steps to
     // shutdown and cleanup the sync session besides setting m_state.

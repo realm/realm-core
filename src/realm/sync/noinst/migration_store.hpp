@@ -47,6 +47,11 @@ public:
     static MigrationStoreRef create(DBRef db,
                                     std::function<void(MigrationStore::MigrationState)>&& on_migration_state_changed);
 
+    // Converts the configuration from PBS to FLX if in the migrated state, otherwise returns the passed in config
+    // object. If the provided config is configured for FLX, the migration will be canceled and the migration state
+    // will be cleared.
+    std::shared_ptr<realm::SyncConfig> convert_sync_config(std::shared_ptr<realm::SyncConfig> config);
+
     // Called when the server responds with migrate to FLX and stores the FLX
     // subscription RQL query string
     void migrate_to_flx(std::string_view rql_query_string);
@@ -55,7 +60,7 @@ public:
     void cancel_migration();
 
     // Clear the migration store info
-    void clear();
+    void clear(std::unique_lock<std::mutex> lock);
 
     bool is_migrated();
 

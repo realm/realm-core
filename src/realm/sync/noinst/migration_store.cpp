@@ -84,6 +84,33 @@ std::string_view MigrationStore::get_query_string()
     return m_query_string;
 }
 
+std::shared_ptr<realm::SyncConfig> MigrationStore::convert_sync_config(std::shared_ptr<realm::SyncConfig> config)
+{
+    REALM_ASSERT(config);
+
+    {
+        std::unique_lock lock{m_mutex};
+        if (config->flx_sync_requested) {
+            // Will need to clear the config if the user SyncConfig if FLX and state is
+            // migrated, but not during download fresh realm as part of a client reset
+            if (m_state == MigrationState::Migrated) {
+                // No need to fire the notification callback here, just proceed as normal
+                clear(std::move(lock));
+            }
+            return config;
+        }
+        if (m_state == MigrationState::NotMigrated) {
+            return config;
+        }
+    }
+
+    auto flx_config = std::make_shared<realm::SyncConfig>(*config); // deep copy
+    flx_config->partition_value = "";
+    flx_config->flx_sync_requested = true;
+
+    return flx_config;
+}
+
 void MigrationStore::migrate_to_flx(std::string_view rql_query_string)
 {
     REALM_ASSERT(m_state == MigrationState::NotMigrated);
@@ -111,23 +138,25 @@ void MigrationStore::migrate_to_flx(std::string_view rql_query_string)
 void MigrationStore::cancel_migration()
 {
     // Clear the migration state
-    {
-        std::lock_guard lock{m_mutex};
-        clear();
-        m_state = MigrationState::NotMigrated;
-        m_query_string = {};
-    }
+    std::unique_lock lock{m_mutex};
+    clear(std::move(lock));
 
     m_on_migration_state_changed(MigrationState::NotMigrated);
 }
 
-void MigrationStore::clear()
+void MigrationStore::clear(std::unique_lock<std::mutex>)
 {
+    // Already cleared
+    if (m_state == MigrationState::NotMigrated)
+        return;
+
     auto tr = m_db->start_read();
     auto migration_table = tr->get_table(m_migration_table);
     if (migration_table->is_empty())
         return;
 
+    m_state = MigrationState::NotMigrated;
+    m_query_string = {};
     tr->promote_to_write();
     migration_table->clear();
     tr->commit();
