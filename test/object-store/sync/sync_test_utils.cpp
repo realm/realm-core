@@ -68,7 +68,7 @@ bool results_contains_original_name(SyncFileActionMetadataResults& results, cons
     return false;
 }
 
-bool ReturnsTrueAfter::match(util::FunctionRef<bool()> condition) const
+bool ReturnsTrueWithinTimeLimit::match(util::FunctionRef<bool()> condition) const
 {
     const auto wait_start = std::chrono::steady_clock::now();
     bool predicate_returned_true = false;
