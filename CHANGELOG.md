@@ -17,7 +17,6 @@
 -----------
 
 ### Internals
-* None.
 * Add admin api and test for performing the PBS->FLX migration and roll back on the server. (PR [#6366](https://github.com/realm/realm-core/pull/6366))
 
 ----------------------------------------------
