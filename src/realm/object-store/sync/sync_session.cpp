@@ -107,7 +107,7 @@ void SyncSession::become_active()
 void SyncSession::restart_session()
 {
     util::CheckedUniqueLock lock(m_state_mutex);
-    do_restart_session();
+    do_restart_session(std::move(lock));
 }
 
 void SyncSession::become_dying(util::CheckedUniqueLock lock)
@@ -157,7 +157,7 @@ void SyncSession::become_paused(util::CheckedUniqueLock lock)
     do_become_inactive(std::move(lock), Status::OK());
 }
 
-void SyncSession::do_restart_session()
+void SyncSession::do_restart_session(util::CheckedUniqueLock)
 {
     // Nothing to do if the sync session is currently paused
     // It will be resumed when resume() is called
@@ -341,12 +341,11 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const Realm
         return sync::MigrationStore::create(m_db, [this](MigrationState) {
             // Migration state changed - Update the configuration to
             // match the new sync mode.
-            {
-                util::CheckedLockGuard lock(m_config_mutex);
-                m_config.sync_config = m_migration_store->convert_sync_config(m_original_sync_config);
-            }
+            util::CheckedLockGuard cfg_lock(m_config_mutex);
+            m_config.sync_config = m_migration_store->convert_sync_config(m_original_sync_config);
 
             // If using FLX, set up m_flx_subscription_store and the history_write_validator
+            util::CheckedLockGuard state_lock(m_state_mutex);
             update_subscription_store();
         });
     }()}
@@ -742,7 +741,7 @@ void SyncSession::handle_error(SyncError error)
             }
             break;
         case NextStateAfterError::restart: {
-            do_restart_session();
+            do_restart_session(std::move(lock));
             return; // don't propagate the error
         }
         case NextStateAfterError::inactive: {
@@ -1267,16 +1266,11 @@ void SyncSession::update_configuration(SyncConfig new_config)
 
 void SyncSession::update_subscription_store()
 {
-    {
-        util::CheckedLockGuard state_lk(m_state_mutex);
-        REALM_ASSERT(!m_session);
-    }
-
-    util::CheckedLockGuard config_lk(m_config_mutex);
-
     // Not using sync
     if (!m_config.sync_config)
         return;
+
+    REALM_ASSERT(!m_session);
 
     auto& history = static_cast<sync::ClientReplication&>(*m_db->get_replication());
 
