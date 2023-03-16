@@ -245,7 +245,7 @@ struct ProtocolErrorInfo {
     std::vector<CompensatingWriteErrorInfo> compensating_writes;
     std::optional<ResumptionDelayInfo> resumption_delay_interval;
     Action server_requests_action;
-    std::string migration_query_string;
+    std::optional<std::string> migration_query_string;
 
     bool is_fatal() const
     {

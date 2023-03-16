@@ -296,7 +296,7 @@ public:
                                 "Missing/invalid partition query string in migrate to flexible sync error response");
                         }
 
-                        info.migration_query_string = *query_string;
+                        info.migration_query_string.emplace(query_string->get<std::string_view>());
                     }
 
                     if (auto rejected_updates = json.find("rejectedUpdates"); rejected_updates != json.end()) {

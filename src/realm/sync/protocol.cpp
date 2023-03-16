@@ -145,7 +145,7 @@ const char* get_protocol_error_message(int error_code) noexcept
         case ProtocolError::bad_progress:
             return "Bad progress information (DOWNLOAD)";
         case ProtocolError::revert_to_pbs:
-            return "Server rolled back to partition based sync after migration - reverting client to partition based "
+            return "Server rolled back after flexible based sync migration - reverting client to partition based "
                    "sync";
     }
     return nullptr;
