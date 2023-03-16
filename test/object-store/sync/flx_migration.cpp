@@ -31,7 +31,7 @@ static void trigger_server_migration(const AppSession& app_session, bool switch_
         else
             return "FLX->PBS Rollback";
     }();
-    const int duration = 90;
+    const int duration = 300; // 5 minutes, for now, since it sometimes takes longet than 90 seconds
     try {
         timed_sleeping_wait_for(
             [&] {
