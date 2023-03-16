@@ -4,7 +4,7 @@
 * Expose `RealmConfig::schema_subset_mode` in the C-API. (PR [#6379](https://github.com/realm/realm-core/pull/6379))
 
 ### Fixed
-* Fixed a case of history diverging when empty reciprocal changesets are part of the merging window in OT. This may have resulted in arrays being in different orders on different devices. ([#6191](https://github.com/realm/realm-core/issues/6191), since v11.13.0)
+* Fixed a bug that may have resulted in arrays being in different orders on different devices. Some cases of “Invalid prior_size” may be fixed too. ([#6191](https://github.com/realm/realm-core/issues/6191), since v11.13.0)
 
 ### Breaking changes
 * None.
