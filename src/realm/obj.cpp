@@ -239,7 +239,6 @@ CollectionListPtr CollectionList::get_collection_list(size_t ndx) const
 
 void CollectionList::remove(size_t ndx)
 {
-    REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) == m_level);
     ensure_created();
     REALM_ASSERT(m_key_type == type_Int);
     auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
@@ -255,7 +254,6 @@ void CollectionList::remove(size_t ndx)
 
 void CollectionList::remove(StringData key)
 {
-    REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) == m_level);
     ensure_created();
     REALM_ASSERT(m_key_type == type_String);
     auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());

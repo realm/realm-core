@@ -684,39 +684,66 @@ TEST(List_NestedList_Remove)
     auto tr = db->start_write();
     auto table = tr->add_table("table");
     auto list_col = table->add_column(type_Int, "int_list_list", false, {CollectionType::List, CollectionType::List});
+    auto list_col2 = table->add_column(type_Int, "int_dict_list_list", false,
+                                       {CollectionType::Dictionary, CollectionType::List, CollectionType::List});
+
     CHECK_EQUAL(table->get_nesting_levels(list_col), 1);
+    CHECK_EQUAL(table->get_nesting_levels(list_col2), 2);
+
     Obj obj = table->create_object();
+
     auto list = obj.get_collection_list(list_col);
     CHECK(list->is_empty());
     auto collection = list->insert_collection(0);
     dynamic_cast<Lst<Int>*>(collection.get())->add(5);
+
+    auto dict = obj.get_collection_list(list_col2);
+    auto list2 = dict->insert_collection_list("Foo");
+    auto collection2 = list2->insert_collection(0);
+    dynamic_cast<Lst<Int>*>(collection2.get())->add(5);
+
     tr->commit_and_continue_as_read();
     CHECK_NOT(list->is_empty());
     CHECK_EQUAL(obj.get_collection_list(list_col)->get_collection_ptr(0)->get_any(0).get_int(), 5);
+    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection2.get())->get(0), 5);
     // transaction
     {
         tr->promote_to_write();
+
         auto lst = list->get_collection_ptr(0);
         dynamic_cast<Lst<Int>*>(lst.get())->add(47);
+
+        lst = obj.get_collection_list(list_col2)->insert_collection_list("Foo")->get_collection_ptr(0);
+        dynamic_cast<Lst<Int>*>(collection2.get())->set(0, 100);
+
         tr->commit_and_continue_as_read();
     }
-    CHECK(collection->size() == 2);
     CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection.get())->get(0), 5);
     CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection.get())->get(1), 47);
+    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection2.get())->get(0), 100);
+
+    CHECK(list->size() == 1);
+    CHECK(dict->size() == 1);
+    CHECK(list2->size() == 1);
+    CHECK(collection->size() == 2);
+    CHECK(collection2->size() == 1);
 
     tr->promote_to_write();
-    CHECK(collection->size() == 2);
+
     dynamic_cast<Lst<Int>*>(collection.get())->remove(0); // remove 5
     dynamic_cast<Lst<Int>*>(collection.get())->remove(0); // remove 47
     CHECK(collection->size() == 0);
+    dynamic_cast<Lst<Int>*>(collection2.get())->remove(0); // remove 100
+    CHECK(collection2->size() == 0);
+
     list->remove(0);
-    // out of index (nothing should happen)
-    list->remove(1);
+    dict->remove("Foo");
     tr->commit_and_continue_as_read();
+
     CHECK_EQUAL(list->size(), 0);
+    CHECK_EQUAL(dict->size(), 0);
     // CHECK_EQUAL(collection->size(), 2); this ptr should be gone and memory cannot be accessed TODO: probably we
     // need to throw an excpetion here.
-
     tr->promote_to_write();
     obj.remove();
     tr->commit_and_continue_as_read();
