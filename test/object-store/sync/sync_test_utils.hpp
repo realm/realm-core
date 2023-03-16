@@ -54,9 +54,9 @@ void timed_sleeping_wait_for(util::FunctionRef<bool()> condition,
                              std::chrono::milliseconds max_ms = std::chrono::seconds(30),
                              std::chrono::milliseconds sleep_ms = std::chrono::milliseconds(1));
 
-class ReturnsTrueAfter : public Catch::Matchers::MatcherGenericBase {
+class ReturnsTrueWithinTimeLimit : public Catch::Matchers::MatcherGenericBase {
 public:
-    ReturnsTrueAfter(std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000))
+    ReturnsTrueWithinTimeLimit(std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000))
         : m_max_ms(max_ms)
     {
     }

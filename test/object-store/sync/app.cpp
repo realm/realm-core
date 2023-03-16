@@ -3086,14 +3086,14 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             [&] {
                 return dbref.use_count() == 2;
             },
-            ReturnsTrueAfter{});
+            ReturnsTrueWithinTimeLimit{});
 
         sync_sess_ext_ref.reset();
         REQUIRE_THAT(
             [&] {
                 return dbref.use_count() == 1;
             },
-            ReturnsTrueAfter{});
+            ReturnsTrueWithinTimeLimit{});
     }
 
     SECTION("validation") {
