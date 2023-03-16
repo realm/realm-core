@@ -472,7 +472,7 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
     }
 
     fresh_sync_session->assert_mutex_unlocked();
-    if (auto local_subs_store = get_flx_subscription_store(); local_subs_store) {
+    if (auto local_subs_store = get_flx_subscription_store()) {
         sync::SubscriptionSet active = local_subs_store->get_active();
         auto fresh_sub_store = fresh_sync_session->get_flx_subscription_store();
         REALM_ASSERT(fresh_sub_store);
@@ -524,7 +524,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
             return;
         }
         lock.unlock();
-        if (auto local_subs_store = get_flx_subscription_store(); local_subs_store) {
+        if (auto local_subs_store = get_flx_subscription_store()) {
             // In DiscardLocal mode, only the active subscription set is preserved
             // this means that we have to remove all other subscriptions including later
             // versioned ones.
@@ -573,7 +573,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
 // `m_session`.
 void SyncSession::handle_error(SyncError error)
 {
-    enum class NextStateAfterError { none, restart, inactive, error };
+    enum class NextStateAfterError { none, inactive, error };
     auto next_state = error.is_fatal ? NextStateAfterError::error : NextStateAfterError::none;
     auto error_code = error.get_system_error();
     util::Optional<ShouldBackup> delete_file;
@@ -630,8 +630,7 @@ void SyncSession::handle_error(SyncError error)
             case sync::ProtocolErrorInfo::Action::MigrateToFLX:
                 if (!m_original_sync_config->flx_sync_requested) {
                     m_migration_store->migrate_to_flx(error.migration_query_string);
-                    // restart session without notifying user
-                    next_state = NextStateAfterError::restart;
+                    next_state = NextStateAfterError::inactive;
                     break;
                 }
                 else {
@@ -642,8 +641,7 @@ void SyncSession::handle_error(SyncError error)
                 // Original config was PBS, cancel the migration
                 if (!m_original_sync_config->flx_sync_requested) {
                     m_migration_store->cancel_migration();
-                    // restart session without notifying user
-                    next_state = NextStateAfterError::restart;
+                    next_state = NextStateAfterError::inactive;
                     break;
                 }
                 else {
@@ -740,10 +738,6 @@ void SyncSession::handle_error(SyncError error)
                 cancel_pending_waits(std::move(lock), error.to_status()); // unlocks the mutex
             }
             break;
-        case NextStateAfterError::restart: {
-            do_restart_session(std::move(lock));
-            return; // don't propagate the error
-        }
         case NextStateAfterError::inactive: {
             become_inactive(std::move(lock), error.to_status());
             break;
