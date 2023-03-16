@@ -155,7 +155,7 @@ void load_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadat
     }
 }
 
-SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr)
+SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr, bool read_only)
 {
     TableKey legacy_table_key;
     ColKey legacy_version_key;
@@ -170,16 +170,21 @@ SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr)
     REALM_ASSERT_3(tr->get_transact_stage(), ==, DB::transact_Reading);
     if (!m_table) {
         if (tr->has_table(c_sync_internal_schemas_table)) {
+            // Even if read_only is set, this will load m_table with a valid value
             load_sync_metadata_schema(tr, &unified_schema_version_table_def);
         }
         else {
+            if (read_only) {
+                return; // as requested, don't try to create the table if it doesn't exist
+            }
             tr->promote_to_write();
             create_sync_metadata_schema(tr, &unified_schema_version_table_def);
             tr->commit_and_continue_as_read();
         }
     }
 
-    if (!tr->has_table(c_flx_metadata_table)) {
+    // Don't try to convert the legacy table if read_only is requested
+    if (!tr->has_table(c_flx_metadata_table) || read_only) {
         return;
     }
 
@@ -198,6 +203,10 @@ SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr)
 util::Optional<int64_t> SyncMetadataSchemaVersions::get_version_for(const TransactionRef& tr,
                                                                     std::string_view schema_group_name)
 {
+    if (!m_table) {
+        return util::none;
+    }
+
     auto schema_versions = tr->get_table(m_table);
     auto obj_key = schema_versions->find_primary_key(Mixed{StringData(schema_group_name)});
     if (!obj_key) {
@@ -214,6 +223,10 @@ util::Optional<int64_t> SyncMetadataSchemaVersions::get_version_for(const Transa
 void SyncMetadataSchemaVersions::set_version_for(const TransactionRef& tr, std::string_view schema_group_name,
                                                  int64_t version)
 {
+    if (!m_table) {
+        return;
+    }
+
     auto schema_versions = tr->get_table(m_table);
     auto metadata_obj = schema_versions->create_object_with_primary_key(Mixed{StringData(schema_group_name)});
     metadata_obj.set(m_version_field, version);

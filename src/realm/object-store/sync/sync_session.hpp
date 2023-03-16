@@ -255,7 +255,7 @@ public:
         return m_server_url;
     }
 
-    const std::shared_ptr<sync::SubscriptionStore>& get_flx_subscription_store() REQUIRES(!m_config_mutex);
+    std::shared_ptr<sync::SubscriptionStore> get_flx_subscription_store() REQUIRES(!m_config_mutex);
 
     // Create an external reference to this session. The sync session attempts to remain active
     // as long as an external reference to the session exists.
@@ -361,7 +361,7 @@ private:
 
     // Create a subscription store pointer based on the flexible based sync configuration or return
     // null if not using flexible sync.
-    void update_subscription_store() REQUIRES(m_config_mutex, m_state_mutex);
+    void update_subscription_store() REQUIRES(m_config_mutex);
 
     void download_fresh_realm(sync::ProtocolErrorInfo::Action server_requests_action)
         REQUIRES(!m_config_mutex, !m_state_mutex, !m_connection_state_mutex);

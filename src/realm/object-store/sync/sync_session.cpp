@@ -344,8 +344,13 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const Realm
             util::CheckedLockGuard cfg_lock(m_config_mutex);
             m_config.sync_config = m_migration_store->convert_sync_config(m_original_sync_config);
 
+            {
+                // The session should be closed before updating the FLX subscription store
+                util::CheckedLockGuard state_lock(m_state_mutex);
+                REALM_ASSERT(!m_session);
+            }
+
             // If using FLX, set up m_flx_subscription_store and the history_write_validator
-            util::CheckedLockGuard state_lock(m_state_mutex);
             update_subscription_store();
         });
     }()}
@@ -628,26 +633,19 @@ void SyncSession::handle_error(SyncError error)
                 }
                 break;
             case sync::ProtocolErrorInfo::Action::MigrateToFLX:
-                if (!m_original_sync_config->flx_sync_requested) {
-                    m_migration_store->migrate_to_flx(error.migration_query_string);
-                    next_state = NextStateAfterError::inactive;
-                    break;
-                }
-                else {
-                    // Should not receive this error if original sync config is FLX
-                    REALM_UNREACHABLE();
-                }
+                // Should not receive this error if original sync config is FLX
+                REALM_ASSERT(!m_original_sync_config->flx_sync_requested);
+                // Original config was PBS, migrating to FLX
+                m_migration_store->migrate_to_flx(error.migration_query_string);
+                next_state = NextStateAfterError::inactive;
+                break;
             case sync::ProtocolErrorInfo::Action::RevertToPBS:
+                // Should not receive this error if original sync config is FLX
+                REALM_ASSERT(!m_original_sync_config->flx_sync_requested);
                 // Original config was PBS, cancel the migration
-                if (!m_original_sync_config->flx_sync_requested) {
-                    m_migration_store->cancel_migration();
-                    next_state = NextStateAfterError::inactive;
-                    break;
-                }
-                else {
-                    // Should not receive this error if original sync config is FLX
-                    REALM_UNREACHABLE();
-                }
+                m_migration_store->cancel_migration();
+                next_state = NextStateAfterError::inactive;
+                break;
         }
     }
     else if (error_code.category() == realm::sync::client_error_category()) {
@@ -1215,7 +1213,7 @@ std::string const& SyncSession::path() const
     return m_db->get_path();
 }
 
-const std::shared_ptr<sync::SubscriptionStore>& SyncSession::get_flx_subscription_store()
+std::shared_ptr<sync::SubscriptionStore> SyncSession::get_flx_subscription_store()
 {
     util::CheckedLockGuard lock(m_config_mutex);
     return m_flx_subscription_store;
@@ -1264,15 +1262,12 @@ void SyncSession::update_subscription_store()
     if (!m_config.sync_config)
         return;
 
-    REALM_ASSERT(!m_session);
-
     auto& history = static_cast<sync::ClientReplication&>(*m_db->get_replication());
 
     // If the subscription store exists and switching to PBS, then clear the store
     if (!m_config.sync_config->flx_sync_requested) {
         if (m_flx_subscription_store) {
             history.set_write_validator_factory(nullptr);
-            m_flx_subscription_store->clear();
             m_flx_subscription_store.reset();
         }
         return;

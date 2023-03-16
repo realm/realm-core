@@ -37,6 +37,11 @@ MigrationStore::MigrationStore(DBRef db,
     , m_state(MigrationState::NotMigrated)
     , m_query_string{}
 {
+    load_data(true); // read_only
+}
+
+bool MigrationStore::load_data(bool read_only)
+{
     std::vector<SyncMetadataTable> internal_tables{
         {&m_migration_table,
          c_flx_migration_table,
@@ -48,28 +53,43 @@ MigrationStore::MigrationStore(DBRef db,
     };
 
     auto tr = m_db->start_read();
-    SyncMetadataSchemaVersions schema_versions(tr);
-
-    if (auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_migration_store);
-        !schema_version) {
-        tr->promote_to_write();
-        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_migration_store, c_schema_version);
-        create_sync_metadata_schema(tr, &internal_tables);
-        tr->commit_and_continue_as_read();
-    }
-    else {
-        if (*schema_version != c_schema_version) {
-            throw std::runtime_error("Invalid schema version for flexible sync migration store metadata");
+    if (!m_migration_table) {
+        SyncMetadataSchemaVersions schema_versions(tr, read_only);
+        if (!schema_versions.is_initialized()) {
+            return false; // no data to read and writing is disabled
         }
-        load_sync_metadata_schema(tr, &internal_tables);
+
+        if (auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_migration_store);
+            !schema_version) {
+            if (read_only) {
+                return false; // no data to read and writing is disabled
+            }
+
+            tr->promote_to_write();
+            schema_versions.set_version_for(tr, internal_schema_groups::c_flx_migration_store, c_schema_version);
+            create_sync_metadata_schema(tr, &internal_tables);
+            tr->commit_and_continue_as_read();
+        }
+        else {
+            if (*schema_version != c_schema_version) {
+                throw std::runtime_error("Invalid schema version for flexible sync migration store metadata");
+            }
+            load_sync_metadata_schema(tr, &internal_tables);
+        }
     }
 
-    // Read the migration object if exists
+    // Read the migration object if exists, or default to not migrated
+    std::lock_guard lock(m_mutex);
     if (auto migration_table = tr->get_table(m_migration_table); !migration_table->is_empty()) {
         auto migration_store_obj = migration_table->get_object(0);
         m_state = static_cast<MigrationState>(migration_store_obj.get<int64_t>(m_migration_state));
         m_query_string = migration_store_obj.get<String>(m_migration_query_str);
     }
+    else {
+        m_state = MigrationState::NotMigrated;
+        m_query_string = {};
+    }
+    return true;
 }
 
 bool MigrationStore::is_migrated()
@@ -117,6 +137,11 @@ void MigrationStore::migrate_to_flx(std::string_view rql_query_string)
     REALM_ASSERT(!rql_query_string.empty());
 
     {
+        // Make sure the migration table has been initialized
+        if (!m_migration_table) {
+            REALM_ASSERT(load_data());
+        }
+
         std::unique_lock lock{m_mutex};
         m_query_string = rql_query_string;
         m_state = MigrationState::Migrated;
@@ -144,17 +169,21 @@ void MigrationStore::cancel_migration()
     m_on_migration_state_changed(MigrationState::NotMigrated);
 }
 
-void MigrationStore::clear(std::unique_lock<std::mutex>)
+void MigrationStore::clear(std::unique_lock<std::mutex> lock)
 {
-    // Already cleared
-    if (m_state == MigrationState::NotMigrated)
-        return;
+    // Make sure the migration table has been initialized
+    lock.unlock();
+    if (!m_migration_table) {
+        REALM_ASSERT(load_data());
+    }
 
     auto tr = m_db->start_read();
     auto migration_table = tr->get_table(m_migration_table);
-    if (migration_table->is_empty())
-        return;
+    if (migration_table->is_empty()) {
+        return; // already cleared
+    }
 
+    lock.lock();
     m_state = MigrationState::NotMigrated;
     m_query_string = {};
     tr->promote_to_write();

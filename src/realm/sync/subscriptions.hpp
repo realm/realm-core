@@ -337,10 +337,6 @@ public:
     using TableSet = std::set<std::string, std::less<>>;
     TableSet get_tables_for_latest(const Transaction& tr) const;
 
-    // Erase all the persistent subscription store data
-    // The subscription store object must be deleted before calling this function
-    void clear();
-
     struct PendingSubscription {
         int64_t query_version;
         DB::version_type snapshot_version;

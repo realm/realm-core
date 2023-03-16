@@ -906,17 +906,4 @@ bool SubscriptionStore::would_refresh(DB::version_type version) const noexcept
     return version < m_db->get_version_of_latest_snapshot();
 }
 
-void SubscriptionStore::clear()
-{
-    // Need to cancel the pending notifications - will do in a separate PR
-    auto tr = m_db->start_read();
-    auto sub_sets = tr->get_table(m_sub_set_table);
-    if (sub_sets->is_empty())
-        return;
-
-    tr->promote_to_write();
-    sub_sets->clear();
-    tr->commit();
-}
-
 } // namespace realm::sync

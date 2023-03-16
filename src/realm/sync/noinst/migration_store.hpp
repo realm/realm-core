@@ -59,9 +59,6 @@ public:
     // Clear the migrated state
     void cancel_migration();
 
-    // Clear the migration store info
-    void clear(std::unique_lock<std::mutex> lock);
-
     bool is_migrated();
 
     std::string_view get_query_string();
@@ -74,6 +71,14 @@ public:
 protected:
     explicit MigrationStore(DBRef db,
                             std::function<void(MigrationStore::MigrationState)>&& on_migration_state_changed);
+
+    // Read the data from the database - returns true if successful
+    // Will return false if read_only is set and the metadata schema
+    // versions info is not already set.
+    bool load_data(bool read_only = false); // requires !m_mutex
+
+    // Clear the migration store info
+    void clear(std::unique_lock<std::mutex> lock);
 
     DBRef m_db;
 
