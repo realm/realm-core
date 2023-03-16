@@ -243,8 +243,14 @@ void CollectionList::remove(size_t ndx)
     ensure_created();
     REALM_ASSERT(m_key_type == type_Int);
     auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
-    int_keys->erase(ndx);
-    m_refs.erase(ndx);
+    if (ndx < int_keys->size()) {
+        auto btree_index = int_keys->find_first(int_keys->get(ndx));
+        if (btree_index != realm::not_found) {
+            int_keys->erase(btree_index);
+            m_refs.erase(btree_index);
+        }
+    }
+    // TODO: should I throw here?
 }
 
 void CollectionList::remove(StringData key)
@@ -259,7 +265,7 @@ void CollectionList::remove(StringData key)
         string_keys->erase(it.index());
         m_refs.erase(it.index());
     }
-    // TODO: shoud I throw here in order to signal that the element has not been found.
+    // TODO: shoud I throw here?
 }
 
 ref_type CollectionList::get_collection_ref(Index index) const noexcept

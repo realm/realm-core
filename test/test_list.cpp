@@ -33,8 +33,8 @@ using namespace std::chrono;
 #include "test.hpp"
 #include "test_types_helper.hpp"
 
-//#include <valgrind/callgrind.h>
-//#define PERFORMACE_TESTING
+// #include <valgrind/callgrind.h>
+// #define PERFORMACE_TESTING
 
 using namespace realm;
 using namespace realm::util;
@@ -677,7 +677,7 @@ TEST(List_NestedList_Insert)
     CHECK_EQUAL(collection2->size(), 0);
 }
 
-ONLY(List_NestedList_Remove)
+TEST(List_NestedList_Remove)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(make_in_realm_history(), path);
@@ -693,22 +693,29 @@ ONLY(List_NestedList_Remove)
     tr->commit_and_continue_as_read();
     CHECK_NOT(list->is_empty());
     CHECK_EQUAL(obj.get_collection_list(list_col)->get_collection_ptr(0)->get_any(0).get_int(), 5);
-    tr->promote_to_write();
+    // transaction
     {
+        tr->promote_to_write();
         auto lst = list->get_collection_ptr(0);
         dynamic_cast<Lst<Int>*>(lst.get())->add(47);
+        tr->commit_and_continue_as_read();
     }
-    tr->commit_and_continue_as_read();
-    CHECK(collection->size() != 0);
+    CHECK(collection->size() == 2);
     CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection.get())->get(0), 5);
     CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection.get())->get(1), 47);
 
     tr->promote_to_write();
+    CHECK(collection->size() == 2);
+    dynamic_cast<Lst<Int>*>(collection.get())->remove(0); // remove 5
+    dynamic_cast<Lst<Int>*>(collection.get())->remove(0); // remove 47
+    CHECK(collection->size() == 0);
     list->remove(0);
+    // out of index (nothing should happen)
     list->remove(1);
     tr->commit_and_continue_as_read();
     CHECK_EQUAL(list->size(), 0);
-    CHECK_EQUAL(collection->size(), 2);
+    // CHECK_EQUAL(collection->size(), 2); this ptr should be gone and memory cannot be accessed TODO: probably we
+    // need to throw an excpetion here.
 
     tr->promote_to_write();
     obj.remove();
