@@ -91,6 +91,15 @@ AppError failed_log_in(std::shared_ptr<App> app, AppCredentials credentials = Ap
 
 } // namespace
 
+namespace realm {
+class TestHelper {
+public:
+    static DBRef get_db(Realm& realm)
+    {
+        return Realm::Internal::get_db(realm);
+    }
+};
+} // namespace realm
 
 #if REALM_ENABLE_AUTH_TESTS
 
@@ -3051,6 +3060,40 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(realm->sync_session() == realm->sync_session());
             REQUIRE(realm->sync_session()->state() == SyncSession::State::Paused);
         }
+    }
+
+    SECTION("pausing a session does not hold the DB open") {
+        SyncTestFile config(app, partition, schema);
+        DBRef dbref;
+        std::shared_ptr<SyncSession> sync_sess_ext_ref;
+        {
+            auto realm = Realm::get_shared_realm(config);
+            wait_for_download(*realm);
+
+            auto state = realm->sync_session()->state();
+            REQUIRE(state == SyncSession::State::Active);
+
+            sync_sess_ext_ref = realm->sync_session()->external_reference();
+            dbref = TestHelper::get_db(*realm);
+            REQUIRE(dbref.use_count() == 4);
+
+            realm->sync_session()->pause();
+            state = realm->sync_session()->state();
+            REQUIRE(state == SyncSession::State::Paused);
+        }
+
+        REQUIRE_THAT(
+            [&] {
+                return dbref.use_count() == 2;
+            },
+            ReturnsTrueAfter{});
+
+        sync_sess_ext_ref.reset();
+        REQUIRE_THAT(
+            [&] {
+                return dbref.use_count() == 1;
+            },
+            ReturnsTrueAfter{});
     }
 
     SECTION("validation") {

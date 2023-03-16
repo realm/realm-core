@@ -68,6 +68,24 @@ bool results_contains_original_name(SyncFileActionMetadataResults& results, cons
     return false;
 }
 
+bool ReturnsTrueAfter::match(util::FunctionRef<bool()> condition) const
+{
+    const auto wait_start = std::chrono::steady_clock::now();
+    bool predicate_returned_true = false;
+    util::EventLoop::main().run_until([&] {
+        if (std::chrono::steady_clock::now() - wait_start > m_max_ms) {
+            return true;
+        }
+        auto ret = condition();
+        if (ret) {
+            predicate_returned_true = true;
+        }
+        return ret;
+    });
+
+    return predicate_returned_true;
+}
+
 void timed_wait_for(util::FunctionRef<bool()> condition, std::chrono::milliseconds max_ms)
 {
     const auto wait_start = std::chrono::steady_clock::now();
