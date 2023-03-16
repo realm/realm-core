@@ -76,6 +76,7 @@ public:
     void set_development_mode_to(const std::string& app_id, bool enable) const;
     void delete_app(const std::string& app_id) const;
     void trigger_client_reset(const std::string& app_id, int64_t file_ident) const;
+    void migrate_to_flx(const std::string& app_id, const std::string& service_id, bool migrate_to_flx) const;
 
     struct Service {
         std::string id;
@@ -118,6 +119,16 @@ public:
     bool is_sync_enabled(const std::string& app_id) const;
     bool is_sync_terminated(const std::string& app_id) const;
     bool is_initial_sync_complete(const std::string& app_id) const;
+
+    struct MigrationStatus {
+        std::string statusMessage;
+        bool isMigrated = false;
+        bool isCancelable = false;
+        bool isRevertible = false;
+        bool complete = false;
+    };
+
+    MigrationStatus get_migration_status(const std::string& app_id) const;
 
     const std::string& base_url() const noexcept
     {

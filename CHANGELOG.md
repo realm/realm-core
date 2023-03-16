@@ -2,11 +2,11 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Expose `RealmConfig::schema_subset_mode` in the C-API. (PR [#6379](https://github.com/realm/realm-core/pull/6379))
+* None.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Fixed a case of history diverging when empty reciprocal changesets are part of the merging window in OT. This may have resulted in arrays being in different orders on different devices. ([#6191](https://github.com/realm/realm-core/issues/6191), since v11.13.0)
+* None.
 
 ### Breaking changes
 * None.
@@ -17,8 +17,29 @@
 -----------
 
 ### Internals
+* Add admin api and test for performing the PBS->FLX migration and roll back on the server. (PR [#6366](https://github.com/realm/realm-core/pull/6366))
 * Integrate protocol support for PBS->FLX client migration ([PR #6355](https://github.com/realm/realm-core/pull/6355))
 
+----------------------------------------------
+
+# 13.7.1 Release notes
+
+### Enhancements
+* Expose `RealmConfig::schema_subset_mode` in the C-API. (PR [#6379](https://github.com/realm/realm-core/pull/6379))
+
+### Fixed
+* Fixed a bug that may have resulted in arrays being in different orders on different devices. Some cases of “Invalid prior_size” may be fixed too. ([#6191](https://github.com/realm/realm-core/issues/6191), since v11.13.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None
 ----------------------------------------------
 
 # 13.7.0 Release notes
