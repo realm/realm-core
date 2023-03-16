@@ -466,13 +466,15 @@ protected:
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
     static constexpr int_fast64_t ubound_for_width(size_t width) noexcept;
 
+    // This will have to be eventually used, exposing this here for testing.
+    size_t count(int64_t value) const noexcept;
+
 private:
     void update_width_cache_from_header() noexcept;
 
     void do_ensure_minimum_width(int_fast64_t);
 
     int64_t sum(size_t start, size_t end) const;
-    size_t count(int64_t value) const noexcept;
 
     template <size_t w>
     int64_t sum(size_t start, size_t end) const;
