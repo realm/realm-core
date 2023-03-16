@@ -105,14 +105,14 @@ if(REALM_ENABLE_SYNC)
     endif()
 endif()
 
-if(REALM_TEST_SYNC_LOGGING)
+if(REALM_TEST_LOGGING)
     target_compile_definitions(ObjectStoreTests PRIVATE
-        TEST_ENABLE_SYNC_LOGGING=1
+        TEST_ENABLE_LOGGING=1
     )
 
-    if(REALM_TEST_SYNC_LOGGING_LEVEL)
+    if(REALM_TEST_LOGGING_LEVEL)
         target_compile_definitions(ObjectStoreTests PRIVATE
-            TEST_ENABLE_SYNC_LOGGING_LEVEL=${REALM_TEST_SYNC_LOGGING_LEVEL}
+            TEST_LOGGING_LEVEL=${REALM_TEST_LOGGING_LEVEL}
         )
     endif()
 endif()

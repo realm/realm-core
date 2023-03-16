@@ -22,7 +22,35 @@
 
 namespace realm::util {
 
-const Logger::Level Logger::default_log_level = Level::info;
+std::shared_ptr<util::Logger> Logger::s_default_logger;
+Logger::Level Logger::s_default_level = Level::info;
+
+void Logger::set_default_logger(std::shared_ptr<util::Logger> logger) noexcept
+{
+    s_default_logger = logger;
+}
+
+std::shared_ptr<util::Logger>& Logger::get_default_logger() noexcept
+{
+    if (!s_default_logger) {
+        s_default_logger = std::make_shared<StderrLogger>();
+        s_default_logger->set_level_threshold(s_default_level);
+    }
+
+    return s_default_logger;
+}
+
+void Logger::set_default_level_threshold(Level level) noexcept
+{
+    s_default_level = level;
+    if (s_default_logger)
+        s_default_logger->set_level_threshold(level);
+}
+
+Logger::Level Logger::get_default_level_threshold() noexcept
+{
+    return s_default_level;
+}
 
 const char* Logger::get_level_prefix(Level level) noexcept
 {

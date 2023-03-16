@@ -2598,6 +2598,10 @@ TableView Table::get_sorted_view(SortDescriptor order) const
     return const_cast<Table*>(this)->get_sorted_view(std::move(order));
 }
 
+util::Logger* Table::get_logger() const noexcept
+{
+    return *m_repl ? (*m_repl)->get_logger() : nullptr;
+}
 
 // Called after a commit. Table will effectively contain the same as before,
 // but now with new refs from the file
@@ -2715,16 +2719,6 @@ void Table::to_json(std::ostream& out, size_t link_depth, const std::map<std::st
     out << "]";
 }
 
-
-size_t Table::compute_aggregated_byte_size() const noexcept
-{
-    if (!m_top.is_attached())
-        return 0;
-    const Array& real_top = (m_top);
-    MemStats stats_2;
-    real_top.stats(stats_2);
-    return stats_2.allocated;
-}
 
 bool Table::operator==(const Table& t) const
 {

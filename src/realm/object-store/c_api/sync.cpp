@@ -26,7 +26,6 @@
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/util/basic_system_errors.hpp>
 
-#include "logging.hpp"
 #include "types.hpp"
 #include "util.hpp"
 
@@ -206,19 +205,6 @@ RLM_API void realm_sync_client_config_set_metadata_encryption_key(realm_sync_cli
                                                                   const uint8_t key[64]) noexcept
 {
     config->custom_encryption_key = std::vector<char>(key, key + 64);
-}
-
-RLM_API void realm_sync_client_config_set_log_callback(realm_sync_client_config_t* config, realm_log_func_t callback,
-                                                       realm_userdata_t userdata,
-                                                       realm_free_userdata_func_t userdata_free) noexcept
-{
-    config->logger_factory = make_logger_factory(callback, userdata, userdata_free);
-}
-
-RLM_API void realm_sync_client_config_set_log_level(realm_sync_client_config_t* config,
-                                                    realm_log_level_e level) noexcept
-{
-    config->log_level = realm::util::Logger::Level(level);
 }
 
 RLM_API void realm_sync_client_config_set_reconnect_mode(realm_sync_client_config_t* config,

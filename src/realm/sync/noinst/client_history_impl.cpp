@@ -627,6 +627,11 @@ void ClientHistory::set_reciprocal_transform(version_type version, BinaryData da
     std::size_t index = size_t(version - m_sync_history_base_version) - 1;
     REALM_ASSERT(index < sync_history_size());
 
+    if (data.is_null()) {
+        m_arrays->reciprocal_transforms.set(index, BinaryData{"", 0}); // Throws
+        return;
+    }
+
     auto compressed = util::compression::allocate_and_compress_nonportable(data);
     m_arrays->reciprocal_transforms.set(index, BinaryData{compressed.data(), compressed.size()}); // Throws
 }
@@ -764,6 +769,7 @@ Replication::version_type ClientHistory::add_changeset(BinaryData ct_changeset, 
 
 void ClientHistory::add_sync_history_entry(const HistoryEntry& entry)
 {
+    REALM_ASSERT(m_arrays->changesets.size() == sync_history_size());
     REALM_ASSERT(m_arrays->reciprocal_transforms.size() == sync_history_size());
     REALM_ASSERT(m_arrays->remote_versions.size() == sync_history_size());
     REALM_ASSERT(m_arrays->origin_file_idents.size() == sync_history_size());
@@ -775,7 +781,7 @@ void ClientHistory::add_sync_history_entry(const HistoryEntry& entry)
         m_arrays->changesets.add(BinaryData{compressed.data(), compressed.size()}); // Throws
     }
     else {
-        m_arrays->changesets.add(BinaryData()); // Throws
+        m_arrays->changesets.add(BinaryData("", 0)); // Throws
     }
 
     m_arrays->reciprocal_transforms.add(BinaryData{});                                            // Throws
@@ -1175,6 +1181,7 @@ void ClientHistory::update_from_ref_and_version(ref_type ref, version_type versi
 
     m_ct_history_base_version = version - ct_history_size();
     m_sync_history_base_version = version - sync_history_size();
+    REALM_ASSERT(m_arrays->changesets.size() == sync_history_size());
     REALM_ASSERT(m_arrays->reciprocal_transforms.size() == sync_history_size());
     REALM_ASSERT(m_arrays->remote_versions.size() == sync_history_size());
     REALM_ASSERT(m_arrays->origin_file_idents.size() == sync_history_size());

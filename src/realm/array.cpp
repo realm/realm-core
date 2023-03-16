@@ -1234,6 +1234,7 @@ void Array::set(size_t ndx, int64_t value)
     set_direct<width>(m_data, ndx, value);
 }
 
+#ifdef REALM_DEBUG
 namespace {
 
 class MemStatsHandler : public Array::MemUsageHandler {
@@ -1315,6 +1316,7 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
         handler.handle(ref, allocated, used); // Throws
     }
 }
+#endif
 
 void Array::verify() const
 {

@@ -70,6 +70,9 @@ typedef Link BackLink;
 namespace _impl {
 class TableFriend;
 }
+namespace util {
+class Logger;
+}
 namespace metrics {
 class QueryInfo;
 }
@@ -621,14 +624,6 @@ public:
     /// See operator==().
     bool operator!=(const Table& t) const;
 
-    /// Compute the sum of the sizes in number of bytes of all the array nodes
-    /// that currently make up this table. See also
-    /// Group::compute_aggregate_byte_size().
-    ///
-    /// If this table accessor is the detached state, this function returns
-    /// zero.
-    size_t compute_aggregated_byte_size() const noexcept;
-
     // Debug
     void verify() const;
 
@@ -812,6 +807,7 @@ private:
     void remove_recursive(CascadeState&);
 
     Replication* get_repl() const noexcept;
+    util::Logger* get_logger() const noexcept;
 
     void set_ndx_in_parent(size_t ndx_in_parent) noexcept;
 
