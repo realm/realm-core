@@ -189,13 +189,13 @@ TEST(Set_Mixed_SortStringAndBinary)
     set.sort(indices, false);
     CHECK_EQUAL(indices, (std::vector<size_t>{4, 3, 2, 1, 0}));
 
-    // Binary values which should be interleaved with the strings
+    // Binary values which should come after strings
     set.insert(BinaryData("b", 1));
     set.insert(BinaryData("d", 1));
     set.sort(indices, true);
-    CHECK_EQUAL(indices, (std::vector<size_t>{0, 1, 4, 2, 5, 3, 6}));
+    CHECK_EQUAL(indices, (std::vector<size_t>{0, 1, 2, 3, 4, 5, 6}));
     set.sort(indices, false);
-    CHECK_EQUAL(indices, (std::vector<size_t>{6, 3, 5, 2, 4, 1, 0}));
+    CHECK_EQUAL(indices, (std::vector<size_t>{6, 5, 4, 3, 2, 1, 0}));
 
     // Non-empty but no strings
     set.clear();
