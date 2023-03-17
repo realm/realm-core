@@ -1459,12 +1459,12 @@ TEST(TableView_SortOrder_Core)
 {
     Table table;
     auto col = table.add_column(type_String, "1");
-    // This tests the expected sorting order with STRING_COMPARE_CORE. See utf8_compare() in unicode.cpp. Only
-    // characters
-    // that have a visual representation are tested (control characters such as line feed are omitted).
+    // This tests the expected sorting order of strings. Only characters that have a
+    // visual representation are tested (control characters such as line feed are
+    // omitted).
     //
-    // NOTE: Your editor must assume that Core source code is in utf8, and it must save as utf8, else this unit
-    // test will fail.
+    // NOTE: Your editor must assume that Core source code is in utf8, and it must save
+    // as utf8, else this unit test will fail.
 
     table.create_object().set_all(" ");
     table.create_object().set_all("!");

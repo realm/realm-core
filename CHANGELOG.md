@@ -7,9 +7,12 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Align dictionaries to Lists and Sets when they get cleared. ([#6205](https://github.com/realm/realm-core/issues/6205), since v10.4.0)
+* Fixed equality queries on a Mixed property with an index possibly returning the wrong result if values of different types happened to have the same StringIndex hash.
  
 ### Breaking changes
 * Support for upgrading from Realm files produced by RealmCore v5.23.9 or earlier is no longer supported.
+* Sorting order of strings has changed to use standard unicode codepoint order instead of grouping similar english letters together. A noticeable change will be from "aAbBzZ" to "ABZabz". ([2573](https://github.com/realm/realm-core/issues/2573))
+* BinaryData and StringData are now strongly typed for comparisons and queries. This change is especially relevant when querying for a string constant on a Mixed property, as now only strings will be returned. If searching for BinaryData is desired, then that type must be specified by the constant. In RQL the new way to specify a binary constant is to use `mixed = bin('xyz')` or `mixed = binary('xyz')`. ([6118](https://github.com/realm/realm-core/issues/6118)).
 
 ### Compatibility
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
