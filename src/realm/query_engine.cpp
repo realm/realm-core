@@ -184,6 +184,7 @@ void MixedNode<Equal>::init(bool will_query_ranges)
 size_t MixedNode<Equal>::find_first_local(size_t start, size_t end)
 {
     REALM_ASSERT(m_table);
+    Equal cond;
 
     if (m_index_evaluator) {
         return m_index_evaluator->do_search_index(m_cluster, start, end);
@@ -215,6 +216,17 @@ void MixedNode<EqualIns>::init(bool will_query_ranges)
             m_index_matches.clear();
             constexpr bool case_insensitive = true;
             index->find_all(m_index_matches, val_as_string, case_insensitive);
+            // It is unfortunate but necessary to check the type due to Binary and String
+            // having the same StringIndex hash values
+            for (auto it = m_index_matches.begin(); it != m_index_matches.end();) {
+                Mixed to_check = m_table->get_object(*it).get_any(m_condition_column_key);
+                if (!Mixed::types_are_comparable(to_check, m_value)) {
+                    it = m_index_matches.erase(it);
+                }
+                else {
+                    ++it;
+                }
+            }
             m_index_evaluator->init(&m_index_matches);
         }
         else {
@@ -244,18 +256,14 @@ size_t MixedNode<EqualIns>::find_first_local(size_t start, size_t end)
     REALM_ASSERT(m_table);
 
     EqualIns cond;
-    if (m_value.is_type(type_String)) {
+    if (m_value.is_type(type_String, type_Binary)) {
         for (size_t i = start; i < end; i++) {
             QueryValue val(m_leaf_ptr->get(i));
-            StringData val_as_str;
-            if (val.is_type(type_String)) {
-                val_as_str = val.get<StringData>();
+            if (!Mixed::types_are_comparable(m_value, val)) {
+                continue;
             }
-            else if (val.is_type(type_Binary)) {
-                val_as_str = StringData(val.get<BinaryData>().data(), val.get<BinaryData>().size());
-            }
-            if (!val_as_str.is_null() &&
-                cond(m_value.get<StringData>(), m_ucase.c_str(), m_lcase.c_str(), val_as_str))
+            StringData val_as_str = val.export_to_type<StringData>();
+            if (cond(m_value.export_to_type<StringData>(), m_ucase.c_str(), m_lcase.c_str(), val_as_str))
                 return i;
         }
     }
