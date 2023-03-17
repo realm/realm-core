@@ -184,7 +184,6 @@ void MixedNode<Equal>::init(bool will_query_ranges)
 size_t MixedNode<Equal>::find_first_local(size_t start, size_t end)
 {
     REALM_ASSERT(m_table);
-    Equal cond;
 
     if (m_index_evaluator) {
         return m_index_evaluator->do_search_index(m_cluster, start, end);

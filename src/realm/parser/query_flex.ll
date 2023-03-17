@@ -59,6 +59,7 @@ blank   [ \t\r]
 (?i:sort)                   return yy::parser::make_SORT(yytext);
 (?i:distinct)               return yy::parser::make_DISTINCT(yytext);
 (?i:limit)                  return yy::parser::make_LIMIT(yytext);
+(((?i:bin)|(?i:binary))"(") return yy::parser::make_BINARY(yytext);
 (?i:obj)                    return yy::parser::make_OBJ(yytext);
 (?i:ascending)|(?i:asc)     return yy::parser::make_ASCENDING(yytext);
 (?i:descending)|(?i:desc)   return yy::parser::make_DESCENDING(yytext);
@@ -82,7 +83,7 @@ blank   [ \t\r]
 [+-]?(?i:nan)               return  yy::parser::make_NAN(yytext);
 (?i:null)|(?i:nil)          return yy::parser::make_NULL_VAL ();
 "uuid("{hex}{8}"-"{hex}{4}"-"{hex}{4}"-"{hex}{4}"-"{hex}{12}")" return yy::parser::make_UUID(yytext); 
-"oid("{hex}{24}")"          return yy::parser::make_OID(yytext); 
+"oid("{hex}{24}")"          return yy::parser::make_OID(yytext);
 ("T"{sint}":"{sint})|({int}"-"{int}"-"{int}[@T]{int}":"{int}":"{int}(":"{int})?) return yy::parser::make_TIMESTAMP(yytext);
 "O"{int}                    return yy::parser::make_LINK (yytext);
 "L"{int}":"{int}            return yy::parser::make_TYPED_LINK (yytext);
@@ -95,6 +96,7 @@ blank   [ \t\r]
 ("B64\""[a-zA-Z0-9/\+=]*\")         return yy::parser::make_BASE64(yytext);
 (\"({char1}|{escape}|{unicode})*\") return yy::parser::make_STRING (yytext);
 ('({char2}|{escape}|{unicode})*')   return yy::parser::make_STRING (yytext);
+
 ({letter}|{utf8})({id_char}|{utf8}|{ws})*           return yy::parser::make_ID (check_escapes(yytext));
 
 .          {

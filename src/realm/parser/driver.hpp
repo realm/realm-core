@@ -157,6 +157,8 @@ public:
         FLOAT,
         STRING,
         BASE64,
+        BINARY_STR,
+        BINARY_BASE64,
         TIMESTAMP,
         UUID_T,
         OID,
@@ -194,6 +196,9 @@ public:
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
     util::Optional<ExpressionComparisonType> m_comp_type;
     std::string target_table;
+
+private:
+    void decode_b64(util::UniqueFunction<void(StringData)>);
 };
 
 class GeospatialNode : public ValueNode {

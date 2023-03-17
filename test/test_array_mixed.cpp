@@ -239,19 +239,19 @@ TEST(Mixed_string_binary_compare)
     const auto b = Mixed("B");
     const auto c = Mixed(BinaryData("C", 1));
 
-    CHECK_GREATER(a.compare(b), 0);
+    CHECK_LESS(a.compare(b), 0);
     CHECK_LESS(b.compare(c), 0);
     CHECK_GREATER(c.compare(a), 0);
 
     std::vector<std::array<Mixed, 3>> perms = {
-        {a, b, c}, {a, c, b}, {b, a, c}, // vars[2] is the expected ordering
+        {a, b, c}, {a, c, b}, {b, a, c}, // vars[0] is the expected ordering
         {b, c, a}, {c, a, b}, {c, b, a},
     };
     for (auto& arr : perms) {
         std::sort(arr.begin(), arr.end());
-        CHECK_EQUAL(arr[0], perms[2][0]);
-        CHECK_EQUAL(arr[1], perms[2][1]);
-        CHECK_EQUAL(arr[2], perms[2][2]);
+        CHECK_EQUAL(arr[0], perms[0][0]);
+        CHECK_EQUAL(arr[1], perms[0][1]);
+        CHECK_EQUAL(arr[2], perms[0][2]);
     }
 }
 

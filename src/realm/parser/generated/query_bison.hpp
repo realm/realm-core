@@ -542,6 +542,7 @@ namespace yy {
       // "sort"
       // "distinct"
       // "limit"
+      // "binary"
       // "ascending"
       // "descending"
       // "@size"
@@ -648,11 +649,12 @@ namespace yy {
     TOK_SORT = 308,                // "sort"
     TOK_DISTINCT = 309,            // "distinct"
     TOK_LIMIT = 310,               // "limit"
-    TOK_ASCENDING = 311,           // "ascending"
-    TOK_DESCENDING = 312,          // "descending"
-    TOK_SIZE = 313,                // "@size"
-    TOK_TYPE = 314,                // "@type"
-    TOK_KEY_VAL = 315              // "key or value"
+    TOK_BINARY = 311,              // "binary"
+    TOK_ASCENDING = 312,           // "ascending"
+    TOK_DESCENDING = 313,          // "descending"
+    TOK_SIZE = 314,                // "@size"
+    TOK_TYPE = 315,                // "@type"
+    TOK_KEY_VAL = 316              // "key or value"
       };
       /// Backward compatibility alias (Bison 3.6).
       typedef token_kind_type yytokentype;
@@ -669,7 +671,7 @@ namespace yy {
     {
       enum symbol_kind_type
       {
-        YYNTOKENS = 73, ///< Number of tokens.
+        YYNTOKENS = 74, ///< Number of tokens.
         SYM_YYEMPTY = -2,
         SYM_YYEOF = 0,                           // "end of file"
         SYM_YYerror = 1,                         // error
@@ -727,60 +729,61 @@ namespace yy {
         SYM_SORT = 53,                           // "sort"
         SYM_DISTINCT = 54,                       // "distinct"
         SYM_LIMIT = 55,                          // "limit"
-        SYM_ASCENDING = 56,                      // "ascending"
-        SYM_DESCENDING = 57,                     // "descending"
-        SYM_SIZE = 58,                           // "@size"
-        SYM_TYPE = 59,                           // "@type"
-        SYM_KEY_VAL = 60,                        // "key or value"
-        SYM_61_ = 61,                            // '+'
-        SYM_62_ = 62,                            // '-'
-        SYM_63_ = 63,                            // '*'
-        SYM_64_ = 64,                            // '/'
-        SYM_65_ = 65,                            // '('
-        SYM_66_ = 66,                            // ')'
-        SYM_67_ = 67,                            // '.'
-        SYM_68_ = 68,                            // ','
-        SYM_69_ = 69,                            // '['
-        SYM_70_ = 70,                            // ']'
-        SYM_71_ = 71,                            // '{'
-        SYM_72_ = 72,                            // '}'
-        SYM_YYACCEPT = 73,                       // $accept
-        SYM_final = 74,                          // final
-        SYM_query = 75,                          // query
-        SYM_compare = 76,                        // compare
-        SYM_expr = 77,                           // expr
-        SYM_value = 78,                          // value
-        SYM_prop = 79,                           // prop
-        SYM_aggregate = 80,                      // aggregate
-        SYM_simple_prop = 81,                    // simple_prop
-        SYM_subquery = 82,                       // subquery
-        SYM_coordinate = 83,                     // coordinate
-        SYM_geopoint = 84,                       // geopoint
-        SYM_geoloop_content = 85,                // geoloop_content
-        SYM_geoloop = 86,                        // geoloop
-        SYM_geopoly_content = 87,                // geopoly_content
-        SYM_geospatial = 88,                     // geospatial
-        SYM_post_query = 89,                     // post_query
-        SYM_distinct = 90,                       // distinct
-        SYM_distinct_param = 91,                 // distinct_param
-        SYM_sort = 92,                           // sort
-        SYM_sort_param = 93,                     // sort_param
-        SYM_limit = 94,                          // limit
-        SYM_direction = 95,                      // direction
-        SYM_list = 96,                           // list
-        SYM_list_content = 97,                   // list_content
-        SYM_constant = 98,                       // constant
-        SYM_primary_key = 99,                    // primary_key
-        SYM_boolexpr = 100,                      // boolexpr
-        SYM_comp_type = 101,                     // comp_type
-        SYM_post_op = 102,                       // post_op
-        SYM_aggr_op = 103,                       // aggr_op
-        SYM_equality = 104,                      // equality
-        SYM_relational = 105,                    // relational
-        SYM_stringop = 106,                      // stringop
-        SYM_path = 107,                          // path
-        SYM_path_elem = 108,                     // path_elem
-        SYM_id = 109                             // id
+        SYM_BINARY = 56,                         // "binary"
+        SYM_ASCENDING = 57,                      // "ascending"
+        SYM_DESCENDING = 58,                     // "descending"
+        SYM_SIZE = 59,                           // "@size"
+        SYM_TYPE = 60,                           // "@type"
+        SYM_KEY_VAL = 61,                        // "key or value"
+        SYM_62_ = 62,                            // '+'
+        SYM_63_ = 63,                            // '-'
+        SYM_64_ = 64,                            // '*'
+        SYM_65_ = 65,                            // '/'
+        SYM_66_ = 66,                            // '('
+        SYM_67_ = 67,                            // ')'
+        SYM_68_ = 68,                            // '.'
+        SYM_69_ = 69,                            // ','
+        SYM_70_ = 70,                            // '['
+        SYM_71_ = 71,                            // ']'
+        SYM_72_ = 72,                            // '{'
+        SYM_73_ = 73,                            // '}'
+        SYM_YYACCEPT = 74,                       // $accept
+        SYM_final = 75,                          // final
+        SYM_query = 76,                          // query
+        SYM_compare = 77,                        // compare
+        SYM_expr = 78,                           // expr
+        SYM_value = 79,                          // value
+        SYM_prop = 80,                           // prop
+        SYM_aggregate = 81,                      // aggregate
+        SYM_simple_prop = 82,                    // simple_prop
+        SYM_subquery = 83,                       // subquery
+        SYM_coordinate = 84,                     // coordinate
+        SYM_geopoint = 85,                       // geopoint
+        SYM_geoloop_content = 86,                // geoloop_content
+        SYM_geoloop = 87,                        // geoloop
+        SYM_geopoly_content = 88,                // geopoly_content
+        SYM_geospatial = 89,                     // geospatial
+        SYM_post_query = 90,                     // post_query
+        SYM_distinct = 91,                       // distinct
+        SYM_distinct_param = 92,                 // distinct_param
+        SYM_sort = 93,                           // sort
+        SYM_sort_param = 94,                     // sort_param
+        SYM_limit = 95,                          // limit
+        SYM_direction = 96,                      // direction
+        SYM_list = 97,                           // list
+        SYM_list_content = 98,                   // list_content
+        SYM_constant = 99,                       // constant
+        SYM_primary_key = 100,                   // primary_key
+        SYM_boolexpr = 101,                      // boolexpr
+        SYM_comp_type = 102,                     // comp_type
+        SYM_post_op = 103,                       // post_op
+        SYM_aggr_op = 104,                       // aggr_op
+        SYM_equality = 105,                      // equality
+        SYM_relational = 106,                    // relational
+        SYM_stringop = 107,                      // stringop
+        SYM_path = 108,                          // path
+        SYM_path_elem = 109,                     // path_elem
+        SYM_id = 110                             // id
       };
     };
 
@@ -932,6 +935,7 @@ namespace yy {
       case symbol_kind::SYM_SORT: // "sort"
       case symbol_kind::SYM_DISTINCT: // "distinct"
       case symbol_kind::SYM_LIMIT: // "limit"
+      case symbol_kind::SYM_BINARY: // "binary"
       case symbol_kind::SYM_ASCENDING: // "ascending"
       case symbol_kind::SYM_DESCENDING: // "descending"
       case symbol_kind::SYM_SIZE: // "@size"
@@ -1363,6 +1367,7 @@ switch (yykind)
       case symbol_kind::SYM_SORT: // "sort"
       case symbol_kind::SYM_DISTINCT: // "distinct"
       case symbol_kind::SYM_LIMIT: // "limit"
+      case symbol_kind::SYM_BINARY: // "binary"
       case symbol_kind::SYM_ASCENDING: // "ascending"
       case symbol_kind::SYM_DESCENDING: // "descending"
       case symbol_kind::SYM_SIZE: // "@size"
@@ -2383,6 +2388,21 @@ switch (yykind)
 #if 201103L <= YY_CPLUSPLUS
       static
       symbol_type
+      make_BINARY (std::string v)
+      {
+        return symbol_type (token::TOK_BINARY, std::move (v));
+      }
+#else
+      static
+      symbol_type
+      make_BINARY (const std::string& v)
+      {
+        return symbol_type (token::TOK_BINARY, v);
+      }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+      static
+      symbol_type
       make_ASCENDING (std::string v)
       {
         return symbol_type (token::TOK_ASCENDING, std::move (v));
@@ -2528,7 +2548,7 @@ switch (yykind)
     // YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
     // Performed when YYTABLE does not specify something else to do.  Zero
     // means the default is an error.
-    static const signed char yydefact_[];
+    static const unsigned char yydefact_[];
 
     // YYPGOTO[NTERM-NUM].
     static const short yypgoto_[];
@@ -2783,9 +2803,9 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 555,     ///< Last index in yytable_.
+      yylast_ = 574,     ///< Last index in yytable_.
       yynnts_ = 37,  ///< Number of nonterminal symbols.
-      yyfinal_ = 66 ///< Termination state number.
+      yyfinal_ = 69 ///< Termination state number.
     };
 
 
@@ -2809,15 +2829,15 @@ switch (yykind)
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-      65,    66,    63,    61,    68,    62,    67,    64,     2,     2,
+      66,    67,    64,    62,    69,    63,    68,    65,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,    69,     2,    70,     2,     2,     2,     2,     2,     2,
+       2,    70,     2,    71,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,    71,     2,    72,     2,     2,     2,     2,
+       2,     2,     2,    72,     2,    73,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -2836,10 +2856,10 @@ switch (yykind)
       25,    26,    27,    28,    29,    30,    31,    32,    33,    34,
       35,    36,    37,    38,    39,    40,    41,    42,    43,    44,
       45,    46,    47,    48,    49,    50,    51,    52,    53,    54,
-      55,    56,    57,    58,    59,    60
+      55,    56,    57,    58,    59,    60,    61
     };
     // Last valid token kind.
-    const int code_max = 315;
+    const int code_max = 316;
 
     if (t <= 0)
       return symbol_kind::SYM_YYEOF;
@@ -2974,6 +2994,7 @@ switch (yykind)
       case symbol_kind::SYM_SORT: // "sort"
       case symbol_kind::SYM_DISTINCT: // "distinct"
       case symbol_kind::SYM_LIMIT: // "limit"
+      case symbol_kind::SYM_BINARY: // "binary"
       case symbol_kind::SYM_ASCENDING: // "ascending"
       case symbol_kind::SYM_DESCENDING: // "descending"
       case symbol_kind::SYM_SIZE: // "@size"
@@ -3131,6 +3152,7 @@ switch (yykind)
       case symbol_kind::SYM_SORT: // "sort"
       case symbol_kind::SYM_DISTINCT: // "distinct"
       case symbol_kind::SYM_LIMIT: // "limit"
+      case symbol_kind::SYM_BINARY: // "binary"
       case symbol_kind::SYM_ASCENDING: // "ascending"
       case symbol_kind::SYM_DESCENDING: // "descending"
       case symbol_kind::SYM_SIZE: // "@size"
