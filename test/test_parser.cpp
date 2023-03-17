@@ -1095,14 +1095,14 @@ TEST(Parser_NullableBinaries)
     verify_query(test_context, items, "nullable\\tdata == NIL", 2);
     verify_query(test_context, items, "nullable\\tdata != NIL", 3);
 
-    verify_query(test_context, items, "nullable\\tdata CONTAINS 'f'", 2);
-    verify_query(test_context, items, "nullable\\tdata BEGINSWITH 'f'", 1);
-    verify_query(test_context, items, "nullable\\tdata ENDSWITH 'e'", 2);
-    verify_query(test_context, items, "nullable\\tdata LIKE 'f*'", 1);
-    verify_query(test_context, items, "nullable\\tdata CONTAINS[c] 'F'", 2);
-    verify_query(test_context, items, "nullable\\tdata BEGINSWITH[c] 'F'", 1);
-    verify_query(test_context, items, "nullable\\tdata ENDSWITH[c] 'E'", 2);
-    verify_query(test_context, items, "nullable\\tdata LIKE[c] 'F*'", 1);
+    verify_query(test_context, items, "nullable\\tdata CONTAINS bin('f')", 2);
+    verify_query(test_context, items, "nullable\\tdata BEGINSWITH bin('f')", 1);
+    verify_query(test_context, items, "nullable\\tdata ENDSWITH bin('e')", 2);
+    verify_query(test_context, items, "nullable\\tdata LIKE bin('f*')", 1);
+    verify_query(test_context, items, "nullable\\tdata CONTAINS[c] bin('F')", 2);
+    verify_query(test_context, items, "nullable\\tdata BEGINSWITH[c] bin('F')", 1);
+    verify_query(test_context, items, "nullable\\tdata ENDSWITH[c] bin('E')", 2);
+    verify_query(test_context, items, "nullable\\tdata LIKE[c] bin('F*')", 1);
 
     verify_query(test_context, items, "nullable\\tdata CONTAINS NULL", 5);
     verify_query(test_context, items, "nullable\\tdata BEGINSWITH NULL", 5);
@@ -1135,14 +1135,14 @@ TEST(Parser_NullableBinaries)
     verify_query(test_context, people, "fav_item.nullable\\tdata !=[c] NULL", 3);
     verify_query(test_context, people, "NULL ==[c] fav_item.data", 0);
 
-    verify_query(test_context, people, "fav_item.data CONTAINS 'f'", 2);
-    verify_query(test_context, people, "fav_item.data BEGINSWITH 'f'", 1);
-    verify_query(test_context, people, "fav_item.data ENDSWITH 'e'", 2);
-    verify_query(test_context, people, "fav_item.data LIKE 'f*'", 1);
-    verify_query(test_context, people, "fav_item.data CONTAINS[c] 'F'", 2);
-    verify_query(test_context, people, "fav_item.data BEGINSWITH[c] 'F'", 1);
-    verify_query(test_context, people, "fav_item.data ENDSWITH[c] 'E'", 2);
-    verify_query(test_context, people, "fav_item.data LIKE[c] 'F*'", 1);
+    verify_query(test_context, people, "fav_item.data CONTAINS bin('f')", 2);
+    verify_query(test_context, people, "fav_item.data BEGINSWITH bin('f')", 1);
+    verify_query(test_context, people, "fav_item.data ENDSWITH bin('e')", 2);
+    verify_query(test_context, people, "fav_item.data LIKE bin('f*')", 1);
+    verify_query(test_context, people, "fav_item.data CONTAINS[c] bin('F')", 2);
+    verify_query(test_context, people, "fav_item.data BEGINSWITH[c] bin('F')", 1);
+    verify_query(test_context, people, "fav_item.data ENDSWITH[c] bin('E')", 2);
+    verify_query(test_context, people, "fav_item.data LIKE[c] bin('F*')", 1);
 
     // two column
     verify_query(test_context, people, "fav_item.data == fav_item.nullable\\tdata", 3);
@@ -1150,7 +1150,8 @@ TEST(Parser_NullableBinaries)
     verify_query(test_context, people, "fav_item.nullable\\tdata == fav_item.nullable\\tdata", 5);
 
     verify_query(test_context, items,
-                 "data contains NULL && data contains 'fo' && !(data contains 'asdfasdfasdf') && data contains 'rk'",
+                 "data contains NULL && data contains bin('fo') && !(data contains bin('asdfasdfasdf')) && data "
+                 "contains bin('rk')",
                  1);
 }
 
@@ -1559,7 +1560,7 @@ TEST(Parser_substitution)
     verify_query_sub(test_context, t, "name == $3", args, num_args, 0);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $4", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $5", args, num_args, 0));
-    verify_query_sub(test_context, t, "name == $6", args, num_args, 0);
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $6", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $7", args, num_args, 0));
     // bool
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $0", args, num_args, 0));
@@ -1580,10 +1581,11 @@ TEST(Parser_substitution)
     // binary
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $0", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $1", args, num_args, 0));
-    verify_query_sub(test_context, t, "binary == $2", args, num_args, 1);
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $2", args, num_args, 0));
     verify_query_sub(test_context, t, "binary == $3", args, num_args, 3);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $4", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $5", args, num_args, 0));
+    verify_query_sub(test_context, t, "binary == $6", args, num_args, 1);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $7", args, num_args, 0));
 }
 
@@ -4705,21 +4707,29 @@ TEST(Parser_Mixed)
     verify_query(test_context, table, "mixed != 50", 99);
     verify_query(test_context, table, "mixed == null", 1);
     verify_query(test_context, table, "mixed != null", 99);
-    verify_query(test_context, table, "mixed beginswith 'String2'", 3); // 20, 24, 28
-    verify_query(test_context, table, "mixed beginswith B64\"U3RyaW5nMg==\"",
-                 3); // 20, 24, 28, this string literal is base64 for 'String2'
-    verify_query(test_context, table, "mixed contains \"trin\"", 25);
-    verify_query(test_context, table, "mixed like \"Strin*\"", 25);
+    verify_query(test_context, table, "mixed beginswith 'String2'", 2);      // 20, 24, 28
+    verify_query(test_context, table, "mixed beginswith bin('String2')", 1); // 28
+    // the following string literal is base64 for 'String2'
+    verify_query(test_context, table, "mixed beginswith B64\"U3RyaW5nMg==\"", 2);      // 20, 24
+    verify_query(test_context, table, "mixed beginswith bin(B64\"U3RyaW5nMg==\")", 1); // 28
+    verify_query(test_context, table, "mixed contains \"trin\"", 24);
+    verify_query(test_context, table, "mixed contains bin(\"trin\")", 1);
+    verify_query(test_context, table, "mixed like \"Strin*\"", 24);
+    verify_query(test_context, table, "mixed like bin(\"Strin*\")", 1); // 28
     verify_query(test_context, table, "mixed endswith \"4\"", 5); // 4, 24, 44, 64, 84
+    verify_query(test_context, table, "mixed endswith bin(\"4\")", 0);
     verify_query(test_context, table, "mixed == oid(" + id.to_string() + ")", 1);
 
-    char bin[1] = {0x34};
-    std::any args[] = {BinaryData(bin), ObjLink(table->get_key(), table->begin()->get_key()),
+    char bin[1] = {'4'};
+    std::any args[] = {BinaryData(bin),
+                       ObjLink(table->get_key(), table->begin()->get_key()),
                        ObjLink(origin->get_key(), origin->begin()->get_key()),
                        ObjLink(TableKey(), ObjKey()), // null link
-                       realm::null{}};
-    size_t num_args = 5;
-    verify_query_sub(test_context, table, "mixed endswith $0", args, num_args, 5); // 4, 24, 44, 64, 84
+                       realm::null{},
+                       StringData(bin)};
+    size_t num_args = 6;
+    verify_query_sub(test_context, table, "mixed endswith $0", args, num_args, 0);
+    verify_query_sub(test_context, table, "mixed endswith $5", args, num_args, 5); // 4, 24, 44, 64, 84
     verify_query_sub(test_context, origin, "link == $1", args, num_args, 1);
     verify_query_sub(test_context, origin, "link == $3", args, num_args, 1);
     verify_query_sub(test_context, origin, "link == $4", args, num_args, 1);
@@ -4730,16 +4740,24 @@ TEST(Parser_Mixed)
     verify_query_sub(test_context, origin, "NONE links == $1 && links.@size > 0", args, num_args, 9);
     verify_query_sub(test_context, origin, "mixed == $1", args, num_args, 1);
 
-    verify_query(test_context, table, "mixed == \"String2Binary\"", 1);
-    verify_query(test_context, table, "mixed ==[c] \"string2binary\"", 1);
-    verify_query(test_context, table, "mixed !=[c] \"string2binary\"", 99);
+    verify_query(test_context, table, "mixed == \"String2Binary\"", 0);
+    verify_query(test_context, table, "mixed == \"String4\"", 1);
+    verify_query(test_context, table, "mixed == bin(\"String2Binary\")", 1);
+    verify_query(test_context, table, "mixed ==[c] \"string2binary\"", 0);
+    verify_query(test_context, table, "mixed ==[c] \"string4\"", 1);
+    verify_query(test_context, table, "mixed ==[c] binary(\"string2binary\")", 1);
+    verify_query(test_context, table, "mixed !=[c] \"string2binary\"", 100);
+    verify_query(test_context, table, "mixed !=[c] \"string4\"", 99);
+    verify_query(test_context, table, "mixed !=[c] bin(\"string2binary\")", 99);
     verify_query(test_context, table, "mixed == \"String48\"", 1);
     verify_query(test_context, table, "mixed == 3.0", 3);
     verify_query(test_context, table, "mixed == NULL", 1);
     verify_query(test_context, origin, "links.mixed > 50", 5);
     verify_query(test_context, origin, "links.mixed beginswith[c] \"string\"", 10);
+    verify_query(test_context, origin, "links.mixed beginswith[c] bin(\"string\")", 1);
     verify_query(test_context, origin, "link.mixed > 50", 2);
     verify_query(test_context, origin, "link.mixed beginswith[c] \"string\"", 5);
+    verify_query(test_context, origin, "link.mixed beginswith[c] bin(\"string\")", 0);
     verify_query(test_context, origin, "link == NULL", 1);
     verify_query(test_context, origin, "link.mixed == NULL", 1);
     verify_query(test_context, origin, "links.mixed == NULL", 1);

@@ -41,7 +41,7 @@ std::string print_value<>(BinaryData data)
     if (data.is_null()) {
         return "NULL";
     }
-    return print_value<StringData>(StringData(data.data(), data.size()));
+    return util::format("binary(%1)", print_value<StringData>(StringData(data.data(), data.size())));
 }
 
 template <>

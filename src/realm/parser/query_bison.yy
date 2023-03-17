@@ -119,6 +119,7 @@ using namespace realm::query_parser;
 %token <std::string> SORT "sort"
 %token <std::string> DISTINCT "distinct"
 %token <std::string> LIMIT "limit"
+%token <std::string> BINARY "binary"
 %token <std::string> ASCENDING "ascending"
 %token <std::string> DESCENDING "descending"
 %token <std::string> SIZE "@size"
@@ -274,6 +275,8 @@ constant
                                     tmp->add_table($3);
                                     $$ = tmp;
                                 }
+    | BINARY STRING ')'     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BINARY_STR, $2); }
+    | BINARY BASE64 ')'     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BINARY_BASE64, $2); }
 
 primary_key
     : NATURAL0                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, $1); }
