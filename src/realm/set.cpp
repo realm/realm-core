@@ -226,6 +226,34 @@ void Set<Mixed>::migrate()
     }
 }
 
+template <>
+void Set<Mixed>::migrate_strings()
+{
+    // sort order of strings changed
+    const size_t set_size = size();
+    size_t first_binary = set_size;
+    size_t first_string = set_size;
+    for (size_t n = 0; n < set_size; n++) {
+        auto val = m_tree->get(n);
+        if (val.is_type(type_String) && first_string == set_size) {
+            first_string = n;
+            continue;
+        }
+        if (val.is_type(type_Binary)) {
+            first_binary = n;
+            break;
+        }
+    }
+    do_resort(first_string, first_binary);
+}
+
+template <>
+void Set<StringData>::migrate_strings()
+{
+    // sort order of strings changed
+    do_resort(0, size());
+}
+
 void LnkSet::remove_target_row(size_t link_ndx)
 {
     // Deleting the object will automatically remove all links

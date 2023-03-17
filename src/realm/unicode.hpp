@@ -49,9 +49,6 @@ size_t sequence_length(char lead);
 // in, then the compare yields a random result such that the row may or
 // may not be included in the result set.
 
-// Return bool(string1 < string2)
-bool utf8_compare(StringData string1, StringData string2);
-
 // Return unicode value of character.
 uint32_t utf8value(const char* character);
 

@@ -316,7 +316,6 @@ private:
     void do_delete(ObjKey key, StringData, size_t offset);
 
     Mixed get(ObjKey key) const;
-
     void node_add_key(ref_type ref);
 
 #ifdef REALM_DEBUG

@@ -228,10 +228,8 @@ public:
     bool accumulate_numeric_to(Decimal128& destination) const noexcept;
     bool is_unresolved_link() const noexcept;
     bool is_same_type(const Mixed& b) const noexcept;
-    // Will use utf8_compare for strings
+    // Will use unsigned lexicographical comparison for strings
     int compare(const Mixed& b) const noexcept;
-    // Will compare strings as arrays of signed chars
-    int compare_signed(const Mixed& b) const noexcept;
     friend bool operator==(const Mixed& a, const Mixed& b) noexcept
     {
         return a.compare(b) == 0;

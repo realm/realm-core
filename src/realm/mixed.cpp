@@ -59,6 +59,7 @@ static const int sorting_rank[] = {
 
 int compare_string(StringData a, StringData b)
 {
+    // Observe! Changing these values breaks the file format for Set<Mixed> and the StringIndex
     if (a == b)
         return 0;
     return a < b ? -1 : 1;
@@ -225,7 +226,7 @@ bool Mixed::accumulate_numeric_to(Decimal128& destination) const noexcept
 
 int Mixed::compare(const Mixed& b) const noexcept
 {
-    // Observe! Changing this function breaks the file format for Set<Mixed>
+    // Observe! Changing this function breaks the file format for Set<Mixed> and the StringIndex
 
     if (is_null()) {
         return b.is_null() ? 0 : -1;
@@ -347,17 +348,7 @@ int Mixed::compare(const Mixed& b) const noexcept
     // Using rank table will ensure that all numeric values are kept together
     return (sorting_rank[m_type] > sorting_rank[b.m_type]) ? 1 : -1;
 
-    // Observe! Changing this function breaks the file format for Set<Mixed>
-}
-
-int Mixed::compare_signed(const Mixed& b) const noexcept
-{
-    if (is_type(type_String) && b.is_type(type_String)) {
-        auto a_val = get_string();
-        auto b_val = b.get_string();
-        return a_val == b_val ? 0 : a_val < b_val ? -1 : 1;
-    }
-    return compare(b);
+    // Observe! Changing this function breaks the file format for Set<Mixed> and the StringIndex
 }
 
 template <>
