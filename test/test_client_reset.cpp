@@ -21,8 +21,6 @@ using namespace realm::fixtures;
 
 namespace {
 
-using ErrorInfo = Session::ErrorInfo;
-
 TEST(ClientReset_TransferGroupWithDanglingLinks)
 {
     SHARED_GROUP_TEST_PATH(path_1);
@@ -147,7 +145,7 @@ TEST(ClientReset_NoLocalChanges)
         // The session that receives an error.
         {
             BowlOfStonesSemaphore bowl;
-            auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
+            auto listener = [&](ConnectionState state, util::Optional<SessionErrorInfo> error_info) {
                 if (state != ConnectionState::disconnected)
                     return;
                 REALM_ASSERT(error_info);
@@ -596,7 +594,7 @@ TEST(ClientReset_ThreeClients)
         // The clients get session errors.
         {
             BowlOfStonesSemaphore bowl;
-            auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
+            auto listener = [&](ConnectionState state, util::Optional<SessionErrorInfo> error_info) {
                 if (state != ConnectionState::disconnected)
                     return;
                 REALM_ASSERT(error_info);
@@ -770,7 +768,7 @@ TEST(ClientReset_DoNotRecoverSchema)
         Session session = fixture.make_session(path_1, server_path_2, std::move(session_config));
         BowlOfStonesSemaphore bowl;
         session.set_connection_state_change_listener(
-            [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
+            [&](ConnectionState state, util::Optional<SessionErrorInfo> error_info) {
                 if (state != ConnectionState::disconnected)
                     return;
                 REALM_ASSERT(error_info);

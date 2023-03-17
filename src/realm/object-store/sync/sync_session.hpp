@@ -40,6 +40,7 @@ class SyncUser;
 
 namespace sync {
 class Session;
+struct SessionErrorInfo;
 class MigrationStore;
 }
 
@@ -287,10 +288,7 @@ public:
 
     // Expose some internal functionality to testing code.
     struct OnlyForTesting {
-        static void handle_error(SyncSession& session, SyncError error)
-        {
-            session.handle_error(std::move(error));
-        }
+        static void handle_error(SyncSession& session, sync::SessionErrorInfo&& error);
         static void nonsync_transact_notify(SyncSession& session, VersionID::version_type version)
         {
             session.nonsync_transact_notify(version);
@@ -368,7 +366,7 @@ private:
     void handle_fresh_realm_downloaded(DBRef db, Status status,
                                        sync::ProtocolErrorInfo::Action server_requests_action)
         REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
-    void handle_error(SyncError) REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
+    void handle_error(sync::SessionErrorInfo) REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     void handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status error_code, std::string_view context_message)
         REQUIRES(!m_state_mutex, !m_config_mutex);
     void cancel_pending_waits(util::CheckedUniqueLock, Status) RELEASE(m_state_mutex);

@@ -69,14 +69,10 @@ struct SyncError : public SystemError {
     // If this error resulted from a compensating write, this vector will contain information about each object
     // that caused a compensating write and why the write was illegal.
     std::vector<sync::CompensatingWriteErrorInfo> compensating_writes_info;
-    // If a client migration to FLX is taking place, this string will contain the query string for any
-    // subscriptions generated while the client migration is active
-    std::string_view migration_query_string;
 
     SyncError(std::error_code error_code, std::string_view msg, bool is_fatal,
               std::optional<std::string_view> serverLog = std::nullopt,
-              std::vector<sync::CompensatingWriteErrorInfo> compensating_writes = {},
-              std::optional<std::string_view> query_string = std::nullopt);
+              std::vector<sync::CompensatingWriteErrorInfo> compensating_writes = {});
 
     static constexpr const char c_original_file_path_key[] = "ORIGINAL_FILE_PATH";
     static constexpr const char c_recovery_file_path_key[] = "RECOVERY_FILE_PATH";

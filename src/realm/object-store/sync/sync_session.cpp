@@ -539,10 +539,10 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
                                  util::make_optional<std::string_view>(status.reason()));
             std::move(mut_sub).commit();
         }
-        const bool is_fatal = true;
-        SyncError synthetic(make_error_code(sync::Client::Error::auto_client_reset_failure),
-                            util::format("A fatal error occured during client reset: '%1'", status.reason()),
-                            is_fatal);
+        const bool try_again = false;
+        sync::SessionErrorInfo synthetic(
+            make_error_code(sync::Client::Error::auto_client_reset_failure),
+            util::format("A fatal error occured during client reset: '%1'", status.reason()), try_again);
         handle_error(synthetic);
         return;
     }
@@ -574,15 +574,21 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
     revive_if_needed();
 }
 
+void SyncSession::OnlyForTesting::handle_error(SyncSession& session, sync::SessionErrorInfo&& error)
+{
+    session.handle_error(std::move(error));
+}
+
 // This method should only be called from within the error handler callback registered upon the underlying
 // `m_session`.
-void SyncSession::handle_error(SyncError error)
+void SyncSession::handle_error(sync::SessionErrorInfo error)
 {
     enum class NextStateAfterError { none, inactive, error };
-    auto next_state = error.is_fatal ? NextStateAfterError::error : NextStateAfterError::none;
-    auto error_code = error.get_system_error();
+    auto next_state = error.try_again ? NextStateAfterError::none : NextStateAfterError::error;
+    auto error_code = error.error_code;
     util::Optional<ShouldBackup> delete_file;
     bool log_out_user = false;
+    bool unrecognized_by_client = false;
 
     if (error_code == make_error_code(sync::Client::Error::auto_client_reset_failure)) {
         // At this point, automatic recovery has been attempted but it failed.
@@ -635,8 +641,9 @@ void SyncSession::handle_error(SyncError error)
             case sync::ProtocolErrorInfo::Action::MigrateToFLX:
                 // Should not receive this error if original sync config is FLX
                 REALM_ASSERT(!m_original_sync_config->flx_sync_requested);
+                REALM_ASSERT(error.migration_query_string);
                 // Original config was PBS, migrating to FLX
-                m_migration_store->migrate_to_flx(error.migration_query_string);
+                m_migration_store->migrate_to_flx(*error.migration_query_string);
                 next_state = NextStateAfterError::inactive;
                 break;
             case sync::ProtocolErrorInfo::Action::RevertToPBS:
@@ -708,18 +715,24 @@ void SyncSession::handle_error(SyncError error)
         auto simplified_error = sync::websocket::get_simplified_websocket_error(
             static_cast<sync::websocket::WebSocketError>(error_code.value()));
         std::error_code new_error_code(simplified_error, sync::websocket::websocket_error_category());
-        error = SyncError(new_error_code, error.reason(), error.is_fatal);
+        error = sync::SessionErrorInfo(new_error_code, error.message, error.try_again);
     }
     else {
         // Unrecognized error code.
-        error.is_unrecognized_by_client = true;
+        unrecognized_by_client = true;
     }
 
     util::CheckedUniqueLock lock(m_state_mutex);
-    if (delete_file)
-        update_error_and_mark_file_for_deletion(error, *delete_file);
+    SyncError sync_error{error.error_code, std::string(error.message), error.is_fatal(), error.log_url,
+                         std::move(error.compensating_writes)};
+    // `action` is used over `shouldClientReset` and `isRecoveryModeDisabled`.
+    sync_error.server_requests_action = error.server_requests_action;
+    sync_error.is_unrecognized_by_client = unrecognized_by_client;
 
-    if (m_state == State::Dying && error.is_fatal) {
+    if (delete_file)
+        update_error_and_mark_file_for_deletion(sync_error, *delete_file);
+
+    if (m_state == State::Dying && !error.try_again) {
         become_inactive(std::move(lock));
         return;
     }
@@ -733,15 +746,15 @@ void SyncSession::handle_error(SyncError error)
     switch (next_state) {
         case NextStateAfterError::none:
             if (config(&SyncConfig::cancel_waits_on_nonfatal_error)) {
-                cancel_pending_waits(std::move(lock), error.to_status()); // unlocks the mutex
+                cancel_pending_waits(std::move(lock), sync_error.to_status()); // unlocks the mutex
             }
             break;
         case NextStateAfterError::inactive: {
-            become_inactive(std::move(lock), error.to_status());
+            become_inactive(std::move(lock), sync_error.to_status());
             break;
         }
         case NextStateAfterError::error: {
-            cancel_pending_waits(std::move(lock), error.to_status());
+            cancel_pending_waits(std::move(lock), sync_error.to_status());
             break;
         }
     }
@@ -752,7 +765,7 @@ void SyncSession::handle_error(SyncError error)
     }
 
     if (auto error_handler = config(&SyncConfig::error_handler)) {
-        error_handler(shared_from_this(), std::move(error));
+        error_handler(shared_from_this(), std::move(sync_error));
     }
 }
 
@@ -891,7 +904,7 @@ void SyncSession::create_sync_session()
     // Sets up the connection state listener. This callback is used for both reporting errors as well as changes to
     // the connection state.
     m_session->set_connection_state_change_listener(
-        [weak_self](sync::ConnectionState state, util::Optional<sync::Session::ErrorInfo> error) {
+        [weak_self](sync::ConnectionState state, util::Optional<sync::SessionErrorInfo> error) {
             // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
             // nothing useful we can do with them.
             auto self = weak_self.lock();
@@ -920,12 +933,7 @@ void SyncSession::create_sync_session()
             }
 
             if (error) {
-                SyncError sync_error{
-                    error->error_code, std::string(error->message),           error->is_fatal(),
-                    error->log_url,    std::move(error->compensating_writes), error->migration_query_string};
-                // `action` is used over `shouldClientReset` and `isRecoveryModeDisabled`.
-                sync_error.server_requests_action = error->server_requests_action;
-                self->handle_error(std::move(sync_error));
+                self->handle_error(std::move(*error));
             }
         });
 }
