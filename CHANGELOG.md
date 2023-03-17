@@ -1,3 +1,67 @@
+# NEXT RELEASE
+
+### Enhancements
+* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* None.
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+
+### Breaking changes
+* Add `service_name` parameter to `realm_app_call_function`.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Add admin api and test for performing the PBS->FLX migration and roll back on the server. (PR [#6366](https://github.com/realm/realm-core/pull/6366))
+
+----------------------------------------------
+
+# 13.7.1 Release notes
+
+### Enhancements
+* Expose `RealmConfig::schema_subset_mode` in the C-API. (PR [#6379](https://github.com/realm/realm-core/pull/6379))
+
+### Fixed
+* Fixed a bug that may have resulted in arrays being in different orders on different devices. Some cases of “Invalid prior_size” may be fixed too. ([#6191](https://github.com/realm/realm-core/issues/6191), since v11.13.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None
+----------------------------------------------
+
+# 13.7.0 Release notes
+
+### Enhancements
+* Add logging at the Storage level. (PR [#6339](https://github.com/realm/realm-core/pull/6339))
+
+### Fixed
+* None.
+
+### Breaking changes
+* You can no longer associate a Logger Factory with the SyncManager. Instead you can install one default logger via Logger::set_default_logger(). This logger will then be used all over Core. Logging cmake flags updated to use REALM_TEST_LOGGING and REALM_TEST_LOGGING_LEVEL
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* The OpenSSL dependency is included only exactly where needed. Where OpenSSL is not available and the target system doesn't provide them, we now bundle public domain implementations of the SHA1 and SHA2 hashes. Common hashing operations are exposed by `util/sha_crypto.hpp` so that call sites don't need to reason about the exact hash provider. ([PR #6308](https://github.com/realm/realm-core/pull/6308))
+
+----------------------------------------------
+
 # 13.6.0 Release notes
 
 ### Enhancements
