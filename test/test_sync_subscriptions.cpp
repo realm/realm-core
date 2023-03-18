@@ -532,12 +532,34 @@ TEST(Sync_SubscriptionStoreSubSetHasTable)
     CHECK(table_set.empty());
 }
 
+// Copied from sync_metadata_schema.cpp
+constexpr static std::string_view c_flx_metadata_table("flx_metadata");
+constexpr static std::string_view c_meta_schema_version_field("schema_version");
+
+static void create_legacy_metadata_schema(DBRef db, int64_t version)
+{
+    // Create the legacy table
+    TableKey legacy_table_key;
+    ColKey legacy_version_key;
+    std::vector<SyncMetadataTable> legacy_table_def{
+        {&legacy_table_key, c_flx_metadata_table, {{&legacy_version_key, c_meta_schema_version_field, type_Int}}}};
+    auto tr = db->start_write();
+    create_sync_metadata_schema(tr, &legacy_table_def);
+    tr->commit_and_continue_writing();
+    auto legacy_meta_table = tr->get_table(legacy_table_key);
+    auto legacy_object = legacy_meta_table->create_object();
+    // Set the legacy version, which will be converted to the flx subscription store version
+    legacy_object.set(legacy_version_key, version);
+    tr->commit();
+}
+
 TEST(Sync_SyncMetadataSchemaVersionsReader)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
     DBRef db = DB::create(make_client_replication(), sub_store_path);
-    std::string schema_group_name = "";
+    std::string schema_group_name = "schema_group_name";
     int64_t version = 123;
+    int64_t legacy_version = 345;
 
     {
         auto tr = db->start_read();
@@ -548,7 +570,7 @@ TEST(Sync_SyncMetadataSchemaVersionsReader)
 
     {
         auto tr = db->start_read();
-        // Initialize the schema versions table
+        // Initialize the schema versions table and set a schema version
         SyncMetadataSchemaVersions schema_versions(tr);
         tr->promote_to_write();
         schema_versions.set_version_for(tr, schema_group_name, version);
@@ -566,6 +588,25 @@ TEST(Sync_SyncMetadataSchemaVersionsReader)
         auto schema_version = reader.get_version_for(tr, schema_group_name);
         CHECK(schema_version);
         CHECK(*schema_version == version);
+    }
+
+    // Create the legacy metadata schema table
+    create_legacy_metadata_schema(db, legacy_version);
+    {
+        auto tr = db->start_read();
+        // Verify opening a reader with legacy data returns uninitialized
+        SyncMetadataSchemaVersionsReader reader(tr);
+        CHECK(!reader.is_initialized());
+    }
+
+    // Test case where both tables exist in database
+    {
+        auto tr = db->start_read();
+        // Initialize the schema versions table and set a schema version
+        SyncMetadataSchemaVersions schema_versions(tr);
+        auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_subscription_store);
+        CHECK(schema_version);
+        CHECK(*schema_version == legacy_version);
     }
 }
 
@@ -640,31 +681,12 @@ TEST(Sync_SyncMetadataSchemaVersions)
 
 TEST(Sync_SyncMetadataSchemaVersions_LegacyTable)
 {
-    // Copied from sync_metadata_schema.cpp
-    constexpr static std::string_view c_flx_metadata_table("flx_metadata");
-    constexpr static std::string_view c_meta_schema_version_field("schema_version");
-
     SHARED_GROUP_TEST_PATH(sub_store_path)
     DBRef db = DB::create(make_client_replication(), sub_store_path);
     int64_t version = 678;
 
-    {
-        // Create the legacy table
-        TableKey legacy_table_key;
-        ColKey legacy_version_key;
-        std::vector<SyncMetadataTable> legacy_table_def{
-            {&legacy_table_key,
-             c_flx_metadata_table,
-             {{&legacy_version_key, c_meta_schema_version_field, type_Int}}}};
-        auto tr = db->start_write();
-        create_sync_metadata_schema(tr, &legacy_table_def);
-        tr->commit_and_continue_writing();
-        auto legacy_meta_table = tr->get_table(legacy_table_key);
-        auto legacy_object = legacy_meta_table->create_object();
-        legacy_object.set(legacy_version_key, version);
-        tr->commit();
-    }
-
+    // Create the legacy metadata schema table
+    create_legacy_metadata_schema(db, version);
     {
         auto tr = db->start_read();
         // Converts the legacy table to the unified table
@@ -672,6 +694,8 @@ TEST(Sync_SyncMetadataSchemaVersions_LegacyTable)
         auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_subscription_store);
         CHECK(schema_version);
         CHECK(*schema_version == version);
+        // Verify the legacy table has been deleted after the conversion
+        CHECK(!tr->has_table(c_flx_metadata_table));
     }
 }
 

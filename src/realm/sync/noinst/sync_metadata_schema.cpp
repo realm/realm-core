@@ -217,9 +217,16 @@ SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr)
     // If the versions table exists, then m_table would have been initialized by the reader constructor
     // If the versions table doesn't exist, then initialize it now
     if (!m_table) {
-        tr->promote_to_write();
-        create_sync_metadata_schema(tr, &unified_schema_version_table_def);
-        tr->commit_and_continue_as_read();
+        // table should have already been initialized or needs to be created,
+        // but re-initialize in case it isn't (e.g. both unified and legacy tables exist in DB)
+        if (REALM_UNLIKELY(tr->has_table(c_sync_internal_schemas_table))) {
+            load_sync_metadata_schema(tr, &unified_schema_version_table_def);
+        }
+        else {
+            tr->promote_to_write();
+            create_sync_metadata_schema(tr, &unified_schema_version_table_def);
+            tr->commit_and_continue_as_read();
+        }
     }
 
     if (!tr->has_table(c_flx_metadata_table)) {
