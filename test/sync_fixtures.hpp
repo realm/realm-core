@@ -507,7 +507,7 @@ public:
             }
             std::string dir = util::File::resolve(dir_name, server_dir);
             util::try_make_dir(dir);
-            util::Optional<PKey> public_key;
+            std::optional<PKey> public_key;
             if (!config.server_public_key_path.empty())
                 public_key = PKey::load_public(config.server_public_key_path);
             Server::Config config_2;
@@ -585,7 +585,7 @@ public:
     void set_client_side_error_handler(int client_index, std::function<ErrorHandler> handler)
     {
         auto handler_2 = [handler = std::move(handler)](ConnectionState state,
-                                                        util::Optional<SessionErrorInfo> error_info) {
+                                                        std::optional<SessionErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
@@ -706,7 +706,7 @@ public:
             session.set_connection_state_change_listener(m_connection_state_change_listeners[client_index]);
         }
         else {
-            auto fallback_listener = [this](ConnectionState state, util::Optional<SessionErrorInfo> error) {
+            auto fallback_listener = [this](ConnectionState state, std::optional<SessionErrorInfo> error) {
                 if (state != ConnectionState::disconnected)
                     return;
                 REALM_ASSERT(error);
@@ -815,7 +815,7 @@ private:
     std::vector<uint_least64_t> m_allow_server_errors;
     FakeClock m_fake_token_expiration_clock;
 
-    static util::Optional<std::array<char, 64>> make_crypt_key(const std::string& key)
+    static std::optional<std::array<char, 64>> make_crypt_key(const std::string& key)
     {
         if (!key.empty()) {
             if (key.size() != 64)
@@ -1073,7 +1073,7 @@ inline void RealmFixture::async_wait_for_download_completion(WaitOperCompletionH
 inline void RealmFixture::setup_error_handler(util::UniqueFunction<ErrorHandler> handler)
 {
     auto listener = [handler = std::move(handler)](ConnectionState state,
-                                                   const util::Optional<SessionErrorInfo>& error_info) {
+                                                   const std::optional<SessionErrorInfo>& error_info) {
         if (state != ConnectionState::disconnected)
             return;
         REALM_ASSERT(error_info);
