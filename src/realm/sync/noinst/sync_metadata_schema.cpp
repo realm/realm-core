@@ -155,7 +155,7 @@ void load_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadat
     }
 }
 
-SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr, bool read_only)
+SyncMetadataSchemaVersionsReader::SyncMetadataSchemaVersionsReader(const TransactionRef& tr)
 {
     TableKey legacy_table_key;
     ColKey legacy_version_key;
@@ -168,40 +168,20 @@ SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr,
          {{&m_version_field, c_meta_schema_version_field, type_Int}}}};
 
     REALM_ASSERT_3(tr->get_transact_stage(), ==, DB::transact_Reading);
-    if (!m_table) {
-        if (tr->has_table(c_sync_internal_schemas_table)) {
-            // Even if read_only is set, this will load m_table with a valid value
-            load_sync_metadata_schema(tr, &unified_schema_version_table_def);
-        }
-        else {
-            if (read_only) {
-                return; // as requested, don't try to create the table if it doesn't exist
-            }
-            tr->promote_to_write();
-            create_sync_metadata_schema(tr, &unified_schema_version_table_def);
-            tr->commit_and_continue_as_read();
-        }
-    }
-
-    // Don't try to convert the legacy table if read_only is requested
-    if (!tr->has_table(c_flx_metadata_table) || read_only) {
+    // If the legacy_meta_table exists, then this table hasn't been converted and
+    // the metadata schema versions information has not been upgraded/not accurate
+    if (tr->has_table(c_flx_metadata_table)) {
         return;
     }
 
-    load_sync_metadata_schema(tr, &legacy_table_def);
-    // Migrate from just having a subscription store metadata table to having multiple table groups with multiple
-    // versions.
-    tr->promote_to_write();
-    auto legacy_meta_table = tr->get_table(legacy_table_key);
-    auto legacy_obj = legacy_meta_table->get_object(0);
-    set_version_for(tr, internal_schema_groups::c_flx_subscription_store,
-                    legacy_obj.get<int64_t>(legacy_version_key));
-    tr->remove_table(legacy_table_key);
-    tr->commit_and_continue_as_read();
+    if (tr->has_table(c_sync_internal_schemas_table)) {
+        // Load m_table with the table/schema information
+        load_sync_metadata_schema(tr, &unified_schema_version_table_def);
+    }
 }
 
-util::Optional<int64_t> SyncMetadataSchemaVersions::get_version_for(const TransactionRef& tr,
-                                                                    std::string_view schema_group_name)
+util::Optional<int64_t> SyncMetadataSchemaVersionsReader::get_version_for(const TransactionRef& tr,
+                                                                          std::string_view schema_group_name)
 {
     if (!m_table) {
         return util::none;
@@ -220,12 +200,50 @@ util::Optional<int64_t> SyncMetadataSchemaVersions::get_version_for(const Transa
     return metadata_obj.get<int64_t>(m_version_field);
 }
 
+SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr)
+    : SyncMetadataSchemaVersionsReader(tr)
+{
+    TableKey legacy_table_key;
+    ColKey legacy_version_key;
+    std::vector<SyncMetadataTable> legacy_table_def{
+        {&legacy_table_key, c_flx_metadata_table, {{&legacy_version_key, c_meta_schema_version_field, type_Int}}}};
+    std::vector<SyncMetadataTable> unified_schema_version_table_def{
+        {&m_table,
+         c_sync_internal_schemas_table,
+         {&m_schema_group_field, c_meta_schema_schema_group_field, type_String},
+         {{&m_version_field, c_meta_schema_version_field, type_Int}}}};
+
+    REALM_ASSERT_3(tr->get_transact_stage(), ==, DB::transact_Reading);
+    // If the versions table exists, then m_table would have been initialized by the reader constructor
+    // If the versions table doesn't exist, then initialize it now
+    if (!m_table) {
+        tr->promote_to_write();
+        create_sync_metadata_schema(tr, &unified_schema_version_table_def);
+        tr->commit_and_continue_as_read();
+    }
+
+    if (!tr->has_table(c_flx_metadata_table)) {
+        return;
+    }
+
+    // Convert the legacy table to the regular schema versions table if it exists
+    load_sync_metadata_schema(tr, &legacy_table_def);
+    // Migrate from just having a subscription store metadata table to having multiple table groups with multiple
+    // versions.
+    tr->promote_to_write();
+    auto legacy_meta_table = tr->get_table(legacy_table_key);
+    auto legacy_obj = legacy_meta_table->get_object(0);
+    // Only the flx subscription store can potentially have the legacy metadata table
+    set_version_for(tr, internal_schema_groups::c_flx_subscription_store,
+                    legacy_obj.get<int64_t>(legacy_version_key));
+    tr->remove_table(legacy_table_key);
+    tr->commit_and_continue_as_read();
+}
+
 void SyncMetadataSchemaVersions::set_version_for(const TransactionRef& tr, std::string_view schema_group_name,
                                                  int64_t version)
 {
-    if (!m_table) {
-        return;
-    }
+    REALM_ASSERT(m_table);
 
     auto schema_versions = tr->get_table(m_table);
     auto metadata_obj = schema_versions->create_object_with_primary_key(Mixed{StringData(schema_group_name)});

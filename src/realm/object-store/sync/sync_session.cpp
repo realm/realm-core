@@ -197,6 +197,11 @@ void SyncSession::do_become_inactive(util::CheckedUniqueLock lock, Status status
     if (m_sync_manager) {
         m_sync_manager->unregister_session(m_db->get_path());
     }
+    if (m_needs_subscription_store_updated) {
+        // m_needs_subscription_store_updated contains the updated 'flx_sync_requested' value
+        update_subscription_store(*m_needs_subscription_store_updated);
+        m_needs_subscription_store_updated.reset();
+    }
     m_state_mutex.unlock(lock);
 
     // Send notifications after releasing the lock to prevent deadlocks in the callback.
@@ -336,24 +341,7 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const Realm
     , m_db{std::move(db)}
     , m_flx_subscription_store{}
     , m_original_sync_config{m_config.sync_config}
-    , m_migration_store{[&]() {
-        using MigrationState = sync::MigrationStore::MigrationState;
-        return sync::MigrationStore::create(m_db, [this](MigrationState) {
-            // Migration state changed - Update the configuration to
-            // match the new sync mode.
-            util::CheckedLockGuard cfg_lock(m_config_mutex);
-            m_config.sync_config = m_migration_store->convert_sync_config(m_original_sync_config);
-
-            {
-                // The session should be closed before updating the FLX subscription store
-                util::CheckedLockGuard state_lock(m_state_mutex);
-                REALM_ASSERT(!m_session);
-            }
-
-            // If using FLX, set up m_flx_subscription_store and the history_write_validator
-            update_subscription_store();
-        });
-    }()}
+    , m_migration_store{sync::MigrationStore::create(m_db)}
     , m_client(client)
     , m_sync_manager(sync_manager)
 {
@@ -366,7 +354,7 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const Realm
     m_config.sync_config = m_migration_store->convert_sync_config(m_original_sync_config);
 
     // If using FLX, set up m_flx_subscription_store and the history_write_validator
-    update_subscription_store();
+    update_subscription_store(m_config.sync_config->flx_sync_requested);
 }
 
 std::shared_ptr<SyncManager> SyncSession::sync_manager() const
@@ -477,7 +465,7 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
     }
 
     fresh_sync_session->assert_mutex_unlocked();
-    if (auto local_subs_store = get_flx_subscription_store()) {
+    if (auto local_subs_store = m_flx_subscription_store) {
         sync::SubscriptionSet active = local_subs_store->get_active();
         auto fresh_sub_store = fresh_sync_session->get_flx_subscription_store();
         REALM_ASSERT(fresh_sub_store);
@@ -584,7 +572,7 @@ void SyncSession::OnlyForTesting::handle_error(SyncSession& session, sync::Sessi
 void SyncSession::handle_error(sync::SessionErrorInfo error)
 {
     enum class NextStateAfterError { none, inactive, error };
-    auto next_state = error.try_again ? NextStateAfterError::none : NextStateAfterError::error;
+    auto next_state = error.is_fatal() ? NextStateAfterError::error : NextStateAfterError::none;
     auto error_code = error.error_code;
     util::Optional<ShouldBackup> delete_file;
     bool log_out_user = false;
@@ -641,9 +629,10 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
             case sync::ProtocolErrorInfo::Action::MigrateToFLX:
                 // Should not receive this error if original sync config is FLX
                 REALM_ASSERT(!m_original_sync_config->flx_sync_requested);
-                REALM_ASSERT(error.migration_query_string);
+                REALM_ASSERT(error.migration_query_string && !error.migration_query_string->empty());
                 // Original config was PBS, migrating to FLX
                 m_migration_store->migrate_to_flx(*error.migration_query_string);
+                update_sync_config_after_migration();
                 next_state = NextStateAfterError::inactive;
                 break;
             case sync::ProtocolErrorInfo::Action::RevertToPBS:
@@ -651,6 +640,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                 REALM_ASSERT(!m_original_sync_config->flx_sync_requested);
                 // Original config was PBS, cancel the migration
                 m_migration_store->cancel_migration();
+                update_sync_config_after_migration();
                 next_state = NextStateAfterError::inactive;
                 break;
         }
@@ -732,7 +722,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     if (delete_file)
         update_error_and_mark_file_for_deletion(sync_error, *delete_file);
 
-    if (m_state == State::Dying && !error.try_again) {
+    if (m_state == State::Dying && error.is_fatal()) {
         become_inactive(std::move(lock));
         return;
     }
@@ -1223,7 +1213,7 @@ std::string const& SyncSession::path() const
 
 std::shared_ptr<sync::SubscriptionStore> SyncSession::get_flx_subscription_store()
 {
-    util::CheckedLockGuard lock(m_config_mutex);
+    util::CheckedLockGuard lock(m_state_mutex);
     return m_flx_subscription_store;
 }
 
@@ -1258,22 +1248,36 @@ void SyncSession::update_configuration(SyncConfig new_config)
         REALM_ASSERT(m_state == State::Inactive || m_state == State::Paused);
         REALM_ASSERT(!m_session);
         REALM_ASSERT(m_config.sync_config->user == new_config.user);
+        // Since this is used for testing purposes only, just update the current sync_config
         m_config.sync_config = std::make_shared<SyncConfig>(std::move(new_config));
         break;
     }
     revive_if_needed();
 }
 
-void SyncSession::update_subscription_store()
+void SyncSession::update_sync_config_after_migration()
 {
-    // Not using sync
-    if (!m_config.sync_config)
-        return;
+    // Migration state changed - Update the configuration to
+    // match the new sync mode.
+    bool flx_sync_requested;
+    {
+        util::CheckedLockGuard cfg_lock(m_config_mutex);
+        m_config.sync_config = m_migration_store->convert_sync_config(m_original_sync_config);
+        flx_sync_requested = m_config.sync_config->flx_sync_requested;
+    }
 
-    auto& history = static_cast<sync::ClientReplication&>(*m_db->get_replication());
+    util::CheckedLockGuard cfg_lock(m_state_mutex);
+    m_needs_subscription_store_updated.emplace(flx_sync_requested);
+}
+
+void SyncSession::update_subscription_store(bool flx_sync_requested)
+{
+    // The session should be closed before updating the FLX subscription store
+    REALM_ASSERT(!m_session);
 
     // If the subscription store exists and switching to PBS, then clear the store
-    if (!m_config.sync_config->flx_sync_requested) {
+    auto& history = static_cast<sync::ClientReplication&>(*m_db->get_replication());
+    if (!flx_sync_requested) {
         if (m_flx_subscription_store) {
             history.set_write_validator_factory(nullptr);
             m_flx_subscription_store.reset();

@@ -120,29 +120,35 @@ struct SyncMetadataTable {
 void create_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadataTable>* tables);
 void load_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadataTable>* tables);
 
-// SyncMetadataSchemas manages the schema version numbers for different groups of internal tables used
-// within sync.
-class SyncMetadataSchemaVersions {
+class SyncMetadataSchemaVersionsReader {
 public:
-    // Set read_only to true to prevent creating the metadata schema versions table upon creation
-    // If read_only is set, use is_initialized() to determine if valid metadata schema versions info was read
-    explicit SyncMetadataSchemaVersions(const TransactionRef& ref, bool read_only = false);
+    explicit SyncMetadataSchemaVersionsReader(const TransactionRef& ref);
 
     util::Optional<int64_t> get_version_for(const TransactionRef& tr, std::string_view schema_group_name);
-    void set_version_for(const TransactionRef& tr, std::string_view schema_group_name, int64_t version);
 
     // returns false if the metadata schema versions table is not available, in cases where:
     // * the metadata schema version table was not created during construction (i.e. read-only flag was set)
     // * the metadata schema version table could not be read
+    // * the legacy metadata schema version data still exists and has not been converted
     bool is_initialized() const
     {
         return bool(m_table);
     }
 
-private:
+protected:
     TableKey m_table;
     ColKey m_version_field;
     ColKey m_schema_group_field;
+};
+
+
+// SyncMetadataSchemas manages the schema version numbers for different groups of internal tables used
+// within sync.
+class SyncMetadataSchemaVersions : public SyncMetadataSchemaVersionsReader {
+public:
+    explicit SyncMetadataSchemaVersions(const TransactionRef& ref);
+
+    void set_version_for(const TransactionRef& tr, std::string_view schema_group_name, int64_t version);
 };
 
 } // namespace realm::sync

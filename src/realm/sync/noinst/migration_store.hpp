@@ -44,8 +44,7 @@ public:
         Migrated,
     };
 
-    static MigrationStoreRef create(DBRef db,
-                                    std::function<void(MigrationStore::MigrationState)>&& on_migration_state_changed);
+    static MigrationStoreRef create(DBRef db);
 
     // Converts the configuration from PBS to FLX if in the migrated state, otherwise returns the passed in config
     // object. If the provided config is configured for FLX, the migration will be canceled and the migration state
@@ -69,8 +68,7 @@ public:
     std::optional<Subscription> make_subscription(const std::string& object_class_name);
 
 protected:
-    explicit MigrationStore(DBRef db,
-                            std::function<void(MigrationStore::MigrationState)>&& on_migration_state_changed);
+    explicit MigrationStore(DBRef db);
 
     // Read the data from the database - returns true if successful
     // Will return false if read_only is set and the metadata schema
@@ -81,8 +79,6 @@ protected:
     void clear(std::unique_lock<std::mutex> lock);
 
     DBRef m_db;
-
-    std::function<void(MigrationStore::MigrationState)> m_on_migration_state_changed;
 
     TableKey m_migration_table;
     ColKey m_migration_completed_at;

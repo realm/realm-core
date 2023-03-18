@@ -532,4 +532,147 @@ TEST(Sync_SubscriptionStoreSubSetHasTable)
     CHECK(table_set.empty());
 }
 
+TEST(Sync_SyncMetadataSchemaVersionsReader)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    DBRef db = DB::create(make_client_replication(), sub_store_path);
+    std::string schema_group_name = "";
+    int64_t version = 123;
+
+    {
+        auto tr = db->start_read();
+        // Verify opening a reader on an unitialized versions table returns uninitialized
+        SyncMetadataSchemaVersionsReader reader(tr);
+        CHECK(!reader.is_initialized());
+    }
+
+    {
+        auto tr = db->start_read();
+        // Initialize the schema versions table
+        SyncMetadataSchemaVersions schema_versions(tr);
+        tr->promote_to_write();
+        schema_versions.set_version_for(tr, schema_group_name, version);
+        tr->commit_and_continue_as_read();
+        auto schema_version = schema_versions.get_version_for(tr, schema_group_name);
+        CHECK(schema_version);
+        CHECK(*schema_version == version);
+    }
+
+    {
+        auto tr = db->start_read();
+        // Verify opening a reader on an initialized versions table returns initialized
+        SyncMetadataSchemaVersionsReader reader(tr);
+        CHECK(reader.is_initialized());
+        auto schema_version = reader.get_version_for(tr, schema_group_name);
+        CHECK(schema_version);
+        CHECK(*schema_version == version);
+    }
+}
+
+TEST(Sync_SyncMetadataSchemaVersions)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    DBRef db = DB::create(make_client_replication(), sub_store_path);
+    int64_t flx_version = 234, flx_version2 = 77777;
+    int64_t btstrp_version = 567, btstrp_version2 = 888888;
+    int64_t mig_version = 890, mig_version2 = 9999999;
+
+    auto check_version = [this, &db](SyncMetadataSchemaVersionsReader& schema_versions,
+                                     const std::string_view& group_name, int64_t expected_version) {
+        auto tr = db->start_read();
+        auto schema_version = schema_versions.get_version_for(tr, group_name);
+        CHECK(schema_version);
+        CHECK(*schema_version == expected_version);
+    };
+
+    {
+        // Initialize the table and write values
+        auto tr = db->start_read();
+        SyncMetadataSchemaVersions schema_versions(tr);
+        tr->promote_to_write();
+        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_subscription_store, flx_version);
+        schema_versions.set_version_for(tr, internal_schema_groups::c_pending_bootstraps, btstrp_version);
+        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_migration_store, mig_version);
+        tr->commit();
+
+        check_version(schema_versions, internal_schema_groups::c_flx_subscription_store, flx_version);
+        check_version(schema_versions, internal_schema_groups::c_pending_bootstraps, btstrp_version);
+        check_version(schema_versions, internal_schema_groups::c_flx_migration_store, mig_version);
+    }
+
+    {
+        // Re-read the data and verify the values
+        auto tr = db->start_read();
+        SyncMetadataSchemaVersions schema_versions(tr);
+
+        check_version(schema_versions, internal_schema_groups::c_flx_subscription_store, flx_version);
+        check_version(schema_versions, internal_schema_groups::c_pending_bootstraps, btstrp_version);
+        check_version(schema_versions, internal_schema_groups::c_flx_migration_store, mig_version);
+    }
+
+    {
+        // Write new values and verify the values
+        auto tr = db->start_read();
+        SyncMetadataSchemaVersions schema_versions(tr);
+        tr->promote_to_write();
+        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_subscription_store, flx_version2);
+        tr->commit_and_continue_writing();
+        schema_versions.set_version_for(tr, internal_schema_groups::c_pending_bootstraps, btstrp_version2);
+        tr->commit_and_continue_writing();
+        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_migration_store, mig_version2);
+        tr->commit();
+
+        check_version(schema_versions, internal_schema_groups::c_flx_subscription_store, flx_version2);
+        check_version(schema_versions, internal_schema_groups::c_pending_bootstraps, btstrp_version2);
+        check_version(schema_versions, internal_schema_groups::c_flx_migration_store, mig_version2);
+    }
+
+    {
+        // Re-read the data and verify the values with a reader
+        auto tr = db->start_read();
+        SyncMetadataSchemaVersionsReader schema_versions(tr);
+
+        check_version(schema_versions, internal_schema_groups::c_flx_subscription_store, flx_version2);
+        check_version(schema_versions, internal_schema_groups::c_pending_bootstraps, btstrp_version2);
+        check_version(schema_versions, internal_schema_groups::c_flx_migration_store, mig_version2);
+    }
+}
+
+TEST(Sync_SyncMetadataSchemaVersions_LegacyTable)
+{
+    // Copied from sync_metadata_schema.cpp
+    constexpr static std::string_view c_flx_metadata_table("flx_metadata");
+    constexpr static std::string_view c_meta_schema_version_field("schema_version");
+
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    DBRef db = DB::create(make_client_replication(), sub_store_path);
+    int64_t version = 678;
+
+    {
+        // Create the legacy table
+        TableKey legacy_table_key;
+        ColKey legacy_version_key;
+        std::vector<SyncMetadataTable> legacy_table_def{
+            {&legacy_table_key,
+             c_flx_metadata_table,
+             {{&legacy_version_key, c_meta_schema_version_field, type_Int}}}};
+        auto tr = db->start_write();
+        create_sync_metadata_schema(tr, &legacy_table_def);
+        tr->commit_and_continue_writing();
+        auto legacy_meta_table = tr->get_table(legacy_table_key);
+        auto legacy_object = legacy_meta_table->create_object();
+        legacy_object.set(legacy_version_key, version);
+        tr->commit();
+    }
+
+    {
+        auto tr = db->start_read();
+        // Converts the legacy table to the unified table
+        SyncMetadataSchemaVersions schema_versions(tr);
+        auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_subscription_store);
+        CHECK(schema_version);
+        CHECK(*schema_version == version);
+    }
+}
+
 } // namespace realm::sync
