@@ -16,12 +16,11 @@
  *
  **************************************************************************/
 
-#include "realm/sync/noinst/sync_metadata_schema.hpp"
+#include <realm/sync/noinst/sync_metadata_schema.hpp>
 
-#include "realm/data_type.hpp"
-#include "realm/transaction.hpp"
-#include "realm/util/flat_map.hpp"
-#include "realm/util/optional.hpp"
+#include <realm/data_type.hpp>
+#include <realm/transaction.hpp>
+#include <realm/util/flat_map.hpp>
 #include <stdexcept>
 
 namespace realm::sync {
@@ -180,8 +179,8 @@ SyncMetadataSchemaVersionsReader::SyncMetadataSchemaVersionsReader(const Transac
     }
 }
 
-util::Optional<int64_t> SyncMetadataSchemaVersionsReader::get_version_for(const TransactionRef& tr,
-                                                                          std::string_view schema_group_name)
+std::optional<int64_t> SyncMetadataSchemaVersionsReader::get_version_for(const TransactionRef& tr,
+                                                                         std::string_view schema_group_name)
 {
     if (!m_table) {
         return util::none;

@@ -55,13 +55,11 @@ bool MigrationStore::load_data(bool read_only)
     std::optional<int64_t> schema_version;
     auto tr = m_db->start_read();
     if (read_only) {
+        // Writing is disabled
         SyncMetadataSchemaVersionsReader schema_versions(tr);
-        if (!schema_versions.is_initialized()) {
-            return false; // no data to read and writing is disabled
-        }
         schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_migration_store);
         if (!schema_version) {
-            return false; // data to read, but version does not exist and writing is disabled
+            return false; // Either table is not initialized or version does not exist
         }
     }
     else { // writable

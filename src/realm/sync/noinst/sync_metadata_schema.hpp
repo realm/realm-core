@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "realm/data_type.hpp"
-#include "realm/keys.hpp"
-#include "realm/util/optional.hpp"
+#include <realm/data_type.hpp>
+#include <realm/keys.hpp>
+
 #include <memory>
 #include <stdexcept>
 #include <string_view>
@@ -124,16 +124,7 @@ class SyncMetadataSchemaVersionsReader {
 public:
     explicit SyncMetadataSchemaVersionsReader(const TransactionRef& ref);
 
-    util::Optional<int64_t> get_version_for(const TransactionRef& tr, std::string_view schema_group_name);
-
-    // returns false if the metadata schema versions table is not available, in cases where:
-    // * the metadata schema version table was not created during construction (i.e. read-only flag was set)
-    // * the metadata schema version table could not be read
-    // * the legacy metadata schema version data still exists and has not been converted
-    bool is_initialized() const
-    {
-        return bool(m_table);
-    }
+    std::optional<int64_t> get_version_for(const TransactionRef& tr, std::string_view schema_group_name);
 
 protected:
     TableKey m_table;

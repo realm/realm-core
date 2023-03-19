@@ -1,8 +1,8 @@
-#include "realm/exceptions.hpp"
-#include "realm/object_id.hpp"
-#include "realm/sync/noinst/sync_metadata_schema.hpp"
-#include "realm/sync/subscriptions.hpp"
-#include "realm/sync/noinst/client_history_impl.hpp"
+#include <realm/exceptions.hpp>
+#include <realm/object_id.hpp>
+#include <realm/sync/noinst/sync_metadata_schema.hpp>
+#include <realm/sync/subscriptions.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 
 #include "test.hpp"
 #include "util/test_path.hpp"
@@ -565,7 +565,8 @@ TEST(Sync_SyncMetadataSchemaVersionsReader)
         auto tr = db->start_read();
         // Verify opening a reader on an unitialized versions table returns uninitialized
         SyncMetadataSchemaVersionsReader reader(tr);
-        CHECK(!reader.is_initialized());
+        auto schema_version = reader.get_version_for(tr, schema_group_name);
+        CHECK(!schema_version);
     }
 
     {
@@ -584,7 +585,6 @@ TEST(Sync_SyncMetadataSchemaVersionsReader)
         auto tr = db->start_read();
         // Verify opening a reader on an initialized versions table returns initialized
         SyncMetadataSchemaVersionsReader reader(tr);
-        CHECK(reader.is_initialized());
         auto schema_version = reader.get_version_for(tr, schema_group_name);
         CHECK(schema_version);
         CHECK(*schema_version == version);
@@ -596,7 +596,8 @@ TEST(Sync_SyncMetadataSchemaVersionsReader)
         auto tr = db->start_read();
         // Verify opening a reader with legacy data returns uninitialized
         SyncMetadataSchemaVersionsReader reader(tr);
-        CHECK(!reader.is_initialized());
+        auto schema_version = reader.get_version_for(tr, schema_group_name);
+        CHECK(!schema_version);
     }
 
     // Test case where both tables exist in database
