@@ -317,9 +317,9 @@ enum class ProtocolError {
     compensating_write           = RLM_SYNC_ERR_SESSION_COMPENSATING_WRITE,         // Client attempted a write that is disallowed by permissions, or modifies and
                                                                                     // object outside the current query, and the server undid the modification
                                                                                     // (UPLOAD)
-    migrate_to_flx               = RLM_SYNC_ERR_SESSION_MIGRATE_TO_FLX,             // Server migrated to FLX -> migrate client to FLX
+    migrate_to_flx               = RLM_SYNC_ERR_SESSION_MIGRATE_TO_FLX,             // Server migrated from PBS to FLX - migrate client to FLX (BIND)
     bad_progress                 = RLM_SYNC_ERR_SESSION_BAD_PROGRESS,               // Bad progress information (ERROR)
-    revert_to_pbs                = RLM_SYNC_ERR_SESSION_REVERT_TO_PBS,              // Server rolled back to PBS -> revert FLX client migration
+    revert_to_pbs                = RLM_SYNC_ERR_SESSION_REVERT_TO_PBS,              // Server rolled back to PBS after FLX migration - revert FLX client migration (BIND)
 
     // clang-format on
 };

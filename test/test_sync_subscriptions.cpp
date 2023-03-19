@@ -602,11 +602,13 @@ TEST(Sync_SyncMetadataSchemaVersionsReader)
     // Test case where both tables exist in database
     {
         auto tr = db->start_read();
-        // Initialize the schema versions table and set a schema version
+        // Initialize the schema versions table and verify the converted flx subscription store version
         SyncMetadataSchemaVersions schema_versions(tr);
         auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_subscription_store);
         CHECK(schema_version);
         CHECK(*schema_version == legacy_version);
+        // Verify the legacy table has been deleted after the conversion
+        CHECK(!tr->has_table(c_flx_metadata_table));
     }
 }
 
@@ -669,7 +671,7 @@ TEST(Sync_SyncMetadataSchemaVersions)
     }
 
     {
-        // Re-read the data and verify the values with a reader
+        // Re-read the data and verify the new values with a reader
         auto tr = db->start_read();
         SyncMetadataSchemaVersionsReader schema_versions(tr);
 
