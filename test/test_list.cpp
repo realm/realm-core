@@ -677,7 +677,7 @@ TEST(List_NestedList_Insert)
     CHECK_EQUAL(collection2->size(), 0);
 }
 
-ONLY(List_NestedList_Remove)
+TEST(List_NestedList_Remove)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(make_in_realm_history(), path);
@@ -736,7 +736,7 @@ ONLY(List_NestedList_Remove)
 
     CHECK_EQUAL(list->size(), 0);
     CHECK_EQUAL(dict->size(), 0);
-    // CHECK_EQUAL(collection->size(), 0); this ptr is garbage. Investigate this.
+    // CHECK_EQUAL(collection->size(), 0); //this ptr is garbage. Investigate this.
     tr->promote_to_write();
     obj.remove();
     tr->commit_and_continue_as_read();
