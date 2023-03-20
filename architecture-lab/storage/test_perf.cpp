@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <iostream>
+#include <iomanip>
 #include <sstream>
 #include <string>
 #include <fstream>
@@ -48,6 +49,17 @@ struct chunk {
     {
         return memcmp(symbols, a2.symbols, 2 * CHUNK_SIZE) == 0 && prefix_index == a2.prefix_index;
     };
+};
+template <>
+struct std::hash<std::vector<uint16_t>> {
+    std::size_t operator()(const std::vector<uint16_t>& c) const noexcept
+    {
+        auto seed = c.size();
+        for (auto& x : c) {
+            seed = (seed + 3) * (x + 7);
+        }
+        return seed;
+    }
 };
 
 template <>
@@ -111,8 +123,8 @@ int hash(uint32_t expansion)
 
 class string_compressor {
 public:
-    std::vector<chunk> chunks;
-    std::unordered_map<chunk, int> map;
+    std::vector<std::vector<uint16_t>> symbols;
+    std::unordered_map<std::vector<uint16_t>, int> symbol_map;
     std::vector<encoding_entry> encoding_table;
     std::vector<uint32_t> decoding_table;
     bool separators[256];
@@ -237,13 +249,31 @@ public:
         }
         // compress all groups together
         size = compress_symbols(symbols, out_size, 4, 10);
+        compressed_symbols += size;
         return size;
     }
     int handle(const char* _first, const char* _past)
     {
-        uint16_t symbols[8192];
-        auto size = compress(symbols, _first, _past);
-        // decompress_and_verify(symbols, size, _first, _past);
+        uint16_t symbol_buffer[8192];
+        auto size = compress(symbol_buffer, _first, _past);
+        // decompress_and_verify(symbol_buffer, size, _first, _past);
+
+        std::vector<uint16_t> symbol(size);
+        for (int j = 0; j < size; ++j)
+            symbol[j] = symbol_buffer[j];
+        auto it = symbol_map.find(symbol);
+        if (it == symbol_map.end()) {
+            auto id = symbols.size();
+            symbols.push_back(symbol);
+            symbol_map[symbol] = id;
+            unique_symbol_size += size;
+            return id;
+        }
+        else {
+            return it->second;
+        }
+
+#if 0
         uint16_t* first = symbols;
         uint16_t* past = symbols + size;
         uint16_t* last = first + CHUNK_SIZE;
@@ -269,6 +299,7 @@ public:
             last += CHUNK_SIZE;
         }
         return prefix;
+#endif
     }
     int symbol_table_size()
     {
@@ -277,6 +308,8 @@ public:
     int next_id = 0;
     int next_prefix_id = -1;
     int64_t total_chars = 0;
+    int64_t compressed_symbols = 0;
+    int64_t unique_symbol_size = 0;
 };
 
 struct compressor_driver {
@@ -434,7 +467,7 @@ int main(int argc, char* argv[])
     void* file_start = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
     assert(file_start != (void*)-1);
     long step_size = 5000000;
-    int num_work_packages = 8;
+    int num_work_packages = 6;
     concurrent_queue<results*> to_reader;
     for (int i = 0; i < num_work_packages; ++i)
         to_reader.put(new results(step_size, max_fields));
@@ -653,35 +686,39 @@ int main(int argc, char* argv[])
         uint64_t dict_size = 0;
         uint64_t symbol_size = 0;
         uint64_t ref_size = 0;
+        uint64_t compressed_size = 0;
         for (int i = 0; i < max_fields; ++i) {
             if (compressors[i]) {
                 uint64_t col_from_size = compressors[i]->total_chars;
                 // add one byte to each for zero termination:
                 col_from_size += num_line;
-                auto chunks = compressors[i]->map.size();
+                auto ids = compressors[i]->symbols.size();
                 int ref_cost =
-                    chunks >= 32768
+                    ids >= 32768
                         ? 32
-                        : (chunks >= 128
-                               ? 16
-                               : (chunks >= 8 ? 8 : (chunks >= 4 ? 4 : (chunks >= 2 ? 2 : (chunks >= 1 ? 1 : 0)))));
+                        : (ids >= 128 ? 16 : (ids >= 8 ? 8 : (ids >= 4 ? 4 : (ids >= 2 ? 2 : (ids >= 1 ? 1 : 0)))));
                 uint64_t col_ref_size = (ref_cost * num_line) / 8;
-                uint64_t col_dict_size = chunks * sizeof(chunk);
+                // assume 4 bytes overhead for each unique string:
+                uint64_t col_dict_size = compressors[i]->unique_symbol_size + 4 * compressors[i]->symbols.size();
                 uint64_t col_symbol_size = compressors[i]->symbol_table_size() * sizeof(encoding_entry);
                 uint64_t col_total = col_ref_size + col_dict_size + col_symbol_size;
-                std::cout << "Field " << i << " from " << compressors[i]->total_chars << " chars -> " << col_ref_size
-                          << " (refs) + " << col_dict_size << " (dict) + " << col_symbol_size
-                          << " (symbol table) = " << col_total << " or " << (col_total * 100) / col_from_size << " %"
-                          << std::endl;
+                uint64_t col_compressed = compressors[i]->compressed_symbols;
+                std::cout << "Field " << std::right << std::setw(3) << i << " from " << std::setw(11)
+                          << compressors[i]->total_chars << " to " << std::setw(11) << col_compressed * 2
+                          << " bytes + " << std::setw(9) << col_symbol_size << " for symboltable \tInterned into "
+                          << std::setw(11) << col_ref_size << " (refs) + " << std::setw(11) << col_dict_size
+                          << " (dict), totalling " << std::setw(11) << col_total << std::endl;
                 compressors[i].reset();
                 dict_size += col_dict_size;
                 symbol_size += col_symbol_size;
                 ref_size += col_ref_size;
                 from_size += col_from_size;
+                compressed_size += col_compressed * 2;
             }
         }
-        std::cout << "Total effect: from " << from_size << " -> " << ref_size << " (refs) + " << dict_size
-                  << " (dict) + " << symbol_size << " (symbol table) = ";
+        std::cout << "Total effect: from " << from_size << " to " << compressed_size << " bytes of symbols + "
+                  << symbol_size << " for symbol table. \tInterned into " << ref_size << " (refs) + " << dict_size
+                  << " (dict)  =  ";
         auto total = ref_size + dict_size + symbol_size;
         std::cout << total << " or " << (total * 100) / from_size << " %" << std::endl;
 
