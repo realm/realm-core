@@ -738,6 +738,7 @@ TEST(List_NestedList_Remove)
 
     list->remove(0);
     dict->remove("Foo");
+    tr->verify();
     tr->commit_and_continue_as_read();
 
     CHECK_EQUAL(list->size(), 0);
