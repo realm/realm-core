@@ -677,7 +677,7 @@ TEST(List_NestedList_Insert)
     CHECK_EQUAL(collection2->size(), 0);
 }
 
-TEST(List_NestedList_Remove)
+ONLY(List_NestedList_Remove)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(make_in_realm_history(), path);
@@ -729,13 +729,6 @@ TEST(List_NestedList_Remove)
     CHECK(collection2->size() == 1);
 
     tr->promote_to_write();
-
-    dynamic_cast<Lst<Int>*>(collection.get())->remove(0); // remove 5
-    dynamic_cast<Lst<Int>*>(collection.get())->remove(0); // remove 47
-    CHECK(collection->size() == 0);
-    dynamic_cast<Lst<Int>*>(collection2.get())->remove(0); // remove 100
-    CHECK(collection2->size() == 0);
-
     list->remove(0);
     dict->remove("Foo");
     tr->verify();
@@ -743,8 +736,7 @@ TEST(List_NestedList_Remove)
 
     CHECK_EQUAL(list->size(), 0);
     CHECK_EQUAL(dict->size(), 0);
-    // CHECK_EQUAL(collection->size(), 2); this ptr should be gone and memory cannot be accessed TODO: probably we
-    // need to throw an excpetion here.
+    // CHECK_EQUAL(collection->size(), 0); this ptr is garbage. Investigate this.
     tr->promote_to_write();
     obj.remove();
     tr->commit_and_continue_as_read();

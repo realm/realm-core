@@ -239,31 +239,33 @@ CollectionListPtr CollectionList::get_collection_list(size_t ndx) const
 
 void CollectionList::remove(size_t ndx)
 {
-    ensure_created();
     REALM_ASSERT(m_key_type == type_Int);
     auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
     if (ndx < int_keys->size()) {
-        auto btree_index = int_keys->find_first(int_keys->get(ndx));
-        if (btree_index != realm::not_found) {
-            int_keys->erase(btree_index);
-            m_refs.erase(btree_index);
-        }
+        int_keys->erase(ndx);
+        auto ref = m_refs.get(ndx);
+        Array::destroy_deep(to_ref(ref), *m_alloc);
+        m_refs.erase(ndx);
+        return;
     }
-    // TODO: should I throw here?
+    throw InvalidArgument("Index out of bound");
 }
 
 void CollectionList::remove(StringData key)
 {
-    ensure_created();
     REALM_ASSERT(m_key_type == type_String);
     auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
     IteratorAdapter help(string_keys);
     auto it = std::lower_bound(help.begin(), help.end(), key);
     if (it.index() < string_keys->size()) {
-        string_keys->erase(it.index());
-        m_refs.erase(it.index());
+        const auto index = it.index();
+        string_keys->erase(index);
+        auto ref = m_refs.get(index);
+        Array::destroy_deep(to_ref(ref), *m_alloc);
+        m_refs.erase(index);
+        return;
     }
-    // TODO: shoud I throw here?
+    throw InvalidArgument("Key not found");
 }
 
 ref_type CollectionList::get_collection_ref(Index index) const noexcept
