@@ -333,8 +333,12 @@ class CollectionList : public CollectionParent,
                        protected ArrayParent,
                        public std::enable_shared_from_this<CollectionList> {
 public:
-    CollectionList(std::shared_ptr<CollectionParent> parent, ColKey col_key, Index index, CollectionType coll_type);
-    CollectionList(const CollectionList&);
+    [[nodiscard]] static CollectionListPtr create(std::shared_ptr<CollectionParent> parent, ColKey col_key,
+                                                  Index index, CollectionType coll_type)
+    {
+        return std::shared_ptr<CollectionList>(new CollectionList(parent, col_key, index, coll_type));
+    }
+    CollectionList(const CollectionList&) = delete;
 
     ~CollectionList();
 
@@ -415,8 +419,8 @@ public:
     CollectionListPtr insert_collection_list(StringData key);
     CollectionListPtr get_collection_list(size_t ndx) const;
 
-    void remove(size_t ndx);     // TODO
-    void remove(StringData key); // TODO
+    void remove(size_t ndx);
+    void remove(StringData key);
 
     ref_type get_child_ref(size_t child_ndx) const noexcept final;
     void update_child_ref(size_t child_ndx, ref_type new_ref) final;
@@ -431,6 +435,8 @@ private:
     mutable std::unique_ptr<BPlusTreeBase> m_keys;
     mutable BPlusTree<ref_type> m_refs;
     DataType m_key_type;
+
+    CollectionList(std::shared_ptr<CollectionParent> parent, ColKey col_key, Index index, CollectionType coll_type);
 
     UpdateStatus ensure_created()
     {
