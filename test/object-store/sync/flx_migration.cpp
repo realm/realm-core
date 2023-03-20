@@ -3,6 +3,7 @@
 #include <util/baas_admin_api.hpp>
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/util/future.hpp>
 
 #include <catch2/catch_all.hpp>
 #include <chrono>
@@ -187,6 +188,30 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
 
     // Roll back to PBS
     trigger_server_migration(session.app_session(), false, logger_ptr);
+
+    // Try to connect as FLX
+    {
+        SyncTestFile flx_config(session.app()->current_user(), server_app_config.schema,
+                                SyncConfig::FLXSyncEnabled{});
+        auto [err_promise, err_future] = util::make_promise_future<void>();
+        util::CopyablePromiseHolder promise(std::move(err_promise));
+        auto original_error_handler = std::move(flx_config.sync_config->error_handler);
+        flx_config.sync_config->error_handler =
+            [err_handler = std::move(original_error_handler),
+             error_promise = std::move(promise)](std::shared_ptr<SyncSession> sess, SyncError err) mutable {
+                // This situation should return the switch_to_pbs error
+                if (err.get_system_error() == make_error_code(sync::ProtocolError::switch_to_pbs)) {
+                    error_promise.get_promise().emplace_value();
+                    return;
+                }
+                err_handler(sess, err);
+            };
+        auto flx_realm = Realm::get_shared_realm(flx_config);
+        timed_sleeping_wait_for([error_future = std::move(err_future)] {
+            return error_future.is_ready();
+        });
+        REQUIRE(flx_realm->sync_session()->state() == SyncSession::State::Inactive);
+    }
 
     {
         SyncTestFile pbs_config(session.app(), partition1, server_app_config.schema);
