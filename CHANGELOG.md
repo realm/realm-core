@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* `Logger::set_default_logger()` did not perform any locking, resulting in data races if it was called while the default logger was being read on another thread ([PR #6398](https://github.com/realm/realm-core/pull/6398), since v13.7.0).
 
 ### Breaking changes
 * None.
