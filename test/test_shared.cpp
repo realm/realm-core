@@ -419,8 +419,7 @@ TEST(Shared_CompactingOnTheFly)
     SHARED_GROUP_TEST_PATH(path);
     Thread writer_thread;
     {
-        std::unique_ptr<Replication> hist(make_in_realm_history());
-        DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
+        DBRef sg = get_test_db(path, crypt_key());
         // Create table entries
         std::vector<ColKey> cols; // unsafe to hold colkeys across transaction! FIXME: should be reported
         {
@@ -463,8 +462,7 @@ TEST(Shared_CompactingOnTheFly)
         writer_thread.join();
     }
     {
-        std::unique_ptr<Replication> hist(make_in_realm_history());
-        DBRef sg2 = DB::create(*hist, path, DBOptions(crypt_key()));
+        DBRef sg2 = get_test_db(path, crypt_key());
         {
             WriteTransaction wt(sg2);
             wt.commit();
@@ -478,8 +476,7 @@ TEST(Shared_CompactingOnTheFly)
         rt2.get_group().verify();
     }
     {
-        std::unique_ptr<Replication> hist(make_in_realm_history());
-        DBRef sg2 = DB::create(*hist, path, DBOptions(crypt_key()));
+        DBRef sg2 = get_test_db(path, crypt_key());
         ReadTransaction rt2(sg2);
         auto table = rt2.get_table("test");
         CHECK(table);
@@ -492,7 +489,7 @@ TEST(Shared_CompactingOnTheFly)
 TEST(Shared_ReadAfterCompact)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    DBRef sg = get_test_db(path);
     {
         WriteTransaction wt(sg);
         auto table = wt.add_table("table");
@@ -516,7 +513,7 @@ TEST(Shared_ReadAfterCompact)
 TEST(Shared_ReadOverRead)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    DBRef sg = get_test_db(path);
     {
         WriteTransaction wt(sg);
         auto table = wt.add_table("table");
@@ -524,7 +521,7 @@ TEST(Shared_ReadOverRead)
         table->create_object().set_all(1);
         wt.commit();
     }
-    DBRef sg2 = DB::create(path);
+    DBRef sg2 = get_test_db(path);
     auto rt2 = sg2->start_read();
     auto table2 = rt2->get_table("table");
     for (int i = 2; i < 4; ++i) {
@@ -539,7 +536,7 @@ TEST(Shared_ReadOverRead)
 TEST(Shared_ReadOverReadAfterCompact)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    DBRef sg = get_test_db(path);
     {
         WriteTransaction wt(sg);
         auto table = wt.add_table("table");
@@ -548,7 +545,7 @@ TEST(Shared_ReadOverReadAfterCompact)
         wt.commit();
     }
     sg->compact();
-    DBRef sg2 = DB::create(path);
+    DBRef sg2 = get_test_db(path);
     auto rt = sg->start_read();
     auto rt2 = sg2->start_read();
     auto table = rt->get_table("table");
@@ -575,7 +572,7 @@ TEST(Shared_ReadOverRead2)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
-        DBRef sg = DB::create(path);
+        DBRef sg = get_test_db(path);
         {
             WriteTransaction wt(sg);
             auto table = wt.add_table("table");
@@ -584,8 +581,8 @@ TEST(Shared_ReadOverRead2)
             wt.commit();
         }
     }
-    DBRef sg3 = DB::create(path);
-    DBRef sg2 = DB::create(path);
+    DBRef sg2 = get_test_db(path);
+    DBRef sg3 = get_test_db(path);
     auto rt2 = sg2->start_read();
     auto table2 = rt2->get_table("table");
     for (int i = 2; i < 4; ++i) {
@@ -607,7 +604,8 @@ TEST(Shared_EncryptedRemap)
     const int64_t rows = 12;
     SHARED_GROUP_TEST_PATH(path);
     {
-        DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
+        DBRef sg = get_test_db(path, crypt_key());
+
         // Create table entries
 
         WriteTransaction wt(sg);
@@ -620,7 +618,7 @@ TEST(Shared_EncryptedRemap)
         wt.commit();
     }
 
-    DBRef sg2 = DB::create(path, true, DBOptions(crypt_key()));
+    DBRef sg2 = get_test_db(path, crypt_key());
 
     CHECK_EQUAL(true, sg2->compact());
     ReadTransaction rt2(sg2);
@@ -2258,7 +2256,7 @@ TEST(Shared_EncryptionPageReadFailure)
 TEST(Shared_VersionCount)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    DBRef sg = get_test_db(path);
     CHECK_EQUAL(1, sg->get_number_of_versions());
     TransactionRef reader = sg->start_read();
     {
@@ -2496,7 +2494,7 @@ TEST(Shared_MovingSearchIndex)
 TEST_IF(Shared_BeginReadFailure, _impl::SimulatedFailure::is_enabled())
 {
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    DBRef sg = get_test_db(path);
     using sf = _impl::SimulatedFailure;
     sf::OneShotPrimeGuard pg(sf::shared_group__grow_reader_mapping);
     CHECK_THROW(sg->start_read(), sf);
@@ -2539,7 +2537,7 @@ TEST(Shared_CompactEmpty)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
-        DBRef sg = DB::create(path);
+        DBRef sg = get_test_db(path);
         CHECK(sg->compact());
     }
 }
@@ -2549,7 +2547,7 @@ TEST(Shared_VersionOfBoundSnapshot)
 {
     SHARED_GROUP_TEST_PATH(path);
     DB::version_type version;
-    DBRef sg = DB::create(path);
+    DBRef sg = get_test_db(path);
     {
         ReadTransaction rt(sg);
         version = rt.get_version();
@@ -3327,7 +3325,7 @@ TEST(Shared_ConstObject)
 TEST(Shared_ConstObjectIterator)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    DBRef sg = get_test_db(path);
     ColKey col;
     {
         TransactionRef writer = sg->start_write();
@@ -3378,7 +3376,7 @@ TEST(Shared_ConstObjectIterator)
 TEST(Shared_ConstList)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    DBRef sg = get_test_db(path);
     TransactionRef writer = sg->start_write();
 
     TableRef t = writer->add_table("Foo");

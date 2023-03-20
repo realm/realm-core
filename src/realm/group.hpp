@@ -493,22 +493,6 @@ public:
         return !(*this == g);
     }
 
-    /// Control of what to include when computing memory usage
-    enum SizeAggregateControl {
-        size_of_state = 1,     ///< size of tables, indexes, toplevel array
-        size_of_history = 2,   ///< size of the in-file history compartment
-        size_of_freelists = 4, ///< size of the freelists
-        size_of_all = 7
-    };
-    /// Compute the sum of the sizes in number of bytes of all the array nodes
-    /// that currently make up this group. When this group represents a snapshot
-    /// in a Realm file (such as during a read transaction via a Transaction
-    /// instance), this function computes the footprint of that snapshot within
-    /// the Realm file.
-    ///
-    /// If this group accessor is the detached state, this function returns
-    /// zero.
-    size_t compute_aggregated_byte_size(SizeAggregateControl ctrl = SizeAggregateControl::size_of_all) const noexcept;
     /// Return the size taken up by the current snapshot. This is in contrast to
     /// the number returned by DB::get_stats() which will return the
     /// size of the last snapshot done in that DB. If the snapshots are
@@ -816,6 +800,10 @@ private:
                                              int& history_type, int& history_schema_version) noexcept;
     static ref_type get_history_ref(const Array& top) noexcept;
     static size_t get_logical_file_size(const Array& top) noexcept;
+    size_t get_logical_file_size() const noexcept
+    {
+        return get_logical_file_size(m_top);
+    }
     void clear_history();
     void set_history_schema_version(int version);
     template <class Accessor>

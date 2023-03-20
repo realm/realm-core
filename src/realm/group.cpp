@@ -1262,54 +1262,6 @@ void Group::to_json(std::ostream& out, size_t link_depth, std::map<std::string, 
     out << "}" << std::endl;
 }
 
-namespace {
-
-size_t size_of_tree_from_ref(ref_type ref, Allocator& alloc)
-{
-    if (ref) {
-        Array a(alloc);
-        a.init_from_ref(ref);
-        MemStats stats;
-        a.stats(stats);
-        return stats.allocated;
-    }
-    else
-        return 0;
-}
-} // namespace
-
-size_t Group::compute_aggregated_byte_size(SizeAggregateControl ctrl) const noexcept
-{
-    SlabAlloc& alloc = *const_cast<SlabAlloc*>(&m_alloc);
-    if (!m_top.is_attached())
-        return 0;
-    size_t used = 0;
-    if (ctrl & SizeAggregateControl::size_of_state) {
-        MemStats stats;
-        m_table_names.stats(stats);
-        m_tables.stats(stats);
-        used = stats.allocated + m_top.get_byte_size();
-        used += sizeof(SlabAlloc::Header);
-    }
-    if (ctrl & SizeAggregateControl::size_of_freelists) {
-        if (m_top.size() >= 6) {
-            auto ref = m_top.get_as_ref_or_tagged(3).get_as_ref();
-            used += size_of_tree_from_ref(ref, alloc);
-            ref = m_top.get_as_ref_or_tagged(4).get_as_ref();
-            used += size_of_tree_from_ref(ref, alloc);
-            ref = m_top.get_as_ref_or_tagged(5).get_as_ref();
-            used += size_of_tree_from_ref(ref, alloc);
-        }
-    }
-    if (ctrl & SizeAggregateControl::size_of_history) {
-        if (m_top.size() >= 9) {
-            auto ref = m_top.get_as_ref_or_tagged(8).get_as_ref();
-            used += size_of_tree_from_ref(ref, alloc);
-        }
-    }
-    return used;
-}
-
 size_t Group::get_used_space() const noexcept
 {
     if (!m_top.is_attached())

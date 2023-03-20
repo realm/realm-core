@@ -104,11 +104,20 @@ void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInf
 
 namespace realm {
 
+std::map<DB::TransactStage, const char*> log_messages = {
+    {DB::TransactStage::transact_Frozen, "Start frozen: %1"},
+    {DB::TransactStage::transact_Writing, "Start write: %1"},
+    {DB::TransactStage::transact_Reading, "Start read: %1"},
+};
+
 Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage)
     : Group(alloc)
     , db(_db)
     , m_read_lock(rli)
 {
+    if (db->m_logger) {
+        db->m_logger->log(util::Logger::Level::trace, log_messages[stage], rli.m_version);
+    }
     bool writable = stage == DB::transact_Writing;
     m_transact_stage = DB::transact_Ready;
     set_metrics(db->m_metrics);
@@ -835,6 +844,9 @@ void Transaction::acquire_write_lock()
 
 void Transaction::do_end_read() noexcept
 {
+    if (db->m_logger)
+        db->m_logger->log(util::Logger::Level::trace, "End transaction");
+
     prepare_for_close();
     detach();
 

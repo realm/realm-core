@@ -177,6 +177,8 @@ public:
         m_replication = repl;
     }
 
+    void set_logger(const std::shared_ptr<util::Logger>& logger) noexcept;
+
     void create_new_history(Replication& repl) REQUIRES(!m_mutex);
     void create_new_history(std::unique_ptr<Replication> repl) REQUIRES(!m_mutex);
 
@@ -488,6 +490,7 @@ private:
     bool m_wait_for_change_enabled = true; // Initially wait_for_change is enabled
     bool m_write_transaction_open GUARDED_BY(m_mutex) = false;
     std::string m_db_path;
+    size_t m_path_hash = 0;
     int m_file_format_version = 0;
     util::InterprocessMutex m_writemutex;
     std::unique_ptr<ReadLockInfo> m_fake_read_lock_if_immutable;
@@ -498,6 +501,7 @@ private:
     std::function<void(int, int)> m_upgrade_callback;
     std::shared_ptr<metrics::Metrics> m_metrics;
     std::unique_ptr<AsyncCommitHelper> m_commit_helper;
+    std::shared_ptr<util::Logger> m_logger;
     bool m_is_sync_agent = false;
 
     /// Attach this DB instance to the specified database file.

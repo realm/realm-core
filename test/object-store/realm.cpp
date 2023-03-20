@@ -3917,26 +3917,6 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
 #endif
 }
 
-TEST_CASE("Statistics on Realms") {
-    _impl::RealmCoordinator::assert_no_open_realms();
-    InMemoryTestFile config;
-    // config.cache = false;
-    config.automatic_change_notifications = false;
-
-    auto r = Realm::get_shared_realm(config);
-    r->update_schema({
-        {"object", {{"value", PropertyType::Int}}},
-    });
-
-    SECTION("compute_size") {
-        auto s = r->read_group().compute_aggregated_byte_size();
-        REQUIRE(s > 0);
-    }
-#ifdef _WIN32
-    _impl::RealmCoordinator::clear_all_caches();
-#endif
-}
-
 TEST_CASE("RealmCoordinator: get_unbound_realm()") {
     TestFile config;
     config.cache = true;

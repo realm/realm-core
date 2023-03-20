@@ -222,7 +222,7 @@ if(REALM_ENABLE_SYNC)
     if(CMAKE_SYSTEM_NAME MATCHES "^Windows|Linux|Android")
         set(REALM_NEEDS_OPENSSL TRUE)
     endif()
-elseif(CMAKE_SYSTEM_NAME MATCHES "Linux|Android")
+elseif(REALM_ENABLE_ENCRYPTION AND CMAKE_SYSTEM_NAME MATCHES "Linux|Android")
     set(REALM_NEEDS_OPENSSL TRUE)
 endif()
 

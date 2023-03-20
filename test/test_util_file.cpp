@@ -2,6 +2,7 @@
 #ifdef TEST_UTIL_FILE
 
 #include <realm/util/file.hpp>
+#include <filesystem>
 
 #include "test.hpp"
 #include <cstdio>
@@ -116,9 +117,10 @@ TEST(Utils_File_dir)
 
 TEST(Utils_File_dir_unicode)
 {
-    // Test make_dir and remove_dir with paths that include special characters
-    // This would previously fail on Windows
-    std::string dir_name = File::resolve("temporäreDatei", test_util::get_test_path_prefix());
+    using std::filesystem::u8path;
+
+    constexpr char all_the_unicode[] = u8"фоо-бар Λορεμ ლორემ 植物 החלל جمعت søren";
+    std::string dir_name = File::resolve(all_the_unicode, test_util::get_test_path_prefix());
 
     // Create directory
     bool dir_exists = File::is_dir(dir_name);
@@ -134,6 +136,14 @@ TEST(Utils_File_dir_unicode)
         dir_exists = File::is_dir(dir_name);
     }
     CHECK(dir_exists);
+
+    // Double-check using filesystem facilities with enforce UTF-8 handling
+    CHECK(std::filesystem::exists(u8path(test_util::get_test_path_prefix()) / u8path(all_the_unicode)));
+
+    // Create file
+    File f(File::resolve("test.realm", dir_name), File::mode_Write);
+    f.close();
+    File::remove(f.get_path());
 
     // Remove directory
     remove_dir(dir_name);
@@ -161,7 +171,15 @@ TEST(Utils_File_resolve)
 {
     std::string res;
     res = File::resolve("", "");
+
+#if REALM_HAVE_STD_FILESYSTEM
+    // The std::filesystem-based implementation canonicalizes the resolved path in terms of '.' and '..'
+    // This doesn't affect the actual behavior of the file APIs since 'some/dir/.' == 'some/dir'
+    // but it does produce a different string value.
+    CHECK_EQUAL(res, "");
+#else
     CHECK_EQUAL(res, ".");
+#endif
 
 #ifdef _WIN32
     res = File::resolve("C:\\foo\\bar", "dir");
