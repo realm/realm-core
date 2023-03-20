@@ -60,20 +60,6 @@ CollectionList::CollectionList(std::shared_ptr<CollectionParent> parent, ColKey 
     m_refs.set_parent(&m_top, 1);
 }
 
-CollectionList::CollectionList(const CollectionList& other)
-    : m_parent(other.m_parent)
-    , m_index(other.m_index)
-    , m_level(other.m_level)
-    , m_alloc(other.m_alloc)
-    , m_col_key(other.m_col_key)
-    , m_top(*m_alloc)
-    , m_refs(*m_alloc)
-    , m_key_type(other.m_key_type)
-{
-    m_top.set_parent(this, 0);
-    m_refs.set_parent(&m_top, 1);
-}
-
 CollectionList::~CollectionList() {}
 
 bool CollectionList::init_from_parent(bool allow_create) const
@@ -233,8 +219,7 @@ CollectionListPtr CollectionList::get_collection_list(size_t ndx) const
         index = std::string(string_keys->get(ndx));
     }
     auto coll_type = get_table()->get_nested_column_type(m_col_key, m_level);
-    return std::make_shared<CollectionList>(const_cast<CollectionList*>(this)->shared_from_this(), m_col_key, index,
-                                            coll_type);
+    return CollectionList::create(const_cast<CollectionList*>(this)->shared_from_this(), m_col_key, index, coll_type);
 }
 
 void CollectionList::remove(size_t ndx)
@@ -270,14 +255,16 @@ void CollectionList::remove(StringData key)
 
 ref_type CollectionList::get_collection_ref(Index index) const noexcept
 {
+    size_t ndx;
     if (m_key_type == type_Int) {
         auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
-        auto ndx = int_keys->find_first(mpark::get<int64_t>(index));
-        return m_refs.get(ndx);
+        ndx = int_keys->find_first(mpark::get<int64_t>(index));
     }
-    auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
-    auto ndx = string_keys->find_first(StringData(mpark::get<std::string>(index)));
-    return m_refs.get(ndx);
+    else {
+        auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
+        ndx = string_keys->find_first(StringData(mpark::get<std::string>(index)));
+    }
+    return ndx == realm::not_found ? 0 : m_refs.get(ndx);
 }
 
 void CollectionList::set_collection_ref(Index index, ref_type ref)
@@ -285,11 +272,15 @@ void CollectionList::set_collection_ref(Index index, ref_type ref)
     if (m_key_type == type_Int) {
         auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
         auto ndx = int_keys->find_first(mpark::get<int64_t>(index));
+        REALM_ASSERT(ndx != realm::not_found);
         return m_refs.set(ndx, ref);
     }
-    auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
-    auto ndx = string_keys->find_first(StringData(mpark::get<std::string>(index)));
-    return m_refs.set(ndx, ref);
+    else {
+        auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
+        auto ndx = string_keys->find_first(StringData(mpark::get<std::string>(index)));
+        REALM_ASSERT(ndx != realm::not_found);
+        return m_refs.set(ndx, ref);
+    }
 }
 
 CollectionParent::~CollectionParent() {}
@@ -2533,7 +2524,7 @@ CollectionListPtr Obj::get_collection_list(ColKey col_key) const
 {
     REALM_ASSERT(m_table->get_nesting_levels(col_key) > 0);
     auto coll_type = m_table->get_nested_column_type(col_key, 0);
-    return std::make_shared<CollectionList>(std::make_shared<Obj>(*this), col_key, col_key, coll_type);
+    return CollectionList::create(std::make_shared<Obj>(*this), col_key, col_key, coll_type);
 }
 
 
