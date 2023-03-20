@@ -87,8 +87,8 @@ public:
     CollectionListPtr insert_collection_list(StringData key);
     CollectionListPtr get_collection_list(size_t ndx) const;
 
-    void remove(size_t ndx);     // TODO
-    void remove(StringData key); // TODO
+    void remove(size_t ndx);
+    void remove(StringData key);
 
     ref_type get_child_ref(size_t child_ndx) const noexcept final;
     void update_child_ref(size_t child_ndx, ref_type new_ref) final;
