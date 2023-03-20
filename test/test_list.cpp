@@ -736,7 +736,7 @@ TEST(List_NestedList_Remove)
 
     CHECK_EQUAL(list->size(), 0);
     CHECK_EQUAL(dict->size(), 0);
-    // CHECK_EQUAL(collection->size(), 0); //this ptr is garbage. Investigate this.
+    CHECK_EQUAL(collection->size(), 0);
     tr->promote_to_write();
     obj.remove();
     tr->commit_and_continue_as_read();
