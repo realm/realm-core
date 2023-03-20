@@ -3,6 +3,7 @@
 #include <util/baas_admin_api.hpp>
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/sync/protocol.hpp>
 #include <realm/util/future.hpp>
 
 #include <catch2/catch_all.hpp>
@@ -122,15 +123,15 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
     {
         auto realm1 = Realm::get_shared_realm(config1);
 
-        CHECK(!wait_for_upload(*realm1));
-        CHECK(!wait_for_download(*realm1));
+        REQUIRE(!wait_for_upload(*realm1));
+        REQUIRE(!wait_for_download(*realm1));
 
         check_data(realm1, true, false);
 
         auto realm2 = Realm::get_shared_realm(config2);
 
-        CHECK(!wait_for_upload(*realm2));
-        CHECK(!wait_for_download(*realm2));
+        REQUIRE(!wait_for_upload(*realm2));
+        REQUIRE(!wait_for_download(*realm2));
 
         check_data(realm2, false, true);
     }
@@ -147,8 +148,8 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
             auto subs = flx_realm->get_latest_subscription_set();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 
-            CHECK(!wait_for_upload(*flx_realm));
-            CHECK(!wait_for_download(*flx_realm));
+            REQUIRE(!wait_for_upload(*flx_realm));
+            REQUIRE(!wait_for_download(*flx_realm));
 
             check_data(flx_realm, false, false);
         }
@@ -162,8 +163,8 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
             auto subs = std::move(mut_subs).commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 
-            CHECK(!wait_for_upload(*flx_realm));
-            CHECK(!wait_for_download(*flx_realm));
+            REQUIRE(!wait_for_upload(*flx_realm));
+            REQUIRE(!wait_for_download(*flx_realm));
             wait_for_advance(*flx_realm);
 
             check_data(flx_realm, true, false);
@@ -178,8 +179,8 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
             auto subs = std::move(mut_subs).commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 
-            CHECK(!wait_for_upload(*flx_realm));
-            CHECK(!wait_for_download(*flx_realm));
+            REQUIRE(!wait_for_upload(*flx_realm));
+            REQUIRE(!wait_for_download(*flx_realm));
             wait_for_advance(*flx_realm);
 
             check_data(flx_realm, true, true);
@@ -217,8 +218,8 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
         SyncTestFile pbs_config(session.app(), partition1, server_app_config.schema);
         auto pbs_realm = Realm::get_shared_realm(pbs_config);
 
-        CHECK(!wait_for_upload(*pbs_realm));
-        CHECK(!wait_for_download(*pbs_realm));
+        REQUIRE(!wait_for_upload(*pbs_realm));
+        REQUIRE(!wait_for_download(*pbs_realm));
 
         check_data(pbs_realm, true, false);
     }
@@ -226,12 +227,22 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
         SyncTestFile pbs_config(session.app(), partition2, server_app_config.schema);
         auto pbs_realm = Realm::get_shared_realm(pbs_config);
 
-        CHECK(!wait_for_upload(*pbs_realm));
-        CHECK(!wait_for_download(*pbs_realm));
+        REQUIRE(!wait_for_upload(*pbs_realm));
+        REQUIRE(!wait_for_download(*pbs_realm));
 
         check_data(pbs_realm, false, true);
     }
 }
+
+#ifdef REALM_SYNC_PROTOCOL_V8
+
+TEST_CASE("Validate protocol v8 features", "[flx],[migration]") {
+    REQUIRE(sync::get_current_protocol_version() >= 8);
+    REQUIRE("com.mongodb.realm-sync#" == sync::get_pbs_websocket_protocol_prefix());
+    REQUIRE("com.mongodb.realm-query-sync#" == sync::get_flx_websocket_protocol_prefix());
+}
+
+#endif // REALM_SYNC_PROTOCOL_V8
 
 #endif // REALM_ENABLE_AUTH_TESTS
 #endif // REALM_ENABLE_SYNC
