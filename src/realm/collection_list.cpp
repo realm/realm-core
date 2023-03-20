@@ -204,6 +204,36 @@ CollectionListPtr CollectionList::get_collection_list(size_t ndx) const
     return CollectionList::create(const_cast<CollectionList*>(this)->shared_from_this(), m_col_key, index, coll_type);
 }
 
+void CollectionList::remove(size_t ndx)
+{
+    REALM_ASSERT(m_key_type == type_Int);
+    auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
+    const auto sz = int_keys->size();
+    if (ndx >= sz) {
+        throw OutOfBounds("CollectionList::remove", ndx, sz);
+    }
+    int_keys->erase(ndx);
+    auto ref = m_refs.get(ndx);
+    Array::destroy_deep(ref, *m_alloc);
+    m_refs.erase(ndx);
+}
+
+void CollectionList::remove(StringData key)
+{
+    REALM_ASSERT(m_key_type == type_String);
+    auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
+    IteratorAdapter help(string_keys);
+    auto it = std::lower_bound(help.begin(), help.end(), key);
+    if (it.index() >= string_keys->size()) {
+        throw KeyNotFound("CollectionList::remove");
+    }
+    const auto index = it.index();
+    string_keys->erase(index);
+    auto ref = m_refs.get(index);
+    Array::destroy_deep(ref, *m_alloc);
+    m_refs.erase(index);
+}
+
 ref_type CollectionList::get_collection_ref(Index index) const noexcept
 {
     size_t ndx;
