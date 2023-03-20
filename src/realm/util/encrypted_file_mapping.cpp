@@ -495,8 +495,7 @@ void AESCryptor::write(FileDesc fd, off_t pos, const char* src, size_t size, Wri
                 ++iv.iv1;
 
             crypt(mode_Encrypt, pos, m_rw_buffer.get(), src, reinterpret_cast<const char*>(&iv.iv1));
-            hmac_sha224(Span(reinterpret_cast<uint8_t*>(m_rw_buffer.get()), block_size),
-                        iv.hmac1, m_hmacKey);
+            hmac_sha224(Span(reinterpret_cast<uint8_t*>(m_rw_buffer.get()), block_size), iv.hmac1, m_hmacKey);
             // In the extremely unlikely case that both the old and new versions have
             // the same hash we won't know which IV to use, so bump the IV until
             // they're different.
@@ -647,7 +646,6 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx, size_t required)
     char* addr = page_addr(local_page_ndx);
 
     if (!copy_up_to_date_page(local_page_ndx)) {
-
         const size_t page_ndx_in_file = local_page_ndx + m_first_page;
         const size_t end_page_ndx_in_file = m_first_page + m_page_state.size();
         off_t data_pos = off_t(page_ndx_in_file << m_page_shift);
