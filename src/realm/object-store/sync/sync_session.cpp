@@ -650,7 +650,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                     // Update error to the "switch to PBS" connect error
                     error = sync::SessionErrorInfo(make_error_code(sync::ProtocolError::switch_to_pbs),
                                                    "Server rolled back after flexible sync migration - cannot "
-                                                   "connect with flexible based sync config",
+                                                   "connect with flexible sync config",
                                                    false);
                     next_state = NextStateAfterError::error;
                     break;
