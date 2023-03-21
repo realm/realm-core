@@ -3075,6 +3075,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
             sync_sess_ext_ref = realm->sync_session()->external_reference();
             dbref = TestHelper::get_db(*realm);
+            // One ref each for the
+            // - RealmCoordinator
+            // - SyncSession
+            // - SessionWrapper
+            // - local dbref
             REQUIRE(dbref.use_count() == 4);
 
             realm->sync_session()->pause();
@@ -3082,12 +3087,14 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(state == SyncSession::State::Paused);
         }
 
+        // Closing the realm should leave one ref for the SyncSession and one for the local dbref.
         REQUIRE_THAT(
             [&] {
                 return dbref.use_count() == 2;
             },
             ReturnsTrueWithinTimeLimit{});
 
+        // Releasing the external reference should leave one ref (the local dbref) only.
         sync_sess_ext_ref.reset();
         REQUIRE_THAT(
             [&] {
