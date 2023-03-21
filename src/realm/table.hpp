@@ -178,14 +178,11 @@ public:
     ColKey add_column_dictionary(DataType type, StringData name, bool nullable = false,
                                  DataType key_type = type_String)
     {
-        auto col_key = add_column(type, name, nullable, {CollectionType::Dictionary}, key_type);
-        return col_key;
+        return add_column(type, name, nullable, {CollectionType::Dictionary}, key_type);
     }
     ColKey add_column_dictionary(Table& target, StringData name, DataType key_type = type_String)
     {
-        auto col_key = add_column(target, name, {CollectionType::Dictionary});
-        m_spec.set_dictionary_key_type(m_leaf_ndx2spec_ndx[col_key.get_index().val], key_type);
-        return col_key;
+        return add_column(target, name, {CollectionType::Dictionary}, key_type);
     }
 
     CollectionType get_nested_column_type(ColKey col_key, size_t level) const

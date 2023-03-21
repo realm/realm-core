@@ -20,10 +20,8 @@
 #define REALM_OBJ_HPP
 
 #include <realm/node.hpp>
-#include <realm/table_ref.hpp>
-#include <realm/keys.hpp>
+#include <realm/collection_parent.hpp>
 #include <realm/mixed.hpp>
-#include <external/mpark/variant.hpp>
 #include <map>
 
 #define REALM_CLUSTER_IF
@@ -31,14 +29,9 @@
 namespace realm {
 
 class ClusterTree;
-class Replication;
 class TableView;
-class CollectionBase;
 class CascadeState;
-class LstBase;
-class SetBase;
 class ObjList;
-class CollectionList;
 struct GlobalKey;
 
 template <class>
@@ -47,25 +40,18 @@ template <class>
 class Set;
 template <class T>
 using LstPtr = std::unique_ptr<Lst<T>>;
-using LstBasePtr = std::unique_ptr<LstBase>;
 template <class T>
 using SetPtr = std::unique_ptr<Set<T>>;
-using SetBasePtr = std::unique_ptr<SetBase>;
-using CollectionBasePtr = std::unique_ptr<CollectionBase>;
+
 using LinkCollectionPtr = std::unique_ptr<ObjList>;
-using CollectionListPtr = std::shared_ptr<CollectionList>;
 
 class LnkLst;
 using LnkLstPtr = std::unique_ptr<LnkLst>;
 class LnkSet;
 using LnkSetPtr = std::unique_ptr<LnkSet>;
 
-template <class>
-class Set;
-class Dictionary;
 class CollectionList;
 class DictionaryLinkValues;
-using DictionaryPtr = std::unique_ptr<Dictionary>;
 
 namespace _impl {
 class DeepChangeChecker;
@@ -75,58 +61,6 @@ enum JSONOutputMode {
     output_mode_json,       // default / existing implementation for outputting realm to json
     output_mode_xjson,      // extended json as described in the spec
     output_mode_xjson_plus, // extended json as described in the spec with additional modifier used for sync
-};
-
-/// The status of an accessor after a call to `update_if_needed()`.
-enum class UpdateStatus {
-    /// The owning object or column no longer exist, and the accessor could
-    /// not be updated. The accessor should be left in a detached state
-    /// after this, and further calls to `update_if_needed()` are not
-    /// guaranteed to reattach the accessor.
-    Detached,
-
-    /// The underlying data of the accessor was changed since the last call
-    /// to `update_if_needed()`. The accessor is still valid.
-    Updated,
-
-    /// The underlying data of the accessor did not change since the last
-    /// call to `update_if_needed()`, and the accessor is still valid in its
-    /// current state.
-    NoChange,
-};
-
-class CollectionParent {
-public:
-    using Index = mpark::variant<ColKey, int64_t, std::string>;
-
-    virtual ~CollectionParent();
-    virtual size_t get_level() const noexcept = 0;
-    virtual Replication* get_replication() const = 0;
-    virtual UpdateStatus update_if_needed_with_status() const = 0;
-    virtual bool update_if_needed() const = 0;
-    virtual int_fast64_t bump_content_version() = 0;
-    virtual void bump_both_versions() = 0;
-    virtual TableRef get_table() const noexcept = 0;
-    virtual ColKey get_col_key() const noexcept
-    {
-        return {};
-    }
-    virtual const Obj& get_object() const noexcept = 0;
-    virtual ref_type get_collection_ref(Index) const noexcept = 0;
-    virtual void set_collection_ref(Index, ref_type ref) = 0;
-
-    // Used when inserting a new link. You will not remove existing links in this process
-    void set_backlink(ColKey col_key, ObjLink new_link) const;
-    // Used when replacing a link, return true if CascadeState contains objects to remove
-    bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const;
-    // Used when removing a backlink, return true if CascadeState contains objects to remove
-    bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const;
-
-protected:
-    LstBasePtr get_listbase_ptr(ColKey col_key) const;
-    SetBasePtr get_setbase_ptr(ColKey col_key) const;
-    DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
-    CollectionBasePtr get_collection_ptr(ColKey col_key) const;
 };
 
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
