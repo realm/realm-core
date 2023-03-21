@@ -333,7 +333,11 @@ target_include_directories(Storage INTERFACE
     $<INSTALL_INTERFACE:include>
 )
 
-target_include_directories(Storage PRIVATE "${CMAKE_SOURCE_DIR}/src/external")
+set_source_files_properties(geospatial.cpp PROPERTIES
+    INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/src/external"
+    # the only flag not supported with pragma diagnostic disable in src file by gcc until 13.
+    COMPILE_FLAGS "$<$<CXX_COMPILER_ID:GNU>: -Wno-unknown-pragmas>"
+)
 
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     target_sources(Storage PRIVATE $<TARGET_OBJECTS:sha_win32>)
