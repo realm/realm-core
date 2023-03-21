@@ -28,7 +28,6 @@
 #include <realm/util/functional.hpp>
 #include <realm/util/function_ref.hpp>
 
-#include "util/event_loop.hpp"
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 
@@ -46,13 +45,6 @@ namespace realm {
 bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity,
                            const std::string& auth_server);
 bool results_contains_original_name(SyncFileActionMetadataResults& results, const std::string& original_name);
-
-void timed_wait_for(util::FunctionRef<bool()> condition,
-                    std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000));
-
-void timed_sleeping_wait_for(util::FunctionRef<bool()> condition,
-                             std::chrono::milliseconds max_ms = std::chrono::seconds(30),
-                             std::chrono::milliseconds sleep_ms = std::chrono::milliseconds(1));
 
 class ReturnsTrueWithinTimeLimit : public Catch::Matchers::MatcherGenericBase {
 public:

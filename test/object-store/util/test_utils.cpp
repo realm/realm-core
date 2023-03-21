@@ -16,13 +16,13 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/object-store/impl/realm_coordinator.hpp>
 #include "test_utils.hpp"
 
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/string_data.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/demangle.hpp>
 #include <realm/util/file.hpp>
-#include <realm/string_data.hpp>
 
 #include <external/json/json.hpp>
 
@@ -228,6 +228,29 @@ void chmod(const std::string& path, int permissions)
     static_cast<void>(path);
     static_cast<void>(permissions);
 #endif
+}
+
+void timed_wait_for(util::FunctionRef<bool()> condition, std::chrono::milliseconds max_ms)
+{
+    const auto wait_start = std::chrono::steady_clock::now();
+    util::EventLoop::main().run_until([&] {
+        if (std::chrono::steady_clock::now() - wait_start > max_ms) {
+            throw std::runtime_error(util::format("timed_wait_for exceeded %1 ms", max_ms.count()));
+        }
+        return condition();
+    });
+}
+
+void timed_sleeping_wait_for(util::FunctionRef<bool()> condition, std::chrono::milliseconds max_ms,
+                             std::chrono::milliseconds sleep_ms)
+{
+    const auto wait_start = std::chrono::steady_clock::now();
+    while (!condition()) {
+        if (std::chrono::steady_clock::now() - wait_start > max_ms) {
+            throw std::runtime_error(util::format("timed_sleeping_wait_for exceeded %1 ms", max_ms.count()));
+        }
+        std::this_thread::sleep_for(sleep_ms);
+    }
 }
 
 } // namespace realm

@@ -204,7 +204,6 @@ private:
     util::CheckedMutex m_async_mutex;
     std::condition_variable m_async_cv GUARDED_BY(m_async_mutex);
     AsyncState m_async_stage GUARDED_BY(m_async_mutex) = AsyncState::Idle;
-    std::chrono::steady_clock::time_point m_request_time_point;
     bool m_waiting_for_write_lock GUARDED_BY(m_async_mutex) = false;
     bool m_waiting_for_sync GUARDED_BY(m_async_mutex) = false;
 

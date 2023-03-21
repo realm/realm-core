@@ -261,7 +261,7 @@ public:
     // ask for write mutex. Callback takes place when mutex has been acquired.
     // callback may occur on ANOTHER THREAD. Must not be called if write mutex
     // has already been acquired.
-    void async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void()>&& when_acquired);
+    void async_request_write_mutex(const TransactionRef& tr, util::UniqueFunction<void()>&& when_acquired);
 
     // report statistics of last commit done on THIS DB.
     // The free space reported is what can be expected to be freed
@@ -500,7 +500,7 @@ private:
     util::InterprocessCondVar m_pick_next_writer;
     std::function<void(int, int)> m_upgrade_callback;
     std::shared_ptr<metrics::Metrics> m_metrics;
-    std::unique_ptr<AsyncCommitHelper> m_commit_helper;
+    std::shared_ptr<AsyncCommitHelper> m_commit_helper;
     std::shared_ptr<util::Logger> m_logger;
     bool m_is_sync_agent = false;
 
@@ -612,7 +612,7 @@ private:
     void close_internal(std::unique_lock<util::InterprocessMutex>, bool allow_open_read_transactions)
         REQUIRES(!m_mutex);
 
-    void async_begin_write(util::UniqueFunction<void()> fn);
+    void async_begin_write(util::UniqueFunction<bool()> fn);
     void async_end_write();
     void async_sync_to_disk(util::UniqueFunction<void()> fn);
 

@@ -766,15 +766,7 @@ void Transaction::prepare_for_close()
             break;
 
         case AsyncState::Requesting:
-            // We don't have the ability to cancel a wait on the write lock, so
-            // unfortunately we have to wait for it to be acquired.
-            REALM_ASSERT(m_transact_stage == DB::transact_Reading);
-            REALM_ASSERT(!m_oldest_version_not_persisted);
-            m_waiting_for_write_lock = true;
-            m_async_cv.wait(lck.native_handle(), [this]() REQUIRES(m_async_mutex) {
-                return !m_waiting_for_write_lock;
-            });
-            db->end_write_on_correct_thread();
+            m_async_stage = AsyncState::Idle;
             break;
 
         case AsyncState::HasLock:
