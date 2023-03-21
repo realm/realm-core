@@ -1092,10 +1092,10 @@ void SyncSession::close(util::CheckedUniqueLock lock)
             m_state_mutex.unlock(lock);
             break;
         case State::Paused:
-            // The paused state is sticky, so we don't transition to inactive here if we're already paused.
-            m_state_mutex.unlock(lock);
-            break;
         case State::Inactive: {
+            // We need to register from the sync manager if it still exists so that we don't end up
+            // holding the DBRef open after the session is closed. Otherwise we can end up preventing
+            // the user from deleting the realm when it's in the paused/inactive state.
             if (m_sync_manager) {
                 m_sync_manager->unregister_session(m_db->get_path());
             }
