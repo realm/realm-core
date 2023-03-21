@@ -1539,13 +1539,13 @@ TEST(Array_get_sum)
     for (uint64_t i = 0; i < size; ++i) {
         c.add(0x10000);
     }
-    CHECK_EQUAL(c.get_sum(), 0x10000 * size);
+    CHECK_EQUAL(c.get_sum(), 0x10000LL * size);
 
     // test multiple chunks w=32
     c.clear();
     for (uint64_t i = 0; i < size; ++i)
         c.add(0x100000);
-    CHECK_EQUAL(c.get_sum(), 0x100000 * size);
+    CHECK_EQUAL(c.get_sum(), 0x100000LL * size);
 
     // test multiple chunks w=64
     c.clear();

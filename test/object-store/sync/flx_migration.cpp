@@ -3,6 +3,8 @@
 #include <util/baas_admin_api.hpp>
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/sync/protocol.hpp>
+#include <realm/util/future.hpp>
 
 #include <catch2/catch_all.hpp>
 #include <chrono>
@@ -31,7 +33,7 @@ static void trigger_server_migration(const AppSession& app_session, bool switch_
         else
             return "FLX->PBS Rollback";
     }();
-    const int duration = 90;
+    const int duration = 300; // 5 minutes, for now, since it sometimes takes longet than 90 seconds
     try {
         timed_sleeping_wait_for(
             [&] {
@@ -121,15 +123,15 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
     {
         auto realm1 = Realm::get_shared_realm(config1);
 
-        CHECK(!wait_for_upload(*realm1));
-        CHECK(!wait_for_download(*realm1));
+        REQUIRE(!wait_for_upload(*realm1));
+        REQUIRE(!wait_for_download(*realm1));
 
         check_data(realm1, true, false);
 
         auto realm2 = Realm::get_shared_realm(config2);
 
-        CHECK(!wait_for_upload(*realm2));
-        CHECK(!wait_for_download(*realm2));
+        REQUIRE(!wait_for_upload(*realm2));
+        REQUIRE(!wait_for_download(*realm2));
 
         check_data(realm2, false, true);
     }
@@ -146,8 +148,8 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
             auto subs = flx_realm->get_latest_subscription_set();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 
-            CHECK(!wait_for_upload(*flx_realm));
-            CHECK(!wait_for_download(*flx_realm));
+            REQUIRE(!wait_for_upload(*flx_realm));
+            REQUIRE(!wait_for_download(*flx_realm));
 
             check_data(flx_realm, false, false);
         }
@@ -161,8 +163,8 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
             auto subs = std::move(mut_subs).commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 
-            CHECK(!wait_for_upload(*flx_realm));
-            CHECK(!wait_for_download(*flx_realm));
+            REQUIRE(!wait_for_upload(*flx_realm));
+            REQUIRE(!wait_for_download(*flx_realm));
             wait_for_advance(*flx_realm);
 
             check_data(flx_realm, true, false);
@@ -177,8 +179,8 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
             auto subs = std::move(mut_subs).commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 
-            CHECK(!wait_for_upload(*flx_realm));
-            CHECK(!wait_for_download(*flx_realm));
+            REQUIRE(!wait_for_upload(*flx_realm));
+            REQUIRE(!wait_for_download(*flx_realm));
             wait_for_advance(*flx_realm);
 
             check_data(flx_realm, true, true);
@@ -188,12 +190,30 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
     // Roll back to PBS
     trigger_server_migration(session.app_session(), false, logger_ptr);
 
+    // Try to connect as FLX
+    {
+        SyncTestFile flx_config(session.app()->current_user(), server_app_config.schema,
+                                SyncConfig::FLXSyncEnabled{});
+        auto [err_promise, err_future] = util::make_promise_future<SyncError>();
+        util::CopyablePromiseHolder promise(std::move(err_promise));
+        flx_config.sync_config->error_handler =
+            [&logger_ptr, error_promise = std::move(promise)](std::shared_ptr<SyncSession>, SyncError err) mutable {
+                // This situation should return the switch_to_pbs error
+                logger_ptr->error("Server rolled back - connect as FLX received error: %1", err.reason());
+                error_promise.get_promise().emplace_value(std::move(err));
+            };
+        auto flx_realm = Realm::get_shared_realm(flx_config);
+        auto err = wait_for_future(std::move(err_future), std::chrono::seconds(30)).get();
+        REQUIRE(err.get_system_error() == make_error_code(sync::ProtocolError::switch_to_pbs));
+        REQUIRE(flx_realm->sync_session()->state() == SyncSession::State::Inactive);
+    }
+
     {
         SyncTestFile pbs_config(session.app(), partition1, server_app_config.schema);
         auto pbs_realm = Realm::get_shared_realm(pbs_config);
 
-        CHECK(!wait_for_upload(*pbs_realm));
-        CHECK(!wait_for_download(*pbs_realm));
+        REQUIRE(!wait_for_upload(*pbs_realm));
+        REQUIRE(!wait_for_download(*pbs_realm));
 
         check_data(pbs_realm, true, false);
     }
@@ -201,12 +221,22 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
         SyncTestFile pbs_config(session.app(), partition2, server_app_config.schema);
         auto pbs_realm = Realm::get_shared_realm(pbs_config);
 
-        CHECK(!wait_for_upload(*pbs_realm));
-        CHECK(!wait_for_download(*pbs_realm));
+        REQUIRE(!wait_for_upload(*pbs_realm));
+        REQUIRE(!wait_for_download(*pbs_realm));
 
         check_data(pbs_realm, false, true);
     }
 }
+
+#ifdef REALM_SYNC_PROTOCOL_V8
+
+TEST_CASE("Validate protocol v8 features", "[flx],[migration]") {
+    REQUIRE(sync::get_current_protocol_version() >= 8);
+    REQUIRE("com.mongodb.realm-sync#" == sync::get_pbs_websocket_protocol_prefix());
+    REQUIRE("com.mongodb.realm-query-sync#" == sync::get_flx_websocket_protocol_prefix());
+}
+
+#endif // REALM_SYNC_PROTOCOL_V8
 
 #endif // REALM_ENABLE_AUTH_TESTS
 #endif // REALM_ENABLE_SYNC
