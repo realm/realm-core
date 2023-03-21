@@ -232,7 +232,7 @@ void FuzzObject::set_obj(Group& group, FuzzLog& log, State& s)
                         obj.add_int(col, value);
                     }
                     catch (const LogicError& le) {
-                        if (le.kind() != LogicError::illegal_combination) {
+                        if (le.code() != ErrorCodes::IllegalOperation) {
                             throw;
                         }
                     }

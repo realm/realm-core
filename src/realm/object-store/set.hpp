@@ -105,14 +105,12 @@ public:
 
     bool operator==(const Set& rhs) const noexcept;
 
-    struct InvalidEmbeddedOperationException : std::logic_error {
-        InvalidEmbeddedOperationException()
-            : std::logic_error("Cannot add an embedded object to a Set.")
-        {
-        }
-    };
-
 private:
+    const char* type_name() const noexcept override
+    {
+        return "Set";
+    }
+
     SetBase& set_base() const noexcept
     {
         REALM_ASSERT_DEBUG(dynamic_cast<SetBase*>(m_coll_base.get()));

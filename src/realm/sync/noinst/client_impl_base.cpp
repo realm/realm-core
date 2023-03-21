@@ -30,6 +30,7 @@ using namespace realm;
 using namespace _impl;
 using namespace realm::util;
 using namespace realm::sync;
+using namespace realm::sync::websocket;
 
 // clang-format off
 using Connection      = ClientImpl::Connection;
@@ -210,7 +211,7 @@ ClientImpl::ClientImpl(ClientConfig config)
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
         actualize_and_finalize_session_wrappers(); // Throws
     });
 }
@@ -228,6 +229,7 @@ void ClientImpl::post(SyncSocketProvider::FunctionHandler&& handler)
         handler(status);
 
         std::lock_guard lock(m_drain_mutex);
+        REALM_ASSERT(m_outstanding_posts);
         --m_outstanding_posts;
         m_drain_cv.notify_all();
     });
@@ -266,6 +268,7 @@ SyncSocketProvider::SyncTimer ClientImpl::create_timer(std::chrono::milliseconds
         handler(status);
 
         std::lock_guard lock(m_drain_mutex);
+        REALM_ASSERT(m_outstanding_posts);
         --m_outstanding_posts;
         m_drain_cv.notify_all();
     });
@@ -301,6 +304,7 @@ void Connection::activate()
 void Connection::activate_session(std::unique_ptr<Session> sess)
 {
     REALM_ASSERT(&sess->m_conn == this);
+    REALM_ASSERT(!m_force_closed);
     Session& sess_2 = *sess;
     session_ident_type ident = sess->m_ident;
     auto p = m_sessions.emplace(ident, std::move(sess)); // Throws
@@ -318,15 +322,14 @@ void Connection::activate_session(std::unique_ptr<Session> sess)
 void Connection::initiate_session_deactivation(Session* sess)
 {
     REALM_ASSERT(&sess->m_conn == this);
+    REALM_ASSERT(m_num_active_sessions);
     if (REALM_UNLIKELY(--m_num_active_sessions == 0)) {
         if (m_activated && m_state == ConnectionState::disconnected)
             m_on_idle->trigger();
     }
     sess->initiate_deactivation(); // Throws
     if (sess->m_state == Session::Deactivated) {
-        // Session is now deactivated, so remove and destroy it.
-        session_ident_type ident = sess->m_ident;
-        m_sessions.erase(ident);
+        finish_session_deactivation(sess);
     }
 }
 
@@ -376,23 +379,47 @@ void Connection::cancel_reconnect_delay()
     // soon as there are any sessions that are both active and unsuspended.
 }
 
+void ClientImpl::Connection::finish_session_deactivation(Session* sess)
+{
+    REALM_ASSERT(sess->m_state == Session::Deactivated);
+    auto ident = sess->m_ident;
+    m_sessions.erase(ident);
+}
 
 void Connection::force_close()
 {
-    if (m_disconnect_delay_in_progress || m_reconnect_delay_in_progress) {
-        m_reconnect_disconnect_timer.reset();
-        m_disconnect_delay_in_progress = false;
-        m_reconnect_delay_in_progress = false;
-    }
-
-    REALM_ASSERT(m_num_active_unsuspended_sessions == 0);
-    REALM_ASSERT(m_num_active_sessions == 0);
-    if (m_state == ConnectionState::disconnected) {
+    if (m_force_closed) {
         return;
     }
 
-    voluntary_disconnect();
-    logger.info("Force disconnected");
+    m_force_closed = true;
+
+    if (m_state != ConnectionState::disconnected) {
+        voluntary_disconnect();
+    }
+
+    REALM_ASSERT(m_state == ConnectionState::disconnected);
+    if (m_reconnect_delay_in_progress || m_disconnect_delay_in_progress) {
+        m_reconnect_disconnect_timer.reset();
+        m_reconnect_delay_in_progress = false;
+        m_disconnect_delay_in_progress = false;
+    }
+
+    // We must copy any session pointers we want to close to a vector because force_closing
+    // the session may remove it from m_sessions and invalidate the iterator uses to loop
+    // through the map. By copying to a separate vector we ensure our iterators remain valid.
+    std::vector<Session*> to_close;
+    for (auto& session_pair : m_sessions) {
+        if (session_pair.second->m_state == Session::State::Active) {
+            to_close.push_back(session_pair.second.get());
+        }
+    }
+
+    for (auto& sess : to_close) {
+        sess->force_close();
+    }
+
+    logger.debug("Force closed idle connection");
 }
 
 
@@ -436,10 +463,14 @@ void Connection::websocket_connected_handler(const std::string& protocol)
 
 bool Connection::websocket_binary_message_received(util::Span<const char> data)
 {
+    if (m_force_closed) {
+        logger.debug("Received binary message after connection was force closed");
+        return false;
+    }
     std::error_code ec;
     using sf = SimulatedFailure;
     if (sf::trigger(sf::sync_client__read_head, ec)) {
-        read_or_write_error(ec);
+        read_or_write_error(ec, "simulated read error");
         return bool(m_websocket);
     }
 
@@ -453,84 +484,115 @@ void Connection::websocket_error_handler()
     m_websocket_error_received = true;
 }
 
-
 bool Connection::websocket_closed_handler(bool was_clean, Status status)
 {
+    if (m_force_closed) {
+        logger.debug("Received websocket close message after connection was force closed");
+        return false;
+    }
     logger.info("Closing the websocket with status='%1', was_clean='%2'", status, was_clean);
-    // Return early.
-    if (status.is_ok()) {
-        return bool(m_websocket);
-    }
+    auto error_code = status.get_std_error_code();
 
-    auto&& status_code = status.code();
-    std::error_code error_code{static_cast<int>(status_code), websocket::websocket_close_status_category()};
-
-    // TODO: Use a switch statement once websocket errors have their own category in exception unification.
-    if (status_code == ErrorCodes::ResolveFailed || status_code == ErrorCodes::ConnectionFailed) {
-        m_reconnect_info.m_reason = ConnectionTerminationReason::connect_operation_failed;
-        constexpr bool try_again = true;
-        involuntary_disconnect(SessionErrorInfo{error_code, try_again}); // Throws
-    }
-    else if (status_code == ErrorCodes::ReadError || status_code == ErrorCodes::WriteError) {
-        read_or_write_error(error_code);
-    }
-    else if (status_code == ErrorCodes::WebSocket_GoingAway || status_code == ErrorCodes::WebSocket_ProtocolError ||
-             status_code == ErrorCodes::WebSocket_UnsupportedData || status_code == ErrorCodes::WebSocket_Reserved ||
-             status_code == ErrorCodes::WebSocket_InvalidPayloadData ||
-             status_code == ErrorCodes::WebSocket_PolicyViolation ||
-             status_code == ErrorCodes::WebSocket_InavalidExtension) {
-        m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
-        constexpr bool try_again = true;
-        SessionErrorInfo error_info{error_code, status.reason(), try_again};
-        involuntary_disconnect(std::move(error_info));
-    }
-    else if (status_code == ErrorCodes::WebSocket_MessageTooBig) {
-        m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
-        constexpr bool try_again = true;
-        auto ec = make_error_code(ProtocolError::limits_exceeded);
-        auto message = util::format(
-            "Sync websocket closed because the server received a message that was too large: %1", status.reason());
-        SessionErrorInfo error_info(ec, message, try_again);
-        error_info.server_requests_action = ProtocolErrorInfo::Action::ClientReset;
-        involuntary_disconnect(std::move(error_info));
-    }
-    else if (status_code == ErrorCodes::WebSocket_TLSHandshakeFailed) {
-        error_code = ClientError::ssl_server_cert_rejected;
-        constexpr bool is_fatal = true;
-        m_reconnect_info.m_reason = ConnectionTerminationReason::ssl_certificate_rejected;
-        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
-    }
-    else if (status_code == ErrorCodes::WebSocket_Client_Too_Old) {
-        error_code = ClientError::client_too_old_for_server;
-        constexpr bool is_fatal = true;
-        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
-    }
-    else if (status_code == ErrorCodes::WebSocket_Client_Too_New) {
-        error_code = ClientError::client_too_new_for_server;
-        constexpr bool is_fatal = true;
-        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
-    }
-    else if (status_code == ErrorCodes::WebSocket_Protocol_Mismatch) {
-        error_code = ClientError::protocol_mismatch;
-        constexpr bool is_fatal = true;
-        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
-    }
-    else if (status_code == ErrorCodes::WebSocket_Retry_Error || status_code == ErrorCodes::WebSocket_Forbidden) {
-        constexpr bool is_fatal = true;
-        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
-    }
-    else if (status_code == ErrorCodes::WebSocket_Unauthorized ||
-             status_code == ErrorCodes::WebSocket_MovedPermanently ||
-             status_code == ErrorCodes::WebSocket_InternalServerError ||
-             status_code == ErrorCodes::WebSocket_AbnormalClosure ||
-             status_code == ErrorCodes::WebSocket_Retry_Error) {
-        constexpr bool is_fatal = false;
-        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_nonfatal_error;
-        close_due_to_client_side_error(error_code, std::nullopt, is_fatal); // Throws
+    switch (static_cast<WebSocketError>(error_code.value())) {
+        case WebSocketError::websocket_ok:
+            break;
+        case WebSocketError::websocket_resolve_failed:
+            [[fallthrough]];
+        case WebSocketError::websocket_connection_failed: {
+            m_reconnect_info.m_reason = ConnectionTerminationReason::connect_operation_failed;
+            constexpr bool try_again = true;
+            involuntary_disconnect(SessionErrorInfo{error_code, try_again}); // Throws
+            break;
+        }
+        case WebSocketError::websocket_read_error:
+            [[fallthrough]];
+        case WebSocketError::websocket_write_error: {
+            read_or_write_error(error_code, status.reason()); // Throws
+            break;
+        }
+        case WebSocketError::websocket_going_away:
+            [[fallthrough]];
+        case WebSocketError::websocket_protocol_error:
+            [[fallthrough]];
+        case WebSocketError::websocket_unsupported_data:
+            [[fallthrough]];
+        case WebSocketError::websocket_invalid_payload_data:
+            [[fallthrough]];
+        case WebSocketError::websocket_policy_violation:
+            [[fallthrough]];
+        case WebSocketError::websocket_reserved:
+            [[fallthrough]];
+        case WebSocketError::websocket_no_status_received:
+            [[fallthrough]];
+        case WebSocketError::websocket_invalid_extension: {
+            m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
+            constexpr bool try_again = true;
+            SessionErrorInfo error_info{error_code, status.reason(), try_again};
+            involuntary_disconnect(std::move(error_info)); // Throws
+            break;
+        }
+        case WebSocketError::websocket_message_too_big: {
+            m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
+            constexpr bool try_again = true;
+            auto ec = make_error_code(ProtocolError::limits_exceeded);
+            auto message =
+                util::format("Sync websocket closed because the server received a message that was too large: %1",
+                             status.reason());
+            SessionErrorInfo error_info(ec, message, try_again);
+            error_info.server_requests_action = ProtocolErrorInfo::Action::ClientReset;
+            involuntary_disconnect(std::move(error_info)); // Throws
+            break;
+        }
+        case WebSocketError::websocket_tls_handshake_failed: {
+            error_code = ClientError::ssl_server_cert_rejected;
+            constexpr bool is_fatal = true;
+            m_reconnect_info.m_reason = ConnectionTerminationReason::ssl_certificate_rejected;
+            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            break;
+        }
+        case WebSocketError::websocket_client_too_old: {
+            error_code = ClientError::client_too_old_for_server;
+            constexpr bool is_fatal = true;
+            m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
+            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            break;
+        }
+        case WebSocketError::websocket_client_too_new: {
+            error_code = ClientError::client_too_new_for_server;
+            constexpr bool is_fatal = true;
+            m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
+            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            break;
+        }
+        case WebSocketError::websocket_protocol_mismatch: {
+            error_code = ClientError::protocol_mismatch;
+            constexpr bool is_fatal = true;
+            m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
+            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            break;
+        }
+        case WebSocketError::websocket_fatal_error:
+            [[fallthrough]];
+        case WebSocketError::websocket_forbidden: {
+            constexpr bool is_fatal = true;
+            m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
+            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            break;
+        }
+        case WebSocketError::websocket_unauthorized:
+            [[fallthrough]];
+        case WebSocketError::websocket_moved_permanently:
+            [[fallthrough]];
+        case WebSocketError::websocket_internal_server_error:
+            [[fallthrough]];
+        case WebSocketError::websocket_abnormal_closure:
+            [[fallthrough]];
+        case WebSocketError::websocket_retry_error: {
+            constexpr bool is_fatal = false;
+            m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_nonfatal_error;
+            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            break;
+        }
     }
 
     return bool(m_websocket);
@@ -543,6 +605,11 @@ void Connection::initiate_reconnect_wait()
     REALM_ASSERT(m_activated);
     REALM_ASSERT(!m_reconnect_delay_in_progress);
     REALM_ASSERT(!m_disconnect_delay_in_progress);
+
+    // If we've been force closed then we don't need/want to reconnect. Just return early here.
+    if (m_force_closed) {
+        return;
+    }
 
     using milliseconds_lim = ReconnectInfo::milliseconds_lim;
 
@@ -700,7 +767,7 @@ void Connection::handle_reconnect_wait(Status status)
 {
     if (!status.is_ok()) {
         REALM_ASSERT(status != ErrorCodes::OperationAborted);
-        throw ExceptionForStatus(status);
+        throw Exception(status);
     }
 
     m_reconnect_delay_in_progress = false;
@@ -838,7 +905,7 @@ void Connection::handle_connect_wait(Status status)
 {
     if (!status.is_ok()) {
         REALM_ASSERT(status != ErrorCodes::OperationAborted);
-        throw ExceptionForStatus(status);
+        throw Exception(status);
     }
 
     REALM_ASSERT(m_state == ConnectionState::connecting);
@@ -937,7 +1004,7 @@ void Connection::initiate_ping_delay(milliseconds_type now)
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         handle_ping_delay();                                    // Throws
     });                                                         // Throws
@@ -972,7 +1039,7 @@ void Connection::initiate_pong_timeout()
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         handle_pong_timeout(); // Throws
     });                        // Throws
@@ -1001,7 +1068,7 @@ void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         handle_write_message(); // Throws
     });                         // Throws
@@ -1014,9 +1081,7 @@ void Connection::handle_write_message()
 {
     m_sending_session->message_sent(); // Throws
     if (m_sending_session->m_state == Session::Deactivated) {
-        // Session is now deactivated, so remove and destroy it.
-        session_ident_type ident = m_sending_session->m_ident;
-        m_sessions.erase(ident);
+        finish_session_deactivation(m_sending_session);
     }
     m_sending_session = nullptr;
     m_sending = false;
@@ -1044,9 +1109,7 @@ void Connection::send_next_message()
         sess.send_message(); // Throws
 
         if (sess.m_state == Session::Deactivated) {
-            // Session is now deactivated, so remove and destroy it.
-            session_ident_type ident = sess.m_ident;
-            m_sessions.erase(ident);
+            finish_session_deactivation(&sess);
         }
 
         // An enlisted session may choose to not send a message. In that case,
@@ -1088,7 +1151,7 @@ void Connection::initiate_write_ping(const OutputBuffer& out)
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         handle_write_ping(); // Throws
     });                      // Throws
@@ -1138,7 +1201,7 @@ void Connection::handle_disconnect_wait(Status status)
 {
     if (!status.is_ok()) {
         REALM_ASSERT(status != ErrorCodes::OperationAborted);
-        throw ExceptionForStatus(status);
+        throw Exception(status);
     }
 
     m_disconnect_delay_in_progress = false;
@@ -1153,11 +1216,11 @@ void Connection::handle_disconnect_wait(Status status)
 }
 
 
-void Connection::read_or_write_error(std::error_code ec)
+void Connection::read_or_write_error(std::error_code ec, std::string_view msg)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
     bool is_fatal = false;
-    close_due_to_client_side_error(ec, std::nullopt, is_fatal); // Throws
+    close_due_to_client_side_error(ec, msg, is_fatal); // Throws
 }
 
 
@@ -1328,9 +1391,7 @@ void Connection::receive_error_message(const ProtocolErrorInfo& info, session_id
         }
 
         if (sess->m_state == Session::Deactivated) {
-            // Session is now deactivated, so remove and destroy it.
-            session_ident_type ident = sess->m_ident;
-            m_sessions.erase(ident);
+            finish_session_deactivation(sess);
         }
         return;
     }
@@ -1444,9 +1505,7 @@ void Connection::receive_unbound_message(session_ident_type session_ident)
     }
 
     if (sess->m_state == Session::Deactivated) {
-        // Session is now deactivated, so remove and destroy it.
-        session_ident_type ident = sess->m_ident;
-        m_sessions.erase(ident);
+        finish_session_deactivation(sess);
     }
 }
 
@@ -1619,6 +1678,12 @@ void Session::on_integration_failure(const IntegrationException& error)
     m_client_error = util::make_optional<IntegrationException>(error);
     m_error_to_send = true;
 
+    constexpr bool try_again = true;
+    std::error_code error_code = error.code();
+    auto msg = error_code.message() + ": " + error.what();
+    // Surface the error to the user otherwise is lost.
+    on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{error.code(), std::move(msg), try_again});
+
     // Since the deactivation process has not been initiated, the UNBIND
     // message cannot have been sent unless an ERROR message was received.
     REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
@@ -1733,8 +1798,9 @@ void Session::activate()
     }
     catch (const IntegrationException& error) {
         logger.error("Error integrating bootstrap changesets: %1", error.what());
-        on_suspended(SessionErrorInfo{error.code(), false});
+        m_suspended = true;
         m_conn.one_less_active_unsuspended_session(); // Throws
+        on_suspended(SessionErrorInfo{error.code(), false});
     }
 
     if (has_pending_client_reset) {
@@ -1836,8 +1902,10 @@ void Session::send_message()
     if (m_error_to_send)
         return send_json_error_message(); // Throws
 
-    if (m_connection_to_close)
-        return close_connection(); // Throws
+    // Stop sending upload, mark and query messages when the client detects an error.
+    if (m_client_error) {
+        return;
+    }
 
     if (m_target_download_mark > m_last_download_mark_sent)
         return send_mark_message(); // Throws
@@ -2150,22 +2218,20 @@ void Session::send_json_error_message()
     ClientProtocol& protocol = m_conn.get_client_protocol();
     OutputBuffer& out = m_conn.get_output_buffer();
     session_ident_type session_ident = get_ident();
-    std::error_code ec = m_client_error->code();
+    auto client_error = m_client_error->code();
+    auto protocol_error = client_error_to_protocol_error(client_error);
     auto message = m_client_error->what();
 
-    logger.info("Sending: ERROR \"%1\" (error_code=%2, session_ident=%3)", message, ec.value(),
+    logger.info("Sending: ERROR \"%1\" (error_code=%2, session_ident=%3)", message, static_cast<int>(protocol_error),
                 session_ident); // Throws
 
     nlohmann::json error_body_json;
     error_body_json["message"] = message;
-    protocol.make_json_error_message(out, session_ident, ec.value(), error_body_json.dump()); // Throws
-
+    protocol.make_json_error_message(out, session_ident, static_cast<int>(protocol_error),
+                                     error_body_json.dump()); // Throws
     m_conn.initiate_write_message(out, this); // Throws
 
     m_error_to_send = false;
-    m_connection_to_close = true;
-
-    // Connection is waiting to be closed
     enlist_to_send(); // Throws
 }
 
@@ -2199,11 +2265,9 @@ void Session::close_connection()
     REALM_ASSERT(m_state == Active);
     REALM_ASSERT(m_ident_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
-    REALM_ASSERT(m_connection_to_close);
     REALM_ASSERT(m_client_error);
 
     m_conn.close_due_to_protocol_error(m_client_error->code(), m_client_error->what()); // Throws
-    m_connection_to_close = false;
     m_client_error = util::none;
 }
 
@@ -2339,6 +2403,13 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
                  progress.latest_server_version.version, progress.latest_server_version.salt,
                  progress.upload.client_version, progress.upload.last_integrated_server_version, downloadable_bytes,
                  batch_state != DownloadBatchState::MoreToCome, query_version, received_changesets.size()); // Throws
+
+    // Ignore download messages when the client detects an error. This is to prevent transforming the same bad
+    // changeset over and over again.
+    if (m_client_error) {
+        logger.debug("Ignoring download message because the client detected an integration error");
+        return;
+    }
 
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm must not be accessed any
@@ -2504,10 +2575,6 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
         return {};
     }
 
-    // Ignore the error because the connection is going to be closed.
-    if (m_connection_to_close)
-        return std::error_code{}; // Success
-
     bool legal_at_this_time = (m_bind_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
         logger.error("Illegal message at this time");
@@ -2606,7 +2673,7 @@ void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)
         if (status == ErrorCodes::OperationAborted)
             return;
         else if (!status.is_ok())
-            throw ExceptionForStatus(status);
+            throw Exception(status);
 
         m_try_again_activation_timer.reset();
         cancel_resumption_delay();

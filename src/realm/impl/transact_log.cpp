@@ -66,7 +66,7 @@ bool TransactLogEncoder::dictionary_erase(size_t ndx, Mixed key)
 REALM_NORETURN
 void TransactLogParser::parser_error() const
 {
-    throw BadTransactLog();
+    throw Exception(ErrorCodes::BadChangeset, "Bad transaction log");
 }
 
 } // namespace _impl

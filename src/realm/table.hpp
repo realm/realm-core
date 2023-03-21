@@ -70,6 +70,9 @@ typedef Link BackLink;
 namespace _impl {
 class TableFriend;
 }
+namespace util {
+class Logger;
+}
 namespace metrics {
 class QueryInfo;
 }
@@ -175,7 +178,7 @@ public:
     void check_column(ColKey col_key) const
     {
         if (REALM_UNLIKELY(!valid_column(col_key)))
-            throw LogicError(LogicError::column_does_not_exist);
+            throw InvalidColumnKey();
     }
     // Change the type of a table. Only allowed to switch to/from TopLevel from/to Embedded.
     void set_table_type(Type new_type, bool handle_backlinks = false);
@@ -335,11 +338,11 @@ public:
     // - turns the object into a tombstone if links exist
     // - otherwise works just as remove_object()
     ObjKey invalidate_object(ObjKey key);
-    Obj get_tombstone(ObjKey key) const
+    Obj try_get_tombstone(ObjKey key) const
     {
         REALM_ASSERT(key.is_unresolved());
         REALM_ASSERT(m_tombstones);
-        return m_tombstones->get(key);
+        return m_tombstones->try_get_obj(key);
     }
 
     void clear();
@@ -520,7 +523,7 @@ private:
     void change_nullability(ColKey from, ColKey to, bool throw_on_null);
     template <class F, class T>
     void change_nullability_list(ColKey from, ColKey to, bool throw_on_null);
-    Obj create_linked_object(GlobalKey = {});
+    Obj create_linked_object();
     // Change the embedded property of a table. If switching to being embedded, the table must
     // not have a primary key and all objects must have exactly 1 backlink.
     void set_embedded(bool embedded, bool handle_backlinks);
@@ -620,14 +623,6 @@ public:
     ///
     /// See operator==().
     bool operator!=(const Table& t) const;
-
-    /// Compute the sum of the sizes in number of bytes of all the array nodes
-    /// that currently make up this table. See also
-    /// Group::compute_aggregate_byte_size().
-    ///
-    /// If this table accessor is the detached state, this function returns
-    /// zero.
-    size_t compute_aggregated_byte_size() const noexcept;
 
     // Debug
     void verify() const;
@@ -811,10 +806,8 @@ private:
     void nullify_links(CascadeState&);
     void remove_recursive(CascadeState&);
 
-    /// Used by query. Follows chain of link columns and returns final target table
-    const Table* get_link_chain_target(const std::vector<ColKey>&) const;
-
     Replication* get_repl() const noexcept;
+    util::Logger* get_logger() const noexcept;
 
     void set_ndx_in_parent(size_t ndx_in_parent) noexcept;
 
@@ -994,8 +987,8 @@ public:
     {
         auto ck = m_current_table->get_column_key(col_name);
         if (!ck) {
-            throw std::runtime_error(
-                util::format("'%1' has no property '%2'", m_current_table->get_class_name(), col_name));
+            throw LogicError(ErrorCodes::InvalidProperty,
+                             util::format("'%1' has no property '%2'", m_current_table->get_class_name(), col_name));
         }
         add(ck);
         return *this;
@@ -1021,11 +1014,13 @@ public:
             ct = col_type_Link;
         if constexpr (std::is_same_v<T, Dictionary>) {
             if (!col_key.is_dictionary())
-                throw LogicError(LogicError::type_mismatch);
+                throw LogicError(ErrorCodes::TypeMismatch, "Not a dictionary");
         }
         else {
             if (ct != ColumnTypeTraits<T>::column_id)
-                throw LogicError(LogicError::type_mismatch);
+                throw LogicError(ErrorCodes::TypeMismatch,
+                                 util::format("Expected %1 to be a %2", m_current_table->get_column_name(col_key),
+                                              ColumnTypeTraits<T>::column_id));
         }
 
         if (std::is_same<T, Link>::value || std::is_same<T, LnkLst>::value || std::is_same<T, BackLink>::value) {
@@ -1367,11 +1362,6 @@ public:
     static void batch_erase_rows(Table& table, const KeyColumn& keys)
     {
         table.batch_erase_rows(keys); // Throws
-    }
-    // Temporary hack
-    static Obj create_linked_object(Table& table, GlobalKey id)
-    {
-        return table.create_linked_object(id);
     }
     static ObjKey global_to_local_object_id_hashed(const Table& table, GlobalKey global_id)
     {

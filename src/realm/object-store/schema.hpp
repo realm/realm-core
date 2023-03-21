@@ -144,6 +144,11 @@ struct SchemaSubsetMode {
     static const SchemaSubsetMode AllProperties;
     // Always report the complete schema.
     static const SchemaSubsetMode Complete;
+
+    friend bool operator==(const SchemaSubsetMode& x, const SchemaSubsetMode& y)
+    {
+        return x.include_types == y.include_types && x.include_properties == y.include_properties;
+    }
 };
 
 inline constexpr SchemaSubsetMode SchemaSubsetMode::Strict = {false, false};

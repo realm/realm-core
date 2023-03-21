@@ -31,7 +31,7 @@ public:
     struct ServerSchema {
         Schema schema;
         std::vector<std::string> queryable_fields;
-        std::vector<AppCreateConfig::FLXSyncRole> default_roles;
+        std::vector<AppCreateConfig::ServiceRole> service_roles;
         bool dev_mode_enabled = false;
     };
 
@@ -55,9 +55,10 @@ public:
         server_app_config.dev_mode_enabled = server_schema.dev_mode_enabled;
         AppCreateConfig::FLXSyncConfig flx_config;
         flx_config.queryable_fields = server_schema.queryable_fields;
-        flx_config.default_roles = server_schema.default_roles;
 
         server_app_config.flx_sync_config = std::move(flx_config);
+        server_app_config.service_roles = server_schema.service_roles;
+
         return create_app(server_app_config);
     }
 
@@ -72,17 +73,20 @@ public:
         ServerSchema server_schema;
         std::shared_ptr<GenericNetworkTransport> transport = instance_of<SynchronousTestTransport>;
         ReconnectMode reconnect_mode = ReconnectMode::testing;
+        std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider = nullptr;
     };
 
     explicit FLXSyncTestHarness(Config&& config)
         : m_test_session(make_app_from_server_schema(config.test_name, config.server_schema), config.transport, true,
-                         config.reconnect_mode)
+                         config.reconnect_mode, config.custom_socket_provider)
         , m_schema(std::move(config.server_schema.schema))
     {
     }
     FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema = default_server_schema(),
-                       std::shared_ptr<GenericNetworkTransport> transport = instance_of<SynchronousTestTransport>)
-        : m_test_session(make_app_from_server_schema(test_name, server_schema), std::move(transport))
+                       std::shared_ptr<GenericNetworkTransport> transport = instance_of<SynchronousTestTransport>,
+                       std::shared_ptr<realm::sync::SyncSocketProvider> custom_socket_provider = nullptr)
+        : m_test_session(make_app_from_server_schema(test_name, server_schema), std::move(transport), true,
+                         realm::ReconnectMode::normal, custom_socket_provider)
         , m_schema(std::move(server_schema.schema))
     {
     }

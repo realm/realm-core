@@ -236,13 +236,18 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, const st
     static_cast<void>(shared_part);
 
     free_lock_info();
-
-    m_filename = path + "." + mutex_name + ".mx";
+    if (path.size() == 0) {
+        m_filename = make_temp_file(mutex_name.c_str());
+    }
+    else {
+        m_filename = path + "." + mutex_name + ".mx";
+    }
 
     std::lock_guard<Mutex> guard(*s_mutex);
 
     // Try to get the file uid if the file exists
-    if (File::get_unique_id(m_filename, m_fileuid)) {
+    if (auto uid = File::get_unique_id(m_filename)) {
+        m_fileuid = std::move(*uid);
         auto result = s_info_map->find(m_fileuid);
         if (result != s_info_map->end()) {
             // File exists and the lock info has been created in the map.

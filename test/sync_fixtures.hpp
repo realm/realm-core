@@ -537,7 +537,7 @@ public:
             Client::Config config_2;
 
             m_client_socket_providers.push_back(std::make_shared<websocket::DefaultSocketProvider>(
-                m_client_loggers[i], "", websocket::DefaultSocketProvider::AutoStart{false}));
+                m_client_loggers[i], "", nullptr, websocket::DefaultSocketProvider::AutoStart{false}));
             config_2.socket_provider = m_client_socket_providers.back();
             config_2.logger = m_client_loggers[i];
             config_2.reconnect_mode = ReconnectMode::testing;
@@ -566,7 +566,9 @@ public:
     {
         unit_test::TestContext& test_context = m_test_context;
         stop();
-        m_clients.clear();
+        for (int i = 0; i < m_num_clients; ++i) {
+            m_clients[i]->shutdown_and_wait();
+        }
         m_client_socket_providers.clear();
         for (int i = 0; i < m_num_servers; ++i) {
             if (m_server_threads[i].joinable())
@@ -668,13 +670,13 @@ public:
             });
         }
         // We can't wait for clearing the simulated failure since some tests stop the client early
-        client.drain();
+        client.shutdown_and_wait();
     }
 
     void stop()
     {
         for (int i = 0; i < m_num_clients; ++i)
-            m_clients[i]->stop();
+            m_clients[i]->shutdown();
         for (int i = 0; i < m_num_servers; ++i)
             m_servers[i]->stop();
     }
@@ -689,11 +691,15 @@ public:
         return *m_servers[server_index];
     }
 
-    Session make_session(int client_index, DBRef db, Session::Config config = {})
+    Session make_session(int client_index, int server_index, DBRef db, std::string realm_identifier,
+                         Session::Config config = {})
     {
         //  *ClientServerFixture uses the service identifier "/realm-sync" to distinguish Sync
         //  connections, while the MongoDB/Stitch-based Sync server does not.
         config.service_identifier = "/realm-sync";
+        config.realm_identifier = std::move(realm_identifier);
+        config.server_port = m_server_ports[server_index];
+        config.server_address = "localhost";
 
         Session session{*m_clients[client_index], std::move(db), nullptr, std::move(config)};
         if (m_connection_state_change_listeners[client_index]) {
@@ -717,16 +723,6 @@ public:
         return session;
     }
 
-    void bind_session(Session& session, int server_index, std::string server_path,
-                      std::string signed_user_token = g_signed_test_user_token,
-                      ProtocolEnvelope protocol = ProtocolEnvelope::realm)
-    {
-        std::string server_address = "localhost";
-        port_type server_port = m_server_ports[server_index];
-        session.bind(std::move(server_address), std::move(server_path), std::move(signed_user_token), server_port,
-                     protocol);
-    }
-
     Session make_bound_session(int client_index, DBRef db, int server_index, std::string server_path,
                                Session::Config config = {})
     {
@@ -737,9 +733,10 @@ public:
     Session make_bound_session(int client_index, DBRef db, int server_index, std::string server_path,
                                std::string signed_user_token, Session::Config config = {})
     {
-        Session session = make_session(client_index, std::move(db), std::move(config));
-        bind_session(session, server_index, std::move(server_path), std::move(signed_user_token),
-                     config.protocol_envelope);
+        config.signed_user_token = std::move(signed_user_token);
+        Session session =
+            make_session(client_index, server_index, std::move(db), std::move(server_path), std::move(config));
+        session.bind();
         return session;
     }
 
@@ -894,22 +891,16 @@ public:
         return MultiClientServerFixture::get_server(0);
     }
 
-    Session make_session(DBRef db, Session::Config&& config = {})
+    Session make_session(DBRef db, std::string realm_identifier, Session::Config&& config = {})
     {
-        return MultiClientServerFixture::make_session(0, std::move(db), std::move(config));
+        return MultiClientServerFixture::make_session(0, 0, std::move(db), std::move(realm_identifier),
+                                                      std::move(config));
     }
-    Session make_session(std::string const& path, Session::Config&& config = {})
+    Session make_session(std::string const& path, std::string realm_identifier, Session::Config&& config = {})
     {
         auto db = DB::create(make_client_replication(), path);
-        return MultiClientServerFixture::make_session(0, std::move(db), std::move(config));
-    }
-
-    void bind_session(Session& session, std::string server_path,
-                      std::string signed_user_token = g_signed_test_user_token,
-                      ProtocolEnvelope protocol = ProtocolEnvelope::realm)
-    {
-        MultiClientServerFixture::bind_session(session, 0, std::move(server_path), std::move(signed_user_token),
-                                               protocol);
+        return MultiClientServerFixture::make_session(0, 0, std::move(db), std::move(realm_identifier),
+                                                      std::move(config));
     }
 
     Session make_bound_session(DBRef db, std::string server_path = "/test", Session::Config&& config = {})
@@ -997,25 +988,26 @@ private:
 
 inline RealmFixture::RealmFixture(ClientServerFixture& client_server_fixture, const std::string& real_path,
                                   const std::string& virt_path, Config config)
-    : m_self_ref{std::make_shared<SelfRef>(this)}                            // Throws
-    , m_db{DB::create(make_client_replication(), real_path)}                 // Throws
-    , m_session{client_server_fixture.make_session(m_db, std::move(config))} // Throws
+    : m_self_ref{std::make_shared<SelfRef>(this)}                                       // Throws
+    , m_db{DB::create(make_client_replication(), real_path)}                            // Throws
+    , m_session{client_server_fixture.make_session(m_db, virt_path, std::move(config))} // Throws
 {
     if (config.error_handler)
         setup_error_handler(std::move(config.error_handler));
-    client_server_fixture.bind_session(m_session, virt_path);
+    m_session.bind();
 }
 
 
 inline RealmFixture::RealmFixture(MultiClientServerFixture& client_server_fixture, int client_index, int server_index,
                                   const std::string& real_path, const std::string& virt_path, Config config)
-    : m_self_ref{std::make_shared<SelfRef>(this)}                                          // Throws
-    , m_db{DB::create(make_client_replication(), real_path)}                               // Throws
-    , m_session{client_server_fixture.make_session(client_index, m_db, std::move(config))} // Throws
+    : m_self_ref{std::make_shared<SelfRef>(this)}            // Throws
+    , m_db{DB::create(make_client_replication(), real_path)} // Throws
+    , m_session{client_server_fixture.make_session(client_index, server_index, m_db, virt_path, std::move(config))}
+// Throws
 {
     if (config.error_handler)
         setup_error_handler(std::move(config.error_handler));
-    client_server_fixture.bind_session(m_session, server_index, virt_path);
+    m_session.bind();
 }
 
 inline RealmFixture::~RealmFixture() noexcept
