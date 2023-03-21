@@ -141,7 +141,7 @@ const char* get_protocol_error_message(int error_code) noexcept
             return "Client attempted a write that is disallowed by permissions, or modifies an object outside the "
                    "current query, and the server undid the change";
         case ProtocolError::migrate_to_flx:
-            return "Server migrated to flexible based sync - migrating client to flexible based sync";
+            return "Server migrated to flexible sync - migrating client to use flexible sync";
         case ProtocolError::bad_progress:
             return "Bad progress information (DOWNLOAD)";
         case ProtocolError::revert_to_pbs:

@@ -29,9 +29,9 @@ static void trigger_server_migration(const AppSession& app_session, bool switch_
     std::string last_status;
     std::string op_stg = [switch_to_flx] {
         if (switch_to_flx)
-            return "PBS->FLX Migration";
+            return "PBS->FLX Server migration";
         else
-            return "FLX->PBS Rollback";
+            return "FLX->PBS Server rollback";
     }();
     const int duration = 300; // 5 minutes, for now, since it sometimes takes longet than 90 seconds
     try {
