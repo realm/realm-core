@@ -16,7 +16,7 @@ using namespace realm::fixtures;
 
 namespace {
 
-using ErrorInfo = Session::ErrorInfo;
+using ErrorInfo = SessionErrorInfo;
 
 // FIXME: Rewrite this test without QBS
 TEST_IF(ClientResetQueryBased_1, false)
