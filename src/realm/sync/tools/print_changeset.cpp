@@ -98,41 +98,50 @@ void print_changeset_in_file(std::istream& input_file, bool hex, bool compressed
 
 void print_changesets_in_log_file(std::istream& input_file)
 {
-    std::string prev_line;
-    for (std::string line; std::getline(input_file, line);) {
-        const std::string_view changeset_prefix("Changeset: ");
-        const std::string_view compressed_changeset_prefix("Changeset(comp): ");
-        std::string changeset_contents;
-        if (auto pos = line.find(changeset_prefix); pos != std::string::npos) {
-            changeset_contents = changeset_hex_to_binary(line.substr(pos + changeset_prefix.size()));
+    int log_line_num = 1;
+    try {
+        for (std::string line; std::getline(input_file, line); ++log_line_num) {
+            const std::string_view changeset_prefix("Changeset: ");
+            const std::string_view compressed_changeset_prefix("Changeset(comp): ");
+            std::string changeset_contents;
+            if (auto pos = line.find(changeset_prefix); pos != std::string::npos) {
+                changeset_contents = changeset_hex_to_binary(line.substr(pos + changeset_prefix.size()));
+            }
+            else if (auto pos = line.find(compressed_changeset_prefix); pos != std::string::npos) {
+                changeset_contents =
+                    changeset_compressed_to_binary(line.substr(pos + compressed_changeset_prefix.size()));
+            }
+            else {
+                std::cout << line << std::endl;
+                continue;
+            }
+            parse_and_print_changeset(changeset_contents);
         }
-        else if (auto pos = line.find(compressed_changeset_prefix); pos != std::string::npos) {
-            changeset_contents =
-                changeset_compressed_to_binary(line.substr(pos + compressed_changeset_prefix.size()));
-        }
-        else {
-            prev_line = line;
-            continue;
-        }
-        std::cout << prev_line << std::endl;
-        parse_and_print_changeset(changeset_contents);
+    }
+    catch (const Exception& e) {
+        throw RuntimeError(e.code(), util::format("Exception at line number %1: %2", log_line_num, e.to_status()));
+    }
+    catch (const std::exception& e) {
+        throw RuntimeError(ErrorCodes::RuntimeError,
+                           util::format("Exception at line number %1: %2", log_line_num, e.what()));
     }
 }
 
 void print_help(std::string_view prog_name)
 {
     std::cerr << "Synopsis: " << prog_name
-              << " <changeset file>\n"
+              << " [changeset file]\n"
                  "\n"
                  "Where <changeset file> is the file system path of a file containing a\n"
-                 "changeset, possibly in hex format.\n"
+                 "changeset encoded in hex/base64 compressed format or sync client trace-level log output.\n"
+                 "If no changeset file is given, input shall be read from stdin.\n"
                  "\n"
                  "Options:\n"
                  "  -h, --help             Display command-line synopsis followed by the list of\n"
                  "                         available options.\n"
                  "  -H, --hex              Interpret file contents as hex encoded.\n"
                  "  -C, --compressed       Interpret file contents as Base64 encoded and compressed.\n"
-                 "  -L, -input-is-logfile  Read input from stdin as a trace-level log file\n";
+                 "  -l, -input-is-logfile  Read input from stdin as a trace-level log file\n";
 }
 
 } // namespace
@@ -156,16 +165,18 @@ int main(int argc, const char** argv)
     std::istream* changeset_input = &std::cin;
     try {
         auto arg_result = arg_parser.parse(argc, argv);
-        if (arg_result.unmatched_arguments.size() != 1) {
+        if (arg_result.unmatched_arguments.size() > 1) {
             throw std::runtime_error(
                 util::format("Expected one input argument, got %1", arg_result.unmatched_arguments.size()));
         }
-        std::string file_path(arg_result.unmatched_arguments.front());
-        if (file_path.empty() || file_path.front() == '-') {
-            throw std::runtime_error(util::format("Expected path to file, got \"%1\"", file_path));
+        else if (arg_result.unmatched_arguments.size() == 1) {
+            std::string file_path(arg_result.unmatched_arguments.front());
+            if (file_path.empty() || file_path.front() == '-') {
+                throw std::runtime_error(util::format("Expected path to file, got \"%1\"", file_path));
+            }
+            changeset_input_file.open(file_path);
+            changeset_input = &changeset_input_file;
         }
-        changeset_input_file.open(file_path);
-        changeset_input = &changeset_input_file;
     }
     catch (const std::runtime_error& e) {
         util::format(std::cerr, "Error parsing arguments: %1\n", e.what());
