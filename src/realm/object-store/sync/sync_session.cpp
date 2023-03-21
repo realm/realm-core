@@ -1296,9 +1296,7 @@ void SyncSession::update_subscription_store(bool flx_sync_requested)
     auto& history = static_cast<sync::ClientReplication&>(*m_db->get_replication());
     if (!flx_sync_requested) {
         if (m_flx_subscription_store) {
-            auto tr = m_db->start_write();
             history.set_write_validator_factory(nullptr);
-            tr->close();
             // Empty the subscription store and cancel any pending subscription notification
             // waiters - will be done in a separate PR
             m_flx_subscription_store.reset();
@@ -1322,7 +1320,6 @@ void SyncSession::update_subscription_store(bool flx_sync_requested)
     });
 
     std::weak_ptr<sync::SubscriptionStore> weak_sub_mgr(m_flx_subscription_store);
-    auto tr = m_db->start_write();
     history.set_write_validator_factory(
         [weak_sub_mgr](Transaction& tr) -> util::UniqueFunction<sync::SyncReplication::WriteValidator> {
             auto sub_mgr = weak_sub_mgr.lock();
@@ -1340,7 +1337,6 @@ void SyncSession::update_subscription_store(bool flx_sync_requested)
                 }
             };
         });
-    tr->close();
 }
 
 // Represents a reference to the SyncSession from outside of the sync subsystem.
