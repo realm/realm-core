@@ -45,6 +45,7 @@ set(S2_UTIL_CODING_SOURCES
 
 set(S2_UTIL_MATH_SOURCES
     util/math/mathutil.cc
+    util/math/mathlimits.cc
 )
 
 add_library(s2geometry OBJECT
