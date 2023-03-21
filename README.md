@@ -34,7 +34,7 @@ unacceptable behavior to [community-conduct@mongodb.com](mailto:community-conduc
 
 Realm Core is published under the Apache 2.0 license.
 
-Please also see THIRD-PARTY-NOTICES for and licenses related to included third party libraries.
+See the THIRD-PARTY-NOTICES file for licenses related to included third party libraries.
 
 ## Feedback
 
