@@ -197,11 +197,15 @@ void SyncSession::do_become_inactive(util::CheckedUniqueLock lock, Status status
     if (m_sync_manager) {
         m_sync_manager->unregister_session(m_db->get_path());
     }
-    if (m_needs_subscription_store_updated) {
-        // m_needs_subscription_store_updated contains the updated 'flx_sync_requested' value
-        update_subscription_store(*m_needs_subscription_store_updated);
-        m_needs_subscription_store_updated.reset();
-    }
+
+    // As part of client migration, the subscription store will need to be updated when
+    // magrating from PBS->FLX or rolling back from FLX->PBS once the session is torn down
+    //    if (m_needs_subscription_store_updated) {
+    //        // m_needs_subscription_store_updated contains the updated 'flx_sync_requested' value
+    //        update_subscription_store(*m_needs_subscription_store_updated);
+    //        m_needs_subscription_store_updated.reset();
+    //    }
+
     m_state_mutex.unlock(lock);
 
     // Send notifications after releasing the lock to prevent deadlocks in the callback.
@@ -339,7 +343,6 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const Realm
                          SyncManager* sync_manager)
     : m_config{config}
     , m_db{std::move(db)}
-    , m_flx_subscription_store{}
     , m_original_sync_config{m_config.sync_config}
     , m_migration_store{sync::MigrationStore::create(m_db)}
     , m_client(client)
@@ -565,6 +568,11 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
 void SyncSession::OnlyForTesting::handle_error(SyncSession& session, sync::SessionErrorInfo&& error)
 {
     session.handle_error(std::move(error));
+}
+
+void SyncSession::OnlyForTesting::handle_error(SyncSession& session, SyncError&& error)
+{
+    session.handle_error({error.get_system_error(), std::string(error.reason()), !error.is_fatal});
 }
 
 // This method should only be called from within the error handler callback registered upon the underlying
@@ -1275,7 +1283,7 @@ void SyncSession::update_sync_config_after_migration()
         flx_sync_requested = m_config.sync_config->flx_sync_requested;
     }
 
-    util::CheckedLockGuard cfg_lock(m_state_mutex);
+    util::CheckedLockGuard state_lock(m_state_mutex);
     m_needs_subscription_store_updated.emplace(flx_sync_requested);
 }
 
@@ -1288,7 +1296,11 @@ void SyncSession::update_subscription_store(bool flx_sync_requested)
     auto& history = static_cast<sync::ClientReplication&>(*m_db->get_replication());
     if (!flx_sync_requested) {
         if (m_flx_subscription_store) {
+            auto tr = m_db->start_write();
             history.set_write_validator_factory(nullptr);
+            tr->close();
+            // Empty the subscription store and cancel any pending subscription notification
+            // waiters - will be done in a separate PR
             m_flx_subscription_store.reset();
         }
         return;
@@ -1310,6 +1322,7 @@ void SyncSession::update_subscription_store(bool flx_sync_requested)
     });
 
     std::weak_ptr<sync::SubscriptionStore> weak_sub_mgr(m_flx_subscription_store);
+    auto tr = m_db->start_write();
     history.set_write_validator_factory(
         [weak_sub_mgr](Transaction& tr) -> util::UniqueFunction<sync::SyncReplication::WriteValidator> {
             auto sub_mgr = weak_sub_mgr.lock();
@@ -1327,7 +1340,7 @@ void SyncSession::update_subscription_store(bool flx_sync_requested)
                 }
             };
         });
-    return;
+    tr->close();
 }
 
 // Represents a reference to the SyncSession from outside of the sync subsystem.

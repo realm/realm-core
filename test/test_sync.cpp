@@ -89,6 +89,8 @@ using namespace realm::fixtures;
 
 namespace {
 
+using ErrorInfo = SessionErrorInfo;
+
 class TestServerHistoryContext : public _impl::ServerHistory::Context {
 public:
     std::mt19937_64& server_history_get_random() noexcept override final
@@ -140,7 +142,6 @@ TEST(Sync_BadVirtualPath)
 
     int nerrors = 0;
 
-    using ErrorInfo = SessionErrorInfo;
     auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
         if (state != ConnectionState::disconnected)
             return;
@@ -575,7 +576,6 @@ TEST(Sync_TokenWithoutExpirationAllowed)
         TEST_CLIENT_DB(db);
         ClientServerFixture fixture(dir, test_context);
 
-        using ErrorInfo = SessionErrorInfo;
         auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
@@ -785,7 +785,7 @@ struct ExpectChangesetError {
     MultiClientServerFixture& fixture;
     std::string expected_error;
 
-    void operator()(ConnectionState state, util::Optional<SessionErrorInfo> error_info) const noexcept
+    void operator()(ConnectionState state, util::Optional<ErrorInfo> error_info) const noexcept
     {
         if (state == ConnectionState::disconnected) {
             return;
@@ -4886,7 +4886,7 @@ TEST(Sync_ConnectionStateChange)
     TEST_DIR(dir);
     TEST_CLIENT_DB(db_1);
     TEST_CLIENT_DB(db_2);
-    using ErrorInfo = SessionErrorInfo;
+
     std::vector<ConnectionState> states_1, states_2;
     {
         ClientServerFixture fixture(dir, test_context);
@@ -5105,7 +5105,7 @@ TEST_IF(Sync_SSL_Certificates, false)
 
         Session session{client, db, nullptr, std::move(session_config)};
 
-        auto listener = [&](ConnectionState state, const util::Optional<SessionErrorInfo>& error_info) {
+        auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
             if (state == ConnectionState::disconnected) {
                 CHECK(error_info);
                 client_logger->debug(
@@ -5182,7 +5182,7 @@ TEST(Sync_BadChangeset)
             wt.commit();
         }
 
-        auto listener = [&](ConnectionState state, const util::Optional<SessionErrorInfo>& error_info) {
+        auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
@@ -5231,7 +5231,7 @@ TEST(Sync_GoodChangeset_AccentCharacterInFieldName)
             wt.commit();
         }
 
-        auto listener = [&](ConnectionState state, const util::Optional<SessionErrorInfo>) {
+        auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>) {
             if (state != ConnectionState::disconnected)
                 return;
             did_fail = true;

@@ -16,6 +16,8 @@ using namespace realm::fixtures;
 
 namespace {
 
+using ErrorInfo = SessionErrorInfo;
+
 // FIXME: Rewrite this test without QBS
 TEST_IF(ClientResetQueryBased_1, false)
 {
@@ -169,7 +171,7 @@ TEST_IF(ClientResetQueryBased_1, false)
     //        // The session that receives an error.
     //        {
     //            BowlOfStonesSemaphore bowl;
-    //            auto listener = [&](ConnectionState state, const SessionErrorInfo* error_info) {
+    //            auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
     //                if (state != ConnectionState::disconnected)
     //                    return;
     //                REALM_ASSERT(error_info);

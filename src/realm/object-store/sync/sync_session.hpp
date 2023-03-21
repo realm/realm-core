@@ -291,6 +291,7 @@ public:
     // Expose some internal functionality to testing code.
     struct OnlyForTesting {
         static void handle_error(SyncSession& session, sync::SessionErrorInfo&& error);
+        static void handle_error(SyncSession& session, SyncError&& error);
         static void nonsync_transact_notify(SyncSession& session, VersionID::version_type version)
         {
             session.nonsync_transact_notify(version);
@@ -359,9 +360,8 @@ private:
 
     SyncSession(_impl::SyncClient&, std::shared_ptr<DB>, const RealmConfig&, SyncManager* sync_manager);
 
-    // Create a subscription store pointer based on the flexible based sync configuration or return
-    // null if not using flexible sync.
-    void update_subscription_store(bool) REQUIRES(m_state_mutex);
+    // Initialize or tear down the subscription store based on whether or not flx_sync_requested is true
+    void update_subscription_store(bool flx_sync_requested) REQUIRES(m_state_mutex);
     // Update the sync config after a PBS->FLX migration or FLX->PBS rollback occurs
     void update_sync_config_after_migration() REQUIRES(!m_config_mutex, !m_state_mutex);
 
