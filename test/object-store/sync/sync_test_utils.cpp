@@ -20,6 +20,7 @@
 
 #include "util/baas_admin_api.hpp"
 
+#include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
@@ -203,6 +204,35 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app)
                                      REQUIRE(!error);
                                  });
     return creds;
+}
+
+void wait_for_advance(Realm& realm)
+{
+    struct Context : BindingContext {
+        Realm& realm;
+        DB::version_type target_version;
+        bool& done;
+        Context(Realm& realm, bool& done)
+            : realm(realm)
+            , target_version(*realm.latest_snapshot_version())
+            , done(done)
+        {
+        }
+
+        void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
+        {
+            if (realm.read_transaction_version().version >= target_version) {
+                done = true;
+            }
+        }
+    };
+
+    bool done = false;
+    realm.m_binding_context = std::make_unique<Context>(realm, done);
+    timed_wait_for([&] {
+        return done;
+    });
+    realm.m_binding_context = nullptr;
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS

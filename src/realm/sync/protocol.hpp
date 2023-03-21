@@ -39,17 +39,29 @@ namespace sync {
 //
 constexpr int get_current_protocol_version() noexcept
 {
+#ifdef REALM_SYNC_PROTOCOL_V8
+    return 8;
+#else
     return 7;
+#endif // REALM_SYNC_PROTOCOL_V8
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
 {
+#ifdef REALM_SYNC_PROTOCOL_V8
+    return "com.mongodb.realm-sync#";
+#else
     return "com.mongodb.realm-sync/";
+#endif // REALM_SYNC_PROTOCOL_V8
 }
 
 constexpr std::string_view get_flx_websocket_protocol_prefix() noexcept
 {
+#ifdef REALM_SYNC_PROTOCOL_V8
+    return "com.mongodb.realm-query-sync#";
+#else
     return "com.mongodb.realm-query-sync/";
+#endif // REALM_SYNC_PROTOCOL_V8
 }
 
 enum class SyncServerMode { PBS, FLX };
@@ -311,7 +323,7 @@ enum class ProtocolError {
     initial_sync_not_completed   = RLM_SYNC_ERR_SESSION_INITIAL_SYNC_NOT_COMPLETED, // Client tried to open a session before initial sync is complete (BIND)
     write_not_allowed            = RLM_SYNC_ERR_SESSION_WRITE_NOT_ALLOWED,          // Client attempted a write that is disallowed by permissions, or modifies an
                                                                                     // object outside the current query - requires client reset (UPLOAD)
-    compensating_write           = RLM_SYNC_ERR_SESSION_COMPENSATING_WRITE,         // Client attempted a write that is disallowed by permissions, or modifies and
+    compensating_write           = RLM_SYNC_ERR_SESSION_COMPENSATING_WRITE,         // Client attempted a write that is disallowed by permissions, or modifies an
                                                                                     // object outside the current query, and the server undid the modification
                                                                                     // (UPLOAD)
     bad_progress                 = RLM_SYNC_ERR_SESSION_BAD_PROGRESS,               // Bad progress information (ERROR)

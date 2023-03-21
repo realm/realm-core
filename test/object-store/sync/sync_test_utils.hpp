@@ -153,6 +153,8 @@ struct AutoVerifiedEmailCredentials : app::AppCredentials {
 
 AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app);
 
+void wait_for_advance(Realm& realm);
+
 #endif // REALM_ENABLE_AUTH_TESTS
 
 #endif // REALM_ENABLE_SYNC
