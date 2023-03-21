@@ -104,6 +104,25 @@ ColKey add_column(Group& group, Table& table, Property const& property)
     // LinkingObjects must be an artifact of an existing link column.
     REALM_ASSERT(property.type != PropertyType::LinkingObjects);
 
+    // TODO add a proper method for this
+    auto process_nested_collection = [](const Property& property) {
+        std::vector<CollectionType> collection_types;
+        for (const auto& prop_type : property.nested_types) {
+            // TODO: implement all the checks, eg avoid Set<List<T>>
+            if (is_array(prop_type)) {
+                collection_types.push_back(CollectionType::List);
+            }
+            else if (is_set(prop_type)) {
+                collection_types.push_back(CollectionType::Set);
+            }
+            else if (is_dictionary(prop_type)) {
+                collection_types.push_back(CollectionType::Dictionary);
+            }
+            // TODO throw if something odd happens here.
+        }
+        return collection_types;
+    };
+
     if (property.is_primary) {
         // Primary key columns should have been created when the table was created
         if (auto col = table.get_column_key(property.name)) {
@@ -128,14 +147,32 @@ ColKey add_column(Group& group, Table& table, Property const& property)
         }
     }
     else if (is_array(property.type)) {
+        if (property.type_is_nested()) {
+            const auto& collection_types = process_nested_collection(property);
+            const auto& final_type = property.nested_types.back();
+            return table.add_column(to_core_type(final_type & ~PropertyType::Flags), property.name,
+                                    is_nullable(final_type), collection_types);
+        }
         return table.add_column_list(to_core_type(property.type & ~PropertyType::Flags), property.name,
                                      is_nullable(property.type));
     }
     else if (is_set(property.type)) {
+        if (property.type_is_nested()) {
+            const auto& collection_types = process_nested_collection(property);
+            const auto& final_type = property.nested_types.back();
+            return table.add_column(to_core_type(final_type & ~PropertyType::Flags), property.name,
+                                    is_nullable(final_type), collection_types);
+        }
         return table.add_column_set(to_core_type(property.type & ~PropertyType::Flags), property.name,
                                     is_nullable(property.type));
     }
     else if (is_dictionary(property.type)) {
+        if (property.type_is_nested()) {
+            const auto& collection_types = process_nested_collection(property);
+            const auto& final_type = property.nested_types.back();
+            return table.add_column(to_core_type(final_type & ~PropertyType::Flags), property.name,
+                                    is_nullable(final_type), collection_types);
+        }
         return table.add_column_dictionary(to_core_type(property.type & ~PropertyType::Flags), property.name,
                                            is_nullable(property.type));
     }

@@ -59,6 +59,7 @@ enum class PropertyType : unsigned short {
     Required = 0,
     Nullable = 64,
     Array = 128,
+
     Set = 256,
     Dictionary = 512,
 
@@ -96,6 +97,8 @@ struct Property {
     IsPrimary is_primary = false;
     IsIndexed is_indexed = false;
     IsFulltextIndexed is_fulltext_indexed = false;
+    using NestedTypes = std::vector<PropertyType>;
+    NestedTypes nested_types;
 
     ColKey column_key;
 
@@ -107,8 +110,12 @@ struct Property {
     // Text property with fulltext index
     Property(std::string name, IsFulltextIndexed indexed, std::string public_name = "");
 
+    // Link to another object
     Property(std::string name, PropertyType type, std::string object_type, std::string link_origin_property_name = "",
              std::string public_name = "");
+
+    // Nested collections
+    Property(std::string name, const std::vector<PropertyType>& nested_types, std::string public_name = "");
 
     Property(Property const&) = default;
     Property(Property&&) noexcept = default;
@@ -127,6 +134,7 @@ struct Property {
 
     bool type_is_indexable() const noexcept;
     bool type_is_nullable() const noexcept;
+    bool type_is_nested() const noexcept;
 
     std::string type_string() const;
 };
@@ -336,6 +344,15 @@ inline Property::Property(std::string name, PropertyType type, std::string objec
 {
 }
 
+inline Property::Property(std::string name, const std::vector<PropertyType>& nested_types, std::string public_name)
+    : name(std::move(name))
+    , public_name(std::move(public_name))
+    , nested_types(nested_types)
+{
+    REALM_ASSERT(!nested_types.empty());
+    type = nested_types.front();
+}
+
 inline bool Property::type_is_indexable() const noexcept
 {
     return !is_collection(type) &&
@@ -348,6 +365,11 @@ inline bool Property::type_is_nullable() const noexcept
 {
     return !((is_array(type) || is_set(type)) && type == PropertyType::Object) &&
            type != PropertyType::LinkingObjects;
+}
+
+inline bool Property::type_is_nested() const noexcept
+{
+    return !nested_types.empty();
 }
 
 inline std::string Property::type_string() const
