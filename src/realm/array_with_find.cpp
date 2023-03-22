@@ -79,5 +79,4 @@ size_t ArrayWithFind::first_set_bit64(int64_t v) const
     return first_set_bit(v1) + 32;
 }
 
-
 } // namespace realm

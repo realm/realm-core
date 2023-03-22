@@ -96,6 +96,13 @@ typedef enum realm_schema_mode {
     RLM_SCHEMA_MODE_MANUAL,
 } realm_schema_mode_e;
 
+typedef enum realm_schema_subset_mode {
+    RLM_SCHEMA_SUBSET_MODE_STRICT,
+    RLM_SCHEMA_SUBSET_MODE_ALL_CLASSES,
+    RLM_SCHEMA_SUBSET_MODE_ALL_PROPERTIES,
+    RLM_SCHEMA_SUBSET_MODE_COMPLETE
+} realm_schema_subset_mode_e;
+
 /* Key types */
 typedef uint32_t realm_class_key_t;
 typedef int64_t realm_property_key_t;
@@ -679,6 +686,20 @@ RLM_API realm_schema_mode_e realm_config_get_schema_mode(const realm_config_t*);
  * This function cannot fail.
  */
 RLM_API void realm_config_set_schema_mode(realm_config_t*, realm_schema_mode_e);
+
+/**
+ * Get the subset schema mode.
+ *
+ * This function cannot fail.
+ */
+RLM_API realm_schema_subset_mode_e realm_config_get_schema_subset_mode(const realm_config_t*);
+
+/**
+ * Set schema subset mode
+ *
+ * This function cannot fail
+ */
+RLM_API void realm_config_set_schema_subset_mode(realm_config_t*, realm_schema_subset_mode_e);
 
 /**
  * Set the migration callback.
@@ -2459,6 +2480,12 @@ RLM_API realm_results_t* realm_get_backlinks(realm_object_t* object, realm_class
 RLM_API bool realm_query_delete_all(const realm_query_t*);
 
 /**
+ * Set the boolean passed as argument to true or false whether the realm_results passed is valid or not
+ * @return true/false if no exception has occured.
+ */
+RLM_API bool realm_results_is_valid(const realm_results_t*, bool*);
+
+/**
  * Count the number of results.
  *
  * If the result is "live" (not a snapshot), this may rerun the query if things
@@ -3348,6 +3375,8 @@ typedef enum realm_sync_error_action {
     RLM_SYNC_ERROR_ACTION_DELETE_REALM,
     RLM_SYNC_ERROR_ACTION_CLIENT_RESET,
     RLM_SYNC_ERROR_ACTION_CLIENT_RESET_NO_RECOVERY,
+    RLM_SYNC_ERROR_ACTION_MIGRATE_TO_FLX,
+    RLM_SYNC_ERROR_ACTION_REVERT_TO_PBS,
 } realm_sync_error_action_e;
 
 typedef struct realm_sync_session realm_sync_session_t;

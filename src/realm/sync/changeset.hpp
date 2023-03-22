@@ -61,7 +61,6 @@ struct Changeset {
     struct IteratorImpl;
     using iterator = IteratorImpl<false>;
     using const_iterator = IteratorImpl<true>;
-    using value_type = Instruction;
     iterator begin() noexcept;
     iterator end() noexcept;
     const_iterator begin() const noexcept;

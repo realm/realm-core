@@ -563,6 +563,17 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             check_mode(RLM_SCHEMA_MODE_MANUAL);
         }
 
+        SECTION("realm_config_set_schema_subset_mode()") {
+            auto check_subset_mode = [&](realm_schema_subset_mode_e mode) {
+                realm_config_set_schema_subset_mode(config.get(), mode);
+                CHECK(realm_config_get_schema_subset_mode(config.get()) == mode);
+            };
+            check_subset_mode(RLM_SCHEMA_SUBSET_MODE_ALL_CLASSES);
+            check_subset_mode(RLM_SCHEMA_SUBSET_MODE_ALL_PROPERTIES);
+            check_subset_mode(RLM_SCHEMA_SUBSET_MODE_COMPLETE);
+            check_subset_mode(RLM_SCHEMA_SUBSET_MODE_STRICT);
+        }
+
         SECTION("realm_config_set_disable_format_upgrade()") {
             realm_config_set_disable_format_upgrade(config.get(), true);
             CHECK(realm_config_get_disable_format_upgrade(config.get()) == true);
@@ -2521,6 +2532,12 @@ TEST_CASE("C API", "[c_api]") {
             SECTION("results") {
                 auto r = cptr_checked(realm_query_find_all(q.get()));
                 CHECK(!realm_is_frozen(r.get()));
+
+                SECTION("realm_results_is_valid") {
+                    bool valid;
+                    CHECK(checked(realm_results_is_valid(r.get(), &valid)));
+                    CHECK(valid);
+                }
 
                 SECTION("realm_results_count()") {
                     size_t count;
