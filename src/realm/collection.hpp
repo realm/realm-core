@@ -119,7 +119,7 @@ public:
         return ndx;
     }
 
-    virtual void set_owner(const Obj& obj, CollectionParent::Index index) = 0;
+    virtual void set_owner(const Obj& obj, ColKey) = 0;
     virtual void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) = 0;
 
 
@@ -382,11 +382,11 @@ public:
         return false;
     }
 
-    void set_owner(const Obj& obj, CollectionParent::Index index) override
+    void set_owner(const Obj& obj, ColKey ck) override
     {
         m_obj_mem = obj;
         m_parent = &m_obj_mem;
-        m_index = index;
+        m_index = ck;
         if (obj) {
             m_alloc = &obj.get_alloc();
         }
@@ -401,6 +401,8 @@ public:
         if (m_obj_mem) {
             m_alloc = &m_obj_mem.get_alloc();
         }
+        // Force update on next access
+        m_content_version = 0;
     }
 
     using Interface::get_owner_key;

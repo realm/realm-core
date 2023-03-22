@@ -467,6 +467,10 @@ ColKey Table::add_column(Table& target, StringData name, std::vector<CollectionT
     ColKey col_key = generate_col_key(ColumnType(data_type), attr);
 
     auto retval = do_insert_column(col_key, data_type, name, &target, key_type); // Throws
+    if (collection_types.size() > 1) {
+        collection_types.pop_back();
+        m_spec.set_nested_column_types(m_leaf_ndx2spec_ndx[col_key.get_index().val], collection_types);
+    }
     return retval;
 }
 
