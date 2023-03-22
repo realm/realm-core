@@ -70,6 +70,9 @@ typedef Link BackLink;
 namespace _impl {
 class TableFriend;
 }
+namespace util {
+class Logger;
+}
 namespace metrics {
 class QueryInfo;
 }
@@ -834,6 +837,7 @@ private:
     void remove_recursive(CascadeState&);
 
     Replication* get_repl() const noexcept;
+    util::Logger* get_logger() const noexcept;
 
     void set_ndx_in_parent(size_t ndx_in_parent) noexcept;
 

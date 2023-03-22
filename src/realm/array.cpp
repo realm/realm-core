@@ -686,23 +686,6 @@ int64_t Array::sum(size_t start, size_t end) const
 
         for (size_t t = 0; t < chunks; t++) {
             if (w == 1) {
-
-#if 0
-#if defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
-                s += __popcnt64(data[t]);
-#elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(REALM_PTR_64)
-                s += __builtin_popcountll(data[t]);
-#else
-                uint64_t a = data[t];
-                const uint64_t m1  = 0x5555555555555555ULL;
-                a -= (a >> 1) & m1;
-                a = (a & m2) + ((a >> 2) & m2);
-                a = (a + (a >> 4)) & m4;
-                a = (a * h01) >> 56;
-                s += a;
-#endif
-#endif
-
                 s += fast_popcount64(data[t]);
             }
             else if (w == 2) {
@@ -724,91 +707,89 @@ int64_t Array::sum(size_t start, size_t end) const
     }
 
 #ifdef REALM_COMPILER_SSE
-    if (sseavx<42>()) {
 
-        // 2000 items summed 500000 times, 8/16/32 bits, miliseconds:
-        // Naive, templated get<>: 391 371 374
-        // SSE:                     97 148 282
+    // 2000 items summed 500000 times, 8/16/32 bits, miliseconds:
+    // Naive, templated get<>: 391 371 374
+    // SSE:                     97 148 282
 
-        if ((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / no0(w)) {
-            __m128i* data = reinterpret_cast<__m128i*>(m_data + start * w / 8);
-            __m128i sum_result = {0};
-            __m128i sum2;
+    if ((w == 8 || w == 16 || w == 32) && end - start > sizeof(__m128i) * 8 / no0(w)) {
+        __m128i* data = reinterpret_cast<__m128i*>(m_data + start * w / 8);
+        __m128i sum_result = {0};
+        __m128i sum2;
 
-            size_t chunks = (end - start) * w / 8 / sizeof(__m128i);
+        size_t chunks = (end - start) * w / 8 / sizeof(__m128i);
 
-            for (size_t t = 0; t < chunks; t++) {
-                if (w == 8) {
-                    /*
-                    // 469 ms AND disadvantage of handling max 64k elements before overflow
-                    __m128i vl = _mm_cvtepi8_epi16(data[t]);
-                    __m128i vh = data[t];
-                    vh.m128i_i64[0] = vh.m128i_i64[1];
-                    vh = _mm_cvtepi8_epi16(vh);
-                    sum_result = _mm_add_epi16(sum_result, vl);
-                    sum_result = _mm_add_epi16(sum_result, vh);
-                    */
+        for (size_t t = 0; t < chunks; t++) {
+            if (w == 8) {
+                /*
+                 // 469 ms AND disadvantage of handling max 64k elements before overflow
+                 __m128i vl = _mm_cvtepi8_epi16(data[t]);
+                 __m128i vh = data[t];
+                 vh.m128i_i64[0] = vh.m128i_i64[1];
+                 vh = _mm_cvtepi8_epi16(vh);
+                 sum_result = _mm_add_epi16(sum_result, vl);
+                 sum_result = _mm_add_epi16(sum_result, vh);
+                 */
 
-                    /*
-                    // 424 ms
-                    __m128i vl = _mm_unpacklo_epi8(data[t], _mm_set1_epi8(0));
-                    __m128i vh = _mm_unpackhi_epi8(data[t], _mm_set1_epi8(0));
-                    sum_result = _mm_add_epi32(sum_result, _mm_madd_epi16(vl, _mm_set1_epi16(1)));
-                    sum_result = _mm_add_epi32(sum_result, _mm_madd_epi16(vh, _mm_set1_epi16(1)));
-                    */
+                /*
+                 // 424 ms
+                 __m128i vl = _mm_unpacklo_epi8(data[t], _mm_set1_epi8(0));
+                 __m128i vh = _mm_unpackhi_epi8(data[t], _mm_set1_epi8(0));
+                 sum_result = _mm_add_epi32(sum_result, _mm_madd_epi16(vl, _mm_set1_epi16(1)));
+                 sum_result = _mm_add_epi32(sum_result, _mm_madd_epi16(vh, _mm_set1_epi16(1)));
+                 */
 
-                    __m128i vl = _mm_cvtepi8_epi16(data[t]); // sign extend lower words 8->16
-                    __m128i vh = data[t];
-                    vh = _mm_srli_si128(vh, 8); // v >>= 64
-                    vh = _mm_cvtepi8_epi16(vh); // sign extend lower words 8->16
-                    __m128i sum1 = _mm_add_epi16(vl, vh);
-                    __m128i sumH = _mm_cvtepi16_epi32(sum1);
-                    __m128i sumL = _mm_srli_si128(sum1, 8); // v >>= 64
-                    sumL = _mm_cvtepi16_epi32(sumL);
-                    sum_result = _mm_add_epi32(sum_result, sumL);
-                    sum_result = _mm_add_epi32(sum_result, sumH);
-                }
-                else if (w == 16) {
-                    // todo, can overflow for array size > 2^32
-                    __m128i vl = _mm_cvtepi16_epi32(data[t]); // sign extend lower words 16->32
-                    __m128i vh = data[t];
-                    vh = _mm_srli_si128(vh, 8);  // v >>= 64
-                    vh = _mm_cvtepi16_epi32(vh); // sign extend lower words 16->32
-                    sum_result = _mm_add_epi32(sum_result, vl);
-                    sum_result = _mm_add_epi32(sum_result, vh);
-                }
-                else if (w == 32) {
-                    __m128i v = data[t];
-                    __m128i v0 = _mm_cvtepi32_epi64(v); // sign extend lower dwords 32->64
-                    v = _mm_srli_si128(v, 8);           // v >>= 64
-                    __m128i v1 = _mm_cvtepi32_epi64(v); // sign extend lower dwords 32->64
-                    sum_result = _mm_add_epi64(sum_result, v0);
-                    sum_result = _mm_add_epi64(sum_result, v1);
-
-                    /*
-                    __m128i m = _mm_set1_epi32(0xc000);             // test if overflow could happen (still need
-                    underflow test).
-                    __m128i mm = _mm_and_si128(data[t], m);
-                    zz = _mm_or_si128(mm, zz);
-                    sum_result = _mm_add_epi32(sum_result, data[t]);
-                    */
-                }
+                __m128i vl = _mm_cvtepi8_epi16(data[t]); // sign extend lower words 8->16
+                __m128i vh = data[t];
+                vh = _mm_srli_si128(vh, 8); // v >>= 64
+                vh = _mm_cvtepi8_epi16(vh); // sign extend lower words 8->16
+                __m128i sum1 = _mm_add_epi16(vl, vh);
+                __m128i sumH = _mm_cvtepi16_epi32(sum1);
+                __m128i sumL = _mm_srli_si128(sum1, 8); // v >>= 64
+                sumL = _mm_cvtepi16_epi32(sumL);
+                sum_result = _mm_add_epi32(sum_result, sumL);
+                sum_result = _mm_add_epi32(sum_result, sumH);
             }
-            start += sizeof(__m128i) * 8 / no0(w) * chunks;
-
-            // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop
-            // (vc2010/gcc4.6)
-            sum2 = sum_result;
-
-            // Avoid aliasing bug where sum2 might not yet be initialized when accessed by get_universal
-            char sum3[sizeof sum2];
-            memcpy(&sum3, &sum2, sizeof sum2);
-
-            // Sum elements of sum
-            for (size_t t = 0; t < sizeof(__m128i) * 8 / ((w == 8 || w == 16) ? 32 : 64); ++t) {
-                int64_t v = get_universal < (w == 8 || w == 16) ? 32 : 64 > (reinterpret_cast<char*>(&sum3), t);
-                s += v;
+            else if (w == 16) {
+                // todo, can overflow for array size > 2^32
+                __m128i vl = _mm_cvtepi16_epi32(data[t]); // sign extend lower words 16->32
+                __m128i vh = data[t];
+                vh = _mm_srli_si128(vh, 8);  // v >>= 64
+                vh = _mm_cvtepi16_epi32(vh); // sign extend lower words 16->32
+                sum_result = _mm_add_epi32(sum_result, vl);
+                sum_result = _mm_add_epi32(sum_result, vh);
             }
+            else if (w == 32) {
+                __m128i v = data[t];
+                __m128i v0 = _mm_cvtepi32_epi64(v); // sign extend lower dwords 32->64
+                v = _mm_srli_si128(v, 8);           // v >>= 64
+                __m128i v1 = _mm_cvtepi32_epi64(v); // sign extend lower dwords 32->64
+                sum_result = _mm_add_epi64(sum_result, v0);
+                sum_result = _mm_add_epi64(sum_result, v1);
+
+                /*
+                 __m128i m = _mm_set1_epi32(0xc000);             // test if overflow could happen (still need
+                 underflow test).
+                 __m128i mm = _mm_and_si128(data[t], m);
+                 zz = _mm_or_si128(mm, zz);
+                 sum_result = _mm_add_epi32(sum_result, data[t]);
+                 */
+            }
+        }
+        start += sizeof(__m128i) * 8 / no0(w) * chunks;
+
+        // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop
+        // (vc2010/gcc4.6)
+        sum2 = sum_result;
+
+        // Avoid aliasing bug where sum2 might not yet be initialized when accessed by get_universal
+        char sum3[sizeof sum2];
+        memcpy(&sum3, &sum2, sizeof sum2);
+
+        // Sum elements of sum
+        for (size_t t = 0; t < sizeof(__m128i) * 8 / ((w == 8 || w == 16) ? 32 : 64); ++t) {
+            int64_t v = get_universal < (w == 8 || w == 16) ? 32 : 64 > (reinterpret_cast<char*>(&sum3), t);
+            s += v;
         }
     }
 #endif

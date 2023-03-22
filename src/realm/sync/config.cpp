@@ -34,7 +34,7 @@ using ProtocolError = realm::sync::ProtocolError;
 static const constexpr std::string_view s_middle(" Logs: ");
 
 SyncError::SyncError(std::error_code error_code, std::string_view msg, bool is_fatal,
-                     util::Optional<std::string_view> serverLog,
+                     std::optional<std::string_view> serverLog,
                      std::vector<sync::CompensatingWriteErrorInfo> compensating_writes)
     : SystemError(error_code, serverLog ? util::format("%1%2%3", msg, s_middle, *serverLog) : std::string(msg))
     , is_fatal(is_fatal)

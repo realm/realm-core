@@ -39,20 +39,6 @@
 using namespace realm;
 using namespace realm::util;
 
-namespace {
-
-class Initialization {
-public:
-    Initialization()
-    {
-        realm::cpuid_init();
-    }
-};
-
-Initialization initialization;
-
-} // anonymous namespace
-
 Group::Group()
     : m_local_alloc(new SlabAlloc)
     , m_alloc(*m_local_alloc) // Throws
