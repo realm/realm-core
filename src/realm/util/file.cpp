@@ -1722,11 +1722,15 @@ const char* File::get_encryption_key() const
     return m_encryption_key.get();
 }
 
-void File::MapBase::map(const File& f, AccessMode a, size_t size, int map_flags, size_t offset)
+void File::MapBase::map(const File& f, AccessMode a, size_t size, int map_flags, size_t offset,
+                        util::WriteObserver* observer)
 {
     REALM_ASSERT(!m_addr);
 #if REALM_ENABLE_ENCRYPTION
     m_addr = f.map(a, size, m_encrypted_mapping, map_flags, offset);
+    if (observer && m_encrypted_mapping) {
+        m_encrypted_mapping->set_observer(observer);
+    }
 #else
     m_addr = f.map(a, size, map_flags, offset);
 #endif
@@ -1761,7 +1765,8 @@ void File::MapBase::remap(const File& f, AccessMode a, size_t size, int map_flag
     m_size = m_reservation_size = size;
 }
 
-bool File::MapBase::try_reserve(const File& file, AccessMode a, size_t size, size_t offset)
+bool File::MapBase::try_reserve(const File& file, AccessMode a, size_t size, size_t offset,
+                                util::WriteObserver* observer)
 {
 #ifdef _WIN32
     // unsupported for now
@@ -1780,6 +1785,9 @@ bool File::MapBase::try_reserve(const File& file, AccessMode a, size_t size, siz
     if (file.m_encryption_key) {
         m_encrypted_mapping =
             util::reserve_mapping(addr, {m_fd, file.get_path(), a, file.m_encryption_key.get()}, offset);
+        if (observer) {
+            m_encrypted_mapping->set_observer(observer);
+        }
     }
 #endif
 #endif
