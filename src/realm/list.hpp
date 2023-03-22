@@ -498,9 +498,9 @@ public:
         return m_list.get_tree();
     }
 
-    void set_owner(const Obj& obj, CollectionParent::Index index) override
+    void set_owner(const Obj& obj, ColKey ck) override
     {
-        m_list.set_owner(obj, index);
+        m_list.set_owner(obj, ck);
     }
 
     void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
