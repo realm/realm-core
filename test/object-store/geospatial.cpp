@@ -130,8 +130,13 @@ TEST_CASE("geospatial") {
         auto obj = create(AnyDict{
             {"_id", INT64_C(1)},
             {"location", AnyDict{{"type", "Point"s}, {"coordinates", AnyVec{1.1, 2.2, 3.3}}}},
-//            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(30)}}}},
         });
+
+        {
+            TableRef table = obj.obj().get_table();
+            REQUIRE(!Geospatial::is_geospatial(table, table->get_column_key("_id")));
+            REQUIRE(Geospatial::is_geospatial(table, table->get_column_key("location")));
+        }
 
         REQUIRE(obj.obj().get<int64_t>("_id") == 1);
         auto linked_obj = util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "location")).obj();

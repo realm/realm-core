@@ -31,6 +31,7 @@ class S2Region;
 namespace realm {
 
 class Obj;
+class TableRef;
 
 struct GeoPoint {
     GeoPoint()
@@ -131,6 +132,7 @@ public:
 
     static Geospatial from_obj(const Obj& obj, ColKey type_col = {}, ColKey coords_col = {});
     static Geospatial from_link(const Obj& obj);
+    static bool is_geospatial(const TableRef table, ColKey link_col);
     void assign_to(Obj& link) const;
 
     std::string get_type_string() const noexcept

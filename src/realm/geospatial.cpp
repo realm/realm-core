@@ -47,6 +47,7 @@
 #include <realm/list.hpp>
 #include <realm/obj.hpp>
 #include <realm/table.hpp>
+#include <realm/table_ref.hpp>
 
 namespace {
 
@@ -61,6 +62,29 @@ static bool type_is_valid(std::string str_type)
 namespace realm {
 
 const double Geospatial::c_radius_km = 6371.01;
+
+bool Geospatial::is_geospatial(const TableRef table, ColKey link_col)
+{
+    if (!table || !link_col) {
+        return false;
+    }
+    if (!table->is_link_type(link_col.get_type())) {
+        return false;
+    }
+    TableRef target = table->get_link_target(link_col);
+    if (!target || !target->is_embedded()) {
+        return false;
+    }
+    ColKey type_col = target->get_column_key(StringData(c_geo_point_type_col_name));
+    if (!type_col || type_col.is_collection() || type_col.get_type() != col_type_String) {
+        return false;
+    }
+    ColKey coords_col = target->get_column_key(StringData(c_geo_point_coords_col_name));
+    if (!coords_col || !coords_col.is_list() || coords_col.get_type() != col_type_Double) {
+        return false;
+    }
+    return true;
+}
 
 Geospatial Geospatial::from_obj(const Obj& obj, ColKey type_col, ColKey coords_col)
 {

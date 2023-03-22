@@ -110,7 +110,8 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
         if (m_args[i].arg[0].type == RLM_TYPE_GEOSPATIAL) {
             return from_capi(m_args[i].arg[0].geospatial).get();
         }
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        throw LogicError{ErrorCodes::TypeMismatch,
+                         util::format("query argument %1 must be a geospatial type", i)}; // LCOV_EXCL_LINE
     }
 
     bool is_argument_null(size_t i) final
