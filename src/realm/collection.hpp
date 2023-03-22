@@ -5,7 +5,6 @@
 #include <realm/bplustree.hpp>
 #include <realm/obj_list.hpp>
 #include <realm/table.hpp>
-#include <realm/array_ref.hpp>
 
 #include <iosfwd>      // std::ostream
 #include <type_traits> // std::void_t
@@ -120,7 +119,7 @@ public:
         return ndx;
     }
 
-    virtual void set_owner(const Obj& obj, CollectionParent::Index index) = 0;
+    virtual void set_owner(const Obj& obj, ColKey) = 0;
     virtual void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) = 0;
 
 
@@ -328,141 +327,6 @@ struct AverageHelper<T, std::void_t<ColumnSumType<T>>> {
     }
 };
 
-using CollectionListPtr = std::shared_ptr<CollectionList>;
-class CollectionList : public CollectionParent,
-                       protected ArrayParent,
-                       public std::enable_shared_from_this<CollectionList> {
-public:
-    [[nodiscard]] static CollectionListPtr create(std::shared_ptr<CollectionParent> parent, ColKey col_key,
-                                                  Index index, CollectionType coll_type)
-    {
-        return std::shared_ptr<CollectionList>(new CollectionList(parent, col_key, index, coll_type));
-    }
-    CollectionList(const CollectionList&) = delete;
-
-    ~CollectionList();
-
-    bool init_from_parent(bool allow_create) const;
-
-    Replication* get_replication() const final
-    {
-        return m_parent->get_replication();
-    }
-    size_t get_level() const noexcept final
-    {
-        return m_level;
-    }
-    UpdateStatus update_if_needed_with_status() const final
-    {
-        auto status = m_parent->update_if_needed_with_status();
-        switch (status) {
-            case UpdateStatus::Detached: {
-                m_top.detach();
-                return UpdateStatus::Detached;
-            }
-            case UpdateStatus::NoChange:
-                if (m_top.is_attached()) {
-                    return UpdateStatus::NoChange;
-                }
-                // The tree has not been initialized yet for this accessor, so
-                // perform lazy initialization by treating it as an update.
-                [[fallthrough]];
-            case UpdateStatus::Updated: {
-                bool attached = init_from_parent(false);
-                return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
-            }
-        }
-        REALM_UNREACHABLE();
-    }
-    bool update_if_needed() const final
-    {
-        return update_if_needed_with_status() != UpdateStatus::Detached;
-    }
-    int_fast64_t bump_content_version() final
-    {
-        return m_parent->bump_content_version();
-    }
-    void bump_both_versions() override
-    {
-        m_parent->bump_both_versions();
-    }
-    TableRef get_table() const noexcept final
-    {
-        return m_parent->get_table();
-    }
-    ColKey get_col_key() const noexcept final
-    {
-        return m_col_key;
-    }
-    const Obj& get_object() const noexcept final
-    {
-        return m_parent->get_object();
-    }
-
-    ref_type get_collection_ref(Index index) const noexcept final;
-    void set_collection_ref(Index index, ref_type ref) final;
-
-    bool is_empty() const
-    {
-        return size() == 0;
-    }
-
-    size_t size() const
-    {
-        return update_if_needed() ? m_refs.size() : 0;
-    }
-    CollectionBasePtr insert_collection(size_t ndx);
-    CollectionBasePtr insert_collection(StringData key);
-    CollectionBasePtr get_collection_ptr(size_t ndx) const;
-
-    CollectionListPtr insert_collection_list(size_t ndx);
-    CollectionListPtr insert_collection_list(StringData key);
-    CollectionListPtr get_collection_list(size_t ndx) const;
-
-    void remove(size_t ndx);
-    void remove(StringData key);
-
-    ref_type get_child_ref(size_t child_ndx) const noexcept final;
-    void update_child_ref(size_t child_ndx, ref_type new_ref) final;
-
-private:
-    std::shared_ptr<CollectionParent> m_parent;
-    CollectionParent::Index m_index;
-    size_t m_level;
-    Allocator* m_alloc;
-    ColKey m_col_key;
-    mutable Array m_top;
-    mutable std::unique_ptr<BPlusTreeBase> m_keys;
-    mutable BPlusTree<ref_type> m_refs;
-    DataType m_key_type;
-
-    CollectionList(std::shared_ptr<CollectionParent> parent, ColKey col_key, Index index, CollectionType coll_type);
-
-    UpdateStatus ensure_created()
-    {
-        auto status = m_parent->update_if_needed_with_status();
-        switch (status) {
-            case UpdateStatus::Detached:
-                break; // Not possible (would have thrown earlier).
-            case UpdateStatus::NoChange: {
-                if (m_top.is_attached()) {
-                    return UpdateStatus::NoChange;
-                }
-                // The tree has not been initialized yet for this accessor, so
-                // perform lazy initialization by treating it as an update.
-                [[fallthrough]];
-            }
-            case UpdateStatus::Updated: {
-                bool attached = init_from_parent(true);
-                REALM_ASSERT(attached);
-                return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
-            }
-        }
-
-        REALM_UNREACHABLE();
-    }
-};
-
 /// Convenience base class for collections, which implements most of the
 /// relevant interfaces for a collection that is bound to an object accessor and
 /// representable as a BPlusTree<T>.
@@ -518,11 +382,11 @@ public:
         return false;
     }
 
-    void set_owner(const Obj& obj, CollectionParent::Index index) override
+    void set_owner(const Obj& obj, ColKey ck) override
     {
         m_obj_mem = obj;
         m_parent = &m_obj_mem;
-        m_index = index;
+        m_index = ck;
         if (obj) {
             m_alloc = &obj.get_alloc();
         }
@@ -537,6 +401,8 @@ public:
         if (m_obj_mem) {
             m_alloc = &m_obj_mem.get_alloc();
         }
+        // Force update on next access
+        m_content_version = 0;
     }
 
     using Interface::get_owner_key;

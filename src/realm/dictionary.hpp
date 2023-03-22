@@ -97,8 +97,9 @@ public:
     Iterator erase(Iterator it);
     bool try_erase(Mixed key);
 
-    void nullify(Mixed);
+    void nullify(size_t);
     void remove_backlinks(CascadeState& state) const;
+    size_t find_first(Mixed value) const;
 
     void clear() final;
 
@@ -146,9 +147,9 @@ public:
 
     void migrate();
 
-    void set_owner(const Obj& obj, CollectionParent::Index index) override
+    void set_owner(const Obj& obj, ColKey ck) override
     {
-        Base::set_owner(obj, index);
+        Base::set_owner(obj, ck);
         get_key_type();
     }
 
@@ -402,9 +403,9 @@ public:
         return nullptr;
     }
 
-    void set_owner(const Obj& obj, CollectionParent::Index index) override
+    void set_owner(const Obj& obj, ColKey ck) override
     {
-        m_source.set_owner(obj, index);
+        m_source.set_owner(obj, ck);
     }
 
     void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
