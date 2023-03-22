@@ -181,9 +181,12 @@ public:
 
 class GeospatialNode : public ValueNode {
 public:
-    struct Box {};
-    struct Polygon {};
-    struct Sphere {};
+    struct Box {
+    };
+    struct Polygon {
+    };
+    struct Sphere {
+    };
     using PointString = std::array<std::string, 3>; // lon, lat, alt
     GeospatialNode(Box, PointString p1, PointString p2);
     GeospatialNode(Sphere, PointString p, std::string radius);
