@@ -18,11 +18,13 @@
 
 #include <realm/object-store/list.hpp>
 
+#include <realm/collection_list.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/shared_realm.hpp>
+
 #include <realm/exceptions.hpp>
 
 namespace {
@@ -85,6 +87,20 @@ Obj List::get(size_t row_ndx) const
     auto obj = list.get_target_table()->get_object(list.get(row_ndx));
     record_audit_read(obj);
     return obj;
+}
+
+template <>
+CollectionBasePtr List::get(size_t row_ndx) const
+{
+    verify_attached();
+    const auto sz = size();
+    if (row_ndx >= sz) {
+        throw OutOfBounds("List::get", row_ndx, sz);
+    }
+    auto obj = m_coll_base->get_obj();
+    auto list = obj.get_collection_list(m_coll_base->get_col_key());
+    auto collection = list->get_collection_ptr(row_ndx);
+    return collection;
 }
 
 template <typename T>
@@ -233,6 +249,83 @@ Obj List::insert_embedded(size_t list_ndx)
         throw IllegalOperation("Not a list of embedded objects");
 
     return as<Obj>().create_and_insert_linked_object(list_ndx);
+}
+
+std::unique_ptr<List> List::insert_list(size_t list_ndx)
+{
+    // TODO: unify this under one method
+    verify_in_transaction();
+    REALM_ASSERT(m_realm);
+    REALM_ASSERT(m_coll_base);
+    // TODO should I move this inside any listbase() ????
+    // TODO account for the replicator, it needs to track this
+    auto collection_list = m_coll_base->get_obj().get_collection_list(m_coll_base->get_col_key());
+    auto collection = collection_list->insert_collection(list_ndx);
+    return std::make_unique<List>(m_realm, std::move(collection)); // This is expensive, but I don't see any other
+                                                                   // way.
+}
+
+std::unique_ptr<object_store::Set> List::insert_set(size_t list_ndx)
+{
+    verify_in_transaction();
+    REALM_ASSERT(m_realm);
+    REALM_ASSERT(m_coll_base);
+    // TODO should I move this inside any listbase() ????
+    // TODO account for the replicator, it needs to track this
+    auto collection_list = m_coll_base->get_obj().get_collection_list(m_coll_base->get_col_key());
+    auto collection = collection_list->insert_collection(list_ndx);
+    return std::make_unique<object_store::Set>(m_realm, std::move(collection));
+}
+
+std::unique_ptr<object_store::Dictionary> List::insert_dictionary(StringData key)
+{
+    verify_in_transaction();
+    REALM_ASSERT(m_realm);
+    REALM_ASSERT(m_coll_base);
+    // TODO should I move this inside any listbase() ????
+    // TODO account for the replicator, it needs to track this
+    auto collection_list = m_coll_base->get_obj().get_collection_list(m_coll_base->get_col_key());
+    auto collection = collection_list->insert_collection(key);
+    return std::make_unique<object_store::Dictionary>(m_realm, std::move(collection));
+}
+
+std::unique_ptr<List> List::get_list(size_t list_ndx) const
+{
+    verify_attached();
+    REALM_ASSERT(m_realm);
+    REALM_ASSERT(m_coll_base);
+    // TODO should I move this inside any listbase() ????
+    // TODO account for the replicator, it needs to track this
+    auto collection_list = m_coll_base->get_obj().get_collection_list(m_coll_base->get_col_key());
+    auto collection = collection_list->get_collection_ptr(list_ndx);
+    return std::make_unique<List>(m_realm, std::move(collection)); // This is expensive, but I don't see any other
+                                                                   // way.
+}
+
+std::unique_ptr<object_store::Set> List::get_set(size_t list_ndx) const
+{
+    verify_attached();
+    REALM_ASSERT(m_realm);
+    REALM_ASSERT(m_coll_base);
+    // TODO should I move this inside any listbase() ????
+    // TODO account for the replicator, it needs to track this
+    auto collection_list = m_coll_base->get_obj().get_collection_list(m_coll_base->get_col_key());
+    auto collection = collection_list->get_collection_ptr(list_ndx);
+    return std::make_unique<object_store::Set>(
+        m_realm, std::move(collection)); // This is expensive, but I don't see any other way.
+}
+
+std::unique_ptr<object_store::Dictionary> List::get_dictionary(size_t list_ndx) const
+{
+    verify_attached();
+    REALM_ASSERT(m_realm);
+    REALM_ASSERT(m_coll_base);
+    // TODO should I move this inside any listbase() ????
+    // TODO account for the replicator, it needs to track this
+    auto collection_list = m_coll_base->get_obj().get_collection_list(m_coll_base->get_col_key());
+    auto collection = collection_list->get_collection_ptr(list_ndx);
+    return std::make_unique<object_store::Dictionary>(
+        m_realm, std::move(collection)); // This is expensive, but I don't see any other way.
 }
 
 Obj List::get_object(size_t list_ndx)

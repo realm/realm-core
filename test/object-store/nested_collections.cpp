@@ -46,38 +46,24 @@ TEST_CASE("nested-list") {
     config.cache = false;
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
-    r->update_schema(
-        {{"list_of_list", {{"nested_list", {PropertyType::Array, PropertyType::Array, PropertyType::Int}}}}});
-    auto origin = r->read_group().get_table("class_list_of_list");
-    REQUIRE(origin);
+    r->update_schema({
+        {"list", {{"value", PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable}}},
+        {"list_of_list", {{"nested_list", {PropertyType::Array, PropertyType::Array, PropertyType::Int}}}},
+    });
+    auto table = r->read_group().get_table("class_list_of_list");
 
-    // auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
-    //  auto target = r->read_group().get_table("class_target");
-    //  ColKey col_link = origin->get_column_key("array");
-    //  //ColKey col_target_value = target->get_column_key("value");
+    r->begin_transaction();
+    auto nested_obj = table->create_object();
+    auto nested_col_key = table->get_column_key("nested_list");
 
-    // r->begin_transaction();
+    List list1{r, nested_obj, nested_col_key};
+    auto collection = list1.insert_list(0);
+    collection->insert_any(0, 100);
+    collection->insert_any(0, 101);
+    collection->insert_any(0, 102);
+    r->commit_transaction();
 
-    // std::vector<ObjKey> target_keys;
-    // target->create_objects(10, target_keys);
-    // for (int i = 0; i < 10; ++i)
-    //     target->get_object(target_keys[i]).set_all(i);
-
-    // Obj obj = origin->create_object();
-    // auto lv = obj.get_linklist_ptr(col_link);
-    // for (int i = 0; i < 10; ++i)
-    //     lv->add(target_keys[i]);
-    // auto lv2 = origin->create_object().get_linklist_ptr(col_link);
-    // for (int i = 0; i < 10; ++i)
-    //     lv2->add(target_keys[i]);
-
-
-    // r->commit_transaction();
-
-    // auto write = [&](auto&& f) {
-    //     r->begin_transaction();
-    //     f();
-    //     r->commit_transaction();
-    //     advance_and_notify(*r);
-    // };
+    auto inner_list = list1.get_list(0);
+    REQUIRE(inner_list->size() == 3);
+    REQUIRE(*inner_list == *collection);
 }
