@@ -159,9 +159,9 @@ public:
     static const size_t max_column_name_length = 63;
     static const uint64_t max_num_columns = 0xFFFFUL; // <-- must be power of two -1
     ColKey add_column(DataType type, StringData name, bool nullable = false, std::vector<CollectionType> = {},
-                      DataType key_type = DataType(0));
+                      DataType key_type = type_String);
     ColKey add_column(Table& target, StringData name, std::vector<CollectionType> = {},
-                      DataType key_type = DataType(0));
+                      DataType key_type = type_String);
     ColKey add_column_list(DataType type, StringData name, bool nullable = false)
     {
         return add_column(type, name, nullable, {CollectionType::List});
