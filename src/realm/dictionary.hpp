@@ -97,8 +97,9 @@ public:
     Iterator erase(Iterator it);
     bool try_erase(Mixed key);
 
-    void nullify(Mixed);
+    void nullify(size_t);
     void remove_backlinks(CascadeState& state) const;
+    size_t find_first(Mixed value) const;
 
     void clear() final;
 

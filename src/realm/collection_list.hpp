@@ -72,6 +72,8 @@ public:
         return m_parent->get_object();
     }
 
+    Index get_index(size_t ndx) const noexcept;
+
     ref_type get_collection_ref(Index index) const noexcept final;
     void set_collection_ref(Index index, ref_type ref) final;
 

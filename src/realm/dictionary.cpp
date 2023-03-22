@@ -668,12 +668,12 @@ auto Dictionary::erase(Iterator it) -> Iterator
     return {this, pos};
 }
 
-void Dictionary::nullify(Mixed key)
+void Dictionary::nullify(size_t ndx)
 {
     REALM_ASSERT(m_dictionary_top);
-    auto ndx = do_find_key(key);
     REALM_ASSERT(ndx != realm::npos);
 
+    auto key = do_get_key(ndx);
     if (Replication* repl = get_replication()) {
         repl->dictionary_set(*this, ndx, key, Mixed());
     }
@@ -686,6 +686,11 @@ void Dictionary::remove_backlinks(CascadeState& state) const
     for (auto&& elem : *this) {
         clear_backlink(elem.second, state);
     }
+}
+
+size_t Dictionary::find_first(Mixed value) const
+{
+    return update() ? m_values->find_first(value) : realm::not_found;
 }
 
 void Dictionary::clear()

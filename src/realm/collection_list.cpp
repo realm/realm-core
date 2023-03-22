@@ -293,4 +293,17 @@ void CollectionList::set_collection_ref(Index index, ref_type ref)
     }
 }
 
+auto CollectionList::get_index(size_t ndx) const noexcept -> Index
+{
+    if (m_key_type == type_Int) {
+        auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
+        return int_keys->get(ndx);
+    }
+    else {
+        auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
+        return string_keys->get(ndx);
+    }
+    return {};
+}
+
 } // namespace realm
