@@ -516,18 +516,20 @@ public:
     virtual ~VersionManager() {}
 
     void cleanup_versions(uint64_t& oldest_live_version, TopRefMap& top_refs, bool& any_new_unreachables)
+        REQUIRES(!m_info_mutex)
     {
         std::lock_guard lock(m_mutex);
+        util::CheckedLockGuard info_lock(m_info_mutex);
         ensure_reader_mapping();
         m_info->readers.purge_versions(oldest_live_version, top_refs, any_new_unreachables);
     }
 
-    version_type get_newest_version()
+    version_type get_newest_version() REQUIRES(!m_local_readers_mutex, !m_info_mutex)
     {
         return get_version_id_of_latest_snapshot().version;
     }
 
-    VersionID get_version_id_of_latest_snapshot()
+    VersionID get_version_id_of_latest_snapshot() REQUIRES(!m_local_readers_mutex, !m_info_mutex)
     {
         {
             // First check the local cache. This is an unlocked read, so it may
@@ -535,7 +537,8 @@ public:
             // a stale value (acceptable for a racing write on one thread and
             // a read on another), or a new value which is guaranteed to not
             // be an active index in the local cache.
-            std::lock_guard lock(m_local_mutex);
+            util::CheckedLockGuard lock(m_local_readers_mutex);
+            util::CheckedLockGuard info_lock(m_info_mutex);
             auto index = m_info->readers.newest.load();
             if (index < m_local_readers.size()) {
                 auto& r = m_local_readers[index];
@@ -546,15 +549,16 @@ public:
         }
 
         std::lock_guard lock(m_mutex);
+        util::CheckedLockGuard info_lock(m_info_mutex);
         auto index = m_info->readers.newest.load();
         ensure_reader_mapping(index);
         return {m_info->readers.get(index).version, index};
     }
 
-    void release_read_lock(const ReadLockInfo& read_lock)
+    void release_read_lock(const ReadLockInfo& read_lock) REQUIRES(!m_local_readers_mutex, !m_info_mutex)
     {
         {
-            std::lock_guard lock(m_local_mutex);
+            util::CheckedLockGuard lock(m_local_readers_mutex);
             REALM_ASSERT(read_lock.m_reader_idx < m_local_readers.size());
             auto& r = m_local_readers[read_lock.m_reader_idx];
             auto& f = field_for_type(r, read_lock.m_type);
@@ -566,6 +570,7 @@ public:
         }
 
         std::lock_guard lock(m_mutex);
+        util::CheckedLockGuard info_lock(m_info_mutex);
         // we should not need to call ensure_full_reader_mapping,
         // since releasing a read lock means it has been grabbed
         // earlier - and hence must reside in mapped memory:
@@ -576,6 +581,7 @@ public:
     }
 
     ReadLockInfo grab_read_lock(ReadLockInfo::Type type, VersionID version_id = {})
+        REQUIRES(!m_local_readers_mutex, !m_info_mutex)
     {
         ReadLockInfo read_lock;
         if (try_grab_local_read_lock(read_lock, type, version_id))
@@ -584,6 +590,7 @@ public:
         {
             const bool pick_specific = version_id.version != VersionID().version;
             std::lock_guard lock(m_mutex);
+            util::CheckedLockGuard info_lock(m_info_mutex);
             auto newest = m_info->readers.newest.load();
             REALM_ASSERT(newest != VersionList::nil);
             read_lock.m_reader_idx = pick_specific ? version_id.index : newest;
@@ -602,7 +609,7 @@ public:
         }
 
         {
-            std::lock_guard local_lock(m_local_mutex);
+            util::CheckedLockGuard local_lock(m_local_readers_mutex);
             grow_local_cache(read_lock.m_reader_idx + 1);
             auto& r2 = m_local_readers[read_lock.m_reader_idx];
             if (!r2.is_active()) {
@@ -618,15 +625,17 @@ public:
         return read_lock;
     }
 
-    void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
+    void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version) REQUIRES(!m_info_mutex)
     {
         std::lock_guard lock(m_mutex);
+        util::CheckedLockGuard info_lock(m_info_mutex);
         m_info->init_versioning(top_ref, file_size, initial_version);
     }
 
-    void add_version(ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
+    void add_version(ref_type new_top_ref, size_t new_file_size, uint64_t new_version) REQUIRES(!m_info_mutex)
     {
         std::lock_guard lock(m_mutex);
+        util::CheckedLockGuard info_lock(m_info_mutex);
         ensure_reader_mapping();
         if (m_info->readers.try_allocate_entry(new_top_ref, new_file_size, new_version)) {
             return;
@@ -643,7 +652,7 @@ public:
 
 
 private:
-    void grow_local_cache(size_t new_size)
+    void grow_local_cache(size_t new_size) REQUIRES(m_local_readers_mutex)
     {
         if (new_size > m_local_readers.size())
             m_local_readers.resize(new_size, VersionList::ReadCount{});
@@ -659,10 +668,15 @@ private:
     }
 
     bool try_grab_local_read_lock(ReadLockInfo& read_lock, ReadLockInfo::Type type, VersionID version_id)
+        REQUIRES(!m_local_readers_mutex, !m_info_mutex)
     {
         const bool pick_specific = version_id.version != VersionID().version;
-        auto index = pick_specific ? version_id.index : m_info->readers.newest.load();
-        std::lock_guard local_lock(m_local_mutex);
+        auto index = version_id.index;
+        if (!pick_specific) {
+            util::CheckedLockGuard lock(m_info_mutex);
+            index = m_info->readers.newest.load();
+        }
+        util::CheckedLockGuard local_lock(m_local_readers_mutex);
         if (index >= m_local_readers.size())
             return false;
 
@@ -693,20 +707,20 @@ private:
         }
     }
 
-    virtual void expand_version_list(unsigned new_entries) = 0;
-
 protected:
-    std::mutex m_local_mutex;
     util::InterprocessMutex& m_mutex;
-    std::vector<VersionList::ReadCount> m_local_readers;
+    util::CheckedMutex m_local_readers_mutex;
+    std::vector<VersionList::ReadCount> m_local_readers GUARDED_BY(m_local_readers_mutex);
 
-    unsigned int m_local_max_entry = 0;
-    SharedInfo* m_info = nullptr;
+    util::CheckedMutex m_info_mutex;
+    unsigned int m_local_max_entry GUARDED_BY(m_info_mutex) = 0;
+    SharedInfo* m_info GUARDED_BY(m_info_mutex) = nullptr;
 
-    virtual void ensure_reader_mapping(unsigned int required = -1) = 0;
+    virtual void ensure_reader_mapping(unsigned int required = -1) REQUIRES(m_info_mutex) = 0;
+    virtual void expand_version_list(unsigned new_entries) REQUIRES(m_info_mutex) = 0;
 };
 
-class DB::FileVersionManager : public DB::VersionManager {
+class DB::FileVersionManager final : public DB::VersionManager {
 public:
     FileVersionManager(File& file, util::InterprocessMutex& mutex)
         : VersionManager(mutex)
@@ -731,7 +745,7 @@ public:
         }
     }
 
-    void expand_version_list(unsigned new_entries) override
+    void expand_version_list(unsigned new_entries) override REQUIRES(m_info_mutex)
     {
         size_t new_info_size = sizeof(SharedInfo) + m_info->readers.compute_required_space(new_entries);
         m_file.prealloc(new_info_size);                                          // Throws
@@ -740,7 +754,7 @@ public:
     }
 
 private:
-    void ensure_reader_mapping(unsigned int required = -1) override
+    void ensure_reader_mapping(unsigned int required = -1) override REQUIRES(m_info_mutex)
     {
         using _impl::SimulatedFailure;
         SimulatedFailure::trigger(SimulatedFailure::shared_group__grow_reader_mapping); // Throws
@@ -762,7 +776,7 @@ private:
     File::Map<SharedInfo> m_reader_map;
 };
 
-class DB::InMemoryVersionManager : public DB::VersionManager {
+class DB::InMemoryVersionManager final : public DB::VersionManager {
 public:
     InMemoryVersionManager(SharedInfo* info, util::InterprocessMutex& mutex)
         : VersionManager(mutex)
