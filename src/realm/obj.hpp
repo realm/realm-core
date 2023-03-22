@@ -79,8 +79,8 @@ public:
     {
         return 0;
     }
-    ref_type get_collection_ref(Index index) const noexcept override;
-    void set_collection_ref(Index index, ref_type ref) override;
+    ref_type get_collection_ref(Index) const noexcept final;
+    void set_collection_ref(Index index, ref_type) final;
 
     TableRef get_table() const noexcept final
     {

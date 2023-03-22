@@ -1788,11 +1788,84 @@ bool Obj::remove_one_backlink(ColKey backlink_col_key, ObjKey origin_key)
 }
 
 namespace {
+
+struct Helper {
+    Helper(CollectionListPtr l)
+        : list(std::move(l))
+        , index(0)
+        , sz(list->size())
+    {
+    }
+    CollectionListPtr list;
+    size_t index;
+    size_t sz;
+};
+
+std::vector<Helper> init_levels(Obj& obj, ColKey origin_col_key, size_t nesting_levels)
+{
+    std::vector<Helper> levels;
+    levels.reserve(nesting_levels);
+
+    levels.emplace_back(std::move(obj.get_collection_list(origin_col_key)));
+    for (size_t i = 1; i < nesting_levels; i++) {
+        levels.emplace_back(std::move(levels.back().list->get_collection_list(0)));
+    }
+
+    return levels;
+}
+
+bool advance(std::vector<Helper>& levels)
+{
+    levels.pop_back();
+
+    if (levels.empty()) {
+        return false;
+    }
+
+    Helper& current = levels.back();
+    current.index++;
+    if (current.index == current.sz) {
+        if (!advance(levels)) {
+            return false;
+        }
+    }
+    levels.emplace_back(std::move(levels.back().list->get_collection_list(levels.back().index)));
+
+    return true;
+}
+
+template <class T, class U>
+size_t find_link_value_in_collection(T& coll, Obj& obj, ColKey origin_col_key, U link)
+{
+    auto nesting_levels = obj.get_table()->get_nesting_levels(origin_col_key);
+    if (nesting_levels == 0) {
+        coll.set_owner(obj, origin_col_key);
+        return coll.find_first(link);
+    }
+
+    // Iterate through all leaf arrays until link is found
+    std::vector<Helper> levels = init_levels(obj, origin_col_key, nesting_levels);
+
+    bool give_up = false;
+    while (!give_up) {
+        Helper& current = levels.back();
+        for (size_t i = 0; i < current.sz; i++) {
+            coll.set_owner(current.list, current.list->get_index(i));
+            size_t ndx = coll.find_first(link);
+            if (ndx != realm::not_found) {
+                return ndx;
+            }
+        }
+        give_up = !advance(levels);
+    }
+    return realm::not_found;
+}
+
 template <class T>
 inline void nullify_linklist(Obj& obj, ColKey origin_col_key, T target)
 {
-    Lst<T> link_list(obj, origin_col_key);
-    size_t ndx = link_list.find_first(target);
+    Lst<T> link_list(origin_col_key);
+    size_t ndx = find_link_value_in_collection(link_list, obj, origin_col_key, target);
 
     REALM_ASSERT(ndx != realm::npos); // There has to be one
 
@@ -1811,24 +1884,35 @@ inline void nullify_linklist(Obj& obj, ColKey origin_col_key, T target)
     BPlusTree<T>& tree = const_cast<BPlusTree<T>&>(link_list.get_tree());
     tree.erase(ndx);
 }
+
 template <class T>
 inline void nullify_set(Obj& obj, ColKey origin_col_key, T target)
 {
-    Set<T> set(obj, origin_col_key);
-    size_t ndx = set.find_first(target);
+    Set<T> link_set(origin_col_key);
+    size_t ndx = find_link_value_in_collection(link_set, obj, origin_col_key, target);
 
     REALM_ASSERT(ndx != realm::npos); // There has to be one
 
     if (Replication* repl = obj.get_replication()) {
-        repl->set_erase(set, ndx, target); // Throws
+        repl->set_erase(link_set, ndx, target); // Throws
     }
 
     // We cannot just call 'remove' on set as it would produce the wrong
     // replication instruction and also attempt an update on the backlinks from
     // the object that we in the process of removing.
-    BPlusTree<T>& tree = const_cast<BPlusTree<T>&>(set.get_tree());
+    BPlusTree<T>& tree = const_cast<BPlusTree<T>&>(link_set.get_tree());
     tree.erase(ndx);
 }
+
+inline void nullify_dictionary(Obj& obj, ColKey origin_col_key, Mixed target)
+{
+    Dictionary dict(origin_col_key);
+    size_t ndx = find_link_value_in_collection(dict, obj, origin_col_key, target);
+
+    REALM_ASSERT(ndx != realm::npos); // There has to be one
+    dict.nullify(ndx);
+}
+
 } // namespace
 
 template <class ValueType>
@@ -1886,14 +1970,9 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
         {
             nullify_set(m_origin_obj, m_origin_col_key, m_target_link);
         }
-        void on_dictionary(Dictionary& dict) final
+        void on_dictionary(Dictionary&) final
         {
-            Mixed val{m_target_link};
-            for (auto it : dict) {
-                if (it.second == val) {
-                    dict.nullify(it.first);
-                }
-            }
+            nullify_dictionary(m_origin_obj, m_origin_col_key, m_target_link);
         }
         void on_link_property(ColKey origin_col_key) final
         {
@@ -1911,6 +1990,7 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
     private:
         ObjLink m_target_link;
     } nullifier{*this, origin_col_key, target_link};
+
     nullifier.run();
 
     get_alloc().bump_content_version();
