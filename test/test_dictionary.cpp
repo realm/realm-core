@@ -176,10 +176,11 @@ TEST(Dictionary_Links)
         CHECK(dict.insert("Pet", pluto).second);
         CHECK_EQUAL(pluto.get_backlink_count(), 1);
         CHECK_NOT(dict.insert("Pet", lady).second);
+        CHECK(dict.insert("Dog", lady).second); // Have two links pointing to lady
         CHECK_EQUAL(pluto.get_backlink_count(), 0);
-        CHECK_EQUAL(lady.get_backlink_count(*persons, col_dict), 1);
+        CHECK_EQUAL(lady.get_backlink_count(*persons, col_dict), 2);
         CHECK_EQUAL(lady.get_backlink(*persons, col_dict, 0), adam.get_key());
-        CHECK_EQUAL(lady.get_backlink_count(), 1);
+        CHECK_EQUAL(lady.get_backlink_count(), 2);
         CHECK_EQUAL(dict.get("Pet").get<ObjKey>(), lady.get_key());
         lady.remove();
         cmp(dict["Pet"], Mixed());
