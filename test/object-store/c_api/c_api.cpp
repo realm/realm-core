@@ -2533,6 +2533,12 @@ TEST_CASE("C API", "[c_api]") {
                 auto r = cptr_checked(realm_query_find_all(q.get()));
                 CHECK(!realm_is_frozen(r.get()));
 
+                SECTION("realm_results_is_valid") {
+                    bool valid;
+                    CHECK(checked(realm_results_is_valid(r.get(), &valid)));
+                    CHECK(valid);
+                }
+
                 SECTION("realm_results_count()") {
                     size_t count;
                     CHECK(checked(realm_results_count(r.get(), &count)));
