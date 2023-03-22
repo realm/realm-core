@@ -1943,7 +1943,7 @@ std::size_t Service::Descriptor::read_some(char* buffer, std::size_t size, std::
     for (;;) {
         int flags = 0;
 #ifdef _WIN32
-        int ret = ::recv(m_fd, buffer, int(size), flags);
+        ssize_t ret = ::recv(m_fd, buffer, int(size), flags);
         if (ret == SOCKET_ERROR) {
             int err = WSAGetLastError();
             // Retry on interruption by system signal
@@ -2028,7 +2028,7 @@ std::size_t Service::Descriptor::write_some(const char* data, std::size_t size, 
         flags |= MSG_NOSIGNAL;
 #endif
 #ifdef _WIN32
-        int ret = ::send(m_fd, data, int(size), flags);
+        ssize_t ret = ::send(m_fd, data, int(size), flags);
         if (ret == SOCKET_ERROR) {
             int err = WSAGetLastError();
             // Retry on interruption by system signal

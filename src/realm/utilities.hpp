@@ -19,23 +19,30 @@
 #ifndef REALM_UTILITIES_HPP
 #define REALM_UTILITIES_HPP
 
-#include <algorithm>
 #include <cstdint>
-#include <cstdio>
+#include <cstdlib>
 #include <cstdlib> // size_t
-#include <ctime>
+#include <cstdio>
+#include <algorithm>
 #include <functional>
+#include <time.h>
 
 #ifdef _WIN32
 
-#include <BaseTsd.h>
 #include <WinSock2.h>
 #include <intrin.h>
+#include <BaseTsd.h>
+
+#if !defined(_SSIZE_T_) && !defined(_SSIZE_T_DEFINED)
+typedef SSIZE_T ssize_t;
+#define _SSIZE_T_
+#define _SSIZE_T_DEFINED
+#endif
 
 #endif // _WIN32
 
-#include <realm/util/assert.hpp>
 #include <realm/util/features.h>
+#include <realm/util/assert.hpp>
 #include <realm/util/functional.hpp>
 #include <realm/util/safe_int_ops.hpp>
 
@@ -63,11 +70,61 @@
 
 #if defined(REALM_PTR_64) && defined(REALM_X86_OR_X64) && !REALM_WATCHOS
 #define REALM_COMPILER_SSE // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
+#define REALM_COMPILER_AVX
 #endif
 
 namespace realm {
 
 using StringCompareCallback = util::UniqueFunction<bool(const char* string1, const char* string2)>;
+
+extern signed char sse_support;
+extern signed char avx_support;
+
+template <int version>
+REALM_FORCEINLINE bool sseavx()
+{
+    /*
+    Return whether or not SSE 3.0 (if version = 30) or 4.2 (for version = 42) is supported. Return value
+    is based on the CPUID instruction.
+
+    sse_support = -1: No SSE support
+    sse_support = 0: SSE3
+    sse_support = 1: SSE42
+
+    avx_support = -1: No AVX support
+    avx_support = 0: AVX1 supported
+    sse_support = 1: AVX2 supported (not yet implemented for detection in our cpuid_init(), todo)
+
+    This lets us test very rapidly at runtime because we just need 1 compare instruction (with 0) to test both for
+    SSE 3 and 4.2 by caller (compiler optimizes if calls are concecutive), and can decide branch with ja/jl/je because
+    sse_support is signed type. Also, 0 requires no immediate operand. Same for AVX.
+
+    We runtime-initialize sse_support in a constructor of a static variable which is not guaranteed to be called
+    prior to cpu_sse(). So we compile-time initialize sse_support to -2 as fallback.
+    */
+    static_assert(version == 1 || version == 2 || version == 30 || version == 42,
+                  "Only version == 1 (AVX), 2 (AVX2), 30 (SSE 3) and 42 (SSE 4.2) are supported for detection");
+#ifdef REALM_COMPILER_SSE
+    if (version == 30)
+        return (sse_support >= 0);
+    else if (version == 42)
+        return (sse_support > 0); // faster than == 1 (0 requres no immediate operand)
+    else if (version == 1)        // avx
+        return (avx_support >= 0);
+    else if (version == 2) // avx2
+        return (avx_support > 0);
+    else
+        return false;
+#else
+    return false;
+#endif
+}
+
+void cpuid_init();
+void* round_up(void* p, size_t align);
+void* round_down(void* p, size_t align);
+constexpr size_t round_up(size_t p, size_t align);
+constexpr size_t round_down(size_t p, size_t align);
 void millisleep(unsigned long milliseconds);
 
 #ifdef _WIN32
@@ -104,18 +161,18 @@ inline int log2(size_t x)
     if (x == 0)
         return -1;
 #if defined(__GNUC__)
-    if constexpr (sizeof(size_t) == sizeof(unsigned long long)) {
-        return 63 - __builtin_clzll(x); // returns int
-    }
+#ifdef REALM_PTR_64
+    return 63 - __builtin_clzll(x); // returns int
+#else
     return 31 - __builtin_clz(x); // returns int
+#endif
 #elif defined(_WIN32)
     unsigned long index = 0;
-    if constexpr (sizeof(size_t) == sizeof(__int64)) {
-        _BitScanReverse64(&index, static_cast<unsigned __int64>(x)); // outputs unsigned long
-    }
-    else {
-        _BitScanReverse(&index, static_cast<unsigned long>(x)); // outputs unsigned long
-    }
+#ifdef REALM_PTR_64
+    unsigned char c = _BitScanReverse64(&index, x); // outputs unsigned long
+#else
+    unsigned char c = _BitScanReverse(&index, x); // outputs unsigned long
+#endif
     return static_cast<int>(index);
 #else // not __GNUC__ and not _WIN32
     int r = 0;
@@ -133,18 +190,18 @@ inline int ctz(size_t x)
         return sizeof(x) * 8;
 
 #if defined(__GNUC__)
-    if constexpr (sizeof(size_t) == sizeof(unsigned long long)) {
-        return __builtin_ctzll(x); // returns int
-    }
-    return __builtin_ctz(x); // returns int
+#ifdef REALM_PTR_64
+    return __builtin_ctzll(x); // returns int
+#else
+    return __builtin_ctz(x);      // returns int
+#endif
 #elif defined(_WIN32)
     unsigned long index = 0;
-    if constexpr (sizeof(size_t) == sizeof(__int64)) {
-        _BitScanForward64(&index, static_cast<unsigned __int64>(x)); // outputs unsigned long
-    }
-    else {
-        _BitScanForward(&index, static_cast<unsigned long>(x)); // outputs unsigned long
-    }
+#ifdef REALM_PTR_64
+    unsigned char c = _BitScanForward64(&index, x); // outputs unsigned long
+#else
+    unsigned char c = _BitScanForward(&index, x); // outputs unsigned long
+#endif
     return static_cast<int>(index);
 #else // not __GNUC__ and not _WIN32
     int r = 0;
@@ -302,6 +359,22 @@ constexpr inline size_t round_down(size_t p, size_t align)
     size_t r = p;
     return r & (~(align - 1));
 }
+
+
+template <class T>
+struct Wrap {
+    Wrap(const T& v)
+        : m_value(v)
+    {
+    }
+    operator T() const
+    {
+        return m_value;
+    }
+
+private:
+    T m_value;
+};
 
 // PlacementDelete is intended for use with std::unique_ptr when it holds an object allocated with
 // placement new. It simply calls the object's destructor without freeing the memory.
