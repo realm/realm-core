@@ -804,7 +804,6 @@ REALM_FORCEINLINE bool ArrayWithFind::find_sse_intern(__m128i* action_data, __m1
         size_t s = i * sizeof(__m128i) * 8 / no0(width);
 
         while (resmask != 0) {
-
             uint64_t upper = lower_bits<width / 8>() << (no0(width / 8) - 1);
             uint64_t pattern =
                 resmask &
