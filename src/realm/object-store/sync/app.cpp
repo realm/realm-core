@@ -42,9 +42,9 @@ namespace {
 REALM_COLD
 REALM_NOINLINE
 REALM_NORETURN
-void throw_json_error(JSONErrorCode ec, std::string_view message)
+void throw_json_error(ErrorCodes::Error ec, std::string_view message)
 {
-    throw AppError(make_error_code(ec), std::string(message));
+    throw AppError(ec, std::string(message));
 }
 
 template <typename T>
@@ -53,7 +53,7 @@ T as(const Bson& bson)
     if (holds_alternative<T>(bson)) {
         return static_cast<T>(bson);
     }
-    throw_json_error(JSONErrorCode::malformed_json, "?");
+    throw_json_error(ErrorCodes::MalformedJson, "?");
 }
 
 template <typename T>
@@ -63,7 +63,8 @@ T get(const BsonDocument& doc, const std::string& key)
     if (auto it = raw.find(key); it != raw.end()) {
         return as<T>(it->second);
     }
-    throw_json_error(JSONErrorCode::missing_json_key, key);
+    throw_json_error(ErrorCodes::MissingJsonKey, key);
+    return {};
 }
 
 template <typename T>
@@ -74,7 +75,7 @@ void read_field(const BsonDocument& data, const std::string& key, T& value)
         value = as<T>(it->second);
     }
     else {
-        throw_json_error(JSONErrorCode::missing_json_key, key);
+        throw_json_error(ErrorCodes::MissingJsonKey, key);
     }
 }
 
@@ -100,7 +101,7 @@ T parse(std::string_view str)
         return as<T>(bson::parse(str));
     }
     catch (const std::exception& e) {
-        throw_json_error(JSONErrorCode::malformed_json, e.what());
+        throw_json_error(ErrorCodes::MalformedJson, e.what());
     }
 }
 
@@ -234,19 +235,19 @@ App::App(const Config& config)
     REALM_ASSERT(m_config.transport);
 
     if (m_config.device_info.platform.empty()) {
-        throw std::runtime_error("You must specify the Platform in App::Config::device");
+        throw InvalidArgument("You must specify the Platform in App::Config::device");
     }
 
     if (m_config.device_info.platform_version.empty()) {
-        throw std::runtime_error("You must specify the Platform Version in App::Config::device");
+        throw InvalidArgument("You must specify the Platform Version in App::Config::device");
     }
 
     if (m_config.device_info.sdk.empty()) {
-        throw std::runtime_error("You must specify the SDK Name in App::Config::device");
+        throw InvalidArgument("You must specify the SDK Name in App::Config::device");
     }
 
     if (m_config.device_info.sdk_version.empty()) {
-        throw std::runtime_error("You must specify the SDK Version in App::Config::device");
+        throw InvalidArgument("You must specify the SDK Version in App::Config::device");
     }
 
     // change the scheme in the base url to ws from http to satisfy the sync client
@@ -259,19 +260,19 @@ App::~App() {}
 
 void App::configure(const SyncClientConfig& sync_client_config)
 {
+    init_logger();
     auto sync_route = make_sync_route(m_app_route);
     m_sync_manager->configure(shared_from_this(), sync_route, sync_client_config);
     if (auto metadata = m_sync_manager->app_metadata()) {
+        // If there is app metadata stored, then update the hostname/syncroute using that info
         update_hostname(metadata);
     }
 }
 
 inline bool App::init_logger()
 {
-    // If a log function is called before configure(), a null ptr will be
-    // returned by get_logger()
     if (!m_logger_ptr) {
-        m_logger_ptr = m_sync_manager->get_logger();
+        m_logger_ptr = util::Logger::get_default_logger();
     }
     return bool(m_logger_ptr);
 }
@@ -310,7 +311,7 @@ std::string App::make_sync_route(const std::string& http_app_route)
 
 void App::update_hostname(const util::Optional<SyncAppMetadata>& metadata)
 {
-    // Update url components based on new hostname value
+    // Update url components based on new hostname value from the app metadata
     if (metadata) {
         update_hostname(metadata->hostname, metadata->ws_hostname);
     }
@@ -318,7 +319,7 @@ void App::update_hostname(const util::Optional<SyncAppMetadata>& metadata)
 
 void App::update_hostname(const std::string& hostname, const Optional<std::string>& ws_hostname)
 {
-    // Update url components based on new hostname value
+    // Update url components based on new hostname (and optional websocket hostname) values
     log_debug("App: update_hostname: %1 | %2", hostname, ws_hostname);
     REALM_ASSERT(m_sync_manager);
     std::lock_guard<std::mutex> lock(*m_route_mutex);
@@ -627,7 +628,7 @@ void App::log_in_with_credentials(
                 self = shared_from_this()](const Response& response) mutable {
                    if (auto error = AppUtils::check_for_errors(response)) {
                        self->log_error("App: log_in_with_credentials failed: %1 message: %2",
-                                       response.http_status_code, error->message);
+                                       response.http_status_code, error->what());
                        return completion(nullptr, std::move(error));
                    }
 
@@ -709,15 +710,14 @@ bool App::verify_user_present(const std::shared_ptr<SyncUser>& user) const
 std::shared_ptr<SyncUser> App::switch_user(const std::shared_ptr<SyncUser>& user) const
 {
     if (!user || user->state() != SyncUser::State::LoggedIn) {
-        throw AppError(make_client_error_code(ClientErrorCode::user_not_logged_in),
-                       "User is no longer valid or is logged out");
+        throw AppError(ErrorCodes::ClientUserNotLoggedIn, "User is no longer valid or is logged out");
     }
 
     auto users = m_sync_manager->all_users();
     auto it = std::find(users.begin(), users.end(), user);
 
     if (it == users.end()) {
-        throw AppError(make_client_error_code(ClientErrorCode::user_not_found), "User does not exist");
+        throw AppError(ErrorCodes::ClientUserNotFound, "User does not exist");
     }
 
     m_sync_manager->set_current_user(user->identity());
@@ -728,12 +728,10 @@ std::shared_ptr<SyncUser> App::switch_user(const std::shared_ptr<SyncUser>& user
 void App::remove_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void(Optional<AppError>)>&& completion)
 {
     if (!user || user->state() == SyncUser::State::Removed) {
-        return completion(
-            AppError(make_client_error_code(ClientErrorCode::user_not_found), "User has already been removed"));
+        return completion(AppError(ErrorCodes::ClientUserNotFound, "User has already been removed"));
     }
     if (!verify_user_present(user)) {
-        return completion(
-            AppError(make_client_error_code(ClientErrorCode::user_not_found), "No user has been found"));
+        return completion(AppError(ErrorCodes::ClientUserNotFound, "No user has been found"));
     }
 
     if (user->is_logged_in()) {
@@ -752,17 +750,14 @@ void App::remove_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void
 void App::delete_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void(Optional<AppError>)>&& completion)
 {
     if (!user) {
-        return completion(AppError(make_client_error_code(ClientErrorCode::user_not_found),
-                                   "The specified user could not be found."));
+        return completion(AppError(ErrorCodes::ClientUserNotFound, "The specified user could not be found."));
     }
     if (user->state() != SyncUser::State::LoggedIn) {
-        return completion(AppError(make_client_error_code(ClientErrorCode::user_not_logged_in),
-                                   "User must be logged in to be deleted."));
+        return completion(AppError(ErrorCodes::ClientUserNotLoggedIn, "User must be logged in to be deleted."));
     }
 
     if (!verify_user_present(user)) {
-        return completion(
-            AppError(make_client_error_code(ClientErrorCode::user_not_found), "No user has been found."));
+        return completion(AppError(ErrorCodes::ClientUserNotFound, "No user has been found."));
     }
 
     Request req;
@@ -785,16 +780,15 @@ void App::link_user(const std::shared_ptr<SyncUser>& user, const AppCredentials&
                     UniqueFunction<void(const std::shared_ptr<SyncUser>&, Optional<AppError>)>&& completion)
 {
     if (!user) {
-        return completion(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_found),
-                                            "The specified user could not be found."));
+        return completion(nullptr,
+                          AppError(ErrorCodes::ClientUserNotFound, "The specified user could not be found."));
     }
     if (user->state() != SyncUser::State::LoggedIn) {
-        return completion(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_logged_in),
-                                            "The specified user is not logged in."));
+        return completion(nullptr,
+                          AppError(ErrorCodes::ClientUserNotLoggedIn, "The specified user is not logged in."));
     }
     if (!verify_user_present(user)) {
-        return completion(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_found),
-                                            "The specified user was not found."));
+        return completion(nullptr, AppError(ErrorCodes::ClientUserNotFound, "The specified user was not found."));
     }
 
     App::log_in_with_credentials(credentials, user, std::move(completion));
@@ -828,8 +822,8 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
 {
     std::string route;
 
-    if (!new_hostname && m_sync_manager->app_metadata()) {
-        // Skip if the app_metadata has already been initialized and a new hostname is not provided
+    if (!new_hostname && (m_sync_manager->app_metadata() || m_location_updated)) {
+        // Skip if the app_metadata/location data has already been initialized and a new hostname is not provided
         return completion(util::none); // early return
     }
     else {
@@ -855,11 +849,17 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
             auto ws_hostname = get<std::string>(json, "ws_hostname");
             auto deployment_model = get<std::string>(json, "deployment_model");
             auto location = get<std::string>(json, "location");
-            self->m_sync_manager->perform_metadata_update([&](SyncMetadataManager& manager) {
-                manager.set_app_metadata(deployment_model, location, hostname, ws_hostname);
-            });
-
-            self->update_hostname(self->m_sync_manager->app_metadata());
+            if (self->m_sync_manager->perform_metadata_update([&](SyncMetadataManager& manager) {
+                    manager.set_app_metadata(deployment_model, location, hostname, ws_hostname);
+                })) {
+                // Update the hostname and sync route using the new app metadata info
+                self->update_hostname(self->m_sync_manager->app_metadata());
+            }
+            else {
+                // No metadata in use, update the hostname and sync route directly
+                self->update_hostname(hostname, ws_hostname);
+            }
+            self->m_location_updated = true;
         }
         catch (const AppError&) {
             // Pass the response back to completion
@@ -949,7 +949,7 @@ void App::handle_redirect_response(Request&& request, const Response& response,
         // Location not found in the response, pass error response up the chain
         Response error;
         error.http_status_code = response.http_status_code;
-        error.client_error_code = ClientErrorCode::redirect_error;
+        error.client_error_code = ErrorCodes::ClientRedirectError;
         error.body = "Redirect response missing location header";
         return completion(error); // early return
     }
@@ -959,7 +959,7 @@ void App::handle_redirect_response(Request&& request, const Response& response,
         Response error;
         error.http_status_code = response.http_status_code;
         error.custom_status_code = 0;
-        error.client_error_code = ClientErrorCode::too_many_redirects;
+        error.client_error_code = ErrorCodes::ClientTooManyRedirects;
         error.body = util::format("number of redirections exceeded %1", max_http_redirects);
         return completion(error); // early return
     }
@@ -1002,7 +1002,7 @@ void App::handle_auth_failure(const AppError& error, const Response& response, R
                               util::UniqueFunction<void(const Response&)>&& completion)
 {
     // Only handle auth failures
-    if (*error.http_status_code == 401) {
+    if (*error.additional_status_code == 401) {
         if (request.uses_refresh_token) {
             if (sync_user && sync_user->is_logged_in()) {
                 sync_user->log_out();
@@ -1036,13 +1036,12 @@ void App::refresh_access_token(const std::shared_ptr<SyncUser>& sync_user,
                                util::UniqueFunction<void(Optional<AppError>)>&& completion)
 {
     if (!sync_user) {
-        completion(AppError(make_client_error_code(ClientErrorCode::user_not_found), "No current user exists"));
+        completion(AppError(ErrorCodes::ClientUserNotFound, "No current user exists"));
         return;
     }
 
     if (!sync_user->is_logged_in()) {
-        completion(
-            AppError(make_client_error_code(ClientErrorCode::user_not_logged_in), "The user is not logged in"));
+        completion(AppError(ErrorCodes::ClientUserNotLoggedIn, "The user is not logged in"));
         return;
     }
 
@@ -1097,7 +1096,7 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
          completion = std::move(completion)](const Response& response) {
             if (auto error = AppUtils::check_for_errors(response)) {
                 self->log_error("App: call_function: %1 service_name: %2 -> %3 ERROR: %4", name, service_name,
-                                response.http_status_code, error->message);
+                                response.http_status_code, error->what());
                 return completion(nullptr, error);
             }
             completion(&response.body, util::none);
@@ -1135,8 +1134,7 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
                       catch (const std::exception& e) {
                           self->log_error("App: call_function: %1 service_name: %2 - error parsing result: %3", name,
                                           service_name, e.what());
-                          return completion(util::none,
-                                            AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
+                          return completion(util::none, AppError(ErrorCodes::BadBsonParse, e.what()));
                       };
                       completion(std::move(body_as_bson), util::none);
                   });

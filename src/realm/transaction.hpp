@@ -204,6 +204,7 @@ private:
     util::CheckedMutex m_async_mutex;
     std::condition_variable m_async_cv GUARDED_BY(m_async_mutex);
     AsyncState m_async_stage GUARDED_BY(m_async_mutex) = AsyncState::Idle;
+    std::chrono::steady_clock::time_point m_request_time_point;
     bool m_waiting_for_write_lock GUARDED_BY(m_async_mutex) = false;
     bool m_waiting_for_sync GUARDED_BY(m_async_mutex) = false;
 
@@ -336,24 +337,28 @@ template <class O>
 inline void Transaction::advance_read(O* observer, VersionID version_id)
 {
     if (m_transact_stage != DB::transact_Reading)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactionState("Not a read transaction");
 
     // It is an error if the new version precedes the currently bound one.
     if (version_id.version < m_read_lock.m_version)
-        throw LogicError(LogicError::bad_version);
+        throw IllegalOperation("Requesting an older version when advancing");
 
     auto hist = get_history(); // Throws
     if (!hist)
-        throw LogicError(LogicError::no_history);
+        throw IllegalOperation("No transaction log when advancing");
 
+    auto old_version = m_read_lock.m_version;
     internal_advance_read(observer, version_id, *hist, false); // Throws
+    if (db->m_logger) {
+        db->m_logger->log(util::Logger::Level::trace, "Advance read: %1 -> %2", old_version, m_read_lock.m_version);
+    }
 }
 
 template <class O>
 inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
 {
     if (m_transact_stage != DB::transact_Reading)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactionState("Not a read transaction");
 
     if (!holds_write_mutex()) {
         if (nonblocking) {
@@ -363,13 +368,20 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
             }
         }
         else {
+            auto t1 = std::chrono::steady_clock::now();
             acquire_write_lock(); // Throws
+            if (db->m_logger) {
+                auto t2 = std::chrono::steady_clock::now();
+                db->m_logger->log(util::Logger::Level::trace, "Acquired write lock in %1 us",
+                                  std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+            }
         }
     }
+    auto old_version = m_read_lock.m_version;
     try {
         Replication* repl = db->get_replication();
         if (!repl)
-            throw LogicError(LogicError::no_history);
+            throw IllegalOperation("No transaction log when promoting to write");
 
         VersionID version = VersionID(); // Latest
         m_history = repl->_get_history_write();
@@ -393,6 +405,11 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
         throw;
     }
 
+    if (db->m_logger) {
+        db->m_logger->log(util::Logger::Level::trace, "Promote to write: %1 -> %2", old_version,
+                          m_read_lock.m_version);
+    }
+
     set_transact_stage(DB::transact_Writing);
     return true;
 }
@@ -401,11 +418,11 @@ template <class O>
 inline void Transaction::rollback_and_continue_as_read(O* observer)
 {
     if (m_transact_stage != DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactionState("Not a write transaction");
 
     Replication* repl = db->get_replication();
     if (!repl)
-        throw LogicError(LogicError::no_history);
+        throw IllegalOperation("No transaction log when rolling back");
 
     BinaryData uncommitted_changes = repl->get_uncommitted_changes();
 
@@ -437,6 +454,10 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
 
     if (!holds_write_mutex())
         db->end_write_on_correct_thread();
+
+    if (db->m_logger) {
+        db->m_logger->log(util::Logger::Level::trace, "Rollback");
+    }
 
     m_history = nullptr;
     set_transact_stage(DB::transact_Reading);

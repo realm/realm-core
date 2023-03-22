@@ -90,17 +90,17 @@ public:
     constexpr StringData(const char* external_data, size_t data_size) noexcept;
 
     template <class T, class A>
-    StringData(const std::basic_string<char, T, A>&);
+    constexpr StringData(const std::basic_string<char, T, A>&);
 
     template <class T, class A>
     operator std::basic_string<char, T, A>() const;
 
     template <class T, class A>
-    StringData(const util::Optional<std::basic_string<char, T, A>>&);
+    constexpr StringData(const util::Optional<std::basic_string<char, T, A>>&);
 
     constexpr StringData(std::string_view sv);
 
-    constexpr StringData(const null&) noexcept;
+    constexpr StringData(const null&) noexcept {}
 
     /// Initialize from a zero terminated C style string. Pass null to construct
     /// a null reference.
@@ -129,8 +129,8 @@ public:
     /// it is converted to false.
     constexpr bool is_null() const noexcept;
 
-    friend bool operator==(const StringData&, const StringData&) noexcept;
-    friend bool operator!=(const StringData&, const StringData&) noexcept;
+    friend constexpr bool operator==(const StringData&, const StringData&) noexcept;
+    friend constexpr bool operator!=(const StringData&, const StringData&) noexcept;
 
     //@{
     /// Trivial bytewise lexicographical comparison.
@@ -161,8 +161,8 @@ public:
     template <class C, class T>
     friend std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, const StringData&);
 
-    explicit operator bool() const noexcept;
-    explicit operator std::string_view() const noexcept
+    constexpr explicit operator bool() const noexcept;
+    constexpr explicit operator std::string_view() const noexcept
     {
         return std::string_view(m_data, m_size);
     }
@@ -200,7 +200,7 @@ constexpr inline StringData::StringData(std::string_view sv)
 }
 
 template <class T, class A>
-inline StringData::StringData(const std::basic_string<char, T, A>& s)
+constexpr inline StringData::StringData(const std::basic_string<char, T, A>& s)
     : m_data(s.data())
     , m_size(s.size())
 {
@@ -213,17 +213,14 @@ inline StringData::operator std::basic_string<char, T, A>() const
 }
 
 template <class T, class A>
-inline StringData::StringData(const util::Optional<std::basic_string<char, T, A>>& s)
+constexpr inline StringData::StringData(const util::Optional<std::basic_string<char, T, A>>& s)
     : m_data(s ? s->data() : nullptr)
     , m_size(s ? s->size() : 0)
 {
 }
 
-constexpr inline StringData::StringData(const null&) noexcept {}
-
 constexpr inline StringData::StringData(const char* c_str) noexcept
     : m_data(c_str)
-    , m_size(0)
 {
     if (c_str)
         m_size = std::char_traits<char>::length(c_str);
@@ -249,12 +246,12 @@ constexpr inline bool StringData::is_null() const noexcept
     return !m_data;
 }
 
-inline bool operator==(const StringData& a, const StringData& b) noexcept
+constexpr inline bool operator==(const StringData& a, const StringData& b) noexcept
 {
     return a.m_size == b.m_size && a.is_null() == b.is_null() && safe_equal(a.m_data, a.m_data + a.m_size, b.m_data);
 }
 
-inline bool operator!=(const StringData& a, const StringData& b) noexcept
+constexpr inline bool operator!=(const StringData& a, const StringData& b) noexcept
 {
     return !(a == b);
 }
@@ -385,7 +382,7 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const
     return out;
 }
 
-inline StringData::operator bool() const noexcept
+constexpr inline StringData::operator bool() const noexcept
 {
     return !is_null();
 }

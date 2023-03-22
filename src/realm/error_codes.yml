@@ -1,0 +1,48 @@
+error_categories:
+  - generic_error
+  - logic_error
+  - runtime_error
+  - invalid_argument
+
+error_codes:
+  - { code: 0, name: OK }
+  - { code: 1, name: UnknownError, categories: [ generic_error ] }
+  - { code: 2, name: RuntimeError, categories: [ generic_error ] }
+  - { code: 3, name: LogicError, categories: [ generic_error ] }
+  - { code: 4, name: BrokenPromise }
+  - { code: 5, name: InvalidArgument, categories: [ generic_error ] }
+  - { code: 6, name: OutOfMemory }
+  - { code: 7, name: NoSuchTable }
+  - { code: 8, name: CrossTableLinkTarget }
+  - { code: 9, name: UnsupportedFileFormatVersion }
+  - { code: 10, name: MultipleSyncAgents }
+  - { code: 11, name: AddressSpaceExhausted }
+  - { code: 12, name: OutOfDiskSpace, categories: [ runtime_error ] }
+  - { code: 13, name: KeyNotFound }
+  - { code: 14, name: OutOfBounds }
+  - { code: 15, name: IllegalOperation }
+  - { code: 16, name: KeyAlreadyUsed }
+  - { code: 17, name: SerializationError, categories: [ logic_error ] }
+  - { code: 18, name: InvalidPath, categories: [ invalid_argument ] }
+  - { code: 19, name: DuplicatePrimaryKeyValue }
+  - { code: 20, name: SyntaxError, categories: [ logic_error ] }
+  - { code: 21, name: InvalidQueryArg, categories: [ invalid_argument ] }
+  - { code: 22, name: InvalidQuery, categories: [ runtime_error ] }
+  - { code: 23, name: NotInATransaction }
+  - { code: 24, name: WrongThread }
+  - { code: 25, name: InvalidatedObject }
+  - { code: 26, name: InvalidProperty }
+  - { code: 27, name: MissingPrimaryKey }
+  - { code: 28, name: UnexpectedPrimaryKey }
+  - { code: 29, name: WrongPrimaryKeyType }
+  - { code: 30, name: ModifyPrimaryKey }
+  - { code: 31, name: ReadOnlyProperty }
+  - { code: 32, name: PropertyNotNullable }
+  - { code: 33, name: MaximumFileSizeExceeded }
+  - { code: 34, name: TableNameInUse }
+  - { code: 35, name: InvalidTableRef }
+  - { code: 36, name: BadChangeset }
+  - { code: 37, name: InvalidDictionaryKey }
+  - { code: 38, name: InvalidDictionaryValue }
+
+

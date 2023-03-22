@@ -6,6 +6,9 @@
 #include <realm/list.hpp>
 #include <realm/table_view.hpp>
 
+#include <realm/object_converter.hpp>
+#include <realm/sync/noinst/client_reset.hpp>
+
 #include "test.hpp"
 #include "sync_fixtures.hpp"
 #include "util/semaphore.hpp"
@@ -18,7 +21,48 @@ using namespace realm::fixtures;
 
 namespace {
 
-using ErrorInfo = Session::ErrorInfo;
+using ErrorInfo = SessionErrorInfo;
+
+TEST(ClientReset_TransferGroupWithDanglingLinks)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    auto setup_realm = [](auto& path) {
+        DBRef sg = DB::create(make_client_replication(), path);
+
+        auto wt = sg->start_write();
+
+        // The ordering of creating the tables matters here. The bug this test is verifying depends
+        // on tablekeys being created such that the table that links come from is transferred before
+        // the table that links are linking to.
+        auto table = wt->add_table_with_primary_key("class_table", type_String, "_id");
+        auto target = wt->add_table_with_primary_key("class_target", type_Int, "_id");
+        table->add_column_list(*target, "list");
+        auto obj = table->create_object_with_primary_key(Mixed{"the_object"});
+        auto lst = obj.get_linklist("list");
+        for (int64_t i = 0; i < 10; ++i) {
+            target->create_object_with_primary_key(i);
+            lst.add(target->create_object_with_primary_key(i).get_key());
+        }
+        wt->commit();
+
+        return sg;
+    };
+
+    auto sg_1 = setup_realm(path_1);
+    auto sg_2 = setup_realm(path_2);
+
+    auto rt = sg_1->start_read();
+    auto wt = sg_2->start_write();
+
+    auto target_2 = wt->get_table("class_target");
+    auto obj = target_2->get_object_with_primary_key(Mixed{5});
+    obj.invalidate();
+
+    wt->commit_and_continue_writing();
+    _impl::client_reset::transfer_group(*rt, *wt, *test_context.logger);
+}
 
 TEST(ClientReset_NoLocalChanges)
 {
@@ -76,8 +120,8 @@ TEST(ClientReset_NoLocalChanges)
         session.nonsync_transact_notify(wt.commit());
         session.wait_for_upload_complete_or_client_stopped();
 
-        Session session_2 = fixture.make_session(path_2);
-        fixture.bind_session(session_2, server_path);
+        Session session_2 = fixture.make_session(path_2, server_path);
+        session_2.bind();
         session_2.wait_for_download_complete_or_client_stopped();
     }
 
@@ -112,17 +156,17 @@ TEST(ClientReset_NoLocalChanges)
                 bowl.add_stone();
             };
 
-            Session session = fixture.make_session(path_2);
+            Session session = fixture.make_session(path_2, server_path);
             session.set_connection_state_change_listener(listener);
-            fixture.bind_session(session, server_path);
+            session.bind();
             bowl.get_stone();
         }
 
         // get a fresh copy from the server to reset against
         SHARED_GROUP_TEST_PATH(path_fresh);
         {
-            Session session_fresh = fixture.make_session(path_fresh);
-            fixture.bind_session(session_fresh, server_path);
+            Session session_fresh = fixture.make_session(path_fresh, server_path);
+            session_fresh.bind();
             session_fresh.wait_for_download_complete_or_client_stopped();
         }
         DBRef sg_fresh = DB::create(make_client_replication(), path_fresh);
@@ -153,9 +197,9 @@ TEST(ClientReset_NoLocalChanges)
                 client_reset_config.fresh_copy = std::move(sg_fresh);
                 session_config.client_reset_config = std::move(client_reset_config);
             }
-            Session session = fixture.make_session(sg, std::move(session_config));
+            Session session = fixture.make_session(sg, server_path, std::move(session_config));
             session.set_sync_transact_callback(std::move(sync_transact_callback));
-            fixture.bind_session(session, server_path);
+            session.bind();
             session.wait_for_download_complete_or_client_stopped();
             CHECK(sync_transact_callback_called);
         }
@@ -185,8 +229,8 @@ TEST(ClientReset_InitialLocalChanges)
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    Session session_1 = fixture.make_session(path_1);
-    fixture.bind_session(session_1, server_path);
+    Session session_1 = fixture.make_session(path_1, server_path);
+    session_1.bind();
 
     // First we make a changeset and upload it
     {
@@ -212,8 +256,8 @@ TEST(ClientReset_InitialLocalChanges)
     // get a fresh copy from the server to reset against
     SHARED_GROUP_TEST_PATH(path_fresh);
     {
-        Session session_fresh = fixture.make_session(path_fresh);
-        fixture.bind_session(session_fresh, server_path);
+        Session session_fresh = fixture.make_session(path_fresh, server_path);
+        session_fresh.bind();
         session_fresh.wait_for_download_complete_or_client_stopped();
     }
     DBRef sg_fresh = DB::create(make_client_replication(), path_fresh);
@@ -226,8 +270,8 @@ TEST(ClientReset_InitialLocalChanges)
         client_reset_config.fresh_copy = std::move(sg_fresh);
         session_config_2.client_reset_config = std::move(client_reset_config);
     }
-    Session session_2 = fixture.make_session(path_2, std::move(session_config_2));
-    fixture.bind_session(session_2, server_path);
+    Session session_2 = fixture.make_session(path_2, server_path, std::move(session_config_2));
+    session_2.bind();
     session_2.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
 
@@ -303,8 +347,8 @@ TEST_TYPES(ClientReset_LocalChangesWhenOffline, std::true_type, std::false_type)
     {
         // Download a new Realm. The state is empty.
         Session::Config session_config_1;
-        Session session_1 = fixture.make_session(sg, std::move(session_config_1));
-        fixture.bind_session(session_1, server_path);
+        Session session_1 = fixture.make_session(sg, server_path, std::move(session_config_1));
+        session_1.bind();
         session_1.wait_for_download_complete_or_client_stopped();
 
         WriteTransaction wt{sg};
@@ -316,8 +360,8 @@ TEST_TYPES(ClientReset_LocalChangesWhenOffline, std::true_type, std::false_type)
     }
 
     DBRef sg_2 = DB::create(make_client_replication(), path_2);
-    Session session_2 = fixture.make_session(sg_2);
-    fixture.bind_session(session_2, server_path);
+    Session session_2 = fixture.make_session(sg_2, server_path);
+    session_2.bind();
     session_2.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
 
@@ -341,8 +385,8 @@ TEST_TYPES(ClientReset_LocalChangesWhenOffline, std::true_type, std::false_type)
     // get a fresh copy from the server to reset against
     SHARED_GROUP_TEST_PATH(path_fresh1);
     {
-        Session session4 = fixture.make_session(path_fresh1);
-        fixture.bind_session(session4, server_path);
+        Session session4 = fixture.make_session(path_fresh1, server_path);
+        session4.bind();
         session4.wait_for_download_complete_or_client_stopped();
     }
     DBRef sg_fresh1 = DB::create(make_client_replication(), path_fresh1);
@@ -351,8 +395,8 @@ TEST_TYPES(ClientReset_LocalChangesWhenOffline, std::true_type, std::false_type)
     session_config_3.client_reset_config = Session::Config::ClientReset{};
     session_config_3.client_reset_config->mode = recover ? ClientResyncMode::Recover : ClientResyncMode::DiscardLocal;
     session_config_3.client_reset_config->fresh_copy = std::move(sg_fresh1);
-    Session session_3 = fixture.make_session(sg, std::move(session_config_3));
-    fixture.bind_session(session_3, server_path);
+    Session session_3 = fixture.make_session(sg, server_path, std::move(session_config_3));
+    session_3.bind();
     session_3.wait_for_upload_complete_or_client_stopped();
     session_3.wait_for_download_complete_or_client_stopped();
 
@@ -442,10 +486,10 @@ TEST(ClientReset_ThreeClients)
             wt.commit();
         }
 
-        Session session_1 = fixture.make_session(path_1);
-        fixture.bind_session(session_1, server_path);
-        Session session_2 = fixture.make_session(path_2);
-        fixture.bind_session(session_2, server_path);
+        Session session_1 = fixture.make_session(path_1, server_path);
+        session_1.bind();
+        Session session_2 = fixture.make_session(path_2, server_path);
+        session_2.bind();
 
         session_1.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_upload_complete_or_client_stopped();
@@ -561,12 +605,12 @@ TEST(ClientReset_ThreeClients)
                 bowl.add_stone();
             };
 
-            Session session_1 = fixture.make_session(path_1);
+            Session session_1 = fixture.make_session(path_1, server_path);
             session_1.set_connection_state_change_listener(listener);
-            fixture.bind_session(session_1, server_path);
-            Session session_2 = fixture.make_session(path_2);
+            session_1.bind();
+            Session session_2 = fixture.make_session(path_2, server_path);
             session_2.set_connection_state_change_listener(listener);
-            fixture.bind_session(session_2, server_path);
+            session_2.bind();
             bowl.get_stone();
             bowl.get_stone();
         }
@@ -575,15 +619,15 @@ TEST(ClientReset_ThreeClients)
         SHARED_GROUP_TEST_PATH(path_fresh1);
         SHARED_GROUP_TEST_PATH(path_fresh2);
         {
-            Session session4 = fixture.make_session(path_fresh1);
-            fixture.bind_session(session4, server_path);
+            Session session4 = fixture.make_session(path_fresh1, server_path);
+            session4.bind();
             session4.wait_for_download_complete_or_client_stopped();
         }
         DBRef sg_fresh1 = DB::create(make_client_replication(), path_fresh1);
 
         {
-            Session session4 = fixture.make_session(path_fresh2);
-            fixture.bind_session(session4, server_path);
+            Session session4 = fixture.make_session(path_fresh2, server_path);
+            session4.bind();
             session4.wait_for_download_complete_or_client_stopped();
         }
         DBRef sg_fresh2 = DB::create(make_client_replication(), path_fresh2);
@@ -604,10 +648,10 @@ TEST(ClientReset_ThreeClients)
                 client_reset_config.fresh_copy = std::move(sg_fresh2);
                 session_config_2.client_reset_config = std::move(client_reset_config);
             }
-            Session session_1 = fixture.make_session(path_1, std::move(session_config_1));
-            fixture.bind_session(session_1, server_path);
-            Session session_2 = fixture.make_session(path_2, std::move(session_config_2));
-            fixture.bind_session(session_2, server_path);
+            Session session_1 = fixture.make_session(path_1, server_path, std::move(session_config_1));
+            session_1.bind();
+            Session session_2 = fixture.make_session(path_2, server_path, std::move(session_config_2));
+            session_2.bind();
 
             session_1.wait_for_download_complete_or_client_stopped();
             session_2.wait_for_download_complete_or_client_stopped();
@@ -632,10 +676,10 @@ TEST(ClientReset_ThreeClients)
         }
 
         // Upload and download complete the clients.
-        Session session_1 = fixture.make_session(path_1);
-        fixture.bind_session(session_1, server_path);
-        Session session_2 = fixture.make_session(path_2);
-        fixture.bind_session(session_2, server_path);
+        Session session_1 = fixture.make_session(path_1, server_path);
+        session_1.bind();
+        Session session_2 = fixture.make_session(path_2, server_path);
+        session_2.bind();
 
         session_1.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_upload_complete_or_client_stopped();
@@ -647,8 +691,8 @@ TEST(ClientReset_ThreeClients)
         // A third client downloads the state
         {
             Session::Config session_config;
-            Session session = fixture.make_session(path_3, std::move(session_config));
-            fixture.bind_session(session, server_path);
+            Session session = fixture.make_session(path_3, server_path, std::move(session_config));
+            session.bind();
             session.wait_for_download_complete_or_client_stopped();
         }
     }
@@ -706,8 +750,8 @@ TEST(ClientReset_DoNotRecoverSchema)
     // get a fresh copy from the server to reset against
     SHARED_GROUP_TEST_PATH(path_fresh1);
     {
-        Session session_fresh = fixture.make_session(path_fresh1);
-        fixture.bind_session(session_fresh, server_path_2);
+        Session session_fresh = fixture.make_session(path_fresh1, server_path_2);
+        session_fresh.bind();
         session_fresh.wait_for_download_complete_or_client_stopped();
     }
     DBRef sg_fresh1 = DB::create(make_client_replication(), path_fresh1);
@@ -723,7 +767,7 @@ TEST(ClientReset_DoNotRecoverSchema)
             client_reset_config.fresh_copy = std::move(sg_fresh1);
             session_config.client_reset_config = std::move(client_reset_config);
         }
-        Session session = fixture.make_session(path_1, std::move(session_config));
+        Session session = fixture.make_session(path_1, server_path_2, std::move(session_config));
         BowlOfStonesSemaphore bowl;
         session.set_connection_state_change_listener(
             [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
@@ -734,7 +778,7 @@ TEST(ClientReset_DoNotRecoverSchema)
                 CHECK_EQUAL(ec, sync::Client::Error::auto_client_reset_failure);
                 bowl.add_stone();
             });
-        fixture.bind_session(session, server_path_2);
+        session.bind();
         bowl.get_stone();
     }
 
@@ -797,8 +841,8 @@ TEST(ClientReset_PinnedVersion)
         // get a fresh copy from the server to reset against
         SHARED_GROUP_TEST_PATH(path_fresh);
         {
-            Session session_fresh = fixture.make_session(path_fresh);
-            fixture.bind_session(session_fresh, server_path_1);
+            Session session_fresh = fixture.make_session(path_fresh, server_path_1);
+            session_fresh.bind();
             session_fresh.wait_for_download_complete_or_client_stopped();
         }
         DBRef sg_fresh = DB::create(make_client_replication(), path_fresh);

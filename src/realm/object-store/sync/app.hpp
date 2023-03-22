@@ -386,6 +386,7 @@ private:
     std::string m_app_route;
     std::string m_auth_route;
     uint64_t m_request_timeout_ms;
+    bool m_location_updated = false;
     std::shared_ptr<SyncManager> m_sync_manager;
     std::shared_ptr<util::Logger> m_logger_ptr;
 

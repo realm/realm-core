@@ -69,9 +69,7 @@ public:
     T get(size_t ndx) const
     {
         const auto current_size = size();
-        if (ndx >= current_size) {
-            throw std::out_of_range("Index out of range");
-        }
+        CollectionBase::validate_index("get()", ndx, current_size);
         return m_tree->get(ndx);
     }
 
@@ -514,7 +512,7 @@ inline Set<T>::Set(const Obj& obj, ColKey col_key)
     : Base(obj, col_key)
 {
     if (!col_key.is_set()) {
-        throw LogicError(LogicError::collection_type_mismatch);
+        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a set");
     }
 
     check_column_type<value_type>(m_col_key);
@@ -641,7 +639,8 @@ std::pair<size_t, bool> Set<T>::insert(T value)
     update_if_needed();
 
     if (value_is_null(value) && !m_nullable)
-        throw LogicError(LogicError::column_not_nullable);
+        throw InvalidArgument(ErrorCodes::PropertyNotNullable,
+                              util::format("Set: %1", CollectionBase::get_property_name()));
 
     ensure_created();
     auto it = find_impl(value);
@@ -1053,7 +1052,8 @@ inline ObjKey LnkSet::get(size_t ndx) const
 {
     const auto current_size = size();
     if (ndx >= current_size) {
-        throw std::out_of_range("Index out of range");
+        throw OutOfBounds(util::format("Invalid index into set: %1", CollectionBase::get_property_name()), ndx,
+                          current_size);
     }
     return m_set.m_tree->get(virtual2real(ndx));
 }

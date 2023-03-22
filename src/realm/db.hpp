@@ -45,9 +45,19 @@ using TransactionRef = std::shared_ptr<Transaction>;
 
 /// Thrown by DB::create() if the lock file is already open in another
 /// process which can't share mutexes with this process
-struct IncompatibleLockFile : std::runtime_error {
-    IncompatibleLockFile(const std::string& msg)
-        : std::runtime_error("Incompatible lock file. " + msg)
+struct IncompatibleLockFile : FileAccessError {
+    IncompatibleLockFile(const std::string& path, const std::string& msg)
+        : FileAccessError(
+              ErrorCodes::IncompatibleLockFile,
+              util::format(
+                  "Realm file '%1' is currently open in another process which cannot share access with this process. "
+                  "This could either be due to the existing process being a different architecture or due to the "
+                  "existing process using an incompatible version of Realm. "
+                  "If the other process is Realm Studio, you may need to update it (or update Realm if your Studio "
+                  "version is too new), and if using an iOS simulator, make sure that you are using a 64-bit "
+                  "simulator. Underlying problem: %2",
+                  path, msg),
+              path)
     {
     }
 };
@@ -61,9 +71,10 @@ struct IncompatibleLockFile : std::runtime_error {
 /// This exception will also be thrown if the history schema version is lower
 /// than required, and no migration is possible
 /// (Replication::is_upgradable_history_schema()).
-struct IncompatibleHistories : util::File::AccessError {
+struct IncompatibleHistories : FileAccessError {
     IncompatibleHistories(const std::string& msg, const std::string& path)
-        : util::File::AccessError("Incompatible histories. " + msg, path)
+        : FileAccessError(ErrorCodes::IncompatibleHistories,
+                          msg + " Synchronized Realms cannot be opened in non-sync mode, and vice versa.", path)
     {
     }
 };
@@ -76,9 +87,9 @@ struct IncompatibleHistories : util::File::AccessError {
 /// for read or write operations.
 /// It will also be thrown if a realm which requires upgrade is opened in read-only
 /// mode (Group::open).
-struct FileFormatUpgradeRequired : util::File::AccessError {
-    FileFormatUpgradeRequired(const std::string& msg, const std::string& path)
-        : util::File::AccessError(msg, path)
+struct FileFormatUpgradeRequired : FileAccessError {
+    FileFormatUpgradeRequired(const std::string& path)
+        : FileAccessError(ErrorCodes::FileFormatUpgradeRequired, "Database upgrade required but prohibited.", path, 0)
     {
     }
 };
@@ -119,6 +130,7 @@ public:
     static DBRef create(std::unique_ptr<Replication> repl, const std::string& file,
                         const DBOptions& options = DBOptions());
     static DBRef create(BinaryData, bool take_ownership = true);
+    static DBRef create(std::unique_ptr<Replication> repl, const DBOptions& options = DBOptions());
 
     ~DB() noexcept;
 
@@ -161,6 +173,8 @@ public:
     {
         m_replication = repl;
     }
+
+    void set_logger(const std::shared_ptr<util::Logger>& logger) noexcept;
 
     void create_new_history(Replication& repl) REQUIRES(!m_mutex);
     void create_new_history(std::unique_ptr<Replication> repl) REQUIRES(!m_mutex);
@@ -425,6 +439,8 @@ protected:
 private:
     class AsyncCommitHelper;
     class VersionManager;
+    class FileVersionManager;
+    class InMemoryVersionManager;
     struct SharedInfo;
     struct ReadCount;
     struct ReadLockInfo {
@@ -440,6 +456,7 @@ private:
             auto res = std::make_unique<ReadLockInfo>();
             res->m_top_ref = top_ref;
             res->m_file_size = file_size;
+            res->m_version = 1;
             return res;
         }
         void check() const noexcept
@@ -464,9 +481,12 @@ private:
     std::vector<ReadLockInfo> m_local_locks_held GUARDED_BY(m_mutex); // tracks all read locks held by this DB
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer
+    std::unique_ptr<SharedInfo> m_in_memory_info;
+    SharedInfo* m_info = nullptr;
     bool m_wait_for_change_enabled = true;  // Initially wait_for_change is enabled
     bool m_write_transaction_open GUARDED_BY(m_mutex) = false;
     std::string m_db_path;
+    size_t m_path_hash = 0;
     int m_file_format_version = 0;
     util::InterprocessMutex m_writemutex;
     std::unique_ptr<ReadLockInfo> m_fake_read_lock_if_immutable;
@@ -477,6 +497,7 @@ private:
     std::function<void(int, int)> m_upgrade_callback;
     std::shared_ptr<metrics::Metrics> m_metrics;
     std::unique_ptr<AsyncCommitHelper> m_commit_helper;
+    std::shared_ptr<util::Logger> m_logger;
     bool m_is_sync_agent = false;
 
     /// Attach this DB instance to the specified database file.
@@ -499,9 +520,9 @@ private:
     /// \param options See DBOptions for details of each option.
     /// Sensible defaults are provided if this parameter is left out.
     ///
-    /// \throw util::File::AccessError If the file could not be opened. If the
+    /// \throw FileAccessError If the file could not be opened. If the
     /// reason corresponds to one of the exception types that are derived from
-    /// util::File::AccessError, the derived exception type is thrown. Note that
+    /// FileAccessError, the derived exception type is thrown. Note that
     /// InvalidDatabase is among these derived exception types.
     ///
     /// \throw FileFormatUpgradeRequired if \a DBOptions::allow_upgrade
@@ -515,6 +536,7 @@ private:
         REQUIRES(!m_mutex);
     void open(BinaryData, bool take_ownership = true) REQUIRES(!m_mutex);
     void open(Replication&, const std::string& file, const DBOptions& options = DBOptions()) REQUIRES(!m_mutex);
+    void open(Replication& repl, const DBOptions options = DBOptions()) REQUIRES(!m_mutex);
 
     void do_open(const std::string& file, bool no_create, const DBOptions& options);
 
@@ -618,12 +640,17 @@ private:
 
 // Implementation:
 
-struct DB::BadVersion : std::exception {
+struct DB::BadVersion : Exception {
+    BadVersion(version_type version)
+        : Exception(ErrorCodes::BadVersion,
+                    util::format("Unable to lock version %1 as it does not exist or has been cleaned up.", version))
+    {
+    }
 };
 
 inline bool DB::is_attached() const noexcept
 {
-    return bool(m_fake_read_lock_if_immutable) || m_file_map.is_attached();
+    return bool(m_fake_read_lock_if_immutable) || m_info;
 }
 
 class DB::ReadLockGuard {
