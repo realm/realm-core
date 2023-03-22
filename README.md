@@ -8,7 +8,7 @@ This repository holds the source code for the core database component used by al
 * [Realm Dart/Flutter](https://github.com/realm/realm-dart)
 * [Realm Java](https://github.com/realm/realm-java)
 * [Realm Kotlin](https://github.com/realm/realm-kotlin)
-* [Realm Objective-C/Swift](https://github.com/realm/realm-cocoa)
+* [Realm Swift/Objective-C](https://github.com/realm/realm-swift)
 * [Realm .NET](https://github.com/realm/realm-dotnet)
 * [Realm Node.js/React Native/Web](https://github.com/realm/realm-js)
 
