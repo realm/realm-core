@@ -17,8 +17,6 @@ realm_refresh_callback_token::~realm_refresh_callback_token()
     realm::c_api::CBindingContext::get(*m_realm).realm_pending_refresh_callbacks().remove(m_token);
 }
 
-const realm_free_userdata_func_t CBindingThreadObserver::m_default_free_userdata = [](realm_userdata_t) {};
-
 namespace realm::c_api {
 
 
