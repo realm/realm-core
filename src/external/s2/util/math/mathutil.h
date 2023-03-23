@@ -431,7 +431,7 @@ class MathUtil {
 
   // Return Not a Number.
   // Consider instead using MathLimits<double>::kNaN directly.
-  static double NaN() { return MathLimits<double>::kNaN; }
+  static double NaN();
 
   // the sine cardinal function
   static double Sinc(double x) {

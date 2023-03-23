@@ -305,6 +305,7 @@ add_library(Storage STATIC
     ${REALM_NOINST_HEADERS}
     ${REALM_OBJECT_FILES}
     $<TARGET_OBJECTS:Bid>
+    $<TARGET_OBJECTS:s2geometry>
 )
 add_library(Realm::Storage ALIAS Storage)
 
@@ -330,6 +331,12 @@ target_include_directories(Storage INTERFACE
     $<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/src>
     $<BUILD_INTERFACE:${RealmCore_BINARY_DIR}/src>
     $<INSTALL_INTERFACE:include>
+)
+
+set_source_files_properties(geospatial.cpp PROPERTIES
+    INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/src/external"
+    # the only flag not supported with pragma diagnostic disable in src file by gcc until 13.
+    COMPILE_FLAGS "$<$<CXX_COMPILER_ID:GNU>: -Wno-unknown-pragmas>"
 )
 
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")

@@ -387,8 +387,15 @@ let package = Package(
             publicHeadersPath: "."
         ),
         .target(
+            name: "s2geometry",
+            path: "src/external/s2",
+            publicHeadersPath: ".",
+            cxxSettings: ([
+                .headerSearchPath(".."),
+            ] + cxxSettings) as [CXXSetting]),
+        .target(
             name: "RealmCore",
-            dependencies: ["Bid"],
+            dependencies: ["Bid", "s2geometry"],
             path: "src",
             exclude: ([
                 "CMakeLists.txt",
@@ -410,7 +417,9 @@ let package = Package(
                 "win32",
             ] + syncExcludes + syncServerSources) as [String],
             publicHeadersPath: ".",
-            cxxSettings: cxxSettings,
+            cxxSettings: ([
+                .headerSearchPath("external"),
+            ] + cxxSettings) as [CXXSetting],
             linkerSettings: [
                 .linkedLibrary("compression"),
                 .linkedLibrary("z"),

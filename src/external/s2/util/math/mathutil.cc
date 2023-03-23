@@ -8,7 +8,6 @@
 #endif
 
 #include "util/math/mathlimits.h"
-#include "util/math/mathlimits.cc"
 #include "util/math/mathutil.h"
 #include <vector>
 using std::vector;
@@ -193,6 +192,8 @@ void MathUtil::ShardsToRead(const vector<bool>& shards_to_write,
     }
   }
 }
+
+double MathUtil::NaN() { return MathLimits<double>::kNaN; }
 
 double MathUtil::Harmonic(int64 const n, double *const e) {
   CHECK_GT(n, 0);
