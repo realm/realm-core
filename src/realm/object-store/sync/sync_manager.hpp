@@ -75,6 +75,9 @@ struct SyncClientConfig {
     MetadataMode metadata_mode = MetadataMode::Encryption;
     util::Optional<std::vector<char>> custom_encryption_key;
 
+    using LoggerFactory = std::function<std::shared_ptr<util::Logger>(util::Logger::Level)>;
+    LoggerFactory logger_factory;
+    util::Logger::Level log_level = util::Logger::Level::info;
     ReconnectMode reconnect_mode = ReconnectMode::normal; // For internal sync-client testing only!
     bool multiplex_sessions = false;
 
@@ -121,6 +124,13 @@ public:
     // Destroys the sync manager, terminates all sessions created by it, and stops its SyncClient.
     ~SyncManager();
 
+    // Sets the log level for the Sync Client.
+    // The log level can only be set up until the point the Sync Client is
+    // created (when the first Session is created) or an App operation is
+    // performed (e.g. log in).
+    void set_log_level(util::Logger::Level) noexcept REQUIRES(!m_mutex);
+    void set_logger_factory(SyncClientConfig::LoggerFactory) REQUIRES(!m_mutex);
+
     // Sets the application level user agent string.
     // This should have the format specified here:
     // https://github.com/realm/realm-sync/blob/develop/src/realm/sync/client.hpp#L126 The user agent can only be set
@@ -140,6 +150,7 @@ public:
     /// on a per-session basis.
     void reconnect() const REQUIRES(!m_session_mutex);
 
+    util::Logger::Level log_level() const noexcept REQUIRES(!m_mutex);
 
     std::vector<std::shared_ptr<SyncSession>> get_all_sessions() const REQUIRES(!m_session_mutex);
     std::shared_ptr<SyncSession> get_session(std::shared_ptr<DB> db, const RealmConfig& config)
