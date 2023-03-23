@@ -32,6 +32,9 @@
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_templated.hpp>
+
 // disable the tests that rely on having baas available on the network
 // but allow opt-in by building with REALM_ENABLE_AUTH_TESTS=1
 #ifndef REALM_ENABLE_AUTH_TESTS
@@ -50,6 +53,24 @@ void timed_wait_for(util::FunctionRef<bool()> condition,
 void timed_sleeping_wait_for(util::FunctionRef<bool()> condition,
                              std::chrono::milliseconds max_ms = std::chrono::seconds(30),
                              std::chrono::milliseconds sleep_ms = std::chrono::milliseconds(1));
+
+class ReturnsTrueWithinTimeLimit : public Catch::Matchers::MatcherGenericBase {
+public:
+    ReturnsTrueWithinTimeLimit(std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000))
+        : m_max_ms(max_ms)
+    {
+    }
+
+    bool match(util::FunctionRef<bool()> condition) const;
+
+    std::string describe() const override
+    {
+        return util::format("PredicateReturnsTrueAfter %1ms", m_max_ms.count());
+    }
+
+private:
+    std::chrono::milliseconds m_max_ms;
+};
 
 template <typename T>
 struct TimedFutureState : public util::AtomicRefCountBase {

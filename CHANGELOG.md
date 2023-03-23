@@ -2,10 +2,10 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Expose `Results::is_valid()` in the C API, in order to prevent to use an invalid Results. (PR [#6407](https://github.com/realm/realm-core/pull/6407))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* `SyncSession::pause()` could hold a reference to the database open after shutting down the sync session, preventing users from being able to delete the realm. ([#6372](https://github.com/realm/realm-core/issues/6372), since v13.3.0)
 * `Logger::set_default_logger()` did not perform any locking, resulting in data races if it was called while the default logger was being read on another thread ([PR #6398](https://github.com/realm/realm-core/pull/6398), since v13.7.0).
 
 ### Breaking changes
@@ -18,6 +18,8 @@
 
 ### Internals
 * Add admin api and test for performing the PBS->FLX migration and roll back on the server. (PR [#6366](https://github.com/realm/realm-core/pull/6366))
+* Integrate protocol support for PBS->FLX client migration ([PR #6355](https://github.com/realm/realm-core/pull/6355))
+* `SyncManager::reset_for_testing()` could race with SyncSession's being torn down in other threads causing an assertion for `REALM_ASSERT_RELEASE(no_sessions)` to fail. `SyncManager::reset_for_testing()` now waits/yields for up to 5 seconds for sessions being torn down in other threads to finish tearing down before checking this assertion. ([#6271](https://github.com/realm/realm-core/issues/6271))
 
 ----------------------------------------------
 

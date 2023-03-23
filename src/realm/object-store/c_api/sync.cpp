@@ -101,6 +101,10 @@ static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ClientReset) 
               RLM_SYNC_ERROR_ACTION_CLIENT_RESET);
 static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::ClientResetNoRecovery) ==
               RLM_SYNC_ERROR_ACTION_CLIENT_RESET_NO_RECOVERY);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::MigrateToFLX) ==
+              RLM_SYNC_ERROR_ACTION_MIGRATE_TO_FLX);
+static_assert(realm_sync_error_action_e(ProtocolErrorInfo::Action::RevertToPBS) ==
+              RLM_SYNC_ERROR_ACTION_REVERT_TO_PBS);
 
 static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Pending) ==
               RLM_SYNC_SUBSCRIPTION_PENDING);
@@ -878,7 +882,7 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
                                        error_message};
     std::error_code err;
     sync_error_to_error_code(sync_error, &err);
-    SyncSession::OnlyForTesting::handle_error(*session->get(), {err, error_message, is_fatal});
+    SyncSession::OnlyForTesting::handle_error(*session->get(), sync::SessionErrorInfo{err, error_message, !is_fatal});
 }
 
 } // namespace realm::c_api
