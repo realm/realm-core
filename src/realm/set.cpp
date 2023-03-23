@@ -132,6 +132,7 @@ void Set<ObjLink>::do_erase(size_t ndx)
 template <>
 void Set<Mixed>::do_insert(size_t ndx, Mixed value)
 {
+    REALM_ASSERT(!value.is_type(type_Link));
     if (value.is_type(type_TypedLink)) {
         auto target_link = value.get<ObjLink>();
         m_parent->get_table()->get_parent_group()->validate(target_link);

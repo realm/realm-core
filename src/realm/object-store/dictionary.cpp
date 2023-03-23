@@ -108,9 +108,9 @@ public:
     {
         REALM_TERMINATE("not implemented");
     }
-    void set_owner(const Obj& obj, CollectionParent::Index index) override
+    void set_owner(const Obj& obj, ColKey ck) override
     {
-        m_dictionary->set_owner(obj, index);
+        m_dictionary->set_owner(obj, ck);
     }
     void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
     {
