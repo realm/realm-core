@@ -35,7 +35,7 @@ static void trigger_server_migration(const AppSession& app_session, bool switch_
     }();
     const int duration = 300; // 5 minutes, for now, since it sometimes takes longet than 90 seconds
     try {
-        timed_sleeping_wait_for(
+        REQUIRE_THAT(
             [&] {
                 status = app_session.admin_api.get_migration_status(app_session.server_app_id);
                 if (logger && last_status != status.statusMessage) {
@@ -45,7 +45,7 @@ static void trigger_server_migration(const AppSession& app_session, bool switch_
                 return status.complete;
             },
             // Query the migration status every 0.5 seconds for up to 90 seconds
-            std::chrono::seconds(duration), std::chrono::milliseconds(500));
+            ReturnsTrueWithinTimeLimitWithSleeps(std::chrono::seconds(duration), std::chrono::milliseconds(500)));
     }
     catch (const std::runtime_error&) {
         if (logger)

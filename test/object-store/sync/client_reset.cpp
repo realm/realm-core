@@ -183,9 +183,11 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset]") {
     }
 
     realm->sync_session()->resume();
-    timed_wait_for([&] {
-        return util::File::exists(_impl::ClientResetOperation::get_fresh_path_for(realm_config.path));
-    });
+    REQUIRE_THAT(
+        [&] {
+            return util::File::exists(_impl::ClientResetOperation::get_fresh_path_for(realm_config.path));
+        },
+        ReturnsTrueWithinTimeLimit{});
     realm->sync_session()->pause();
     realm->sync_session()->resume();
     wait_for_upload(*realm);
@@ -847,12 +849,12 @@ TEST_CASE("sync: client reset", "[client reset]") {
             REQUIRE(!local_coordinator);
             REQUIRE(before_callback_invoctions == 0);
             REQUIRE(after_callback_invocations == 0);
-            timed_sleeping_wait_for(
+            REQUIRE_THAT(
                 [&]() -> bool {
                     std::lock_guard<std::mutex> lock(mtx);
                     return after_callback_invocations > 0;
                 },
-                std::chrono::seconds(60));
+                ReturnsTrueWithinTimeLimitWithSleeps{std::chrono::seconds(60)});
             // this test also relies on the test config above to verify the Realm instances in the callbacks
             REQUIRE(before_callback_invoctions == 1);
             REQUIRE(after_callback_invocations == 1);
@@ -902,12 +904,12 @@ TEST_CASE("sync: client reset", "[client reset]") {
             SyncSession::OnlyForTesting::handle_error(*session, std::move(synthetic));
 
             session->revive_if_needed();
-            timed_sleeping_wait_for(
+            REQUIRE_THAT(
                 [&]() -> bool {
                     std::lock_guard<std::mutex> lock(mtx);
                     return before_callback_invoctions > 0;
                 },
-                std::chrono::seconds(120));
+                ReturnsTrueWithinTimeLimitWithSleeps{std::chrono::seconds(120)});
             millisleep(500); // just make some space for the after callback to be attempted
             REQUIRE(before_callback_invoctions == 1);
             REQUIRE(after_callback_invocations == 0);
@@ -931,7 +933,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 REQUIRE(after_callback_invocations == 0);
                 test_reset.reset();
                 auto realm = Realm::get_shared_realm(local_config);
-                timed_sleeping_wait_for(
+                REQUIRE_THAT(
                     [&]() -> bool {
                         std::lock_guard<std::mutex> lock(mtx);
                         realm->begin_transaction();
@@ -943,7 +945,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                         realm->cancel_transaction();
                         return value == 6;
                     },
-                    std::chrono::seconds(20));
+                    ReturnsTrueWithinTimeLimitWithSleeps{std::chrono::seconds(20)});
             }
             auto session = test_app_session.app()->sync_manager()->get_existing_session(local_config.path);
             if (session) {
@@ -1586,36 +1588,44 @@ TEST_CASE("sync: client reset", "[client reset]") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
             make_fake_previous_reset(ClientResyncMode::DiscardLocal);
             make_reset(local_config, remote_config)->run();
-            timed_sleeping_wait_for([&]() -> bool {
-                return !!err;
-            });
+            REQUIRE_THAT(
+                [&]() -> bool {
+                    return !!err;
+                },
+                ReturnsTrueWithinTimeLimitWithSleeps{});
             REQUIRE(err.value()->is_client_reset_requested());
         }
         SECTION("In Recover mode: a previous failed recover reset is detected and generates an error") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
             make_fake_previous_reset(ClientResyncMode::Recover);
             make_reset(local_config, remote_config)->run();
-            timed_sleeping_wait_for([&]() -> bool {
-                return !!err;
-            });
+            REQUIRE_THAT(
+                [&]() -> bool {
+                    return !!err;
+                },
+                ReturnsTrueWithinTimeLimitWithSleeps{});
             REQUIRE(err.value()->is_client_reset_requested());
         }
         SECTION("In Recover mode: a previous failed discard reset is detected and generates an error") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
             make_fake_previous_reset(ClientResyncMode::DiscardLocal);
             make_reset(local_config, remote_config)->run();
-            timed_sleeping_wait_for([&]() -> bool {
-                return !!err;
-            });
+            REQUIRE_THAT(
+                [&]() -> bool {
+                    return !!err;
+                },
+                ReturnsTrueWithinTimeLimitWithSleeps{});
             REQUIRE(err.value()->is_client_reset_requested());
         }
         SECTION("In RecoverOrDiscard mode: a previous failed discard reset is detected and generates an error") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
             make_fake_previous_reset(ClientResyncMode::DiscardLocal);
             make_reset(local_config, remote_config)->run();
-            timed_sleeping_wait_for([&]() -> bool {
-                return !!err;
-            });
+            REQUIRE_THAT(
+                [&]() -> bool {
+                    return !!err;
+                },
+                ReturnsTrueWithinTimeLimitWithSleeps{});
             REQUIRE(err.value()->is_client_reset_requested());
         }
         const ObjectId added_pk = ObjectId::gen();
@@ -1648,12 +1658,12 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     create_object(*realm, "object", {added_pk}, partition);
                 })
                 ->run();
-            timed_sleeping_wait_for(
+            REQUIRE_THAT(
                 [&]() -> bool {
                     std::lock_guard<std::mutex> lock(mtx);
                     return after_callback_invocations > 0 || err;
                 },
-                std::chrono::seconds(120));
+                ReturnsTrueWithinTimeLimitWithSleeps{std::chrono::seconds(120)});
             REQUIRE(!err);
         }
         SECTION("In DiscardLocal mode: a previous failed recovery does not cause an error") {
@@ -1677,12 +1687,12 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     create_object(*realm, "object", {added_pk}, partition);
                 })
                 ->run();
-            timed_sleeping_wait_for(
+            REQUIRE_THAT(
                 [&]() -> bool {
                     std::lock_guard<std::mutex> lock(mtx);
                     return after_callback_invocations > 0 || err;
                 },
-                std::chrono::seconds(120));
+                ReturnsTrueWithinTimeLimitWithSleeps{std::chrono::seconds(120)});
             REQUIRE(!err);
         }
     } // end cycle detection

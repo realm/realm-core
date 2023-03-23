@@ -2713,9 +2713,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 REQUIRE(error.reason() == "Unable to refresh the user access token.");
             };
             auto r = Realm::get_shared_realm(config);
-            timed_wait_for([&] {
-                return sync_error_handler_called.load();
-            });
+            REQUIRE_THAT(
+                [&] {
+                    return sync_error_handler_called.load();
+                },
+                ReturnsTrueWithinTimeLimit{});
             // the failed refresh logs out the user
             REQUIRE(!user->is_logged_in());
         }
@@ -2745,11 +2747,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
             create_one_dog(r);
-            timed_wait_for(
+            REQUIRE_THAT(
                 [&] {
                     return did_receive_valid_token.load();
                 },
-                30s);
+                ReturnsTrueWithinTimeLimit{30s});
             REQUIRE(user->is_logged_in());
             REQUIRE(response_times.size() >= num_error_responses);
             std::vector<uint64_t> delay_times;
@@ -2816,15 +2818,19 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     REQUIRE(stat.code() == ErrorCodes::InvalidSession);
                 });
                 transport->unblock();
-                timed_wait_for([&] {
-                    return called.load();
-                });
+                REQUIRE_THAT(
+                    [&] {
+                        return called.load();
+                    },
+                    ReturnsTrueWithinTimeLimit{});
                 std::lock_guard<std::mutex> lock(mtx);
                 REQUIRE(called);
             }
-            timed_wait_for([&] {
-                return sync_error_handler_called.load();
-            });
+            REQUIRE_THAT(
+                [&] {
+                    return sync_error_handler_called.load();
+                },
+                ReturnsTrueWithinTimeLimit{});
 
             // the failed refresh logs out the user
             std::lock_guard<std::mutex> lock(mtx);
@@ -2996,12 +3002,12 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
         // If we haven't gotten an error in more than 5 minutes, then something has gone wrong
         // and we should fail the test.
-        timed_wait_for(
+        REQUIRE_THAT(
             [&] {
                 std::lock_guard lk(mutex);
                 return done;
             },
-            std::chrono::minutes(5));
+            ReturnsTrueWithinTimeLimit{std::chrono::minutes(5)});
     }
 
     SECTION("too large sync message error handling") {
@@ -3116,9 +3122,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             };
             auto r = Realm::get_shared_realm(config);
             auto session = app->current_user()->session_for_on_disk_path(r->config().path);
-            timed_wait_for([&] {
-                return error_did_occur.load();
-            });
+            REQUIRE_THAT(
+                [&] {
+                    return error_did_occur.load();
+                },
+                ReturnsTrueWithinTimeLimit{});
             REQUIRE(error_did_occur.load());
         }
 
@@ -3227,18 +3235,22 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collect
     TestAppSession test_session(create_app(server_app_config));
 
     auto wait_for_num_objects_to_equal = [](realm::SharedRealm r, const std::string& table_name, size_t count) {
-        timed_sleeping_wait_for([&]() -> bool {
-            r->refresh();
-            TableRef dest = r->read_group().get_table(table_name);
-            size_t cur_count = dest->size();
-            return cur_count == count;
-        });
+        REQUIRE_THAT(
+            [&]() -> bool {
+                r->refresh();
+                TableRef dest = r->read_group().get_table(table_name);
+                size_t cur_count = dest->size();
+                return cur_count == count;
+            },
+            ReturnsTrueWithinTimeLimitWithSleeps{});
     };
     auto wait_for_num_outgoing_links_to_equal = [&](realm::SharedRealm r, Obj obj, size_t count) {
-        timed_sleeping_wait_for([&]() -> bool {
-            r->refresh();
-            return test_type.size_of_collection(obj) == count;
-        });
+        REQUIRE_THAT(
+            [&]() -> bool {
+                r->refresh();
+                return test_type.size_of_collection(obj) == count;
+            },
+            ReturnsTrueWithinTimeLimitWithSleeps{});
     };
 
     CppContext c;
@@ -3377,12 +3389,14 @@ TEMPLATE_TEST_CASE("app: partition types", "[sync][app][partition]", cf::Int, cf
     auto app = test_session.app();
 
     auto wait_for_num_objects_to_equal = [](realm::SharedRealm r, const std::string& table_name, size_t count) {
-        timed_sleeping_wait_for([&]() -> bool {
-            r->refresh();
-            TableRef dest = r->read_group().get_table(table_name);
-            size_t cur_count = dest->size();
-            return cur_count == count;
-        });
+        REQUIRE_THAT(
+            [&]() -> bool {
+                r->refresh();
+                TableRef dest = r->read_group().get_table(table_name);
+                size_t cur_count = dest->size();
+                return cur_count == count;
+            },
+            ReturnsTrueWithinTimeLimitWithSleeps{});
     };
     using T = typename TestType::Type;
     CppContext c;
@@ -4789,9 +4803,11 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
         user->log_out();
     }
 
-    timed_wait_for([&] {
-        return !app->sync_manager()->has_existing_sessions();
-    });
+    REQUIRE_THAT(
+        [&] {
+            return !app->sync_manager()->has_existing_sessions();
+        },
+        ReturnsTrueWithinTimeLimit{});
 
     mock_transport_worker.mark_complete();
 }

@@ -173,7 +173,7 @@ static std::vector<AuditEvent> get_audit_events_from_baas(TestAppSession& sessio
     std::vector<AuditEvent> events;
     static const std::set<std::string> nonmetadata_fields = {"activity", "event", "data", "realm_id"};
 
-    timed_wait_for(
+    REQUIRE_THAT(
         [&] {
             uint64_t count = 0;
             collection.count({}, [&](uint64_t c, util::Optional<app::AppError> error) {
@@ -186,7 +186,7 @@ static std::vector<AuditEvent> get_audit_events_from_baas(TestAppSession& sessio
             }
             return true;
         },
-        std::chrono::minutes(5));
+        ReturnsTrueWithinTimeLimit{std::chrono::minutes(5)});
 
     collection.find({}, {},
                     [&](util::Optional<std::vector<bson::Bson>>&& result, util::Optional<app::AppError> error) {
@@ -1710,12 +1710,12 @@ TEST_CASE("audit integration tests") {
         auto realm = Realm::get_shared_realm(config);
         fn(realm, 0);
 
-        timed_wait_for(
+        REQUIRE_THAT(
             [&] {
                 std::lock_guard lock(mutex);
                 return (bool)error;
             },
-            std::chrono::seconds(30));
+            ReturnsTrueWithinTimeLimit{std::chrono::seconds(30)});
         REQUIRE(bool(error));
         return *error;
     };
