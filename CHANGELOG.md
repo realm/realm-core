@@ -1,11 +1,19 @@
 # NEXT RELEASE
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* Performance improvement for the following queries ([6376](https://github.com/realm/realm-core/issues/6376)):
+    * Significant (~75%) improvement when counting (`Query::count()`) the number of exact matches (with no other query conditions) on a string/int/UUID/ObjectID property that has an index. This improvement will be especially noticiable if there are a large number of results returned (duplicate values).
+    * Significant (~99%) improvement when querying for an exact match on a Timestamp property that has an index.
+    * Significant (~99%) improvement when querying for a case insensitive match on a Mixed property that has an index.
+    * Moderate (~25%) improvement when querying for an exact match on a Boolean property that has an index.
+    * Small (~5%) improvement when querying for a case insensitive match on a Mixed property that does not have an index.
 * Expose `Results::is_valid()` in the C API, in order to prevent to use an invalid Results. (PR [#6407](https://github.com/realm/realm-core/pull/6407))
 * Restore `SyncManager::set_logger_factory()` to enable setting different loggers for different SyncManagers ([PR #6400](https://github.com/realm/realm-core/pull/6400)).
 
 ### Fixed
+* Fixed a crash when querying a mixed property with a string operator (contains/like/beginswith/endswith) or with case insensitivity. ([6376](https://github.com/realm/realm-core/issues/6376) since introduction of Mixed)
+* Querying for equality of a string on an indexed mixed property was returning case insensitive matches. For example querying for `myIndexedMixed == "Foo"` would incorrectly match on values of "foo" or "FOO" etc. ([6376](https://github.com/realm/realm-core/issues/6376) since introduction of Mixed)
+* Adding an index to a Mixed property on a non-empty table would crash with an assertion. ([6376](https://github.com/realm/realm-core/issues/6376) since introduction of Mixed)
 * `SyncSession::pause()` could hold a reference to the database open after shutting down the sync session, preventing users from being able to delete the realm. ([#6372](https://github.com/realm/realm-core/issues/6372), since v13.3.0)
 * `Logger::set_default_logger()` did not perform any locking, resulting in data races if it was called while the default logger was being read on another thread ([PR #6398](https://github.com/realm/realm-core/pull/6398), since v13.7.0).
 
