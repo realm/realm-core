@@ -326,8 +326,6 @@ private:
     std::int_fast64_t m_staged_upload_mark = 0, m_staged_download_mark = 0;
     std::int_fast64_t m_reached_upload_mark = 0, m_reached_download_mark = 0;
 
-    void do_initiate(ProtocolEnvelope, std::string server_address, port_type server_port);
-
     void on_sync_progress();
     void on_upload_completion();
     void on_download_completion();
@@ -976,6 +974,10 @@ SyncClientHookAction SessionImpl::call_debug_hook(const SyncClientHookData& data
             REALM_ASSERT(!err_processing_err);
             return SyncClientHookAction::EarlyReturn;
         }
+        case realm::SyncClientHookAction::TriggerReconnect: {
+            get_connection().voluntary_disconnect();
+            return SyncClientHookAction::EarlyReturn;
+        }
         default:
             return action;
     }
@@ -1244,7 +1246,10 @@ SessionWrapper::set_connection_state_change_listener(util::UniqueFunction<Connec
 
 inline void SessionWrapper::initiate()
 {
-    do_initiate(m_protocol_envelope, m_server_address, m_server_port); // Throws
+    REALM_ASSERT(!m_initiated);
+    ServerEndpoint server_endpoint{m_protocol_envelope, m_server_address, m_server_port, m_user_id, m_sync_mode};
+    m_client.register_unactualized_session_wrapper(this, std::move(server_endpoint)); // Throws
+    m_initiated = true;
 }
 
 
@@ -1578,13 +1583,6 @@ inline void SessionWrapper::report_sync_transact(VersionID old_version, VersionI
         m_sync_transact_handler(old_version, new_version); // Throws
 }
 
-void SessionWrapper::do_initiate(ProtocolEnvelope protocol, std::string server_address, port_type server_port)
-{
-    REALM_ASSERT(!m_initiated);
-    ServerEndpoint server_endpoint{protocol, std::move(server_address), server_port, m_user_id, m_sync_mode};
-    m_client.register_unactualized_session_wrapper(this, std::move(server_endpoint)); // Throws
-    m_initiated = true;
-}
 
 inline void SessionWrapper::on_sync_progress()
 {

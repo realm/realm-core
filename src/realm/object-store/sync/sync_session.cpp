@@ -718,6 +718,13 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
             }
         }
 
+        // If the websocket was closed cleanly or if the socket disappeared, don't notify the user as an error
+        // since the sync client will retry.
+        if (error_code == sync::websocket::WebSocketError::websocket_ok ||
+            error_code == sync::websocket::WebSocketError::websocket_abnormal_closure) {
+            return;
+        }
+
         // Surface a simplified websocket error to the user.
         auto simplified_error = sync::websocket::get_simplified_websocket_error(
             static_cast<sync::websocket::WebSocketError>(error_code.value()));
@@ -839,6 +846,7 @@ void SyncSession::create_sync_session()
 
     sync::Session::Config session_config;
     session_config.signed_user_token = sync_config.user->access_token();
+    session_config.user_id = sync_config.user->identity();
     session_config.realm_identifier = sync_config.partition_value;
     session_config.verify_servers_ssl_certificate = sync_config.client_validate_ssl;
     session_config.ssl_trust_certificate_path = sync_config.ssl_trust_certificate_path;

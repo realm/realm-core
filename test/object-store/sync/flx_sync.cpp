@@ -2493,7 +2493,7 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
                 REQUIRE(table->find_primary_key(bar_obj_id));
                 REQUIRE_FALSE(table->find_primary_key(bizz_obj_id));
 
-                return SyncClientHookAction::SuspendWithRetryableError;
+                return SyncClientHookAction::TriggerReconnect;
             };
         auto problem_realm = Realm::get_shared_realm(triggered_config);
 
@@ -2738,7 +2738,7 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
                 REQUIRE_FALSE(data.error_info->compensating_writes.empty());
                 promise.get_promise().emplace_value();
 
-                return SyncClientHookAction::SuspendWithRetryableError;
+                return SyncClientHookAction::TriggerReconnect;
             };
 
         auto realm = Realm::get_shared_realm(config);

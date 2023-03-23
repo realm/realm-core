@@ -925,7 +925,8 @@ void Connection::handle_connection_established()
 
     // TODO(RCORE-1380) get this information in-band rather than from the websocket.
     if (auto coid = m_websocket->get_appservices_request_id(); !coid.empty()) {
-        logger.info("Connected to app services with request id: \"%1\"", coid);
+        logger.info("Connected to app services with request id: \"%1\" for user \"%2\"", coid,
+                    m_server_endpoint.user_id);
     }
 
     milliseconds_type now = monotonic_clock_now();
