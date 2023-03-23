@@ -22,6 +22,7 @@
 #include <realm/alloc.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/keys.hpp>
+#include <realm/mixed.hpp>
 
 #include <external/mpark/variant.hpp>
 
@@ -61,6 +62,17 @@ enum class UpdateStatus {
     /// call to `update_if_needed()`, and the accessor is still valid in its
     /// current state.
     NoChange,
+};
+
+
+using PathElement = Mixed;
+using Path = std::vector<PathElement>;
+
+// Path from the group level.
+struct FullPath {
+    TableKey top_table;
+    ObjKey top_objkey;
+    Path path_from_top;
 };
 
 class CollectionParent {

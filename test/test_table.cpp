@@ -4913,14 +4913,16 @@ TEST(Table_EmbeddedObjectCreateAndDestroyDictionary)
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
     auto ck = parent->add_column_dictionary(*table, "theGreatColumn");
+    auto ck1 = parent->add_column(*table, "theLesserColumn");
     Obj o = parent->create_object();
     auto parent_dict = o.get_dictionary(ck);
     Obj o2 = parent_dict.create_and_insert_linked_object("one");
+    Obj o4 = o.create_and_set_linked_object(ck1);
 
     auto obj_path = o2.get_path();
-    CHECK_EQUAL(obj_path.path_from_top.size(), 1);
-    CHECK_EQUAL(obj_path.path_from_top[0].col_key, ck);
-    CHECK_EQUAL(obj_path.path_from_top[0].index.get_string(), "one");
+    CHECK_EQUAL(obj_path.path_from_top.size(), 2);
+    CHECK_EQUAL(obj_path.path_from_top[0].get_string(), "theGreatColumn");
+    CHECK_EQUAL(obj_path.path_from_top[1].get_string(), "one");
 
     Obj o3 = parent_dict.create_and_insert_linked_object("two");
     parent_dict.create_and_insert_linked_object("three");
@@ -4929,32 +4931,40 @@ TEST(Table_EmbeddedObjectCreateAndDestroyDictionary)
 
     auto o2_dict = o2.get_dictionary(col_recurse);
     auto o3_dict = o3.get_dictionary(col_recurse);
+    auto o4_dict = o4.get_dictionary(col_recurse);
     o2_dict.create_and_insert_linked_object("foo1");
     o2_dict.create_and_insert_linked_object("foo2");
     o3_dict.create_and_insert_linked_object("foo3");
+    o4_dict.create_and_insert_linked_object("foo4");
 
     obj_path = o2_dict.get_object("foo1").get_path();
-    CHECK_EQUAL(obj_path.path_from_top.size(), 2);
-    CHECK_EQUAL(obj_path.path_from_top[0].index.get_string(), "one");
-    CHECK_EQUAL(obj_path.path_from_top[0].col_key, ck);
-    CHECK_EQUAL(obj_path.path_from_top[1].index.get_string(), "foo1");
-    CHECK_EQUAL(obj_path.path_from_top[1].col_key, col_recurse);
+    CHECK_EQUAL(obj_path.path_from_top.size(), 4);
+    CHECK_EQUAL(obj_path.path_from_top[0].get_string(), "theGreatColumn");
+    CHECK_EQUAL(obj_path.path_from_top[1].get_string(), "one");
+    CHECK_EQUAL(obj_path.path_from_top[2].get_string(), "theRecursiveBit");
+    CHECK_EQUAL(obj_path.path_from_top[3].get_string(), "foo1");
+
+    obj_path = o4_dict.get_object("foo4").get_path();
+    CHECK_EQUAL(obj_path.path_from_top.size(), 3);
+    CHECK_EQUAL(obj_path.path_from_top[0].get_string(), "theLesserColumn");
+    CHECK_EQUAL(obj_path.path_from_top[1].get_string(), "theRecursiveBit");
+    CHECK_EQUAL(obj_path.path_from_top[2].get_string(), "foo4");
 
     tr->commit_and_continue_as_read();
     tr->verify();
 
     tr->promote_to_write();
-    CHECK(table->size() == 6);
+    CHECK_EQUAL(table->size(), 8);
     parent_dict.create_and_insert_linked_object("one"); // implicitly remove entry for 02
     CHECK(!o2.is_valid());
-    CHECK(table->size() == 4);
+    CHECK_EQUAL(table->size(), 6);
     parent_dict.clear();
-    CHECK(table->size() == 0);
+    CHECK_EQUAL(table->size(), 2);
     parent_dict.create_and_insert_linked_object("four");
     parent_dict.create_and_insert_linked_object("five");
-    CHECK(table->size() == 2);
+    CHECK_EQUAL(table->size(), 4);
     o.remove();
-    CHECK(table->size() == 0);
+    CHECK_EQUAL(table->size(), 0);
     tr->commit();
 }
 
