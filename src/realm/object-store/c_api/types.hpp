@@ -822,7 +822,7 @@ public:
         : m_create_callback_func{on_thread_create}
         , m_destroy_callback_func{on_thread_destroy}
         , m_error_callback_func{on_error}
-        , m_user_data{userdata, [free_userdata] {
+        , m_user_data{userdata, [&free_userdata] {
                           if (free_userdata)
                               return free_userdata;
                           else
@@ -882,7 +882,7 @@ public:
 protected:
     CBindingThreadObserver() = default;
 
-    static const realm_free_userdata_func_t m_default_free_userdata;
+    static constexpr realm_free_userdata_func_t m_default_free_userdata = [](realm_userdata_t) {};
 
     realm_on_object_store_thread_callback_t m_create_callback_func = nullptr;
     realm_on_object_store_thread_callback_t m_destroy_callback_func = nullptr;

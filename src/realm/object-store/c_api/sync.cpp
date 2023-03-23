@@ -40,8 +40,6 @@ realm_sync_session_connection_state_notification_token::~realm_sync_session_conn
     session->unregister_connection_change_callback(token);
 }
 
-const realm_free_userdata_func_t CBindingThreadObserver::m_default_free_userdata = [](realm_userdata_t) {};
-
 namespace realm::c_api {
 
 static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::NoEncryption) ==
