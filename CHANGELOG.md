@@ -6,6 +6,7 @@
 
 ### Fixed
 * `SyncSession::pause()` could hold a reference to the database open after shutting down the sync session, preventing users from being able to delete the realm. ([#6372](https://github.com/realm/realm-core/issues/6372), since v13.3.0)
+* Prevented memory crash when having a query with more than 1000 logical clauses. (PR [#6428](https://github.com/realm/realm-core/pull/6428))
 
 ### Breaking changes
 * None.
