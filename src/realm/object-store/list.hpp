@@ -21,7 +21,6 @@
 
 #include <realm/object-store/collection.hpp>
 
-
 #include <realm/decimal128.hpp>
 #include <realm/list.hpp>
 #include <realm/mixed.hpp>
@@ -85,16 +84,6 @@ public:
     void set_any(size_t list_ndx, Mixed value);
     Mixed get_any(size_t list_ndx) const final;
     size_t find_any(Mixed value) const final;
-
-    // nested collections
-    std::unique_ptr<List> insert_list(size_t list_ndx);
-    std::unique_ptr<object_store::Set> insert_set(size_t list_ndx);
-    std::unique_ptr<object_store::Dictionary> insert_dictionary(StringData key);
-
-    std::unique_ptr<List> get_list(size_t list_ndx) const;
-    std::unique_ptr<object_store::Set> get_set(size_t list_ndx) const;
-    std::unique_ptr<object_store::Dictionary> get_dictionary(size_t list_ndx) const;
-
 
     Results filter(Query q) const;
 

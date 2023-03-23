@@ -240,7 +240,12 @@ static void compare(ObjectSchema const& existing_schema, ObjectSchema const& tar
                     std::vector<SchemaChange>& changes)
 {
     for (auto& current_prop : existing_schema.persisted_properties) {
-        auto target_prop = target_schema.property_for_name(current_prop.name);
+        auto target_prop = const_cast<Property*>(target_schema.property_for_name(current_prop.name));
+        bool target_is_nested = target_prop->type_is_nested();
+        if (target_is_nested) {
+            // adjust type for nested collections
+            target_prop->type = target_prop->nested_types.front();
+        }
 
         if (!target_prop) {
             changes.emplace_back(schema_change::RemoveProperty{&existing_schema, &current_prop});

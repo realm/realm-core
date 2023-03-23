@@ -350,7 +350,8 @@ inline Property::Property(std::string name, const std::vector<PropertyType>& nes
     , nested_types(nested_types)
 {
     REALM_ASSERT(!nested_types.empty());
-    type = nested_types.front();
+    type = nested_types.back();
+    this->nested_types.pop_back();
 }
 
 inline bool Property::type_is_indexable() const noexcept

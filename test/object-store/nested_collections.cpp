@@ -19,25 +19,28 @@
 #include <catch2/catch_all.hpp>
 
 #include "util/test_file.hpp"
-#include "util/test_utils.hpp"
-#include "util/event_loop.hpp"
-#include "util/index_helpers.hpp"
+// #include "util/test_utils.hpp"
+// #include "util/event_loop.hpp"
+// #include "util/index_helpers.hpp"
 
-#include <realm/object-store/binding_context.hpp>
-#include <realm/object-store/list.hpp>
-#include <realm/object-store/object.hpp>
+// #include <realm/object-store/binding_context.hpp>
+// #include <realm/object-store/list.hpp>
+// #include <realm/object-store/object.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/property.hpp>
-#include <realm/object-store/results.hpp>
+// #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
 
-#include <realm/object-store/impl/realm_coordinator.hpp>
-#include <realm/object-store/impl/object_accessor_impl.hpp>
+// #include <realm/object-store/impl/realm_coordinator.hpp>
+// #include <realm/object-store/impl/object_accessor_impl.hpp>
 
-#include <realm/version.hpp>
+// #include <realm/version.hpp>
 #include <realm/db.hpp>
+#include <realm/collection_list.hpp>
+#include <realm/list.hpp>
+#include <realm/dictionary.hpp>
 
-#include <cstdint>
+// #include <cstdint>
 
 using namespace realm;
 
@@ -47,23 +50,18 @@ TEST_CASE("nested-list") {
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
-        {"list", {{"value", PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable}}},
+        //{"list", {{"value", PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable}}},
         {"list_of_list", {{"nested_list", {PropertyType::Array, PropertyType::Array, PropertyType::Int}}}},
     });
     auto table = r->read_group().get_table("class_list_of_list");
-
+    // TODO use object store API
     r->begin_transaction();
     auto nested_obj = table->create_object();
     auto nested_col_key = table->get_column_key("nested_list");
-
-    List list1{r, nested_obj, nested_col_key};
-    auto collection = list1.insert_list(0);
-    collection->insert_any(0, 100);
-    collection->insert_any(0, 101);
-    collection->insert_any(0, 102);
-    r->commit_transaction();
-
-    auto inner_list = list1.get_list(0);
-    REQUIRE(inner_list->size() == 3);
-    REQUIRE(*inner_list == *collection);
+    auto list = nested_obj.get_collection_list(nested_col_key);
+    CHECK(list->is_empty());
+    auto collection = list->insert_collection(0);
+    auto storage_list = dynamic_cast<Lst<Int>*>(collection.get());
+    storage_list->add(5);
+    REQUIRE(storage_list->size() == 1);
 }
