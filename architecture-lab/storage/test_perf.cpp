@@ -243,12 +243,12 @@ public:
                 *to++ = *p++ & 0xFF;
             int group_size = to - group_start;
             // compress the group
-            group_size = compress_symbols(group_start, group_size, 5);
+            group_size = compress_symbols(group_start, group_size, 1);
             to = group_start + group_size;
             out_size += group_size;
         }
         // compress all groups together
-        size = compress_symbols(symbols, out_size, 4, 10);
+        size = compress_symbols(symbols, out_size, 4, 8);
         compressed_symbols += size;
         return size;
     }
@@ -312,6 +312,131 @@ public:
     int64_t unique_symbol_size = 0;
 };
 
+int bits_needed(int64_t val)
+{
+    if (val < 0)
+        val = -val;
+    if (val < 8) {
+        if (val < 2)
+            return val;
+        return 4;
+    }
+    if (val < 128)
+        return 8;
+    if (val < 32768)
+        return 16;
+    if (val >> 31)
+        return 64;
+    return 32;
+}
+
+enum EncType { Array = 0, Empty = 1, Sprse = 2, Indir = 3, Offst = 4 };
+
+std::string EncName[] = {"array", "empty", "sparse", "indir", "offst"};
+
+struct leaf_compression_analyzer {
+    constexpr static int leaf_size = 200;
+    int64_t values[leaf_size];
+    std::unordered_map<int64_t, int> unique_values;
+    int entry_count = 0;
+    uint64_t total_bytes = 0;
+    uint64_t type_counts[5] = {0, 0, 0, 0, 0};
+
+    void note_value(int64_t value)
+    {
+        unique_values[value]++;
+        values[entry_count] = value;
+        entry_count++;
+        if (entry_count == leaf_size) {
+            post_process();
+        }
+    }
+
+    void post_process()
+    {
+        int64_t default_value = 0;
+        int64_t max_value = std::numeric_limits<int64_t>::min();
+        int64_t min_value = std::numeric_limits<int64_t>::max();
+        int default_value_count = 0;
+        auto it = unique_values.end();
+        int bits_per_value = 0;
+        // a) determine how many bits are needed to rep greatest value.
+        // b) determine most frequent value - which will become default value.
+        for (auto entry = unique_values.begin(); entry != unique_values.end(); ++entry) {
+            auto bits = bits_needed(entry->first);
+            if (bits > bits_per_value) {
+                bits_per_value = bits;
+            }
+            if (entry->second > default_value_count) {
+                default_value = entry->first;
+                default_value_count = entry->second;
+                it = entry;
+            }
+            if (entry->first > max_value)
+                max_value = entry->first;
+            if (entry->first < min_value)
+                min_value = entry->first;
+        }
+        auto range = max_value - min_value;
+        if (it != unique_values.end()) {
+            unique_values.erase(it);
+        }
+        int unique_non_default_values = unique_values.size();
+        int non_default_values = 0;
+        for (int k = 0; k < entry_count; k++) {
+            if (values[k] != default_value)
+                non_default_values++;
+        }
+        // now we can estimate the cost of different layouts:
+        // starting point is our current encoding:
+        int leaf_cost = 8 + (bits_per_value * entry_count + 7) / 8;
+        EncType enc_type = EncType::Array;
+
+        // with special case where everything is 0
+        if (default_value == 0 && non_default_values == 0) {
+            leaf_cost = 8;
+            enc_type = EncType::Empty;
+            // std::cout << "Empty      " << leaf_cost << " bytes" << std::endl;
+        }
+        // next evaluate a sparse encoding, only feasible with few values (8)
+        /*
+        if (non_default_values < 8) {
+            int alt_leaf_cost = 16 + (bits_per_value * (non_default_values + (default_value ? 1 : 0) + 7) / 8);
+            // std::cout << "Sparse     " << leaf_cost << " bytes" << std::endl;
+            if (alt_leaf_cost < leaf_cost) {
+                leaf_cost = alt_leaf_cost;
+                enc_type = EncType::Sprse;
+            }
+        }
+        */
+        // with few unique values, use a local dict and let each entry be an index into it
+        if (unique_non_default_values < 15) {
+            // local dict cost:
+            int alt_leaf_cost = 16 + (bits_per_value * (non_default_values + 1) + 7) / 8;
+            // array of indirections cost:
+            alt_leaf_cost += (entry_count * bits_needed(unique_non_default_values)) / 8; // 4 bits index each
+            // std::cout << "Local dict " << leaf_cost << " bytes" << std::endl;
+            if (alt_leaf_cost < leaf_cost) {
+                leaf_cost = alt_leaf_cost;
+                enc_type = EncType::Indir;
+            }
+        }
+        // if we have many values but within a narrow band, try base+offset encoding
+        if (bits_needed(range) < bits_per_value) {
+            auto range_bits = bits_needed(range);
+            auto alt_leaf_cost = 16 + (bits_needed(min_value + range / 2) + entry_count * range_bits) / 8;
+            if (alt_leaf_cost < leaf_cost) {
+                leaf_cost = alt_leaf_cost;
+                enc_type = EncType::Offst;
+            }
+        }
+        type_counts[enc_type]++;
+        total_bytes += leaf_cost;
+        unique_values.clear();
+        entry_count = 0;
+    }
+};
+
 struct compressor_driver {
     struct entry {
         long* res;
@@ -320,9 +445,14 @@ struct compressor_driver {
     };
     std::vector<entry> work;
     string_compressor* compressor;
+    leaf_compression_analyzer* leaf_analyzer;
     void set_compressor(string_compressor* _compressor)
     {
         compressor = _compressor;
+    }
+    void set_leaf_analyzer(leaf_compression_analyzer* _leaf_analyzer)
+    {
+        leaf_analyzer = _leaf_analyzer;
     }
     compressor_driver(long size)
     {
@@ -335,7 +465,9 @@ struct compressor_driver {
     void perform()
     {
         for (auto& entry : work) {
-            *entry.res = compressor->handle(entry.first, entry.last);
+            auto val = compressor->handle(entry.first, entry.last);
+            leaf_analyzer->note_value(val);
+            *entry.res = val;
         }
         work.clear();
     }
@@ -474,6 +606,7 @@ int main(int argc, char* argv[])
     concurrent_queue<results*> to_writer;
     concurrent_queue<std::shared_ptr<driver_workload>> to_compressor;
     concurrent_queue<std::shared_ptr<driver_workload>> free_drivers;
+    leaf_compression_analyzer leaf_analyzers[max_fields];
 
     std::thread writer([&]() {
         std::cout << "Initial scan / object creation" << std::endl;
@@ -610,6 +743,7 @@ int main(int argc, char* argv[])
                 if (compressible[j] == 's') {
                     auto& driver = drivers->drivers[j];
                     driver->set_compressor(compressors[j].get());
+                    driver->set_leaf_analyzer(&leaf_analyzers[j]);
                     threads.push_back(std::make_unique<std::thread>([&]() { driver->perform(); }));
                 }
             }
@@ -658,11 +792,15 @@ int main(int argc, char* argv[])
                     if (compressible[num_value] == 's') {
                         drivers->drivers[num_value]->add_to_work(line_results + num_value, read_ptr, read_ptr2);
                     }
-                    else if (read_ptr == read_ptr2)
-                        line_results[num_value] = 0;
-                    else
-                        line_results[num_value] = atol(read_ptr);
-
+                    else {
+                        int64_t val;
+                        if (read_ptr == read_ptr2)
+                            val = 0;
+                        else
+                            val = atol(read_ptr);
+                        line_results[num_value] = val;
+                        leaf_analyzers[num_value].note_value(val);
+                    }
                     ++num_value;
                     read_ptr = read_ptr2 + 1;
                 }
@@ -687,37 +825,49 @@ int main(int argc, char* argv[])
         uint64_t symbol_size = 0;
         uint64_t ref_size = 0;
         uint64_t compressed_size = 0;
+        std::cout << "String compression results:" << std::endl;
         for (int i = 0; i < max_fields; ++i) {
             if (compressors[i]) {
                 uint64_t col_from_size = compressors[i]->total_chars;
                 // add one byte to each for zero termination:
                 col_from_size += num_line;
                 auto ids = compressors[i]->symbols.size();
-                int ref_cost =
-                    ids >= 32768
-                        ? 32
-                        : (ids >= 128 ? 16 : (ids >= 8 ? 8 : (ids >= 4 ? 4 : (ids >= 2 ? 2 : (ids >= 1 ? 1 : 0)))));
-                uint64_t col_ref_size = (ref_cost * num_line) / 8;
                 // assume 4 bytes overhead for each unique string:
-                uint64_t col_dict_size = compressors[i]->unique_symbol_size + 4 * compressors[i]->symbols.size();
+                uint64_t col_dict_entries = compressors[i]->symbols.size();
+                uint64_t col_dict_size = compressors[i]->unique_symbol_size + 4 * col_dict_entries;
                 uint64_t col_symbol_size = compressors[i]->symbol_table_size() * sizeof(encoding_entry);
-                uint64_t col_total = col_ref_size + col_dict_size + col_symbol_size;
+                uint64_t col_total = col_dict_size + col_symbol_size;
                 uint64_t col_compressed = compressors[i]->compressed_symbols;
                 std::cout << "Field " << std::right << std::setw(3) << i << " from " << std::setw(11)
                           << compressors[i]->total_chars << " to " << std::setw(11) << col_compressed * 2
                           << " bytes + " << std::setw(9) << col_symbol_size << " for symboltable \tInterned into "
-                          << std::setw(11) << col_ref_size << " (refs) + " << std::setw(11) << col_dict_size
-                          << " (dict), totalling " << std::setw(11) << col_total << std::endl;
+                          << std::setw(11) << col_dict_entries << " unique values stored in " << std::setw(11)
+                          << col_dict_size << " bytes" << std::endl;
                 compressors[i].reset();
                 dict_size += col_dict_size;
                 symbol_size += col_symbol_size;
-                ref_size += col_ref_size;
                 from_size += col_from_size;
                 compressed_size += col_compressed * 2;
             }
         }
+        std::cout << "Leaf compression results:" << std::endl;
+        for (int i = 0; i < max_fields; ++i) {
+            auto col_ref_size = leaf_analyzers[i].total_bytes;
+            ref_size += col_ref_size;
+            uint64_t total_arrays = 0;
+            for (int t = EncType::Array; t <= EncType::Offst; t++) {
+                total_arrays += leaf_analyzers[i].type_counts[t];
+            }
+            std::cout << "Field " << std::right << std::setw(3) << i << " leafs compressed to " << std::setw(11)
+                      << col_ref_size << " (";
+            for (int t = EncType::Array; t <= EncType::Offst; t++) {
+                std::cout << EncName[t] << ": " << std::right << std::setw(3)
+                          << leaf_analyzers[i].type_counts[t] * 100 / total_arrays << " %  ";
+            }
+            std::cout << ")" << std::endl;
+        }
         std::cout << "Total effect: from " << from_size << " to " << compressed_size << " bytes of symbols + "
-                  << symbol_size << " for symbol table. \tInterned into " << ref_size << " (refs) + " << dict_size
+                  << symbol_size << " for symbol table. \tTotal leaf size " << ref_size << " (refs) + " << dict_size
                   << " (dict)  =  ";
         auto total = ref_size + dict_size + symbol_size;
         std::cout << total << " or " << (total * 100) / from_size << " %" << std::endl;
