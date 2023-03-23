@@ -854,3 +854,119 @@ TEST(List_NestedDictList_Links)
     t.remove();
     CHECK_EQUAL(foo_ll0->size(), 0);
 }
+
+TEST(List_NestedList_Unresolved)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(make_in_realm_history(), path);
+    auto tr = db->start_write();
+    auto target = tr->add_table_with_primary_key("target", type_String, "_id");
+    auto origin = tr->add_table("origin");
+    auto list_col = origin->add_column(*target, "obj_dict_list",
+                                       {CollectionType::Dictionary, CollectionType::List, CollectionType::List});
+
+    Obj o = origin->create_object();
+    Obj t = target->create_object_with_primary_key("Adam");
+
+    auto dict = o.get_collection_list(list_col);
+    CHECK(dict->is_empty());
+    auto list_foo = dict->insert_collection_list("Foo");
+    auto list_bar = dict->insert_collection_list("Bar");
+    auto foo_coll_0 = list_foo->insert_collection(0);
+    auto foo_coll_1 = list_foo->insert_collection(1);
+    auto bar_coll_0 = list_bar->insert_collection(0);
+    auto bar_coll_1 = list_bar->insert_collection(1);
+    auto foo_ll0 = dynamic_cast<LnkLst*>(foo_coll_0.get());
+    auto foo_ll1 = dynamic_cast<LnkLst*>(foo_coll_1.get());
+    auto bar_ll0 = dynamic_cast<LnkLst*>(bar_coll_0.get());
+    auto bar_ll1 = dynamic_cast<LnkLst*>(bar_coll_1.get());
+
+    foo_ll0->add(t.get_key());
+    foo_ll1->add(target->create_object_with_primary_key("Brian").get_key());
+    bar_ll0->add(target->create_object_with_primary_key("Charlie").get_key());
+    bar_ll1->add(target->create_object_with_primary_key("Daniel").get_key());
+    CHECK_EQUAL(t.get_backlink_count(), 1);
+    target->invalidate_object(t.get_key());
+    CHECK_EQUAL(foo_ll0->size(), 0);
+    target->create_object_with_primary_key("Adam");
+    CHECK_EQUAL(foo_ll0->size(), 1);
+}
+
+TEST(List_NestedSet_Unresolved)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(make_in_realm_history(), path);
+    auto tr = db->start_write();
+    auto target = tr->add_table_with_primary_key("target", type_String, "_id");
+    auto origin = tr->add_table("origin");
+    auto list_col = origin->add_column(type_Mixed, "obj_dict_list", true,
+                                       {CollectionType::Dictionary, CollectionType::List, CollectionType::Set});
+
+    Obj o = origin->create_object();
+    Obj t = target->create_object_with_primary_key("Adam");
+
+    auto dict = o.get_collection_list(list_col);
+    CHECK(dict->is_empty());
+    auto list_foo = dict->insert_collection_list("Foo");
+    auto list_bar = dict->insert_collection_list("Bar");
+    auto foo_coll_0 = list_foo->insert_collection(0);
+    auto foo_coll_1 = list_foo->insert_collection(1);
+    auto bar_coll_0 = list_bar->insert_collection(0);
+    auto bar_coll_1 = list_bar->insert_collection(1);
+    auto foo_ll0 = dynamic_cast<Set<Mixed>*>(foo_coll_0.get());
+    auto foo_ll1 = dynamic_cast<Set<Mixed>*>(foo_coll_1.get());
+    auto bar_ll0 = dynamic_cast<Set<Mixed>*>(bar_coll_0.get());
+    auto bar_ll1 = dynamic_cast<Set<Mixed>*>(bar_coll_1.get());
+
+    foo_ll0->insert(t.get_link());
+    foo_ll0->insert(5);
+    foo_ll0->insert("Hello");
+    foo_ll1->insert(target->create_object_with_primary_key("Brian").get_link());
+    bar_ll0->insert(target->create_object_with_primary_key("Charlie").get_link());
+    bar_ll1->insert(target->create_object_with_primary_key("Daniel").get_link());
+    CHECK_EQUAL(t.get_backlink_count(), 1);
+    target->invalidate_object(t.get_key());
+    auto obj = target->create_object_with_primary_key("Adam");
+    CHECK_EQUAL(obj.get_backlink_count(), 1);
+}
+
+TEST(List_NestedDict_Unresolved)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(make_in_realm_history(), path);
+    auto tr = db->start_write();
+    auto target = tr->add_table_with_primary_key("target", type_String, "_id");
+    auto origin = tr->add_table("origin");
+    auto list_col =
+        origin->add_column(type_Mixed, "obj_dict_list", true,
+                           {CollectionType::Dictionary, CollectionType::List, CollectionType::Dictionary});
+
+    Obj o = origin->create_object();
+    Obj t = target->create_object_with_primary_key("Adam");
+
+    auto dict = o.get_collection_list(list_col);
+    CHECK(dict->is_empty());
+    auto list_foo = dict->insert_collection_list("Foo");
+    auto list_bar = dict->insert_collection_list("Bar");
+    auto foo_coll_0 = list_foo->insert_collection(0);
+    auto foo_coll_1 = list_foo->insert_collection(1);
+    auto bar_coll_0 = list_bar->insert_collection(0);
+    auto bar_coll_1 = list_bar->insert_collection(1);
+    auto foo_ll0 = dynamic_cast<Dictionary*>(foo_coll_0.get());
+    auto foo_ll1 = dynamic_cast<Dictionary*>(foo_coll_1.get());
+    auto bar_ll0 = dynamic_cast<Dictionary*>(bar_coll_0.get());
+    auto bar_ll1 = dynamic_cast<Dictionary*>(bar_coll_1.get());
+
+    foo_ll0->insert("A", t.get_link());
+    foo_ll0->insert("B", 5);
+    foo_ll0->insert("C", "Hello");
+    foo_ll1->insert("A", target->create_object_with_primary_key("Brian").get_link());
+    bar_ll0->insert("A", target->create_object_with_primary_key("Charlie").get_link());
+    bar_ll1->insert("A", target->create_object_with_primary_key("Daniel").get_link());
+    CHECK_EQUAL(t.get_backlink_count(), 1);
+    target->invalidate_object(t.get_key());
+    CHECK(foo_ll0->get("A").is_null());
+    auto obj = target->create_object_with_primary_key("Adam");
+    CHECK_EQUAL(obj.get_backlink_count(), 1);
+    CHECK_EQUAL(foo_ll0->get("A"), Mixed(obj.get_link()));
+}

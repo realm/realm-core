@@ -2168,6 +2168,41 @@ LinkCollectionPtr Obj::get_linkcollection_ptr(ColKey col_key) const
     return {};
 }
 
+template <class T>
+inline void replace_in_linklist(Obj& obj, ColKey origin_col_key, T target, T replacement)
+{
+    Lst<T> link_list(origin_col_key);
+    size_t ndx = find_link_value_in_collection(link_list, obj, origin_col_key, target);
+
+    REALM_ASSERT(ndx != realm::npos); // There has to be one
+
+    link_list.set(ndx, replacement);
+}
+
+template <class T>
+inline void replace_in_linkset(Obj& obj, ColKey origin_col_key, T target, T replacement)
+{
+    Set<T> link_set(origin_col_key);
+    size_t ndx = find_link_value_in_collection(link_set, obj, origin_col_key, target);
+
+    REALM_ASSERT(ndx != realm::npos); // There has to be one
+
+    link_set.erase(target);
+    link_set.insert(replacement);
+}
+
+inline void replace_in_dictionary(Obj& obj, ColKey origin_col_key, Mixed target, Mixed replacement)
+{
+    Dictionary dict(origin_col_key);
+    size_t ndx = find_link_value_in_collection(dict, obj, origin_col_key, target);
+
+    REALM_ASSERT(ndx != realm::npos); // There has to be one
+
+    auto key = dict.get_key(ndx);
+    dict.insert(key, replacement);
+}
+
+
 void Obj::assign_pk_and_backlinks(const Obj& other)
 {
     struct LinkReplacer : LinkTranslator {
@@ -2179,48 +2214,33 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
         }
         void on_list_of_links(LnkLst&) final
         {
-            // using Lst<ObjKey> for direct access without hiding unresolved keys
-            auto list = m_origin_obj.get_list<ObjKey>(m_origin_col_key);
-            auto n = list.find_first(m_dest_orig.get_key());
-            REALM_ASSERT(n != realm::npos);
-            list.set(n, m_dest_replace.get_key());
+            replace_in_linklist(m_origin_obj, m_origin_col_key, m_dest_orig.get_key(), m_dest_replace.get_key());
         }
-        void on_list_of_mixed(Lst<Mixed>& list) final
+        void on_list_of_mixed(Lst<Mixed>&) final
         {
-            auto n = list.find_first(m_dest_orig.get_link());
-            REALM_ASSERT(n != realm::npos);
-            list.set(n, m_dest_replace.get_link());
+            replace_in_linklist<Mixed>(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(),
+                                       m_dest_replace.get_link());
         }
-        void on_list_of_typedlink(Lst<ObjLink>& list) final
+        void on_list_of_typedlink(Lst<ObjLink>&) final
         {
-            auto n = list.find_first(m_dest_orig.get_link());
-            REALM_ASSERT(n != realm::npos);
-            list.set(n, m_dest_replace.get_link());
+            replace_in_linklist(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(), m_dest_replace.get_link());
         }
         void on_set_of_links(LnkSet&) final
         {
-            // using Set<ObjKey> for direct access without hiding unresolved keys
-            auto set = m_origin_obj.get_set<ObjKey>(m_origin_col_key);
-            set.erase(m_dest_orig.get_key());
-            set.insert(m_dest_replace.get_key());
+            replace_in_linkset(m_origin_obj, m_origin_col_key, m_dest_orig.get_key(), m_dest_replace.get_key());
         }
-        void on_set_of_mixed(Set<Mixed>& set) final
+        void on_set_of_mixed(Set<Mixed>&) final
         {
-            set.erase(m_dest_orig.get_link());
-            set.insert(m_dest_replace.get_link());
+            replace_in_linkset<Mixed>(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(),
+                                      m_dest_replace.get_link());
         }
-        void on_set_of_typedlink(Set<ObjLink>& set) final
+        void on_set_of_typedlink(Set<ObjLink>&) final
         {
-            set.erase(m_dest_orig.get_link());
-            set.insert(m_dest_replace.get_link());
+            replace_in_linkset(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(), m_dest_replace.get_link());
         }
-        void on_dictionary(Dictionary& dict) final
+        void on_dictionary(Dictionary&) final
         {
-            Mixed val(m_dest_orig.get_link());
-            auto key = dict.find_value(val);
-            REALM_ASSERT(!key.is_null());
-            auto link = m_dest_replace.get_link();
-            dict.insert(key, link);
+            replace_in_dictionary(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(), m_dest_replace.get_link());
         }
         void on_link_property(ColKey col) final
         {
