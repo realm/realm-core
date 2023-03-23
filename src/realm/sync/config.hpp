@@ -19,6 +19,7 @@
 #ifndef REALM_SYNC_CONFIG_HPP
 #define REALM_SYNC_CONFIG_HPP
 
+#include <realm/exceptions.hpp>
 #include <realm/db.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/optional.hpp>
@@ -28,7 +29,6 @@
 #include <memory>
 #include <string>
 #include <map>
-#include <system_error>
 #include <unordered_map>
 
 namespace realm {
@@ -47,11 +47,10 @@ using port_type = std::uint_fast16_t;
 enum class ProtocolError;
 } // namespace sync
 
-struct SyncError {
-    std::error_code error_code;
+struct SyncError : public SystemError {
+    enum class ClientResetModeAllowed { DoNotClientReset, RecoveryPermitted, RecoveryNotPermitted };
+
     bool is_fatal;
-    /// A consolidated explanation of the error, including a link to the server logs if applicable.
-    std::string message;
     // Just the minimal error message, without any log URL.
     std::string_view simple_message;
     // The URL to the associated server log if any. If not supplied by the server, this will be `empty()`.
@@ -71,8 +70,8 @@ struct SyncError {
     // that caused a compensating write and why the write was illegal.
     std::vector<sync::CompensatingWriteErrorInfo> compensating_writes_info;
 
-    SyncError(std::error_code error_code, std::string msg, bool is_fatal,
-              util::Optional<std::string> serverLog = util::none,
+    SyncError(std::error_code error_code, std::string_view msg, bool is_fatal,
+              std::optional<std::string_view> serverLog = std::nullopt,
               std::vector<sync::CompensatingWriteErrorInfo> compensating_writes = {});
 
     static constexpr const char c_original_file_path_key[] = "ORIGINAL_FILE_PATH";

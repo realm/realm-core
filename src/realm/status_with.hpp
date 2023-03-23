@@ -65,17 +65,8 @@ class REALM_NODISCARD StatusWith {
 public:
     using value_type = T;
 
-    StatusWith(ErrorCodes::Error code, StringData reason)
-        : m_status(code, reason)
-    {
-    }
-
-    StatusWith(ErrorCodes::Error code, const std::string& reason)
-        : m_status(code, reason)
-    {
-    }
-
-    StatusWith(ErrorCodes::Error code, const char* reason)
+    template <typename Reason, std::enable_if_t<std::is_constructible_v<std::string_view, Reason>, int> = 0>
+    StatusWith(ErrorCodes::Error code, Reason reason)
         : m_status(code, reason)
     {
     }

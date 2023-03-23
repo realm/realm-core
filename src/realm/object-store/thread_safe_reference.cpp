@@ -162,7 +162,7 @@ public:
             // the current write transaction then the collection cannot be
             // handed over and would just be empty when resolved.
             if (q.view_owner_obj_key() != m_query->view_owner_obj_key()) {
-                throw std::logic_error(
+                throw WrongTransactionState(
                     "Cannot create a ThreadSafeReference to Results backed by a collection of objects "
                     "inside the write transaction which created the collection.");
             }

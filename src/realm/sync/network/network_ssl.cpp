@@ -786,6 +786,7 @@ int Stream::bio_write(BIO* bio, const char* data, int size) noexcept
     Service::Descriptor& desc = stream.m_tcp_socket.m_desc;
     std::error_code ec;
     std::size_t n = desc.write_some(data, std::size_t(size), ec);
+
     BIO_clear_retry_flags(bio);
     if (ec) {
         if (REALM_UNLIKELY(ec != error::resource_unavailable_try_again)) {
@@ -809,6 +810,7 @@ int Stream::bio_read(BIO* bio, char* buffer, int size) noexcept
     Service::Descriptor& desc = stream.m_tcp_socket.m_desc;
     std::error_code ec;
     std::size_t n = desc.read_some(buffer, std::size_t(size), ec);
+
     BIO_clear_retry_flags(bio);
     if (ec) {
         if (REALM_UNLIKELY(ec == MiscExtErrors::end_of_input)) {
@@ -1405,6 +1407,8 @@ OSStatus Stream::tcp_read(void* data, std::size_t* length) noexcept
     std::error_code ec;
     std::size_t bytes_read = desc.read_some(reinterpret_cast<char*>(data), *length, ec);
 
+    m_last_operation = BlockingOperation::read;
+
     // A successful but short read should be treated the same as EAGAIN.
     if (!ec && bytes_read < *length) {
         ec = error::resource_unavailable_try_again;
@@ -1418,7 +1422,6 @@ OSStatus Stream::tcp_read(void* data, std::size_t* length) noexcept
             return noErr;
         }
         if (ec == error::resource_unavailable_try_again) {
-            m_last_operation = BlockingOperation::read;
             return errSSLWouldBlock;
         }
         return errSecIO;
@@ -1437,6 +1440,8 @@ OSStatus Stream::tcp_write(const void* data, std::size_t* length) noexcept
     std::error_code ec;
     std::size_t bytes_written = desc.write_some(reinterpret_cast<const char*>(data), *length, ec);
 
+    m_last_operation = BlockingOperation::write;
+
     // A successful but short write should be treated the same as EAGAIN.
     if (!ec && bytes_written < *length) {
         ec = error::resource_unavailable_try_again;
@@ -1447,7 +1452,6 @@ OSStatus Stream::tcp_write(const void* data, std::size_t* length) noexcept
 
     if (ec) {
         if (ec == error::resource_unavailable_try_again) {
-            m_last_operation = BlockingOperation::write;
             return errSSLWouldBlock;
         }
         return errSecIO;

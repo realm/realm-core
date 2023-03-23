@@ -37,24 +37,24 @@ TEST(GlobalKey_FromString)
     CHECK_EQUAL(GlobalKey::from_string("{0-0}"), GlobalKey(0, 0));
     CHECK_EQUAL(GlobalKey::from_string("{aaaabbbbccccdddd-eeeeffff00001111}"),
                 GlobalKey(0xaaaabbbbccccddddULL, 0xeeeeffff00001111ULL));
-    CHECK_THROW(GlobalKey::from_string(""), std::invalid_argument);
-    CHECK_THROW(GlobalKey::from_string("{}"), std::invalid_argument);
-    CHECK_THROW(GlobalKey::from_string("{"), std::invalid_argument);
-    CHECK_THROW(GlobalKey::from_string("}"), std::invalid_argument);
-    CHECK_THROW(GlobalKey::from_string("0"), std::invalid_argument);
-    CHECK_THROW(GlobalKey::from_string("{0}"), std::invalid_argument);
-    CHECK_THROW(GlobalKey::from_string("-"), std::invalid_argument);
-    CHECK_THROW(GlobalKey::from_string("0-"), std::invalid_argument);
-    CHECK_THROW(GlobalKey::from_string("{0-0"), std::invalid_argument);
-    CHECK_THROW(GlobalKey::from_string("{0-0-0}"), std::invalid_argument);
-    CHECK_THROW(GlobalKey::from_string("{aaaabbbbccccdddde-0}"), std::invalid_argument);
-    CHECK_THROW(GlobalKey::from_string("{0g-0}"), std::invalid_argument);
-    CHECK_THROW(GlobalKey::from_string("{0-0g}"), std::invalid_argument);
-    CHECK_THROW(GlobalKey::from_string("{0-aaaabbbbccccdddde}"), std::invalid_argument);
-    CHECK_THROW(GlobalKey::from_string("{-}"), std::invalid_argument);
+    CHECK_THROW(GlobalKey::from_string(""), InvalidArgument);
+    CHECK_THROW(GlobalKey::from_string("{}"), InvalidArgument);
+    CHECK_THROW(GlobalKey::from_string("{"), InvalidArgument);
+    CHECK_THROW(GlobalKey::from_string("}"), InvalidArgument);
+    CHECK_THROW(GlobalKey::from_string("0"), InvalidArgument);
+    CHECK_THROW(GlobalKey::from_string("{0}"), InvalidArgument);
+    CHECK_THROW(GlobalKey::from_string("-"), InvalidArgument);
+    CHECK_THROW(GlobalKey::from_string("0-"), InvalidArgument);
+    CHECK_THROW(GlobalKey::from_string("{0-0"), InvalidArgument);
+    CHECK_THROW(GlobalKey::from_string("{0-0-0}"), InvalidArgument);
+    CHECK_THROW(GlobalKey::from_string("{aaaabbbbccccdddde-0}"), InvalidArgument);
+    CHECK_THROW(GlobalKey::from_string("{0g-0}"), InvalidArgument);
+    CHECK_THROW(GlobalKey::from_string("{0-0g}"), InvalidArgument);
+    CHECK_THROW(GlobalKey::from_string("{0-aaaabbbbccccdddde}"), InvalidArgument);
+    CHECK_THROW(GlobalKey::from_string("{-}"), InvalidArgument);
 
     // std::strtoull accepts the "0x" prefix. We don't.
-    CHECK_THROW(GlobalKey::from_string("{0x0-0x0}"), std::invalid_argument);
+    CHECK_THROW(GlobalKey::from_string("{0x0-0x0}"), InvalidArgument);
     {
         std::istringstream istr("{1-2}");
         GlobalKey oid;

@@ -19,7 +19,7 @@
 #ifndef REALM_SECTIONED_RESULTS_HPP
 #define REALM_SECTIONED_RESULTS_HPP
 
-#include <realm/util/functional.hpp>
+#include <realm/object-store/results.hpp>
 
 #include <list>
 
@@ -93,6 +93,7 @@ private:
     Mixed m_key;
     std::unique_ptr<char[]> m_key_buffer;
     Section* get_if_valid() const;
+    Section* get_section() const;
 };
 
 /**
@@ -104,7 +105,7 @@ private:
 class SectionedResults {
 public:
     SectionedResults() = default;
-    using SectionKeyFunc = util::UniqueFunction<Mixed(Mixed value, SharedRealm realm)>;
+    using SectionKeyFunc = util::UniqueFunction<Mixed(Mixed value, std::shared_ptr<Realm> realm)>;
 
     /**
      * Returns a `ResultsSection` which will be bound to a section key present at the given index in
@@ -151,16 +152,10 @@ public:
     SectionedResults freeze(std::shared_ptr<Realm> const& frozen_realm) REQUIRES(!m_mutex);
 
     bool is_valid() const;
+    void check_valid() const; // Throws if not valid
     bool is_frozen() const REQUIRES(!m_mutex);
     /// Replaces the function which will perform the sectioning on the underlying results.
     void reset_section_callback(SectionKeyFunc section_callback) REQUIRES(!m_mutex);
-
-    // The input index parameter was out of bounds
-    struct OutOfBoundsIndexException : public std::out_of_range {
-        OutOfBoundsIndexException(size_t r, size_t c);
-        const size_t requested;
-        const size_t valid_count;
-    };
 
 private:
     friend class Results;

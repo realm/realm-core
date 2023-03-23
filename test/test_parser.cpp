@@ -534,13 +534,13 @@ TEST(Parser_ConstrainedQuery)
     CHECK_EQUAL(q.count(), 1);
     q.and_query(t->column<Int>(int_col) <= 0);
     CHECK_EQUAL(q.count(), 1);
-    CHECK_THROW(q.get_description(), SerialisationError);
+    CHECK_THROW(q.get_description(), SerializationError);
 
     Query q2(t, list_0);
     CHECK_EQUAL(q2.count(), 2);
     q2.and_query(t->column<Int>(int_col) <= 0);
     CHECK_EQUAL(q2.count(), 1);
-    CHECK_THROW(q2.get_description(), SerialisationError);
+    CHECK_THROW(q2.get_description(), SerializationError);
 }
 
 TEST(Parser_basic_serialisation)
@@ -675,7 +675,7 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "age > 2 AND !TRUEPREDICATE", 0);
 
     CHECK_THROW_EX(
-        verify_query(test_context, t, "buddy.age > $0", 0), std::out_of_range,
+        verify_query(test_context, t, "buddy.age > $0", 0), query_parser::InvalidQueryArgError,
         CHECK_EQUAL(std::string(e.what()), "Attempt to retreive an argument when no arguments were given"));
     CHECK_THROW_EX(verify_query(test_context, t, "age == infinity", 0), query_parser::InvalidQueryError,
                    CHECK_EQUAL(std::string(e.what()), "Infinity not supported for int"));
@@ -4047,7 +4047,7 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "NONE items.price * 2 > ANY items.price", 0);
 
     // unsupported combinations
-    CHECK_THROW(verify_query(test_context, t, "{1, 2, 3, 4, 5, 6} * {1, 2, 3} == items.price", 1), std::logic_error);
+    CHECK_THROW(verify_query(test_context, t, "{1, 2, 3, 4, 5, 6} * {1, 2, 3} == items.price", 1), LogicError);
     CHECK_THROW(verify_query(test_context, t, "{8, 10}.@size >= ANY items.price", 3), query_parser::SyntaxError);
     CHECK_THROW(verify_query(test_context, t, "{8, 10}.@max >= ANY items.price", 3), query_parser::SyntaxError);
     CHECK_THROW(verify_query(test_context, t, "{8, 10}.@min >= ANY items.price", 3), query_parser::SyntaxError);

@@ -79,8 +79,8 @@ struct StringMaker<ThreadSafeSyncError> {
         if (!value) {
             return "No SyncError";
         }
-        return realm::util::format("SyncError(%1), is_fatal: %2, with message: '%3'", value->error_code,
-                                   value->is_fatal, value->message);
+        return realm::util::format("SyncError(%1), is_fatal: %2, with message: '%3'", value->get_system_error(),
+                                   value->is_fatal, value->reason());
     }
 };
 } // namespace Catch
@@ -132,7 +132,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset]") {
     SyncTestFile realm_config(app->current_user(), partition.value, schema);
     realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        if (err.error_code == util::make_error_code(util::MiscExtErrors::end_of_input)) {
+        if (err.get_system_error() == util::make_error_code(util::MiscExtErrors::end_of_input)) {
             return;
         }
 
@@ -141,7 +141,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset]") {
             return;
         }
 
-        FAIL(util::format("got error from server: %1: %2", err.error_code.value(), err.message));
+        FAIL(util::format("got error from server: %1: %2", err.get_system_error().value(), err.what()));
     };
 
     auto realm = Realm::get_shared_realm(realm_config);
@@ -227,7 +227,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
     SyncTestFile realm_config(app->current_user(), partition.value, schema);
     realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        if (err.error_code == sync::websocket::make_error_code(ErrorCodes::ReadError)) {
+        if (err.get_system_error() == sync::websocket::WebSocketError::websocket_read_error) {
             return;
         }
 
@@ -236,7 +236,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
             return;
         }
 
-        FAIL(util::format("got error from server: %1: %2", err.error_code.value(), err.message));
+        FAIL(util::format("got error from server: %1: %2", err.get_system_error().value(), err.what()));
     };
 
     auto realm = Realm::get_shared_realm(realm_config);
@@ -353,7 +353,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
         REQUIRE(!util::File::exists(orig_path));
         REQUIRE(util::File::exists(recovery_path));
         local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-            CAPTURE(err.message);
+            CAPTURE(err.reason());
             CAPTURE(local_config.path);
             FAIL("Error handler should not have been called");
         };
@@ -363,7 +363,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
     }
 
     local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        CAPTURE(err.message);
+        CAPTURE(err.reason());
         CAPTURE(local_config.path);
         FAIL("Error handler should not have been called");
     };
@@ -381,6 +381,8 @@ TEST_CASE("sync: client reset", "[client reset]") {
         REQUIRE(before->is_frozen());
         REQUIRE(before->read_group().get_table("class_object"));
         REQUIRE(before->config().path == local_config.path);
+        REQUIRE_FALSE(before->schema().empty());
+        REQUIRE(before->schema_version() != ObjectStore::NotVersioned);
         REQUIRE(util::File::exists(local_config.path));
     };
     local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, ThreadSafeReference after_ref,
@@ -867,8 +869,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 temp_config.persist();
                 temp_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
                 config_copy = std::make_unique<SyncConfig>(*temp_config.sync_config);
-                config_copy->notify_before_client_reset = [&](SharedRealm) {
+                config_copy->notify_before_client_reset = [&](SharedRealm before_realm) {
                     std::lock_guard<std::mutex> lock(mtx);
+                    REQUIRE(before_realm);
+                    REQUIRE(before_realm->schema_version() != ObjectStore::NotVersioned);
                     ++before_callback_invoctions_2;
                 };
                 config_copy->notify_after_client_reset = [&](SharedRealm, ThreadSafeReference, bool) {
@@ -876,11 +880,13 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     ++after_callback_invocations_2;
                 };
 
-                temp_config.sync_config->notify_before_client_reset = [&](SharedRealm) {
+                temp_config.sync_config->notify_before_client_reset = [&](SharedRealm before_realm) {
                     std::lock_guard<std::mutex> lock(mtx);
                     ++before_callback_invoctions;
                     REQUIRE(session);
                     REQUIRE(config_copy);
+                    REQUIRE(before_realm);
+                    REQUIRE(before_realm->schema_version() != ObjectStore::NotVersioned);
                     session->update_configuration(*config_copy);
                 };
 
@@ -890,10 +896,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 session = test_app_session.app()->sync_manager()->get_existing_session(temp_config.path);
                 REQUIRE(session);
             }
-            realm::SyncError synthetic(sync::make_error_code(sync::ProtocolError::bad_client_file),
-                                       "A fake client reset error", true);
+            sync::SessionErrorInfo synthetic(sync::make_error_code(sync::ProtocolError::bad_client_file),
+                                             "A fake client reset error", false);
             synthetic.server_requests_action = sync::ProtocolErrorInfo::Action::ClientReset;
-            SyncSession::OnlyForTesting::handle_error(*session, synthetic);
+            SyncSession::OnlyForTesting::handle_error(*session, std::move(synthetic));
 
             session->revive_if_needed();
             timed_sleeping_wait_for(
@@ -1741,6 +1747,98 @@ TEST_CASE("sync: client reset", "[client reset]") {
     } // end: The server can prohibit recovery
 }
 
+TEST_CASE("sync: Client reset during async open", "[client reset]") {
+    const reset_utils::Partition partition{"realm_id", random_string(20)};
+    Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
+    Schema schema{
+        {"object",
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"value", PropertyType::String},
+             partition_prop,
+         }},
+    };
+
+    std::string base_url = get_base_url();
+    REQUIRE(!base_url.empty());
+    auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
+    server_app_config.partition_key = partition_prop;
+    TestAppSession test_app_session(create_app(server_app_config));
+    auto app = test_app_session.app();
+
+    auto before_callback_called = util::make_promise_future<void>();
+    auto after_callback_called = util::make_promise_future<void>();
+    create_user_and_log_in(app);
+    SyncTestFile realm_config(app->current_user(), partition.value, std::nullopt,
+                              [](std::shared_ptr<SyncSession>, SyncError) { /*noop*/ });
+    realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+
+    realm_config.sync_config->on_sync_client_event_hook =
+        [&, client_reset_triggered = false](std::weak_ptr<SyncSession> weak_sess,
+                                            const SyncClientHookData& event_data) mutable {
+            auto sess = weak_sess.lock();
+            if (!sess) {
+                return SyncClientHookAction::NoAction;
+            }
+            if (sess->path() != realm_config.path) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            if (event_data.event != SyncClientHookEvent::DownloadMessageReceived) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            if (client_reset_triggered) {
+                return SyncClientHookAction::NoAction;
+            }
+            client_reset_triggered = true;
+            reset_utils::trigger_client_reset(test_app_session.app_session());
+            return SyncClientHookAction::EarlyReturn;
+        };
+
+    // Expected behaviour is that the frozen realm passed in the callback should have no
+    // schema initialized if a client reset happens during an async open and the realm has never been opened before.
+    // SDK's should handle any edge cases which require the use of a schema i.e
+    // calling set_schema_subset(...)
+    realm_config.sync_config->notify_before_client_reset =
+        [promise = util::CopyablePromiseHolder(std::move(before_callback_called.promise))](
+            std::shared_ptr<Realm> realm) mutable {
+            CHECK(realm->schema_version() == ObjectStore::NotVersioned);
+            promise.get_promise().emplace_value();
+        };
+
+    realm_config.sync_config->notify_after_client_reset =
+        [promise = util::CopyablePromiseHolder(std::move(after_callback_called.promise))](
+            std::shared_ptr<Realm> realm, ThreadSafeReference, bool) mutable {
+            CHECK(realm->schema_version() == ObjectStore::NotVersioned);
+            promise.get_promise().emplace_value();
+        };
+
+    auto realm_task = Realm::get_synchronized_realm(realm_config);
+    auto realm_pf = util::make_promise_future<SharedRealm>();
+    realm_task->start([promise_holder = util::CopyablePromiseHolder(std::move(realm_pf.promise))](
+                          ThreadSafeReference ref, std::exception_ptr ex) mutable {
+        auto promise = promise_holder.get_promise();
+        if (ex) {
+            try {
+                std::rethrow_exception(ex);
+            }
+            catch (...) {
+                promise.set_error(exception_to_status());
+            }
+            return;
+        }
+        auto realm = Realm::get_shared_realm(std::move(ref));
+        if (!realm) {
+            promise.set_error({ErrorCodes::RuntimeError, "could not get realm from threadsaferef"});
+        }
+        promise.emplace_value(std::move(realm));
+    });
+    auto realm = realm_pf.future.get();
+    before_callback_called.future.get();
+    after_callback_called.future.get();
+}
+
 #endif // REALM_ENABLE_AUTH_TESTS
 
 namespace cf = realm::collection_fixtures;
@@ -1772,10 +1870,10 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
          }},
         {"test type",
          {{"_id", PropertyType::Int, Property::IsPrimary{true}},
-          {"value", TestType::property_type()},
-          {"list", PropertyType::Array | TestType::property_type()},
-          {"dictionary", PropertyType::Dictionary | TestType::property_type()},
-          {"set", PropertyType::Set | TestType::property_type()}}},
+          {"value", TestType::property_type},
+          {"list", PropertyType::Array | TestType::property_type},
+          {"dictionary", PropertyType::Dictionary | TestType::property_type},
+          {"set", PropertyType::Set | TestType::property_type}}},
     };
 
     SyncTestFile config2(init_sync_manager.app(), "default");

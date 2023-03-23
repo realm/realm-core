@@ -16,11 +16,17 @@
  *
  **************************************************************************/
 
-#include <realm/util/aes_cryptor.hpp>
+#include <realm/util/encrypted_file_mapping.hpp>
+
 #include <realm/util/file_mapper.hpp>
-#include <realm/utilities.hpp>
 
 #if REALM_ENABLE_ENCRYPTION
+#include <realm/util/aes_cryptor.hpp>
+#include <realm/util/errno.hpp>
+#include <realm/utilities.hpp>
+#include <realm/util/sha_crypto.hpp>
+#include <realm/util/terminate.hpp>
+
 #include <cstdlib>
 #include <algorithm>
 #include <stdexcept>
@@ -43,15 +49,7 @@
 #include <pthread.h>
 #endif
 
-#include <realm/util/encrypted_file_mapping.hpp>
-#include <realm/util/terminate.hpp>
-#include <realm/util/sha_crypto.hpp>
-#endif
-
 namespace realm::util {
-
-#if REALM_ENABLE_ENCRYPTION
-
 SharedFileInfo::SharedFileInfo(const uint8_t* key)
     : cryptor(key)
 {
@@ -146,8 +144,8 @@ AESCryptor::AESCryptor(const uint8_t* key)
     : m_rw_buffer(new char[block_size])
     , m_dst_buffer(new char[block_size])
 {
-    memcpy(m_aesKey, key, 32);
-    memcpy(m_hmacKey, key + 32, 32);
+    memcpy(m_aesKey.data(), key, 32);
+    memcpy(m_hmacKey.data(), key + 32, 32);
 
 #if REALM_PLATFORM_APPLE
     // A random iv is passed to CCCryptorReset. This iv is *not used* by Realm; we set it manually prior to
@@ -191,7 +189,7 @@ AESCryptor::~AESCryptor() noexcept
 
 void AESCryptor::check_key(const uint8_t* key)
 {
-    if (memcmp(m_aesKey, key, 32) != 0 || memcmp(m_hmacKey, key + 32, 32) != 0)
+    if (memcmp(m_aesKey.data(), key, 32) != 0 || memcmp(m_hmacKey.data(), key + 32, 32) != 0)
         throw DecryptionFailed();
 }
 
@@ -232,7 +230,7 @@ iv_table& AESCryptor::get_iv_table(FileDesc fd, off_t data_pos) noexcept
 
 bool AESCryptor::check_hmac(const void* src, size_t len, const uint8_t* hmac) const
 {
-    uint8_t buffer[224 / 8];
+    std::array<uint8_t, 224 / 8> buffer;
     hmac_sha224(Span(reinterpret_cast<const uint8_t*>(src), len), buffer, m_hmacKey);
 
     // Constant-time memcmp to avoid timing attacks
@@ -356,7 +354,8 @@ void AESCryptor::write(FileDesc fd, off_t pos, const char* src, size_t size) noe
                 ++iv.iv1;
 
             crypt(mode_Encrypt, pos, m_rw_buffer.get(), src, reinterpret_cast<const char*>(&iv.iv1));
-            hmac_sha224(Span(reinterpret_cast<uint8_t*>(m_rw_buffer.get()), block_size), iv.hmac1, m_hmacKey);
+            hmac_sha224(Span(reinterpret_cast<uint8_t*>(m_rw_buffer.get()), block_size),
+                        Span<uint8_t, 28>(iv.hmac1, 28), m_hmacKey);
             // In the extremely unlikely case that both the old and new versions have
             // the same hash we won't know which IV to use, so bump the IV until
             // they're different.
@@ -406,7 +405,7 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* sr
     }
 
 #else
-    if (!EVP_CipherInit_ex(m_ctx, EVP_aes_256_cbc(), NULL, m_aesKey, iv, mode))
+    if (!EVP_CipherInit_ex(m_ctx, EVP_aes_256_cbc(), NULL, m_aesKey.data(), iv, mode))
         handle_error();
 
     int len;
@@ -614,10 +613,11 @@ void EncryptedFileMapping::reclaim_page(size_t page_ndx)
     void* addr = page_addr(page_ndx);
     void* addr2 = ::mmap(addr, 1 << m_page_shift, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
     if (addr != addr2) {
-        if (addr2 == 0)
-            throw std::system_error(errno, std::system_category(), std::string("using mmap() to clear page failed"));
-        else
-            throw std::runtime_error("internal error in mmap()");
+        if (addr2 == 0) {
+            int err = errno;
+            throw SystemError(err, get_errno_msg("using mmap() to clear page failed", err));
+        }
+        throw std::runtime_error("internal error in mmap()");
     }
 #endif
 }
@@ -879,9 +879,10 @@ File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept
     size_t ps = page_size();
     return real_offset((size + ps - 1) & ~(ps - 1));
 }
-
+} // namespace realm::util
 #else
 
+namespace realm::util {
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept
 {
     return size;
@@ -891,7 +892,5 @@ File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept
 {
     return size;
 }
-
-#endif // REALM_ENABLE_ENCRYPTION
-
 } // namespace realm::util
+#endif // REALM_ENABLE_ENCRYPTION

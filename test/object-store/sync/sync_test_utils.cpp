@@ -20,6 +20,7 @@
 
 #include "util/baas_admin_api.hpp"
 
+#include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
@@ -39,8 +40,8 @@ std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error)
         os << "(none)";
     }
     else {
-        os << "AppError(error_code=" << error->error_code
-           << ", http_status_code=" << error->http_status_code.value_or(0) << ", message=\"" << error->message
+        os << "AppError(error_code=" << error->code()
+           << ", http_status_code=" << error->additional_status_code.value_or(0) << ", message=\"" << error->reason()
            << "\", link_to_server_logs=\"" << error->link_to_server_logs << "\")";
     }
     return os;
@@ -66,6 +67,24 @@ bool results_contains_original_name(SyncFileActionMetadataResults& results, cons
         }
     }
     return false;
+}
+
+bool ReturnsTrueWithinTimeLimit::match(util::FunctionRef<bool()> condition) const
+{
+    const auto wait_start = std::chrono::steady_clock::now();
+    bool predicate_returned_true = false;
+    util::EventLoop::main().run_until([&] {
+        if (std::chrono::steady_clock::now() - wait_start > m_max_ms) {
+            return true;
+        }
+        auto ret = condition();
+        if (ret) {
+            predicate_returned_true = true;
+        }
+        return ret;
+    });
+
+    return predicate_returned_true;
 }
 
 void timed_wait_for(util::FunctionRef<bool()> condition, std::chrono::milliseconds max_ms)
@@ -185,6 +204,35 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app)
                                      REQUIRE(!error);
                                  });
     return creds;
+}
+
+void wait_for_advance(Realm& realm)
+{
+    struct Context : BindingContext {
+        Realm& realm;
+        DB::version_type target_version;
+        bool& done;
+        Context(Realm& realm, bool& done)
+            : realm(realm)
+            , target_version(*realm.latest_snapshot_version())
+            , done(done)
+        {
+        }
+
+        void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
+        {
+            if (realm.read_transaction_version().version >= target_version) {
+                done = true;
+            }
+        }
+    };
+
+    bool done = false;
+    realm.m_binding_context = std::make_unique<Context>(realm, done);
+    timed_wait_for([&] {
+        return done;
+    });
+    realm.m_binding_context = nullptr;
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
@@ -308,7 +356,7 @@ struct FakeLocalClientReset : public TestClientReset {
             sync::SaltedFileIdent fake_ident{1, 123456789};
             auto local_db = TestHelper::get_db(local_realm);
             auto remote_db = TestHelper::get_db(remote_realm);
-            util::StderrLogger logger(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+            util::StderrLogger logger(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
             using _impl::client_reset::perform_client_reset_diff;
             constexpr bool recovery_is_allowed = true;
             perform_client_reset_diff(local_db, remote_db, fake_ident, logger, m_mode, recovery_is_allowed, nullptr,
@@ -350,7 +398,7 @@ void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const A
                                                uint64_t count, util::Optional<app::AppError> error) mutable {
                 REQUIRE(!error);
                 if (error) {
-                    promise.set_error({ErrorCodes::RuntimeError, error->message});
+                    promise.set_error({ErrorCodes::RuntimeError, error->reason()});
                 }
                 else {
                     promise.emplace_value(count);
@@ -359,6 +407,34 @@ void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const A
             return pf.future.get() > 0;
         },
         std::chrono::minutes(15), std::chrono::milliseconds(500));
+}
+
+void trigger_client_reset(const AppSession& app_session)
+{
+    // cause a client reset by restarting the sync service
+    // this causes the server's sync history to be resynthesized
+    auto baas_sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
+    auto baas_sync_config = app_session.admin_api.get_config(app_session.server_app_id, baas_sync_service);
+
+    REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+    app_session.admin_api.disable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
+    timed_sleeping_wait_for([&] {
+        return app_session.admin_api.is_sync_terminated(app_session.server_app_id);
+    });
+    app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
+    REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+    if (app_session.config.dev_mode_enabled) { // dev mode is not sticky across a reset
+        app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
+    }
+
+    // In FLX sync, the server won't let you connect until the initial sync is complete. With PBS tho, we need
+    // to make sure we've actually copied all the data from atlas into the realm history before we do any of
+    // our remote changes.
+    if (!app_session.config.flx_sync_config) {
+        timed_sleeping_wait_for([&] {
+            return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
+        });
+    }
 }
 
 void trigger_client_reset(const AppSession& app_session, const SharedRealm& realm)

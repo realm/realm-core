@@ -44,7 +44,7 @@ RLM_API bool realm_set_find(const realm_set_t* set, realm_value_t value, size_t*
         try {
             check_value_assignable(*set, val);
         }
-        catch (const NotNullableException&) {
+        catch (const NotNullable&) {
             if (out_index)
                 *out_index = realm::not_found;
             if (out_found)
@@ -92,7 +92,7 @@ RLM_API bool realm_set_erase(realm_set_t* set, realm_value_t value, bool* out_er
         try {
             check_value_assignable(*set, val);
         }
-        catch (const NotNullableException&) {
+        catch (const NotNullable&) {
             if (out_erased)
                 *out_erased = false;
             return true;
@@ -133,7 +133,7 @@ RLM_API realm_set_t* realm_set_from_thread_safe_reference(const realm_t* realm, 
     return wrap_err([&]() {
         auto stsr = dynamic_cast<realm_set::thread_safe_reference*>(tsr);
         if (!stsr) {
-            throw std::logic_error{"Thread safe reference type mismatch"};
+            throw LogicError{ErrorCodes::IllegalOperation, "Thread safe reference type mismatch"};
         }
 
         auto set = stsr->resolve<object_store::Set>(*realm);

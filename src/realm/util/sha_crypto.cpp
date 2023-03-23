@@ -37,7 +37,7 @@
 #define REALM_USE_BUNDLED_SHA2 1
 #endif
 
-#if REALM_USE_BUNDLED_SHA2
+#ifdef REALM_USE_BUNDLED_SHA2
 #include <sha224.hpp>
 #include <sha256.hpp>
 #include <cstring>
@@ -138,9 +138,9 @@ void message_digest(const EVP_MD* digest_type, const char* in_buffer, size_t in_
 }
 #endif
 
-#if REALM_USE_BUNDLED_SHA2
+#ifdef REALM_USE_BUNDLED_SHA2
 using namespace realm::util;
-template <typename sha_state, size_t digest_length>
+template <typename ShaState, size_t digest_length>
 void hmac(Span<const uint8_t> in_buffer, Span<uint8_t, digest_length> out_buffer, Span<const uint8_t, 32> key)
 {
     uint8_t ipad[64];
@@ -154,7 +154,7 @@ void hmac(Span<const uint8_t> in_buffer, Span<uint8_t, digest_length> out_buffer
     memset(opad + 32, 0x5C, 32);
 
     // Full hmac operation is sha_alg(opad + sha_alg(ipad + data))
-    sha_state s;
+    ShaState s;
     sha_init(s);
     sha_process(s, ipad, 64);
     sha_process(s, in_buffer.data(), std::uint32_t(in_buffer.size()));
@@ -215,7 +215,7 @@ void hmac_sha224(Span<const uint8_t> in_buffer, Span<uint8_t, 28> out_buffer, Sp
 #if REALM_PLATFORM_APPLE
     static_assert(CC_SHA224_DIGEST_LENGTH == out_buffer.size());
     CCHmac(kCCHmacAlgSHA224, key.data(), key.size(), in_buffer.data(), in_buffer.size(), out_buffer.data());
-#elif REALM_USE_BUNDLED_SHA2
+#elif defined(REALM_USE_BUNDLED_SHA2)
     static_assert(28 == out_buffer.size());
     hmac<sha224_state>(in_buffer, out_buffer, key);
 #elif REALM_HAVE_OPENSSL
@@ -234,7 +234,7 @@ void hmac_sha256(Span<const uint8_t> in_buffer, Span<uint8_t, 32> out_buffer, Sp
 #if REALM_PLATFORM_APPLE
     static_assert(CC_SHA256_DIGEST_LENGTH == out_buffer.size());
     CCHmac(kCCHmacAlgSHA256, key.data(), key.size(), in_buffer.data(), in_buffer.size(), out_buffer.data());
-#elif REALM_USE_BUNDLED_SHA2
+#elif defined(REALM_USE_BUNDLED_SHA2)
     static_assert(32 == out_buffer.size());
     hmac<sha256_state>(in_buffer, out_buffer, key);
 #elif REALM_HAVE_OPENSSL

@@ -257,8 +257,8 @@ TEST(Sync_HistoryMigration)
             if (history_schema_version != client_schema_version)
                 throw std::runtime_error{"Bad history schema version for client-side file"};
         }
-        catch (const FileFormatUpgradeRequired&) {
-            // File formats prior to 10 cannot be opened in read-only mode
+        catch (const FileAccessError&) {
+            // File formats prior to 23 cannot be opened in read-only mode
         }
         // History migration is a side-effect of verification
         verify_client_file(client_path);
@@ -278,8 +278,8 @@ TEST(Sync_HistoryMigration)
             if (history_schema_version != server_schema_version)
                 throw std::runtime_error{"Bad history schema version for server-side file"};
         }
-        catch (const FileFormatUpgradeRequired&) {
-            // File formats prior to 10 cannot be opened in read-only mode
+        catch (const FileAccessError&) {
+            // File formats prior to 23 cannot be opened in read-only mode
         }
         // History migration is a side-effect of verification
         verify_server_file(server_path);
@@ -321,6 +321,7 @@ TEST(Sync_HistoryMigration)
 
     auto get_server_path = [&](const std::string& server_dir) {
         fixtures::ClientServerFixture fixture{server_dir, test_context};
+        fixture.start();
         return fixture.map_virtual_to_real_path(virtual_path);
     };
 

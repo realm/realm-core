@@ -116,7 +116,8 @@ RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t* realm, rea
     if (object && !did_create) {
         delete object;
         object = wrap_err([&]() {
-            throw DuplicatePrimaryKeyException("Object with this primary key already exists");
+            auto& shared_realm = *realm;
+            throw ObjectAlreadyExists(shared_realm->read_group().get_class_name(TableKey(table_key)), from_capi(pk));
             return nullptr;
         });
     }
@@ -133,21 +134,6 @@ RLM_API realm_object_t* realm_object_get_or_create_with_primary_key(realm_t* rea
         auto pkval = from_capi(pk);
         if (did_create)
             *did_create = false;
-
-        ColKey pkcol = table->get_primary_key_column();
-        if (!pkcol) {
-            throw UnexpectedPrimaryKeyException("Class does not have a primary key");
-        }
-
-        if (pkval.is_null() && !pkcol.is_nullable()) {
-            auto& schema = schema_for_table(*realm, tblkey);
-            throw NotNullableException{schema.name, schema.primary_key};
-        }
-
-        if (!pkval.is_null() && pkval.get_type() != DataType(pkcol.get_type())) {
-            auto& schema = schema_for_table(*realm, tblkey);
-            throw WrongPrimaryKeyTypeException{schema.name};
-        }
 
         auto obj = table->create_object_with_primary_key(pkval, did_create);
         auto object = Object{shared_realm, std::move(obj)};
@@ -259,7 +245,7 @@ RLM_API realm_object_t* realm_object_from_thread_safe_reference(const realm_t* r
     return wrap_err([&]() {
         auto otsr = dynamic_cast<realm_object::thread_safe_reference*>(tsr);
         if (!otsr) {
-            throw std::logic_error{"Thread safe reference type mismatch"};
+            throw LogicError{ErrorCodes::IllegalOperation, "Thread safe reference type mismatch"};
         }
 
         auto obj = otsr->resolve<Object>(*realm);
