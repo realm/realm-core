@@ -708,7 +708,8 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 add_subscription_for_new_object(local_realm, str_field_value, local_added_int);
                 auto latest_subs = local_realm->get_latest_subscription_set();
                 REQUIRE(latest_subs.version() > subs.version());
-                wait_for_future(latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete)).get();
+                wait_for_future(latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete))
+                    .get();
                 local_realm->refresh();
                 count_of_foo = count_queries_with_str(latest_subs, util::format("\"%1\"", str_field_value));
                 REQUIRE(count_of_foo == 1);

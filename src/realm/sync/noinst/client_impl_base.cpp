@@ -2631,7 +2631,7 @@ void Session::suspend(const SessionErrorInfo& info)
     // still in the Active state
     if (m_state == Active) {
         m_conn.one_less_active_unsuspended_session();                      // Throws
-        on_suspended(info); // Throws
+        on_suspended(info);                                                // Throws
     }
 
     if (info.try_again) {
