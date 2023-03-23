@@ -3,9 +3,11 @@
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Expose `Results::is_valid()` in the C API, in order to prevent to use an invalid Results. (PR [#6407](https://github.com/realm/realm-core/pull/6407))
+* Restore `SyncManager::set_logger_factory()` to enable setting different loggers for different SyncManagers ([PR #6400](https://github.com/realm/realm-core/pull/6400)).
 
 ### Fixed
 * `SyncSession::pause()` could hold a reference to the database open after shutting down the sync session, preventing users from being able to delete the realm. ([#6372](https://github.com/realm/realm-core/issues/6372), since v13.3.0)
+* `Logger::set_default_logger()` did not perform any locking, resulting in data races if it was called while the default logger was being read on another thread ([PR #6398](https://github.com/realm/realm-core/pull/6398), since v13.7.0).
 
 ### Breaking changes
 * None.
