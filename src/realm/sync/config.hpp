@@ -71,7 +71,7 @@ struct SyncError : public SystemError {
     std::vector<sync::CompensatingWriteErrorInfo> compensating_writes_info;
 
     SyncError(std::error_code error_code, std::string_view msg, bool is_fatal,
-              util::Optional<std::string_view> serverLog = util::none,
+              std::optional<std::string_view> serverLog = std::nullopt,
               std::vector<sync::CompensatingWriteErrorInfo> compensating_writes = {});
 
     static constexpr const char c_original_file_path_key[] = "ORIGINAL_FILE_PATH";

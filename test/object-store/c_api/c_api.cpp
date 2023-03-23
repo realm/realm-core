@@ -563,6 +563,17 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             check_mode(RLM_SCHEMA_MODE_MANUAL);
         }
 
+        SECTION("realm_config_set_schema_subset_mode()") {
+            auto check_subset_mode = [&](realm_schema_subset_mode_e mode) {
+                realm_config_set_schema_subset_mode(config.get(), mode);
+                CHECK(realm_config_get_schema_subset_mode(config.get()) == mode);
+            };
+            check_subset_mode(RLM_SCHEMA_SUBSET_MODE_ALL_CLASSES);
+            check_subset_mode(RLM_SCHEMA_SUBSET_MODE_ALL_PROPERTIES);
+            check_subset_mode(RLM_SCHEMA_SUBSET_MODE_COMPLETE);
+            check_subset_mode(RLM_SCHEMA_SUBSET_MODE_STRICT);
+        }
+
         SECTION("realm_config_set_disable_format_upgrade()") {
             realm_config_set_disable_format_upgrade(config.get(), true);
             CHECK(realm_config_get_disable_format_upgrade(config.get()) == true);
@@ -1065,6 +1076,16 @@ bool should_compact_on_launch(void* userdata_p, uint64_t, uint64_t)
     return false;
 }
 
+struct LogUserData {
+    std::vector<std::string> log;
+};
+
+void realm_log_func(realm_userdata_t u, realm_log_level_e, const char* message)
+{
+    LogUserData* userdata = static_cast<LogUserData*>(u);
+    userdata->log.emplace_back(message);
+}
+
 } // anonymous namespace
 
 TEST_CASE("C API", "[c_api]") {
@@ -1357,6 +1378,26 @@ TEST_CASE("C API", "[c_api]") {
             CHECK(realm_clear_last_error());
             delete ex;
         }
+    }
+
+    SECTION("logging") {
+        LogUserData userdata;
+        auto log_level_old = util::Logger::get_default_level_threshold();
+        realm_set_log_callback(realm_log_func, RLM_LOG_LEVEL_DEBUG, &userdata, nullptr);
+        auto config = make_config(test_file.path.c_str(), false);
+        realm_t* realm = realm_open(config.get());
+        realm_release(realm);
+        REQUIRE(userdata.log.size() == 2);
+        userdata.log.clear();
+        realm_set_log_level(RLM_LOG_LEVEL_ERROR);
+        realm = realm_open(config.get());
+        realm_release(realm);
+        REQUIRE(userdata.log.empty());
+
+        // Remove this logger again
+        realm_set_log_callback(nullptr, RLM_LOG_LEVEL_DEBUG, nullptr, nullptr);
+        // Restore old log level
+        util::Logger::set_default_level_threshold(log_level_old);
     }
 
     realm_t* realm;
@@ -2504,6 +2545,12 @@ TEST_CASE("C API", "[c_api]") {
             SECTION("results") {
                 auto r = cptr_checked(realm_query_find_all(q.get()));
                 CHECK(!realm_is_frozen(r.get()));
+
+                SECTION("realm_results_is_valid") {
+                    bool valid;
+                    CHECK(checked(realm_results_is_valid(r.get(), &valid)));
+                    CHECK(valid);
+                }
 
                 SECTION("realm_results_count()") {
                     size_t count;
@@ -5275,7 +5322,7 @@ static void realm_app_user2(void* p, realm_user_t* user, const realm_app_error_t
 TEST_CASE("C API app: link_user integration w/c_api transport", "[c_api][sync][app]") {
     struct TestTransportUserData {
         TestTransportUserData()
-            : logger(std::make_unique<util::StderrLogger>(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL))
+            : logger(std::make_unique<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL))
             , transport(std::make_unique<SynchronousTestTransport>())
         {
         }

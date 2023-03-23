@@ -20,6 +20,7 @@
 #define REALM_TEST_UTIL_TEST_PATH_HPP
 
 #include <string>
+#include <memory>
 
 #include <realm/util/features.h>
 
@@ -40,6 +41,9 @@
 #define SHARED_GROUP_TEST_PATH(var_name) TEST_PATH_HELPER(realm::test_util::DBTestPathGuard, var_name, "realm");
 
 namespace realm {
+
+class DB;
+
 namespace test_util {
 
 /// Disable automatic removal of test files.
@@ -157,6 +161,7 @@ private:
     std::size_t m_counter = 0;
 };
 
+std::shared_ptr<DB> get_test_db(const std::string& path, const char* crypt_key = nullptr);
 
 } // namespace test_util
 } // namespace realm
