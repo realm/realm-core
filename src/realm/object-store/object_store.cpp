@@ -137,6 +137,24 @@ ColKey add_column(Group& group, Table& table, Property const& property)
         auto target_name = ObjectStore::table_name_for_object_type(property.object_type);
         TableRef link_table = group.get_table(target_name);
         REALM_ASSERT(link_table);
+        if (property.type_is_nested()) {
+            const auto& collection_types = process_nested_collection(property);
+            const auto nested_type = property.nested_types.front();
+            if (is_array(nested_type)) {
+                return table.add_column(to_core_type(property.type & ~PropertyType::Flags), property.name,
+                                        is_nullable(property.type), collection_types);
+            }
+            else if (is_set(nested_type)) {
+                throw InvalidColumnKey("Set cannot contain any nested collection");
+            }
+            else if (is_dictionary(nested_type)) {
+                return table.add_column(to_core_type(property.type & ~PropertyType::Flags), property.name,
+                                        is_nullable(property.type), collection_types);
+            }
+            else {
+                throw InvalidColumnKey("Not a valid nested collection property");
+            }
+        }
         if (is_array(property.type)) {
             return table.add_column_list(*link_table, property.name);
         }
@@ -150,6 +168,24 @@ ColKey add_column(Group& group, Table& table, Property const& property)
             return table.add_column(*link_table, property.name);
         }
     }
+    else if (property.type_is_nested()) {
+        const auto& collection_types = process_nested_collection(property);
+        const auto nested_type = property.nested_types.front();
+        if (is_array(nested_type)) {
+            return table.add_column(to_core_type(property.type & ~PropertyType::Flags), property.name,
+                                    is_nullable(property.type), collection_types);
+        }
+        else if (is_set(nested_type)) {
+            throw InvalidColumnKey("Set cannot contain any nested collection");
+        }
+        else if (is_dictionary(nested_type)) {
+            return table.add_column(to_core_type(property.type & ~PropertyType::Flags), property.name,
+                                    is_nullable(property.type), collection_types);
+        }
+        else {
+            throw InvalidColumnKey("Not a valid nested collection property");
+        }
+    }
     else if (is_array(property.type)) {
         return table.add_column_list(to_core_type(property.type & ~PropertyType::Flags), property.name,
                                      is_nullable(property.type));
@@ -161,24 +197,6 @@ ColKey add_column(Group& group, Table& table, Property const& property)
     else if (is_dictionary(property.type)) {
         return table.add_column_dictionary(to_core_type(property.type & ~PropertyType::Flags), property.name,
                                            is_nullable(property.type));
-    }
-    else if (property.type_is_nested()) {
-        const auto& collection_types = process_nested_collection(property);
-        const auto& nested_type = property.nested_types.front();
-        if (is_array(nested_type)) {
-            return table.add_column(to_core_type(property.type & ~PropertyType::Flags), property.name,
-                                    is_nullable(property.type), collection_types);
-        }
-        else if (is_set(nested_type)) {
-            throw InvalidColumnKey("Set cannot contain any nested collection");
-        }
-        else if (is_dictionary(nested_type)) {
-            return table.add_column_dictionary(to_core_type(property.type & ~PropertyType::Flags), property.name,
-                                               is_nullable(property.type));
-        }
-        else {
-            throw InvalidColumnKey("Not a valid nested collection property");
-        }
     }
     else {
         auto key = table.add_column(to_core_type(property.type), property.name, is_nullable(property.type));
