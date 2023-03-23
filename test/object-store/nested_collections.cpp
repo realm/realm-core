@@ -19,29 +19,15 @@
 #include <catch2/catch_all.hpp>
 
 #include "util/test_file.hpp"
-// #include "util/test_utils.hpp"
-// #include "util/event_loop.hpp"
-// #include "util/index_helpers.hpp"
-
-// #include <realm/object-store/binding_context.hpp>
-// #include <realm/object-store/list.hpp>
-// #include <realm/object-store/object.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/property.hpp>
-// #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
 
-// #include <realm/object-store/impl/realm_coordinator.hpp>
-// #include <realm/object-store/impl/object_accessor_impl.hpp>
-
-// #include <realm/version.hpp>
 #include <realm/db.hpp>
 #include <realm/collection_list.hpp>
 #include <realm/list.hpp>
 #include <realm/set.hpp>
 #include <realm/dictionary.hpp>
-
-// #include <cstdint>
 
 using namespace realm;
 
