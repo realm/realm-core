@@ -30,7 +30,7 @@ class QueryNode : public ParserNode {
 public:
     ~QueryNode() override;
     virtual Query visit(ParserDriver*) = 0;
-    virtual void canonicalize() {}
+    virtual void canonicalize(int depth = 0) {}
 };
 
 class TrueOrFalseNode : public QueryNode {
@@ -47,18 +47,24 @@ protected:
 
 class LogicalNode : public QueryNode {
 public:
+    static constexpr int MAX_DEPTH_OF_LOGICAL_NODES = 1000;
     std::vector<QueryNode*> children;
     LogicalNode(QueryNode* left, QueryNode* right)
     {
         children.emplace_back(left);
         children.emplace_back(right);
     }
-    void canonicalize() override
+    void canonicalize(int depth = 0) override
     {
+        if (depth >= MAX_DEPTH_OF_LOGICAL_NODES) {
+            throw InvalidQueryError("The query has too many conditions.");
+        }
+        depth++;        
         std::vector<QueryNode*> newChildren;
         auto& my_type = typeid(*this);
         for (auto& child : children) {
-            child->canonicalize();
+
+            child->canonicalize(depth);
             if (typeid(*child) == my_type) {
                 auto logical_node = static_cast<LogicalNode*>(child);
                 for (auto c : logical_node->children) {
