@@ -185,6 +185,7 @@ public:
 
     void cancel_reconnect_delay();
     bool wait_for_session_terminations_or_client_stopped();
+    void voluntary_disconnect_all_connections();
 
 private:
     using connection_ident_type = std::int_fast64_t;
@@ -439,6 +440,8 @@ public:
 
     void resume_active_sessions();
 
+    void voluntary_disconnect();
+
     std::string get_active_appservices_connection_id();
 
     Connection(ClientImpl&, connection_ident_type, ServerEndpoint, const std::string& authorization_header_name,
@@ -506,7 +509,6 @@ private:
     void close_due_to_protocol_error(std::error_code, std::optional<std::string_view> msg = std::nullopt);
     void close_due_to_client_side_error(std::error_code, std::optional<std::string_view> msg, bool is_fatal);
     void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
-    void voluntary_disconnect();
     void involuntary_disconnect(const SessionErrorInfo& info);
     void disconnect(const SessionErrorInfo& info);
     void change_state_to_disconnected() noexcept;

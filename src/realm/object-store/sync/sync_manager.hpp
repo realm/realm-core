@@ -243,6 +243,12 @@ public:
     SyncManager(const SyncManager&) = delete;
     SyncManager& operator=(const SyncManager&) = delete;
 
+    struct OnlyForTesting {
+        friend class TestHelper;
+
+        static void voluntary_disconnect_all_connections(SyncManager&);
+    };
+
 protected:
     friend class SyncUser;
     friend class SyncSesson;

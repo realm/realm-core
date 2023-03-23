@@ -99,6 +99,11 @@ struct SyncClient {
         m_client.shutdown();
     }
 
+    void voluntary_disconnect_all_connections()
+    {
+        m_client.voluntary_disconnect_all_connections();
+    }
+
     std::unique_ptr<sync::Session> make_session(std::shared_ptr<DB> db,
                                                 std::shared_ptr<sync::SubscriptionStore> flx_sub_store,
                                                 sync::Session::Config config)

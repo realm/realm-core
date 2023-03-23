@@ -2527,6 +2527,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 }
             };
 
+            SyncManager::OnlyForTesting::voluntary_disconnect_all_connections(*sync_manager);
             sync_session->resume();
             REQUIRE(!wait_for_download(*r));
 
@@ -2584,6 +2585,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 }
             };
 
+            SyncManager::OnlyForTesting::voluntary_disconnect_all_connections(*sync_manager);
             sync_session->resume();
             REQUIRE(wait_for_download(*r));
             REQUIRE(!user1->is_logged_in());

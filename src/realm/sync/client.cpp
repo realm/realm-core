@@ -443,6 +443,51 @@ void ClientImpl::cancel_reconnect_delay()
 }
 
 
+void ClientImpl::voluntary_disconnect_all_connections()
+{
+    auto done_pf = util::make_promise_future<void>();
+    post([this, promise = std::move(done_pf.promise)](Status status) mutable {
+        if (status == ErrorCodes::OperationAborted) {
+            return;
+        }
+
+        REALM_ASSERT(status.is_ok());
+
+        try {
+            for (auto& p : m_server_slots) {
+                ServerSlot& slot = p.second;
+                if (m_one_connection_per_session) {
+                    REALM_ASSERT(!slot.connection);
+                    for (const auto& p : slot.alt_connections) {
+                        ClientImpl::Connection& conn = *p.second;
+                        if (conn.get_state() == ConnectionState::disconnected) {
+                            continue;
+                        }
+                        conn.voluntary_disconnect();
+                    }
+                }
+                else {
+                    REALM_ASSERT(slot.alt_connections.empty());
+                    if (!slot.connection) {
+                        continue;
+                    }
+                    ClientImpl::Connection& conn = *slot.connection;
+                    if (conn.get_state() == ConnectionState::disconnected) {
+                        continue;
+                    }
+                    conn.voluntary_disconnect();
+                }
+            }
+        }
+        catch (...) {
+            promise.set_error(exception_to_status());
+        }
+        promise.emplace_value();
+    });
+    done_pf.future.get();
+}
+
+
 bool ClientImpl::wait_for_session_terminations_or_client_stopped()
 {
     // Thread safety required
@@ -1925,6 +1970,10 @@ void Client::cancel_reconnect_delay()
     m_impl->cancel_reconnect_delay();
 }
 
+void Client::voluntary_disconnect_all_connections()
+{
+    m_impl->voluntary_disconnect_all_connections();
+}
 
 bool Client::wait_for_session_terminations_or_client_stopped()
 {

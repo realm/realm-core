@@ -61,6 +61,9 @@ public:
     /// Thread-safe.
     void cancel_reconnect_delay();
 
+    /// Forces all open connections to disconnect/reconnect. To be used in testing.
+    void voluntary_disconnect_all_connections();
+
     /// \brief Wait for session termination to complete.
     ///
     /// Wait for termination of all sessions whose termination was initiated
