@@ -807,19 +807,42 @@ Obj::FatPath Obj::get_fat_path() const
 Obj::Path Obj::get_path() const
 {
     Path result;
-    bool top_done = false;
-    auto sizer = [&](size_t size) {
-        result.path_from_top.reserve(size);
-    };
-    auto step = [&](const Obj& o2, ColKey col, Mixed idx) -> void {
-        if (!top_done) {
-            top_done = true;
-            result.top_table = o2.get_table()->get_key();
-            result.top_objkey = o2.get_key();
-        }
-        result.path_from_top.push_back({col, idx});
-    };
-    traverse_path(step, sizer);
+    if (m_table->is_embedded()) {
+        REALM_ASSERT(get_backlink_count() == 1);
+        m_table->for_each_backlink_column([&](ColKey col_key) {
+            std::vector<ObjKey> backlinks = get_all_backlinks(col_key);
+            if (backlinks.size() == 1) {
+                TableRef origin_table = m_table->get_opposite_table(col_key);
+                Obj obj = origin_table->get_object(backlinks[0]); // always the first (and only)
+                result = obj.get_path();
+                auto next_col_key = m_table->get_opposite_column(col_key);
+                result.path_from_top.push_back(Mixed(obj.get_table()->get_column_name(next_col_key)));
+
+                ColumnAttrMask attr = next_col_key.get_attrs();
+                Mixed index;
+                if (attr.test(col_attr_List)) {
+                    REALM_ASSERT(next_col_key.get_type() == col_type_LinkList);
+                    LnkLst link_list = obj.get_linklist(next_col_key);
+                    auto i = link_list.find_first(get_key());
+                    REALM_ASSERT(i != realm::not_found);
+                    result.path_from_top.push_back(Mixed(int64_t(i)));
+                }
+                else if (attr.test(col_attr_Dictionary)) {
+                    auto dict = obj.get_dictionary(next_col_key);
+                    auto ndx = dict.find_first(get_link());
+                    REALM_ASSERT(ndx != realm::not_found);
+                    result.path_from_top.push_back(dict.get_key(ndx));
+                }
+
+                return IteratorControl::Stop; // early out
+            }
+            return IteratorControl::AdvanceToNext; // try next column
+        });
+    }
+    else {
+        result.top_objkey = get_key();
+        result.top_table = get_table()->get_key();
+    }
     return result;
 }
 

@@ -174,12 +174,6 @@ public:
     // Get the path in a minimal format without including object accessors.
     // If you need to obtain additional information for each object in the path,
     // you should use get_fat_path() or traverse_path() instead (see below).
-    struct PathElement;
-    struct Path {
-        TableKey top_table;
-        ObjKey top_objkey;
-        std::vector<PathElement> path_from_top;
-    };
     Path get_path() const;
 
     // Get the fat path to this object expressed as a vector of fat path elements.
@@ -434,11 +428,6 @@ ObjKey Obj::_get(ColKey::Idx col_ndx) const;
 
 struct Obj::FatPathElement {
     Obj obj;        // Object which embeds...
-    ColKey col_key; // Column holding link or link list which embeds...
-    Mixed index;    // index into link list or dictionary (or null)
-};
-
-struct Obj::PathElement {
     ColKey col_key; // Column holding link or link list which embeds...
     Mixed index;    // index into link list or dictionary (or null)
 };
