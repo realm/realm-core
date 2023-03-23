@@ -720,8 +720,8 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
 
         // If the websocket was closed cleanly or if the socket disappeared, don't notify the user as an error
         // since the sync client will retry.
-        if (error_code == sync::websocket::WebSocketError::websocket_ok ||
-            error_code == sync::websocket::WebSocketError::websocket_abnormal_closure) {
+        if (error_code == sync::websocket::WebSocketError::websocket_read_error ||
+            error_code == sync::websocket::WebSocketError::websocket_write_error) {
             return;
         }
 
