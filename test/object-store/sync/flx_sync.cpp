@@ -1246,7 +1246,7 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
                 session->close();
                 promise->emplace_value();
 
-                return SyncClientHookAction::NoAction;
+                return SyncClientHookAction::TriggerReconnect;
             };
 
         auto realm = Realm::get_shared_realm(config);
@@ -1259,7 +1259,6 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
 
         interrupted.get();
         realm->sync_session()->shutdown_and_wait();
-        realm->close();
     }
 
     _impl::RealmCoordinator::assert_no_open_realms();
