@@ -2392,6 +2392,12 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
                                        DownloadBatchState batch_state, int64_t query_version,
                                        const ReceivedChangesets& received_changesets)
 {
+    // Ignore the message if the deactivation process has been initiated,
+    // because in that case, the associated Realm must not be accessed any
+    // longer.
+    if (m_state != Active)
+        return;
+
     if (is_steady_state_download_message(batch_state, query_version)) {
         batch_state = DownloadBatchState::SteadyState;
     }
@@ -2411,12 +2417,6 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
         logger.debug("Ignoring download message because the client detected an integration error");
         return;
     }
-
-    // Ignore the message if the deactivation process has been initiated,
-    // because in that case, the associated Realm must not be accessed any
-    // longer.
-    if (m_state != Active)
-        return;
 
     bool legal_at_this_time = (m_ident_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
@@ -2568,13 +2568,14 @@ std::error_code Session::receive_query_error_message(int error_code, std::string
 // deactivated upon return.
 std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
 {
+    // Ignore the message if the deactivation process has been initiated,
+    // because in that case, the associated Realm must not be accessed any
+    // longer.
+    if (m_state != Active)
+        return {}; // Success
+
     logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, error_action=%4)", info.message,
                 info.raw_error_code, info.try_again, info.server_requests_action); // Throws
-
-    auto debug_action = call_debug_hook(SyncClientHookEvent::ErrorMessageReceived, info);
-    if (debug_action == SyncClientHookAction::EarlyReturn) {
-        return {};
-    }
 
     bool legal_at_this_time = (m_bind_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
@@ -2593,6 +2594,10 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
         return ClientError::bad_error_code;
     }
 
+    auto debug_action = call_debug_hook(SyncClientHookEvent::ErrorMessageReceived, info);
+    if (debug_action == SyncClientHookAction::EarlyReturn) {
+        return {};
+    }
     // For compensating write errors, we need to defer raising them to the SDK until after the server version
     // containing the compensating write has appeared in a download message.
     if (error_code == ProtocolError::compensating_write) {
