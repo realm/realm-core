@@ -65,8 +65,9 @@ void ArrayKeyBase<0>::verify() const
     // Verify that forward link has a corresponding backlink
     for (size_t i = 0; i < size(); ++i) {
         if (ObjKey target_key = get(i)) {
-            auto target_obj = target_key.is_unresolved() ? target_table->get_tombstone(target_key)
-                                                         : target_table->get_object(target_key);
+            auto target_obj = target_key.is_unresolved() ? target_table->try_get_tombstone(target_key)
+                                                         : target_table->try_get_object(target_key);
+            REALM_ASSERT(target_obj);
             verify_link(target_obj);
         }
     }
@@ -100,8 +101,9 @@ void ArrayKeyBase<1>::verify() const
         if (ObjKey target_key = get(i)) {
             ObjKey origin_key = cluster->get_real_key(i);
 
-            auto target_obj = target_key.is_unresolved() ? target_table->get_tombstone(target_key)
-                                                         : target_table->get_object(target_key);
+            auto target_obj = target_key.is_unresolved() ? target_table->try_get_tombstone(target_key)
+                                                         : target_table->try_get_object(target_key);
+            REALM_ASSERT(target_obj);
             verify_link(target_obj, origin_key);
         }
     }

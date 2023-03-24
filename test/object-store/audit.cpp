@@ -48,6 +48,7 @@
 
 using namespace realm;
 using namespace std::string_literals;
+using Catch::Matchers::StartsWith;
 using nlohmann::json;
 
 #ifndef AUDIT_LOG_LEVEL
@@ -81,7 +82,7 @@ std::vector<AuditEvent> get_audit_events(TestSyncManager& manager, bool parse_ev
         // If the session is still active (in this case the audit session) wait for audit to complete
         if (session->state() == SyncSession::State::Active) {
             auto [promise, future] = util::make_promise_future<void>();
-            session->wait_for_upload_completion([promise = std::move(promise)](std::error_code) mutable {
+            session->wait_for_upload_completion([promise = std::move(promise)](Status) mutable {
                 // Don't care if error occurred, just finish operation
                 promise.emplace_value();
             });
@@ -1103,20 +1104,28 @@ TEST_CASE("audit management") {
         config.audit_config = std::make_shared<AuditConfig>();
         SECTION("invalid prefix") {
             config.audit_config->partition_value_prefix = "";
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), InvalidName,
+                              "Audit partition prefix must not be empty");
             config.audit_config->partition_value_prefix = "/audit";
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), InvalidName,
+                              "Invalid audit parition prefix '/audit': prefix must not contain slashes");
         }
         SECTION("invalid metadata") {
             config.audit_config->metadata = {{"", "a"}};
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
-            std::string long_name('a', 64);
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), InvalidName,
+                              "Invalid audit metadata key '': keys must be 1-63 characters long");
+            std::string long_name(64, 'a');
             config.audit_config->metadata = {{long_name, "b"}};
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(
+                Realm::get_shared_realm(config), InvalidName,
+                "Invalid audit metadata key 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa': keys "
+                "must be 1-63 characters long");
             config.audit_config->metadata = {{"activity", "c"}};
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), InvalidName,
+                              "Invalid audit metadata key 'activity': metadata keys cannot overlap with the audit "
+                              "event properties");
             config.audit_config->metadata = {{"a", "d"}, {"a", "e"}};
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
+            REQUIRE_EXCEPTION(Realm::get_shared_realm(config), InvalidName, "Duplicate audit metadata key 'a'");
         }
     }
 
@@ -1773,7 +1782,7 @@ TEST_CASE("audit integration tests") {
     SECTION("invalid metadata properties") {
         config.audit_config->metadata = {{"invalid key", "value"}};
         auto error = expect_error(config, generate_event);
-        REQUIRE(error.message.find("Invalid schema change") == 0);
+        REQUIRE_THAT(error.what(), StartsWith("Invalid schema change"));
         REQUIRE(error.is_fatal);
     }
 
@@ -1806,7 +1815,7 @@ TEST_CASE("audit integration tests") {
         config.audit_config = std::make_shared<AuditConfig>();
 
         auto error = expect_error(config, generate_event);
-        REQUIRE(error.message.find("Invalid schema change") == 0);
+        REQUIRE_THAT(error.what(), StartsWith("Invalid schema change"));
         REQUIRE(error.is_fatal);
     }
 
@@ -1881,7 +1890,7 @@ TEST_CASE("audit integration tests") {
         SECTION("auditing with a flexible sync user reports a sync error") {
             config.audit_config->audit_user = harness.app()->current_user();
             auto error = expect_error(config, generate_event);
-            REQUIRE_THAT(error.message,
+            REQUIRE_THAT(error.what(),
                          Catch::Matchers::ContainsSubstring(
                              "Client connected using partition-based sync when app is using flexible sync"));
             REQUIRE(error.is_fatal);

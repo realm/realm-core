@@ -17,13 +17,6 @@ realm_refresh_callback_token::~realm_refresh_callback_token()
     realm::c_api::CBindingContext::get(*m_realm).realm_pending_refresh_callbacks().remove(m_token);
 }
 
-#if REALM_ENABLE_SYNC
-realm_thread_observer_token::~realm_thread_observer_token()
-{
-    realm::g_binding_callback_thread_observer = nullptr;
-}
-#endif // REALM_ENABLE_SYNC
-
 namespace realm::c_api {
 
 
@@ -308,7 +301,8 @@ RLM_API bool realm_remove_table(realm_t* realm, const char* table_name, bool* ta
             const auto& schema = (*realm)->schema();
             const auto& object_schema = schema.find(table_name);
             if (object_schema != schema.end()) {
-                throw std::logic_error("Attempt to remove a table that is currently part of the schema");
+                throw LogicError(ErrorCodes::InvalidSchemaChange,
+                                 "Attempt to remove a table that is currently part of the schema");
             }
             (*realm)->read_group().remove_table(table->get_key());
             *table_deleted = true;
@@ -322,7 +316,7 @@ RLM_API realm_t* realm_from_thread_safe_reference(realm_thread_safe_reference_t*
     return wrap_err([&]() {
         auto rtsr = dynamic_cast<shared_realm::thread_safe_reference*>(tsr);
         if (!rtsr) {
-            throw std::logic_error{"Thread safe reference type mismatch"};
+            throw LogicError{ErrorCodes::IllegalOperation, "Thread safe reference type mismatch"};
         }
 
         // FIXME: This moves out of the ThreadSafeReference, so it isn't
@@ -355,37 +349,5 @@ void CBindingContext::did_change(std::vector<ObserverState> const&, std::vector<
     }
     m_realm_changed_callbacks.invoke();
 }
-
-#if REALM_ENABLE_SYNC
-
-RLM_API
-realm_thread_observer_token_t*
-realm_set_binding_callback_thread_observer(realm_on_object_store_thread_callback_t on_thread_create,
-                                           realm_on_object_store_thread_callback_t on_thread_destroy,
-                                           realm_on_object_store_error_callback_t on_error, realm_userdata_t userdata,
-                                           realm_free_userdata_func_t free_userdata)
-{
-    realm::c_api::CBindingThreadObserver::ThreadCallback thread_create =
-        [on_thread_create, userdata = UserdataPtr{userdata, free_userdata}]() {
-            on_thread_create(userdata.get());
-        };
-
-    realm::c_api::CBindingThreadObserver::ThreadCallback thread_destroyed =
-        [on_thread_destroy, userdata = UserdataPtr{userdata, free_userdata}]() {
-            on_thread_destroy(userdata.get());
-        };
-
-    realm::c_api::CBindingThreadObserver::ErrorCallback error =
-        [on_error, userdata = UserdataPtr{userdata, free_userdata}](const char* error) {
-            on_error(userdata.get(), error);
-        };
-
-    auto& instance = realm::c_api::CBindingThreadObserver::create();
-    instance.set(std::move(thread_create), std::move(thread_destroyed), std::move(error));
-    g_binding_callback_thread_observer = &instance;
-    return new realm_thread_observer_token_t();
-}
-
-#endif // REALM_ENABLE_SYNC
 
 } // namespace realm::c_api

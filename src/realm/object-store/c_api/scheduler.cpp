@@ -188,12 +188,12 @@ RLM_API bool realm_scheduler_set_default_factory(realm_userdata_t userdata, real
         static_cast<void>(factory_func);
         static_cast<void>(s_default_factory_mutex);
         static_cast<void>(s_default_factory_set);
-        throw std::logic_error{"This platform already has a default scheduler implementation"};
+        throw IllegalOperation{"This platform already has a default scheduler implementation"};
         return true;
 #else
         std::unique_lock<std::mutex> lock{s_default_factory_mutex};
         if (s_default_factory_set) {
-            throw std::logic_error{"A default scheduler factory has already been registered"};
+            throw IllegalOperation{"A default scheduler factory has already been registered"};
         }
         DefaultFactory factory{userdata, free_func, factory_func};
         Scheduler::set_default_factory(std::move(factory));

@@ -149,6 +149,7 @@ set(REALM_INSTALL_HEADERS
     decimal128.hpp
     dictionary.hpp
     disable_sync_to_disk.hpp
+    error_codes.h
     error_codes.hpp
     exceptions.hpp
     global_key.hpp
@@ -329,8 +330,24 @@ target_include_directories(Storage INTERFACE
     $<INSTALL_INTERFACE:include>
 )
 
+# On systems without a built-in SHA-1 implementation (or one provided by a dependency)
+# we need to bundle the public domain implementation.
+if(NOT APPLE AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NOT REALM_HAVE_OPENSSL)
+    add_library(sha1 OBJECT ../external/sha-1/sha1.c)
+    target_include_directories(Storage PRIVATE ../external/sha-1)
+    target_sources(Storage PRIVATE $<TARGET_OBJECTS:sha1>)
+endif()
+
+# On systems without a built-in SHA-2 implementation (or one provided by a dependency)
+# we need to bundle the public domain implementation.
+# Note: This is also used on Windows because Windows lacks a native SHA224 hash needed for realm encryption
+if(NOT APPLE AND NOT REALM_HAVE_OPENSSL OR WIN32)
+    add_library(sha2 OBJECT ../external/sha-2/sha224.cpp ../external/sha-2/sha256.cpp)
+    target_include_directories(Storage PRIVATE ../external/sha-2)
+    target_sources(Storage PRIVATE $<TARGET_OBJECTS:sha2>)
+endif()
+
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    target_sources(Storage PRIVATE $<TARGET_OBJECTS:sha_win32>)
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         target_link_libraries(Storage INTERFACE Version.lib psapi.lib)
     endif()
@@ -345,7 +362,7 @@ endif()
 
 target_link_libraries(Storage INTERFACE Threads::Threads)
 
-if(UNIX AND NOT APPLE)
+if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE AND REALM_HAVE_OPENSSL)
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
 endif()
 

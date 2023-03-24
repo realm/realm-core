@@ -79,7 +79,7 @@ Query::Query(ConstTableRef table, std::unique_ptr<TableView> tv)
 void Query::create()
 {
     if (m_table && m_table->is_asymmetric()) {
-        throw LogicError{LogicError::wrong_kind_of_table};
+        throw IllegalOperation{"Query on ephemeral objects not allowed"};
     }
     m_groups.emplace_back();
 }
@@ -181,7 +181,7 @@ void Query::set_table(TableRef tr)
     }
 
     if (tr->is_asymmetric()) {
-        throw LogicError{LogicError::wrong_kind_of_table};
+        throw IllegalOperation{"Query on ephemeral objects not allowed"};
     }
 
     m_table = tr;
@@ -265,7 +265,7 @@ namespace {
 
 REALM_NOINLINE REALM_COLD REALM_NORETURN void throw_type_mismatch_error()
 {
-    throw LogicError{LogicError::type_mismatch};
+    throw LogicError(ErrorCodes::TypeMismatch, "Could not build query");
 }
 
 template <class Node>
@@ -939,7 +939,7 @@ Query& Query::fulltext(ColKey column_key, StringData value)
 {
     auto index = m_table->get_search_index(column_key);
     if (!(index && index->is_fulltext_index())) {
-        util::runtime_error("Column has no fulltext index");
+        throw IllegalOperation{"Column has no fulltext index"};
     }
 
     auto node = std::unique_ptr<ParentNode>{new StringNodeFulltext(std::move(value), column_key)};
@@ -951,7 +951,7 @@ Query& Query::fulltext(ColKey column_key, StringData value, const LinkMap& link_
 {
     auto index = link_map.get_target_table()->get_search_index(column_key);
     if (!(index && index->is_fulltext_index())) {
-        util::runtime_error("Column has no fulltext index");
+        throw IllegalOperation{"Column has no fulltext index"};
     }
 
     auto lm = std::make_unique<LinkMap>(link_map);
@@ -992,12 +992,14 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key) const
             auto node = pn->m_children[best];
             if (node->has_search_index()) {
                 auto keys = node->index_based_keys();
+                REALM_ASSERT(keys);
                 // The node having the search index can be removed from the query as we know that
                 // all the objects will match this condition
                 pn->m_children[best] = pn->m_children.back();
                 pn->m_children.pop_back();
-                for (auto key : keys) {
-                    auto obj = m_table->get_object(key);
+                const size_t num_keys = keys->size();
+                for (size_t i = 0; i < num_keys; ++i) {
+                    auto obj = m_table->get_object(keys->get(i));
                     if (pn->m_children.empty() || eval_object(obj)) {
                         st.m_key_offset = obj.get_key().value;
                         st.match(realm::npos, obj.get<T>(column_key));
@@ -1185,66 +1187,97 @@ ObjKey Query::find() const
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Find);
 #endif
 
+    auto logger = m_table->get_logger();
+    bool do_log = false;
+    std::chrono::steady_clock::time_point t1;
+
+    if (logger && logger->would_log(util::Logger::Level::debug)) {
+        logger->log(util::Logger::Level::debug, "Query find first: '%1'", get_description_safe());
+        t1 = std::chrono::steady_clock::now();
+        do_log = true;
+    }
+
+    ObjKey ret;
     init();
 
     // ordering could change the way in which objects are returned, in this case we need to run find_all()
     if (m_ordering && (m_ordering->will_apply_sort() || m_ordering->will_apply_distinct())) {
-        auto table = find_all();
-        if (table.size() > 0) {
+        auto table_view = find_all();
+        if (table_view.size() > 0) {
             // we just need to find the first.
-            return table.get_key(0);
-        }
-        else {
-            return null_key;
+            ret = table_view.get_key(0);
         }
     }
-
-    // User created query with no criteria; return first
-    if (!has_conditions()) {
+    else if (!has_conditions()) {
+        // User created query with no criteria; return first
         if (m_view) {
             if (m_view->size() > 0) {
-                return m_view->get_key(0);
-            }
-            return null_key;
-        }
-        else
-            return m_table->size() == 0 ? null_key : m_table.unchecked_ptr()->begin()->get_key();
-    }
-
-    if (m_view) {
-        size_t sz = m_view->size();
-        for (size_t i = 0; i < sz; i++) {
-            const Obj obj = m_view->get_object(i);
-            if (eval_object(obj)) {
-                return obj.get_key();
+                ret = m_view->get_key(0);
             }
         }
-        return null_key;
+        else {
+            ret = m_table->size() == 0 ? null_key : m_table.unchecked_ptr()->begin()->get_key();
+        }
     }
     else {
-        auto node = root_node();
-        ObjKey key;
-        auto f = [&node, &key](const Cluster* cluster) {
-            size_t end = cluster->node_size();
-            node->set_cluster(cluster);
-            size_t res = node->find_first(0, end);
-            if (res != not_found) {
-                key = cluster->get_real_key(res);
-                // We should just find one - we're done
-                return IteratorControl::Stop;
+        if (m_view) {
+            size_t sz = m_view->size();
+            for (size_t i = 0; i < sz; i++) {
+                const Obj obj = m_view->get_object(i);
+                if (eval_object(obj)) {
+                    ret = obj.get_key();
+                    break;
+                }
             }
-            return IteratorControl::AdvanceToNext;
-        };
+        }
+        else {
+            auto node = root_node();
+            ObjKey key;
+            auto f = [&node, &key](const Cluster* cluster) {
+                size_t end = cluster->node_size();
+                node->set_cluster(cluster);
+                size_t res = node->find_first(0, end);
+                if (res != not_found) {
+                    key = cluster->get_real_key(res);
+                    // We should just find one - we're done
+                    return IteratorControl::Stop;
+                }
+                return IteratorControl::AdvanceToNext;
+            };
 
-        m_table->traverse_clusters(f);
-        return key;
+            m_table->traverse_clusters(f);
+            ret = key;
+        }
     }
+
+    if (do_log) {
+        auto t2 = std::chrono::steady_clock::now();
+        logger->log(util::Logger::Level::debug, "Query first found: %1, Duration: %2 us", ret,
+                    std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+    }
+
+    return ret;
 }
 
 void Query::do_find_all(TableView& ret, size_t limit) const
 {
-    if (limit == 0)
+    auto logger = m_table->get_logger();
+    std::chrono::steady_clock::time_point t1;
+    bool do_log = false;
+
+    if (limit == 0) {
+        if (logger) {
+            logger->log(util::Logger::Level::debug, "Query find all: limit = 0 -> result: 0");
+        }
         return;
+    }
+
+    if (logger && logger->would_log(util::Logger::Level::debug)) {
+        logger->log(util::Logger::Level::debug, "Query find all: '%1', limit = %2", get_description_safe(),
+                    int64_t(limit));
+        t1 = std::chrono::steady_clock::now();
+        do_log = true;
+    }
 
     init();
 
@@ -1281,6 +1314,8 @@ void Query::do_find_all(TableView& ret, size_t limit) const
             auto best = find_best_node(pn);
             auto node = pn->m_children[best];
             if (node->has_search_index()) {
+                auto keys = node->index_based_keys();
+                REALM_ASSERT(keys);
                 KeyColumn& refs = ret.m_key_values;
 
                 // The node having the search index can be removed from the query as we know that
@@ -1288,8 +1323,9 @@ void Query::do_find_all(TableView& ret, size_t limit) const
                 pn->m_children[best] = pn->m_children.back();
                 pn->m_children.pop_back();
 
-                auto keys = node->index_based_keys();
-                for (auto key : keys) {
+                const size_t num_keys = keys->size();
+                for (size_t i = 0; i < num_keys; ++i) {
+                    ObjKey key = keys->get(i);
                     if (limit == 0)
                         break;
                     if (pn->m_children.empty()) {
@@ -1305,24 +1341,32 @@ void Query::do_find_all(TableView& ret, size_t limit) const
                         }
                     }
                 }
-                return;
             }
-            // no index on best node (and likely no index at all), descend B+-tree
-            node = pn;
-            QueryStateFindAll<KeyColumn> st(ret.m_key_values, limit);
+            else {
+                // no index on best node (and likely no index at all), descend B+-tree
+                node = pn;
+                QueryStateFindAll<KeyColumn> st(ret.m_key_values, limit);
 
-            auto f = [&node, &st, this](const Cluster* cluster) {
-                size_t e = cluster->node_size();
-                node->set_cluster(cluster);
-                st.m_key_offset = cluster->get_offset();
-                st.m_key_values = cluster->get_key_array();
-                aggregate_internal(node, &st, 0, e, nullptr);
-                // Stop if limit is reached
-                return st.match_count() == st.limit() ? IteratorControl::Stop : IteratorControl::AdvanceToNext;
-            };
+                auto f = [&node, &st, this](const Cluster* cluster) {
+                    size_t e = cluster->node_size();
+                    node->set_cluster(cluster);
+                    st.m_key_offset = cluster->get_offset();
+                    st.m_key_values = cluster->get_key_array();
+                    aggregate_internal(node, &st, 0, e, nullptr);
+                    // Stop if limit is reached
+                    return st.match_count() == st.limit() ? IteratorControl::Stop : IteratorControl::AdvanceToNext;
+                };
 
-            m_table->traverse_clusters(f);
+                m_table->traverse_clusters(f);
+            }
         }
+    }
+
+
+    if (do_log) {
+        auto t2 = std::chrono::steady_clock::now();
+        logger->log(util::Logger::Level::debug, "Query found: %1, Duration: %2 us", ret.size(),
+                    std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
     }
 }
 
@@ -1343,21 +1387,42 @@ TableView Query::find_all(size_t limit) const
 
 size_t Query::do_count(size_t limit) const
 {
-    if (limit == 0)
+    auto logger = m_table->get_logger();
+    std::chrono::steady_clock::time_point t1;
+    bool do_log = false;
+
+    if (limit == 0) {
+        if (logger) {
+            logger->log(util::Logger::Level::debug, "Query count: limit = 0 -> result: 0");
+        }
         return 0;
+    }
 
     if (!has_conditions()) {
         // User created query with no criteria; count all
+        size_t cnt_all;
         if (m_view) {
-            return std::min(m_view->size(), limit);
+            cnt_all = std::min(m_view->size(), limit);
         }
         else {
-            return std::min(m_table->size(), limit);
+            cnt_all = std::min(m_table->size(), limit);
         }
+        if (logger) {
+            logger->log(util::Logger::Level::debug, "Query count (no condition): limit = %1 -> result: %2",
+                        int64_t(limit), cnt_all);
+        }
+        return cnt_all;
     }
 
-    init();
+    if (logger && logger->would_log(util::Logger::Level::debug)) {
+        logger->log(util::Logger::Level::debug, "Query count: '%1', limit = %2", get_description_safe(),
+                    int64_t(limit));
+        t1 = std::chrono::steady_clock::now();
+        do_log = true;
+    }
     size_t cnt = 0;
+
+    init();
 
     if (m_view) {
         m_view->for_each([&](const Obj& obj) {
@@ -1368,50 +1433,58 @@ size_t Query::do_count(size_t limit) const
         });
     }
     else {
-        size_t counter = 0;
         auto pn = root_node();
         auto best = find_best_node(pn);
         auto node = pn->m_children[best];
         if (node->has_search_index()) {
             auto keys = node->index_based_keys();
+            REALM_ASSERT(keys);
             if (pn->m_children.size() > 1) {
                 // The node having the search index can be removed from the query as we know that
                 // all the objects will match this condition
                 pn->m_children[best] = pn->m_children.back();
                 pn->m_children.pop_back();
-                for (auto key : keys) {
-                    auto obj = m_table->get_object(key);
+                const size_t num_keys = keys->size();
+                for (size_t i = 0; i < num_keys; ++i) {
+                    auto obj = m_table->get_object(keys->get(i));
                     if (eval_object(obj)) {
-                        ++counter;
-                        if (counter == limit)
+                        ++cnt;
+                        if (cnt == limit)
                             break;
                     }
                 }
             }
             else {
                 // The node having the search index is the only node
-                auto sz = keys.size();
-                counter = std::min(limit, sz);
+                auto sz = keys->size();
+                cnt = std::min(limit, sz);
             }
-            return counter;
         }
-        // no index, descend down the B+-tree instead
-        node = pn;
-        QueryStateCount st(limit);
+        else {
+            // no index, descend down the B+-tree instead
+            node = pn;
+            QueryStateCount st(limit);
 
-        auto f = [&node, &st, this](const Cluster* cluster) {
-            size_t e = cluster->node_size();
-            node->set_cluster(cluster);
-            st.m_key_offset = cluster->get_offset();
-            st.m_key_values = cluster->get_key_array();
-            aggregate_internal(node, &st, 0, e, nullptr);
-            // Stop if limit or end is reached
-            return st.match_count() == st.limit() ? IteratorControl::Stop : IteratorControl::AdvanceToNext;
-        };
+            auto f = [&node, &st, this](const Cluster* cluster) {
+                size_t e = cluster->node_size();
+                node->set_cluster(cluster);
+                st.m_key_offset = cluster->get_offset();
+                st.m_key_values = cluster->get_key_array();
+                aggregate_internal(node, &st, 0, e, nullptr);
+                // Stop if limit or end is reached
+                return st.match_count() == st.limit() ? IteratorControl::Stop : IteratorControl::AdvanceToNext;
+            };
 
-        m_table->traverse_clusters(f);
+            m_table->traverse_clusters(f);
 
-        cnt = st.get_count();
+            cnt = st.get_count();
+        }
+    }
+
+    if (do_log) {
+        auto t2 = std::chrono::steady_clock::now();
+        logger->log(util::Logger::Level::debug, "Query matches: %1, Duration: %2 us", cnt,
+                    std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
     }
 
     return cnt;
@@ -1639,9 +1712,6 @@ std::string Query::get_description(util::serializer::SerialisationState& state) 
 {
     std::string description;
     if (auto root = root_node()) {
-        if (m_view) {
-            throw SerialisationError("Serialisation of a query constrained by a view is not currently supported");
-        }
         description = root->describe_expression(state);
     }
     else {
@@ -1668,8 +1738,22 @@ util::bind_ptr<DescriptorOrdering> Query::get_ordering()
 
 std::string Query::get_description() const
 {
+    if (m_view) {
+        throw SerializationError("Serialization of a query constrained by a view is not currently supported");
+    }
     util::serializer::SerialisationState state(m_table->get_parent_group());
     return get_description(state);
+}
+
+std::string Query::get_description_safe() const noexcept
+{
+    try {
+        util::serializer::SerialisationState state(m_table->get_parent_group());
+        return get_description(state);
+    }
+    catch (...) {
+    }
+    return "Unknown Query";
 }
 
 void Query::init() const
@@ -1795,7 +1879,7 @@ Query Query::operator&&(const Query& q)
 Query Query::operator!()
 {
     if (!root_node())
-        throw util::runtime_error("negation of empty query is not supported");
+        throw Exception(ErrorCodes::InvalidQuery, "negation of empty query is not supported");
     Query q(m_table);
     q.Not();
     q.and_query(*this);

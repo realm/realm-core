@@ -263,7 +263,7 @@ TEST(StringIndex_NonIndexable)
     table->add_column(type_Binary, "binary");
 
     for (auto col : table->get_column_keys()) {
-        CHECK_LOGIC_ERROR(table->add_search_index(col), LogicError::illegal_combination);
+        CHECK_LOGIC_ERROR(table->add_search_index(col), ErrorCodes::IllegalOperation);
     }
 }
 
@@ -1788,6 +1788,15 @@ TEST(StringIndex_QuerySingleObject)
     CHECK_EQUAL(q.count(), 1);
     q = table->where().equal(table->get_column_key("name"), "Bar", true);
     CHECK_EQUAL(q.count(), 0);
+}
+
+TEST(StringIndex_MixedNonEmptyTable)
+{
+    Group g;
+    auto table = g.add_table("foo");
+    auto col = table->add_column(type_Mixed, "any");
+    table->create_object().set(col, Mixed("abcdefgh"));
+    table->add_search_index(col);
 }
 
 TEST(StringIndex_MixedEqualBitPattern)

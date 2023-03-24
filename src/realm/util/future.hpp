@@ -22,7 +22,7 @@
 #include <mutex>
 #include <type_traits>
 
-#include "realm/status.hpp"
+#include "realm/exceptions.hpp"
 #include "realm/status_with.hpp"
 #include "realm/util/assert.hpp"
 #include "realm/util/bind_ptr.hpp"
@@ -171,14 +171,14 @@ inline auto throwing_call(Func&& func, Args&&... args)
     else if constexpr (std::is_same_v<Result, Status>) {
         auto res = (call(func, std::forward<Args>(args)...));
         if (!res.is_ok()) {
-            throw ExceptionForStatus(std::move(res));
+            throw Exception(std::move(res));
         }
         return FakeVoid{};
     }
     else if constexpr (is_status_with<Result>) {
         auto res = (call(func, std::forward<Args>(args)...));
         if (!res.is_ok()) {
-            throw ExceptionForStatus(std::move(res.get_status()));
+            throw Exception(std::move(res.get_status()));
         }
         return std::move(res.get_value());
     }
@@ -1012,7 +1012,7 @@ private:
 
         m_shared->wait();
         if (!m_shared->m_status.is_ok()) {
-            throw ExceptionForStatus(m_shared->m_status);
+            throw Exception(m_shared->m_status);
         }
         return *m_shared->m_data;
     }

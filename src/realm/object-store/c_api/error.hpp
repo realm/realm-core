@@ -52,6 +52,7 @@ public:
 private:
     util::Optional<realm_error_t> m_err;
     std::string m_message_buf;
+    std::string m_path_buf;
     void* m_usercode_error;
 };
 

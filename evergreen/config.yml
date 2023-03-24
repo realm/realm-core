@@ -32,7 +32,7 @@ functions:
         script: |-
           set -o errexit
           git submodule update --init --recursive
-  
+
   "compile":
     - command: shell.exec
       params:
@@ -108,8 +108,8 @@ functions:
               set_cmake_var realm_vars CMAKE_TOOLCHAIN_FILE PATH "${cmake_toolchain_file}"
           fi
 
-          set_cmake_var realm_vars REALM_TEST_SYNC_LOGGING BOOL On
-          set_cmake_var realm_vars REALM_TEST_SYNC_LOGGING_LEVEL STRING "debug"
+          set_cmake_var realm_vars REALM_TEST_LOGGING BOOL On
+          set_cmake_var realm_vars REALM_TEST_LOGGING_LEVEL STRING "debug"
 
           GENERATOR="${cmake_generator}"
           if [ -z "${cmake_generator|}" ]; then
@@ -228,7 +228,7 @@ functions:
       content_type: text/text
       display_name: install baas output
       optional: true
-  
+
   "upload fuzzer results":
   - command: shell.exec
     params:
@@ -238,7 +238,7 @@ functions:
           echo "Found crash file"
           mv crash-* realm-fuzzer-crash.txt
         fi
-    
+
   - command: s3.put
     params:
       working_dir: realm-core/build/test/realm-fuzzer
@@ -625,7 +625,7 @@ tasks:
                 export DEVELOPER_DIR="${xcode_developer_dir}"
             fi
 
-            ./evergreen/install_baas.sh -w ./baas-work-dir -b 1e1df073f20bbf490c0f57086e890aa482855f61 2>&1 | tee install_baas_output.log
+            ./evergreen/install_baas.sh -w ./baas-work-dir -b afb2fc14ccb8f4fcadeeecb091bab834d119baba 2>&1 | tee install_baas_output.log
         fi
 
   - command: shell.exec
@@ -784,7 +784,7 @@ task_groups:
   - func: "upload fuzzer results"
   tasks:
   - fuzzer
-  
+
 buildvariants:
 - name: ubuntu2004
   display_name: "Ubuntu 20.04 x86_64 (Clang 11)"
@@ -936,7 +936,7 @@ buildvariants:
   - name: fuzzer-tests
     cron: "@daily"
     patchable: true
-    
+
 - name: rhel70
   display_name: "RHEL 7 x86_64"
   run_on: rhel70-small

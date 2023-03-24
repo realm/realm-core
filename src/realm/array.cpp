@@ -686,7 +686,6 @@ int64_t Array::sum(size_t start, size_t end) const
 
         for (size_t t = 0; t < chunks; t++) {
             if (w == 1) {
-
 #if 0
 #if defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
                 s += __popcnt64(data[t]);
@@ -702,7 +701,6 @@ int64_t Array::sum(size_t start, size_t end) const
                 s += a;
 #endif
 #endif
-
                 s += fast_popcount64(data[t]);
             }
             else if (w == 2) {
@@ -725,7 +723,6 @@ int64_t Array::sum(size_t start, size_t end) const
 
 #ifdef REALM_COMPILER_SSE
     if (sseavx<42>()) {
-
         // 2000 items summed 500000 times, 8/16/32 bits, miliseconds:
         // Naive, templated get<>: 391 371 374
         // SSE:                     97 148 282
@@ -1017,7 +1014,7 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
         byte_size = header_size + size * bytes_per_elem;
     }
     if (overflow)
-        throw util::overflow_error("Byte size overflow");
+        throw std::overflow_error("Byte size overflow");
     REALM_ASSERT_3(byte_size, >, 0);
     size_t aligned_byte_size = ((byte_size - 1) | 7) + 1; // 8-byte alignment
     return aligned_byte_size;
@@ -1234,6 +1231,7 @@ void Array::set(size_t ndx, int64_t value)
     set_direct<width>(m_data, ndx, value);
 }
 
+#ifdef REALM_DEBUG
 namespace {
 
 class MemStatsHandler : public Array::MemUsageHandler {
@@ -1315,6 +1313,7 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
         handler.handle(ref, allocated, used); // Throws
     }
 }
+#endif
 
 void Array::verify() const
 {

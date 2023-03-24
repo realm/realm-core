@@ -296,10 +296,10 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
     REALM_ASSERT(column_ndx <= m_types.size());
 
     if (REALM_UNLIKELY(name.size() > Table::max_column_name_length)) {
-        throw LogicError(LogicError::column_name_too_long);
+        throw InvalidArgument(ErrorCodes::InvalidName, util::format("Name too long: %1", name));
     }
     if (get_column_index(name) != npos) {
-        throw LogicError(LogicError::column_name_in_use);
+        throw InvalidArgument(ErrorCodes::InvalidName, util::format("Property name in use: %1", name));
     }
 
     if (type != col_type_BackLink) {
@@ -308,7 +308,6 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
     }
 
     m_types.insert(column_ndx, int(type)); // Throws
-    // FIXME: So far, attributes are never reported to the replication system
     m_attr.insert(column_ndx, attr); // Throws
     m_keys.insert(column_ndx, col_key.value);
 

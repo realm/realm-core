@@ -24,6 +24,7 @@
 #include <realm/util/checked_mutex.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/sync/binding_callback_thread_observer.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/socket_provider.hpp>
 
@@ -76,7 +77,6 @@ struct SyncClientConfig {
 
     using LoggerFactory = std::function<std::shared_ptr<util::Logger>(util::Logger::Level)>;
     LoggerFactory logger_factory;
-    // FIXME: Should probably be util::Logger::Level::error
     util::Logger::Level log_level = util::Logger::Level::info;
     ReconnectMode reconnect_mode = ReconnectMode::normal; // For internal sync-client testing only!
     bool multiplex_sessions = false;
@@ -84,6 +84,10 @@ struct SyncClientConfig {
     // The SyncSocket instance used by the Sync Client for event synchronization
     // and creating WebSockets. If not provided the default implementation will be used.
     std::shared_ptr<sync::SyncSocketProvider> socket_provider;
+
+    // Optional thread observer for event loop thread events in the default SyncSocketProvider
+    // implementation. It is not used for custom SyncSocketProvider implementations.
+    std::shared_ptr<BindingCallbackThreadObserver> default_socket_provider_thread_observer;
 
     // {@
     // Optional information about the binding/application that is sent as part of the User-Agent

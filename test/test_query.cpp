@@ -156,6 +156,11 @@ TEST(Query_Parser)
     // You don't need to create a query object first:
     match = books.query("pages >= 200 && author == \"David Griffiths\"").find();
     CHECK_EQUAL(obj2.get_key(), match);
+
+    // Check that we handle unicode strings correctly
+    std::string query_string = "author == \"جمعتs\"";
+    q = books.query(query_string);
+    CHECK_EQUAL(q.get_description(), query_string);
 }
 
 
@@ -951,7 +956,7 @@ TEST(Query_Not)
 
     // applying not to an empty query is forbidden
     realm::Query q4 = table.where();
-    CHECK_THROW(!q4, std::runtime_error);
+    CHECK_THROW(!q4, realm::Exception);
 }
 
 
@@ -2379,12 +2384,15 @@ TEST(Query_TwoColumnsNumeric)
             size_t num_expected_matches = num_rows;
             if ((lhs_type == type_Mixed) != (rhs_type == type_Mixed)) {
                 // Only one prop is mixed
-                num_expected_matches = 6;
+                // see convert_for_test<Mixed>():
+                // matches on numerics: 1(int), 3(double), 5(decimal128), 9(int), 11(double)
+                num_expected_matches = 5;
             }
             if ((lhs_type == type_String) != (rhs_type == type_String)) {
                 // Only one prop is string
                 num_expected_matches = 0;
                 if ((lhs_type == type_Mixed) || (rhs_type == type_Mixed)) {
+                    // matches on "string 2" and "string 10"
                     num_expected_matches = 2;
                 }
             }
@@ -4062,11 +4070,12 @@ TEST(Query_LinkChainSortErrors)
     // Disallow invalid column ids, linklists, other non-link column types.
     ColKey backlink_ndx(ColKey::Idx{2}, col_type_Link, ColumnAttrMask{}, 0);
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_linklist_col, t2_string_col}})),
-                      LogicError::type_mismatch);
+                      ErrorCodes::InvalidSortDescriptor);
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{backlink_ndx, t2_string_col}})),
-                      LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_int_col, t2_string_col}})), LogicError::type_mismatch);
-    CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_linklist_col}})), LogicError::type_mismatch);
+                      ErrorCodes::InvalidSortDescriptor);
+    CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_int_col, t2_string_col}})),
+                      ErrorCodes::InvalidSortDescriptor);
+    CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_linklist_col}})), ErrorCodes::InvalidSortDescriptor);
 }
 
 
@@ -5610,7 +5619,7 @@ TEST(Query_AsymmetricObjects)
     auto col = table->add_column(type_String, "type");
     table->create_object().set(col, "hello");
     CHECK_LOGIC_ERROR(table->where().equal(col, "hello").Or().Not().group().end_group(),
-                      LogicError::wrong_kind_of_table);
+                      ErrorCodes::IllegalOperation);
 }
 
 #endif // TEST_QUERY

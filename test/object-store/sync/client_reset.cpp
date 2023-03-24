@@ -79,8 +79,8 @@ struct StringMaker<ThreadSafeSyncError> {
         if (!value) {
             return "No SyncError";
         }
-        return realm::util::format("SyncError(%1), is_fatal: %2, with message: '%3'", value->error_code,
-                                   value->is_fatal, value->message);
+        return realm::util::format("SyncError(%1), is_fatal: %2, with message: '%3'", value->get_system_error(),
+                                   value->is_fatal, value->reason());
     }
 };
 } // namespace Catch
@@ -132,7 +132,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset]") {
     SyncTestFile realm_config(app->current_user(), partition.value, schema);
     realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        if (err.error_code == util::make_error_code(util::MiscExtErrors::end_of_input)) {
+        if (err.get_system_error() == util::make_error_code(util::MiscExtErrors::end_of_input)) {
             return;
         }
 
@@ -141,7 +141,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset]") {
             return;
         }
 
-        FAIL(util::format("got error from server: %1: %2", err.error_code.value(), err.message));
+        FAIL(util::format("got error from server: %1: %2", err.get_system_error().value(), err.what()));
     };
 
     auto realm = Realm::get_shared_realm(realm_config);
@@ -227,7 +227,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
     SyncTestFile realm_config(app->current_user(), partition.value, schema);
     realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        if (err.error_code == sync::websocket::make_error_code(ErrorCodes::ReadError)) {
+        if (err.get_system_error() == sync::websocket::WebSocketError::websocket_read_error) {
             return;
         }
 
@@ -236,7 +236,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
             return;
         }
 
-        FAIL(util::format("got error from server: %1: %2", err.error_code.value(), err.message));
+        FAIL(util::format("got error from server: %1: %2", err.get_system_error().value(), err.what()));
     };
 
     auto realm = Realm::get_shared_realm(realm_config);
@@ -353,7 +353,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
         REQUIRE(!util::File::exists(orig_path));
         REQUIRE(util::File::exists(recovery_path));
         local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-            CAPTURE(err.message);
+            CAPTURE(err.reason());
             CAPTURE(local_config.path);
             FAIL("Error handler should not have been called");
         };
@@ -363,7 +363,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
     }
 
     local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        CAPTURE(err.message);
+        CAPTURE(err.reason());
         CAPTURE(local_config.path);
         FAIL("Error handler should not have been called");
     };
@@ -896,10 +896,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 session = test_app_session.app()->sync_manager()->get_existing_session(temp_config.path);
                 REQUIRE(session);
             }
-            realm::SyncError synthetic(sync::make_error_code(sync::ProtocolError::bad_client_file),
-                                       "A fake client reset error", true);
+            sync::SessionErrorInfo synthetic(sync::make_error_code(sync::ProtocolError::bad_client_file),
+                                             "A fake client reset error", false);
             synthetic.server_requests_action = sync::ProtocolErrorInfo::Action::ClientReset;
-            SyncSession::OnlyForTesting::handle_error(*session, synthetic);
+            SyncSession::OnlyForTesting::handle_error(*session, std::move(synthetic));
 
             session->revive_if_needed();
             timed_sleeping_wait_for(
@@ -1870,10 +1870,10 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
          }},
         {"test type",
          {{"_id", PropertyType::Int, Property::IsPrimary{true}},
-          {"value", TestType::property_type()},
-          {"list", PropertyType::Array | TestType::property_type()},
-          {"dictionary", PropertyType::Dictionary | TestType::property_type()},
-          {"set", PropertyType::Set | TestType::property_type()}}},
+          {"value", TestType::property_type},
+          {"list", PropertyType::Array | TestType::property_type},
+          {"dictionary", PropertyType::Dictionary | TestType::property_type},
+          {"set", PropertyType::Set | TestType::property_type}}},
     };
 
     SyncTestFile config2(init_sync_manager.app(), "default");

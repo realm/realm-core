@@ -73,7 +73,7 @@ bool TransactLogEncoder::dictionary_clear(size_t dict_size)
 REALM_NORETURN
 void TransactLogParser::parser_error() const
 {
-    throw BadTransactLog();
+    throw Exception(ErrorCodes::BadChangeset, "Bad transaction log");
 }
 
 } // namespace _impl
