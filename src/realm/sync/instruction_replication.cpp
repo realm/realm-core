@@ -757,7 +757,9 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
         // Populate top object in the normal way.
         auto top_table = table.get_parent_group()->get_table(path.top_table);
         // The first path entry will be the property name on the top object
-        populate_path_instr(instr, *top_table, path.top_objkey, path.path_from_top[0].get_key());
+        auto pString = path.path_from_top[0].get_if_key();
+        REALM_ASSERT(pString);
+        populate_path_instr(instr, *top_table, path.top_objkey, *pString);
 
         size_t sz = path.path_from_top.size();
         instr.path.m_path.reserve(sz - 1);
@@ -766,7 +768,7 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
                 instr.path.push_back(uint32_t(*pval));
             }
             else if (auto pval = path.path_from_top[i].get_if_key()) {
-                InternString interned_field_name = m_encoder.intern_string(*pval);
+                InternString interned_field_name = m_encoder.intern_string(pval->c_str());
                 instr.path.push_back(interned_field_name);
             }
         }

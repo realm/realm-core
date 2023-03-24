@@ -479,6 +479,8 @@ public:
     }
 
     // Overriding members in CollectionParent
+    FullPath get_path() const noexcept final;
+    void add_index(Path& path, Index ndx) const noexcept final;
     TableRef get_table() const noexcept override
     {
         return get_obj().get_table();

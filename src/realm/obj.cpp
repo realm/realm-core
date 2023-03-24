@@ -935,7 +935,7 @@ Obj::FatPath Obj::get_fat_path() const
     return result;
 }
 
-FullPath Obj::get_path() const
+FullPath Obj::get_path() const noexcept
 {
     FullPath result;
     if (m_table->is_embedded()) {
@@ -945,24 +945,28 @@ FullPath Obj::get_path() const
             if (backlinks.size() == 1) {
                 TableRef origin_table = m_table->get_opposite_table(col_key);
                 Obj obj = origin_table->get_object(backlinks[0]); // always the first (and only)
-                result = obj.get_path();
                 auto next_col_key = m_table->get_opposite_column(col_key);
-                result.path_from_top.emplace_back(obj.get_table()->get_column_name(next_col_key));
 
                 ColumnAttrMask attr = next_col_key.get_attrs();
                 Mixed index;
                 if (attr.test(col_attr_List)) {
                     REALM_ASSERT(next_col_key.get_type() == col_type_LinkList);
-                    LnkLst link_list = obj.get_linklist(next_col_key);
-                    auto i = link_list.find_first(get_key());
+                    Lst<ObjKey> link_list(next_col_key);
+                    size_t i = find_link_value_in_collection(link_list, obj, next_col_key, get_key());
                     REALM_ASSERT(i != realm::not_found);
+                    result = link_list.get_path();
                     result.path_from_top.emplace_back(i);
                 }
                 else if (attr.test(col_attr_Dictionary)) {
-                    auto dict = obj.get_dictionary(next_col_key);
-                    auto ndx = dict.find_first(get_link());
+                    Dictionary dict(next_col_key);
+                    size_t ndx = find_link_value_in_collection(dict, obj, next_col_key, get_link());
                     REALM_ASSERT(ndx != realm::not_found);
-                    result.path_from_top.emplace_back(dict.get_key(ndx).get_string());
+                    result = dict.get_path();
+                    result.path_from_top.push_back(dict.get_key(ndx).get_string());
+                }
+                else {
+                    result = obj.get_path();
+                    result.path_from_top.push_back(obj.get_table()->get_column_name(next_col_key));
                 }
 
                 return IteratorControl::Stop; // early out
@@ -977,6 +981,12 @@ FullPath Obj::get_path() const
     return result;
 }
 
+void Obj::add_index(Path& path, Index index) const noexcept
+{
+    auto col_key = mpark::get<ColKey>(index);
+    StringData col_name = get_table()->get_column_name(col_key);
+    path.emplace_back(std::string(col_name));
+}
 
 void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
                   std::vector<ObjLink>& followed, JSONOutputMode output_mode) const

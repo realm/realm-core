@@ -58,6 +58,10 @@ public:
 
     UpdateStatus update_if_needed_with_status() const noexcept final;
     bool update_if_needed() const final;
+
+    FullPath get_path() const noexcept final;
+    void add_index(Path& path, Index ndx) const noexcept final;
+
     TableRef get_table() const noexcept final
     {
         return m_parent->get_table();
