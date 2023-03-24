@@ -85,8 +85,6 @@ public:
     {
         emscripten_websocket_send_binary(m_socket, const_cast<char*>(data.data()), data.size());
 
-        unsigned long long buffered_amount;
-        emscripten_websocket_get_buffered_amount(m_socket, &buffered_amount);
         auto weak_handler = [handler = std::move(handler), sentinel = std::weak_ptr(m_sentinel)](Status status) {
             if (sentinel.lock()) {
                 // only call the real handler if the socket object is still alive
