@@ -745,7 +745,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithFreshSharedGroup)
 }
 
 
-NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_CreateManyTables, testing_supports_fork)
+NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_CreateManyTables, testing_supports_spawn_process)
 {
     SHARED_GROUP_TEST_PATH(path);
     SHARED_GROUP_TEST_PATH(path2);
@@ -886,7 +886,7 @@ TEST(LangBindHelper_AdvanceReadTransact_PinnedSize)
 }
 
 
-NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_InsertTable, testing_supports_fork)
+NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_InsertTable, testing_supports_spawn_process)
 {
     SHARED_GROUP_TEST_PATH(path);
 
@@ -1022,7 +1022,7 @@ TEST(LangBindHelper_AdvanceReadTransact_EnumeratedStrings)
     CHECK_EQUAL(0, table->get_num_unique_values(c2));
 }
 
-NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_supports_fork)
+NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_SearchIndex, testing_supports_spawn_process)
 {
     SHARED_GROUP_TEST_PATH(path);
     if (test_util::SpawnedProcess::is_parent()) {
@@ -1480,7 +1480,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkToNeighbour)
     rt->verify();
 }
 
-NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns, testing_supports_fork)
+NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns, testing_supports_spawn_process)
 {
     SHARED_GROUP_TEST_PATH(path);
     if (test_util::SpawnedProcess::is_parent()) {
@@ -1891,7 +1891,7 @@ TEST(LangBindHelper_AdvanceReadTransact_IntIndex)
     t_r->clear();
 }
 
-NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_TableClear, testing_supports_fork)
+NONCONCURRENT_TEST_IF(LangBindHelper_AdvanceReadTransact_TableClear, testing_supports_spawn_process)
 {
     SHARED_GROUP_TEST_PATH(path);
 
@@ -3338,7 +3338,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 // crash upon exit(0) when attempting to destroy a locked mutex.
 // This is not run with ASAN because children intentionally call exit(0) which does not
 // invoke destructors.
-NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, testing_supports_fork)
+NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, testing_supports_spawn_process)
 {
     const int write_process_count = 7;
     const int read_process_count = 3;
@@ -3371,7 +3371,8 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, testing_
         }
         exit(0);
     }
-    else {
+
+    if (process->is_parent()) {
         process->wait_for_child_to_finish();
     }
 

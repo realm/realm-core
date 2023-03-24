@@ -197,7 +197,7 @@ static const bool running_with_asan = true;
 static const bool running_with_asan = false;
 #endif
 
-constexpr bool testing_supports_fork = !running_with_valgrind && !running_with_tsan && !running_with_asan;
+constexpr bool testing_supports_spawn_process = !running_with_valgrind && !running_with_tsan && !running_with_asan;
 
 //@{
 

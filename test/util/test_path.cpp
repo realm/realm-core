@@ -52,6 +52,7 @@ bool g_keep_files = false;
 
 std::string g_path_prefix;
 std::string g_resource_path;
+std::string g_exe_name;
 
 #ifdef _WIN32
 std::string sanitize_for_file_name(std::string str)
@@ -119,6 +120,7 @@ bool initialize_test_path(int argc, const char* argv[])
 #else
     g_path_prefix = util::make_temp_dir() + "/";
 #endif
+    g_exe_name = argv[0];
 
     auto resources_url = adoptCF(CFBundleCopyResourcesDirectoryURL(CFBundleGetMainBundle()));
     g_resource_path = url_to_path(resources_url.get());
@@ -179,6 +181,11 @@ bool test_dir_is_exfat()
 std::string get_test_resource_path()
 {
     return g_resource_path;
+}
+
+std::string get_test_exe_name()
+{
+    return g_exe_name;
 }
 
 TestPathGuard::TestPathGuard(const std::string& path)

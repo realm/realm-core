@@ -249,13 +249,10 @@ struct ReclaimerThreadStopper {
 #else // REALM_PLATFORM_APPLE
 static dispatch_source_t reclaimer_timer;
 static dispatch_queue_t reclaimer_queue;
-static bool did_init_reclaimer = false;
-static int pid_of_creator = -1;
 
 static void ensure_reclaimer_thread_runs()
 {
-    if (!did_init_reclaimer) {
-        pid_of_creator = getpid();
+    if (!reclaimer_timer) {
         if (__builtin_available(iOS 10, macOS 12, tvOS 10, watchOS 3, *)) {
             reclaimer_queue = dispatch_queue_create_with_target("io.realm.page-reclaimer", DISPATCH_QUEUE_SERIAL,
                                                                 dispatch_get_global_queue(QOS_CLASS_BACKGROUND, 0));
@@ -269,21 +266,19 @@ static void ensure_reclaimer_thread_runs()
             reclaim_pages();
         });
         dispatch_resume(reclaimer_timer);
-        did_init_reclaimer = true;
     }
 }
 
 struct ReclaimerThreadStopper {
     ~ReclaimerThreadStopper()
     {
-        if (did_init_reclaimer && getpid() == pid_of_creator) {
+        if (reclaimer_timer) {
             dispatch_source_cancel(reclaimer_timer);
             // Block until any currently-running timer tasks are done
             dispatch_sync(reclaimer_queue, ^{
                           });
             dispatch_release(reclaimer_timer);
             dispatch_release(reclaimer_queue);
-            did_init_reclaimer = false;
         }
     }
 } reclaimer_thread_stopper;
@@ -696,30 +691,6 @@ void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMo
 
 
 #endif // REALM_ENABLE_ENCRYPTION
-
-void prepare_for_fork_in_parent()
-{
-#if REALM_ENABLE_ENCRYPTION
-#if !REALM_PLATFORM_APPLE
-    if (reclaimer_thread) {
-        reclaimer_shutdown = true;
-        reclaimer_thread->join();
-        reclaimer_thread = nullptr;
-        reclaimer_shutdown = false;
-    }
-#endif // !REALM_PLATFORM_APPLE
-#endif // REALM_ENABLE_ENCRYPTION
-}
-
-void post_fork_in_child()
-{
-#if REALM_ENABLE_ENCRYPTION
-    UniqueLock lock(mapping_mutex);
-    mappings_by_addr.clear();
-    mappings_by_file.clear();
-    num_decrypted_pages = 0;
-#endif // REALM_ENABLE_ENCRYPTION
-}
 
 void* mmap_anon(size_t size)
 {

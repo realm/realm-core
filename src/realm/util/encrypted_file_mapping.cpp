@@ -342,8 +342,7 @@ size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObs
         else {
             // don't wait on the first retry as we want to optimize the case where the first read
             // from the iv table cache didn't validate and we are fetching the iv block from disk for the first time
-            std::pair<iv_table, size_t> cur_iv_and_data_hash =
-                std::make_pair(iv, std::hash<std::string_view>{}(page_data));
+            auto cur_iv_and_data_hash = std::make_pair(iv, std::hash<std::string_view>{}(page_data));
             if (retry_count != 0) {
                 std::this_thread::yield();
                 if (last_iv_and_data_hash == cur_iv_and_data_hash) {

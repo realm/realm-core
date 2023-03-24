@@ -129,7 +129,7 @@ namespace {
 //
 DWORD winfork(std::string unit_test_name)
 {
-    if (getenv("REALM_FORKED"))
+    if (getenv("REALM_SPAWNED"))
         return GetCurrentProcessId();
 
     wchar_t filename[MAX_PATH];
@@ -142,7 +142,7 @@ DWORD winfork(std::string unit_test_name)
     GetModuleFileName(nullptr, filename, MAX_PATH);
 
     std::string environment;
-    environment.append("REALM_FORKED=1");
+    environment.append("REALM_SPAWNED=1");
     environment.append("\0", 1);
     environment.append("UNITTEST_FILTER=" + unit_test_name);
     environment.append("\0\0", 2);

@@ -21,7 +21,10 @@
 #include <realm/util/assert.hpp>
 #include <realm/util/file_mapper.hpp>
 
+#include "test_path.hpp"
+
 #ifndef _WIN32
+#include <spawn.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #endif
@@ -67,18 +70,13 @@ void SpawnedProcess::set_pid(int id)
 
 bool SpawnedProcess::is_child()
 {
-#ifndef _WIN32
-    REALM_ASSERT_EX(m_pid >= 0, m_pid);
-    return m_pid == 0;
-#else
     const char* str = getenv("REALM_CHILD_IDENT");
     return str && str == m_identifier;
-#endif
 }
 
 bool SpawnedProcess::is_parent()
 {
-    return !(getenv("REALM_CHILD_IDENT") || getenv("REALM_FORKED"));
+    return !(getenv("REALM_CHILD_IDENT") || getenv("REALM_SPAWNED"));
 }
 
 int SpawnedProcess::wait_for_child_to_finish()
@@ -134,58 +132,61 @@ static void signal_handler(int signal)
 std::unique_ptr<SpawnedProcess> spawn_process(const std::string& test_name, const std::string& process_ident)
 {
     std::unique_ptr<SpawnedProcess> process = std::make_unique<SpawnedProcess>(test_name, process_ident);
+    const char* child_ident = getenv("REALM_CHILD_IDENT");
+    if (child_ident) {
+        std::signal(SIGSEGV, signal_handler);
+        std::signal(SIGABRT, signal_handler);
+        return process;
+    }
+
+    std::vector<std::string> env_vars = {"REALM_SPAWNED=1", util::format("UNITTEST_FILTER=%1", test_name),
+                                         util::format("REALM_CHILD_IDENT=%1", process_ident)};
+    if (getenv("UNITTEST_ENCRYPT_ALL")) {
+        env_vars.push_back("UNITTEST_ENCRYPT_ALL=1");
+    }
+
 #ifndef _WIN32
-    util::prepare_for_fork_in_parent();
-    int pid = fork();
-    REALM_ASSERT(pid >= 0);
-    if (pid == 0) {
-        std::signal(SIGSEGV, signal_handler);
-        std::signal(SIGABRT, signal_handler);
-        util::post_fork_in_child();
-    }
-    process->set_pid(pid);
+    pid_t pid_of_child;
+    std::string name_of_exe = test_util::get_test_exe_name();
+    // need to use the same test path as parent so that tests use the same realm paths
+    std::string test_path_prefix = test_util::get_test_path_prefix();
+    REALM_ASSERT(name_of_exe.size());
+    char* arg_v[] = {name_of_exe.data(), test_path_prefix.data(), nullptr};
+    char* env_v[] = {env_vars[0].data(), env_vars[1].data(), env_vars[2].data(),
+                     env_vars.size() > 3 ? env_vars[3].data() : nullptr, nullptr};
+    int ret = posix_spawn(&pid_of_child, name_of_exe.data(), nullptr, nullptr, arg_v, env_v);
+    REALM_ASSERT_EX(ret == 0, ret);
+    process->set_pid(pid_of_child);
 #else
-    const char* str = getenv("REALM_CHILD_IDENT");
-    if (!str) {
-        STARTUPINFO si;
-        PROCESS_INFORMATION pi;
-        TCHAR program_name[MAX_PATH];
-        ZeroMemory(&si, sizeof(si));
-        si.cb = sizeof(si);
-        ZeroMemory(&pi, sizeof(pi));
-        auto success = GetModuleFileName(NULL, program_name, MAX_PATH);
-        REALM_ASSERT_EX(success, util::format("GetModuleFileName failed (%1)", GetLastError()), test_name,
+    STARTUPINFO si;
+    PROCESS_INFORMATION pi;
+    TCHAR program_name[MAX_PATH];
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    ZeroMemory(&pi, sizeof(pi));
+    auto success = GetModuleFileName(NULL, program_name, MAX_PATH);
+    REALM_ASSERT_EX(success, util::format("GetModuleFileName failed (%1)", GetLastError()), test_name, process_ident);
+    std::string env;
+    for (auto& var : env_vars) {
+        env.append(var);
+        env.append("\0", 1);
+    }
+    env.append("\0\0", 2);
+    if (!CreateProcess(program_name, // Application name
+                       NULL,         // Command line
+                       NULL,         // Process handle not inheritable
+                       NULL,         // Thread handle not inheritable
+                       FALSE,        // Set handle inheritance to FALSE
+                       0,            // No creation flags, console of child goes to parent
+                       env.data(),   // Environment block, ANSI
+                       NULL,         // Use parent's starting directory
+                       &si,          // Pointer to STARTUPINFO structure
+                       &pi)          // Pointer to PROCESS_INFORMATION structure
+    ) {
+        REALM_ASSERT_EX(false, util::format("CreateProcess failed (%1).\n", GetLastError()), test_name,
                         process_ident);
-        std::string env = "REALM_FORKED=1";
-        env.append("\0", 1);
-        env.append(util::format("UNITTEST_FILTER=%1", test_name));
-        env.append("\0", 1);
-        if (getenv("UNITTEST_ENCRYPT_ALL")) {
-            env.append("UNITTEST_ENCRYPT_ALL=1");
-            env.append("\0", 1);
-        }
-        env.append(util::format("REALM_CHILD_IDENT=%1", process_ident));
-        env.append("\0\0", 2);
-        if (!CreateProcess(program_name, // Application name
-                           NULL,         // Command line
-                           NULL,         // Process handle not inheritable
-                           NULL,         // Thread handle not inheritable
-                           FALSE,        // Set handle inheritance to FALSE
-                           0,            // No creation flags, console of child goes to parent
-                           env.data(),   // Environment block, ANSI
-                           NULL,         // Use parent's starting directory
-                           &si,          // Pointer to STARTUPINFO structure
-                           &pi)          // Pointer to PROCESS_INFORMATION structure
-        ) {
-            REALM_ASSERT_EX(false, util::format("CreateProcess failed (%1).\n", GetLastError()), test_name,
-                            process_ident);
-        }
-        process->set_pid(pi);
     }
-    else {
-        std::signal(SIGSEGV, signal_handler);
-        std::signal(SIGABRT, signal_handler);
-    }
+    process->set_pid(pi);
 #endif
     return process;
 }

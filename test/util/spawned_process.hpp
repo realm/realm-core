@@ -29,14 +29,12 @@
 namespace realm {
 namespace test_util {
 
-// This is a wrapper around UNIX fork(), and Windows CreateProcess().
-// These are fundamentally different ways of process management and care
-// must be taken when using this class for tests to avoid fork bombs.
-// While fork() branches a child process from the current parent state,
-// Windows starts a completely new process with no shared state. The way to
-// emulate fork() on windows is to use environment variables to filter to a
-// specific unit test. Further filtering within the test itself is possible by
-// using `is_child()` which checks against the `ident` string.
+// This is a wrapper around UNIX posix_spawn(), and Windows CreateProcess(). This
+// provides a way to coordinate multi-process tests. Care must be taken when using
+// this class in tests to avoid fork bombs. A completely new test process with no
+// shared state is started. Environment variables are used to filter to a specific
+// unit test. Further filtering within the test itself is possible by using
+// `is_child()` which checks against the `ident` string.
 struct SpawnedProcess {
     SpawnedProcess(const std::string& test_name, const std::string& ident);
     ~SpawnedProcess();
