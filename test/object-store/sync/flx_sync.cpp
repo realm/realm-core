@@ -1845,7 +1845,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
                     if (data.query_version == 1 && data.batch_state == sync::DownloadBatchState::MoreToCome) {
                         session->force_close();
                         promise->emplace_value();
-                        return SyncClientHookAction::EarlyReturn;
+                        return SyncClientHookAction::TriggerReconnect;
                     }
                     return SyncClientHookAction::NoAction;
                 };
@@ -1924,7 +1924,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
                     if (data.query_version == 1 && data.batch_state == sync::DownloadBatchState::LastInBatch) {
                         session->force_close();
                         promise->emplace_value();
-                        return SyncClientHookAction::EarlyReturn;
+                        return SyncClientHookAction::TriggerReconnect;
                     }
                     return SyncClientHookAction::NoAction;
                 };
