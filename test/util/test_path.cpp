@@ -120,7 +120,6 @@ bool initialize_test_path(int argc, const char* argv[])
 #else
     g_path_prefix = util::make_temp_dir() + "/";
 #endif
-    g_exe_name = argv[0];
 
     auto resources_url = adoptCF(CFBundleCopyResourcesDirectoryURL(CFBundleGetMainBundle()));
     g_resource_path = url_to_path(resources_url.get());
@@ -151,6 +150,10 @@ bool initialize_test_path(int argc, const char* argv[])
     g_resource_path = File::resolve("resources", directory) + "/";
     g_path_prefix = directory;
 #endif
+
+    if (argc > 0) {
+        g_exe_name = argv[0];
+    }
 
     if (argc > 1) {
         g_path_prefix = argv[1];
