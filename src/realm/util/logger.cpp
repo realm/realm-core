@@ -19,19 +19,25 @@
 #include <realm/util/logger.hpp>
 
 #include <iostream>
+#include <mutex>
 
 namespace realm::util {
 
-std::shared_ptr<util::Logger> Logger::s_default_logger;
-Logger::Level Logger::s_default_level = Level::info;
+namespace {
+auto& s_logger_mutex = *new std::mutex;
+std::shared_ptr<util::Logger> s_default_logger;
+std::atomic<Logger::Level> s_default_level = Logger::Level::info;
+} // anonymous namespace
 
 void Logger::set_default_logger(std::shared_ptr<util::Logger> logger) noexcept
 {
+    std::lock_guard lock(s_logger_mutex);
     s_default_logger = logger;
 }
 
 std::shared_ptr<util::Logger>& Logger::get_default_logger() noexcept
 {
+    std::lock_guard lock(s_logger_mutex);
     if (!s_default_logger) {
         s_default_logger = std::make_shared<StderrLogger>();
         s_default_logger->set_level_threshold(s_default_level);
@@ -42,6 +48,7 @@ std::shared_ptr<util::Logger>& Logger::get_default_logger() noexcept
 
 void Logger::set_default_level_threshold(Level level) noexcept
 {
+    std::lock_guard lock(s_logger_mutex);
     s_default_level = level;
     if (s_default_logger)
         s_default_logger->set_level_threshold(level);
@@ -49,7 +56,7 @@ void Logger::set_default_level_threshold(Level level) noexcept
 
 Logger::Level Logger::get_default_level_threshold() noexcept
 {
-    return s_default_level;
+    return s_default_level.load(std::memory_order_relaxed);
 }
 
 const char* Logger::get_level_prefix(Level level) noexcept

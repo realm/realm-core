@@ -390,7 +390,7 @@ private:
     std::shared_ptr<SyncManager> m_sync_manager;
     std::shared_ptr<util::Logger> m_logger_ptr;
 
-    /// m_Logger_ptr is not set until the first call to one of these functions.
+    /// m_logger_ptr is not set until the first call to one of these functions.
     /// If configure() not been called, a logger will not be available yet.
     /// @returns true if the logger was set, otherwise false.
     bool init_logger();
