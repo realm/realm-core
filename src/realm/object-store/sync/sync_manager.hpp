@@ -76,7 +76,11 @@ struct SyncClientConfig {
     util::Optional<std::vector<char>> custom_encryption_key;
 
     ReconnectMode reconnect_mode = ReconnectMode::normal; // For internal sync-client testing only!
+#if REALM_ENABLE_SYNC_MULTIPLEXING
+    bool multiplex_sessions = true;
+#else
     bool multiplex_sessions = false;
+#endif
 
     // The SyncSocket instance used by the Sync Client for event synchronization
     // and creating WebSockets. If not provided the default implementation will be used.

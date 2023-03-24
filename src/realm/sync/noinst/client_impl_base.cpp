@@ -132,7 +132,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , logger{*logger_ptr}
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}
-    , m_connection_linger_time{config.connection_linger_time}
+    , m_connection_linger_time{config.one_connection_per_session ? 0 : config.connection_linger_time}
     , m_ping_keepalive_period{config.ping_keepalive_period}
     , m_pong_keepalive_timeout{config.pong_keepalive_timeout}
     , m_fast_reconnect_limit{config.fast_reconnect_limit}
@@ -144,7 +144,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_socket_provider{std::move(config.socket_provider)}
     , m_client_protocol{} // Throws
-    , m_one_connection_per_session{false}
+    , m_one_connection_per_session{config.one_connection_per_session}
     , m_random{}
 {
     // FIXME: Would be better if seeding was up to the application.

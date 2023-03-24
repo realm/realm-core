@@ -160,7 +160,11 @@ struct ClientConfig {
     ///
     /// FIXME: This setting needs to be true for now, due to limitations in
     /// the load balancer.
+#if REALM_ENABLE_SYNC_MULTIPLEXING
+    bool one_connection_per_session = false;
+#else
     bool one_connection_per_session = true;
+#endif
 
     /// Do not access the local file system. Sessions will act as if
     /// initiated on behalf of an empty (or nonexisting) local Realm
