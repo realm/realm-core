@@ -30,8 +30,7 @@
 #elif defined(__EMSCRIPTEN__)
 #include <realm/object-store/impl/emscripten/external_commit_helper.hpp>
 #else
-#warning                                                                                                             \
-    "The GenericExternalCommitHelper has been selected. Realms won't be notified of changes from other threads or processes."
+#warning "The GenericExternalCommitHelper has been selected. Notifications won't be delivered properly"
 #include <realm/object-store/impl/generic/external_commit_helper.hpp>
 #endif
 
