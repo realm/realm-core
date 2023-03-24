@@ -5091,6 +5091,7 @@ TEST_CASE("C API - binding callback thread observer", "[c_api][sync]") {
         REQUIRE(observer_ptr->test_get_create_callback_func() == bcto_on_thread_create);
         REQUIRE(observer_ptr->test_get_destroy_callback_func() == bcto_on_thread_destroy);
         REQUIRE(observer_ptr->test_get_error_callback_func() == bcto_on_thread_error);
+        REQUIRE(observer_ptr->has_handle_error());
         REQUIRE(observer_ptr->test_get_userdata_ptr() == &bcto_user_data);
 
         auto test_thread = std::thread([&]() {
@@ -5114,6 +5115,20 @@ TEST_CASE("C API - binding callback thread observer", "[c_api][sync]") {
     }
 
     REQUIRE(bcto_user_data.bcto_deleted == true);
+
+    {
+        auto config = cptr(realm_sync_client_config_new());
+        realm_sync_client_config_set_default_binding_thread_observer(config.get(), nullptr, nullptr, nullptr, nullptr,
+                                                                     nullptr);
+        auto no_handle_error_ptr =
+            static_cast<CBindingThreadObserver*>(config->default_socket_provider_thread_observer.get());
+        no_handle_error_ptr->did_create_thread();                          // should not crash
+        no_handle_error_ptr->will_destroy_thread();                        // should not crash
+        REQUIRE(!no_handle_error_ptr->has_handle_error());                 // no handler, returns false
+        REQUIRE(!no_handle_error_ptr->handle_error(MultipleSyncAgents())); // no handler, returns false
+        // No free_user_data function was provided and internal default should be used
+        // Should not crash at scope exit
+    }
 }
 #endif
 
