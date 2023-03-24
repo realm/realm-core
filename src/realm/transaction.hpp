@@ -485,10 +485,7 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
 
     // Synchronize readers view of the file
     SlabAlloc& alloc = m_alloc;
-    {
-        util::CheckedLockGuard lock_guard(db->m_mutex);
-        alloc.update_reader_view(new_file_size);
-    }
+    alloc.update_reader_view(new_file_size);
     update_allocator_wrappers(writable);
     using gf = _impl::GroupFriend;
     ref_type hist_ref = gf::get_history_ref(alloc, new_top_ref);

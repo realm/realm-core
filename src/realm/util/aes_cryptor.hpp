@@ -16,8 +16,8 @@
  *
  **************************************************************************/
 
-#ifndef AES_CRYPTOR_HPP
-#define AES_CRYPTOR_HPP
+#ifndef REALM_AES_CRYPTOR_HPP
+#define REALM_AES_CRYPTOR_HPP
 
 #include <array>
 #include <cstddef>
@@ -139,4 +139,4 @@ struct SharedFileInfo {
 } // namespace realm::util
 
 #endif // REALM_ENABLE_ENCRYPTION
-#endif // AES_CRYPTOR_HPP
+#endif // REALM_AES_CRYPTOR_HPP

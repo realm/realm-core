@@ -822,7 +822,8 @@ public:
             return false;
         }
         ++calls_since_last_writer_observed;
-        return (calls_since_last_writer_observed >= 5);
+        constexpr size_t max_calls = 5; // an arbitrary handful, > 1
+        return (calls_since_last_writer_observed >= max_calls);
     }
     void mark(uint64_t pos) override
     {
@@ -836,7 +837,7 @@ public:
 private:
     DB::VersionManager& vm;
     uint64_t last_seen_count = 0;
-    int calls_since_last_writer_observed = 0;
+    size_t calls_since_last_writer_observed = 0;
 };
 
 class DB::InMemoryVersionManager : public DB::VersionManager {
