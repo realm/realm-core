@@ -134,7 +134,7 @@ struct Property {
 
     bool type_is_indexable() const noexcept;
     bool type_is_nullable() const noexcept;
-    bool type_is_nested() const noexcept;
+    size_t type_nesting_levels() const noexcept;
 
     std::string type_string() const;
 };
@@ -368,9 +368,9 @@ inline bool Property::type_is_nullable() const noexcept
            type != PropertyType::LinkingObjects;
 }
 
-inline bool Property::type_is_nested() const noexcept
+inline size_t Property::type_nesting_levels() const noexcept
 {
-    return !nested_types.empty();
+    return nested_types.size();
 }
 
 inline std::string Property::type_string() const

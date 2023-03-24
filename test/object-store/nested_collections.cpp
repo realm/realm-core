@@ -37,13 +37,13 @@ TEST_CASE("nested-list", "[nested-collections]") {
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
-        {"list_of_list", {{"nested_list", {PropertyType::Array, PropertyType::Array, PropertyType::Int}}}},
-        {"list_of_set", {{"nested_set", {PropertyType::Array, PropertyType::Set, PropertyType::Int}}}},
+        {"list_of_list", {{"nested_list", {PropertyType::Array, PropertyType::Array | PropertyType::Int}}}},
+        {"list_of_set", {{"nested_set", {PropertyType::Array, PropertyType::Set | PropertyType::Int}}}},
         {"list_of_list_list",
-         {{"nested_list_list", {PropertyType::Array, PropertyType::Array, PropertyType::Array, PropertyType::Int}}}},
+         {{"nested_list_list", {PropertyType::Array, PropertyType::Array, PropertyType::Array | PropertyType::Int}}}},
         {"list_of_dictonary_list",
          {{"nested_dict_list",
-           {PropertyType::Array, PropertyType::Dictionary, PropertyType::Array, PropertyType::Int}}}},
+           {PropertyType::Array, PropertyType::Dictionary, PropertyType::Array | PropertyType::Int}}}},
     });
     auto table1 = r->read_group().get_table("class_list_of_list");
     auto table2 = r->read_group().get_table("class_list_of_set");
@@ -111,11 +111,12 @@ TEST_CASE("nested-dictionary", "[nested-collections]") {
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
-        {"dictionary_of_list", {{"nested_list", {PropertyType::Dictionary, PropertyType::Array, PropertyType::Int}}}},
-        {"dictionary_of_set", {{"nested_set", {PropertyType::Dictionary, PropertyType::Set, PropertyType::Int}}}},
+        {"dictionary_of_list",
+         {{"nested_list", {PropertyType::Dictionary, PropertyType::Array | PropertyType::Int}}}},
+        {"dictionary_of_set", {{"nested_set", {PropertyType::Dictionary, PropertyType::Set | PropertyType::Int}}}},
         {"dictionary_of_list_of_dictionary",
          {{"nested_list_dict",
-           {PropertyType::Dictionary, PropertyType::Array, PropertyType::Dictionary, PropertyType::Int}}}},
+           {PropertyType::Dictionary, PropertyType::Array, PropertyType::Dictionary | PropertyType::Int}}}},
     });
     auto table1 = r->read_group().get_table("class_dictionary_of_list");
     auto table2 = r->read_group().get_table("class_dictionary_of_set");
@@ -152,7 +153,6 @@ TEST_CASE("nested-dictionary", "[nested-collections]") {
     scollection3->insert("hello", 5);
     REQUIRE(scollection3->size() == 1);
 
-
     r->commit_transaction();
 }
 
@@ -162,14 +162,17 @@ TEST_CASE("nested-set", "[nested-collections]") {
     config.cache = false;
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
+    REQUIRE_NOTHROW(r->update_schema({{"set", {{"no_nested", PropertyType::Set | PropertyType::Int}}}}));
+    REQUIRE_THROWS(
+        r->update_schema({{"set_of_set", {{"nested", {PropertyType::Set, PropertyType::Set | PropertyType::Int}}}}}));
     REQUIRE_THROWS(r->update_schema(
-        {{"set_of_list", {{"nested", {PropertyType::Set, PropertyType::Array, PropertyType::Int}}}}}));
+        {{"set_of_list", {{"nested", {PropertyType::Set, PropertyType::Array | PropertyType::Int}}}}}));
     REQUIRE_THROWS(r->update_schema(
-        {{"set_of_dictionary", {{"nested", {PropertyType::Set, PropertyType::Dictionary, PropertyType::Int}}}}}));
+        {{"set_of_dictionary", {{"nested", {PropertyType::Set, PropertyType::Dictionary | PropertyType::Int}}}}}));
     REQUIRE_THROWS(r->update_schema(
         {{"list_set_list",
-          {{"nested", {PropertyType::Array, PropertyType::Set, PropertyType::Array, PropertyType::Int}}}}}));
+          {{"nested", {PropertyType::Array, PropertyType::Set, PropertyType::Array | PropertyType::Int}}}}}));
     REQUIRE_THROWS(r->update_schema(
         {{"dictionary_set_list",
-          {{"nested", {PropertyType::Dictionary, PropertyType::Set, PropertyType::Array, PropertyType::Int}}}}}));
+          {{"nested", {PropertyType::Dictionary, PropertyType::Set, PropertyType::Array | PropertyType::Int}}}}}));
 }

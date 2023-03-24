@@ -101,15 +101,13 @@ DataType to_core_type(PropertyType type)
 std::vector<CollectionType> process_nested_collection(const Property& property)
 {
     std::vector<CollectionType> collection_types;
+    // process the list of nested levels
     for (const auto& prop_type : property.nested_types) {
         if (is_array(prop_type)) {
             collection_types.push_back(CollectionType::List);
         }
         else if (is_set(prop_type)) {
             collection_types.push_back(CollectionType::Set);
-            if (collection_types.size() != property.nested_types.size()) {
-                throw InvalidColumnKey("Sets cannot contain any nested collections");
-            }
         }
         else if (is_dictionary(prop_type)) {
             collection_types.push_back(CollectionType::Dictionary);
@@ -117,6 +115,17 @@ std::vector<CollectionType> process_nested_collection(const Property& property)
         else {
             throw InvalidColumnKey("Not a valid collection type");
         }
+    }
+
+    // check if the final type is itself a collection.
+    if (is_array(property.type)) {
+        collection_types.push_back(CollectionType::List);
+    }
+    else if (is_set(property.type)) {
+        collection_types.push_back(CollectionType::Set);
+    }
+    else if (is_dictionary(property.type)) {
+        collection_types.push_back(CollectionType::Dictionary);
     }
     return collection_types;
 }
@@ -137,66 +146,47 @@ ColKey add_column(Group& group, Table& table, Property const& property)
         auto target_name = ObjectStore::table_name_for_object_type(property.object_type);
         TableRef link_table = group.get_table(target_name);
         REALM_ASSERT(link_table);
-        if (property.type_is_nested()) {
-            const auto& collection_types = process_nested_collection(property);
-            const auto nested_type = property.nested_types.front();
-            if (is_array(nested_type)) {
-                return table.add_column(to_core_type(property.type & ~PropertyType::Flags), property.name,
-                                        is_nullable(property.type), collection_types);
-            }
-            else if (is_set(nested_type)) {
-                throw InvalidColumnKey("Set cannot contain any nested collection");
-            }
-            else if (is_dictionary(nested_type)) {
-                return table.add_column(to_core_type(property.type & ~PropertyType::Flags), property.name,
-                                        is_nullable(property.type), collection_types);
-            }
-            else {
-                throw InvalidColumnKey("Not a valid nested collection property");
-            }
-        }
         if (is_array(property.type)) {
-            return table.add_column_list(*link_table, property.name);
+            auto collection_types = property.type_nesting_levels()
+                                        ? process_nested_collection(property)
+                                        : std::vector<CollectionType>{CollectionType::List};
+            return table.add_column(*link_table, property.name, collection_types);
         }
         else if (is_set(property.type)) {
-            return table.add_column_set(*link_table, property.name);
+            auto collection_types = property.type_nesting_levels() ? process_nested_collection(property)
+                                                                   : std::vector<CollectionType>{CollectionType::Set};
+            return table.add_column(*link_table, property.name, collection_types);
         }
         else if (is_dictionary(property.type)) {
-            return table.add_column_dictionary(*link_table, property.name);
+            auto collection_types = property.type_nesting_levels()
+                                        ? process_nested_collection(property)
+                                        : std::vector<CollectionType>{CollectionType::Dictionary};
+            return table.add_column(*link_table, property.name, collection_types);
         }
         else {
+            if (property.type_nesting_levels())
+                throw InvalidColumnKey("Not a valid nested collection property");
             return table.add_column(*link_table, property.name);
         }
     }
-    else if (property.type_is_nested()) {
-        const auto& collection_types = process_nested_collection(property);
-        const auto nested_type = property.nested_types.front();
-        if (is_array(nested_type)) {
-            return table.add_column(to_core_type(property.type & ~PropertyType::Flags), property.name,
-                                    is_nullable(property.type), collection_types);
-        }
-        else if (is_set(nested_type)) {
-            throw InvalidColumnKey("Set cannot contain any nested collection");
-        }
-        else if (is_dictionary(nested_type)) {
-            return table.add_column(to_core_type(property.type & ~PropertyType::Flags), property.name,
-                                    is_nullable(property.type), collection_types);
-        }
-        else {
-            throw InvalidColumnKey("Not a valid nested collection property");
-        }
-    }
     else if (is_array(property.type)) {
-        return table.add_column_list(to_core_type(property.type & ~PropertyType::Flags), property.name,
-                                     is_nullable(property.type));
+        auto collection_types = property.type_nesting_levels() ? process_nested_collection(property)
+                                                               : std::vector<CollectionType>{CollectionType::List};
+        return table.add_column(to_core_type(property.type & ~PropertyType::Flags), property.name,
+                                is_nullable(property.type), collection_types);
     }
     else if (is_set(property.type)) {
-        return table.add_column_set(to_core_type(property.type & ~PropertyType::Flags), property.name,
-                                    is_nullable(property.type));
+        auto collection_types = property.type_nesting_levels() ? process_nested_collection(property)
+                                                               : std::vector<CollectionType>{CollectionType::Set};
+        return table.add_column(to_core_type(property.type & ~PropertyType::Flags), property.name,
+                                is_nullable(property.type), collection_types);
     }
     else if (is_dictionary(property.type)) {
-        return table.add_column_dictionary(to_core_type(property.type & ~PropertyType::Flags), property.name,
-                                           is_nullable(property.type));
+        auto collection_types = property.type_nesting_levels()
+                                    ? process_nested_collection(property)
+                                    : std::vector<CollectionType>{CollectionType::Dictionary};
+        return table.add_column(to_core_type(property.type & ~PropertyType::Flags), property.name,
+                                is_nullable(property.type), collection_types);
     }
     else {
         auto key = table.add_column(to_core_type(property.type), property.name, is_nullable(property.type));

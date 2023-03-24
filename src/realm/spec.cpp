@@ -391,6 +391,8 @@ void Spec::set_nested_column_types(size_t column_ndx, const std::vector<Collecti
     auto mem = Array::create_empty_array(Node::type_Normal, false, m_top.get_alloc());
     arr.init_from_mem(mem);
     for (auto t : types) {
+        if (t == CollectionType::Set)
+            throw InvalidColumnKey("Sets cannot contain any nested collections");
         arr.add(int64_t(t));
     }
     arr.update_parent();

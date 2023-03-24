@@ -168,14 +168,12 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
         // account for nesting collections
         const auto nesting_levels = table->get_nesting_levels(col_key);
         if (nesting_levels > 0) {
-            property.nested_types.reserve(nesting_levels + 1);
+            property.nested_types.reserve(nesting_levels);
             for (size_t i = 0; i < nesting_levels; ++i) {
                 const auto nested_column_type = table->get_nested_column_type(col_key, i);
                 const auto prop_type = ObjectSchema::from_core_type(nested_column_type);
                 property.nested_types.push_back(prop_type);
             }
-            property.nested_types.push_back(property.type);
-            property.type = ObjectSchema::from_core_type(col_key.get_type());
         }
 
         if (property.type == PropertyType::Object) {
