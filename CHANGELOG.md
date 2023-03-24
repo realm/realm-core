@@ -1,6 +1,29 @@
 # NEXT RELEASE
 
 ### Enhancements
+* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* None.
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.8.0 Release notes
+
+### Enhancements
 * Performance improvement for the following queries ([6376](https://github.com/realm/realm-core/issues/6376)):
     * Significant (~75%) improvement when counting (`Query::count()`) the number of exact matches (with no other query conditions) on a string/int/UUID/ObjectID property that has an index. This improvement will be especially noticiable if there are a large number of results returned (duplicate values).
     * Significant (~99%) improvement when querying for an exact match on a Timestamp property that has an index.
