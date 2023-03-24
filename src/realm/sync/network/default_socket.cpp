@@ -431,9 +431,15 @@ void DefaultWebSocketImpl::handle_ssl_handshake(std::error_code ec)
     if (ec) {
         REALM_ASSERT(ec != util::error::operation_aborted);
         constexpr bool was_clean = false;
-        websocket_error_and_close_handler(
-            was_clean,
-            Status{make_error_code(WebSocketError::websocket_tls_handshake_failed), ec.message()}); // Throws
+        std::error_code ec2;
+        if (ec == network::ssl::Errors::certificate_rejected) {
+            ec2 = make_error_code(WebSocketError::websocket_tls_handshake_failed);
+        }
+        else {
+            ec2 = make_error_code(WebSocketError::websocket_connection_failed);
+        }
+
+        websocket_error_and_close_handler(was_clean, Status{ec2, ec.message()}); // Throws
         return;
     }
 
