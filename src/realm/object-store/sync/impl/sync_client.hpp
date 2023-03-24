@@ -33,6 +33,10 @@
 #include <realm/object-store/sync/impl/apple/network_reachability_observer.hpp>
 #endif
 
+#ifdef __EMSCRIPTEN__
+#include <realm/object-store/sync/impl/emscripten/socket_provider.hpp>
+#endif
+
 namespace realm {
 namespace _impl {
 
@@ -43,10 +47,14 @@ struct SyncClient {
             if (config.socket_provider) {
                 return config.socket_provider;
             }
+#ifdef __EMSCRIPTEN
+            return std::make_shared<EmscriptenSocketProvider>();
+#else
             auto user_agent = util::format("RealmSync/%1 (%2) %3 %4", REALM_VERSION_STRING, util::get_platform_info(),
                                            config.user_agent_binding_info, config.user_agent_application_info);
             return std::make_shared<sync::websocket::DefaultSocketProvider>(
                 logger, std::move(user_agent), config.default_socket_provider_thread_observer);
+#endif
         }())
         , m_client([&] {
             sync::Client::Config c;

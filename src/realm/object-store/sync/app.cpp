@@ -27,6 +27,10 @@
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 
+#ifdef __EMSCRIPTEN__
+#include <realm/object-store/sync/impl/emscripten/network_transport.hpp>
+#endif
+
 #include <sstream>
 #include <string>
 
@@ -232,6 +236,11 @@ App::App(const Config& config)
     , m_auth_route(m_app_route + auth_path)
     , m_request_timeout_ms(m_config.default_request_timeout_ms.value_or(default_timeout_ms))
 {
+#ifdef __EMSCRIPTEN__
+    if (!m_config.transport) {
+        m_config.transport = std::make_shared<_impl::EmscriptenNetworkTransport>();
+    }
+#endif
     REALM_ASSERT(m_config.transport);
 
     if (m_config.device_info.platform.empty()) {
