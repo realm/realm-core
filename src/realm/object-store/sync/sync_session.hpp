@@ -291,7 +291,6 @@ public:
     // Expose some internal functionality to testing code.
     struct OnlyForTesting {
         static void handle_error(SyncSession& session, sync::SessionErrorInfo&& error);
-        static void handle_error(SyncSession& session, SyncError&& error);
         static void nonsync_transact_notify(SyncSession& session, VersionID::version_type version)
         {
             session.nonsync_transact_notify(version);

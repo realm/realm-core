@@ -18,6 +18,7 @@ include(Utilities)
 include(SpecialtyBuilds)
 include(GetVersion)
 include(CheckCXXCompilerFlag)
+include(CheckCXXSourceCompiles)
 include(CheckCXXSourceRuns)
 include(AcquireRealmDependency)
 
