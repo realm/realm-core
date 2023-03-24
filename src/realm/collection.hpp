@@ -5,6 +5,7 @@
 #include <realm/bplustree.hpp>
 #include <realm/obj_list.hpp>
 #include <realm/table.hpp>
+#include <realm/util/overload.hpp>
 
 #include <iosfwd>      // std::ostream
 #include <type_traits> // std::void_t
@@ -334,6 +335,25 @@ template <class Interface, class Derived>
 class CollectionBaseImpl : public Interface, protected ArrayParent {
 public:
     static_assert(std::is_base_of_v<CollectionBase, Interface>);
+
+    Obj::Path get_path() const
+    {
+        auto path = m_parent->get_path();
+        mpark::visit(util::overload{
+                         [&](ColKey ck) {
+                             StringData col_name = m_parent->get_object().get_table()->get_column_name(ck);
+                             path.path_from_top.push_back(col_name);
+                         },
+                         [&](int64_t ndx) {
+                             path.path_from_top.push_back(ndx);
+                         },
+                         [&](const std::string& key) {
+                             path.path_from_top.push_back(StringData(key.c_str()));
+                         },
+                     },
+                     m_index);
+        return path;
+    }
 
     // Overriding members of CollectionBase:
     ColKey get_col_key() const noexcept final

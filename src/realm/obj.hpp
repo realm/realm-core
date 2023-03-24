@@ -79,6 +79,7 @@ public:
     {
         return 0;
     }
+
     ref_type get_collection_ref(Index) const noexcept final;
     void set_collection_ref(Index index, ref_type) final;
 
@@ -174,7 +175,7 @@ public:
     // Get the path in a minimal format without including object accessors.
     // If you need to obtain additional information for each object in the path,
     // you should use get_fat_path() or traverse_path() instead (see below).
-    Path get_path() const;
+    Path get_path() const noexcept final;
 
     // Get the fat path to this object expressed as a vector of fat path elements.
     // each Fat path elements include a Obj allowing for low cost access to the

@@ -22,6 +22,7 @@
 #include <realm/alloc.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/keys.hpp>
+#include <realm/mixed.hpp>
 
 #include <external/mpark/variant.hpp>
 
@@ -65,7 +66,14 @@ class CollectionParent {
 public:
     using Index = mpark::variant<ColKey, int64_t, std::string>;
 
+    struct Path {
+        TableKey top_table;
+        ObjKey top_objkey;
+        std::vector<Index> path_from_top;
+    };
+
     virtual ~CollectionParent();
+    virtual Path get_path() const noexcept = 0;
     virtual size_t get_level() const noexcept = 0;
     virtual Replication* get_replication() const = 0;
     virtual UpdateStatus update_if_needed_with_status() const = 0;

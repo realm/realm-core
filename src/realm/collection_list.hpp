@@ -42,6 +42,8 @@ public:
 
     bool init_from_parent(bool allow_create) const;
 
+    Path get_path() const noexcept final;
+
     Replication* get_replication() const final
     {
         return m_parent->get_replication();

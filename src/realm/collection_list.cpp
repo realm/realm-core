@@ -22,6 +22,7 @@
 #include <realm/table.hpp>
 #include "realm/array_string.hpp"
 #include "realm/array_integer.hpp"
+#include "realm/util/overload.hpp"
 
 namespace realm {
 
@@ -81,6 +82,25 @@ bool CollectionList::init_from_parent(bool allow_create) const
     m_top.update_parent();
 
     return true;
+}
+
+auto CollectionList::get_path() const noexcept -> Path
+{
+    auto path = m_parent->get_path();
+    mpark::visit(util::overload{
+                     [&](ColKey ck) {
+                         StringData col_name = m_parent->get_object().get_table()->get_column_name(ck);
+                         path.path_from_top.push_back(col_name);
+                     },
+                     [&](int64_t ndx) {
+                         path.path_from_top.push_back(ndx);
+                     },
+                     [&](const std::string& key) {
+                         path.path_from_top.push_back(StringData(key.c_str()));
+                     },
+                 },
+                 m_index);
+    return path;
 }
 
 ref_type CollectionList::get_child_ref(size_t) const noexcept
