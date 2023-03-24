@@ -3766,6 +3766,16 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
     auto observer_ptr = std::make_shared<BindingCallbackThreadObserver>(
         std::move(create_thread), std::move(destroy_thread), std::move(handle_error));
 
+    CHECK(observer_ptr->has_handle_error());
+    {
+        auto no_handle_error_ptr = std::make_shared<BindingCallbackThreadObserver>(
+            nullopt, nullopt, nullopt);
+        no_handle_error_ptr->did_create_thread(); // should not crash
+        no_handle_error_ptr->will_destroy_thread(); // should not crash
+        CHECK(!no_handle_error_ptr->has_handle_error()); // no handler, returns false
+        CHECK(!no_handle_error_ptr->handle_error(MultipleSyncAgents())); // no handler, returns false
+    }
+
     TEST_CLIENT_DB(db);
     Client::Config config;
     config.logger = test_context.logger;

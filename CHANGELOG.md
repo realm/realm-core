@@ -2,6 +2,28 @@
 
 ### Enhancements
 * Enable multiple processes to operate on an encrypted Realm simultaneously. ([#1845](https://github.com/realm/realm-core/issues/1845))
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.8.0 Release notes
+
+### Enhancements
+>>>>>>> master
 * Performance improvement for the following queries ([6376](https://github.com/realm/realm-core/issues/6376)):
     * Significant (~75%) improvement when counting (`Query::count()`) the number of exact matches (with no other query conditions) on a string/int/UUID/ObjectID property that has an index. This improvement will be especially noticiable if there are a large number of results returned (duplicate values).
     * Significant (~99%) improvement when querying for an exact match on a Timestamp property that has an index.
@@ -30,6 +52,8 @@
 * Add admin api and test for performing the PBS->FLX migration and roll back on the server. (PR [#6366](https://github.com/realm/realm-core/pull/6366))
 * Integrate protocol support for PBS->FLX client migration ([PR #6355](https://github.com/realm/realm-core/pull/6355))
 * `SyncManager::reset_for_testing()` could race with SyncSession's being torn down in other threads causing an assertion for `REALM_ASSERT_RELEASE(no_sessions)` to fail. `SyncManager::reset_for_testing()` now waits/yields for up to 5 seconds for sessions being torn down in other threads to finish tearing down before checking this assertion. ([#6271](https://github.com/realm/realm-core/issues/6271))
+* Update event loop to keep full stack trace if no observer is used ([PR #6410](https://github.com/realm/realm-core/pull/6410))
+* `SyncSession::OnlyForTesting::handle_error()` now takes a `realm::sync:SessionErrorInfo` instead of a `realm::SyncError` to reflect internal refactoring ([PR #6433](https://github.com/realm/realm-core/pull/6433)).
 
 ----------------------------------------------
 
