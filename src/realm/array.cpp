@@ -686,7 +686,6 @@ int64_t Array::sum(size_t start, size_t end) const
 
         for (size_t t = 0; t < chunks; t++) {
             if (w == 1) {
-
 #if 0
 #if defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
                 s += __popcnt64(data[t]);
@@ -702,7 +701,6 @@ int64_t Array::sum(size_t start, size_t end) const
                 s += a;
 #endif
 #endif
-
                 s += fast_popcount64(data[t]);
             }
             else if (w == 2) {
@@ -725,7 +723,6 @@ int64_t Array::sum(size_t start, size_t end) const
 
 #ifdef REALM_COMPILER_SSE
     if (sseavx<42>()) {
-
         // 2000 items summed 500000 times, 8/16/32 bits, miliseconds:
         // Naive, templated get<>: 391 371 374
         // SSE:                     97 148 282

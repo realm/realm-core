@@ -896,10 +896,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 session = test_app_session.app()->sync_manager()->get_existing_session(temp_config.path);
                 REQUIRE(session);
             }
-            realm::SyncError synthetic(sync::make_error_code(sync::ProtocolError::bad_client_file),
-                                       "A fake client reset error", true);
+            sync::SessionErrorInfo synthetic(sync::make_error_code(sync::ProtocolError::bad_client_file),
+                                             "A fake client reset error", false);
             synthetic.server_requests_action = sync::ProtocolErrorInfo::Action::ClientReset;
-            SyncSession::OnlyForTesting::handle_error(*session, synthetic);
+            SyncSession::OnlyForTesting::handle_error(*session, std::move(synthetic));
 
             session->revive_if_needed();
             timed_sleeping_wait_for(

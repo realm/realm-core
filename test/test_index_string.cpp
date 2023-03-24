@@ -1790,6 +1790,15 @@ TEST(StringIndex_QuerySingleObject)
     CHECK_EQUAL(q.count(), 0);
 }
 
+TEST(StringIndex_MixedNonEmptyTable)
+{
+    Group g;
+    auto table = g.add_table("foo");
+    auto col = table->add_column(type_Mixed, "any");
+    table->create_object().set(col, Mixed("abcdefgh"));
+    table->add_search_index(col);
+}
+
 TEST(StringIndex_MixedEqualBitPattern)
 {
     Group g;

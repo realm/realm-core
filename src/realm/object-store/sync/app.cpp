@@ -260,7 +260,6 @@ App::~App() {}
 
 void App::configure(const SyncClientConfig& sync_client_config)
 {
-    init_logger();
     auto sync_route = make_sync_route(m_app_route);
     m_sync_manager->configure(shared_from_this(), sync_route, sync_client_config);
     if (auto metadata = m_sync_manager->app_metadata()) {
@@ -269,18 +268,17 @@ void App::configure(const SyncClientConfig& sync_client_config)
     }
 }
 
-inline bool App::init_logger()
+bool App::init_logger()
 {
     if (!m_logger_ptr) {
-        m_logger_ptr = util::Logger::get_default_logger();
+        m_logger_ptr = m_sync_manager->get_logger();
     }
     return bool(m_logger_ptr);
 }
 
 bool App::would_log(util::Logger::Level level)
 {
-    init_logger();
-    return m_logger_ptr && m_logger_ptr->would_log(level);
+    return init_logger() && m_logger_ptr->would_log(level);
 }
 
 template <class... Params>
