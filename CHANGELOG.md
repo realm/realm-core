@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 13.8.0 Release notes
 
 ### Enhancements
 * Performance improvement for the following queries ([6376](https://github.com/realm/realm-core/issues/6376)):
