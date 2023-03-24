@@ -2540,8 +2540,9 @@ std::error_code Session::receive_unbound_message()
 
     // The fact that the UNBIND message has been sent, but an ERROR message has
     // not been received, implies that the deactivation process must have been
-    // initiated, so this session must be in the Deactivating state.
-    REALM_ASSERT(m_state == Deactivating);
+    // initiated, so this session must be in the Deactivating state or the session
+    // has been suspended because of a client side error.
+    REALM_ASSERT(m_state == Deactivating || m_suspended);
 
     m_unbound_message_received = true;
 
