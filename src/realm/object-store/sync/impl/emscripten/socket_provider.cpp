@@ -57,6 +57,7 @@ private:
     static void timeout_callback(void* user_data)
     {
         auto timer = reinterpret_cast<EmscriptenTimer*>(user_data);
+        timer->m_timeout = std::nullopt;
         timer->m_handler(Status::OK());
     }
 };
