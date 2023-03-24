@@ -29,6 +29,7 @@
 * Add admin api and test for performing the PBS->FLX migration and roll back on the server. (PR [#6366](https://github.com/realm/realm-core/pull/6366))
 * Integrate protocol support for PBS->FLX client migration ([PR #6355](https://github.com/realm/realm-core/pull/6355))
 * `SyncManager::reset_for_testing()` could race with SyncSession's being torn down in other threads causing an assertion for `REALM_ASSERT_RELEASE(no_sessions)` to fail. `SyncManager::reset_for_testing()` now waits/yields for up to 5 seconds for sessions being torn down in other threads to finish tearing down before checking this assertion. ([#6271](https://github.com/realm/realm-core/issues/6271))
+* Update event loop to keep full stack trace if no observer is used ([PR #6410](https://github.com/realm/realm-core/pull/6410))
 
 ----------------------------------------------
 
