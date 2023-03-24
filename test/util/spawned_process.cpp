@@ -145,19 +145,10 @@ std::unique_ptr<SpawnedProcess> spawn_process(const std::string& test_name, cons
         env_vars.push_back("UNITTEST_ENCRYPT_ALL=1");
     }
 
-#ifndef _WIN32
-    pid_t pid_of_child;
-    std::string name_of_exe = test_util::get_test_exe_name();
-    // need to use the same test path as parent so that tests use the same realm paths
-    std::string test_path_prefix = test_util::get_test_path_prefix();
-    REALM_ASSERT(name_of_exe.size());
-    char* arg_v[] = {name_of_exe.data(), test_path_prefix.data(), nullptr};
-    char* env_v[] = {env_vars[0].data(), env_vars[1].data(), env_vars[2].data(),
-                     env_vars.size() > 3 ? env_vars[3].data() : nullptr, nullptr};
-    int ret = posix_spawn(&pid_of_child, name_of_exe.data(), nullptr, nullptr, arg_v, env_v);
-    REALM_ASSERT_EX(ret == 0, ret);
-    process->set_pid(pid_of_child);
-#else
+#if REALM_ANDROID
+    // posix_spawn() is unavailable
+    REALM_UNREACHABLE();
+#elif defined(_WIN32)
     STARTUPINFO si;
     PROCESS_INFORMATION pi;
     TCHAR program_name[MAX_PATH];
@@ -187,6 +178,18 @@ std::unique_ptr<SpawnedProcess> spawn_process(const std::string& test_name, cons
                         process_ident);
     }
     process->set_pid(pi);
+#else
+    pid_t pid_of_child;
+    std::string name_of_exe = test_util::get_test_exe_name();
+    // need to use the same test path as parent so that tests use the same realm paths
+    std::string test_path_prefix = test_util::get_test_path_prefix();
+    REALM_ASSERT(name_of_exe.size());
+    char* arg_v[] = {name_of_exe.data(), test_path_prefix.data(), nullptr};
+    char* env_v[] = {env_vars[0].data(), env_vars[1].data(), env_vars[2].data(),
+                     env_vars.size() > 3 ? env_vars[3].data() : nullptr, nullptr};
+    int ret = posix_spawn(&pid_of_child, name_of_exe.data(), nullptr, nullptr, arg_v, env_v);
+    REALM_ASSERT_EX(ret == 0, ret);
+    process->set_pid(pid_of_child);
 #endif
     return process;
 }
