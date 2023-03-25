@@ -1733,6 +1733,7 @@ void File::MapBase::map(const File& f, AccessMode a, size_t size, int map_flags,
     }
 #else
     m_addr = f.map(a, size, map_flags, offset);
+    static_cast<void>(observer);
 #endif
     m_size = m_reservation_size = size;
     m_fd = f.m_fd;
@@ -1769,6 +1770,7 @@ bool File::MapBase::try_reserve(const File& file, AccessMode a, size_t size, siz
                                 util::WriteObserver* observer)
 {
 #ifdef _WIN32
+    static_cast<void>(observer);
     // unsupported for now
     return false;
 #else
@@ -1789,6 +1791,8 @@ bool File::MapBase::try_reserve(const File& file, AccessMode a, size_t size, siz
             m_encrypted_mapping->set_observer(observer);
         }
     }
+#else
+    static_cast<void>(observer);
 #endif
 #endif
     return true;
