@@ -2363,13 +2363,13 @@ TEST_CASE("C API", "[c_api]") {
                 int exceeded_max_count = 1001;
                 for (int node_id = 0; node_id <= exceeded_max_count; node_id++) {
                     std::stringstream node;
-                    node << "_id=obj(" << ObjectId().gen().to_string() << ")"
+                    node << "_id=oid(" << ObjectId().gen().to_string() << ")"
                          << (node_id < exceeded_max_count ? " OR " : "");
                     query.append(node.str());
                 }
                 const char* queryString = query.c_str();
                 CHECK(!realm_query_parse(realm, class_foo.key, queryString, 0, nullptr));
-                CHECK_ERR_CAT(RLM_ERR_INVALID_QUERY_STRING, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
+                CHECK_ERR_CAT(RLM_ERR_INVALID_QUERY, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
             }
 
             SECTION("decimal NaN") {
