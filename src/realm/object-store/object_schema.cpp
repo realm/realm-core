@@ -124,6 +124,20 @@ PropertyType ObjectSchema::from_core_type(ColKey col)
     return prop_type;
 }
 
+PropertyType ObjectSchema::from_core_type(CollectionType type)
+{
+    switch (type) {
+        case CollectionType::List:
+            return PropertyType::Array;
+        case CollectionType::Set:
+            return PropertyType::Set;
+        case CollectionType::Dictionary:
+            return PropertyType::Dictionary;
+        default:
+            REALM_UNREACHABLE();
+    }
+}
+
 ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
     : name(name)
 {
@@ -150,6 +164,17 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
         property.is_indexed = table->search_index_type(col_key) == IndexType::General;
         property.is_fulltext_indexed = table->search_index_type(col_key) == IndexType::Fulltext;
         property.column_key = col_key;
+
+        // account for nesting collections
+        const auto nesting_levels = table->get_nesting_levels(col_key);
+        if (nesting_levels > 0) {
+            property.nested_types.reserve(nesting_levels);
+            for (size_t i = 0; i < nesting_levels; ++i) {
+                const auto nested_column_type = table->get_nested_column_type(col_key, i);
+                const auto prop_type = ObjectSchema::from_core_type(nested_column_type);
+                property.nested_types.push_back(prop_type);
+            }
+        }
 
         if (property.type == PropertyType::Object) {
             // set link type for objects and arrays

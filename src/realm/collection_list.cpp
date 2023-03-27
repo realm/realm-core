@@ -99,7 +99,7 @@ CollectionBasePtr CollectionList::insert_collection(size_t ndx)
     ensure_created();
     REALM_ASSERT(m_key_type == type_Int);
     auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
-    size_t key = 0;
+    int64_t key = 0;
     if (auto max = bptree_maximum(*int_keys, nullptr)) {
         key = *max + 1;
     }
@@ -157,7 +157,7 @@ CollectionListPtr CollectionList::insert_collection_list(size_t ndx)
     ensure_created();
     REALM_ASSERT(m_key_type == type_Int);
     auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
-    size_t key = 0;
+    int64_t key = 0;
     if (auto max = bptree_maximum(*int_keys, nullptr)) {
         key = *max + 1;
     }

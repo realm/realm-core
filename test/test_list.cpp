@@ -637,8 +637,10 @@ TEST(List_NestedList_Insert)
         table->add_column(type_Int, "int_list_list", false, {CollectionType::List, CollectionType::List});
     auto list_col2 = table->add_column(type_Int, "int_dict_list_list", false,
                                        {CollectionType::Dictionary, CollectionType::List, CollectionType::List});
+    auto list_col3 = table->add_column(type_Int, "int_list_set", false, {CollectionType::List, CollectionType::Set});
     CHECK_EQUAL(table->get_nesting_levels(list_col1), 1);
     CHECK_EQUAL(table->get_nesting_levels(list_col2), 2);
+    CHECK_EQUAL(table->get_nesting_levels(list_col3), 1);
     Obj obj = table->create_object();
 
     auto list = obj.get_collection_list(list_col1);
@@ -651,9 +653,15 @@ TEST(List_NestedList_Insert)
     auto collection2 = list2->insert_collection(0);
     dynamic_cast<Lst<Int>*>(collection2.get())->add(5);
 
+    auto set = obj.get_collection_list(list_col3);
+    CHECK(set->is_empty());
+    auto collection3 = set->insert_collection(0);
+    dynamic_cast<Set<Int>*>(collection3.get())->insert(5);
+
     tr->commit_and_continue_as_read();
     CHECK_NOT(list->is_empty());
     CHECK_EQUAL(obj.get_collection_list(list_col1)->get_collection_ptr(0)->get_any(0).get_int(), 5);
+    CHECK_EQUAL(obj.get_collection_list(list_col3)->get_collection_ptr(0)->get_any(0).get_int(), 5);
     tr->promote_to_write();
     {
         list->insert_collection(0);
