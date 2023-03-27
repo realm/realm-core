@@ -40,12 +40,11 @@ public:
     MigrationStore& operator=(const MigrationStore&) = delete;
 
     enum class MigrationState {
-        NotStarted,
-        Completed,
+        NotMigrated,
+        Migrated,
     };
 
-    static MigrationStoreRef create(DBRef db,
-                                    std::function<void(MigrationStore::MigrationState)>&& on_migration_state_changed);
+    static MigrationStoreRef create(DBRef db);
 
     // Converts the configuration from PBS to FLX if in the migrated state, otherwise returns the passed in config
     // object. If the provided config is configured for FLX, the migration will be canceled and the migration state
@@ -54,10 +53,14 @@ public:
 
     // Called when the server responds with migrate to FLX and stores the FLX
     // subscription RQL query string
-    void migrate_to_flx(std::string rql_query_string);
+    void migrate_to_flx(std::string_view rql_query_string);
 
     // Clear the migrated state
     void cancel_migration();
+
+    bool is_migrated();
+
+    std::string_view get_query_string();
 
     // Generate a new subscription that can be added to the subscription store using
     // the query string returned from the server and a name that begins with "flx_migrated_"
@@ -65,15 +68,19 @@ public:
     std::optional<Subscription> make_subscription(const std::string& object_class_name);
 
 protected:
-    explicit MigrationStore(DBRef db,
-                            std::function<void(MigrationStore::MigrationState)>&& on_migration_state_changed);
+    explicit MigrationStore(DBRef db);
+
+    // Read the data from the database - returns true if successful
+    // Will return false if read_only is set and the metadata schema
+    // versions info is not already set.
+    bool load_data(bool read_only = false); // requires !m_mutex
+
+    // Clear the migration store info
+    void clear(std::unique_lock<std::mutex> lock);
 
     DBRef m_db;
 
-    std::function<void(MigrationStore::MigrationState)> m_on_migration_state_changed;
-
     TableKey m_migration_table;
-    ColKey m_migration_started_at;
     ColKey m_migration_completed_at;
     ColKey m_migration_state;
     ColKey m_migration_query_str;

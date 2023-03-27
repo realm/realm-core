@@ -25,8 +25,6 @@
 
 namespace realm {
 
-std::vector<ObjKey> ParentNode::s_dummy_keys;
-
 ParentNode::ParentNode(const ParentNode& from)
     : m_child(from.m_child ? from.m_child->clone() : nullptr)
     , m_condition_column_key(from.m_condition_column_key)
@@ -171,24 +169,15 @@ void MixedNode<Equal>::init(bool will_query_ranges)
 {
     MixedNodeBase::init(will_query_ranges);
 
-    if (m_has_search_index) {
+    REALM_ASSERT(bool(m_index_evaluator) ==
+                 (m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General));
+    if (m_index_evaluator) {
+        auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+        m_index_evaluator->init(index, m_value);
         m_dT = 0.0;
     }
     else {
         m_dT = 10.0;
-    }
-
-    if (m_has_search_index) {
-        // Will set m_index_matches, m_index_matches_destroy, m_results_start and m_results_end
-        auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
-        m_index_matches.clear();
-        index->find_all(m_index_matches, static_cast<Mixed>(m_value), true);
-        m_results_start = 0;
-        m_results_ndx = 0;
-        m_results_end = m_index_matches.size();
-        if (m_results_start != m_results_end) {
-            m_actual_key = m_index_matches[0];
-        }
     }
 }
 
@@ -196,40 +185,86 @@ size_t MixedNode<Equal>::find_first_local(size_t start, size_t end)
 {
     REALM_ASSERT(m_table);
 
-    if (m_has_search_index) {
-        if (start < end) {
-            ObjKey first_key = m_cluster->get_real_key(start);
-            if (first_key < m_last_start_key) {
-                // We are not advancing through the clusters. We basically don't know where we are,
-                // so just start over from the beginning.
-                m_results_ndx = m_results_start;
-                m_actual_key = (m_results_start != m_results_end) ? m_index_matches[m_results_start] : ObjKey();
-            }
-            m_last_start_key = first_key;
-
-            // Check if we can expect to find more keys
-            if (m_results_ndx < m_results_end) {
-                // Check if we should advance to next key to search for
-                while (first_key > m_actual_key) {
-                    m_results_ndx++;
-                    if (m_results_ndx == m_results_end) {
-                        return not_found;
-                    }
-                    m_actual_key = m_index_matches[m_results_ndx];
-                }
-
-                // If actual_key is bigger than last key, it is not in this leaf
-                ObjKey last_key = m_cluster->get_real_key(end - 1);
-                if (m_actual_key > last_key)
-                    return not_found;
-
-                // Now actual_key must be found in leaf keys
-                return m_cluster->lower_bound_key(ObjKey(m_actual_key.value - m_cluster->get_offset()));
-            }
-        }
+    if (m_index_evaluator) {
+        return m_index_evaluator->do_search_index(m_cluster, start, end);
     }
     else {
         Equal cond;
+        for (size_t i = start; i < end; i++) {
+            QueryValue val(m_leaf_ptr->get(i));
+            if (cond(val, m_value))
+                return i;
+        }
+    }
+
+    return not_found;
+}
+
+void MixedNode<EqualIns>::init(bool will_query_ranges)
+{
+    MixedNodeBase::init(will_query_ranges);
+
+    StringData val_as_string;
+    if (m_value.is_type(type_String)) {
+        val_as_string = m_value.get<StringData>();
+    }
+    else if (m_value.is_type(type_Binary)) {
+        BinaryData bin = m_value.get<BinaryData>();
+        val_as_string = StringData(bin.data(), bin.size());
+    }
+    REALM_ASSERT(bool(m_index_evaluator) ==
+                 (m_table.unchecked_ptr()->search_index_type(m_condition_column_key) == IndexType::General));
+    if (m_index_evaluator) {
+        auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+        if (!val_as_string.is_null()) {
+            m_index_matches.clear();
+            constexpr bool case_insensitive = true;
+            index->find_all(m_index_matches, val_as_string, case_insensitive);
+            m_index_evaluator->init(&m_index_matches);
+        }
+        else {
+            // search for non string can use exact match
+            m_index_evaluator->init(index, m_value);
+        }
+        m_dT = 0.0;
+    }
+    else {
+        m_dT = 10.0;
+        if (!val_as_string.is_null()) {
+            auto upper = case_map(val_as_string, true);
+            auto lower = case_map(val_as_string, false);
+            if (!upper || !lower) {
+                throw query_parser::InvalidQueryError(util::format("Malformed UTF-8: %1", val_as_string));
+            }
+            else {
+                m_ucase = std::move(*upper);
+                m_lcase = std::move(*lower);
+            }
+        }
+    }
+}
+
+size_t MixedNode<EqualIns>::find_first_local(size_t start, size_t end)
+{
+    REALM_ASSERT(m_table);
+
+    EqualIns cond;
+    if (m_value.is_type(type_String)) {
+        for (size_t i = start; i < end; i++) {
+            QueryValue val(m_leaf_ptr->get(i));
+            StringData val_as_str;
+            if (val.is_type(type_String)) {
+                val_as_str = val.get<StringData>();
+            }
+            else if (val.is_type(type_Binary)) {
+                val_as_str = StringData(val.get<BinaryData>().data(), val.get<BinaryData>().size());
+            }
+            if (!val_as_str.is_null() &&
+                cond(m_value.get<StringData>(), m_ucase.c_str(), m_lcase.c_str(), val_as_str))
+                return i;
+        }
+    }
+    else {
         for (size_t i = start; i < end; i++) {
             QueryValue val(m_leaf_ptr->get(i));
             if (cond(val, m_value))
@@ -244,18 +279,18 @@ void StringNodeEqualBase::init(bool will_query_ranges)
 {
     StringNodeBase::init(will_query_ranges);
 
+    const bool uses_index = has_search_index();
     if (m_is_string_enum) {
         m_dT = 1.0;
     }
-    else if (m_has_search_index) {
+    else if (uses_index) {
         m_dT = 0.0;
     }
     else {
         m_dT = 10.0;
     }
 
-    if (m_has_search_index) {
-        // Will set m_index_matches, m_index_matches_destroy, m_results_start and m_results_end
+    if (uses_index) {
         _search_index_init();
     }
 }
@@ -264,119 +299,107 @@ size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
 {
     REALM_ASSERT(m_table);
 
-    if (m_has_search_index) {
-        if (start < end) {
-            ObjKey first_key = m_cluster->get_real_key(start);
-            if (first_key < m_last_start_key) {
-                // We are not advancing through the clusters. We basically don't know where we are,
-                // so just start over from the beginning.
-                m_results_ndx = m_results_start;
-                m_actual_key = (m_results_start != m_results_end) ? get_key(m_results_start) : ObjKey();
-            }
-            m_last_start_key = first_key;
-
-            // Check if we can expect to find more keys
-            if (m_results_ndx < m_results_end) {
-                // Check if we should advance to next key to search for
-                while (first_key > m_actual_key) {
-                    m_results_ndx++;
-                    if (m_results_ndx == m_results_end) {
-                        return not_found;
-                    }
-                    m_actual_key = get_key(m_results_ndx);
-                }
-
-                // If actual_key is bigger than last key, it is not in this leaf
-                ObjKey last_key = m_cluster->get_real_key(end - 1);
-                if (m_actual_key > last_key)
-                    return not_found;
-
-                // Now actual_key must be found in leaf keys
-                return m_cluster->lower_bound_key(ObjKey(m_actual_key.value - m_cluster->get_offset()));
-            }
-        }
-        return not_found;
+    if (m_index_evaluator) {
+        return m_index_evaluator->do_search_index(m_cluster, start, end);
     }
 
     return _find_first_local(start, end);
 }
 
 
-size_t do_search_index(ObjKey& last_start_key, size_t& result_get, std::vector<ObjKey>& results,
-                       const Cluster* cluster, size_t start, size_t end)
+void IndexEvaluator::init(StringIndex* index, Mixed value)
 {
+    REALM_ASSERT(index);
+    m_matching_keys = nullptr;
+    FindRes fr;
+    InternalFindResult res;
+
+    m_last_start_key = ObjKey();
+    m_results_start = 0;
+    fr = index->find_all_no_copy(value, res);
+
+    m_index_matches.reset();
+    switch (fr) {
+        case FindRes_single:
+            m_actual_key = ObjKey(res.payload);
+            m_results_end = 1;
+            break;
+        case FindRes_column:
+            m_index_matches.reset(new IntegerColumn(index->get_alloc(), ref_type(res.payload))); // Throws
+            m_results_start = res.start_ndx;
+            m_results_end = res.end_ndx;
+            m_actual_key = ObjKey(m_index_matches->get(m_results_start));
+            break;
+        case FindRes_not_found:
+            m_results_end = 0;
+            break;
+    }
+    m_results_ndx = m_results_start;
+}
+
+void IndexEvaluator::init(std::vector<ObjKey>* storage)
+{
+    REALM_ASSERT(storage);
+    m_matching_keys = storage;
+    m_actual_key = ObjKey();
+    m_last_start_key = ObjKey();
+    m_results_start = 0;
+    m_results_end = m_matching_keys->size();
+    m_results_ndx = 0;
+    if (m_results_start != m_results_end) {
+        m_actual_key = m_matching_keys->at(0);
+    }
+}
+
+size_t IndexEvaluator::do_search_index(const Cluster* cluster, size_t start, size_t end)
+{
+    if (start >= end) {
+        return not_found;
+    }
+
     ObjKey first_key = cluster->get_real_key(start);
-    if (first_key < last_start_key) {
+    if (first_key < m_last_start_key) {
         // We are not advancing through the clusters. We basically don't know where we are,
         // so just start over from the beginning.
-        auto it = std::lower_bound(results.begin(), results.end(), first_key);
-        result_get = (it == results.end()) ? realm::npos : (it - results.begin());
+        m_results_ndx = m_results_start;
+        m_actual_key = (m_results_start != m_results_end) ? get_internal(m_results_start) : ObjKey();
     }
-    last_start_key = first_key;
+    m_last_start_key = first_key;
 
-    if (result_get < results.size()) {
-        auto actual_key = results[result_get];
-        // skip through keys which are in "earlier" leafs than the one selected by start..end:
-        while (first_key > actual_key) {
-            result_get++;
-            if (result_get == results.size())
+    // Check if we can expect to find more keys
+    if (m_results_ndx < m_results_end) {
+        // Check if we should advance to next key to search for
+        while (first_key > m_actual_key) {
+            m_results_ndx++;
+            if (m_results_ndx == m_results_end) {
                 return not_found;
-            actual_key = results[result_get];
+            }
+            m_actual_key = get_internal(m_results_ndx);
         }
 
-        // if actual key is bigger than last key, it is not in this leaf
+        // If actual_key is bigger than last key, it is not in this leaf
         ObjKey last_key = cluster->get_real_key(end - 1);
-        if (actual_key > last_key)
+        if (m_actual_key > last_key)
             return not_found;
 
-        // key is known to be in this leaf, so find key whithin leaf keys
-        return cluster->lower_bound_key(ObjKey(actual_key.value - cluster->get_offset()));
+        // Now actual_key must be found in leaf keys
+        return cluster->lower_bound_key(ObjKey(m_actual_key.value - cluster->get_offset()));
     }
     return not_found;
 }
 
 void StringNode<Equal>::_search_index_init()
 {
-    FindRes fr;
-    InternalFindResult res;
-
-    m_last_start_key = ObjKey();
-    m_results_start = 0;
-    if (ParentNode::m_table->get_primary_key_column() == ParentNode::m_condition_column_key) {
-        m_actual_key = ParentNode::m_table.unchecked_ptr()->find_first(ParentNode::m_condition_column_key,
-                                                                       StringData(StringNodeBase::m_value));
-        m_results_end = m_actual_key ? 1 : 0;
-    }
-    else {
-        auto index = ParentNode::m_table.unchecked_ptr()->get_search_index(ParentNode::m_condition_column_key);
-        fr = index->find_all_no_copy(StringData(StringNodeBase::m_value), res);
-
-        m_index_matches.reset();
-        switch (fr) {
-            case FindRes_single:
-                m_actual_key = ObjKey(res.payload);
-                m_results_end = 1;
-                break;
-            case FindRes_column:
-                m_index_matches.reset(
-                    new IntegerColumn(m_table.unchecked_ptr()->get_alloc(), ref_type(res.payload))); // Throws
-                m_results_start = res.start_ndx;
-                m_results_end = res.end_ndx;
-                m_actual_key = ObjKey(m_index_matches->get(m_results_start));
-                break;
-            case FindRes_not_found:
-                m_results_end = 0;
-                break;
-        }
-    }
-    m_results_ndx = m_results_start;
+    REALM_ASSERT(bool(m_index_evaluator));
+    auto index = ParentNode::m_table.unchecked_ptr()->get_search_index(ParentNode::m_condition_column_key);
+    m_index_evaluator->init(index, StringData(StringNodeBase::m_value));
 }
 
 bool StringNode<Equal>::do_consume_condition(ParentNode& node)
 {
     // Don't use the search index if present since we're in a scenario where
     // it'd be slower
-    m_has_search_index = false;
+    m_index_evaluator.reset();
 
     auto& other = static_cast<StringNode<Equal>&>(node);
     REALM_ASSERT(m_condition_column_key == other.m_condition_column_key);
@@ -414,18 +437,15 @@ std::string StringNode<Equal>::describe(util::serializer::SerialisationState& st
         return StringNodeEqualBase::describe(state);
     }
 
-    // FIXME: once the parser supports it, print something like "column IN {s1, s2, s3}"
-    std::string desc;
+    std::string list_contents;
     bool is_first = true;
     for (auto it : m_needles) {
         StringData sd(it.data(), it.size());
-        desc += (is_first ? "" : " or ") + state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
-                Equal::description() + " " + util::serializer::print_value(sd);
+        list_contents += util::format("%1%2", is_first ? "" : ", ", util::serializer::print_value(sd));
         is_first = false;
     }
-    if (!is_first) {
-        desc = "(" + desc + ")";
-    }
+    std::string col_descr = state.describe_column(ParentNode::m_table, m_condition_column_key);
+    std::string desc = util::format("%1 IN {%2}", col_descr, list_contents);
     return desc;
 }
 
@@ -434,13 +454,9 @@ void StringNode<EqualIns>::_search_index_init()
 {
     auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
     m_index_matches.clear();
-    index->find_all(m_index_matches, StringData(StringNodeBase::m_value), true);
-    m_results_start = 0;
-    m_results_ndx = 0;
-    m_results_end = m_index_matches.size();
-    if (m_results_start != m_results_end) {
-        m_actual_key = m_index_matches[0];
-    }
+    constexpr bool case_insensitive = true;
+    index->find_all(m_index_matches, StringData(StringNodeBase::m_value), case_insensitive);
+    m_index_evaluator->init(&m_index_matches);
 }
 
 size_t StringNode<EqualIns>::_find_first_local(size_t start, size_t end)
@@ -460,19 +476,18 @@ StringNodeFulltext::StringNodeFulltext(StringData v, ColKey column, std::unique_
     : StringNodeEqualBase(v, column)
     , m_link_map(std::move(lm))
 {
-    m_has_search_index = true;
     if (!m_link_map)
         m_link_map = std::make_unique<LinkMap>();
 }
 
 void StringNodeFulltext::table_changed()
 {
+    StringNodeEqualBase::table_changed();
     m_link_map->set_base_table(m_table);
 }
 
 StringNodeFulltext::StringNodeFulltext(const StringNodeFulltext& other)
     : StringNodeEqualBase(other)
-    , m_index_matches(other.m_index_matches)
 {
     m_link_map = std::make_unique<LinkMap>(*other.m_link_map);
 }
@@ -480,8 +495,8 @@ StringNodeFulltext::StringNodeFulltext(const StringNodeFulltext& other)
 void StringNodeFulltext::_search_index_init()
 {
     auto index = m_link_map->get_target_table()->get_search_index(ParentNode::m_condition_column_key);
-    m_index_matches.clear();
     REALM_ASSERT(index && index->is_fulltext_index());
+    m_index_matches.clear();
     index->find_all_fulltext(m_index_matches, StringData(StringNodeBase::m_value));
 
     // If links exists, use backlinks to find the original objects
@@ -494,12 +509,8 @@ void StringNodeFulltext::_search_index_init()
         m_index_matches.assign(tmp.begin(), tmp.end());
     }
 
-    m_results_start = 0;
-    m_results_ndx = 0;
-    m_results_end = m_index_matches.size();
-    if (m_results_start != m_results_end) {
-        m_actual_key = m_index_matches[0];
-    }
+    m_index_evaluator = IndexEvaluator{};
+    m_index_evaluator->init(&m_index_matches);
 }
 
 std::unique_ptr<ArrayPayload> TwoColumnsNodeBase::update_cached_leaf_pointers_for_column(Allocator& alloc,

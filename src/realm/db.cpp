@@ -1382,8 +1382,7 @@ void DB::open(Replication& repl, const std::string& file, const DBOptions& optio
 class DBLogger : public Logger {
 public:
     DBLogger(const std::shared_ptr<Logger>& base_logger, size_t hash) noexcept
-        : Logger(base_logger->get_level_threshold())
-        , m_base_logger(base_logger)
+        : Logger(base_logger)
         , m_hash(hash)
     {
     }
@@ -1394,11 +1393,10 @@ protected:
         std::ostringstream ostr;
         auto id = std::this_thread::get_id();
         ostr << "DB: " << m_hash << " Thread " << id << ": ";
-        Logger::do_log(*m_base_logger, level, ostr.str() + message);
+        Logger::do_log(*m_base_logger_ptr, level, ostr.str() + message);
     }
 
 private:
-    std::shared_ptr<util::Logger> m_base_logger;
     size_t m_hash;
 };
 

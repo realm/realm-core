@@ -1464,4 +1464,168 @@ TEST(Array_Large)
     c.destroy();
 }
 
+TEST(Array_set_all_zero)
+{
+    Array c(Allocator::get_default());
+    c.create(Array::type_Normal);
+
+    CHECK_EQUAL(c.size(), 0);
+    // size or width zero is basically no-op
+    c.set_all_to_zero();
+    CHECK_EQUAL(c.size(), 0);
+
+    c.add(0x01);
+    c.set_all_to_zero();
+    CHECK_EQUAL(c.size(), 1);
+    CHECK_EQUAL(c.get(0), 0);
+    c.destroy();
+}
+
+TEST(Array_set_type)
+{
+    Array c(Allocator::get_default());
+    c.create(Array::type_Normal);
+
+    c.set_type(Array::type_Normal);
+    CHECK_EQUAL(c.get_type(), Array::type_Normal);
+
+    c.set_type(Array::type_InnerBptreeNode);
+    CHECK_EQUAL(c.get_type(), Array::type_InnerBptreeNode);
+
+    c.set_type(Array::type_HasRefs);
+    CHECK_EQUAL(c.get_type(), Array::type_HasRefs);
+
+    c.destroy();
+}
+
+TEST(Array_get_sum)
+{
+    Array c(Allocator::get_default());
+    c.create(Array::type_Normal);
+
+    // simple sum1
+    for (int i = 0; i < 0x10; i++)
+        c.add(i);
+    CHECK_EQUAL(c.get_sum(), 120);
+    c.clear();
+
+    const auto size = realm::max_array_size / 4;
+
+    // test multiple chunks w=1
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x1);
+    CHECK_EQUAL(c.get_sum(), size);
+
+    // test multiple chunks w=2
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x3);
+    CHECK_EQUAL(c.get_sum(), 0x3 * size);
+
+    // test multiple chunks w=4
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x13);
+    CHECK_EQUAL(c.get_sum(), 0x13 * size);
+
+    // test multiple chunks w=8
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x100);
+    CHECK_EQUAL(c.get_sum(), 0x100 * size);
+
+    // test multiple chunks w=16
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i) {
+        c.add(0x10000);
+    }
+    CHECK_EQUAL(c.get_sum(), 0x10000LL * size);
+
+    // test multiple chunks w=32
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x100000);
+    CHECK_EQUAL(c.get_sum(), 0x100000LL * size);
+
+    // test multiple chunks w=64
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(8000000000LL);
+    CHECK_EQUAL(c.get_sum(), (size * 8000000000LL));
+
+    // test generic case
+    c.clear();
+    uint64_t expected = 0;
+    for (uint64_t i = 0; i < 0x30000; ++i) {
+        c.add(i);
+        expected += i;
+    }
+    CHECK_EQUAL(c.get_sum(), expected);
+
+    c.destroy();
+}
+
+TEST(Array_count)
+{
+    struct TestArray : public Array {
+        explicit TestArray(Allocator& allocator)
+            : Array(allocator)
+        {
+        }
+        size_t count(int64_t v)
+        {
+            return Array::count(v);
+        }
+    };
+
+    TestArray c(Allocator::get_default());
+    c.create(Array::type_Normal);
+    const size_t size = realm::max_array_size;
+
+    // test multiple chunks w=1
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x1);
+    CHECK_EQUAL(c.count(0x1), size);
+
+    // test multiple chunks w=2
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x3);
+    CHECK_EQUAL(c.count(0x3), size);
+
+    // test multiple chunks w=4
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x13);
+    CHECK_EQUAL(c.count(0x13), size);
+
+    // test multiple chunks w=8
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x100);
+    CHECK_EQUAL(c.count(0x100), size);
+
+    // test multiple chunks w=16
+    c.clear();
+    for (uint64_t i = 0; i < size; ++i)
+        c.add(0x10000);
+    CHECK_EQUAL(c.count(0x10000), size);
+
+    // test w=32 (number of chunks does not matter)
+    c.clear();
+    const size_t size_32_64_bit = 10;
+    for (uint64_t i = 0; i < size_32_64_bit; ++i)
+        c.add(100000);
+    CHECK_EQUAL(c.count(100000), size_32_64_bit);
+
+    // test w=64 (number of chunks does not matter)
+    c.clear();
+    for (uint64_t i = 0; i < size_32_64_bit; ++i)
+        c.add(8000000000LL);
+    CHECK_EQUAL(c.count(8000000000LL), size_32_64_bit);
+
+    c.destroy();
+}
+
 #endif // TEST_ARRAY

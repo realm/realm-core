@@ -117,7 +117,7 @@ protected:
 
     Logger() noexcept
         : m_level_threshold{m_threshold_base}
-        , m_threshold_base{Logger::s_default_level}
+        , m_threshold_base{get_default_level_threshold()}
     {
     }
 
@@ -140,8 +140,6 @@ protected:
     static const char* get_level_prefix(Level) noexcept;
 
 private:
-    static std::shared_ptr<util::Logger> s_default_logger;
-    static Level s_default_level;
     // Only used by the base Logger class
     std::atomic<Level> m_threshold_base;
 
