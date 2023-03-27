@@ -1386,8 +1386,15 @@ TEST_CASE("C API", "[c_api]") {
         realm_set_log_callback(realm_log_func, RLM_LOG_LEVEL_DEBUG, &userdata, nullptr);
         auto config = make_config(test_file.path.c_str(), false);
         realm_t* realm = realm_open(config.get());
+        realm_begin_write(realm);
+        realm_commit(realm);
+        REQUIRE(userdata.log.size() == 3);
+        realm_set_log_level(RLM_LOG_LEVEL_INFO);
+        // Commit begin/end should not be logged at INFO level
+        realm_begin_write(realm);
+        realm_commit(realm);
+        REQUIRE(userdata.log.size() == 3);
         realm_release(realm);
-        REQUIRE(userdata.log.size() == 2);
         userdata.log.clear();
         realm_set_log_level(RLM_LOG_LEVEL_ERROR);
         realm = realm_open(config.get());
