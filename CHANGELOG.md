@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Fixed an error in the changelog for version 13.4.0 ([#6306](https://github.com/realm/realm-core/pull/6306) since 13.4.0)
+* None.
 
 ### Breaking changes
 * None.
