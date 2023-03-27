@@ -19,7 +19,7 @@
 -----------
 
 ### Internals
-* None.
+* PrintChangeset sync CLI utility can now ingest trace-level log files and decode hex/base64-compressed changeset data within the logs ([#6375](https://github.com/realm/realm-core/pull/6375))
 
 ----------------------------------------------
 
