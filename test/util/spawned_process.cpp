@@ -144,16 +144,9 @@ std::unique_ptr<SpawnedProcess> spawn_process(const std::string& test_name, cons
     if (getenv("UNITTEST_ENCRYPT_ALL")) {
         env_vars.push_back("UNITTEST_ENCRYPT_ALL=1");
     }
-    // this is for iOS simulators
-    if (const char* sim_dir = getenv("DYLD_ROOT_PATH")) {
-        env_vars.push_back(sim_dir);
-    }
-    else if (const char* sim_dir = getenv("DYLD_ROOT_PATHS")) {
-        env_vars.push_back(sim_dir);
-    }
 
-#if REALM_ANDROID
-    // posix_spawn() is unavailable
+#if REALM_ANDROID || REALM_IOS
+    // posix_spawn() is unavailable on Android, and not permitted on iOS
     REALM_UNREACHABLE();
 #elif defined(_WIN32)
     STARTUPINFO si;
