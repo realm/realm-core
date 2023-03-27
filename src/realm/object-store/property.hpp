@@ -116,6 +116,8 @@ struct Property {
 
     // Nested collections
     Property(std::string name, const std::vector<PropertyType>& nested_types, std::string public_name = "");
+    Property(std::string name, const std::vector<PropertyType>& nested_types, std::string object_type,
+             std::string link_origin_property_name = "", std::string public_name = "");
 
     Property(Property const&) = default;
     Property(Property&&) noexcept = default;
@@ -347,6 +349,19 @@ inline Property::Property(std::string name, PropertyType type, std::string objec
 inline Property::Property(std::string name, const std::vector<PropertyType>& nested_types, std::string public_name)
     : name(std::move(name))
     , public_name(std::move(public_name))
+    , nested_types(nested_types)
+{
+    REALM_ASSERT(!nested_types.empty());
+    type = nested_types.back();
+    this->nested_types.pop_back();
+}
+
+inline Property::Property(std::string name, const std::vector<PropertyType>& nested_types, std::string object_type,
+                          std::string link_origin_property_name, std::string public_name)
+    : name(std::move(name))
+    , public_name(std::move(public_name))
+    , object_type(std::move(object_type))
+    , link_origin_property_name(std::move(link_origin_property_name))
     , nested_types(nested_types)
 {
     REALM_ASSERT(!nested_types.empty());
