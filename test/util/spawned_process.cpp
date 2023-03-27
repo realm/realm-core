@@ -144,6 +144,13 @@ std::unique_ptr<SpawnedProcess> spawn_process(const std::string& test_name, cons
     if (getenv("UNITTEST_ENCRYPT_ALL")) {
         env_vars.push_back("UNITTEST_ENCRYPT_ALL=1");
     }
+    // this is for iOS simulators
+    if (const char* sim_dir = getenv("DYLD_ROOT_PATH")) {
+        env_vars.push_back(sim_dir);
+    }
+    else if (const char* sim_dir = getenv("DYLD_ROOT_PATHS")) {
+        env_vars.push_back(sim_dir);
+    }
 
 #if REALM_ANDROID
     // posix_spawn() is unavailable
@@ -185,8 +192,12 @@ std::unique_ptr<SpawnedProcess> spawn_process(const std::string& test_name, cons
     std::string test_path_prefix = test_util::get_test_path_prefix();
     REALM_ASSERT(name_of_exe.size());
     char* arg_v[] = {name_of_exe.data(), test_path_prefix.data(), nullptr};
-    char* env_v[] = {env_vars[0].data(), env_vars[1].data(), env_vars[2].data(),
-                     env_vars.size() > 3 ? env_vars[3].data() : nullptr, nullptr};
+    char* env_v[] = {env_vars[0].data(),
+                     env_vars[1].data(),
+                     env_vars[2].data(),
+                     env_vars.size() > 3 ? env_vars[3].data() : nullptr,
+                     env_vars.size() > 4 ? env_vars[4].data() : nullptr,
+                     nullptr}; // last arg must be null
     int ret = posix_spawn(&pid_of_child, name_of_exe.data(), nullptr, nullptr, arg_v, env_v);
     REALM_ASSERT_EX(ret == 0, ret);
     process->set_pid(pid_of_child);
