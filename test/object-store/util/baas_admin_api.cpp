@@ -462,7 +462,7 @@ AdminAPISession AdminAPISession::login(const std::string& base_url, const std::s
         login_req_body.dump(),
     };
     auto login_resp = do_http_request(std::move(auth_req));
-    REALM_ASSERT(login_resp.http_status_code == 200);
+    REALM_ASSERT_EX(login_resp.http_status_code == 200, login_resp.http_status_code, login_resp.body);
     auto login_resp_body = nlohmann::json::parse(login_resp.body);
 
     std::string access_token = login_resp_body["access_token"];
@@ -479,21 +479,21 @@ void AdminAPISession::revoke_user_sessions(const std::string& user_id, const std
 {
     auto endpoint = apps()[app_id]["users"][user_id]["logout"];
     auto response = endpoint.put("");
-    REALM_ASSERT(response.http_status_code == 204);
+    REALM_ASSERT_EX(response.http_status_code == 204, response.http_status_code, response.body);
 }
 
 void AdminAPISession::disable_user_sessions(const std::string& user_id, const std::string& app_id) const
 {
     auto endpoint = apps()[app_id]["users"][user_id]["disable"];
     auto response = endpoint.put("");
-    REALM_ASSERT(response.http_status_code == 204);
+    REALM_ASSERT_EX(response.http_status_code == 204, response.http_status_code, response.body);
 }
 
 void AdminAPISession::enable_user_sessions(const std::string& user_id, const std::string& app_id) const
 {
     auto endpoint = apps()[app_id]["users"][user_id]["enable"];
     auto response = endpoint.put("");
-    REALM_ASSERT(response.http_status_code == 204);
+    REALM_ASSERT_EX(response.http_status_code == 204, response.http_status_code, response.body);
 }
 
 // returns false for an invalid/expired access token
@@ -530,7 +530,7 @@ void AdminAPISession::delete_app(const std::string& app_id) const
 {
     auto app_endpoint = apps()[app_id];
     auto resp = app_endpoint.del();
-    REALM_ASSERT(resp.http_status_code == 204);
+    REALM_ASSERT_EX(resp.http_status_code == 204, resp.http_status_code, resp.body);
 }
 
 std::vector<AdminAPISession::Service> AdminAPISession::get_services(const std::string& app_id) const
