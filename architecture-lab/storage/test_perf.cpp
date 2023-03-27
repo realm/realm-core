@@ -312,7 +312,7 @@ public:
     int64_t unique_symbol_size = 0;
 };
 
-int bits_needed(int64_t val)
+int signed_bits_needed(int64_t val)
 {
     if (val < 0)
         val = -val;
@@ -326,6 +326,22 @@ int bits_needed(int64_t val)
     if (val < 32768)
         return 16;
     if (val >> 31)
+        return 64;
+    return 32;
+}
+
+int unsigned_bits_needed(uint64_t val)
+{
+    if (val < 16) {
+        if (val < 2)
+            return val;
+        return 4;
+    }
+    if (val < 256)
+        return 8;
+    if (val < 65536)
+        return 16;
+    if (val >> 32)
         return 64;
     return 32;
 }
@@ -363,7 +379,7 @@ struct leaf_compression_analyzer {
         // a) determine how many bits are needed to rep greatest value.
         // b) determine most frequent value - which will become default value.
         for (auto entry = unique_values.begin(); entry != unique_values.end(); ++entry) {
-            auto bits = bits_needed(entry->first);
+            auto bits = signed_bits_needed(entry->first);
             if (bits > bits_per_value) {
                 bits_per_value = bits;
             }
@@ -378,10 +394,8 @@ struct leaf_compression_analyzer {
                 min_value = entry->first;
         }
         auto range = max_value - min_value;
-        if (it != unique_values.end()) {
-            unique_values.erase(it);
-        }
-        int unique_non_default_values = unique_values.size();
+        int num_unique_values = unique_values.size();
+        int unique_non_default_values = num_unique_values - 1;
         int non_default_values = 0;
         for (int k = 0; k < entry_count; k++) {
             if (values[k] != default_value)
@@ -389,10 +403,10 @@ struct leaf_compression_analyzer {
         }
         // now we can estimate the cost of different layouts:
         // starting point is our current encoding:
-        int leaf_cost = 8 + (bits_per_value * entry_count + 7) / 8;
+        int leaf_cost = 8 + 8 + (bits_per_value * entry_count + 7) / 8;
         EncType enc_type = EncType::Array;
 
-        // with special case where everything is 0
+        // with special case where everything is 0, encoded as ref == 0
         if (default_value == 0 && non_default_values == 0) {
             leaf_cost = 8;
             enc_type = EncType::Empty;
@@ -401,7 +415,7 @@ struct leaf_compression_analyzer {
         // next evaluate a sparse encoding, only feasible with few values (8)
         /*
         if (non_default_values < 8) {
-            int alt_leaf_cost = 16 + (bits_per_value * (non_default_values + (default_value ? 1 : 0) + 7) / 8);
+            int alt_leaf_cost = 8 + 16 + (bits_per_value * (non_default_values + (default_value ? 1 : 0) + 7) / 8);
             // std::cout << "Sparse     " << leaf_cost << " bytes" << std::endl;
             if (alt_leaf_cost < leaf_cost) {
                 leaf_cost = alt_leaf_cost;
@@ -410,11 +424,11 @@ struct leaf_compression_analyzer {
         }
         */
         // with few unique values, use a local dict and let each entry be an index into it
-        if (unique_non_default_values < 15) {
+        if (num_unique_values <= 16) {
             // local dict cost:
-            int alt_leaf_cost = 16 + (bits_per_value * (non_default_values + 1) + 7) / 8;
+            int alt_leaf_cost = 8 + 16 + (bits_per_value * num_unique_values + 7) / 8;
             // array of indirections cost:
-            alt_leaf_cost += (entry_count * bits_needed(unique_non_default_values)) / 8; // 4 bits index each
+            alt_leaf_cost += (entry_count * unsigned_bits_needed(num_unique_values - 1)) / 8;
             // std::cout << "Local dict " << leaf_cost << " bytes" << std::endl;
             if (alt_leaf_cost < leaf_cost) {
                 leaf_cost = alt_leaf_cost;
@@ -422,9 +436,9 @@ struct leaf_compression_analyzer {
             }
         }
         // if we have many values but within a narrow band, try base+offset encoding
-        if (bits_needed(range) < bits_per_value) {
-            auto range_bits = bits_needed(range);
-            auto alt_leaf_cost = 16 + (bits_needed(min_value + range / 2) + entry_count * range_bits) / 8;
+        if (unsigned_bits_needed(range) < bits_per_value) {
+            auto range_bits = unsigned_bits_needed(range);
+            auto alt_leaf_cost = 8 + 16 + (signed_bits_needed(min_value + range / 2) + entry_count * range_bits) / 8;
             if (alt_leaf_cost < leaf_cost) {
                 leaf_cost = alt_leaf_cost;
                 enc_type = EncType::Offst;
