@@ -274,9 +274,36 @@ void SyncManager::reset_for_testing()
     }
 }
 
+void SyncManager::set_log_level(util::Logger::Level level) noexcept
+{
+    util::CheckedLockGuard lock(m_mutex);
+    m_config.log_level = level;
+    // Update the level threshold in the already created logger
+    if (m_logger_ptr) {
+        m_logger_ptr->set_level_threshold(level);
+    }
+}
+
+void SyncManager::set_logger_factory(SyncClientConfig::LoggerFactory factory)
+{
+    util::CheckedLockGuard lock(m_mutex);
+    m_config.logger_factory = std::move(factory);
+
+    if (m_sync_client)
+        throw std::logic_error("Cannot set the logger factory after creating the sync client");
+
+    // Create a new logger using the new factory
+    do_make_logger();
+}
+
 void SyncManager::do_make_logger()
 {
-    m_logger_ptr = util::Logger::get_default_logger();
+    if (m_config.logger_factory) {
+        m_logger_ptr = m_config.logger_factory(m_config.log_level);
+    }
+    else {
+        m_logger_ptr = util::Logger::get_default_logger();
+    }
 }
 
 const std::shared_ptr<util::Logger>& SyncManager::get_logger() const
@@ -303,6 +330,12 @@ void SyncManager::reconnect() const
     for (auto& it : m_sessions) {
         it.second->handle_reconnect();
     }
+}
+
+util::Logger::Level SyncManager::log_level() const noexcept
+{
+    util::CheckedLockGuard lock(m_mutex);
+    return m_config.log_level;
 }
 
 bool SyncManager::perform_metadata_update(util::FunctionRef<void(SyncMetadataManager&)> update_function) const

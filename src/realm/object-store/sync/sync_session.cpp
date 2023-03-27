@@ -570,11 +570,6 @@ void SyncSession::OnlyForTesting::handle_error(SyncSession& session, sync::Sessi
     session.handle_error(std::move(error));
 }
 
-void SyncSession::OnlyForTesting::handle_error(SyncSession& session, SyncError&& error)
-{
-    session.handle_error({error.get_system_error(), std::string(error.reason()), !error.is_fatal});
-}
-
 // This method should only be called from within the error handler callback registered upon the underlying
 // `m_session`.
 void SyncSession::handle_error(sync::SessionErrorInfo error)
