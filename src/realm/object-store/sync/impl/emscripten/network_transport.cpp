@@ -76,14 +76,13 @@ void error(emscripten_fetch_t* fetch)
 void EmscriptenNetworkTransport::send_request_to_server(
     const Request& request, util::UniqueFunction<void(const Response&)>&& completion_block)
 {
-    auto state = new FetchState{request.body, std::move(completion_block)};
+    auto state = std::make_unique<FetchState>(FetchState{request.body, std::move(completion_block)});
 
     emscripten_fetch_attr_t attr;
     emscripten_fetch_attr_init(&attr);
     attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY;
     attr.onsuccess = success;
     attr.onerror = error;
-    attr.userData = state;
     attr.timeoutMSecs = static_cast<unsigned long>(request.timeout_ms);
 
     if (state->request_body.size()) {
@@ -117,5 +116,6 @@ void EmscriptenNetworkTransport::send_request_to_server(
             break;
     }
 
+    attr.userData = state.release();
     emscripten_fetch(&attr, request.url.c_str());
 }
