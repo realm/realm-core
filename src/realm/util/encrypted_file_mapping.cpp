@@ -332,7 +332,7 @@ size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObs
         if (observer) {
             we_are_alone = observer->no_concurrent_writer_seen();
         }
-        if (elapsed > max_retry_period || we_are_alone) {
+        if (we_are_alone || (retry_count > 0 && elapsed > max_retry_period)) {
             auto str = util::format("unable to decrypt after %1 seconds (retry_count=%2, from=%3, size=%4)",
                                     std::chrono::duration_cast<std::chrono::seconds>(elapsed).count(), retry_count,
                                     debug_from, size);
@@ -344,10 +344,11 @@ size_t AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObs
             // from the iv table cache didn't validate and we are fetching the iv block from disk for the first time
             auto cur_iv_and_data_hash = std::make_pair(iv, std::hash<std::string_view>{}(page_data));
             if (retry_count != 0) {
-                std::this_thread::yield();
                 if (last_iv_and_data_hash == cur_iv_and_data_hash) {
                     ++num_identical_reads;
                 }
+                // don't retry right away if there are potentially other external writers
+                std::this_thread::yield();
             }
             last_iv_and_data_hash = cur_iv_and_data_hash;
             ++retry_count;
