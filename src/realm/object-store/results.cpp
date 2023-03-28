@@ -116,14 +116,14 @@ bool Results::is_valid() const
         m_realm->verify_thread();
     }
 
+    if (m_collection)
+        return m_collection->is_attached();
+
     // Here we cannot just use if (m_table) as it combines a check if the
     // reference contains a value and if that value is valid.
     // First we check if a table is referenced ...
     if (m_table.unchecked_ptr() != nullptr)
-        return !!m_table; // ... and then we check if it is valid
-
-    if (m_collection)
-        return m_collection->is_attached();
+        return bool(m_table); // ... and then we check if it is valid
 
     return true;
 }
