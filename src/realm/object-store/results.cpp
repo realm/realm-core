@@ -120,7 +120,7 @@ bool Results::is_valid() const
     // reference contains a value and if that value is valid.
     // First we check if a table is referenced ...
     if (m_table.unchecked_ptr() != nullptr)
-        return !!m_table; // ... and then we check if it is valid
+        return bool(m_table); // ... and then we check if it is valid
 
     if (m_collection)
         return m_collection->is_attached();
