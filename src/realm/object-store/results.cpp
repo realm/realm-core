@@ -1080,9 +1080,9 @@ Results Results::import_copy_into_realm(std::shared_ptr<Realm> const& realm)
     util::CheckedUniqueLock lock(m_mutex);
     if (m_mode == Mode::Empty)
         return *this;
-    if (!is_valid()) 
+    if (!is_valid())
         throw StaleAccessor("Attempt to construct a Results for a deleted object");
-    
+
     switch (m_mode) {
         case Mode::Table:
             return Results(realm, realm->import_copy_of(m_table));
