@@ -133,23 +133,37 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     auto int_dict_col = table->get_column_key("int_dict");
     auto linked_object_value_col = linked_table->get_column_key("value");
 
-    realm->begin_transaction();
-    for (int i = 0; i < 8; ++i) {
+    auto create_object = [&](int value, bool with_links = false) {
         Obj obj = table->create_object();
-        obj.set(value_col, (i + 2));
+        obj.set(value_col, (value + 2));
         std::shared_ptr<LnkLst> object_link_view = obj.get_linklist_ptr(object_link_col);
+
         auto int_list = List(realm, obj, int_list_col);
         object_store::Dictionary int_dict(realm, obj, int_dict_col);
+
         for (int j = 0; j < 5; ++j) {
-            auto child_obj = linked_table->create_object();
-            child_obj.set(linked_object_value_col, j + 10);
-            object_link_view->add(child_obj.get_key());
+            if (with_links) {
+                auto child_obj = linked_table->create_object();
+                child_obj.set(linked_object_value_col, j + 10);
+                object_link_view->add(child_obj.get_key());
+            }
             int_list.add(static_cast<Int>(j + 42));
             std::string key = "Key" + util::to_string(j);
-            int_dict.insert(key, i);
+            int_dict.insert(key, value);
         }
-    }
-    realm->commit_transaction();
+        return obj;
+    };
+
+    auto write = [&](const std::function<void()>& fn) {
+        realm->begin_transaction();
+        fn();
+        realm->commit_transaction();
+    };
+
+    write([&]() {
+        for (int i = 0; i < 8; ++i)
+            create_object(i + 2, true);
+    });
 
     Results results(realm, table);
     auto frozen_realm = Realm::get_frozen_realm(config, realm->read_transaction_version());
@@ -288,6 +302,32 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         frozen_realm->close();
         realm->close();
         REQUIRE(DB::call_with_lock(config.path, [](auto) {}));
+    }
+
+    SECTION("Results after owning object remove") {
+        Obj obj;
+        write([&]() {
+            obj = create_object(42);
+        });
+
+        Results results(realm, obj.get_dictionary_ptr(int_dict_col));
+        REQUIRE(results.is_valid());
+        REQUIRE(results.size() == 5);
+
+        write([&]() {
+            obj.remove();
+        });
+
+        REQUIRE_EXCEPTION(results.size(), StaleAccessor, "Access to invalidated Results objects");
+        REQUIRE_EXCEPTION(results.get_any(0).is_null(), StaleAccessor, "Access to invalidated Results objects");
+        REQUIRE_FALSE(results.is_valid());
+
+        Results frozen_res = results.freeze(realm);
+
+        // FIXME would probably be better to throw an exception?
+        REQUIRE(frozen_res.is_frozen());
+        REQUIRE(frozen_res.size() == 0);
+        REQUIRE(frozen_res.is_valid()); // FIXME weird?
     }
 }
 
