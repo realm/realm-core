@@ -39,17 +39,29 @@ namespace sync {
 //
 constexpr int get_current_protocol_version() noexcept
 {
+#ifdef REALM_SYNC_PROTOCOL_V8
+    return 8;
+#else
     return 7;
+#endif // REALM_SYNC_PROTOCOL_V8
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
 {
+#ifdef REALM_SYNC_PROTOCOL_V8
+    return "com.mongodb.realm-sync#";
+#else
     return "com.mongodb.realm-sync/";
+#endif // REALM_SYNC_PROTOCOL_V8
 }
 
 constexpr std::string_view get_flx_websocket_protocol_prefix() noexcept
 {
+#ifdef REALM_SYNC_PROTOCOL_V8
+    return "com.mongodb.realm-query-sync#";
+#else
     return "com.mongodb.realm-query-sync/";
+#endif // REALM_SYNC_PROTOCOL_V8
 }
 
 enum class SyncServerMode { PBS, FLX };
@@ -219,7 +231,9 @@ struct ProtocolErrorInfo {
         Transient,
         DeleteRealm,
         ClientReset,
-        ClientResetNoRecovery
+        ClientResetNoRecovery,
+        MigrateToFLX,
+        RevertToPBS
     };
 
     ProtocolErrorInfo() = default;
@@ -236,13 +250,14 @@ struct ProtocolErrorInfo {
     std::string message;
     bool try_again = false;
     bool client_reset_recovery_is_disabled = false;
-    util::Optional<bool> should_client_reset;
-    util::Optional<std::string> log_url;
+    std::optional<bool> should_client_reset;
+    std::optional<std::string> log_url;
     version_type compensating_write_server_version = 0;
     version_type compensating_write_rejected_client_version = 0;
     std::vector<CompensatingWriteErrorInfo> compensating_writes;
-    util::Optional<ResumptionDelayInfo> resumption_delay_interval;
+    std::optional<ResumptionDelayInfo> resumption_delay_interval;
     Action server_requests_action;
+    std::optional<std::string> migration_query_string;
 
     bool is_fatal() const
     {
@@ -311,10 +326,12 @@ enum class ProtocolError {
     initial_sync_not_completed   = RLM_SYNC_ERR_SESSION_INITIAL_SYNC_NOT_COMPLETED, // Client tried to open a session before initial sync is complete (BIND)
     write_not_allowed            = RLM_SYNC_ERR_SESSION_WRITE_NOT_ALLOWED,          // Client attempted a write that is disallowed by permissions, or modifies an
                                                                                     // object outside the current query - requires client reset (UPLOAD)
-    compensating_write           = RLM_SYNC_ERR_SESSION_COMPENSATING_WRITE,         // Client attempted a write that is disallowed by permissions, or modifies and
+    compensating_write           = RLM_SYNC_ERR_SESSION_COMPENSATING_WRITE,         // Client attempted a write that is disallowed by permissions, or modifies an
                                                                                     // object outside the current query, and the server undid the modification
                                                                                     // (UPLOAD)
+    migrate_to_flx               = RLM_SYNC_ERR_SESSION_MIGRATE_TO_FLX,             // Server migrated from PBS to FLX - migrate client to FLX (BIND)
     bad_progress                 = RLM_SYNC_ERR_SESSION_BAD_PROGRESS,               // Bad progress information (ERROR)
+    revert_to_pbs                = RLM_SYNC_ERR_SESSION_REVERT_TO_PBS,              // Server rolled back to PBS after FLX migration - revert FLX client migration (BIND)
 
     // clang-format on
 };
@@ -399,6 +416,10 @@ inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action actio
             return o << "ClientReset";
         case ProtocolErrorInfo::Action::ClientResetNoRecovery:
             return o << "ClientResetNoRecovery";
+        case ProtocolErrorInfo::Action::MigrateToFLX:
+            return o << "MigrateToFLX";
+        case ProtocolErrorInfo::Action::RevertToPBS:
+            return o << "RevertToPBS";
     }
     return o << "Invalid error action: " << int64_t(action);
 }

@@ -2,10 +2,111 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* None.
+
+### Fixed
+* Fix a stack overflow crash when using the query parser with long chains of AND/OR conditions. ([#6428](https://github.com/realm/realm-core/pull/6428), since v11.7.0)
+* Changing the log level on the fly would not affect the core level log output ([#6440](https://github.com/realm/realm-core/issues/6440), since 13.7.0)
+* `SyncManager::immediately_run_file_actions()` no longer ignores the result of trying to remove a realm. This could have resulted in a client reset action being reported as successful when it actually failed on windows if the `Realm` was still open ([#6050](https://github.com/realm/realm-core/issues/6050)).
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* PrintChangeset sync CLI utility can now ingest trace-level log files and decode hex/base64-compressed changeset data within the logs ([#6375](https://github.com/realm/realm-core/pull/6375))
+
+----------------------------------------------
+
+# 13.8.0 Release notes
+
+### Enhancements
+* Performance improvement for the following queries ([6376](https://github.com/realm/realm-core/issues/6376)):
+    * Significant (~75%) improvement when counting (`Query::count()`) the number of exact matches (with no other query conditions) on a string/int/UUID/ObjectID property that has an index. This improvement will be especially noticiable if there are a large number of results returned (duplicate values).
+    * Significant (~99%) improvement when querying for an exact match on a Timestamp property that has an index.
+    * Significant (~99%) improvement when querying for a case insensitive match on a Mixed property that has an index.
+    * Moderate (~25%) improvement when querying for an exact match on a Boolean property that has an index.
+    * Small (~5%) improvement when querying for a case insensitive match on a Mixed property that does not have an index.
+* Expose `Results::is_valid()` in the C API, in order to prevent to use an invalid Results. (PR [#6407](https://github.com/realm/realm-core/pull/6407))
+* Restore `SyncManager::set_logger_factory()` to enable setting different loggers for different SyncManagers ([PR #6400](https://github.com/realm/realm-core/pull/6400)).
+
+### Fixed
+* Fixed a crash when querying a mixed property with a string operator (contains/like/beginswith/endswith) or with case insensitivity. ([6376](https://github.com/realm/realm-core/issues/6376) since introduction of Mixed)
+* Querying for equality of a string on an indexed mixed property was returning case insensitive matches. For example querying for `myIndexedMixed == "Foo"` would incorrectly match on values of "foo" or "FOO" etc. ([6376](https://github.com/realm/realm-core/issues/6376) since introduction of Mixed)
+* Adding an index to a Mixed property on a non-empty table would crash with an assertion. ([6376](https://github.com/realm/realm-core/issues/6376) since introduction of Mixed)
+* `SyncSession::pause()` could hold a reference to the database open after shutting down the sync session, preventing users from being able to delete the realm. ([#6372](https://github.com/realm/realm-core/issues/6372), since v13.3.0)
+* `Logger::set_default_logger()` did not perform any locking, resulting in data races if it was called while the default logger was being read on another thread ([PR #6398](https://github.com/realm/realm-core/pull/6398), since v13.7.0).
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Add admin api and test for performing the PBS->FLX migration and roll back on the server. (PR [#6366](https://github.com/realm/realm-core/pull/6366))
+* Integrate protocol support for PBS->FLX client migration ([PR #6355](https://github.com/realm/realm-core/pull/6355))
+* `SyncManager::reset_for_testing()` could race with SyncSession's being torn down in other threads causing an assertion for `REALM_ASSERT_RELEASE(no_sessions)` to fail. `SyncManager::reset_for_testing()` now waits/yields for up to 5 seconds for sessions being torn down in other threads to finish tearing down before checking this assertion. ([#6271](https://github.com/realm/realm-core/issues/6271))
+* Update event loop to keep full stack trace if no observer is used ([PR #6410](https://github.com/realm/realm-core/pull/6410))
+* `SyncSession::OnlyForTesting::handle_error()` now takes a `realm::sync:SessionErrorInfo` instead of a `realm::SyncError` to reflect internal refactoring ([PR #6433](https://github.com/realm/realm-core/pull/6433)).
+
+----------------------------------------------
+
+# 13.7.1 Release notes
+
+### Enhancements
+* Expose `RealmConfig::schema_subset_mode` in the C-API. (PR [#6379](https://github.com/realm/realm-core/pull/6379))
+
+### Fixed
+* Fixed a bug that may have resulted in arrays being in different orders on different devices. Some cases of “Invalid prior_size” may be fixed too. ([#6191](https://github.com/realm/realm-core/issues/6191), since v11.13.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None
+----------------------------------------------
+
+# 13.7.0 Release notes
+
+### Enhancements
+* Add logging at the Storage level. (PR [#6339](https://github.com/realm/realm-core/pull/6339))
+
+### Fixed
+* None.
+
+### Breaking changes
+* You can no longer associate a Logger Factory with the SyncManager. Instead you can install one default logger via Logger::set_default_logger(). This logger will then be used all over Core. Logging cmake flags updated to use REALM_TEST_LOGGING and REALM_TEST_LOGGING_LEVEL
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* The OpenSSL dependency is included only exactly where needed. Where OpenSSL is not available and the target system doesn't provide them, we now bundle public domain implementations of the SHA1 and SHA2 hashes. Common hashing operations are exposed by `util/sha_crypto.hpp` so that call sites don't need to reason about the exact hash provider. ([PR #6308](https://github.com/realm/realm-core/pull/6308))
+
+----------------------------------------------
+
+# 13.6.0 Release notes
+
+### Enhancements
 * Add per app support for BindingCallbackThreadObserver ([#6250](https://github.com/realm/realm-core/issues/6250))
 
 ### Fixed
-* Fixed handling of non-ASCII characters in file paths. ([#6336](https://github.com/realm/realm-core/issues/6336), since v13.4.0)
+* You may have a crash on Windows if you try to open a file with non-ASCII path. ([#6336](https://github.com/realm/realm-core/issues/6336), since v13.4.0)
+* Creating subscriptions with queries having unicode parameters causes a server error. ([#6350](https://github.com/realm/realm-core/issues/6350), since v11.7.0)
 
 ### Breaking changes
 * BindingCallbackThreadObserver interface was updated to be part of SyncClientConfig and global instance was removed. ([PR #6156](https://github.com/realm/realm-core/pull/6156))
@@ -18,6 +119,7 @@
 ### Internals
 * Add CAPI test for Binding Callback Thread Observer. ([PR #6156](https://github.com/realm/realm-core/pull/6156))
 * Implement MigrationStore to support migration from PBS to FLX ([PR #6324](https://github.com/realm/realm-core/pull/6324))
+* Removed overloads of `Session::bind()` that allow binding a sync session to server other than the one configured in `Session::Config` ([PR #6358](https://github.com/realm/realm-core/pull/6358)).
 
 ----------------------------------------------
 
@@ -109,7 +211,7 @@
 * Improve performance of interprocess mutexes on iOS which don't need to support reader-writer locking. The primary beneficiary of this is beginning and ending read transactions, which is now almost as fast as pre-v13.0.0 ([PR #6258](https://github.com/realm/realm-core/pull/6258)).
 
 ### Fixed
-* Sharing Realm files between a Catalyst app and Realm Studio did not properly synchronize access to the Realm file ([PR #6258](https://github.com/realm/realm-core/pull/6258), since v6.21.0).
+* Sharing Realm files between a Catalyst app and Realm Studio did not properly synchronize access to the Realm file ([PR #6258](https://github.com/realm/realm-core/pull/6258), since v6.0.21).
 * Fix websocket redirection after server migration if user is logged in ([#6056](https://github.com/realm/realm-core/issues/6056), since v12.9.0)
 * Freezing an immutable Realm would hit an assertion failure ([#6260]https://github.com/realm/realm-core/issues/6260), since v13.3.0).
 

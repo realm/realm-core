@@ -156,6 +156,11 @@ TEST(Query_Parser)
     // You don't need to create a query object first:
     match = books.query("pages >= 200 && author == \"David Griffiths\"").find();
     CHECK_EQUAL(obj2.get_key(), match);
+
+    // Check that we handle unicode strings correctly
+    std::string query_string = "author == \"جمعتs\"";
+    q = books.query(query_string);
+    CHECK_EQUAL(q.get_description(), query_string);
 }
 
 
@@ -2379,12 +2384,15 @@ TEST(Query_TwoColumnsNumeric)
             size_t num_expected_matches = num_rows;
             if ((lhs_type == type_Mixed) != (rhs_type == type_Mixed)) {
                 // Only one prop is mixed
-                num_expected_matches = 6;
+                // see convert_for_test<Mixed>():
+                // matches on numerics: 1(int), 3(double), 5(decimal128), 9(int), 11(double)
+                num_expected_matches = 5;
             }
             if ((lhs_type == type_String) != (rhs_type == type_String)) {
                 // Only one prop is string
                 num_expected_matches = 0;
                 if ((lhs_type == type_Mixed) || (rhs_type == type_Mixed)) {
+                    // matches on "string 2" and "string 10"
                     num_expected_matches = 2;
                 }
             }

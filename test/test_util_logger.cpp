@@ -94,10 +94,11 @@ TEST(Util_Logger_LevelThreshold)
     auto prefix_logger = PrefixLogger("test", threadsafe_logger); // created using Logger shared_ptr
     auto prefix_logger2 = PrefixLogger("test2", prefix_logger);   // created using PrefixLogger
 
-    CHECK(base_logger->get_level_threshold() == Logger::default_log_level);
-    CHECK(threadsafe_logger->get_level_threshold() == Logger::default_log_level);
-    CHECK(prefix_logger.get_level_threshold() == Logger::default_log_level);
-    CHECK(prefix_logger2.get_level_threshold() == Logger::default_log_level);
+    auto default_log_level = Logger::get_default_level_threshold();
+    CHECK(base_logger->get_level_threshold() == default_log_level);
+    CHECK(threadsafe_logger->get_level_threshold() == default_log_level);
+    CHECK(prefix_logger.get_level_threshold() == default_log_level);
+    CHECK(prefix_logger2.get_level_threshold() == default_log_level);
 
     base_logger->set_level_threshold(Logger::Level::error);
     CHECK(base_logger->get_level_threshold() == Logger::Level::error);

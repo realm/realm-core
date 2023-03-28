@@ -120,34 +120,6 @@ std::vector<ObjectId> fill_large_array_schema(FLXSyncTestHarness& harness)
     return ret;
 }
 
-void wait_for_advance(Realm& realm)
-{
-    struct Context : BindingContext {
-        Realm& realm;
-        DB::version_type target_version;
-        bool& done;
-        Context(Realm& realm, bool& done)
-            : realm(realm)
-            , target_version(*realm.latest_snapshot_version())
-            , done(done)
-        {
-        }
-
-        void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
-        {
-            if (realm.read_transaction_version().version >= target_version) {
-                done = true;
-            }
-        }
-    };
-
-    bool done = false;
-    realm.m_binding_context = std::make_unique<Context>(realm, done);
-    timed_wait_for([&] {
-        return done;
-    });
-    realm.m_binding_context = nullptr;
-}
 } // namespace
 
 TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
@@ -2088,6 +2060,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
             Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", bar_obj_id}, {"location", "bar"s}}));
             realm->commit_transaction();
+            wait_for_upload(*realm);
         });
 
         harness->do_with_new_realm([&](SharedRealm realm) {
@@ -2112,6 +2085,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
                 "Attempting to create an object of type 'Asymmetric' with an existing primary key value 'not "
                 "implemented'");
             realm->commit_transaction();
+            wait_for_upload(*realm);
         });
 
         harness->do_with_new_realm([&](SharedRealm realm) {
@@ -2198,6 +2172,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             Object::create(c, realm, "Asymmetric",
                            std::any(AnyDict{{"_id", ObjectId::gen()}, {"embedded_obj", AnyDict{{"value", "foo"s}}}}));
             realm->commit_transaction();
+            wait_for_upload(*realm);
         });
 
         harness->do_with_new_realm([&](SharedRealm realm) {
@@ -2260,7 +2235,6 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
 }
 
 // TODO this test has been failing very frequently. We need to fix it and re-enable it in RCORE-1149.
-#if 0
 TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app]") {
     FLXSyncTestHarness::ServerSchema server_schema;
     server_schema.dev_mode_enabled = true;
@@ -2302,7 +2276,6 @@ TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app]") {
         },
         schema);
 }
-#endif
 
 TEST_CASE("flx: send client error", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_client_error");

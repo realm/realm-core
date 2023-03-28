@@ -73,10 +73,16 @@ struct BindingCallbackThreadObserver {
     // Return true if the exception was handled by this function, otherwise false
     virtual bool handle_error(const std::exception& e)
     {
-        if (!m_create_thread_callback)
+        if (!m_handle_error_callback)
             return false;
 
         return (*m_handle_error_callback)(e);
+    }
+
+    // Return true if this event loop observer has a handle error callback defined
+    virtual bool has_handle_error()
+    {
+        return bool(m_handle_error_callback);
     }
 
 protected:

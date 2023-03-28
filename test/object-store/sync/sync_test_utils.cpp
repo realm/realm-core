@@ -20,6 +20,7 @@
 
 #include "util/baas_admin_api.hpp"
 
+#include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
@@ -66,6 +67,24 @@ bool results_contains_original_name(SyncFileActionMetadataResults& results, cons
         }
     }
     return false;
+}
+
+bool ReturnsTrueWithinTimeLimit::match(util::FunctionRef<bool()> condition) const
+{
+    const auto wait_start = std::chrono::steady_clock::now();
+    bool predicate_returned_true = false;
+    util::EventLoop::main().run_until([&] {
+        if (std::chrono::steady_clock::now() - wait_start > m_max_ms) {
+            return true;
+        }
+        auto ret = condition();
+        if (ret) {
+            predicate_returned_true = true;
+        }
+        return ret;
+    });
+
+    return predicate_returned_true;
 }
 
 void timed_wait_for(util::FunctionRef<bool()> condition, std::chrono::milliseconds max_ms)
@@ -185,6 +204,35 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app)
                                      REQUIRE(!error);
                                  });
     return creds;
+}
+
+void wait_for_advance(Realm& realm)
+{
+    struct Context : BindingContext {
+        Realm& realm;
+        DB::version_type target_version;
+        bool& done;
+        Context(Realm& realm, bool& done)
+            : realm(realm)
+            , target_version(*realm.latest_snapshot_version())
+            , done(done)
+        {
+        }
+
+        void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
+        {
+            if (realm.read_transaction_version().version >= target_version) {
+                done = true;
+            }
+        }
+    };
+
+    bool done = false;
+    realm.m_binding_context = std::make_unique<Context>(realm, done);
+    timed_wait_for([&] {
+        return done;
+    });
+    realm.m_binding_context = nullptr;
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
@@ -308,7 +356,7 @@ struct FakeLocalClientReset : public TestClientReset {
             sync::SaltedFileIdent fake_ident{1, 123456789};
             auto local_db = TestHelper::get_db(local_realm);
             auto remote_db = TestHelper::get_db(remote_realm);
-            util::StderrLogger logger(realm::util::Logger::Level::TEST_ENABLE_SYNC_LOGGING_LEVEL);
+            util::StderrLogger logger(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
             using _impl::client_reset::perform_client_reset_diff;
             constexpr bool recovery_is_allowed = true;
             perform_client_reset_diff(local_db, remote_db, fake_ident, logger, m_mode, recovery_is_allowed, nullptr,

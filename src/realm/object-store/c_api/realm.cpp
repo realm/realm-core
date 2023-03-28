@@ -17,7 +17,6 @@ realm_refresh_callback_token::~realm_refresh_callback_token()
     realm::c_api::CBindingContext::get(*m_realm).realm_pending_refresh_callbacks().remove(m_token);
 }
 
-
 namespace realm::c_api {
 
 
