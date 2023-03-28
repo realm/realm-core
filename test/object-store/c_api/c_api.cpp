@@ -2586,6 +2586,9 @@ TEST_CASE("C API", "[c_api]") {
 
                     CHECK_FALSE(realm_results_count(results.get(), &count));
                     CHECK_ERR(RLM_ERR_STALE_ACCESSOR);
+
+                    CHECK_FALSE(realm_results_resolve_in(results.get(), realm));
+                    CHECK_ERR(RLM_ERR_STALE_ACCESSOR);
                 }
 
                 SECTION("realm_results_count()") {
