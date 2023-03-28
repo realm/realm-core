@@ -5677,8 +5677,6 @@ TEST(Parser_RecursiveLogial)
             args, 0);
     }
 
-    // exclude device tests due to large memory request for string query
-#if !(REALM_IOS || REALM_ANDROID)
     constexpr size_t num_args = 1000;
     std::vector<Mixed> args;
     args.reserve(num_args);
@@ -5708,7 +5706,6 @@ TEST(Parser_RecursiveLogial)
     q = table->query(query, args, {});
     q_count = q.count();
     CHECK_EQUAL(q_count, 1);
-#endif // on device tests
 }
 
 #endif // TEST_PARSER
