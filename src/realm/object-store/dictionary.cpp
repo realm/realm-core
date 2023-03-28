@@ -108,6 +108,14 @@ public:
     {
         REALM_TERMINATE("not implemented");
     }
+    void set_owner(const Obj& obj, CollectionParent::Index index) override
+    {
+        m_dictionary->set_owner(obj, index);
+    }
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        m_dictionary->set_owner(std::move(parent), index);
+    }
 
 private:
     std::shared_ptr<Dictionary> m_dictionary;

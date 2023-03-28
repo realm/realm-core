@@ -79,7 +79,20 @@ public:
     using value_type = T;
 
     Lst() = default;
-    Lst(const Obj& owner, ColKey col_key);
+    Lst(const Obj& owner, ColKey col_key)
+        : Lst<T>(col_key)
+    {
+        this->set_owner(owner, col_key);
+    }
+    Lst(ColKey col_key)
+        : Base(col_key)
+    {
+        if (!col_key.is_list()) {
+            throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a list");
+        }
+
+        check_column_type<T>(m_col_key);
+    }
     Lst(const Lst& other);
     Lst(Lst&&) noexcept;
     Lst& operator=(const Lst& other);
@@ -240,14 +253,15 @@ protected:
     mutable std::unique_ptr<BPlusTree<T>> m_tree;
 
     using Base::bump_content_version;
+    using Base::m_alloc;
     using Base::m_col_key;
     using Base::m_nullable;
-    using Base::m_obj;
+    using Base::m_parent;
 
     bool init_from_parent(bool allow_create) const
     {
         if (!m_tree) {
-            m_tree.reset(new BPlusTree<T>(m_obj.get_alloc()));
+            m_tree.reset(new BPlusTree<T>(*m_alloc));
             const ArrayParent* parent = this;
             m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
         }
@@ -356,6 +370,10 @@ public:
         : m_list(owner, col_key)
     {
     }
+    LnkLst(ColKey col_key)
+        : m_list(col_key)
+    {
+    }
 
     LnkLst(const LnkLst& other) = default;
     LnkLst(LnkLst&& other) = default;
@@ -399,24 +417,14 @@ public:
     ColKey get_col_key() const noexcept final;
 
     // Overriding members of LstBase:
-    std::unique_ptr<LstBase> clone() const
+    std::unique_ptr<LstBase> clone() const override
     {
-        if (get_obj().is_valid()) {
-            return std::make_unique<LnkLst>(get_obj(), get_col_key());
-        }
-        else {
-            return std::make_unique<LnkLst>();
-        }
+        return clone_linklist();
     }
     // Overriding members of ObjList:
-    LinkCollectionPtr clone_obj_list() const
+    LinkCollectionPtr clone_obj_list() const override
     {
-        if (get_obj().is_valid()) {
-            return std::make_unique<LnkLst>(get_obj(), get_col_key());
-        }
-        else {
-            return std::make_unique<LnkLst>();
-        }
+        return clone_linklist();
     }
     void set_null(size_t ndx) final;
     void set_any(size_t ndx, Mixed val) final;
@@ -491,6 +499,16 @@ public:
         return m_list.get_tree();
     }
 
+    void set_owner(const Obj& obj, CollectionParent::Index index) override
+    {
+        m_list.set_owner(obj, index);
+    }
+
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        m_list.set_owner(std::move(parent), index);
+    }
+
 private:
     friend class TableView;
     friend class Query;
@@ -520,17 +538,6 @@ inline void LstBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) cons
     repl->list_move(*this, ndx2, ndx1);
     if (ndx1 + 1 != ndx2)
         repl->list_move(*this, ndx1 + 1, ndx2);
-}
-
-template <class T>
-inline Lst<T>::Lst(const Obj& obj, ColKey col_key)
-    : Base(obj, col_key)
-{
-    if (!col_key.is_list()) {
-        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a list");
-    }
-
-    check_column_type<T>(m_col_key);
 }
 
 template <class T>
@@ -661,7 +668,7 @@ template <class T>
 void Lst<T>::clear()
 {
     if (size() > 0) {
-        if (Replication* repl = this->m_obj.get_replication()) {
+        if (Replication* repl = this->m_parent->get_replication()) {
             repl->list_clear(*this);
         }
         do_clear();
@@ -672,7 +679,7 @@ void Lst<T>::clear()
 template <class T>
 inline CollectionBasePtr Lst<T>::clone_collection() const
 {
-    return std::make_unique<Lst<T>>(m_obj, m_col_key);
+    return std::make_unique<Lst<T>>(*this);
 }
 
 template <class T>
@@ -749,7 +756,7 @@ inline util::Optional<Mixed> Lst<T>::avg(size_t* return_cnt) const
 template <class T>
 inline LstBasePtr Lst<T>::clone() const
 {
-    return std::make_unique<Lst<T>>(m_obj, m_col_key);
+    return std::make_unique<Lst<T>>(*this);
 }
 
 template <class T>
@@ -821,7 +828,7 @@ void Lst<T>::resize(size_t new_size)
         insert_null(current_size++);
     }
     remove(new_size, current_size);
-    m_obj.bump_both_versions();
+    m_parent->bump_both_versions();
 }
 
 template <class T>
@@ -840,7 +847,7 @@ void Lst<T>::move(size_t from, size_t to)
     CollectionBase::validate_index("move()", to, sz);
 
     if (from != to) {
-        if (Replication* repl = this->m_obj.get_replication()) {
+        if (Replication* repl = this->m_parent->get_replication()) {
             repl->list_move(*this, from, to);
         }
         if (to > from) {
@@ -869,7 +876,7 @@ void Lst<T>::swap(size_t ndx1, size_t ndx2)
     CollectionBase::validate_index("swap()", ndx2, sz);
 
     if (ndx1 != ndx2) {
-        if (Replication* repl = this->m_obj.get_replication()) {
+        if (Replication* repl = this->m_parent->get_replication()) {
             LstBase::swap_repl(repl, ndx1, ndx2);
         }
         m_tree->swap(ndx1, ndx2);
@@ -886,7 +893,7 @@ T Lst<T>::set(size_t ndx, T value)
 
     // get will check for ndx out of bounds
     T old = do_get(ndx, "set()");
-    if (Replication* repl = this->m_obj.get_replication()) {
+    if (Replication* repl = this->m_parent->get_replication()) {
         repl->list_set(*this, ndx, value);
     }
     if constexpr (std::is_same_v<T, Mixed>) {
@@ -916,7 +923,7 @@ void Lst<T>::insert(size_t ndx, T value)
 
     ensure_created();
 
-    if (Replication* repl = this->m_obj.get_replication()) {
+    if (Replication* repl = this->m_parent->get_replication()) {
         repl->list_insert(*this, ndx, value, sz);
     }
     do_insert(ndx, value);
@@ -928,7 +935,7 @@ T Lst<T>::remove(size_t ndx)
 {
     // get will check for ndx out of bounds
     T old = do_get(ndx, "remove()");
-    if (Replication* repl = this->m_obj.get_replication()) {
+    if (Replication* repl = this->m_parent->get_replication()) {
         repl->list_erase(*this, ndx);
     }
 

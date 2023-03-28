@@ -3152,8 +3152,13 @@ TEST(Table_ListOfPrimitives)
     timestamp_list.max(&return_ndx);
     CHECK_EQUAL(return_ndx, 1);
 
+    auto timestamp_list2 = timestamp_list.clone();
+    CHECK_EQUAL(timestamp_list2->size(), timestamp_list.size());
+
     t->remove_object(ObjKey(7));
+    auto timestamp_list3 = timestamp_list.clone();
     CHECK_NOT(timestamp_list.is_attached());
+    CHECK_EQUAL(timestamp_list3->size(), 0);
 }
 
 TEST_TYPES(Table_ListOfPrimitivesSort, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128>, Prop<ObjectId>,

@@ -860,6 +860,7 @@ private:
     friend class ClusterTree;
     friend class ColKeyIterator;
     friend class Obj;
+    friend class CollectionParent;
     friend class LnkLst;
     friend class Dictionary;
     friend class IncludeDescriptor;

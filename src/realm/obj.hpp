@@ -20,8 +20,7 @@
 #define REALM_OBJ_HPP
 
 #include <realm/node.hpp>
-#include <realm/table_ref.hpp>
-#include <realm/keys.hpp>
+#include <realm/collection_parent.hpp>
 #include <realm/mixed.hpp>
 #include <map>
 
@@ -30,12 +29,8 @@
 namespace realm {
 
 class ClusterTree;
-class Replication;
 class TableView;
-class CollectionBase;
 class CascadeState;
-class LstBase;
-class SetBase;
 class ObjList;
 struct GlobalKey;
 
@@ -45,11 +40,9 @@ template <class>
 class Set;
 template <class T>
 using LstPtr = std::unique_ptr<Lst<T>>;
-using LstBasePtr = std::unique_ptr<LstBase>;
 template <class T>
 using SetPtr = std::unique_ptr<Set<T>>;
-using SetBasePtr = std::unique_ptr<SetBase>;
-using CollectionBasePtr = std::unique_ptr<CollectionBase>;
+
 using LinkCollectionPtr = std::unique_ptr<ObjList>;
 
 class LnkLst;
@@ -57,11 +50,8 @@ using LnkLstPtr = std::unique_ptr<LnkLst>;
 class LnkSet;
 using LnkSetPtr = std::unique_ptr<LnkSet>;
 
-template <class>
-class Set;
-class Dictionary;
+class CollectionList;
 class DictionaryLinkValues;
-using DictionaryPtr = std::unique_ptr<Dictionary>;
 
 namespace _impl {
 class DeepChangeChecker;
@@ -73,26 +63,8 @@ enum JSONOutputMode {
     output_mode_xjson_plus, // extended json as described in the spec with additional modifier used for sync
 };
 
-/// The status of an accessor after a call to `update_if_needed()`.
-enum class UpdateStatus {
-    /// The owning object or column no longer exist, and the accessor could
-    /// not be updated. The accessor should be left in a detached state
-    /// after this, and further calls to `update_if_needed()` are not
-    /// guaranteed to reattach the accessor.
-    Detached,
-
-    /// The underlying data of the accessor was changed since the last call
-    /// to `update_if_needed()`. The accessor is still valid.
-    Updated,
-
-    /// The underlying data of the accessor did not change since the last
-    /// call to `update_if_needed()`, and the accessor is still valid in its
-    /// current state.
-    NoChange,
-};
-
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
-class Obj {
+class Obj : public CollectionParent {
 public:
     constexpr Obj()
         : m_table(nullptr)
@@ -103,24 +75,29 @@ public:
     }
     Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
 
-    TableRef get_table() const noexcept
+    // Overriding members of CollectionParent:
+    size_t get_level() const noexcept final
+    {
+        return 0;
+    }
+    Replication* get_replication() const override;
+    UpdateStatus update_if_needed_with_status() const override;
+    bool update_if_needed() const override;
+    int_fast64_t bump_content_version() override;
+    void bump_both_versions() override;
+    TableRef get_table() const noexcept final
     {
         return m_table.cast_away_const();
     }
-
-    Allocator& get_alloc() const;
-
-    bool operator==(const Obj& other) const;
-
-    ObjKey get_key() const noexcept
+    const Obj& get_object() const noexcept final
     {
-        return m_key;
+        return *this;
     }
+    ref_type get_collection_ref(Index index) const noexcept override;
+    void set_collection_ref(Index index, ref_type ref) override;
 
-    GlobalKey get_object_id() const;
-    ObjLink get_link() const;
-
-    Replication* get_replication() const;
+    // Operator overloads
+    bool operator==(const Obj& other) const;
 
     // Check if this object is default constructed
     explicit operator bool() const noexcept
@@ -128,8 +105,18 @@ public:
         return m_table != nullptr;
     }
 
+    // Simple getters
+    Allocator& get_alloc() const;
+    ObjKey get_key() const noexcept
+    {
+        return m_key;
+    }
+    GlobalKey get_object_id() const;
+    ObjLink get_link() const;
+
     /// Check if the object is still alive
     bool is_valid() const noexcept;
+
     /// Delete object from table. Object is invalid afterwards.
     void remove();
     /// Invalidate
@@ -351,6 +338,7 @@ private:
     friend class Set;
     friend class Table;
     friend class Transaction;
+    friend class CollectionParent;
 
     mutable TableRef m_table;
     ObjKey m_key;
@@ -365,13 +353,7 @@ private:
     /// Update the accessor. Returns true when the accessor was updated to
     /// reflect new changes to the underlying state.
     bool update() const;
-    // update if needed - with and without check of table instance version:
-    bool update_if_needed() const;
     bool _update_if_needed() const; // no check, use only when already checked
-
-    /// Update the accessor (and return `UpdateStatus::Detached` if the Obj is
-    /// no longer valid, rather than throwing an exception).
-    UpdateStatus update_if_needed_with_status() const;
 
     template <class T>
     bool do_is_null(ColKey::Idx col_ndx) const;
@@ -401,8 +383,6 @@ private:
     size_t colkey2spec_ndx(ColKey);
     bool ensure_writeable();
     void sync(Node& arr);
-    int_fast64_t bump_content_version();
-    void bump_both_versions();
     template <class T>
     void do_set_null(ColKey col_key);
 
@@ -422,12 +402,6 @@ private:
     void add_backlink(ColKey backlink_col, ObjKey origin_key);
     bool remove_one_backlink(ColKey backlink_col, ObjKey origin_key);
     void nullify_link(ColKey origin_col, ObjLink target_key) &&;
-    // Used when inserting a new link. You will not remove existing links in this process
-    void set_backlink(ColKey col_key, ObjLink new_link) const;
-    // Used when replacing a link, return true if CascadeState contains objects to remove
-    bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const;
-    // Used when removing a backlink, return true if CascadeState contains objects to remove
-    bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const;
     template <class T>
     inline void set_spec(T&, ColKey);
     template <class ValueType>
