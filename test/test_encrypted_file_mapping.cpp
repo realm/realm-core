@@ -18,18 +18,13 @@
 
 #include "testsettings.hpp"
 
-// FIXME: Unit tests use POSIX not compatible with Visual Studio and 
-// should be updated.
-#if defined(TEST_ENCRYPTED_FILE_MAPPING) && !defined(_WIN32)
+#if defined(TEST_ENCRYPTED_FILE_MAPPING)
 
 #include <realm/util/aes_cryptor.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
+#include <realm/util/file.hpp>
 
 #include "test.hpp"
-
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -63,6 +58,7 @@
 #if REALM_ENABLE_ENCRYPTION
 
 using namespace realm::util;
+using realm::FileDesc;
 
 namespace {
 const uint8_t test_key[] = "1234567890123456789012345678901123456789012345678901234567890123";
@@ -77,11 +73,10 @@ TEST(EncryptedFile_CryptorBasic)
     const char data[4096] = "test data";
     char buffer[4096];
 
-    int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-    cryptor.write(fd, 0, data, sizeof(data));
-    cryptor.read(fd, 0, buffer, sizeof(buffer));
+    File file(path, realm::util::File::mode_Write);
+    cryptor.write(file.get_descriptor(), 0, data, sizeof(data));
+    cryptor.read(file.get_descriptor(), 0, buffer, sizeof(buffer));
     CHECK(memcmp(buffer, data, strlen(data)) == 0);
-    close(fd);
 }
 
 TEST(EncryptedFile_CryptorRepeatedWrites)
@@ -92,21 +87,19 @@ TEST(EncryptedFile_CryptorRepeatedWrites)
 
     const char data[4096] = "test data";
     char raw_buffer_1[8192] = {0}, raw_buffer_2[8192] = {0};
-    int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    File file(path, realm::util::File::mode_Write);
 
-    cryptor.write(fd, 0, data, sizeof(data));
-    lseek(fd, 0, SEEK_SET);
-    ssize_t actual_read_1 = read(fd, raw_buffer_1, sizeof(raw_buffer_1));
+    cryptor.write(file.get_descriptor(), 0, data, sizeof(data));
+    file.seek(0);
+    ssize_t actual_read_1 = file.read(raw_buffer_1, sizeof(raw_buffer_1));
     CHECK_EQUAL(actual_read_1, sizeof(raw_buffer_1));
 
-    cryptor.write(fd, 0, data, sizeof(data));
-    lseek(fd, 0, SEEK_SET);
-    ssize_t actual_read_2 = read(fd, raw_buffer_2, sizeof(raw_buffer_2));
+    cryptor.write(file.get_descriptor(), 0, data, sizeof(data));
+    file.seek(0);
+    ssize_t actual_read_2 = file.read(raw_buffer_2, sizeof(raw_buffer_2));
     CHECK_EQUAL(actual_read_2, sizeof(raw_buffer_2));
 
     CHECK(memcmp(raw_buffer_1, raw_buffer_2, sizeof(raw_buffer_1)) != 0);
-
-    close(fd);
 }
 
 TEST(EncryptedFile_SeparateCryptors)
@@ -116,20 +109,19 @@ TEST(EncryptedFile_SeparateCryptors)
     const char data[4096] = "test data";
     char buffer[4096];
 
-    int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    File file(path, realm::util::File::mode_Write);
     {
         AESCryptor cryptor(test_key);
         cryptor.set_file_size(16);
-        cryptor.write(fd, 0, data, sizeof(data));
+        cryptor.write(file.get_descriptor(), 0, data, sizeof(data));
     }
     {
         AESCryptor cryptor(test_key);
         cryptor.set_file_size(16);
-        cryptor.read(fd, 0, buffer, sizeof(buffer));
+        cryptor.read(file.get_descriptor(), 0, buffer, sizeof(buffer));
     }
 
     CHECK(memcmp(buffer, data, strlen(data)) == 0);
-    close(fd);
 }
 
 TEST(EncryptedFile_InterruptedWrite)
@@ -138,31 +130,30 @@ TEST(EncryptedFile_InterruptedWrite)
 
     const char data[4096] = "test data";
 
-    int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    File file(path, realm::util::File::mode_Write);
     {
         AESCryptor cryptor(test_key);
         cryptor.set_file_size(16);
-        cryptor.write(fd, 0, data, sizeof(data));
+        cryptor.write(file.get_descriptor(), 0, data, sizeof(data));
     }
 
     // Fake an interrupted write which updates the IV table but not the data
     char buffer[4096];
-    ssize_t actual_pread = pread(fd, buffer, 64, 0);
+    file.seek(0);
+    size_t actual_pread = file.read(buffer, 64);
     CHECK_EQUAL(actual_pread, 64);
 
     memcpy(buffer + 32, buffer, 32);
     buffer[5]++; // first byte of "hmac1" field in iv table
-    ssize_t actual_pwrite = pwrite(fd, buffer, 64, 0);
-    CHECK_EQUAL(actual_pwrite, 64);
+    file.seek(0);
+    file.write(buffer, 64);
 
     {
         AESCryptor cryptor(test_key);
         cryptor.set_file_size(16);
-        cryptor.read(fd, 0, buffer, sizeof(buffer));
+        cryptor.read(file.get_descriptor(), 0, buffer, sizeof(buffer));
         CHECK(memcmp(buffer, data, strlen(data)) == 0);
     }
-
-    close(fd);
 }
 
 TEST(EncryptedFile_LargePages)
@@ -177,11 +168,153 @@ TEST(EncryptedFile_LargePages)
     cryptor.set_file_size(sizeof(data));
     char buffer[sizeof(data)];
 
-    int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-    cryptor.write(fd, 0, data, sizeof(data));
-    cryptor.read(fd, 0, buffer, sizeof(buffer));
+    File file(path, realm::util::File::mode_Write);
+    cryptor.write(file.get_descriptor(), 0, data, sizeof(data));
+    cryptor.read(file.get_descriptor(), 0, buffer, sizeof(buffer));
     CHECK(memcmp(buffer, data, sizeof(data)) == 0);
-    close(fd);
+}
+
+TEST(EncryptedFile_IVRefreshing)
+{
+    using IVPageStates = realm::util::FlatMap<size_t, IVRefreshState>;
+    constexpr size_t block_size = 4096;
+    constexpr size_t blocks_per_metadata_block = 64;
+    const size_t pages_per_metadata_block = block_size * blocks_per_metadata_block / page_size();
+
+    auto verify_page_states = [&](const IVPageStates& states, off_t data_pos,
+                                  std::vector<size_t> expected_pages_refreshed) {
+        size_t start_page_ndx = ((data_pos / block_size) / blocks_per_metadata_block) * blocks_per_metadata_block *
+                                block_size / page_size();
+        size_t end_page_ndx = (((data_pos / block_size) + blocks_per_metadata_block) / blocks_per_metadata_block) *
+                              blocks_per_metadata_block * block_size / page_size();
+
+        CHECK_EQUAL(states.size(), end_page_ndx - start_page_ndx);
+        for (size_t ndx = start_page_ndx; ndx < end_page_ndx; ++ndx) {
+            CHECK_EQUAL(states.count(ndx), 1);
+            bool expected_refresh = std::find(expected_pages_refreshed.begin(), expected_pages_refreshed.end(),
+                                              ndx) != expected_pages_refreshed.end();
+            CHECK(states.at(ndx) == (expected_refresh ? IVRefreshState::RequiresRefresh : IVRefreshState::UpToDate));
+        }
+    };
+
+    TEST_PATH(path);
+    // enough data to span two metadata blocks
+    constexpr size_t data_size = block_size * blocks_per_metadata_block * 2;
+    const size_t num_pages = data_size / page_size();
+    char data[block_size];
+    for (size_t i = 0; i < sizeof(data); ++i)
+        data[i] = static_cast<char>(i);
+
+    AESCryptor cryptor(test_key);
+    cryptor.set_file_size(off_t(data_size));
+    File file(path, realm::util::File::mode_Write);
+    const FileDesc fd = file.get_descriptor();
+
+    auto make_external_write_at_pos = [&](off_t data_pos) -> size_t {
+        const size_t begin_write_block = data_pos / block_size * block_size;
+        const size_t ndx_in_block = data_pos % block_size;
+        AESCryptor cryptor2(test_key);
+        cryptor2.set_file_size(off_t(data_size));
+        cryptor2.read(fd, off_t(begin_write_block), data, block_size);
+        ++data[ndx_in_block];
+        cryptor2.write(fd, off_t(begin_write_block), data, block_size);
+        return data_pos / page_size();
+    };
+
+    for (size_t i = 0; i < data_size; i += block_size) {
+        cryptor.write(fd, off_t(i), data, block_size);
+    }
+
+    IVPageStates states = cryptor.refresh_ivs(fd, 0, 0, num_pages);
+    std::vector<size_t> pages_needing_refresh = {};
+    for (size_t i = 0; i < pages_per_metadata_block; ++i) {
+        pages_needing_refresh.push_back(i);
+    }
+    // initial call requires refreshing all pages in range
+    verify_page_states(states, 0, pages_needing_refresh);
+    states = cryptor.refresh_ivs(fd, 0, 0, num_pages);
+    // subsequent call does not require refreshing anything
+    verify_page_states(states, 0, {});
+
+    pages_needing_refresh = {};
+    for (size_t i = 0; i < pages_per_metadata_block; ++i) {
+        pages_needing_refresh.push_back(i + pages_per_metadata_block);
+    }
+    off_t read_data_pos = off_t(pages_per_metadata_block * page_size());
+    states = cryptor.refresh_ivs(fd, read_data_pos, pages_per_metadata_block, num_pages);
+    verify_page_states(states, read_data_pos, pages_needing_refresh);
+    states = cryptor.refresh_ivs(fd, read_data_pos, pages_per_metadata_block, num_pages);
+    verify_page_states(states, read_data_pos, {});
+
+    read_data_pos = off_t(data_size / 2);
+    size_t read_page_ndx = read_data_pos / page_size();
+    states = cryptor.refresh_ivs(fd, read_data_pos, read_page_ndx, num_pages);
+    verify_page_states(states, read_data_pos, {});
+
+    read_data_pos = off_t(data_size - 1);
+    read_page_ndx = read_data_pos / page_size();
+    states = cryptor.refresh_ivs(fd, read_data_pos, read_page_ndx, num_pages);
+    verify_page_states(states, read_data_pos, {});
+
+    // write at pos 0, read half way through the first page
+    make_external_write_at_pos(0);
+    read_data_pos = off_t(page_size() / 2);
+    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
+    verify_page_states(states, read_data_pos, {0});
+
+    // write at end of first page, read half way through first page
+    make_external_write_at_pos(off_t(page_size() - 1));
+    read_data_pos = off_t(page_size() / 2);
+    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
+    verify_page_states(states, read_data_pos, {0});
+
+    // write at beginning of second page, read in first page
+    make_external_write_at_pos(off_t(page_size()));
+    read_data_pos = off_t(page_size() / 2);
+    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
+    verify_page_states(states, read_data_pos, {1});
+
+    // write at last page of first metadata block, read in first page
+    size_t page_needing_refresh = make_external_write_at_pos(blocks_per_metadata_block * block_size - 1);
+    read_data_pos = off_t(page_size() / 2);
+    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
+    verify_page_states(states, read_data_pos, {page_needing_refresh});
+
+    // test truncation of end_page: write to first page, and last page of first metadata block, read in first page,
+    // but set the end page index lower than the last write
+    make_external_write_at_pos(0);
+    page_needing_refresh = make_external_write_at_pos(blocks_per_metadata_block * block_size - 1);
+    REALM_ASSERT(page_needing_refresh >= 1); // this test assumes page_size is < 64 * block_size
+    read_data_pos = off_t(0);
+    constexpr size_t end_page_index = 1;
+    states = cryptor.refresh_ivs(fd, read_data_pos, 0, end_page_index);
+    CHECK_EQUAL(states.size(), 1);
+    CHECK_EQUAL(states.count(size_t(0)), 1);
+    CHECK(states[0] == IVRefreshState::RequiresRefresh);
+    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
+    verify_page_states(states, 0, {page_needing_refresh});
+
+    // write to a block indexed to the second metadata block
+    page_needing_refresh = make_external_write_at_pos(blocks_per_metadata_block * block_size);
+    // a read anywhere in the first metadata block domain does not require refresh
+    read_data_pos = off_t(page_size() / 2);
+    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
+    verify_page_states(states, read_data_pos, {});
+    // but a read in a page controlled by the second metadata block does require a refresh
+    read_data_pos = off_t(blocks_per_metadata_block * block_size);
+    states = cryptor.refresh_ivs(fd, read_data_pos, page_needing_refresh, num_pages);
+    verify_page_states(states, read_data_pos, {page_needing_refresh});
+
+    // write to the last byte of data
+    page_needing_refresh = make_external_write_at_pos(data_size - 1);
+    // a read anywhere in the first metadata block domain does not require refresh
+    read_data_pos = 0;
+    states = cryptor.refresh_ivs(fd, read_data_pos, 0, num_pages);
+    verify_page_states(states, read_data_pos, {});
+    // but a read in a page controlled by the second metadata block does require a refresh
+    read_data_pos = off_t(data_size - 1);
+    states = cryptor.refresh_ivs(fd, read_data_pos, page_needing_refresh, num_pages);
+    verify_page_states(states, read_data_pos, {page_needing_refresh});
 }
 
 #endif // REALM_ENABLE_ENCRYPTION

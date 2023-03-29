@@ -1,8 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Enable multiple processes to operate on an encrypted Realm simultaneously. ([#1845](https://github.com/realm/realm-core/issues/1845))
 
 ### Fixed
 * Fix a stack overflow crash when using the query parser with long chains of AND/OR conditions. ([#6428](https://github.com/realm/realm-core/pull/6428), since v11.7.0)
