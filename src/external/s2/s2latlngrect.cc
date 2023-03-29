@@ -30,8 +30,8 @@ S2LatLngRect S2LatLngRect::FromPoint(S2LatLng const& p) {
 
 S2LatLngRect S2LatLngRect::FromPointPair(S2LatLng const& p1,
                                          S2LatLng const& p2) {
-  DCHECK(p1.is_valid()) << p1;
-  DCHECK(p2.is_valid()) << p2;
+  DCHECK_EX(p1.is_valid(), p1);
+  DCHECK_EX(p2.is_valid(), p2);
   return S2LatLngRect(R1Interval::FromPointPair(p1.lat().radians(),
                                                 p2.lat().radians()),
                       S1Interval::FromPointPair(p1.lng().radians(),

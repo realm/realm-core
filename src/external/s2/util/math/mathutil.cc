@@ -169,7 +169,7 @@ void MathUtil::ShardsToRead(const vector<bool>& shards_to_write,
                             vector<bool>* shards_to_read) {
   const int N = shards_to_read->size();
   const int M = shards_to_write.size();
-  CHECK(N > 0 || M == 0) << ": have shards to write but not to read";
+  CHECK(N > 0 || M == 0); // ": have shards to write but not to read";
 
   // Input shard n of N can contribute to output shard m of M if there
   // exists a record with sharding hash x s.t. n = x % N and m = x % M.

@@ -111,7 +111,7 @@ class S2Cell : public S2Region {
   bool Contains(S2Point const& p) const;
 
   virtual void Encode(Encoder* const encoder) const {
-    S2LOG(FATAL) << "Unimplemented";
+      REALM_UNREACHABLE(); // Unimplemented
   }
   virtual bool Decode(Decoder* const decoder) { return false; }
 

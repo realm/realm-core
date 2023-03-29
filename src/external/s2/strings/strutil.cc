@@ -328,7 +328,7 @@ char *FastInt32ToBuffer(int32 i, char* buffer) {
 }
 
 char *FastHexToBuffer(int i, char* buffer) {
-  CHECK(i >= 0) << "FastHexToBuffer() wants non-negative integers, not " << i;
+  CHECK_GE(i, 0); // "FastHexToBuffer() wants non-negative integers, not " << i;
 
   static const char *hexdigits = "0123456789abcdef";
   char *p = buffer + 21;

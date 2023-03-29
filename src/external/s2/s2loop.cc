@@ -31,18 +31,6 @@ using std::make_pair;
 
 static const unsigned char kCurrentEncodingVersionNumber = 1;
 
-namespace {
-  s2_env::StringStream& operator<<(s2_env::StringStream& strStream, const S1Angle& angle) {
-    std::stringstream ss;
-    ss << angle;
-    return strStream << ss.str();
-  }
-  // Reverse the output order of Lat/Lng to Lng/Lat
-  s2_env::StringStream& operator<<(s2_env::StringStream& strStream, const S2LatLng& ll) {
-      return strStream << "[" << ll.lng() << ", " << ll.lat() << "]";
-  }
-}
-
 S2Point const* S2LoopIndex::edge_from(int index) const {
   return &loop_->vertex(index);
 }
@@ -107,15 +95,15 @@ void S2Loop::Init(vector<S2Point> const& vertices) {
 bool S2Loop::IsValid(string* err) const {
   // Loops must have at least 3 vertices.
   if (num_vertices() < 3) {
-    VLOG(2) << "Degenerate loop";
-    if (err) *err = "Degenerate loop";
-    return false;
+      s2_logger()->error("Degenerate loop");
+      if (err) *err = "Degenerate loop";
+      return false;
   }
   // All vertices must be unit length.
   for (int i = 0; i < num_vertices(); ++i) {
     if (!S2::IsUnitLength(vertex(i))) {
-      VLOG(2) << "Vertex " << i << " is not unit length";
-      if (err) *err = s2_env::StringStream() << "Vertex " << i << " is not unit length";
+        s2_logger()->error("Vertex %1 is not unit length", i);
+      if (err) *err = realm::util::format("Vertex %1 is not unit length", i);
       return false;
     }
   }
@@ -123,10 +111,9 @@ bool S2Loop::IsValid(string* err) const {
   hash_map<S2Point, int> vmap;
   for (int i = 0; i < num_vertices(); ++i) {
     if (!vmap.insert(make_pair(vertex(i), i)).second) {
-      VLOG(2) << "Duplicate vertices: " << vmap[vertex(i)] << " and " << i;
-      if (err) *err = s2_env::StringStream() << "Duplicate vertices: " << vmap[vertex(i)]
-          << " and " << i;
-      return false;
+        s2_logger()->error("Duplicate vertices: %1 and %2", vmap[vertex(i)], i);
+        if (err) *err = realm::util::format("Duplicate vertices: %1 and %2", vmap[vertex(i)], i);
+        return false;
     }
   }
   // Non-adjacent edges are not allowed to intersect.
@@ -148,17 +135,11 @@ bool S2Loop::IsValid(string* err) const {
         crosses = crosser.RobustCrossing(&vertex(ai+1)) > 0;
         previous_index = ai + 1;
         if (crosses) {
-          VLOG(2) << "Edges " << i << " and " << ai << " cross";
-          // additional debugging information, reverse Lat/Lng order.
-          string errDetail = s2_env::StringStream()
-             << "Edge locations in degrees: "
-             << S2LatLng(vertex(i)) << "-" << S2LatLng(vertex(i + 1))
-             << " and "
-             << S2LatLng(vertex(ai)) << "-" << S2LatLng(vertex(ai + 1));
-          VLOG(2) << errDetail;
+            std::string msg = realm::util::format("Edges %1 and %2 cross. Edge locations in degrees: %3-%4 and %5-%6", i, ai, S2LatLng(vertex(i)), S2LatLng(vertex(i + 1)), S2LatLng(vertex(ai)), S2LatLng(vertex(ai + 1)));
+            s2_logger()->error(msg.c_str());
+            // additional debugging information, reverse Lat/Lng order.
           if (NULL != err) {
-            *err = s2_env::StringStream()
-               << "Edges " << i << " and " << ai << " cross. " << errDetail;
+                *err = msg;
           }
           break;
         }

@@ -190,7 +190,7 @@ class S2CellUnion : public S2Region {
   }
 
   virtual void Encode(Encoder* const encoder) const {
-    S2LOG(FATAL) << "Unimplemented";
+      REALM_UNREACHABLE(); // Unimplemented
   }
   virtual bool Decode(Decoder* const decoder) { return false; }
 

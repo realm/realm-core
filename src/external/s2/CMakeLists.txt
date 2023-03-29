@@ -28,7 +28,6 @@ set(S2_SOURCES
 
 set(S2_BASE_SOURCES
     base/int128.cc
-    base/logging.cc
     base/stringprintf.cc
     base/strtoint.cc
 )
