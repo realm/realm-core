@@ -459,6 +459,13 @@ auto as_writable_bytes(Span<T, extent> s) noexcept
     return s.as_writable_bytes();
 }
 
+template <typename T, typename... Args>
+constexpr auto unsafe_span_cast(Args&&... args)
+{
+    auto temp = Span(std::forward<Args>(args)...);
+    return Span<T, decltype(temp)::extent>(reinterpret_cast<T*>(temp.data()), temp.size());
+}
+
 //  Deduction guides
 template <typename T, size_t extent>
 Span(T (&)[extent]) -> Span<T, extent>;

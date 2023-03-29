@@ -79,8 +79,6 @@ public:
     // this is enforced in logging.cpp.
     enum class Level { all = 0, trace = 1, debug = 2, detail = 3, info = 4, warn = 5, error = 6, fatal = 7, off = 8 };
 
-    static const Level default_log_level;
-
     template <class... Params>
     void log(Level, const char* message, Params&&...);
 
@@ -104,16 +102,28 @@ public:
 
     virtual inline ~Logger() noexcept = default;
 
+    static void set_default_logger(std::shared_ptr<util::Logger>) noexcept;
+    static std::shared_ptr<util::Logger>& get_default_logger() noexcept;
+    static void set_default_level_threshold(Level level) noexcept;
+    static Level get_default_level_threshold() noexcept;
+
 protected:
+    // Used by subclasses that link to a base logger
+    std::shared_ptr<Logger> m_base_logger_ptr;
+
+    // Shared level threshold for subclasses that link to a base logger
+    // See PrefixLogger and ThreadSafeLogger
+    std::atomic<Level>& m_level_threshold;
+
     Logger() noexcept
-        : m_threshold_base{Logger::default_log_level}
-        , m_level_threshold{m_threshold_base}
+        : m_level_threshold{m_threshold_base}
+        , m_threshold_base{get_default_level_threshold()}
     {
     }
 
     explicit Logger(Level level) noexcept
-        : m_threshold_base{level}
-        , m_level_threshold{m_threshold_base}
+        : m_level_threshold{m_threshold_base}
+        , m_threshold_base{level}
     {
     }
 
@@ -133,15 +143,6 @@ private:
     // Only used by the base Logger class
     std::atomic<Level> m_threshold_base;
 
-protected:
-    // Used by subclasses that link to a base logger
-    std::shared_ptr<Logger> m_base_logger_ptr;
-
-    // Shared level threshold for subclasses that link to a base logger
-    // See PrefixLogger and ThreadSafeLogger
-    std::atomic<Level>& m_level_threshold;
-
-private:
     template <class... Params>
     REALM_NOINLINE void do_log(Level, const char* message, Params&&...);
 };
