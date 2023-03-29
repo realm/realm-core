@@ -1856,6 +1856,7 @@ void Session::initiate_deactivation()
 
 void Session::complete_deactivation()
 {
+    REALM_ASSERT(m_state == Deactivating);
     m_state = Deactivated;
 
     logger.debug("Deactivation completed"); // Throws
@@ -2547,7 +2548,7 @@ std::error_code Session::receive_unbound_message()
     m_unbound_message_received = true;
 
     // Detect completion of the unbinding process
-    if (m_unbind_message_sent_2) {
+    if (m_unbind_message_send_complete && m_state == Deactivating) {
         // The deactivation process completes when the unbinding process
         // completes.
         complete_deactivation(); // Throws
@@ -2620,11 +2621,10 @@ void Session::suspend(const SessionErrorInfo& info)
     m_suspended = true;
 
     // Detect completion of the unbinding process
-    if (m_unbind_message_sent_2) {
-        // The fact that the UNBIND message has been sent, but an ERROR message
-        // has not been received, implies that the deactivation process must
-        // have been initiated, so this session must be in the Deactivating
-        // state.
+    if (m_unbind_message_send_complete && m_error_message_received) {
+        // The fact that the UNBIND message has been sent, but we are not being suspended because
+        // we received an ERROR message implies that the deactivation process must
+        // have been initiated, so this session must be in the Deactivating state.
         REALM_ASSERT(m_state == Deactivating);
 
         // The deactivation process completes when the unbinding process

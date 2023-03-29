@@ -986,12 +986,12 @@ private:
     // These are reset when the session is activated, and again whenever the
     // connection is lost or the rebinding process is initiated.
     bool m_enlisted_to_send;
-    bool m_bind_message_sent;        // Sending of BIND message has been initiated
-    bool m_ident_message_sent;       // Sending of IDENT message has been initiated
-    bool m_unbind_message_sent;      // Sending of UNBIND message has been initiated
-    bool m_unbind_message_sent_2;    // Sending of UNBIND message has been completed
-    bool m_error_message_received;   // Session specific ERROR message received
-    bool m_unbound_message_received; // UNBOUND message received
+    bool m_bind_message_sent;            // Sending of BIND message has been initiated
+    bool m_ident_message_sent;           // Sending of IDENT message has been initiated
+    bool m_unbind_message_sent;          // Sending of UNBIND message has been initiated
+    bool m_unbind_message_send_complete; // Sending of UNBIND message has been completed
+    bool m_error_message_received;       // Session specific ERROR message received
+    bool m_unbound_message_received;     // UNBOUND message received
     bool m_error_to_send;
 
     // True when there is a new FLX sync query we need to send to the server.
@@ -1421,7 +1421,7 @@ inline bool ClientImpl::Session::have_client_file_ident() const noexcept
 
 inline bool ClientImpl::Session::unbind_process_complete() const noexcept
 {
-    return (m_unbind_message_sent_2 && (m_suspended || m_error_message_received || m_unbound_message_received));
+    return (m_unbind_message_send_complete && (m_error_message_received || m_unbound_message_received));
 }
 
 inline void ClientImpl::Session::connection_established(bool fast_reconnect)
@@ -1471,14 +1471,14 @@ inline void ClientImpl::Session::message_sent()
     REALM_ASSERT(m_state == Active || m_state == Deactivating);
 
     // No message will be sent after the UNBIND message
-    REALM_ASSERT(!m_unbind_message_sent_2);
+    REALM_ASSERT(!m_unbind_message_send_complete);
 
     if (m_unbind_message_sent) {
         REALM_ASSERT(!m_enlisted_to_send);
 
         // If the sending of the UNBIND message has been initiated, this must be
         // the time when the sending of that message completes.
-        m_unbind_message_sent_2 = true;
+        m_unbind_message_send_complete = true;
 
         // Detect the completion of the unbinding process
         if (m_error_message_received || m_unbound_message_received) {
@@ -1521,7 +1521,7 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     m_error_to_send                       = false;
     m_ident_message_sent = false;
     m_unbind_message_sent = false;
-    m_unbind_message_sent_2 = false;
+    m_unbind_message_send_complete = false;
     m_error_message_received = false;
     m_unbound_message_received = false;
     m_client_error = util::none;
