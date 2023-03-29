@@ -4,8 +4,10 @@
 * Enable multiple processes to operate on an encrypted Realm simultaneously. ([#1845](https://github.com/realm/realm-core/issues/1845))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix a stack overflow crash when using the query parser with long chains of AND/OR conditions. ([#6428](https://github.com/realm/realm-core/pull/6428), since v11.7.0)
+* Changing the log level on the fly would not affect the core level log output ([#6440](https://github.com/realm/realm-core/issues/6440), since 13.7.0)
+* `SyncManager::immediately_run_file_actions()` no longer ignores the result of trying to remove a realm. This could have resulted in a client reset action being reported as successful when it actually failed on windows if the `Realm` was still open ([#6050](https://github.com/realm/realm-core/issues/6050)).
+* Fix a data race in `DB::VersionManager`. If one thread committed a write transaction which increased the number of live versions above the previous highest seen during the current session at the same time as another thread began a read, the reading thread could read from a no-longer-valid memory mapping ([PR #6411](https://github.com/realm/realm-core/pull/6411), since v13.0.0).
 
 ### Breaking changes
 * None.
@@ -16,7 +18,7 @@
 -----------
 
 ### Internals
-* None.
+* PrintChangeset sync CLI utility can now ingest trace-level log files and decode hex/base64-compressed changeset data within the logs ([#6375](https://github.com/realm/realm-core/pull/6375))
 
 ----------------------------------------------
 
@@ -209,7 +211,7 @@
 * Improve performance of interprocess mutexes on iOS which don't need to support reader-writer locking. The primary beneficiary of this is beginning and ending read transactions, which is now almost as fast as pre-v13.0.0 ([PR #6258](https://github.com/realm/realm-core/pull/6258)).
 
 ### Fixed
-* Sharing Realm files between a Catalyst app and Realm Studio did not properly synchronize access to the Realm file ([PR #6258](https://github.com/realm/realm-core/pull/6258), since v6.21.0).
+* Sharing Realm files between a Catalyst app and Realm Studio did not properly synchronize access to the Realm file ([PR #6258](https://github.com/realm/realm-core/pull/6258), since v6.0.21).
 * Fix websocket redirection after server migration if user is logged in ([#6056](https://github.com/realm/realm-core/issues/6056), since v12.9.0)
 * Freezing an immutable Realm would hit an assertion failure ([#6260]https://github.com/realm/realm-core/issues/6260), since v13.3.0).
 
