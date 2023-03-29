@@ -76,15 +76,15 @@ private:
     }
     void websocket_read_error_handler(std::error_code ec) override
     {
-        constexpr bool was_clean = false;
         m_logger.error("Reading failed: %1", ec.message()); // Throws
+        constexpr bool was_clean = false;
         websocket_error_and_close_handler(
             was_clean, Status{make_error_code(WebSocketError::websocket_read_error), ec.message()});
     }
     void websocket_write_error_handler(std::error_code ec) override
     {
-        constexpr bool was_clean = false;
         m_logger.error("Writing failed: %1", ec.message()); // Throws
+        constexpr bool was_clean = false;
         websocket_error_and_close_handler(
             was_clean, Status{make_error_code(WebSocketError::websocket_write_error), ec.message()});
     }

@@ -925,8 +925,7 @@ void Connection::handle_connection_established()
 
     // TODO(RCORE-1380) get this information in-band rather than from the websocket.
     if (auto coid = m_websocket->get_appservices_request_id(); !coid.empty()) {
-        logger.info("Connected to app services with request id: \"%1\" for user \"%2\"", coid,
-                    m_server_endpoint.user_id);
+        logger.info("Connected to app services with request id: \"%1\"", coid);
     }
 
     milliseconds_type now = monotonic_clock_now();
@@ -2570,12 +2569,6 @@ std::error_code Session::receive_query_error_message(int error_code, std::string
 // deactivated upon return.
 std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
 {
-    // Ignore the message if the deactivation process has been initiated,
-    // because in that case, the associated Realm must not be accessed any
-    // longer.
-    if (m_state != Active)
-        return {}; // Success
-
     logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, error_action=%4)", info.message,
                 info.raw_error_code, info.try_again, info.server_requests_action); // Throws
 

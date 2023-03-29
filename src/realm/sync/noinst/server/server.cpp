@@ -1922,7 +1922,7 @@ private:
     void add_common_http_response_headers(HTTPResponse& response)
     {
         response.headers["Server"] = "RealmSync/" REALM_VERSION_STRING; // Throws
-        // This isn't a real X-Appservices-Request-Id, but it should
+        // This isn't a real X-Appservices-Request-Id, but it should be enough to test with
         response.headers["X-Appservices-Request-Id"] = m_appservices_request_id.to_string();
     }
 
