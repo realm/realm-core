@@ -1,7 +1,6 @@
 // Copyright 2005 Google Inc. All Rights Reserved.
 #include "s2.h"
 #include "base/logging.h"
-#include "base/stringprintf.h"
 #include "s2latlng.h"
 
 S2LatLng S2LatLng::Normalized() const {
@@ -55,15 +54,6 @@ S1Angle S2LatLng::GetDistance(S2LatLng const& o) const {
   double dlng = sin(0.5 * (lng2 - lng1));
   double x = dlat * dlat + dlng * dlng * cos(lat1) * cos(lat2);
   return S1Angle::Radians(2 * atan2(sqrt(x), sqrt(max(0.0, 1.0 - x))));
-}
-
-string S2LatLng::ToStringInDegrees() const {
-  S2LatLng pt = Normalized();
-  return StringPrintf("%f,%f", pt.lat().degrees(), pt.lng().degrees());
-}
-
-void S2LatLng::ToStringInDegrees(string* s) const {
-  *s = ToStringInDegrees();
 }
 
 ostream& operator<<(ostream& os, S2LatLng const& ll) {

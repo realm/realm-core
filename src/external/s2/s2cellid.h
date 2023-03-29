@@ -223,24 +223,10 @@ class S2CellId {
   inline static S2CellId Begin(int level);
   inline static S2CellId End(int level);
 
-  // Methods to encode and decode cell ids to compact text strings suitable
-  // for display or indexing.  Cells at lower levels (i.e. larger cells) are
-  // encoded into fewer characters.  The maximum token length is 16.
-  //
-  // ToToken() returns a string by value for convenience; the compiler
-  // does this without intermediate copying in most cases.
-  //
-  // These methods guarantee that FromToken(ToToken(x)) == x even when
-  // "x" is an invalid cell id.  All tokens are alphanumeric strings.
-  // FromToken() returns S2CellId::None() for malformed inputs.
-  string ToToken() const;
-  static S2CellId FromToken(string const& token);
-
   // Creates a debug human readable string. Used for << and available for direct
   // usage as well.
   string ToString() const;
   string toString() const { return ToString(); }
-  string slowToString() const;
   static S2CellId FromString(const string& str);
 
   // Return the four cells that are adjacent across the cell's four edges.
