@@ -135,7 +135,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
 
     auto create_object = [&](int value, bool with_links = false) {
         Obj obj = table->create_object();
-        obj.set(value_col, (value + 2));
+        obj.set(value_col, value);
         std::shared_ptr<LnkLst> object_link_view = obj.get_linklist_ptr(object_link_col);
 
         auto int_list = List(realm, obj, int_list_col);
@@ -242,7 +242,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         JoiningThread thread1([&] {
             REQUIRE(frozen_res.is_frozen());
             REQUIRE(frozen_res.size() == 5);
-            REQUIRE(frozen_res.get<Int>(0) == 0);
+            REQUIRE(frozen_res.get<Int>(0) == 2);
         });
     }
 
@@ -318,16 +318,10 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
             obj.remove();
         });
 
+        REQUIRE_FALSE(results.is_valid());
         REQUIRE_EXCEPTION(results.size(), StaleAccessor, "Access to invalidated Results objects");
         REQUIRE_EXCEPTION(results.get_any(0).is_null(), StaleAccessor, "Access to invalidated Results objects");
-        REQUIRE_FALSE(results.is_valid());
-
-        Results frozen_res = results.freeze(realm);
-
-        // FIXME would probably be better to throw an exception?
-        REQUIRE(frozen_res.is_frozen());
-        REQUIRE(frozen_res.size() == 0);
-        REQUIRE(frozen_res.is_valid()); // FIXME weird?
+        REQUIRE_EXCEPTION(results.freeze(realm), StaleAccessor, "Access to invalidated Results objects");
     }
 }
 
