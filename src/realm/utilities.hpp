@@ -193,7 +193,7 @@ inline int ctz(size_t x)
 #ifdef REALM_PTR_64
     return __builtin_ctzll(x); // returns int
 #else
-    return __builtin_ctz(x); // returns int
+    return __builtin_ctz(x);      // returns int
 #endif
 #elif defined(_WIN32)
     unsigned long index = 0;
