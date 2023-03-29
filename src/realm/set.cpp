@@ -62,9 +62,9 @@ std::vector<Mixed> SetBase::convert_to_mixed_set(const CollectionBase& rhs)
 template <>
 void Set<ObjKey>::do_insert(size_t ndx, ObjKey target_key)
 {
-    auto origin_table = m_parent->get_table();
+    auto origin_table = get_table_unchecked();
     auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
-    m_parent->set_backlink(m_col_key, {target_table_key, target_key});
+    set_backlink(m_col_key, {target_table_key, target_key});
     m_tree->insert(ndx, target_key);
     if (target_key.is_unresolved()) {
         m_tree->set_context_flag(true);
@@ -74,12 +74,12 @@ void Set<ObjKey>::do_insert(size_t ndx, ObjKey target_key)
 template <>
 void Set<ObjKey>::do_erase(size_t ndx)
 {
-    auto origin_table = m_parent->get_table();
+    auto origin_table = get_table_unchecked();
     auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
     ObjKey old_key = get(ndx);
     CascadeState state(old_key.is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
 
-    bool recurse = m_parent->remove_backlink(m_col_key, {target_table_key, old_key}, state);
+    bool recurse = remove_backlink(m_col_key, {target_table_key, old_key}, state);
 
     m_tree->erase(ndx);
 
@@ -109,7 +109,7 @@ void Set<ObjKey>::do_clear()
 template <>
 void Set<ObjLink>::do_insert(size_t ndx, ObjLink target_link)
 {
-    m_parent->set_backlink(m_col_key, target_link);
+    set_backlink(m_col_key, target_link);
     m_tree->insert(ndx, target_link);
 }
 
@@ -119,12 +119,12 @@ void Set<ObjLink>::do_erase(size_t ndx)
     ObjLink old_link = get(ndx);
     CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
 
-    bool recurse = m_parent->remove_backlink(m_col_key, old_link, state);
+    bool recurse = remove_backlink(m_col_key, old_link, state);
 
     m_tree->erase(ndx);
 
     if (recurse) {
-        auto table = m_parent->get_table();
+        auto table = get_table_unchecked();
         _impl::TableFriend::remove_recursive(*table, state); // Throws
     }
 }
@@ -134,8 +134,8 @@ void Set<Mixed>::do_insert(size_t ndx, Mixed value)
 {
     if (value.is_type(type_TypedLink)) {
         auto target_link = value.get<ObjLink>();
-        m_parent->get_table()->get_parent_group()->validate(target_link);
-        m_parent->set_backlink(m_col_key, target_link);
+        get_table_unchecked()->get_parent_group()->validate(target_link);
+        set_backlink(m_col_key, target_link);
     }
     m_tree->insert(ndx, value);
 }
@@ -148,12 +148,12 @@ void Set<Mixed>::do_erase(size_t ndx)
 
         CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All
                                                                   : CascadeState::Mode::Strong);
-        bool recurse = m_parent->remove_backlink(m_col_key, old_link, state);
+        bool recurse = remove_backlink(m_col_key, old_link, state);
 
         m_tree->erase(ndx);
 
         if (recurse) {
-            auto table = m_parent->get_table();
+            auto table = get_table_unchecked();
             _impl::TableFriend::remove_recursive(*table, state); // Throws
         }
     }

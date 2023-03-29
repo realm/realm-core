@@ -2329,12 +2329,12 @@ ref_type Obj::Internal::get_ref(const Obj& obj, ColKey col_key)
 
 ref_type Obj::get_collection_ref(Index index) const noexcept
 {
-    return _get<int64_t>(mpark::get<ColKey>(index).get_index());
+    return to_ref(_get<int64_t>(mpark::get<ColKey>(index).get_index()));
 }
 
 void Obj::set_collection_ref(Index index, ref_type ref)
 {
-    set_int(mpark::get<ColKey>(index), ref);
+    set_int(mpark::get<ColKey>(index), from_ref(ref));
 }
 
 } // namespace realm

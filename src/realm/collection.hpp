@@ -346,21 +346,6 @@ public:
         return m_obj_mem;
     }
 
-    ref_type get_collection_ref() const noexcept
-    {
-        try {
-            return m_parent->get_collection_ref(m_index);
-        }
-        catch (const KeyNotFound&) {
-            return ref_type(0);
-        }
-    }
-
-    void set_collection_ref(ref_type ref)
-    {
-        m_parent->set_collection_ref(m_index, ref);
-    }
-
     /// Returns true if the accessor has changed since the last time
     /// `has_changed()` was called.
     ///
@@ -382,27 +367,6 @@ public:
         return false;
     }
 
-    void set_owner(const Obj& obj, CollectionParent::Index index) override
-    {
-        m_obj_mem = obj;
-        m_parent = &m_obj_mem;
-        m_index = index;
-        if (obj) {
-            m_alloc = &obj.get_alloc();
-        }
-    }
-
-    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
-    {
-        m_obj_mem = parent->get_object();
-        m_col_parent = std::move(parent);
-        m_parent = m_col_parent.get();
-        m_index = index;
-        if (m_obj_mem) {
-            m_alloc = &m_obj_mem.get_alloc();
-        }
-    }
-
     using Interface::get_owner_key;
     using Interface::get_table;
     using Interface::get_target_table;
@@ -410,9 +374,7 @@ public:
 protected:
     Obj m_obj_mem;
     std::shared_ptr<CollectionParent> m_col_parent;
-    CollectionParent* m_parent = nullptr;
     CollectionParent::Index m_index;
-    Allocator* m_alloc = nullptr;
     ColKey m_col_key;
     bool m_nullable = false;
 
@@ -425,20 +387,20 @@ protected:
     CollectionBaseImpl(const CollectionBaseImpl& other)
         : m_obj_mem(other.m_obj_mem)
         , m_col_parent(other.m_col_parent)
-        , m_parent(m_col_parent ? m_col_parent.get() : &m_obj_mem)
         , m_index(other.m_index)
-        , m_alloc(other.m_alloc)
         , m_col_key(other.m_col_key)
         , m_nullable(other.m_nullable)
+        , m_parent(m_col_parent ? m_col_parent.get() : &m_obj_mem)
+        , m_alloc(other.m_alloc)
     {
     }
 
     CollectionBaseImpl(const Obj& obj, ColKey col_key) noexcept
         : m_obj_mem(obj)
-        , m_parent(&m_obj_mem)
         , m_index(col_key)
         , m_col_key(col_key)
         , m_nullable(col_key.is_nullable())
+        , m_parent(&m_obj_mem)
     {
         if (obj) {
             m_alloc = &m_obj_mem.get_alloc();
@@ -475,6 +437,42 @@ protected:
     bool operator!=(const Derived& other) const noexcept
     {
         return !(*this == other);
+    }
+
+    void set_owner(const Obj& obj, CollectionParent::Index index) override
+    {
+        m_obj_mem = obj;
+        m_parent = &m_obj_mem;
+        m_index = index;
+        if (obj) {
+            m_alloc = &obj.get_alloc();
+        }
+    }
+
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        m_obj_mem = parent->get_object();
+        m_col_parent = std::move(parent);
+        m_parent = m_col_parent.get();
+        m_index = index;
+        if (m_obj_mem) {
+            m_alloc = &m_obj_mem.get_alloc();
+        }
+    }
+
+    ref_type get_collection_ref() const noexcept
+    {
+        try {
+            return m_parent->get_collection_ref(m_index);
+        }
+        catch (const KeyNotFound&) {
+            return ref_type(0);
+        }
+    }
+
+    void set_collection_ref(ref_type ref)
+    {
+        m_parent->set_collection_ref(m_index, ref);
     }
 
     /// Refresh the associated `Obj` (if needed), and update the internal
@@ -519,6 +517,7 @@ protected:
     /// method will never return `UpdateStatus::Detached`.
     virtual UpdateStatus ensure_created()
     {
+        check_parent();
         bool changed = m_parent->update_if_needed(); // Throws if the object does not exist.
         auto content_version = m_alloc->get_content_version();
 
@@ -531,7 +530,58 @@ protected:
 
     void bump_content_version()
     {
-        m_content_version = m_parent->bump_content_version();
+        REALM_ASSERT(m_alloc);
+        m_content_version = m_alloc->bump_content_version();
+    }
+
+    void bump_both_versions()
+    {
+        REALM_ASSERT(m_alloc);
+        m_alloc->bump_content_version();
+        m_alloc->bump_storage_version();
+    }
+
+    Replication* get_replication() const
+    {
+        check_parent();
+        return m_parent->get_table()->get_repl();
+    }
+
+    Table* get_table_unchecked() const
+    {
+        check_parent();
+        auto t = m_parent->get_table();
+        REALM_ASSERT(t);
+        return t.unchecked_ptr();
+    }
+
+    Allocator& get_alloc() const
+    {
+        check_alloc();
+        return *m_alloc;
+    }
+
+    void set_alloc(Allocator& alloc)
+    {
+        m_alloc = &alloc;
+    }
+
+    void set_backlink(ColKey col_key, ObjLink new_link) const
+    {
+        check_parent();
+        m_parent->set_backlink(col_key, new_link);
+    }
+    // Used when replacing a link, return true if CascadeState contains objects to remove
+    bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const
+    {
+        check_parent();
+        return m_parent->replace_backlink(col_key, old_link, new_link, state);
+    }
+    // Used when removing a backlink, return true if CascadeState contains objects to remove
+    bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const
+    {
+        check_parent();
+        return m_parent->remove_backlink(col_key, old_link, state);
     }
 
     /// Reset the accessor's tracking of the content version. Derived classes
@@ -555,6 +605,23 @@ protected:
     {
         static_cast<void>(child_ndx);
         set_collection_ref(new_ref);
+    }
+
+private:
+    CollectionParent* m_parent = nullptr;
+    Allocator* m_alloc = nullptr;
+
+    void check_parent() const
+    {
+        if (!m_parent) {
+            throw StaleAccessor("Collection has no owner");
+        }
+    }
+    void check_alloc() const
+    {
+        if (!m_alloc) {
+            throw StaleAccessor("Allocator not set");
+        }
     }
 };
 

@@ -253,15 +253,14 @@ protected:
     mutable std::unique_ptr<BPlusTree<T>> m_tree;
 
     using Base::bump_content_version;
-    using Base::m_alloc;
+    using Base::get_alloc;
     using Base::m_col_key;
     using Base::m_nullable;
-    using Base::m_parent;
 
     bool init_from_parent(bool allow_create) const
     {
         if (!m_tree) {
-            m_tree.reset(new BPlusTree<T>(*m_alloc));
+            m_tree.reset(new BPlusTree<T>(get_alloc()));
             const ArrayParent* parent = this;
             m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
         }
@@ -668,7 +667,7 @@ template <class T>
 void Lst<T>::clear()
 {
     if (size() > 0) {
-        if (Replication* repl = this->m_parent->get_replication()) {
+        if (Replication* repl = Base::get_replication()) {
             repl->list_clear(*this);
         }
         do_clear();
@@ -824,11 +823,13 @@ template <class T>
 void Lst<T>::resize(size_t new_size)
 {
     size_t current_size = size();
-    while (new_size > current_size) {
-        insert_null(current_size++);
+    if (new_size != current_size) {
+        while (new_size > current_size) {
+            insert_null(current_size++);
+        }
+        remove(new_size, current_size);
+        Base::bump_both_versions();
     }
-    remove(new_size, current_size);
-    m_parent->bump_both_versions();
 }
 
 template <class T>
@@ -847,7 +848,7 @@ void Lst<T>::move(size_t from, size_t to)
     CollectionBase::validate_index("move()", to, sz);
 
     if (from != to) {
-        if (Replication* repl = this->m_parent->get_replication()) {
+        if (Replication* repl = Base::get_replication()) {
             repl->list_move(*this, from, to);
         }
         if (to > from) {
@@ -876,7 +877,7 @@ void Lst<T>::swap(size_t ndx1, size_t ndx2)
     CollectionBase::validate_index("swap()", ndx2, sz);
 
     if (ndx1 != ndx2) {
-        if (Replication* repl = this->m_parent->get_replication()) {
+        if (Replication* repl = Base::get_replication()) {
             LstBase::swap_repl(repl, ndx1, ndx2);
         }
         m_tree->swap(ndx1, ndx2);
@@ -893,7 +894,7 @@ T Lst<T>::set(size_t ndx, T value)
 
     // get will check for ndx out of bounds
     T old = do_get(ndx, "set()");
-    if (Replication* repl = this->m_parent->get_replication()) {
+    if (Replication* repl = Base::get_replication()) {
         repl->list_set(*this, ndx, value);
     }
     if constexpr (std::is_same_v<T, Mixed>) {
@@ -923,7 +924,7 @@ void Lst<T>::insert(size_t ndx, T value)
 
     ensure_created();
 
-    if (Replication* repl = this->m_parent->get_replication()) {
+    if (Replication* repl = Base::get_replication()) {
         repl->list_insert(*this, ndx, value, sz);
     }
     do_insert(ndx, value);
@@ -935,7 +936,7 @@ T Lst<T>::remove(size_t ndx)
 {
     // get will check for ndx out of bounds
     T old = do_get(ndx, "remove()");
-    if (Replication* repl = this->m_parent->get_replication()) {
+    if (Replication* repl = Base::get_replication()) {
         repl->list_erase(*this, ndx);
     }
 

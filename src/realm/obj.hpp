@@ -80,11 +80,8 @@ public:
     {
         return 0;
     }
-    Replication* get_replication() const override;
-    UpdateStatus update_if_needed_with_status() const override;
-    bool update_if_needed() const override;
-    int_fast64_t bump_content_version() override;
-    void bump_both_versions() override;
+    UpdateStatus update_if_needed_with_status() const final;
+    bool update_if_needed() const final;
     TableRef get_table() const noexcept final
     {
         return m_table.cast_away_const();
@@ -93,8 +90,8 @@ public:
     {
         return *this;
     }
-    ref_type get_collection_ref(Index index) const noexcept override;
-    void set_collection_ref(Index index, ref_type ref) override;
+    ref_type get_collection_ref(Index index) const noexcept final;
+    void set_collection_ref(Index index, ref_type ref) final;
 
     // Operator overloads
     bool operator==(const Obj& other) const;
@@ -107,6 +104,7 @@ public:
 
     // Simple getters
     Allocator& get_alloc() const;
+    Replication* get_replication() const;
     ObjKey get_key() const noexcept
     {
         return m_key;
@@ -383,6 +381,8 @@ private:
     size_t colkey2spec_ndx(ColKey);
     bool ensure_writeable();
     void sync(Node& arr);
+    int_fast64_t bump_content_version();
+    void bump_both_versions();
     template <class T>
     void do_set_null(ColKey col_key);
 

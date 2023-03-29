@@ -67,17 +67,20 @@ public:
 
     // Return the nesting level of the parent
     virtual size_t get_level() const noexcept = 0;
-    virtual Replication* get_replication() const = 0;
+    /// Get table of owning object
+    virtual TableRef get_table() const noexcept = 0;
+
+protected:
+    template <class, class>
+    friend class CollectionBaseImpl;
+
+    virtual ~CollectionParent();
     /// Update the accessor (and return `UpdateStatus::Detached` if the parent
     /// is no longer valid, rather than throwing an exception).
     virtual UpdateStatus update_if_needed_with_status() const = 0;
     /// Check if the storage version has changed and update if it has
     /// Return true if the object was updated
     virtual bool update_if_needed() const = 0;
-    virtual int_fast64_t bump_content_version() = 0;
-    virtual void bump_both_versions() = 0;
-    /// Get table of owning object
-    virtual TableRef get_table() const noexcept = 0;
     /// Get owning object
     virtual const Obj& get_object() const noexcept = 0;
     /// Get the top ref from pareht
@@ -91,9 +94,6 @@ public:
     bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const;
     // Used when removing a backlink, return true if CascadeState contains objects to remove
     bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const;
-
-protected:
-    virtual ~CollectionParent();
 
     LstBasePtr get_listbase_ptr(ColKey col_key) const;
     SetBasePtr get_setbase_ptr(ColKey col_key) const;
