@@ -116,14 +116,14 @@ bool Results::is_valid() const
         m_realm->verify_thread();
     }
 
+    if (m_collection)
+        return m_collection->is_attached();
+
     // Here we cannot just use if (m_table) as it combines a check if the
     // reference contains a value and if that value is valid.
     // First we check if a table is referenced ...
     if (m_table.unchecked_ptr() != nullptr)
-        return !!m_table; // ... and then we check if it is valid
-
-    if (m_collection)
-        return m_collection->is_attached();
+        return bool(m_table); // ... and then we check if it is valid
 
     return true;
 }
@@ -1080,11 +1080,8 @@ Results Results::import_copy_into_realm(std::shared_ptr<Realm> const& realm)
     util::CheckedUniqueLock lock(m_mutex);
     if (m_mode == Mode::Empty)
         return *this;
-
-    if (!is_valid()) {
-        m_mode = Mode::Empty;
-        return Results();
-    }
+    if (!is_valid())
+        throw StaleAccessor("Attempt to construct a Results for a deleted object");
 
     switch (m_mode) {
         case Mode::Table:

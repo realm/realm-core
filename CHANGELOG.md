@@ -9,6 +9,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Exclusion of words in a full text search does not work ([#6512](https://github.com/realm/realm-core/issues/6512), since v13.0.0 );
+* Fixed `Results::is_valid()` in order to return `false` if the results is bound to a deleted object. ([#6401](https://github.com/realm/realm-core/issues/6401))
 
 ### Breaking changes
 * Add `service_name` parameter to `realm_app_call_function` (PR [#6394](https://github.com/realm/realm-core/pull/6394)).

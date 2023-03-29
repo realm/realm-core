@@ -2546,6 +2546,51 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(valid);
                 }
 
+                SECTION("realm_results_is_valid delete objects") {
+                    write([&] {
+                        realm_object_delete(obj1.get());
+                        realm_object_delete(obj2.get());
+                        realm_results_delete_all(r.get());
+                    });
+                    bool valid;
+                    CHECK(checked(realm_results_is_valid(r.get(), &valid)));
+                    CHECK(valid);
+                }
+
+                SECTION("realm_results_is_valid delete collection") {
+                    auto strings = cptr_checked(realm_get_list(obj2.get(), bar_strings_key));
+                    CHECK(strings);
+                    CHECK(!realm_is_frozen(strings.get()));
+
+                    realm_value_t a = rlm_str_val("a");
+                    realm_value_t b = rlm_str_val("b");
+                    realm_value_t c = rlm_null();
+
+                    write([&] {
+                        CHECK(checked(realm_list_insert(strings.get(), 0, a)));
+                        CHECK(checked(realm_list_insert(strings.get(), 1, b)));
+                        CHECK(checked(realm_list_insert(strings.get(), 2, c)));
+                    });
+                    bool valid;
+                    auto results = cptr_checked(realm_list_to_results(strings.get()));
+                    CHECK(checked(realm_results_is_valid(results.get(), &valid)));
+                    CHECK(valid);
+
+                    write([&] {
+                        CHECK(checked(realm_object_delete(obj2.get())));
+                    });
+
+                    CHECK(checked(realm_results_is_valid(results.get(), &valid)));
+                    CHECK_FALSE(valid);
+                    size_t count;
+
+                    CHECK_FALSE(realm_results_count(results.get(), &count));
+                    CHECK_ERR(RLM_ERR_STALE_ACCESSOR);
+
+                    CHECK_FALSE(realm_results_resolve_in(results.get(), realm));
+                    CHECK_ERR(RLM_ERR_STALE_ACCESSOR);
+                }
+
                 SECTION("realm_results_count()") {
                     size_t count;
                     CHECK(checked(realm_results_count(r.get(), &count)));
