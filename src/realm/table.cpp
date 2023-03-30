@@ -811,6 +811,9 @@ void Table::populate_search_index(ColKey col_key)
                 index->insert(key, value); // Throws
             }
         }
+        else if (type == type_Mixed) {
+            index->insert(key, o.get<Mixed>(col_key));
+        }
         else {
             REALM_ASSERT_RELEASE(false && "Data type does not support search index");
         }
@@ -2604,6 +2607,10 @@ TableView Table::get_sorted_view(SortDescriptor order) const
     return const_cast<Table*>(this)->get_sorted_view(std::move(order));
 }
 
+util::Logger* Table::get_logger() const noexcept
+{
+    return *m_repl ? (*m_repl)->get_logger() : nullptr;
+}
 
 // Called after a commit. Table will effectively contain the same as before,
 // but now with new refs from the file

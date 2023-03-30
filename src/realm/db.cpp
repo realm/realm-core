@@ -29,6 +29,7 @@
 #include <random>
 #include <deque>
 #include <thread>
+#include <chrono>
 #include <condition_variable>
 
 #include <realm/disable_sync_to_disk.hpp>
@@ -515,18 +516,20 @@ public:
     virtual ~VersionManager() {}
 
     void cleanup_versions(uint64_t& oldest_live_version, TopRefMap& top_refs, bool& any_new_unreachables)
+        REQUIRES(!m_info_mutex)
     {
         std::lock_guard lock(m_mutex);
+        util::CheckedLockGuard info_lock(m_info_mutex);
         ensure_reader_mapping();
         m_info->readers.purge_versions(oldest_live_version, top_refs, any_new_unreachables);
     }
 
-    version_type get_newest_version()
+    version_type get_newest_version() REQUIRES(!m_local_readers_mutex, !m_info_mutex)
     {
         return get_version_id_of_latest_snapshot().version;
     }
 
-    VersionID get_version_id_of_latest_snapshot()
+    VersionID get_version_id_of_latest_snapshot() REQUIRES(!m_local_readers_mutex, !m_info_mutex)
     {
         {
             // First check the local cache. This is an unlocked read, so it may
@@ -534,7 +537,8 @@ public:
             // a stale value (acceptable for a racing write on one thread and
             // a read on another), or a new value which is guaranteed to not
             // be an active index in the local cache.
-            std::lock_guard lock(m_local_mutex);
+            util::CheckedLockGuard lock(m_local_readers_mutex);
+            util::CheckedLockGuard info_lock(m_info_mutex);
             auto index = m_info->readers.newest.load();
             if (index < m_local_readers.size()) {
                 auto& r = m_local_readers[index];
@@ -545,15 +549,16 @@ public:
         }
 
         std::lock_guard lock(m_mutex);
+        util::CheckedLockGuard info_lock(m_info_mutex);
         auto index = m_info->readers.newest.load();
         ensure_reader_mapping(index);
         return {m_info->readers.get(index).version, index};
     }
 
-    void release_read_lock(const ReadLockInfo& read_lock)
+    void release_read_lock(const ReadLockInfo& read_lock) REQUIRES(!m_local_readers_mutex, !m_info_mutex)
     {
         {
-            std::lock_guard lock(m_local_mutex);
+            util::CheckedLockGuard lock(m_local_readers_mutex);
             REALM_ASSERT(read_lock.m_reader_idx < m_local_readers.size());
             auto& r = m_local_readers[read_lock.m_reader_idx];
             auto& f = field_for_type(r, read_lock.m_type);
@@ -565,6 +570,7 @@ public:
         }
 
         std::lock_guard lock(m_mutex);
+        util::CheckedLockGuard info_lock(m_info_mutex);
         // we should not need to call ensure_full_reader_mapping,
         // since releasing a read lock means it has been grabbed
         // earlier - and hence must reside in mapped memory:
@@ -575,6 +581,7 @@ public:
     }
 
     ReadLockInfo grab_read_lock(ReadLockInfo::Type type, VersionID version_id = {})
+        REQUIRES(!m_local_readers_mutex, !m_info_mutex)
     {
         ReadLockInfo read_lock;
         if (try_grab_local_read_lock(read_lock, type, version_id))
@@ -583,6 +590,7 @@ public:
         {
             const bool pick_specific = version_id.version != VersionID().version;
             std::lock_guard lock(m_mutex);
+            util::CheckedLockGuard info_lock(m_info_mutex);
             auto newest = m_info->readers.newest.load();
             REALM_ASSERT(newest != VersionList::nil);
             read_lock.m_reader_idx = pick_specific ? version_id.index : newest;
@@ -601,7 +609,7 @@ public:
         }
 
         {
-            std::lock_guard local_lock(m_local_mutex);
+            util::CheckedLockGuard local_lock(m_local_readers_mutex);
             grow_local_cache(read_lock.m_reader_idx + 1);
             auto& r2 = m_local_readers[read_lock.m_reader_idx];
             if (!r2.is_active()) {
@@ -617,15 +625,17 @@ public:
         return read_lock;
     }
 
-    void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
+    void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version) REQUIRES(!m_info_mutex)
     {
         std::lock_guard lock(m_mutex);
+        util::CheckedLockGuard info_lock(m_info_mutex);
         m_info->init_versioning(top_ref, file_size, initial_version);
     }
 
-    void add_version(ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
+    void add_version(ref_type new_top_ref, size_t new_file_size, uint64_t new_version) REQUIRES(!m_info_mutex)
     {
         std::lock_guard lock(m_mutex);
+        util::CheckedLockGuard info_lock(m_info_mutex);
         ensure_reader_mapping();
         if (m_info->readers.try_allocate_entry(new_top_ref, new_file_size, new_version)) {
             return;
@@ -642,7 +652,7 @@ public:
 
 
 private:
-    void grow_local_cache(size_t new_size)
+    void grow_local_cache(size_t new_size) REQUIRES(m_local_readers_mutex)
     {
         if (new_size > m_local_readers.size())
             m_local_readers.resize(new_size, VersionList::ReadCount{});
@@ -658,10 +668,15 @@ private:
     }
 
     bool try_grab_local_read_lock(ReadLockInfo& read_lock, ReadLockInfo::Type type, VersionID version_id)
+        REQUIRES(!m_local_readers_mutex, !m_info_mutex)
     {
         const bool pick_specific = version_id.version != VersionID().version;
-        auto index = pick_specific ? version_id.index : m_info->readers.newest.load();
-        std::lock_guard local_lock(m_local_mutex);
+        auto index = version_id.index;
+        if (!pick_specific) {
+            util::CheckedLockGuard lock(m_info_mutex);
+            index = m_info->readers.newest.load();
+        }
+        util::CheckedLockGuard local_lock(m_local_readers_mutex);
         if (index >= m_local_readers.size())
             return false;
 
@@ -692,20 +707,20 @@ private:
         }
     }
 
-    virtual void expand_version_list(unsigned new_entries) = 0;
-
 protected:
-    std::mutex m_local_mutex;
     util::InterprocessMutex& m_mutex;
-    std::vector<VersionList::ReadCount> m_local_readers;
+    util::CheckedMutex m_local_readers_mutex;
+    std::vector<VersionList::ReadCount> m_local_readers GUARDED_BY(m_local_readers_mutex);
 
-    unsigned int m_local_max_entry = 0;
-    SharedInfo* m_info = nullptr;
+    util::CheckedMutex m_info_mutex;
+    unsigned int m_local_max_entry GUARDED_BY(m_info_mutex) = 0;
+    SharedInfo* m_info GUARDED_BY(m_info_mutex) = nullptr;
 
-    virtual void ensure_reader_mapping(unsigned int required = -1) = 0;
+    virtual void ensure_reader_mapping(unsigned int required = -1) REQUIRES(m_info_mutex) = 0;
+    virtual void expand_version_list(unsigned new_entries) REQUIRES(m_info_mutex) = 0;
 };
 
-class DB::FileVersionManager : public DB::VersionManager {
+class DB::FileVersionManager final : public DB::VersionManager {
 public:
     FileVersionManager(File& file, util::InterprocessMutex& mutex)
         : VersionManager(mutex)
@@ -730,7 +745,7 @@ public:
         }
     }
 
-    void expand_version_list(unsigned new_entries) override
+    void expand_version_list(unsigned new_entries) override REQUIRES(m_info_mutex)
     {
         size_t new_info_size = sizeof(SharedInfo) + m_info->readers.compute_required_space(new_entries);
         m_file.prealloc(new_info_size);                                          // Throws
@@ -739,7 +754,7 @@ public:
     }
 
 private:
-    void ensure_reader_mapping(unsigned int required = -1) override
+    void ensure_reader_mapping(unsigned int required = -1) override REQUIRES(m_info_mutex)
     {
         using _impl::SimulatedFailure;
         SimulatedFailure::trigger(SimulatedFailure::shared_group__grow_reader_mapping); // Throws
@@ -761,7 +776,7 @@ private:
     File::Map<SharedInfo> m_reader_map;
 };
 
-class DB::InMemoryVersionManager : public DB::VersionManager {
+class DB::InMemoryVersionManager final : public DB::VersionManager {
 public:
     InMemoryVersionManager(SharedInfo* info, util::InterprocessMutex& mutex)
         : VersionManager(mutex)
@@ -812,6 +827,13 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
     REALM_ASSERT(path.size());
 
     m_db_path = path;
+    m_path_hash = StringData(path).hash() & 0xffff;
+    set_logger(options.logger);
+    if (m_replication) {
+        m_replication->set_logger(m_logger.get());
+    }
+    if (m_logger)
+        m_logger->log(util::Logger::Level::info, "Open file: %1", path);
     SlabAlloc& alloc = m_alloc;
     if (options.is_immutable) {
         SlabAlloc::Config cfg;
@@ -1371,6 +1393,32 @@ void DB::open(Replication& repl, const std::string& file, const DBOptions& optio
     bool no_create = false;
     open(file, no_create, options); // Throws
 }
+class DBLogger : public Logger {
+public:
+    DBLogger(const std::shared_ptr<Logger>& base_logger, size_t hash) noexcept
+        : Logger(base_logger)
+        , m_hash(hash)
+    {
+    }
+
+protected:
+    void do_log(Level level, const std::string& message) final
+    {
+        std::ostringstream ostr;
+        auto id = std::this_thread::get_id();
+        ostr << "DB: " << m_hash << " Thread " << id << ": ";
+        Logger::do_log(*m_base_logger_ptr, level, ostr.str() + message);
+    }
+
+private:
+    size_t m_hash;
+};
+
+void DB::set_logger(const std::shared_ptr<util::Logger>& logger) noexcept
+{
+    if (logger)
+        m_logger = std::make_shared<DBLogger>(logger, m_path_hash);
+}
 
 void DB::open(Replication& repl, const DBOptions options)
 {
@@ -1480,6 +1528,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     const char* write_key = bool(output_encryption_key) ? *output_encryption_key : get_encryption_key();
     {
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
+        auto t1 = std::chrono::steady_clock::now();
 
         // We must be the ONLY DB object attached if we're to do compaction
         if (info->num_participants > 1)
@@ -1491,6 +1540,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         // in the VersionList. We need to have access to that later to update top_ref and file_size.
         // This is also needed to attach the group (get the proper top pointer, etc)
         TransactionRef tr = start_read();
+        auto file_size_before = tr->get_logical_file_size();
 
         // local lock blocking any transaction from starting (and stopping)
         CheckedLockGuard local_lock(m_mutex);
@@ -1557,6 +1607,11 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
             logical_file_size = Group::get_logical_file_size(top);
         }
         m_version_manager->init_versioning(top_ref, logical_file_size, info->latest_version_number);
+        if (m_logger) {
+            auto t2 = std::chrono::steady_clock::now();
+            m_logger->log(util::Logger::Level::info, "DB compacted from: %1 to %2 in %3 us", file_size_before,
+                          logical_file_size, std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+        }
     }
     return true;
 }
@@ -1589,7 +1644,13 @@ void DB::write_copy(StringData path, const char* output_encryption_key)
     file.open(path, File::access_ReadWrite, File::create_Must, 0);
     file.resize(0);
 
+    auto t1 = std::chrono::steady_clock::now();
     tr->write(file, output_encryption_key, m_info->latest_version_number, writer);
+    if (m_logger) {
+        auto t2 = std::chrono::steady_clock::now();
+        m_logger->log(util::Logger::Level::info, "DB written to '%1' in %2 us", path,
+                      std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+    }
 }
 
 uint_fast64_t DB::get_number_of_versions()
@@ -1708,6 +1769,8 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
             m_file.close();
         }
         m_info = nullptr;
+        if (m_logger)
+            m_logger->log(util::Logger::Level::info, "DB closed");
     }
 }
 
@@ -2330,11 +2393,15 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
 
     GroupWriter out(transaction, Durability(info->durability)); // Throws
     out.set_versions(new_version, top_refs, any_new_unreachables);
-
+    auto t1 = std::chrono::steady_clock::now();
+    auto commit_size = m_alloc.get_commit_size();
+    if (m_logger) {
+        m_logger->log(util::Logger::Level::debug, "Initiate commit version: %1", new_version);
+    }
     if (auto limit = out.get_evacuation_limit()) {
         // Get a work limit based on the size of the transaction we're about to commit
         // Add 4k to ensure progress on small commits
-        size_t work_limit = m_alloc.get_commit_size() / 2 + out.get_free_list_size() + 0x1000;
+        size_t work_limit = commit_size / 2 + out.get_free_list_size() + 0x1000;
         transaction.cow_outliers(out.get_evacuation_progress(), limit, work_limit);
     }
 
@@ -2404,6 +2471,11 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         info->latest_version_number = new_version;
 
         m_new_commit_available.notify_all();
+    }
+    auto t2 = std::chrono::steady_clock::now();
+    if (m_logger) {
+        m_logger->log(util::Logger::Level::debug, "Commit of size %1 done in %2 us", commit_size,
+                      std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
     }
 }
 
@@ -2552,6 +2624,10 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
         util::CheckedLockGuard lck(tr->m_async_mutex);
         REALM_ASSERT(tr->m_async_stage == Transaction::AsyncState::Idle);
         tr->m_async_stage = Transaction::AsyncState::Requesting;
+        tr->m_request_time_point = std::chrono::steady_clock::now();
+        if (tr->db->m_logger) {
+            tr->db->m_logger->log(util::Logger::Level::trace, "Async request write lock");
+        }
     }
     std::weak_ptr<Transaction> weak_tr = tr;
     async_begin_write([weak_tr, cb = std::move(when_acquired)]() {
@@ -2561,6 +2637,12 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
             // we may be in HasCommits
             if (tr->m_async_stage == Transaction::AsyncState::Requesting) {
                 tr->m_async_stage = Transaction::AsyncState::HasLock;
+            }
+            if (tr->db->m_logger) {
+                auto t2 = std::chrono::steady_clock::now();
+                tr->db->m_logger->log(
+                    util::Logger::Level::trace, "Got write lock in %1 us",
+                    std::chrono::duration_cast<std::chrono::microseconds>(t2 - tr->m_request_time_point).count());
             }
             if (tr->m_waiting_for_write_lock) {
                 tr->m_waiting_for_write_lock = false;

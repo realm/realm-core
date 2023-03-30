@@ -247,14 +247,13 @@ Peer::Peer(Context& context, std::string http_request_path, std::string realm_pa
     , m_originator_ident{originator_ident}
     , m_on_sync_error{std::move(on_sync_error)}
 {
-    using ErrorInfo = sync::Session::ErrorInfo;
-    auto listener = [this](ConnectionState state, const ErrorInfo* error_info) {
+    auto listener = [this](ConnectionState state, std::optional<sync::SessionErrorInfo> error_info) {
         m_context.on_session_connection_state_change(m_connection_state, state);
         m_connection_state = state;
         if (state == ConnectionState::disconnected) {
             REALM_ASSERT(error_info);
             std::error_code error_code = error_info->error_code;
-            bool is_fatal = error_info->is_fatal;
+            bool is_fatal = !error_info->try_again;
             Error error = map_error(error_code);
             m_context.on_error(error, is_fatal);
             if (!m_error_seen) {
@@ -274,7 +273,7 @@ Peer::Peer(Context& context, std::string http_request_path, std::string realm_pa
                 refresh_access_token();
                 is_fatal = false;
             }
-            const std::string& detailed_message = error_info->detailed_message;
+            const std::string& detailed_message = error_info->message;
             using Level = util::Logger::Level;
             Level level = (is_fatal ? Level::fatal : Level::error);
             m_logger.log(level, "%1 (error_code=%2)", detailed_message, error_code);
@@ -290,7 +289,7 @@ Peer::Peer(Context& context, std::string http_request_path, std::string realm_pa
     sync::Session::Config session_config;
     session_config.verify_servers_ssl_certificate = verify_ssl_cert;
     session_config.ssl_trust_certificate_path = ssl_trust_certificate_path;
-    session_config.client_reset_config = client_reset_config;
+    session_config.client_reset_config.emplace(std::move(*client_reset_config));
     session_config.service_identifier = http_request_path;
     m_session = sync::Session{m_context.client, m_realm_path, session_config};
     m_session.set_connection_state_change_listener(listener);

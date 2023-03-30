@@ -337,6 +337,15 @@ RLM_API realm_results_t* realm_get_backlinks(realm_object_t* object, realm_class
     });
 }
 
+RLM_API bool realm_results_is_valid(const realm_results_t* results, bool* is_valid)
+{
+    return wrap_err([&]() {
+        if (is_valid)
+            *is_valid = results->is_valid();
+        return true;
+    });
+}
+
 RLM_API bool realm_results_count(realm_results_t* results, size_t* out_count)
 {
     return wrap_err([&]() {

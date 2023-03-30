@@ -96,6 +96,13 @@ typedef enum realm_schema_mode {
     RLM_SCHEMA_MODE_MANUAL,
 } realm_schema_mode_e;
 
+typedef enum realm_schema_subset_mode {
+    RLM_SCHEMA_SUBSET_MODE_STRICT,
+    RLM_SCHEMA_SUBSET_MODE_ALL_CLASSES,
+    RLM_SCHEMA_SUBSET_MODE_ALL_PROPERTIES,
+    RLM_SCHEMA_SUBSET_MODE_COMPLETE
+} realm_schema_subset_mode_e;
+
 /* Key types */
 typedef uint32_t realm_class_key_t;
 typedef int64_t realm_property_key_t;
@@ -566,6 +573,29 @@ RLM_API bool realm_equals(const void*, const void*);
  */
 RLM_API bool realm_is_frozen(const void*);
 
+/* Logging */
+// equivalent to realm::util::Logger::Level in util/logger.hpp and must be kept in sync.
+typedef enum realm_log_level {
+    RLM_LOG_LEVEL_ALL = 0,
+    RLM_LOG_LEVEL_TRACE = 1,
+    RLM_LOG_LEVEL_DEBUG = 2,
+    RLM_LOG_LEVEL_DETAIL = 3,
+    RLM_LOG_LEVEL_INFO = 4,
+    RLM_LOG_LEVEL_WARNING = 5,
+    RLM_LOG_LEVEL_ERROR = 6,
+    RLM_LOG_LEVEL_FATAL = 7,
+    RLM_LOG_LEVEL_OFF = 8,
+} realm_log_level_e;
+
+typedef void (*realm_log_func_t)(realm_userdata_t userdata, realm_log_level_e level, const char* message);
+
+/**
+ * Install the default logger
+ */
+RLM_API void realm_set_log_callback(realm_log_func_t, realm_log_level_e, realm_userdata_t userdata,
+                                    realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
+RLM_API void realm_set_log_level(realm_log_level_e) RLM_API_NOEXCEPT;
+
 /**
  * Get a thread-safe reference representing the same underlying object as some
  * API object.
@@ -677,6 +707,20 @@ RLM_API realm_schema_mode_e realm_config_get_schema_mode(const realm_config_t*);
  * This function cannot fail.
  */
 RLM_API void realm_config_set_schema_mode(realm_config_t*, realm_schema_mode_e);
+
+/**
+ * Get the subset schema mode.
+ *
+ * This function cannot fail.
+ */
+RLM_API realm_schema_subset_mode_e realm_config_get_schema_subset_mode(const realm_config_t*);
+
+/**
+ * Set schema subset mode
+ *
+ * This function cannot fail
+ */
+RLM_API void realm_config_set_schema_subset_mode(realm_config_t*, realm_schema_subset_mode_e);
 
 /**
  * Set the migration callback.
@@ -2457,6 +2501,12 @@ RLM_API realm_results_t* realm_get_backlinks(realm_object_t* object, realm_class
 RLM_API bool realm_query_delete_all(const realm_query_t*);
 
 /**
+ * Set the boolean passed as argument to true or false whether the realm_results passed is valid or not
+ * @return true/false if no exception has occured.
+ */
+RLM_API bool realm_results_is_valid(const realm_results_t*, bool*);
+
+/**
  * Count the number of results.
  *
  * If the result is "live" (not a snapshot), this may rerun the query if things
@@ -2631,22 +2681,6 @@ RLM_API realm_notification_token_t* realm_results_add_notification_callback(real
  * in a different `realm_t` instance
  */
 RLM_API realm_results_t* realm_results_from_thread_safe_reference(const realm_t*, realm_thread_safe_reference_t*);
-
-/* Logging */
-// equivalent to realm::util::Logger::Level in util/logger.hpp and must be kept in sync.
-typedef enum realm_log_level {
-    RLM_LOG_LEVEL_ALL = 0,
-    RLM_LOG_LEVEL_TRACE = 1,
-    RLM_LOG_LEVEL_DEBUG = 2,
-    RLM_LOG_LEVEL_DETAIL = 3,
-    RLM_LOG_LEVEL_INFO = 4,
-    RLM_LOG_LEVEL_WARNING = 5,
-    RLM_LOG_LEVEL_ERROR = 6,
-    RLM_LOG_LEVEL_FATAL = 7,
-    RLM_LOG_LEVEL_OFF = 8,
-} realm_log_level_e;
-
-typedef void (*realm_log_func_t)(realm_userdata_t userdata, realm_log_level_e level, const char* message);
 
 /* HTTP transport */
 typedef enum realm_http_request_method {
@@ -3362,6 +3396,8 @@ typedef enum realm_sync_error_action {
     RLM_SYNC_ERROR_ACTION_DELETE_REALM,
     RLM_SYNC_ERROR_ACTION_CLIENT_RESET,
     RLM_SYNC_ERROR_ACTION_CLIENT_RESET_NO_RECOVERY,
+    RLM_SYNC_ERROR_ACTION_MIGRATE_TO_FLX,
+    RLM_SYNC_ERROR_ACTION_REVERT_TO_PBS,
 } realm_sync_error_action_e;
 
 typedef struct realm_sync_session realm_sync_session_t;
@@ -3475,10 +3511,6 @@ RLM_API void realm_sync_client_config_set_metadata_mode(realm_sync_client_config
                                                         realm_sync_client_metadata_mode_e) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_metadata_encryption_key(realm_sync_client_config_t*,
                                                                   const uint8_t[64]) RLM_API_NOEXCEPT;
-RLM_API void realm_sync_client_config_set_log_callback(realm_sync_client_config_t*, realm_log_func_t,
-                                                       realm_userdata_t userdata,
-                                                       realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
-RLM_API void realm_sync_client_config_set_log_level(realm_sync_client_config_t*, realm_log_level_e) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_reconnect_mode(realm_sync_client_config_t*,
                                                          realm_sync_client_reconnect_mode_e) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_multiplex_sessions(realm_sync_client_config_t*, bool) RLM_API_NOEXCEPT;

@@ -22,6 +22,8 @@
 #include <realm.hpp>
 #include <realm/column_type_traits.hpp>
 
+#include <list>
+
 namespace realm {
 namespace test_util {
 
@@ -113,7 +115,7 @@ inline BinaryData TestValueGenerator::convert_for_test<BinaryData>(int64_t t)
 template <>
 inline Mixed TestValueGenerator::convert_for_test<Mixed>(int64_t v)
 {
-    static std::vector<Mixed> arr = {4, 5.6, Timestamp(5, 6), "Hello", false};
+    // Note: changing this code may affect BenchmarkWithType<Mixed>
     switch (v & 0x7) {
         case 0:
             return Mixed(true);
@@ -128,7 +130,7 @@ inline Mixed TestValueGenerator::convert_for_test<Mixed>(int64_t v)
         case 5:
             return Mixed(convert_for_test<Decimal128>(v));
         case 6:
-            return Mixed(v);
+            return Mixed(convert_for_test<ObjectId>(v));
         case 7:
             return Mixed(convert_for_test<UUID>(v));
     }

@@ -72,7 +72,7 @@ struct Contains : public HackClass {
     {
         if (m1.is_null())
             return !m2.is_null();
-        if (Mixed::types_are_comparable(m1, m2)) {
+        if (m1.is_type(type_String, type_Binary) && Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
             return operator()(b1, b2, false, false);
@@ -133,7 +133,7 @@ struct Like : public HackClass {
     {
         if (m1.is_null() && m2.is_null())
             return true;
-        if (Mixed::types_are_comparable(m1, m2)) {
+        if (m1.is_type(type_String, type_Binary) && Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
             return operator()(b1, b2, false, false);
@@ -186,7 +186,7 @@ struct BeginsWith : public HackClass {
 
     bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
-        if (Mixed::types_are_comparable(m1, m2)) {
+        if (m1.is_type(type_String, type_Binary) && Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
             return b2.begins_with(b1);
@@ -232,7 +232,7 @@ struct EndsWith : public HackClass {
 
     bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
-        if (Mixed::types_are_comparable(m1, m2)) {
+        if (m1.is_type(type_String, type_Binary) && Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
             return operator()(b1, b2, false, false);
@@ -395,7 +395,7 @@ struct ContainsIns : public HackClass {
     {
         if (m1.is_null())
             return !m2.is_null();
-        if (Mixed::types_are_comparable(m1, m2)) {
+        if (m1.is_type(type_String, type_Binary) && Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
             return operator()(b1, b2, false, false);
@@ -479,7 +479,7 @@ struct LikeIns : public HackClass {
     {
         if (m1.is_null() && m2.is_null())
             return true;
-        if (Mixed::types_are_comparable(m1, m2)) {
+        if (m1.is_type(type_String, type_Binary) && Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
             return operator()(b1, b2, false, false);
@@ -544,7 +544,7 @@ struct BeginsWithIns : public HackClass {
 
     bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
-        if (Mixed::types_are_comparable(m1, m2)) {
+        if (m1.is_type(type_String, type_Binary) && Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
             return operator()(b1, b2, false, false);
@@ -610,7 +610,7 @@ struct EndsWithIns : public HackClass {
 
     bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
-        if (Mixed::types_are_comparable(m1, m2)) {
+        if (m1.is_type(type_String, type_Binary) && Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
             return operator()(b1, b2, false, false);
@@ -675,8 +675,18 @@ struct EqualIns : public HackClass {
 
     bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
-        return (m1.is_null() && m2.is_null()) ||
-               (Mixed::types_are_comparable(m1, m2) && operator()(m1.get_binary(), m2.get_binary(), false, false));
+        if (m1.is_null() && m2.is_null()) {
+            return true;
+        }
+        else if (Mixed::types_are_comparable(m1, m2)) {
+            if (m1.is_type(type_String, type_Binary)) {
+                return operator()(m1.get_binary(), m2.get_binary(), false, false);
+            }
+            else {
+                return m1 == m2;
+            }
+        }
+        return false;
     }
 
     template <class A, class B>

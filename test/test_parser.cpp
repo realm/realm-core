@@ -5727,4 +5727,64 @@ TEST(Parser_Geospatial)
                                          "But the provided type is 'string'") != std::string::npos));
 }
 
+TEST(Parser_RecursiveLogial)
+{
+    using util::serializer::print_value;
+    Group g;
+    auto table = g.add_table_with_primary_key("table", type_ObjectId, "id");
+    table->create_object_with_primary_key(ObjectId());
+
+    {
+        std::vector<Mixed> args = {ObjectId(), ObjectId::gen(), ObjectId::gen()};
+        verify_query_sub(test_context, table,
+                         "TRUEPREDICATE AND (id == $1 OR id == $2 OR id == $0) AND TRUEPREDICATE", args, 1);
+        verify_query_sub(
+            test_context, table,
+            "(id == $1 OR id == $2 OR id == $0) AND (TRUEPREDICATE AND id == $0 AND id == $0) AND TRUEPREDICATE",
+            args, 1);
+        verify_query_sub(
+            test_context, table,
+            "(id == $1 OR id == $2 OR id == $0) AND (FALSEPREDICATE AND id == $0 AND id == $0) AND TRUEPREDICATE",
+            args, 0);
+        verify_query_sub(test_context, table,
+                         "(id == $1 OR id == $2 OR FALSEPREDICATE) AND (TRUEPREDICATE AND id == $0 AND id == $0) AND "
+                         "TRUEPREDICATE",
+                         args, 0);
+        verify_query_sub(
+            test_context, table,
+            "(id == $1 OR id == $2 OR id == $0) AND (TRUEPREDICATE AND id == $0 AND id == $0) AND FALSEPREDICATE",
+            args, 0);
+    }
+
+    constexpr size_t num_args = 1000;
+    std::vector<Mixed> args;
+    args.reserve(num_args);
+    for (size_t i = 0; i < num_args; ++i) {
+        args.push_back(ObjectId::gen());
+    }
+
+    std::string base_query;
+    for (size_t i = 0; i < 1000; ++i) {
+        base_query += util::format("%1id = $%2", i == 0 ? "" : " OR ", i);
+    }
+    // minimum size to trigger a stack overflow on "my" machine in debug mode
+    constexpr size_t num_repeats = 53;
+    std::string query = "FALSEPREDICATE";
+    query.reserve(query.size() + ((4 + base_query.size()) * num_repeats));
+    for (size_t i = 0; i < num_repeats; ++i) {
+        query.append(" OR ");
+        query.append(base_query);
+    }
+    Query q = table->query(query, args, {});
+    size_t q_count = q.count();
+    CHECK_EQUAL(q_count, 0);
+
+    query.append(util::format(" OR id = oid(%1)", ObjectId()));
+    query.append(" OR ");
+    query.append(base_query);
+    q = table->query(query, args, {});
+    q_count = q.count();
+    CHECK_EQUAL(q_count, 1);
+}
+
 #endif // TEST_PARSER

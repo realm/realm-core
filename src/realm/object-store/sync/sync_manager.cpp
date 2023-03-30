@@ -178,8 +178,7 @@ bool SyncManager::run_file_action(SyncFileActionMetadata& md)
     switch (md.action()) {
         case SyncFileActionMetadata::Action::DeleteRealm:
             // Delete all the files for the given Realm.
-            m_file_manager->remove_realm(md.original_name());
-            return true;
+            return m_file_manager->remove_realm(md.original_name());
         case SyncFileActionMetadata::Action::BackUpThenDeleteRealm:
             // Copy the primary Realm file to the recovery dir, and then delete the Realm.
             auto new_name = md.new_name();
@@ -230,10 +229,22 @@ void SyncManager::reset_for_testing()
     }
 
     {
-        util::CheckedLockGuard lock(m_session_mutex);
+        util::CheckedUniqueLock lock(m_session_mutex);
+
+        bool no_sessions = !do_has_existing_sessions();
+        // There's a race between this function and sessions tearing themselves down waiting for m_session_mutex.
+        // So we give up to a 5 second grace period for any sessions being torn down to unregister themselves.
+        auto since_poll_start = [start = std::chrono::steady_clock::now()] {
+            return std::chrono::steady_clock::now() - start;
+        };
+        for (; !no_sessions && since_poll_start() < std::chrono::seconds(5);
+             no_sessions = !do_has_existing_sessions()) {
+            lock.unlock();
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            lock.lock();
+        }
         // Callers of `SyncManager::reset_for_testing` should ensure there are no existing sessions
         // prior to calling `reset_for_testing`.
-        bool no_sessions = !do_has_existing_sessions();
         REALM_ASSERT_RELEASE(no_sessions);
 
         // Destroy any inactive sessions.
@@ -279,7 +290,7 @@ void SyncManager::set_logger_factory(SyncClientConfig::LoggerFactory factory)
     m_config.logger_factory = std::move(factory);
 
     if (m_sync_client)
-        throw std::logic_error("Cannot set the logger_factory after creating the sync client");
+        throw std::logic_error("Cannot set the logger factory after creating the sync client");
 
     // Create a new logger using the new factory
     do_make_logger();
@@ -291,8 +302,7 @@ void SyncManager::do_make_logger()
         m_logger_ptr = m_config.logger_factory(m_config.log_level);
     }
     else {
-        // recreate the logger as a StderrLogger, even if it was created before...
-        m_logger_ptr = std::make_shared<util::StderrLogger>(m_config.log_level);
+        m_logger_ptr = util::Logger::get_default_logger();
     }
 }
 
