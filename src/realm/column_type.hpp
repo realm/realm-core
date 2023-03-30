@@ -24,6 +24,8 @@
 
 namespace realm {
 
+enum class CollectionType { List, Set, Dictionary };
+
 struct ColumnType {
     // Note: Enumeration value assignments must be kept in sync with
     // <realm/data_type.hpp>.
