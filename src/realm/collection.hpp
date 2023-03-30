@@ -119,6 +119,10 @@ public:
         return ndx;
     }
 
+    virtual void set_owner(const Obj& obj, CollectionParent::Index index) = 0;
+    virtual void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) = 0;
+
+
     StringData get_property_name() const
     {
         return get_table()->get_column_name(get_col_key());
@@ -339,9 +343,8 @@ public:
 
     const Obj& get_obj() const noexcept final
     {
-        return m_obj;
+        return m_obj_mem;
     }
-
 
     /// Returns true if the accessor has changed since the last time
     /// `has_changed()` was called.
@@ -369,7 +372,9 @@ public:
     using Interface::get_target_table;
 
 protected:
-    Obj m_obj;
+    Obj m_obj_mem;
+    std::shared_ptr<CollectionParent> m_col_parent;
+    CollectionParent::Index m_index;
     ColKey m_col_key;
     bool m_nullable = false;
 
@@ -379,18 +384,49 @@ protected:
     mutable uint_fast64_t m_last_content_version = 0;
 
     CollectionBaseImpl() = default;
-    CollectionBaseImpl(const CollectionBaseImpl& other) = default;
-    CollectionBaseImpl(CollectionBaseImpl&& other) = default;
+    CollectionBaseImpl(const CollectionBaseImpl& other)
+        : m_obj_mem(other.m_obj_mem)
+        , m_col_parent(other.m_col_parent)
+        , m_index(other.m_index)
+        , m_col_key(other.m_col_key)
+        , m_nullable(other.m_nullable)
+        , m_parent(m_col_parent ? m_col_parent.get() : &m_obj_mem)
+        , m_alloc(other.m_alloc)
+    {
+    }
 
     CollectionBaseImpl(const Obj& obj, ColKey col_key) noexcept
-        : m_obj(obj)
+        : m_obj_mem(obj)
+        , m_index(col_key)
         , m_col_key(col_key)
+        , m_nullable(col_key.is_nullable())
+        , m_parent(&m_obj_mem)
+    {
+        if (obj) {
+            m_alloc = &m_obj_mem.get_alloc();
+        }
+    }
+
+    CollectionBaseImpl(ColKey col_key) noexcept
+        : m_col_key(col_key)
         , m_nullable(col_key.is_nullable())
     {
     }
 
-    CollectionBaseImpl& operator=(const CollectionBaseImpl& other) = default;
-    CollectionBaseImpl& operator=(CollectionBaseImpl&& other) = default;
+    CollectionBaseImpl& operator=(const CollectionBaseImpl& other)
+    {
+        if (this != &other) {
+            m_obj_mem = other.m_obj_mem;
+            m_col_parent = other.m_col_parent;
+            m_parent = m_col_parent ? m_col_parent.get() : &m_obj_mem;
+            m_alloc = other.m_alloc;
+            m_index = other.m_index;
+            m_col_key = other.m_col_key;
+            m_nullable = other.m_nullable;
+        }
+
+        return *this;
+    }
 
     bool operator==(const Derived& other) const noexcept
     {
@@ -401,6 +437,42 @@ protected:
     bool operator!=(const Derived& other) const noexcept
     {
         return !(*this == other);
+    }
+
+    void set_owner(const Obj& obj, CollectionParent::Index index) override
+    {
+        m_obj_mem = obj;
+        m_parent = &m_obj_mem;
+        m_index = index;
+        if (obj) {
+            m_alloc = &obj.get_alloc();
+        }
+    }
+
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        m_obj_mem = parent->get_object();
+        m_col_parent = std::move(parent);
+        m_parent = m_col_parent.get();
+        m_index = index;
+        if (m_obj_mem) {
+            m_alloc = &m_obj_mem.get_alloc();
+        }
+    }
+
+    ref_type get_collection_ref() const noexcept
+    {
+        try {
+            return m_parent->get_collection_ref(m_index);
+        }
+        catch (const KeyNotFound&) {
+            return ref_type(0);
+        }
+    }
+
+    void set_collection_ref(ref_type ref)
+    {
+        m_parent->set_collection_ref(m_index, ref);
     }
 
     /// Refresh the associated `Obj` (if needed), and update the internal
@@ -420,10 +492,10 @@ protected:
     /// `UpdateStatus::NoChange`, and the caller is allowed to not do anything.
     virtual UpdateStatus update_if_needed() const
     {
-        UpdateStatus status = m_obj.update_if_needed_with_status();
+        UpdateStatus status = m_parent ? m_parent->update_if_needed_with_status() : UpdateStatus::Detached;
 
         if (status != UpdateStatus::Detached) {
-            auto content_version = m_obj.get_alloc().get_content_version();
+            auto content_version = m_alloc->get_content_version();
             if (content_version != m_content_version) {
                 m_content_version = content_version;
                 status = UpdateStatus::Updated;
@@ -445,8 +517,9 @@ protected:
     /// method will never return `UpdateStatus::Detached`.
     virtual UpdateStatus ensure_created()
     {
-        bool changed = m_obj.update_if_needed(); // Throws if the object does not exist.
-        auto content_version = m_obj.get_alloc().get_content_version();
+        check_parent();
+        bool changed = m_parent->update_if_needed(); // Throws if the object does not exist.
+        auto content_version = m_alloc->get_content_version();
 
         if (changed || content_version != m_content_version) {
             m_content_version = content_version;
@@ -457,7 +530,58 @@ protected:
 
     void bump_content_version()
     {
-        m_content_version = m_obj.bump_content_version();
+        REALM_ASSERT(m_alloc);
+        m_content_version = m_alloc->bump_content_version();
+    }
+
+    void bump_both_versions()
+    {
+        REALM_ASSERT(m_alloc);
+        m_alloc->bump_content_version();
+        m_alloc->bump_storage_version();
+    }
+
+    Replication* get_replication() const
+    {
+        check_parent();
+        return m_parent->get_table()->get_repl();
+    }
+
+    Table* get_table_unchecked() const
+    {
+        check_parent();
+        auto t = m_parent->get_table();
+        REALM_ASSERT(t);
+        return t.unchecked_ptr();
+    }
+
+    Allocator& get_alloc() const
+    {
+        check_alloc();
+        return *m_alloc;
+    }
+
+    void set_alloc(Allocator& alloc)
+    {
+        m_alloc = &alloc;
+    }
+
+    void set_backlink(ColKey col_key, ObjLink new_link) const
+    {
+        check_parent();
+        m_parent->set_backlink(col_key, new_link);
+    }
+    // Used when replacing a link, return true if CascadeState contains objects to remove
+    bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const
+    {
+        check_parent();
+        return m_parent->replace_backlink(col_key, old_link, new_link, state);
+    }
+    // Used when removing a backlink, return true if CascadeState contains objects to remove
+    bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const
+    {
+        check_parent();
+        return m_parent->remove_backlink(col_key, old_link, state);
     }
 
     /// Reset the accessor's tracking of the content version. Derived classes
@@ -474,18 +598,30 @@ protected:
     ref_type get_child_ref(size_t child_ndx) const noexcept final
     {
         static_cast<void>(child_ndx);
-        try {
-            return to_ref(m_obj._get<int64_t>(m_col_key.get_index()));
-        }
-        catch (const KeyNotFound&) {
-            return ref_type(0);
-        }
+        return get_collection_ref();
     }
 
     void update_child_ref(size_t child_ndx, ref_type new_ref) final
     {
         static_cast<void>(child_ndx);
-        m_obj.set_int(m_col_key, from_ref(new_ref));
+        set_collection_ref(new_ref);
+    }
+
+private:
+    CollectionParent* m_parent = nullptr;
+    Allocator* m_alloc = nullptr;
+
+    void check_parent() const
+    {
+        if (!m_parent) {
+            throw StaleAccessor("Collection has no owner");
+        }
+    }
+    void check_alloc() const
+    {
+        if (!m_alloc) {
+            throw StaleAccessor("Allocator not set");
+        }
     }
 };
 
@@ -763,6 +899,26 @@ private:
     mutable value_type m_val;
     const L* m_list;
     size_t m_ndx = size_t(-1);
+};
+
+template <class T>
+class IteratorAdapter {
+public:
+    IteratorAdapter(T* keys)
+        : m_list(keys)
+    {
+    }
+    CollectionIterator<T> begin() const
+    {
+        return CollectionIterator<T>(m_list, 0);
+    }
+    CollectionIterator<T> end() const
+    {
+        return CollectionIterator<T>(m_list, m_list->size());
+    }
+
+private:
+    T* m_list;
 };
 
 } // namespace realm

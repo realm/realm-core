@@ -34,7 +34,12 @@ public:
     Dictionary() {}
     ~Dictionary();
 
-    Dictionary(const Obj& obj, ColKey col_key);
+    Dictionary(const Obj& obj, ColKey col_key)
+        : Dictionary(col_key)
+    {
+        this->set_owner(obj, col_key);
+    }
+    Dictionary(ColKey col_key);
     Dictionary(const Dictionary& other)
         : Base(static_cast<const Base&>(other))
         , m_key_type(other.m_key_type)
@@ -101,7 +106,7 @@ public:
     void for_all_values(T&& f)
     {
         if (update()) {
-            BPlusTree<Mixed> values(m_obj.get_alloc());
+            BPlusTree<Mixed> values(get_alloc());
             values.init_from_ref(m_dictionary_top->get_as_ref(1));
             auto func = [&f](BPlusTreeNode* node, size_t) {
                 auto leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
@@ -120,7 +125,7 @@ public:
     void for_all_keys(Func&& f)
     {
         if (update()) {
-            BPlusTree<T> keys(m_obj.get_alloc());
+            BPlusTree<T> keys(get_alloc());
             keys.init_from_ref(m_dictionary_top->get_as_ref(0));
             auto func = [&f](BPlusTreeNode* node, size_t) {
                 auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);
@@ -140,6 +145,18 @@ public:
     Iterator end() const;
 
     void migrate();
+
+    void set_owner(const Obj& obj, CollectionParent::Index index) override
+    {
+        Base::set_owner(obj, index);
+        get_key_type();
+    }
+
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        Base::set_owner(std::move(parent), index);
+        get_key_type();
+    }
 
 private:
     template <typename T, typename Op>
@@ -183,6 +200,7 @@ private:
         return update_if_needed() != UpdateStatus::Detached;
     }
     void verify() const;
+    void get_key_type();
 };
 
 class Dictionary::Iterator {
@@ -373,7 +391,7 @@ public:
     {
         return m_source.update_if_needed();
     }
-    BPlusTree<ObjKey>* get_mutable_tree() const
+    BPlusTree<ObjKey>* get_mutable_tree() const final
     {
         // We are faking being an ObjList because the underlying storage is not
         // actually a BPlusTree<ObjKey> for dictionaries it is all mixed values.
@@ -382,6 +400,16 @@ public:
         // the same way as for LnkSet and LnkLst. This means that the functions
         // that call get_mutable_tree do not need to do anything for dictionaries.
         return nullptr;
+    }
+
+    void set_owner(const Obj& obj, CollectionParent::Index index) override
+    {
+        m_source.set_owner(obj, index);
+    }
+
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        m_source.set_owner(std::move(parent), index);
     }
 
 private:
@@ -396,7 +424,7 @@ inline std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, const
 
 inline std::unique_ptr<CollectionBase> Dictionary::clone_collection() const
 {
-    return m_obj.get_dictionary_ptr(m_col_key);
+    return m_obj_mem.get_dictionary_ptr(this->get_col_key());
 }
 
 

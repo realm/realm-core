@@ -123,6 +123,12 @@ public:
     /// otherwise null is returned.
     Group* get_parent_group() const noexcept;
 
+
+    Replication* get_repl() const noexcept
+    {
+        return *m_repl;
+    }
+
     // Whether or not elements can be null.
     bool is_nullable(ColKey col_key) const;
 
@@ -798,7 +804,6 @@ private:
     void nullify_links(CascadeState&);
     void remove_recursive(CascadeState&);
 
-    Replication* get_repl() const noexcept;
     util::Logger* get_logger() const noexcept;
 
     void set_ndx_in_parent(size_t ndx_in_parent) noexcept;
@@ -860,6 +865,7 @@ private:
     friend class ClusterTree;
     friend class ColKeyIterator;
     friend class Obj;
+    friend class CollectionParent;
     friend class LnkLst;
     friend class Dictionary;
     friend class IncludeDescriptor;
@@ -1265,11 +1271,6 @@ inline bool Table::operator!=(const Table& t) const
 inline bool Table::is_link_type(ColumnType col_type) noexcept
 {
     return col_type == col_type_Link || col_type == col_type_LinkList;
-}
-
-inline Replication* Table::get_repl() const noexcept
-{
-    return *m_repl;
 }
 
 inline void Table::set_ndx_in_parent(size_t ndx_in_parent) noexcept

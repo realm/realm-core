@@ -743,6 +743,13 @@ TEST(ListList_Clear)
     if (links.size() > 1)
         links.set(1, key0);
     links.clear();
+
+    group->commit_and_continue_as_read();
+    group->promote_to_write();
+
+    obj3.remove();
+    auto links2 = links.clone();
+    CHECK_EQUAL(links2->size(), 0);
 }
 
 TEST(Links_AddBacklinkToTableWithEnumColumns)
