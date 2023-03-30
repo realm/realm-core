@@ -234,9 +234,6 @@ class S2LatLngRect : public S2Region {
   // The point 'p' does not need to be normalized.
   bool Contains(S2Point const& p) const;
 
-  virtual void Encode(Encoder* const encoder) const;
-  virtual bool Decode(Decoder* const decoder);
-
  private:
   // Return true if the edge AB intersects the given edge of constant
   // longitude.

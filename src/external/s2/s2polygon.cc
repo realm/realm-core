@@ -20,7 +20,6 @@ using std::vector;
 #include "s2polygon.h"
 
 #include "base/port.h"  // for HASH_NAMESPACE_DECLARATION_START
-#include "util/coding/coder.h"
 #include "s2edgeindex.h"
 #include "s2cap.h"
 #include "s2cell.h"
@@ -491,56 +490,6 @@ bool S2Polygon::Contains(S2Point const& p) const {
     if (inside && !has_holes_) break;  // Shells are disjoint.
   }
   return inside;
-}
-
-void S2Polygon::Encode(Encoder* const encoder) const {
-  encoder->Ensure(10);  // Sufficient
-  encoder->put8(kCurrentEncodingVersionNumber);
-  encoder->put8(owns_loops_);
-  encoder->put8(has_holes_);
-  encoder->put32(loops_.size());
-  DCHECK_GE(encoder->avail(), 0);
-
-  for (int i = 0; i < num_loops(); ++i) {
-    loop(i)->Encode(encoder);
-  }
-  bound_.Encode(encoder);
-}
-
-bool S2Polygon::Decode(Decoder* const decoder) {
-  return DecodeInternal(decoder, false);
-}
-
-bool S2Polygon::DecodeWithinScope(Decoder* const decoder) {
-  return DecodeInternal(decoder, true);
-}
-
-bool S2Polygon::DecodeInternal(Decoder* const decoder, bool within_scope) {
-  unsigned char version = decoder->get8();
-  if (version > kCurrentEncodingVersionNumber) return false;
-
-  if (owns_loops_) DeleteLoopsInVector(&loops_);
-
-  owns_loops_ = decoder->get8();
-  has_holes_ = decoder->get8();
-  int num_loops = decoder->get32();
-  loops_.clear();
-  loops_.reserve(num_loops);
-  num_vertices_ = 0;
-  for (int i = 0; i < num_loops; ++i) {
-    loops_.push_back(new S2Loop);
-    if (within_scope) {
-      if (!loops_.back()->DecodeWithinScope(decoder)) return false;
-    } else {
-      if (!loops_.back()->Decode(decoder)) return false;
-    }
-    num_vertices_ += loops_.back()->num_vertices();
-  }
-  if (!bound_.Decode(decoder)) return false;
-
-  DCHECK(IsValid(loops_));
-
-  return decoder->avail() >= 0;
 }
 
 // Indexing structure to efficiently ClipEdge() of a polygon.  This is

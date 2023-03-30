@@ -110,11 +110,6 @@ class S2Cell : public S2Region {
   // The point 'p' does not need to be normalized.
   bool Contains(S2Point const& p) const;
 
-  virtual void Encode(Encoder* const encoder) const {
-      REALM_UNREACHABLE(); // Unimplemented
-  }
-  virtual bool Decode(Decoder* const decoder) { return false; }
-
  private:
   // Internal method that does the actual work in the constructors.
   void Init(S2CellId const& id);

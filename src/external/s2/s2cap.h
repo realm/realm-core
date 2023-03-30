@@ -130,11 +130,6 @@ class S2Cap : public S2Region {
   // The point 'p' should be a unit-length vector.
   bool Contains(S2Point const& p) const;
 
-  virtual void Encode(Encoder* const encoder) const {
-      REALM_UNREACHABLE(); // Unimplemented
-  }
-  virtual bool Decode(Decoder* const decoder) { return false; }
-
   ///////////////////////////////////////////////////////////////////////
   // The following static methods are convenience functions for assertions
   // and testing purposes only.

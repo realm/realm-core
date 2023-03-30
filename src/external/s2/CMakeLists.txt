@@ -31,11 +31,6 @@ set(S2_BASE_SOURCES
     base/strtoint.cc
 )
 
-set(S2_UTIL_CODING_SOURCES
-    util/coding/coder.cc
-    util/coding/varint.cc
-)
-
 set(S2_UTIL_MATH_SOURCES
     util/math/mathutil.cc
     util/math/mathlimits.cc
@@ -44,7 +39,6 @@ set(S2_UTIL_MATH_SOURCES
 add_library(s2geometry OBJECT
     ${S2_SOURCES}
     ${S2_BASE_SOURCES}
-    ${S2_UTIL_CODING_SOURCES}
     ${S2_UTIL_MATH_SOURCES}
 )
 

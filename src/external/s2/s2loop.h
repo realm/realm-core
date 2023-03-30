@@ -254,10 +254,6 @@ class S2Loop : public S2Region {
   // The point 'p' does not need to be normalized.
   bool Contains(S2Point const& p) const;
 
-  virtual void Encode(Encoder* const encoder) const;
-  virtual bool Decode(Decoder* const decoder);
-  virtual bool DecodeWithinScope(Decoder* const decoder);
-
  private:
   // Internal constructor used only by Clone() that makes a deep copy of
   // its argument.
@@ -265,14 +261,6 @@ class S2Loop : public S2Region {
 
   void InitOrigin();
   void InitBound();
-
-  // Internal implementation of the Decode and DecodeWithinScope methods above.
-  // If within_scope is true, memory is allocated for vertices_ and data
-  // is copied from the decoder using memcpy. If it is false, vertices_
-  // will point to the memory area inside the decoder, and the field
-  // owns_vertices_ is set to false.
-  bool DecodeInternal(Decoder* const decoder,
-                      bool within_scope);
 
   // Internal implementation of the Intersects() method above.
   bool IntersectsInternal(S2Loop const* b) const;
