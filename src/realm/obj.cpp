@@ -29,8 +29,8 @@
 #include "realm/array_fixed_bytes.hpp"
 #include "realm/array_backlink.hpp"
 #include "realm/array_typed_link.hpp"
+#include "realm/collection_list.hpp"
 #include "realm/cluster_tree.hpp"
-#include "realm/column_type_traits.hpp"
 #include "realm/list.hpp"
 #include "realm/set.hpp"
 #include "realm/dictionary.hpp"
@@ -41,6 +41,7 @@
 #include "realm/spec.hpp"
 #include "realm/table_view.hpp"
 #include "realm/util/base64.hpp"
+#include "realm/util/overload.hpp"
 
 namespace realm {
 
@@ -2040,23 +2041,78 @@ DictionaryPtr Obj::get_dictionary_ptr(ColKey col_key) const
     return dict;
 }
 
+std::shared_ptr<Dictionary> Obj::get_dictionary_ptr(const std::vector<CollectionParent::Index>& path) const
+{
+    REALM_ASSERT(mpark::get<ColKey>(path[0]).is_dictionary());
+    return std::dynamic_pointer_cast<Dictionary>(get_collection_ptr(path));
+}
+
 Dictionary Obj::get_dictionary(StringData col_name) const
 {
     return get_dictionary(get_column_key(col_name));
 }
 
+CollectionListPtr Obj::get_collection_list(ColKey col_key) const
+{
+    REALM_ASSERT(m_table->get_nesting_levels(col_key) > 0);
+    auto coll_type = m_table->get_nested_column_type(col_key, 0);
+    return CollectionList::create(std::make_shared<Obj>(*this), col_key, col_key, coll_type);
+}
+
+CollectionPtr Obj::get_collection_ptr(const std::vector<CollectionParent::Index>& path) const
+{
+    REALM_ASSERT(path.size() > 0);
+
+    CollectionListPtr list;
+    size_t levels_left = path.size() - 1;
+    for (auto& index : path) {
+        if (levels_left == 0) {
+            return mpark::visit(util::overload{[&](ColKey col_key) {
+                                                   return get_collection_ptr(col_key);
+                                               },
+                                               [&](int64_t i) {
+                                                   auto ndx = size_t(i);
+                                                   if (ndx < list->size()) {
+                                                       return list->get_collection(ndx);
+                                                   }
+                                                   REALM_ASSERT(ndx == list->size());
+                                                   return list->insert_collection(ndx);
+                                               },
+                                               [&](const std::string& key) {
+                                                   return list->insert_collection(StringData(key));
+                                               }},
+                                index);
+        }
+        else {
+            list = mpark::visit(util::overload{[&](ColKey col_key) {
+                                                   return get_collection_list(col_key);
+                                               },
+                                               [&](int64_t i) {
+                                                   auto ndx = size_t(i);
+                                                   if (ndx < list->size()) {
+                                                       return list->get_collection_list(ndx);
+                                                   }
+                                                   REALM_ASSERT(ndx == list->size());
+                                                   return list->insert_collection_list(ndx);
+                                               },
+                                               [&](const std::string& key) {
+                                                   return list->insert_collection_list(StringData(key));
+                                               }},
+                                index);
+        }
+        levels_left--;
+    }
+
+    // Return intermediate collection
+    return list;
+}
+
+
 CollectionBasePtr Obj::get_collection_ptr(ColKey col_key) const
 {
-    if (col_key.is_list()) {
-        return get_listbase_ptr(col_key);
-    }
-    else if (col_key.is_set()) {
-        return get_setbase_ptr(col_key);
-    }
-    else if (col_key.is_dictionary()) {
-        return get_dictionary_ptr(col_key);
-    }
-    return {};
+    auto collection = CollectionParent::get_collection_ptr(col_key);
+    collection->set_owner(*this, col_key);
+    return collection;
 }
 
 CollectionBasePtr Obj::get_collection_ptr(StringData col_name) const

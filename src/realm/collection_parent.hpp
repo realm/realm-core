@@ -31,12 +31,14 @@ class Obj;
 class Replication;
 class CascadeState;
 
+class Collection;
 class CollectionBase;
 class CollectionList;
 class LstBase;
 class SetBase;
 class Dictionary;
 
+using CollectionPtr = std::shared_ptr<Collection>;
 using LstBasePtr = std::unique_ptr<LstBase>;
 using SetBasePtr = std::unique_ptr<SetBase>;
 using CollectionBasePtr = std::unique_ptr<CollectionBase>;
@@ -73,6 +75,7 @@ public:
 protected:
     template <class, class>
     friend class CollectionBaseImpl;
+    friend class CollectionList;
 
     virtual ~CollectionParent();
     /// Update the accessor (and return `UpdateStatus::Detached` if the parent

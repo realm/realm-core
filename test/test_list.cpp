@@ -666,3 +666,64 @@ TEST(List_NestedListColumns)
     tr->verify();
     tr->commit_and_continue_as_read();
 }
+
+TEST(List_NestedList)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(make_in_realm_history(), path);
+    auto tr = db->start_write();
+    auto table = tr->add_table("table");
+    auto list_col1 =
+        table->add_column(type_Int, "int_list_list", false, {CollectionType::List, CollectionType::List});
+    auto list_col2 = table->add_column(type_Int, "int_dict_list_list", false,
+                                       {CollectionType::Dictionary, CollectionType::List, CollectionType::List});
+    CHECK_EQUAL(table->get_nesting_levels(list_col1), 1);
+    CHECK_EQUAL(table->get_nesting_levels(list_col2), 2);
+    Obj obj = table->create_object();
+
+    CollectionListPtr list = obj.get_collection_list(list_col1);
+    CHECK(list->is_empty());
+    auto collection = list->insert_collection(0);
+    dynamic_cast<Lst<Int>*>(collection.get())->add(5);
+
+    auto dict = obj.get_collection_list(list_col2);
+    auto list2 = dict->insert_collection_list("Foo");
+    auto collection2 = list2->insert_collection(0);
+    dynamic_cast<Lst<Int>*>(collection2.get())->add(5);
+
+    // Get collection by path
+    auto int_lst = obj.get_list_ptr<Int>({list_col2, "Foo", 0});
+    CHECK_EQUAL(int_lst->get(0), 5);
+
+    auto list3 = dict->insert_collection_list("Foo");
+    // list3 points to the same list as list2
+    auto collection3 = list3->insert_collection(0);
+    dynamic_cast<Lst<Int>*>(collection3.get())->insert(0, 8);
+    // list2 must now update so that the following get() does not return 8
+    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection2.get())->get(0), 5);
+
+    tr->commit_and_continue_as_read();
+    CHECK_NOT(list->is_empty());
+    CHECK_EQUAL(obj.get_collection_list(list_col1)->get_collection(0)->get_any(0).get_int(), 5);
+    tr->promote_to_write();
+    {
+        list->insert_collection(0);
+        auto lst = list->get_collection(0);
+        dynamic_cast<Lst<Int>*>(lst.get())->add(47);
+
+        lst = obj.get_collection_list(list_col2)->insert_collection_list("Foo")->get_collection(0);
+        dynamic_cast<Lst<Int>*>(collection2.get())->set(0, 100);
+    }
+    tr->commit_and_continue_as_read();
+    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection.get())->get(0), 5);
+    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection2.get())->get(0), 100);
+
+    tr->promote_to_write();
+    obj.remove();
+    tr->commit_and_continue_as_read();
+    CHECK_EQUAL(list->size(), 0);
+    CHECK_EQUAL(dict->size(), 0);
+    CHECK_EQUAL(list2->size(), 0);
+    CHECK_EQUAL(collection->size(), 0);
+    CHECK_EQUAL(collection2->size(), 0);
+}
