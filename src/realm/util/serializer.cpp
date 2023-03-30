@@ -231,6 +231,7 @@ std::string print_value<>(realm::Geospatial geo)
         case Geospatial::Type::Invalid:
             return "NULL";
     }
+    return "NULL";
 }
 
 // The variable name must be unique with respect to the already chosen variables at

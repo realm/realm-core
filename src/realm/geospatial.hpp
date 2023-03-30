@@ -252,6 +252,7 @@ public:
                 REALM_ASSERT(m_sphere_radius);
                 return Geospatial(GeoCenterSphere{*m_sphere_radius * Geospatial::c_radius_km, m_data[0]});
         }
+        return Geospatial();
     }
 
 private:
