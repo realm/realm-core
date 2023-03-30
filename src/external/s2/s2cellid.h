@@ -16,11 +16,21 @@ using std::vector;
 
 #include "base/basictypes.h"
 #include "base/logging.h"
-#include "base/port.h"  // for HASH_NAMESPACE_DECLARATION_START
 #include "s2.h"
 #include "util/math/vector2.h"
 
 class S2LatLng;
+
+// The following defines were salvaged from base/port.h
+#if (defined(COMPILER_GCC3) || defined(COMPILER_ICC) || defined(OS_MACOSX)) && !defined(SWIG)
+//
+// Prevent the compiler from padding a structure to natural alignment
+//
+#define PACKED __attribute__ ((packed))
+#else
+#define PACKED
+#endif // GCC
+
 
 // An S2CellId is a 64-bit unsigned integer that uniquely identifies a
 // cell in the S2 cell decomposition.  It has the following format:

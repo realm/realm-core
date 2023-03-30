@@ -19,7 +19,6 @@ using std::vector;
 
 #include "s2polygon.h"
 
-#include "base/port.h"  // for HASH_NAMESPACE_DECLARATION_START
 #include "s2edgeindex.h"
 #include "s2cap.h"
 #include "s2cell.h"

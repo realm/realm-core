@@ -7,7 +7,6 @@
 
 #include "s2/base/integral_types.h"
 #include "s2/base/casts.h"
-#include "s2/base/port.h"
 
 //
 // Google-specific types

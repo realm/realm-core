@@ -26,7 +26,6 @@ using std::reverse;
 #include "s2/base/basictypes.h"
 #include "s2/base/logging.h"
 #include "s2/base/macros.h"
-#include "s2/base/port.h"  // for HASH_NAMESPACE_DECLARATION_START
 #include "s2/util/math/vector3-inl.h"
 #include "s2/util/math/matrix3x3.h"
 

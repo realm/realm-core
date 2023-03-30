@@ -26,11 +26,6 @@ set(S2_SOURCES
     s2regionunion.cc
 )
 
-set(S2_BASE_SOURCES
-    base/int128.cc
-    base/strtoint.cc
-)
-
 set(S2_UTIL_MATH_SOURCES
     util/math/mathutil.cc
     util/math/mathlimits.cc
@@ -38,7 +33,6 @@ set(S2_UTIL_MATH_SOURCES
 
 add_library(s2geometry OBJECT
     ${S2_SOURCES}
-    ${S2_BASE_SOURCES}
     ${S2_UTIL_MATH_SOURCES}
 )
 
