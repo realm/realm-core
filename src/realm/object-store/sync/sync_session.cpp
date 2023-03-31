@@ -1324,7 +1324,7 @@ void SyncSession::save_sync_config_after_migration()
     m_migrated_sync_config = m_migration_store->convert_sync_config(m_original_sync_config);
 }
 
-void SyncSession::update_subscription_store(bool flx_sync_requested) NO_THREAD_SAFETY_ANALYSIS
+void SyncSession::update_subscription_store(bool flx_sync_requested)
 {
     util::CheckedUniqueLock lock(m_state_mutex);
 
