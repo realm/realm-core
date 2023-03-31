@@ -793,6 +793,19 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             })
             ->run();
     }
+
+    SECTION("DiscardLocal: completion callbacks fire after client reset") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        config_local.sync_config->notify_after_client_reset = reset_handler;
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        test_reset
+            ->on_post_local_changes([&](SharedRealm realm) {
+                wait_for_upload(*realm);
+                wait_for_download(*realm);
+            })
+            ->run();
+    }
 }
 
 TEST_CASE("flx: creating an object on a class with no subscription throws", "[sync][flx][app]") {

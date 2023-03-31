@@ -2352,6 +2352,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
 
         m_upload_target_version = m_last_version_available;
         m_upload_progress = m_progress.upload;
+        m_download_progress = m_progress.download;
         // In recovery mode, there may be new changesets to upload and nothing left to download.
         // In FLX DiscardLocal mode, there may be new commits due to subscription handling.
         // For both, we want to allow uploads again without needing external changes to download first.
