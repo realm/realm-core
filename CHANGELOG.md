@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 13.9.0 Release notes
 
 ### Enhancements
 * Enable multiple processes to operate on an encrypted Realm simultaneously. ([#1845](https://github.com/realm/realm-core/issues/1845))
@@ -9,9 +9,6 @@
 * `SyncManager::immediately_run_file_actions()` no longer ignores the result of trying to remove a realm. This could have resulted in a client reset action being reported as successful when it actually failed on windows if the `Realm` was still open ([#6050](https://github.com/realm/realm-core/issues/6050)).
 * Fix a data race in `DB::VersionManager`. If one thread committed a write transaction which increased the number of live versions above the previous highest seen during the current session at the same time as another thread began a read, the reading thread could read from a no-longer-valid memory mapping ([PR #6411](https://github.com/realm/realm-core/pull/6411), since v13.0.0).
 * Performing count() on an undefined Query would crash. ([#6443](https://github.com/realm/realm-core/issues/6443), since v13.7.0)
-
-### Breaking changes
-* None.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
