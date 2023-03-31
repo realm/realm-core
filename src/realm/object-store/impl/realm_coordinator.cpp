@@ -445,6 +445,9 @@ void RealmCoordinator::open_db()
         if (history) {
             options.backup_at_file_format_change = m_config.backup_at_file_format_change;
 #ifdef __EMSCRIPTEN__
+            // Force the DB to be created in memory-only mode, ignoring the filesystem path supplied in the config.
+            // This is so we can run an SDK on top without having to solve the browser persistence problem yet,
+            // or teach RealmConfig and SDKs about pure in-memory realms.
             m_db = DB::create(std::move(history), options);
 #else
             if (m_config.path.size()) {
@@ -520,6 +523,9 @@ void RealmCoordinator::init_external_helpers()
                 if (self->m_notifier)
                     self->m_notifier->notify_others();
 #else
+                // The Emscripten ExternalCommitHelper is a no-op right now.
+                // While we run in single-threaded WebAssembly we take the short-cut of calling on_change()
+                // directly because we know everything, including Sync, runs on the same thread.
                 self->on_change();
 #endif
             }

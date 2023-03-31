@@ -16,31 +16,31 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "network_transport.hpp"
+#include <realm/object-store/sync/impl/emscripten/network_transport.hpp>
+#include <realm/util/scope_exit.hpp>
 #include <emscripten/fetch.h>
 
 using namespace realm;
-using namespace realm::_impl;
 using namespace realm::app;
 
-namespace {
+namespace realm::_impl {
 struct FetchState {
     std::string request_body;
     util::UniqueFunction<void(const Response&)> completion_block;
 };
 
-std::string_view trim_whitespace(std::string_view str)
+static std::string_view trim_whitespace(std::string_view str)
 {
-    auto p0 = str.data();
-    auto p1 = str.data() + str.size();
-    while (p1 > p0 && std::isspace(*(p1 - 1)))
-        --p1;
-    while (p0 < p1 && std::isspace(*p0))
-        ++p0;
-    return std::string_view(p0, p1 - p0);
+    auto begin = str.begin();
+    auto end = str.end();
+    while (end > begin && std::isspace(end[-1]))
+        --end;
+    while (begin < end && std::isspace(begin[0]))
+        ++begin;
+    return std::string_view(&*begin, end - begin);
 }
 
-HttpHeaders parse_headers(std::string_view raw_headers)
+static HttpHeaders parse_headers(std::string_view raw_headers)
 {
     HttpHeaders ret;
     size_t pos;
@@ -54,24 +54,27 @@ HttpHeaders parse_headers(std::string_view raw_headers)
     return ret;
 }
 
-void success(emscripten_fetch_t* fetch)
+static void success(emscripten_fetch_t* fetch)
 {
+    auto guard = util::make_scope_exit([&]() noexcept {
+        emscripten_fetch_close(fetch);
+    });
     std::unique_ptr<FetchState> state(reinterpret_cast<FetchState*>(fetch->userData));
     std::string packed_headers;
     packed_headers.resize(emscripten_fetch_get_response_headers_length(fetch));
     emscripten_fetch_get_response_headers(fetch, packed_headers.data(), packed_headers.size());
     state->completion_block(
         {fetch->status, 0, parse_headers(packed_headers), std::string(fetch->data, size_t(fetch->numBytes)), {}});
-    emscripten_fetch_close(fetch);
 }
 
-void error(emscripten_fetch_t* fetch)
+static void error(emscripten_fetch_t* fetch)
 {
+    auto guard = util::make_scope_exit([&]() noexcept {
+        emscripten_fetch_close(fetch);
+    });
     std::unique_ptr<FetchState> state(reinterpret_cast<FetchState*>(fetch->userData));
     state->completion_block({0, 0, {}, {}, {}});
-    emscripten_fetch_close(fetch);
 }
-} // namespace
 
 void EmscriptenNetworkTransport::send_request_to_server(
     const Request& request, util::UniqueFunction<void(const Response&)>&& completion_block)
@@ -119,3 +122,4 @@ void EmscriptenNetworkTransport::send_request_to_server(
     attr.userData = state.release();
     emscripten_fetch(&attr, request.url.c_str());
 }
+} // namespace realm::_impl

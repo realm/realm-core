@@ -23,22 +23,25 @@
 
 namespace realm::_impl {
 
-class EmscriptenSocketProvider final : public sync::SyncSocketProvider, private util::EmscriptenScheduler {
+class EmscriptenSocketProvider final : public sync::SyncSocketProvider {
 public:
     EmscriptenSocketProvider();
-    virtual ~EmscriptenSocketProvider() final;
+    ~EmscriptenSocketProvider() final;
 
-    virtual SyncTimer create_timer(std::chrono::milliseconds delay, FunctionHandler&& handler) final;
+    SyncTimer create_timer(std::chrono::milliseconds delay, FunctionHandler&& handler) final;
 
-    virtual void post(FunctionHandler&& handler) final
+    void post(FunctionHandler&& handler) final
     {
-        invoke([handler = std::move(handler)]() {
+        m_scheduler.invoke([handler = std::move(handler)]() {
             handler(Status::OK());
         });
     }
 
-    virtual std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
-                                                              sync::WebSocketEndpoint&& endpoint) final;
+    std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
+                                                      sync::WebSocketEndpoint&& endpoint) final;
+
+private:
+    util::EmscriptenScheduler m_scheduler;
 };
 
 } // namespace realm::_impl

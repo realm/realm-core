@@ -32,7 +32,6 @@
 #include <realm/util/cf_ptr.hpp>
 #include <CoreFoundation/CoreFoundation.h>
 #elif defined(__EMSCRIPTEN__)
-#include <emscripten.h>
 // TODO: implement event loop for Emscripten
 #else
 #error "No EventLoop implementation selected, tests will fail"

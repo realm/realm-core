@@ -16,33 +16,38 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "socket_provider.hpp"
+#include <realm/object-store/sync/impl/emscripten/socket_provider.hpp>
 #include <emscripten/websocket.h>
 
 using namespace realm;
-using namespace realm::_impl;
 using namespace realm::sync;
 
-namespace {
+namespace realm::_impl {
+static inline void check_result(EMSCRIPTEN_RESULT result)
+{
+    REALM_ASSERT(result == EMSCRIPTEN_RESULT_SUCCESS);
+}
+
 struct EmscriptenTimer final : SyncSocketProvider::Timer {
-    using doubleMiliseconds = std::chrono::duration<double, std::chrono::milliseconds::period>;
+    using DoubleMiliseconds = std::chrono::duration<double, std::chrono::milliseconds::period>;
 
 public:
     EmscriptenTimer(std::chrono::milliseconds delay, SyncSocketProvider::FunctionHandler&& handler,
                     util::EmscriptenScheduler& scheduler)
         : m_handler(std::move(handler))
-        , m_timeout(emscripten_set_timeout(timeout_callback, doubleMiliseconds(delay).count(), this))
+        , m_timeout(emscripten_set_timeout(timeout_callback, DoubleMiliseconds(delay).count(), this))
         , m_scheduler(scheduler)
     {
     }
-    virtual ~EmscriptenTimer() final
+    ~EmscriptenTimer() final
     {
         cancel();
     }
-    virtual void cancel() final
+    void cancel() final
     {
-        if (m_timeout && m_handler) {
+        if (m_timeout) {
             emscripten_clear_timeout(*m_timeout);
+            m_timeout.reset();
             m_scheduler.invoke([handler = std::move(m_handler)]() {
                 handler(Status(ErrorCodes::OperationAborted, "Timer canceled"));
             });
@@ -57,8 +62,8 @@ private:
     static void timeout_callback(void* user_data)
     {
         auto timer = reinterpret_cast<EmscriptenTimer*>(user_data);
-        timer->m_timeout = std::nullopt;
-        timer->m_handler(Status::OK());
+        timer->m_timeout.reset();
+        std::exchange(timer->m_handler, {})(Status::OK());
     }
 };
 
@@ -69,29 +74,46 @@ public:
         , m_sentinel(std::make_shared<LivenessSentinel>())
         , m_observer(std::move(observer))
     {
-        emscripten_websocket_set_onopen_callback(m_socket, m_observer.get(), open_callback);
-        emscripten_websocket_set_onmessage_callback(m_socket, m_observer.get(), message_callback);
-        emscripten_websocket_set_onerror_callback(m_socket, m_observer.get(), error_callback);
-        emscripten_websocket_set_onclose_callback(m_socket, m_observer.get(), close_callback);
+        check_result(emscripten_websocket_set_onopen_callback(m_socket, m_observer.get(), open_callback));
+        check_result(emscripten_websocket_set_onmessage_callback(m_socket, m_observer.get(), message_callback));
+        check_result(emscripten_websocket_set_onerror_callback(m_socket, m_observer.get(), error_callback));
+        check_result(emscripten_websocket_set_onclose_callback(m_socket, m_observer.get(), close_callback));
     }
 
-    virtual ~EmscriptenWebSocket() final
+    ~EmscriptenWebSocket() final
     {
-        emscripten_websocket_close(m_socket, 0, nullptr);
-        emscripten_websocket_delete(m_socket);
+        m_sentinel.reset();
+        check_result(emscripten_websocket_close(m_socket, 0, nullptr));
+        check_result(emscripten_websocket_delete(m_socket));
     }
 
-    virtual void async_write_binary(util::Span<const char> data, SyncSocketProvider::FunctionHandler&& handler) final
+    // Adapted from
+    // https://github.com/dotnet/runtime/blob/60b480424d51f42dfd66e09b010297dc041602f2/src/mono/wasm/runtime/web-socket.ts#L187:
+    // The WebSocket.send method doesn't provide a done callback, so we need to guess when the operation is done
+    // by observing the outgoing buffer on the websocket.
+    void async_write_binary(util::Span<const char> data, SyncSocketProvider::FunctionHandler&& handler) final
     {
-        emscripten_websocket_send_binary(m_socket, const_cast<char*>(data.data()), data.size());
+        check_result(emscripten_websocket_send_binary(m_socket, const_cast<char*>(data.data()), data.size()));
 
-        auto weak_handler = [handler = std::move(handler), sentinel = std::weak_ptr(m_sentinel)](Status status) {
-            if (sentinel.lock()) {
-                // only call the real handler if the socket object is still alive
-                handler(status);
-            }
-        };
-        emscripten_set_timeout(sending_poll_check, 0, new PollCheckState{m_socket, std::move(weak_handler)});
+        // If the buffered amount is small enough we can just run the handler right away.
+        unsigned long long buffered_amount;
+        check_result(emscripten_websocket_get_buffered_amount(m_socket, &buffered_amount));
+        constexpr unsigned long long blocking_send_threshold = 65536;
+        if (buffered_amount < blocking_send_threshold) {
+            handler(Status::OK());
+        }
+        // Otherwise we start polling the buffer in a recursive timeout (see sending_poll_check below).
+        else {
+            emscripten_set_timeout(
+                sending_poll_check, 0,
+                new PollCheckState{
+                    m_socket, [handler = std::move(handler), sentinel = std::weak_ptr(m_sentinel)](Status status) {
+                        if (sentinel.lock()) {
+                            // only call the real handler if the socket object is still alive
+                            handler(status);
+                        }
+                    }});
+        }
     }
 
 private:
@@ -107,22 +129,18 @@ private:
     static void sending_poll_check(void* user_data)
     {
         std::unique_ptr<PollCheckState> state(reinterpret_cast<PollCheckState*>(user_data));
-        unsigned long long buffered_amount;
-        emscripten_websocket_get_buffered_amount(state->socket, &buffered_amount);
 
-        constexpr unsigned long long blocking_send_threshold = 65536;
-        if (buffered_amount < blocking_send_threshold) {
+        unsigned long long buffered_amount;
+        check_result(emscripten_websocket_get_buffered_amount(state->socket, &buffered_amount));
+        if (buffered_amount == 0) {
             state->handler(Status::OK());
             return;
         }
 
         unsigned short ready_state;
-        emscripten_websocket_get_ready_state(state->socket, &ready_state);
-        if (buffered_amount == 0) {
-            state->handler(Status::OK());
-        }
-        else if (ready_state != 1 /* OPEN */) {
-            // TODO: should we communicate this down the stack?
+        check_result(emscripten_websocket_get_ready_state(state->socket, &ready_state));
+        if (ready_state != 1 /* OPEN */) {
+            // TODO: what's the right error code for websocket was closed while sending?
         }
         else {
             auto delay = state->next_delay;
@@ -135,10 +153,10 @@ private:
     {
         auto observer = reinterpret_cast<WebSocketObserver*>(user_data);
         int length;
-        emscripten_websocket_get_protocol_length(event->socket, &length);
+        check_result(emscripten_websocket_get_protocol_length(event->socket, &length));
         std::string protocol;
         protocol.resize(length - 1);
-        emscripten_websocket_get_protocol(event->socket, protocol.data(), length);
+        check_result(emscripten_websocket_get_protocol(event->socket, protocol.data(), length));
         observer->websocket_connected_handler(protocol);
         return EM_TRUE;
     }
@@ -172,35 +190,29 @@ private:
     std::shared_ptr<LivenessSentinel> m_sentinel;
     std::unique_ptr<WebSocketObserver> m_observer;
 };
-} // namespace
 
-EmscriptenSocketProvider::EmscriptenSocketProvider()
-    : SyncSocketProvider()
-    , EmscriptenScheduler()
-{
-}
+EmscriptenSocketProvider::EmscriptenSocketProvider() = default;
 
 EmscriptenSocketProvider::~EmscriptenSocketProvider() = default;
 
 SyncSocketProvider::SyncTimer EmscriptenSocketProvider::create_timer(std::chrono::milliseconds delay,
                                                                      FunctionHandler&& handler)
 {
-    util::EmscriptenScheduler& scheduler = *this;
-    return std::make_unique<EmscriptenTimer>(delay, std::move(handler), scheduler);
+    return std::make_unique<EmscriptenTimer>(delay, std::move(handler), m_scheduler);
 }
 
 std::unique_ptr<WebSocketInterface> EmscriptenSocketProvider::connect(std::unique_ptr<WebSocketObserver> observer,
                                                                       WebSocketEndpoint&& endpoint)
 {
-    // Convert the list of protocols to a string
-    std::ostringstream protocol_list;
-    protocol_list.exceptions(std::ios_base::failbit | std::ios_base::badbit);
-    protocol_list.imbue(std::locale::classic());
-    if (endpoint.protocols.size() > 1)
-        std::copy(endpoint.protocols.begin(), endpoint.protocols.end() - 1,
-                  std::ostream_iterator<std::string>(protocol_list, ","));
-    protocol_list << endpoint.protocols.back();
-    std::string protocols = protocol_list.str();
+    std::string protocols;
+    for (size_t i = 0; i < endpoint.protocols.size(); i++) {
+        if (i > 0)
+            protocols += ",";
+        protocols += endpoint.protocols[i];
+    }
+
+    // The `/` delimiter character is not allowed in the protocol list. Replace it with #.
+    // TODO: Remove once RCORE-1427 is resolved.
     for (size_t i = 0; i < protocols.size(); i++) {
         if (protocols[i] == '/')
             protocols[i] = '#';
@@ -213,7 +225,9 @@ std::unique_ptr<WebSocketInterface> EmscriptenSocketProvider::connect(std::uniqu
     emscripten_websocket_init_create_attributes(&attr);
     attr.protocols = protocols.c_str();
     attr.url = url.c_str();
+    attr.createOnMainThread = EM_FALSE;
     int result = emscripten_websocket_new(&attr);
     REALM_ASSERT(result > 0);
     return std::make_unique<EmscriptenWebSocket>(result, std::move(observer));
 }
+} // namespace realm::_impl
