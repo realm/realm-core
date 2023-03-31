@@ -150,7 +150,7 @@ TEST(Protocol_Codec_Upload)
         out.reset();
         auto upload_message_builder = protocol.make_upload_message_builder(); // Throws
         // Create a changeset that exceeds the compression threshold (1024 bytes)
-        std::string data1 = std::string("A", 512) + std::string("B", 512) + std::string("C", 512);
+        std::string data1 = std::string(512, 'A') + std::string(512, 'B') + std::string(512, 'C');
         std::string data2 = std::string(util::format("4 2 259609999999 123999 %1 ", data1.length())) + data1;
 
         std::vector<char> expected_data;
