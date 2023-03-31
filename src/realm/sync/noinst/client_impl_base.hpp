@@ -741,7 +741,7 @@ public:
     /// or after initiation of deactivation.
     void request_download_completion_notification();
 
-    /// \brief Gets or creates the subscription store associated with this Session.
+    /// \brief Gets the subscription store associated with this Session.
     SubscriptionStore* get_flx_subscription_store();
 
     /// Update internal client state when a flx subscription becomes complete outside
