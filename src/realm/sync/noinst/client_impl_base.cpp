@@ -1946,7 +1946,6 @@ void Session::send_bind_message()
     REALM_ASSERT(m_state == Active);
 
     session_ident_type session_ident = m_ident;
-    const std::string& path = get_virt_path();
     bool need_client_file_ident = !have_client_file_ident();
     const bool is_subserver = false;
 
@@ -1956,7 +1955,22 @@ void Session::send_bind_message()
     OutputBuffer& out = m_conn.get_output_buffer();
     // Discard the token since it's ignored by the server.
     std::string empty_access_token{};
-    protocol.make_bind_message(protocol_version, out, session_ident, path, empty_access_token, need_client_file_ident,
+    std::string path_data;
+    if (m_is_flx_sync_session) {
+        nlohmann::json bind_json_data;
+        if (protocol_version >= 8) {
+            if (auto migrated_partition = get_migrated_partition(); migrated_partition) {
+                bind_json_data["partitionKey"] = *migrated_partition;
+            }
+        }
+        if (!bind_json_data.empty()) {
+            path_data = bind_json_data.dump();
+        }
+    }
+    else {
+        path_data = get_virt_path();
+    }
+    protocol.make_bind_message(out, session_ident, path_data, empty_access_token, need_client_file_ident,
                                is_subserver); // Throws
     m_conn.initiate_write_message(out, this); // Throws
 

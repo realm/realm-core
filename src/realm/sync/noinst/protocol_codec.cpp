@@ -9,18 +9,15 @@ using OutputBuffer = util::ResettableExpandableBufferOutputStream;
 
 // Client protocol
 
-void ClientProtocol::make_bind_message(int protocol_version, OutputBuffer& out, session_ident_type session_ident,
-                                       const std::string& server_path, const std::string& signed_user_token,
+void ClientProtocol::make_bind_message(OutputBuffer& out, session_ident_type session_ident,
+                                       const std::string& path_data, const std::string& signed_user_token,
                                        bool need_client_file_ident, bool is_subserver)
 {
-    static_cast<void>(protocol_version);
-    out << "bind " << session_ident << " " << server_path.size() << " " << signed_user_token.size() << " "
-        << int(need_client_file_ident); // Throws
-    out << " " << int(is_subserver);    // Throws
-    out << "\n";                        // Throws
+    out << "bind " << session_ident << " " << path_data.size() << " " << signed_user_token.size() << " "
+        << int(need_client_file_ident) << " " << int(is_subserver) << "\n"; // Throws
     REALM_ASSERT(!out.fail());
 
-    out.write(server_path.data(), server_path.size());             // Throws
+    out.write(path_data.data(), path_data.size());                 // Throws
     out.write(signed_user_token.data(), signed_user_token.size()); // Throws
 }
 

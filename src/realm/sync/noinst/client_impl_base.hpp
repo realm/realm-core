@@ -932,6 +932,9 @@ private:
     void begin_resumption_delay(const ProtocolErrorInfo& error_info);
     void clear_resumption_delay_state();
 
+    /// Get the original PBS partition value from before the migration or empty if not migrated
+    const std::optional<std::string>& get_migrated_partition() const;
+
 private:
     Connection& m_conn;
     const session_ident_type m_ident;

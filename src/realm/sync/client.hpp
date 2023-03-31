@@ -333,6 +333,10 @@ public:
         /// changeset data in a single integration attempt.
         size_t flx_bootstrap_batch_size_bytes = 1024 * 1024;
 
+        /// Contains the original PBS partition value from before the migration -
+        /// empty if not migrated
+        std::optional<std::string_view> migrated_partition;
+
         /// Set to true to cause the integration of the first received changeset
         /// (in a DOWNLOAD message) to fail.
         ///

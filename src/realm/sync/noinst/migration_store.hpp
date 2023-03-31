@@ -52,15 +52,15 @@ public:
     std::shared_ptr<realm::SyncConfig> convert_sync_config(std::shared_ptr<realm::SyncConfig> config);
 
     // Called when the server responds with migrate to FLX and stores the FLX
-    // subscription RQL query string
+    // subscription RQL query string and original PBS partition values
     void migrate_to_flx(std::string_view rql_query_string);
 
     // Clear the migrated state
     void cancel_migration();
 
     bool is_migrated();
-
-    std::string_view get_query_string();
+    std::optional<std::string_view> get_migrated_partition();
+    std::optional<std::string_view> get_query_string();
 
     // Generate a new subscription that can be added to the subscription store using
     // the query string returned from the server and a name that begins with "flx_migrated_"
@@ -84,12 +84,15 @@ protected:
     ColKey m_migration_completed_at;
     ColKey m_migration_state;
     ColKey m_migration_query_str;
+    ColKey m_migration_partition;
 
     std::mutex m_mutex;
     // Current migration state
     MigrationState m_state;
     // RQL query string received from the server
     std::string m_query_string;
+    // The original PBS partition string before the migration
+    std::string m_migrated_partition;
 };
 
 } // namespace realm::sync

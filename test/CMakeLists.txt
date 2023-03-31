@@ -185,6 +185,7 @@ if(REALM_ENABLE_SYNC)
         test_sync.cpp
         test_sync_auth.cpp
         test_sync_history_migration.cpp
+        test_sync_protocol_codec.cpp
         test_sync_subscriptions.cpp
         test_sync_pending_bootstraps.cpp
         test_transform.cpp

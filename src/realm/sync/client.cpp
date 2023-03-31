@@ -184,6 +184,9 @@ public:
     SubscriptionStore* get_flx_subscription_store();
     PendingBootstrapStore* get_flx_pending_bootstrap_store();
 
+    /// Get the original PBS partition value from before the migration or empty if not migrated
+    const std::optional<std::string>& get_migrated_partition() const;
+
     void set_sync_transact_handler(util::UniqueFunction<SyncTransactCallback>);
     void set_progress_handler(util::UniqueFunction<ProgressHandler>);
     void set_connection_state_change_listener(util::UniqueFunction<ConnectionStateChangeListener>);
@@ -232,6 +235,7 @@ private:
     const Optional<std::string> m_ssl_trust_certificate_path;
     const std::function<SyncConfig::SSLVerifyCallback> m_ssl_verify_callback;
     const size_t m_flx_bootstrap_batch_size_bytes;
+    const std::optional<std::string> m_migrated_partition;
 
     // This one is different from null when, and only when the session wrapper
     // is in ClientImpl::m_abandoned_session_wrappers.
@@ -950,6 +954,11 @@ void SessionImpl::non_sync_flx_completion(int64_t version)
     m_wrapper.on_flx_sync_version_complete(version);
 }
 
+const std::optional<std::string>& SessionImpl::get_migrated_partition() const
+{
+    return m_wrapper.get_migrated_partition();
+}
+
 SyncClientHookAction SessionImpl::call_debug_hook(const SyncClientHookData& data)
 {
     // Make sure we don't call the debug hook recursively.
@@ -1079,6 +1088,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_ssl_trust_certificate_path{std::move(config.ssl_trust_certificate_path)}
     , m_ssl_verify_callback{std::move(config.ssl_verify_callback)}
     , m_flx_bootstrap_batch_size_bytes(config.flx_bootstrap_batch_size_bytes)
+    , m_migrated_partition(config.migrated_partition)
     , m_http_request_path_prefix{std::move(config.service_identifier)}
     , m_virt_path{std::move(config.realm_identifier)}
     , m_signed_access_token{std::move(config.signed_user_token)}
@@ -1212,6 +1222,11 @@ SubscriptionStore* SessionWrapper::get_flx_subscription_store()
 PendingBootstrapStore* SessionWrapper::get_flx_pending_bootstrap_store()
 {
     return m_flx_pending_bootstrap_store.get();
+}
+
+const std::optional<std::string>& SessionWrapper::get_migrated_partition() const
+{
+    return m_migrated_partition;
 }
 
 inline void SessionWrapper::set_sync_transact_handler(util::UniqueFunction<SyncTransactCallback> handler)
