@@ -109,15 +109,16 @@ struct std::hash<chunk> {
 };
 
 struct encoding_entry {
-    uint32_t expansion;
+    uint16_t exp_a;
+    uint16_t exp_b;
     uint16_t symbol = 0; // unused symbol 0.
 };
 
-int hash(uint32_t expansion)
+int hash(uint16_t a, uint16_t b)
 {
     // range of return value must match size of encoding table
-    uint32_t tmp = (expansion >> 16) + 3;
-    tmp *= expansion + 7;
+    uint32_t tmp = a + 3;
+    tmp *= b + 7;
     return (tmp ^ (tmp >> 16)) & 0xFFFF;
 }
 
@@ -126,8 +127,9 @@ public:
     std::vector<std::vector<uint16_t>> symbols;
     std::unordered_map<std::vector<uint16_t>, int> symbol_map;
     std::vector<encoding_entry> encoding_table;
-    std::vector<uint32_t> decoding_table;
+    std::vector<encoding_entry> decoding_table;
     bool separators[256];
+    uint16_t symbol_buffer[8192];
     string_compressor()
     {
         encoding_table.resize(65536);
@@ -147,24 +149,28 @@ public:
     }
     int compress_symbols(uint16_t symbols[], int size, int max_runs, int breakout_limit = 1)
     {
+        bool table_full = decoding_table.size() >= 65536 - 256;
+        // std::cout << "Input: ";
+        // for (int i = 0; i < size; ++i)
+        //     std::cout << symbols[i] << " ";
+        // std::cout << std::endl;
         for (int runs = 0; runs < max_runs; ++runs) {
             uint16_t* to = symbols;
             int p;
-            bool table_full = decoding_table.size() >= 65536 - 256;
             uint16_t* from = symbols;
             for (p = 0; p < size - 1;) {
-                from = symbols + p;
-                uint32_t pair = (from[0] << 16) | from[1];
-                auto index = hash(pair);
+                uint16_t a = from[0];
+                uint16_t b = from[1];
+                auto index = hash(a, b);
                 auto& e = encoding_table[index];
-                if (e.symbol && e.expansion == pair) {
+                if (e.symbol && e.exp_a == a && e.exp_b == b) {
                     // existing matching entry -> compress
                     *to++ = e.symbol;
                     p += 2;
                 }
                 else if (e.symbol || table_full) {
                     // existing conflicting entry or at capacity -> don't compress
-                    *to++ = from[0];
+                    *to++ = a;
                     p++;
                     // trying to stay aligned yields slightly worse results, so disable for now:
                     // *to++ = from[1];
@@ -173,17 +179,26 @@ public:
                 else {
                     // no matching entry yet, create new one -> compress
                     e.symbol = decoding_table.size() + 256;
-                    decoding_table.push_back(pair);
+                    e.exp_a = a;
+                    e.exp_b = b;
+                    // std::cout << "             new symbol " << e.symbol << " -> " << e.exp_a << " " << e.exp_b
+                    //           << std::endl;
+                    decoding_table.push_back({a, b, e.symbol});
                     table_full = decoding_table.size() >= 65536 - 256;
-                    e.expansion = pair;
                     *to++ = e.symbol;
                     p += 2;
                 }
+                from = symbols + p;
             }
+            // potentially move last unpaired symbol over
             if (p < size) {
-                *to++ = *from;
+                *to++ = *from++; // need to increment for early out check below
             }
             size = to - symbols;
+            // std::cout << " -- Round " << runs << " -> ";
+            // for (int i = 0; i < size; ++i)
+            //     std::cout << symbols[i] << " ";
+            // std::cout << std::endl;
             if (size <= breakout_limit)
                 break; // early out, gonna use at least one chunk anyway
             if (from == to)
@@ -201,9 +216,9 @@ public:
             if (symbol < 256)
                 *to++ = symbol;
             else {
-                auto expansion = decoding_table[symbol - 256];
-                recurse(expansion >> 16, recurse);
-                recurse(expansion & 0x0FFFF, recurse);
+                auto& e = decoding_table[symbol - 256];
+                recurse(e.exp_a, recurse);
+                recurse(e.exp_b, recurse);
             }
         };
 
@@ -217,7 +232,7 @@ public:
         size = to - decompressed;
         // std::cout << "reverse -> ";
         // for (int i = 0; i < size; ++i) {
-        //    std::cout << decompressed[i] << " ";
+        //     std::cout << decompressed[i] << " ";
         // }
         // std::cout << std::endl;
         assert(size == past - first);
@@ -243,18 +258,18 @@ public:
                 *to++ = *p++ & 0xFF;
             int group_size = to - group_start;
             // compress the group
-            group_size = compress_symbols(group_start, group_size, 1);
+            group_size = compress_symbols(group_start, group_size, 2);
             to = group_start + group_size;
             out_size += group_size;
         }
         // compress all groups together
-        size = compress_symbols(symbols, out_size, 4, 8);
+        // size = out_size;
+        size = compress_symbols(symbols, out_size, 2, 4);
         compressed_symbols += size;
         return size;
     }
     int handle(const char* _first, const char* _past)
     {
-        uint16_t symbol_buffer[8192];
         auto size = compress(symbol_buffer, _first, _past);
         // decompress_and_verify(symbol_buffer, size, _first, _past);
 
@@ -272,34 +287,6 @@ public:
         else {
             return it->second;
         }
-
-#if 0
-        uint16_t* first = symbols;
-        uint16_t* past = symbols + size;
-        uint16_t* last = first + CHUNK_SIZE;
-        int prefix = -1;
-        chunk c;
-        while (first < past) {
-            if (last >= past) {
-                last = past;
-                memset(c.symbols, 0, 2 * CHUNK_SIZE);
-            }
-            memcpy(c.symbols, first, 2 * (last - first));
-            c.prefix_index = prefix;
-            auto it = map.find(c);
-            if (it == map.end()) {
-                prefix = chunks.size();
-                map[c] = prefix;
-                chunks.push_back(c);
-            }
-            else {
-                prefix = it->second;
-            }
-            first += CHUNK_SIZE;
-            last += CHUNK_SIZE;
-        }
-        return prefix;
-#endif
     }
     int symbol_table_size()
     {
@@ -312,26 +299,48 @@ public:
     int64_t unique_symbol_size = 0;
 };
 
-int signed_bits_needed(int64_t val)
-{
-    if (val < 0)
-        val = -val;
-    if (val < 8) {
-        if (val < 2)
-            return val;
-        return 4;
-    }
-    if (val < 128)
-        return 8;
-    if (val < 32768)
-        return 16;
-    if (val >> 31)
-        return 64;
-    return 32;
-}
+// controls
+#define USE_UNALIGNED 1
+#define USE_INTERPOLATION 0
+#define USE_LOCAL_DIR 1
+#define USE_SPARSE 1
+#define USE_BASE_OFFSET 0
+#define USE_EMPTY_IMPROVEMENT 1
 
 int unsigned_bits_needed(uint64_t val)
 {
+#if USE_UNALIGNED
+    /* This is with unaligned accesses */
+    if (val >> 48)
+        return 64;
+    if (val >> 32)
+        return 48;
+    if (val >> 24)
+        return 32;
+    if (val >> 16)
+        return 24;
+    if (val >> 12)
+        return 16;
+    if (val >> 8)
+        return 12;
+    if (val >> 6)
+        return 8;
+    if (val >> 5)
+        return 6;
+    if (val >> 4)
+        return 5;
+    if (val >> 3)
+        return 4;
+    if (val >> 2)
+        return 3;
+    if (val >> 1)
+        return 2;
+    if (val)
+        return 1;
+    return 0;
+#else
+    // This is with our current aligned accesses
+
     if (val < 16) {
         if (val < 2)
             return val;
@@ -344,19 +353,39 @@ int unsigned_bits_needed(uint64_t val)
     if (val >> 32)
         return 64;
     return 32;
+
+#endif
 }
 
-enum EncType { Array = 0, Empty = 1, Sprse = 2, Indir = 3, Offst = 4 };
+int signed_bits_needed(int64_t val)
+{
+    // make sure we have room for negation and shift
+    if (val & 0xFF00000000000000ULL)
+        return 64;
+    if (val < 0)
+        return unsigned_bits_needed((-val) << 1);
+    return unsigned_bits_needed(val << 1);
+}
 
-std::string EncName[] = {"array", "empty", "sparse", "indir", "offst"};
+int align(int alignment, int size)
+{
+    int mask = alignment - 1;
+    int unaligned = size & mask;
+    if (unaligned)
+        size += alignment - unaligned;
+    return size;
+}
+enum EncType { Array = 0, Empty = 1, Sprse = 2, Indir = 3, Linear = 4, Offst = 5 };
+
+std::string EncName[] = {"array", "empty", "sparse", "indir", "lnreg", "offst"};
 
 struct leaf_compression_analyzer {
-    constexpr static int leaf_size = 200;
+    constexpr static int leaf_size = 100;
     int64_t values[leaf_size];
     std::unordered_map<int64_t, int> unique_values;
     int entry_count = 0;
     uint64_t total_bytes = 0;
-    uint64_t type_counts[5] = {0, 0, 0, 0, 0};
+    uint64_t type_counts[6] = {0, 0, 0, 0, 0, 0};
 
     void note_value(int64_t value)
     {
@@ -395,7 +424,6 @@ struct leaf_compression_analyzer {
         }
         auto range = max_value - min_value;
         int num_unique_values = unique_values.size();
-        int unique_non_default_values = num_unique_values - 1;
         int non_default_values = 0;
         for (int k = 0; k < entry_count; k++) {
             if (values[k] != default_value)
@@ -403,47 +431,91 @@ struct leaf_compression_analyzer {
         }
         // now we can estimate the cost of different layouts:
         // starting point is our current encoding:
+        // assuming a large db we include 8 bytes for the ref pointing to the data array
         int leaf_cost = 8 + 8 + (bits_per_value * entry_count + 7) / 8;
+        leaf_cost = align(8, leaf_cost);
         EncType enc_type = EncType::Array;
 
         // with special case where everything is 0, encoded as ref == 0
+
         if (default_value == 0 && non_default_values == 0) {
-            leaf_cost = 8;
+            leaf_cost = 8 + (USE_EMPTY_IMPROVEMENT ? 0 : 8);
             enc_type = EncType::Empty;
             // std::cout << "Empty      " << leaf_cost << " bytes" << std::endl;
         }
-        // next evaluate a sparse encoding, only feasible with few values (8)
-        /*
-        if (non_default_values < 8) {
+
+#if USE_SPARSE
+        // next evaluate a sparse encoding with actual entries marked in a bit mask
+        {
             int alt_leaf_cost = 8 + 16 + (bits_per_value * (non_default_values + (default_value ? 1 : 0) + 7) / 8);
             // std::cout << "Sparse     " << leaf_cost << " bytes" << std::endl;
+            alt_leaf_cost = align(8, alt_leaf_cost);
             if (alt_leaf_cost < leaf_cost) {
                 leaf_cost = alt_leaf_cost;
                 enc_type = EncType::Sprse;
             }
         }
-        */
+#endif
+#if USE_LOCAL_DIR
         // with few unique values, use a local dict and let each entry be an index into it
-        if (num_unique_values <= 16) {
+        // experiments suggests a win for surprisingly high number of different values
+        if (num_unique_values <= 3 * entry_count / 4) {
             // local dict cost:
             int alt_leaf_cost = 8 + 16 + (bits_per_value * num_unique_values + 7) / 8;
             // array of indirections cost:
-            alt_leaf_cost += (entry_count * unsigned_bits_needed(num_unique_values - 1)) / 8;
+            alt_leaf_cost += (entry_count * unsigned_bits_needed(num_unique_values - 1) + 7) / 8;
             // std::cout << "Local dict " << leaf_cost << " bytes" << std::endl;
+            alt_leaf_cost = align(8, alt_leaf_cost);
             if (alt_leaf_cost < leaf_cost) {
                 leaf_cost = alt_leaf_cost;
                 enc_type = EncType::Indir;
             }
         }
+#endif
+#if USE_BASE_OFFSET
         // if we have many values but within a narrow band, try base+offset encoding
+        // This is wrong:
+        /*
         if (unsigned_bits_needed(range) < bits_per_value) {
             auto range_bits = unsigned_bits_needed(range);
-            auto alt_leaf_cost = 8 + 16 + (signed_bits_needed(min_value + range / 2) + entry_count * range_bits) / 8;
+            auto alt_leaf_cost =
+                8 + 16 + (signed_bits_needed(min_value + range / 2) + 7) / 8 + (entry_count * range_bits + 7) / 8;
+            alt_leaf_cost = align(8, alt_leaf_cost);
             if (alt_leaf_cost < leaf_cost) {
                 leaf_cost = alt_leaf_cost;
                 enc_type = EncType::Offst;
             }
         }
+        */
+#endif
+#if USE_INTERPOLATION
+        // determine cost of storing offsets from simple linear interpolation
+        if (entry_count) {
+            double ratio = double(values[entry_count - 1] - values[0]) / entry_count;
+            // to work for large values, we need to represent estimate as sum of integer and double
+            double adjustment = 0.0;
+            int64_t base = values[0];
+            max_value = std::numeric_limits<int64_t>::min();
+            min_value = std::numeric_limits<int64_t>::max();
+            for (int j = 0; j < entry_count; ++j) {
+                auto observation = values[j];
+                int64_t offset = observation - base - adjustment;
+                if (offset > max_value)
+                    max_value = offset;
+                if (offset < min_value)
+                    min_value = offset;
+            }
+            auto range = max_value - min_value;
+            // header: div flags + base (int64_t) + ratio (double)
+            auto alt_leaf_cost = 8 + 24 + (entry_count * unsigned_bits_needed(range) + 7) / 8;
+            alt_leaf_cost = align(8, alt_leaf_cost);
+            if (alt_leaf_cost < leaf_cost) {
+                leaf_cost = alt_leaf_cost;
+                enc_type = EncType::Linear;
+            }
+            adjustment += ratio;
+        }
+#endif
         type_counts[enc_type]++;
         total_bytes += leaf_cost;
         unique_values.clear();
@@ -613,7 +685,7 @@ int main(int argc, char* argv[])
     void* file_start = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
     assert(file_start != (void*)-1);
     long step_size = 5000000;
-    int num_work_packages = 6;
+    int num_work_packages = 12;
     concurrent_queue<results*> to_reader;
     for (int i = 0; i < num_work_packages; ++i)
         to_reader.put(new results(step_size, max_fields));
@@ -758,6 +830,7 @@ int main(int argc, char* argv[])
                     auto& driver = drivers->drivers[j];
                     driver->set_compressor(compressors[j].get());
                     driver->set_leaf_analyzer(&leaf_analyzers[j]);
+                    // driver->perform();
                     threads.push_back(std::make_unique<std::thread>([&]() { driver->perform(); }));
                 }
             }
@@ -839,6 +912,7 @@ int main(int argc, char* argv[])
         uint64_t symbol_size = 0;
         uint64_t ref_size = 0;
         uint64_t compressed_size = 0;
+        uint64_t dict_entries = 0;
         std::cout << "String compression results:" << std::endl;
         for (int i = 0; i < max_fields; ++i) {
             if (compressors[i]) {
@@ -859,6 +933,7 @@ int main(int argc, char* argv[])
                           << col_dict_size << " bytes" << std::endl;
                 compressors[i].reset();
                 dict_size += col_dict_size;
+                dict_entries += col_dict_entries;
                 symbol_size += col_symbol_size;
                 from_size += col_from_size;
                 compressed_size += col_compressed * 2;
@@ -880,11 +955,21 @@ int main(int argc, char* argv[])
             }
             std::cout << ")" << std::endl;
         }
-        std::cout << "Total effect: from " << from_size << " to " << compressed_size << " bytes of symbols + "
-                  << symbol_size << " for symbol table. \tTotal leaf size " << ref_size << " (refs) + " << dict_size
-                  << " (dict)  =  ";
-        auto total = ref_size + dict_size + symbol_size;
-        std::cout << total << " or " << (total * 100) / from_size << " %" << std::endl;
+        uint64_t cluster_tree_overhead = 4 * num_line;
+        std::cout << std::endl
+                  << std::right << "Summary:" << std::endl
+                  << " - Read file with size: " << std::setw(11) << size << " bytes. Encoding:" << std::endl
+                  << " - String compression:  " << std::setw(11) << from_size << " -> " << std::setw(11)
+                  << compressed_size << " bytes of symbols + " << std::setw(11) << symbol_size
+                  << " for symbol tables." << std::endl
+                  << " - String interning:    " << std::setw(11) << compressed_size << " -> " << std::setw(11)
+                  << dict_size << " bytes for dictionaries with " << dict_entries << " unique values" << std::endl
+                  << " - Leaf size:           " << std::setw(11) << ref_size << std::endl
+                  << " - ClusterTree overhead:" << std::setw(11) << cluster_tree_overhead << std::endl
+                  << "------------------------" << std::endl;
+        auto total = ref_size + dict_size + symbol_size + cluster_tree_overhead;
+        std::cout << "Size estimate: " << std::right << std::setw(11) << total << "   (data compressed to "
+                  << 1000 * total / size << " pml of original size)" << std::endl;
 
         compressors.clear();
         for (int i = 0; i < num_work_packages; ++i)
