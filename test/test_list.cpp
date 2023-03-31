@@ -33,8 +33,8 @@ using namespace std::chrono;
 #include "test.hpp"
 #include "test_types_helper.hpp"
 
-//#include <valgrind/callgrind.h>
-//#define PERFORMACE_TESTING
+// #include <valgrind/callgrind.h>
+// #define PERFORMACE_TESTING
 
 using namespace realm;
 using namespace realm::util;
