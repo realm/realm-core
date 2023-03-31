@@ -14,6 +14,20 @@ namespace realm {
 template <class L>
 struct CollectionIterator;
 
+class Collection {
+public:
+    virtual ~Collection();
+    /// The size of the collection.
+    virtual size_t size() const = 0;
+    /// True if `size()` returns 0.
+    bool is_empty() const
+    {
+        return size() == 0;
+    }
+};
+
+using CollectionPtr = std::shared_ptr<Collection>;
+
 /// Base class for all collection accessors.
 ///
 /// Collections are bound to particular properties of an object. In a
@@ -21,13 +35,8 @@ struct CollectionIterator;
 /// object consistent with the persisted state, mindful of the fact that the
 /// state may have changed as a consquence of modifications from other instances
 /// referencing the same persisted state.
-class CollectionBase {
+class CollectionBase : public Collection {
 public:
-    virtual ~CollectionBase() {}
-
-    /// The size of the collection.
-    virtual size_t size() const = 0;
-
     /// True if the element at @a ndx is NULL.
     virtual bool is_null(size_t ndx) const = 0;
 
@@ -69,12 +78,6 @@ public:
 
     // Return index of the first occurrence of 'value'
     virtual size_t find_any(Mixed value) const = 0;
-
-    /// True if `size()` returns 0.
-    virtual bool is_empty() const final
-    {
-        return size() == 0;
-    }
 
     /// Get the object that owns this collection.
     virtual const Obj& get_obj() const noexcept = 0;

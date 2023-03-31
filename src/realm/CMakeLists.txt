@@ -24,6 +24,7 @@ set(REALM_SOURCES
     chunked_binary.cpp
     cluster.cpp
     collection.cpp
+    collection_list.cpp
     collection_parent.cpp
     cluster_tree.cpp
     error_codes.cpp
@@ -139,6 +140,7 @@ set(REALM_INSTALL_HEADERS
     cluster.hpp
     cluster_tree.hpp
     collection.hpp
+    collection_list.hpp
     collection_parent.hpp
     column_binary.hpp
     column_fwd.hpp

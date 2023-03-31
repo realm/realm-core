@@ -2,8 +2,9 @@
 #include <realm/bplustree.hpp>
 #include <realm/array_key.hpp>
 
-namespace realm::_impl {
+namespace realm {
 
+namespace _impl {
 size_t virtual2real(const std::vector<size_t>& vec, size_t ndx) noexcept
 {
     for (auto i : vec) {
@@ -86,4 +87,8 @@ void check_for_last_unresolved(BPlusTree<ObjKey>* tree)
     }
 }
 
-} // namespace realm::_impl
+} // namespace _impl
+
+Collection::~Collection() {}
+
+} // namespace realm

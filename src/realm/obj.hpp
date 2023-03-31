@@ -22,6 +22,8 @@
 #include <realm/node.hpp>
 #include <realm/collection_parent.hpp>
 #include <realm/mixed.hpp>
+#include "realm/column_type_traits.hpp"
+
 #include <map>
 
 #define REALM_CLUSTER_IF
@@ -49,9 +51,6 @@ class LnkLst;
 using LnkLstPtr = std::unique_ptr<LnkLst>;
 class LnkSet;
 using LnkSetPtr = std::unique_ptr<LnkSet>;
-
-class CollectionList;
-class DictionaryLinkValues;
 
 namespace _impl {
 class DeepChangeChecker;
@@ -269,6 +268,12 @@ public:
     Lst<U> get_list(ColKey col_key) const;
     template <typename U>
     LstPtr<U> get_list_ptr(ColKey col_key) const;
+    template <typename U>
+    std::shared_ptr<Lst<U>> get_list_ptr(const std::vector<CollectionParent::Index>& path) const
+    {
+        REALM_ASSERT(mpark::get<ColKey>(path[0]).get_type() == ColumnTypeTraits<U>::column_id);
+        return std::dynamic_pointer_cast<Lst<U>>(get_collection_ptr(path));
+    }
 
     template <typename U>
     Lst<U> get_list(StringData col_name) const
@@ -296,17 +301,29 @@ public:
     Set<U> get_set(ColKey col_key) const;
     template <typename U>
     SetPtr<U> get_set_ptr(ColKey col_key) const;
+    template <typename U>
+    std::shared_ptr<Set<U>> get_set_ptr(const std::vector<CollectionParent::Index>& path) const
+    {
+        REALM_ASSERT(mpark::get<ColKey>(path[0]).get_type() == ColumnTypeTraits<U>::column_id);
+        return std::dynamic_pointer_cast<Set<U>>(get_collection_ptr(path));
+    }
     LnkSet get_linkset(ColKey col_key) const;
     LnkSet get_linkset(StringData col_name) const;
     LnkSetPtr get_linkset_ptr(ColKey col_key) const;
     SetBasePtr get_setbase_ptr(ColKey col_key) const;
     Dictionary get_dictionary(ColKey col_key) const;
     DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
+    std::shared_ptr<Dictionary> get_dictionary_ptr(const std::vector<CollectionParent::Index>& path) const;
     Dictionary get_dictionary(StringData col_name) const;
 
     CollectionBasePtr get_collection_ptr(ColKey col_key) const;
     CollectionBasePtr get_collection_ptr(StringData col_name) const;
     LinkCollectionPtr get_linkcollection_ptr(ColKey col_key) const;
+
+    // Get a collection to hold other collections
+    CollectionListPtr get_collection_list(ColKey col_key) const;
+
+    CollectionPtr get_collection_ptr(const std::vector<CollectionParent::Index>&) const;
 
     void assign_pk_and_backlinks(const Obj& other);
 
@@ -323,8 +340,6 @@ private:
     friend class ColumnListBase;
     friend class CollectionBase;
     friend class TableView;
-    template <class, class>
-    friend class Collection;
     template <class, class>
     friend class CollectionBaseImpl;
     template <class>

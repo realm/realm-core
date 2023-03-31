@@ -62,6 +62,7 @@ let notSyncServerSources: [String] = [
     "realm/cluster.cpp",
     "realm/cluster_tree.cpp",
     "realm/collection.cpp",
+    "realm/collection_list.cpp",
     "realm/collection_parent.cpp",
     "realm/column_binary.cpp",
     "realm/db.cpp",

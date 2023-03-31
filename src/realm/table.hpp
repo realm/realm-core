@@ -61,6 +61,7 @@ struct GlobalKey;
 class LinkChain;
 class Subexpr;
 class StringIndex;
+class DictionaryLinkValues;
 
 struct Link {
 };
@@ -164,19 +165,59 @@ public:
     ///
     static const size_t max_column_name_length = 63;
     static const uint64_t max_num_columns = 0xFFFFUL; // <-- must be power of two -1
-    ColKey add_column(DataType type, StringData name, bool nullable = false);
-    ColKey add_column(Table& target, StringData name);
-    ColKey add_column_list(DataType type, StringData name, bool nullable = false);
-    ColKey add_column_list(Table& target, StringData name);
-    ColKey add_column_set(DataType type, StringData name, bool nullable = false);
-    ColKey add_column_set(Table& target, StringData name);
-    ColKey add_column_dictionary(DataType type, StringData name, bool nullable = false,
-                                 DataType key_type = type_String);
-    ColKey add_column_dictionary(Table& target, StringData name, DataType key_type = type_String);
 
-    [[deprecated("Use add_column(Table&) or add_column_list(Table&) instead.")]] //
-    ColKey
-    add_column_link(DataType type, StringData name, Table& target);
+    // Add column holding primitive values. The vector of CollectionType specifies if the
+    // property is a collection and if the collection is nested in other collections.
+    // If the vector is empty, the property is a single value. If the vector contains
+    // a single value - eg. CollectionType::Dictionary, the property is a dictionary of
+    // the type specified. If the vector contains {CollectionType::List, CollectionType::Dictionary}
+    // the property is a list of dictionaries.
+    ColKey add_column(DataType type, StringData name, bool nullable = false, std::vector<CollectionType> = {},
+                      DataType key_type = type_String);
+    // As above, but the values are links to objects in the target table.
+    ColKey add_column(Table& target, StringData name, std::vector<CollectionType> = {},
+                      DataType key_type = type_String);
+
+    // Map old functions to the more general interface above
+    ColKey add_column_list(DataType type, StringData name, bool nullable = false)
+    {
+        return add_column(type, name, nullable, {CollectionType::List});
+    }
+    ColKey add_column_list(Table& target, StringData name)
+    {
+        return add_column(target, name, {CollectionType::List});
+    }
+    ColKey add_column_set(DataType type, StringData name, bool nullable = false)
+    {
+        return add_column(type, name, nullable, {CollectionType::Set});
+    }
+    ColKey add_column_set(Table& target, StringData name)
+    {
+        return add_column(target, name, {CollectionType::Set});
+    }
+    ColKey add_column_dictionary(DataType type, StringData name, bool nullable = false,
+                                 DataType key_type = type_String)
+    {
+        return add_column(type, name, nullable, {CollectionType::Dictionary}, key_type);
+    }
+    ColKey add_column_dictionary(Table& target, StringData name, DataType key_type = type_String)
+    {
+        return add_column(target, name, {CollectionType::Dictionary}, key_type);
+    }
+
+    CollectionType get_nested_column_type(ColKey col_key, size_t level) const
+    {
+        auto spec_ndx = colkey2spec_ndx(col_key);
+        REALM_ASSERT_3(spec_ndx, <, get_column_count());
+        return m_spec.get_nested_column_type(spec_ndx, level);
+    }
+
+    size_t get_nesting_levels(ColKey col_key) const
+    {
+        auto spec_ndx = colkey2spec_ndx(col_key);
+        REALM_ASSERT_3(spec_ndx, <, get_column_count());
+        return m_spec.get_nesting_levels(spec_ndx);
+    }
 
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);
