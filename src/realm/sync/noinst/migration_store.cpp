@@ -81,6 +81,8 @@ bool MigrationStore::load_data(bool read_only)
         load_sync_metadata_schema(tr, &internal_tables);
     }
 
+    REALM_ASSERT(m_migration_table);
+
     // Read the migration object if exists, or default to not migrated
     std::lock_guard lock(m_mutex);
     if (auto migration_table = tr->get_table(m_migration_table); !migration_table->is_empty()) {
@@ -101,7 +103,7 @@ bool MigrationStore::is_migrated()
     return m_state == MigrationState::Migrated;
 }
 
-std::string_view MigrationStore::get_query_string()
+const std::string& MigrationStore::get_query_string()
 {
     std::lock_guard lock{m_mutex};
     return m_query_string;
@@ -189,12 +191,13 @@ void MigrationStore::clear(std::unique_lock<std::mutex>)
     tr->commit();
 }
 
-Subscription MigrationStore::make_subscription(const std::string& object_class_name)
+Subscription MigrationStore::make_subscription(const std::string& object_class_name,
+                                               const std::string& rql_query_string)
 {
     REALM_ASSERT(!object_class_name.empty());
 
     std::string subscription_name = c_flx_subscription_name_prefix.data() + object_class_name;
-    return Subscription{subscription_name, object_class_name, m_query_string};
+    return Subscription{subscription_name, object_class_name, rql_query_string};
 }
 
 bool MigrationStore::create_subscriptions(const SubscriptionStore& subs_store)
@@ -203,6 +206,11 @@ bool MigrationStore::create_subscriptions(const SubscriptionStore& subs_store)
         return false;
     }
 
+    return create_subscriptions(subs_store, m_query_string);
+}
+
+bool MigrationStore::create_subscriptions(const SubscriptionStore& subs_store, const std::string& rql_query_string)
+{
     auto mut_sub = subs_store.get_latest().make_mutable_copy();
     auto sub_count = mut_sub.size();
 
@@ -222,7 +230,7 @@ bool MigrationStore::create_subscriptions(const SubscriptionStore& subs_store)
         }
         auto object_class_name = table->get_class_name();
         if (tables.find(object_class_name) == tables.end()) {
-            auto sub = make_subscription(object_class_name);
+            auto sub = make_subscription(object_class_name, rql_query_string);
             mut_sub.insert_sub(sub);
         }
     }

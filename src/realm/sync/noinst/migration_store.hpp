@@ -59,13 +59,14 @@ public:
 
     bool is_migrated();
 
-    std::string_view get_query_string();
+    const std::string& get_query_string();
 
     // Create subscriptions for each table that does not have a subscription.
     // If subscriptions are created, they are commited and a change of query is sent to the server.
     // Returns 'true' if new subscriptions were created. Returns 'false' if the migration store is not in the migrated
     // state or no new subscriptions were created.
     bool create_subscriptions(const SubscriptionStore& subs_store);
+    bool create_subscriptions(const SubscriptionStore& subs_store, const std::string& rql_query_string);
 
 protected:
     explicit MigrationStore(DBRef db);
@@ -82,7 +83,7 @@ private:
     // Generate a new subscription that can be added to the subscription store using
     // the query string returned from the server and a name that begins with "flx_migrated_"
     // followed by the class name.
-    Subscription make_subscription(const std::string& object_class_name);
+    Subscription make_subscription(const std::string& object_class_name, const std::string& rql_query_string);
 
     DBRef m_db;
 
