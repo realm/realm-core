@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Add migrated state information to flexible sync client BIND message ([PR #6464](https://github.com/realm/realm-core/pull/6464))
 
 ----------------------------------------------
 
