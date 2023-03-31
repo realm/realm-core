@@ -392,6 +392,7 @@ let package = Package(
             publicHeadersPath: ".",
             cxxSettings: ([
                 .headerSearchPath(".."),
+                .headerSearchPath("../.."),
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "RealmCore",
