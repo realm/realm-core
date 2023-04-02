@@ -781,6 +781,7 @@ TEST(List_NestedList_Remove)
 
     tr->promote_to_write();
     list->remove(0);
+    CHECK_THROW_ANY(dict->remove("Bar"));
     dict->remove("Foo");
     tr->verify();
     tr->commit_and_continue_as_read();

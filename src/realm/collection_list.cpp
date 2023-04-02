@@ -253,7 +253,7 @@ void CollectionList::remove(StringData key)
     auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
     IteratorAdapter help(string_keys);
     auto it = std::lower_bound(help.begin(), help.end(), key);
-    if (it.index() >= string_keys->size()) {
+    if (it.index() >= string_keys->size() || *it != key) {
         throw KeyNotFound("CollectionList::remove");
     }
     const auto index = it.index();
