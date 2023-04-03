@@ -19,8 +19,6 @@ using std::vector;
 
 #include "s2polygon.h"
 
-#include "base/port.h"  // for HASH_NAMESPACE_DECLARATION_START
-#include "util/coding/coder.h"
 #include "s2edgeindex.h"
 #include "s2cap.h"
 #include "s2cell.h"
@@ -128,11 +126,9 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops, string* err) {
             continue;
         }
         pair<int, int> other = edges[key];
-        VLOG(2) << "Duplicate edge: loop " << i << ", edge " << j
-                 << " and loop " << other.first << ", edge " << other.second;
+          s2_logger()->error("Duplicate edge: loop %1, edge %2 and loop %3, edge %4", i, j, other.first, other.second);
         if (err) {
-            *err = s2_env::StringStream() << "Duplicate edge: loop " << i << ", edge " << j
-                            << " and loop " << other.first << ", edge " << other.second;
+            *err = realm::util::format("Duplicate edge: loop %1, edge %2 and loop %3, edge %4", i, j, other.first, other.second);
         }
         return false;
       }
@@ -143,16 +139,16 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops, string* err) {
   // two loops cross.
   for (size_t i = 0; i < loops.size(); ++i) {
     if (!loops[i]->IsNormalized()) {
-      VLOG(2) << "Loop " << i << " encloses more than half the sphere";
-      if (err) *err = s2_env::StringStream() << "Loop " << i << " encloses more than half the sphere";
+        s2_logger()->error("Loop %1 encloses more than half the sphere", i);
+        if (err) *err = realm::util::format("Loop %1 encloses more than half the sphere", i);
       return false;
     }
     for (size_t j = i + 1; j < loops.size(); ++j) {
       // This test not only checks for edge crossings, it also detects
       // cases where the two boundaries cross at a shared vertex.
       if (loops[i]->ContainsOrCrosses(loops[j]) < 0) {
-        VLOG(2) << "Loop " << i << " crosses loop " << j;
-        if (err) *err = s2_env::StringStream() << "Loop " << i << " crosses loop " << j;
+          s2_logger()->error("Loop %1 crosses loop %2", i, j);
+          if (err) *err = realm::util::format("Loop %1 crosses loop %2", i, j);
         return false;
       }
     }
@@ -495,56 +491,6 @@ bool S2Polygon::Contains(S2Point const& p) const {
   return inside;
 }
 
-void S2Polygon::Encode(Encoder* const encoder) const {
-  encoder->Ensure(10);  // Sufficient
-  encoder->put8(kCurrentEncodingVersionNumber);
-  encoder->put8(owns_loops_);
-  encoder->put8(has_holes_);
-  encoder->put32(loops_.size());
-  DCHECK_GE(encoder->avail(), 0);
-
-  for (int i = 0; i < num_loops(); ++i) {
-    loop(i)->Encode(encoder);
-  }
-  bound_.Encode(encoder);
-}
-
-bool S2Polygon::Decode(Decoder* const decoder) {
-  return DecodeInternal(decoder, false);
-}
-
-bool S2Polygon::DecodeWithinScope(Decoder* const decoder) {
-  return DecodeInternal(decoder, true);
-}
-
-bool S2Polygon::DecodeInternal(Decoder* const decoder, bool within_scope) {
-  unsigned char version = decoder->get8();
-  if (version > kCurrentEncodingVersionNumber) return false;
-
-  if (owns_loops_) DeleteLoopsInVector(&loops_);
-
-  owns_loops_ = decoder->get8();
-  has_holes_ = decoder->get8();
-  int num_loops = decoder->get32();
-  loops_.clear();
-  loops_.reserve(num_loops);
-  num_vertices_ = 0;
-  for (int i = 0; i < num_loops; ++i) {
-    loops_.push_back(new S2Loop);
-    if (within_scope) {
-      if (!loops_.back()->DecodeWithinScope(decoder)) return false;
-    } else {
-      if (!loops_.back()->Decode(decoder)) return false;
-    }
-    num_vertices_ += loops_.back()->num_vertices();
-  }
-  if (!bound_.Decode(decoder)) return false;
-
-  DCHECK(IsValid(loops_));
-
-  return decoder->avail() >= 0;
-}
-
 // Indexing structure to efficiently ClipEdge() of a polygon.  This is
 // an abstract class because we need to use if for both polygons (for
 // InitToIntersection() and friends) and for sets of vectors of points
@@ -794,7 +740,7 @@ void S2Polygon::InitToIntersectionSloppy(S2Polygon const* a, S2Polygon const* b,
   ClipBoundary(a, false, b, false, false, true, &builder);
   ClipBoundary(b, false, a, false, false, false, &builder);
   if (!builder.AssemblePolygon(this, NULL)) {
-    S2LOG(DFATAL) << "Bad directed edges in InitToIntersection";
+      s2_logger()->fatal("Bad directed edges in InitToIntersection");
   }
 }
 
@@ -816,7 +762,7 @@ void S2Polygon::InitToUnionSloppy(S2Polygon const* a, S2Polygon const* b,
   ClipBoundary(a, false, b, false, true, true, &builder);
   ClipBoundary(b, false, a, false, true, false, &builder);
   if (!builder.AssemblePolygon(this, NULL)) {
-    S2LOG(DFATAL) << "Bad directed edges";
+      s2_logger()->fatal("Bad directed edges");
   }
 }
 
@@ -838,7 +784,7 @@ void S2Polygon::InitToDifferenceSloppy(S2Polygon const* a, S2Polygon const* b,
   ClipBoundary(a, false, b, true, true, true, &builder);
   ClipBoundary(b, true, a, false, false, false, &builder);
   if (!builder.AssemblePolygon(this, NULL)) {
-    S2LOG(DFATAL) << "Bad directed edges in InitToDifference";
+      s2_logger()->fatal("Bad directed edges in InitToDifference");
   }
 }
 
@@ -856,10 +802,10 @@ vector<S2Point>* SimplifyLoopAsPolyline(S2Loop const* loop, S1Angle tolerance) {
   if (indices.size() <= 2) return NULL;
   // Add them all except the last: it is the same as the first.
   vector<S2Point>* simplified_line = new vector<S2Point>(indices.size() - 1);
-  VLOG(4) << "Now simplified to: ";
+    s2_logger()->detail("Now simplified to: ");
   for (size_t i = 0; i + 1 < indices.size(); ++i) {
     (*simplified_line)[i] = line.vertex(indices[i]);
-    VLOG(4) << S2LatLng(line.vertex(indices[i]));
+      s2_logger()->detail("%1", S2LatLng(line.vertex(indices[i])));
   }
   return simplified_line;
 }
@@ -923,7 +869,7 @@ void S2Polygon::InitToSimplified(S2Polygon const* a, S1Angle tolerance) {
     BreakEdgesAndAddToBuilder(&index, &builder);
 
     if (!builder.AssemblePolygon(this, NULL)) {
-      S2LOG(DFATAL) << "Bad edges in InitToSimplified.";
+        s2_logger()->fatal("Bad edges in InitToSimplified.");
     }
   }
 
@@ -1081,7 +1027,7 @@ void S2Polygon::InitToCellUnionBorder(S2CellUnion const& cells) {
     builder.AddLoop(&cell_loop);
   }
   if (!builder.AssemblePolygon(this, NULL)) {
-    S2LOG(DFATAL) << "AssemblePolygon failed in InitToCellUnionBorder";
+      s2_logger()->fatal("AssemblePolygon failed in InitToCellUnionBorder");
   }
 }
 
@@ -1105,8 +1051,7 @@ bool S2Polygon::IsNormalized(string* err) const {
     }
     if (count > 1) {
       if (err) {
-        *err = s2_env::StringStream() << "Loop " << i << " shares more than one vertex"
-                        << " with its parent loop " << GetParent(i);
+          *err = realm::util::format("Loop %1 shares more than one vertex with its parent loop %2", i, GetParent(i));
       }
       return false;
     }

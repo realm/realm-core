@@ -174,9 +174,6 @@ class S2Polyline : public S2Region {
   // is not numerically well-defined except at the polyline vertices.
   virtual bool VirtualContainsPoint(S2Point const& p) const { return false; }
 
-  virtual void Encode(Encoder* const encoder) const;
-  virtual bool Decode(Decoder* const decoder);
-
  private:
   // Internal constructor used only by Clone() that makes a deep copy of
   // its argument.

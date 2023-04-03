@@ -31,8 +31,6 @@ class S2PointRegion : public S2Region {
     return Contains(p);
   }
   bool Contains(S2Point const& p) const { return (point_ == p); }
-  virtual void Encode(Encoder* const encoder) const; 
-  virtual bool Decode(Decoder* const decoder);
 
  private:
   S2Point point_;
