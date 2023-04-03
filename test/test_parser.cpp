@@ -5066,6 +5066,39 @@ TEST(Parser_DictionaryObjects)
     verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'pluto'), obj('dog', 'astro') }", 2);
 }
 
+TEST(Parser_DictionarySorting)
+{
+    Group g;
+    auto dogs = g.add_table_with_primary_key("dog", type_String, "name");
+    auto col_meta = dogs->add_column_dictionary(type_Int, "meta");
+
+    Obj astro = dogs->create_object_with_primary_key("astro");
+    Obj pluto = dogs->create_object_with_primary_key("pluto");
+    Obj lady = dogs->create_object_with_primary_key("lady");
+    Obj snoopy = dogs->create_object_with_primary_key("snoopy");
+
+    astro.get_dictionary(col_meta).insert("age", 4);
+    pluto.get_dictionary(col_meta).insert("age", 5);
+    lady.get_dictionary(col_meta).insert("age", 6);
+    snoopy.get_dictionary(col_meta).insert("age", 7);
+
+    auto query = verify_query(test_context, dogs, "TRUEPREDICATE SORT(meta[\"age\"] ASC)", 4);
+    auto results = query.find_all();
+
+    CHECK_EQUAL(results.get_object(0).get_key(), astro.get_key());
+    CHECK_EQUAL(results.get_object(1).get_key(), pluto.get_key());
+    CHECK_EQUAL(results.get_object(2).get_key(), lady.get_key());
+    CHECK_EQUAL(results.get_object(3).get_key(), snoopy.get_key());
+
+    query = verify_query(test_context, dogs, "TRUEPREDICATE SORT(meta[\"age\"] DESC)", 4);
+    results = query.find_all();
+
+    CHECK_EQUAL(results.get_object(0).get_key(), snoopy.get_key());
+    CHECK_EQUAL(results.get_object(1).get_key(), lady.get_key());
+    CHECK_EQUAL(results.get_object(2).get_key(), pluto.get_key());
+    CHECK_EQUAL(results.get_object(3).get_key(), astro.get_key());
+}
+
 TEST_TYPES(Parser_DictionaryAggregates, Prop<float>, Prop<double>, Prop<Decimal128>)
 {
     using type = typename TEST_TYPE::type;

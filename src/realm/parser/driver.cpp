@@ -1415,20 +1415,19 @@ std::unique_ptr<DescriptorOrdering> DescriptorOrderingNode::visit(ParserDriver* 
         }
         else {
             bool is_distinct = cur_ordering->get_type() == DescriptorNode::DISTINCT;
-            std::vector<std::vector<ColKey>> property_columns;
+            std::vector<std::vector<ExtendedColumnKey>> property_columns;
             for (auto& col_names : cur_ordering->columns) {
-                std::vector<ColKey> columns;
+                std::vector<ExtendedColumnKey> columns;
                 LinkChain link_chain(target);
                 for (size_t ndx_in_path = 0; ndx_in_path < col_names.size(); ++ndx_in_path) {
-                    std::string path_elem = drv->translate(link_chain, col_names[ndx_in_path]);
-                    ColKey col_key = link_chain.get_current_table()->get_column_key(path_elem);
+                    std::string prop_name = drv->translate(link_chain, col_names[ndx_in_path].id);
+                    ColKey col_key = link_chain.get_current_table()->get_column_key(prop_name);
                     if (!col_key) {
-                        throw InvalidQueryError(
-                            util::format("No property '%1' found on object type '%2' specified in '%3' clause",
-                                         col_names[ndx_in_path], link_chain.get_current_table()->get_class_name(),
-                                         is_distinct ? "distinct" : "sort"));
+                        throw InvalidQueryError(util::format(
+                            "No property '%1' found on object type '%2' specified in '%3' clause", prop_name,
+                            link_chain.get_current_table()->get_class_name(), is_distinct ? "distinct" : "sort"));
                     }
-                    columns.push_back(col_key);
+                    columns.emplace_back(col_key, col_names[ndx_in_path].index);
                     if (ndx_in_path < col_names.size() - 1) {
                         link_chain.link(col_key);
                     }
