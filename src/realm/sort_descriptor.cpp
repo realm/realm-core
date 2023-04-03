@@ -34,9 +34,7 @@ std::string ExtendedColumnKey::get_description(const Table* table) const
 {
     std::string description = table->get_column_name(m_colkey);
     if (!m_index.is_null()) {
-        std::ostringstream o;
-        o << "[" << m_index << "]";
-        description += o.str();
+        description += util::format("[%1]", util::serializer::print_value(m_index));
     }
     return description;
 }

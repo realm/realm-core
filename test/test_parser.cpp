@@ -5076,23 +5076,23 @@ TEST(Parser_DictionarySorting)
     Obj pluto = dogs->create_object_with_primary_key("pluto");
     Obj lady = dogs->create_object_with_primary_key("lady");
     Obj snoopy = dogs->create_object_with_primary_key("snoopy");
+    Obj scooby = dogs->create_object_with_primary_key("scooby");
 
     astro.get_dictionary(col_meta).insert("age", 4);
     pluto.get_dictionary(col_meta).insert("age", 5);
     lady.get_dictionary(col_meta).insert("age", 6);
     snoopy.get_dictionary(col_meta).insert("age", 7);
+    scooby.get_dictionary(col_meta).insert("age", 7);
 
-    auto query = verify_query(test_context, dogs, "TRUEPREDICATE SORT(meta[\"age\"] ASC)", 4);
-    auto results = query.find_all();
-
+    auto results = get_sorted_view(dogs, "TRUEPREDICATE SORT(meta[\"age\"] ASC) DISTINCT(meta['age'])");
+    CHECK_EQUAL(results.size(), 4);
     CHECK_EQUAL(results.get_object(0).get_key(), astro.get_key());
     CHECK_EQUAL(results.get_object(1).get_key(), pluto.get_key());
     CHECK_EQUAL(results.get_object(2).get_key(), lady.get_key());
     CHECK_EQUAL(results.get_object(3).get_key(), snoopy.get_key());
 
-    query = verify_query(test_context, dogs, "TRUEPREDICATE SORT(meta[\"age\"] DESC)", 4);
-    results = query.find_all();
-
+    results = get_sorted_view(dogs, "TRUEPREDICATE SORT(meta[\"age\"] DESC) DISTINCT(meta['age'])");
+    CHECK_EQUAL(results.size(), 4);
     CHECK_EQUAL(results.get_object(0).get_key(), snoopy.get_key());
     CHECK_EQUAL(results.get_object(1).get_key(), lady.get_key());
     CHECK_EQUAL(results.get_object(2).get_key(), pluto.get_key());
