@@ -10,6 +10,8 @@
 #define UTIL_MATH_VECTOR2_H__
 
 #include <iostream>
+#include <type_traits>
+
 using std::ostream;
 using std::cout;
 using std::endl;
@@ -35,8 +37,7 @@ class Vector2 {
   // FloatType is the type returned by Norm() and Angle().  These methods are
   // special because they return floating-point values even when VType is an
   // integer.
-  typedef typename base::if_<base::is_integral<VType>::value,
-                             double, VType>::type FloatType;
+  typedef typename std::enable_if_t<std::is_integral<VType>::value || std::is_same_v<double, VType>, VType> FloatType;
 
  public:
   typedef Vector2<VType> Self;
