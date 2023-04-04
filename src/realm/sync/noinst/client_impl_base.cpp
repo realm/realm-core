@@ -1713,7 +1713,7 @@ void Session::on_changesets_integrated(version_type client_version, const SyncPr
     check_for_download_completion();           // Throws
 
     // If the client migrated from PBS to FLX, create subscriptions when new tables are received from server.
-    if (m_is_flx_sync_session) {
+    if (auto migration_store = get_migration_store(); migration_store && m_is_flx_sync_session) {
         auto& flx_subscription_store = *get_flx_subscription_store();
         get_migration_store()->create_subscriptions(flx_subscription_store);
     }
@@ -2372,7 +2372,9 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         }
 
         // If a migration is in progress, mark it complete when client reset is completed.
-        get_migration_store()->complete_migration();
+        if (auto migration_store = get_migration_store()) {
+            migration_store->complete_migration();
+        }
 
         return true;
     };
