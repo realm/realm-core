@@ -16,8 +16,6 @@
  *
  **************************************************************************/
 
-#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
-
 #include <cstring>
 #include <stdexcept>
 #include <system_error>
@@ -27,8 +25,6 @@
 
 #if !defined _WIN32
 #include <unistd.h>
-#else
-#include <codecvt>
 #endif
 
 // "Process shared mutexes" are not officially supported on Android,
