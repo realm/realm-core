@@ -112,6 +112,9 @@ else()
     # compilers that we still support. It is also harmless, unlike pessimizing moves.
     add_cxx_flag_if_supported(-Wno-redundant-move)
 
+    # MacOS Clang 14.0.3 started enabling unused-but-set-variables by default
+    add_cxx_flag_if_supported(-Wno-unused-but-set-variable)
+
     # Ninja buffers output so we need to tell the compiler to use colors even though stdout isn't a tty.
     if("${CMAKE_GENERATOR}" STREQUAL "Ninja")
         add_cxx_flag_if_supported(-fdiagnostics-color)
