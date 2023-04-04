@@ -59,8 +59,8 @@ public:
     void cancel_migration();
 
     bool is_migrated();
-    std::optional<std::string_view> get_migrated_partition();
-    std::optional<std::string_view> get_query_string();
+    std::optional<std::string> get_migrated_partition();
+    std::optional<std::string> get_query_string();
 
     // Generate a new subscription that can be added to the subscription store using
     // the query string returned from the server and a name that begins with "flx_migrated_"

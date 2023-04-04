@@ -103,7 +103,7 @@ bool MigrationStore::is_migrated()
     return m_state == MigrationState::Migrated;
 }
 
-std::optional<std::string_view> MigrationStore::get_migrated_partition()
+std::optional<std::string> MigrationStore::get_migrated_partition()
 {
     std::lock_guard lock{m_mutex};
     if (m_state != MigrationState::Migrated) {
@@ -112,7 +112,7 @@ std::optional<std::string_view> MigrationStore::get_migrated_partition()
     return m_migrated_partition;
 }
 
-std::optional<std::string_view> MigrationStore::get_query_string()
+std::optional<std::string> MigrationStore::get_query_string()
 {
     std::lock_guard lock{m_mutex};
     if (m_state != MigrationState::Migrated) {

@@ -1088,7 +1088,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_ssl_trust_certificate_path{std::move(config.ssl_trust_certificate_path)}
     , m_ssl_verify_callback{std::move(config.ssl_verify_callback)}
     , m_flx_bootstrap_batch_size_bytes(config.flx_bootstrap_batch_size_bytes)
-    , m_migrated_partition(config.migrated_partition)
+    , m_migrated_partition(std::move(config.migrated_partition))
     , m_http_request_path_prefix{std::move(config.service_identifier)}
     , m_virt_path{std::move(config.realm_identifier)}
     , m_signed_access_token{std::move(config.signed_user_token)}

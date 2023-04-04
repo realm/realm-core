@@ -1954,24 +1954,20 @@ void Session::send_bind_message()
     int protocol_version = m_conn.get_negotiated_protocol_version();
     OutputBuffer& out = m_conn.get_output_buffer();
     // Discard the token since it's ignored by the server.
-    std::string empty_access_token{};
-    std::string path_data;
+    std::string empty_access_token;
     if (m_is_flx_sync_session) {
         nlohmann::json bind_json_data;
-        if (protocol_version >= 8) {
-            if (auto migrated_partition = get_migrated_partition(); migrated_partition) {
-                bind_json_data["partitionKey"] = *migrated_partition;
-            }
+        if (auto migrated_partition = get_migrated_partition(); migrated_partition) {
+            bind_json_data["partitionKey"] = *migrated_partition;
         }
-        if (!bind_json_data.empty()) {
-            path_data = bind_json_data.dump();
-        }
+        protocol.make_flx_bind_message(protocol_version, out, session_ident, bind_json_data, empty_access_token,
+                                       need_client_file_ident, is_subserver); // Throws
     }
     else {
-        path_data = get_virt_path();
+        std::string path_data = get_virt_path();
+        protocol.make_pbs_bind_message(protocol_version, out, session_ident, path_data, empty_access_token,
+                                       need_client_file_ident, is_subserver); // Throws
     }
-    protocol.make_bind_message(out, session_ident, path_data, empty_access_token, need_client_file_ident,
-                               is_subserver); // Throws
     m_conn.initiate_write_message(out, this); // Throws
 
     m_bind_message_sent = true;

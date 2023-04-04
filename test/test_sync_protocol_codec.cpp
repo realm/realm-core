@@ -1,6 +1,6 @@
 /*************************************************************************
  *
- * Copyright 2016 Realm Inc.
+ * Copyright 2023 Realm Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,68 +25,83 @@
 #include <memory>
 
 using namespace realm;
-using namespace realm::test_util;
 using namespace realm::util;
 
+using TestContext = test_util::unit_test::TestContext;
+
 template <class A, class B>
-bool compare_out_string(const A& expected, const B& out, const std::shared_ptr<util::Logger>& logger)
+void compare_out_string(const A& expected, const B& out, TestContext& test_context)
 {
-    if (expected.size() == out.size() && memcmp(expected.data(), out.data(), out.size()) == 0) {
-        return true;
-    }
-    logger->error("out data does not equal expected string\nexpected: '%1'\nout: '%2'",
-                  std::string(expected.data(), expected.size()), std::string(out.data(), out.size()));
-    return false;
+    CHECK_EQUAL(std::string_view(expected.data(), expected.size()), std::string_view(out.data(), out.size()));
 }
 
-TEST(Protocol_Codec_Bind)
+TEST(Protocol_Codec_Bind_PBS)
 {
     auto protocol = _impl::ClientProtocol();
     std::string expected_out_string;
     auto out = _impl::ClientProtocol::OutputBuffer();
 
-    expected_out_string = "bind 888234 0 12 1 0\ntoken_string";
-    protocol.make_bind_message(out, 888234, "", "token_string", true, false);
-    CHECK_EQUAL(out.size(), expected_out_string.size());
-    CHECK(compare_out_string(expected_out_string, out, test_context.logger));
+    expected_out_string = "bind 888234 0 5 1 0\ntoken";
+    protocol.make_pbs_bind_message(7, out, 888234, std::string{}, "token", true, false);
+    compare_out_string(expected_out_string, out, test_context);
 
     out.reset();
-    expected_out_string = "bind 999123 11 12 1 0\nserver_pathtoken_string";
-    protocol.make_bind_message(out, 999123, "server_path", "token_string", true, false);
-    CHECK_EQUAL(out.size(), expected_out_string.size());
-    CHECK(compare_out_string(expected_out_string, out, test_context.logger));
+    expected_out_string = "bind 999123 11 12 0 1\nserver/pathtoken_string";
+    protocol.make_pbs_bind_message(8, out, 999123, "server/path", "token_string", false, true);
+    compare_out_string(expected_out_string, out, test_context);
+}
+
+TEST(Protocol_Codec_Bind_FLX)
+{
+    auto protocol = _impl::ClientProtocol();
+    std::string expected_out_string;
+    auto out = _impl::ClientProtocol::OutputBuffer();
 
     auto json_data = nlohmann::json();
     json_data["valA"] = 123;
     json_data["valB"] = "something";
-    std::string json_string = json_data.dump();
 
     out.reset();
-    expected_out_string = "bind 234888 31 5 0 1\n{\"valA\":123,\"valB\":\"something\"}token";
-    protocol.make_bind_message(out, 234888, json_string, "token", false, true);
-    CHECK_EQUAL(out.size(), expected_out_string.size());
-    CHECK(compare_out_string(expected_out_string, out, test_context.logger));
+    expected_out_string = "bind 234888 0 6 0 1\ntoken1";
+    protocol.make_flx_bind_message(7, out, 234888, json_data, "token1", false, true);
+    compare_out_string(expected_out_string, out, test_context);
+
+    out.reset();
+    expected_out_string = "bind 345888 0 6 1 0\ntoken2";
+    protocol.make_flx_bind_message(8, out, 345888, {}, "token2", true, false);
+    compare_out_string(expected_out_string, out, test_context);
+
+    out.reset();
+    expected_out_string = "bind 456888 31 7 0 1\n{\"valA\":123,\"valB\":\"something\"}token21";
+    protocol.make_flx_bind_message(8, out, 456888, json_data, "token21", false, true);
+    compare_out_string(expected_out_string, out, test_context);
 }
 
-TEST(Protocol_Codec_Ident)
+TEST(Protocol_Codec_Ident_PBS)
 {
     auto protocol = _impl::ClientProtocol();
-    std::string expected_out_string;
     auto out = _impl::ClientProtocol::OutputBuffer();
 
     auto file_ident = _impl::ClientProtocol::SaltedFileIdent{999123, 123999};
     auto progress = _impl::ClientProtocol::SyncProgress{{1, 2}, {3, 4}, {5, 6}};
 
-    expected_out_string = "ident 234888 999123 123999 3 4 1 2\n";
+    std::string expected_out_string = "ident 234888 999123 123999 3 4 1 2\n";
     protocol.make_pbs_ident_message(out, 234888, file_ident, progress);
-    CHECK_EQUAL(out.size(), expected_out_string.size());
-    CHECK(compare_out_string(expected_out_string, out, test_context.logger));
+    compare_out_string(expected_out_string, out, test_context);
+}
 
-    out.reset();
-    expected_out_string = "ident 888234 999123 123999 3 4 1 2 3 29\n{\"table\": \"(key == \"value\")\"}";
-    protocol.make_flx_ident_message(out, 888234, file_ident, progress, 3, "{\"table\": \"(key == \"value\")\"}");
-    CHECK_EQUAL(out.size(), expected_out_string.size());
-    CHECK(compare_out_string(expected_out_string, out, test_context.logger));
+TEST(Protocol_Codec_Ident_FLX)
+{
+    auto protocol = _impl::ClientProtocol();
+    auto out = _impl::ClientProtocol::OutputBuffer();
+
+    auto file_ident = _impl::ClientProtocol::SaltedFileIdent{999234, 234999};
+    auto progress = _impl::ClientProtocol::SyncProgress{{3, 4}, {5, 6}, {7, 8}};
+    std::string query_string = "{\"table\": \"(key == \"value\")\"}";
+
+    std::string expected_out_string = "ident 888234 999234 234999 5 6 3 4 3 29\n{\"table\": \"(key == \"value\")\"}";
+    protocol.make_flx_ident_message(out, 888234, file_ident, progress, 3, query_string);
+    compare_out_string(expected_out_string, out, test_context);
 }
 
 TEST(Protocol_Codec_Query_Change)
@@ -96,8 +111,7 @@ TEST(Protocol_Codec_Query_Change)
 
     std::string expected_out_string = "query 238881 5 26\n{\"table\": \"(key < value)\"}";
     protocol.make_query_change_message(out, 238881, 5, "{\"table\": \"(key < value)\"}");
-    CHECK_EQUAL(out.size(), expected_out_string.size());
-    CHECK(compare_out_string(expected_out_string, out, test_context.logger));
+    compare_out_string(expected_out_string, out, test_context);
 }
 
 TEST(Protocol_Codec_JSON_Error)
@@ -112,8 +126,7 @@ TEST(Protocol_Codec_JSON_Error)
 
     std::string expected_out_string = "json_error 9099 31 234888\n{\"valA\":123,\"valB\":\"something\"}";
     protocol.make_json_error_message(out, 234888, 9099, json_string);
-    CHECK_EQUAL(out.size(), expected_out_string.size());
-    CHECK(compare_out_string(expected_out_string, out, test_context.logger));
+    compare_out_string(expected_out_string, out, test_context);
 }
 
 TEST(Protocol_Codec_Test_Command)
@@ -123,8 +136,7 @@ TEST(Protocol_Codec_Test_Command)
 
     std::string expected_out_string = "test_command 234888 1000 17\nsome test command";
     protocol.make_test_command_message(out, 234888, 1000, "some test command");
-    CHECK_EQUAL(out.size(), expected_out_string.size());
-    CHECK(compare_out_string(expected_out_string, out, test_context.logger));
+    compare_out_string(expected_out_string, out, test_context);
 }
 
 TEST(Protocol_Codec_Upload)
@@ -142,8 +154,7 @@ TEST(Protocol_Codec_Upload)
         upload_message_builder.add_changeset(29, 18, 259604001718, 888123, BinaryData(data1.c_str(), data1.length()));
         upload_message_builder.add_changeset(30, 19, 259604001850, 888234, BinaryData(data2.c_str(), data2.length()));
         upload_message_builder.make_upload_message(7, out, 999123, 30, 17, 10);
-        CHECK_EQUAL(out.size(), expected_out_string.size());
-        CHECK(compare_out_string(expected_out_string, out, test_context.logger));
+        compare_out_string(expected_out_string, out, test_context);
     }
 
     {
@@ -165,8 +176,7 @@ TEST(Protocol_Codec_Upload)
 
         upload_message_builder.add_changeset(4, 2, 259609999999, 123999, BinaryData(data1.c_str(), data1.size()));
         upload_message_builder.make_upload_message(7, out, 888123, 4, 2, 0);
-        CHECK_EQUAL(out.size(), expected_data.size());
-        CHECK(compare_out_string(expected_data, out, test_context.logger));
+        compare_out_string(expected_data, out, test_context);
 
         // Find the compressed changeset and uncompress - first look for the newline
         auto out_span = out.as_span();
@@ -185,8 +195,7 @@ TEST(Protocol_Codec_Upload)
         CHECK_EQUAL(changeset.size(), compressed.size());
         Buffer<char> decompressed_buf(data2.length());
         CHECK_NOT(util::compression::decompress(changeset, decompressed_buf));
-        CHECK_EQUAL(data2.length(), decompressed_buf.size());
-        CHECK(compare_out_string(data2, decompressed_buf, test_context.logger));
+        compare_out_string(data2, decompressed_buf, test_context);
     }
 }
 
@@ -197,8 +206,7 @@ TEST(Protocol_Codec_Unbind)
 
     std::string expected_out_string = "unbind 234888\n";
     protocol.make_unbind_message(out, 234888);
-    CHECK_EQUAL(out.size(), expected_out_string.size());
-    CHECK(compare_out_string(expected_out_string, out, test_context.logger));
+    compare_out_string(expected_out_string, out, test_context);
 }
 
 TEST(Protocol_Codec_Mark)
@@ -208,8 +216,7 @@ TEST(Protocol_Codec_Mark)
 
     std::string expected_out_string = "mark 234888 888234\n";
     protocol.make_mark_message(out, 234888, 888234);
-    CHECK_EQUAL(out.size(), expected_out_string.size());
-    CHECK(compare_out_string(expected_out_string, out, test_context.logger));
+    compare_out_string(expected_out_string, out, test_context);
 }
 
 TEST(Protocol_Codec_Ping)
@@ -219,6 +226,5 @@ TEST(Protocol_Codec_Ping)
 
     std::string expected_out_string = "ping 1234567890 23\n";
     protocol.make_ping(out, 1234567890, 23);
-    CHECK_EQUAL(out.size(), expected_out_string.size());
-    CHECK(compare_out_string(expected_out_string, out, test_context.logger));
+    compare_out_string(expected_out_string, out, test_context);
 }

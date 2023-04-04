@@ -335,7 +335,7 @@ public:
 
         /// Contains the original PBS partition value from before the migration -
         /// empty if not migrated
-        std::optional<std::string_view> migrated_partition;
+        std::optional<std::string> migrated_partition;
 
         /// Set to true to cause the integration of the first received changeset
         /// (in a DOWNLOAD message) to fail.
