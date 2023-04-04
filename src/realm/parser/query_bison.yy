@@ -10,7 +10,9 @@
 %code requires {
   #include <string>
   #include <realm/mixed.hpp>
+  #include <realm/geospatial.hpp>
   #include <array>
+  using realm::GeoPoint;
   namespace realm::query_parser {
     class ParserDriver;
     class ConstantNode;
@@ -44,9 +46,6 @@
   }
   using namespace realm::query_parser;
 
-  static inline std::ostream& operator<<(std::ostream& os, std::array<std::string, 3> point) {
-      return os << "['" << point[0] << "', '" << point[1] << "', '" << point[2] << "']";
-  }
 }
 
 // The parsing context.
@@ -136,9 +135,10 @@ using namespace realm::query_parser;
 %token <std::string> KEY_VAL "key or value"
 %type  <bool> direction
 %type  <int> equality relational stringop aggr_op
+%type  <double> coordinate
 %type  <ConstantNode*> constant primary_key
 %type  <GeospatialNode*> geospatial geopoly_content
-%type  < std::array<std::string, 3> > geopoint
+%type  <GeoPoint> geopoint
 %type  <ListNode*> list list_content
 %type  <AggrNode*> aggregate
 %type  <SubqueryNode*> subquery 
@@ -152,12 +152,16 @@ using namespace realm::query_parser;
 %type  <PathNode*> path
 %type  <DescriptorOrderingNode*> post_query
 %type  <DescriptorNode*> sort sort_param distinct distinct_param limit
-%type  <std::string> id double
+%type  <std::string> id
 %type  <PathElem> path_elem
 %type  <PropertyNode*> simple_prop
 
 %destructor { } <int>
 
+%printer { yyo << "['" << $$.longitude << "', '" << $$.latitude;
+           if (auto alt = $$.get_altitude())
+               yyo << "', '" << *alt; 
+           yyo << "']"; }  <GeoPoint>;
 %printer { yyo << $$.id; } <PathElem>;
 %printer { yyo << $$; } <*>;
 %printer { yyo << "<>"; } <>;
@@ -198,8 +202,8 @@ compare
                                     $$ = tmp;
                                 }
     | value BETWEEN list        { $$ = drv.m_parse_nodes.create<BetweenNode>($1, $3); }
-    | value GEOWITHIN geospatial  { $$ = drv.m_parse_nodes.create<GeoWithinNode>($1, $3); }
-    | value GEOWITHIN ARG         { $$ = drv.m_parse_nodes.create<GeoWithinNode>($1, drv.m_parse_nodes.create<ConstantNode>(ConstantNode::ARG, $3)); }
+    | prop GEOWITHIN geospatial { $$ = drv.m_parse_nodes.create<GeoWithinNode>($1, $3); }
+    | prop GEOWITHIN ARG        { $$ = drv.m_parse_nodes.create<GeoWithinNode>($1, $3); }
 
 expr
     : value                     { $$ = $1; }
@@ -236,13 +240,13 @@ simple_prop
 subquery
     : SUBQUERY '(' simple_prop ',' id ',' query ')' '.' SIZE   { $$ = drv.m_parse_nodes.create<SubqueryNode>($3, $5, $7); }
 
-double
-    : FLOAT         { $$ = $1; }
-    | NATURAL0      { $$ = $1; }
+coordinate
+    : FLOAT         { $$ = strtod($1.c_str(), nullptr); }
+    | NATURAL0      { $$ = double(strtoll($1.c_str(), nullptr, 0)); }
 
 geopoint
-    : '[' double ',' double ']' { $$ = std::array<std::string, 3>{$2, $4, ""}; }
-    | '[' double ',' double ',' FLOAT ']' { $$ = std::array<std::string, 3>{$2, $4, $6}; }
+    : '[' coordinate ',' coordinate ']' { $$ = GeoPoint{$2, $4}; }
+    | '[' coordinate ',' coordinate ',' FLOAT ']' { $$ = GeoPoint{$2, $4, strtod($6.c_str(), nullptr)}; }
 
 geopoly_content
     : geopoint { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Polygon{}, $1); }
@@ -250,7 +254,7 @@ geopoly_content
 
 geospatial
     : GEOBOX '(' geopoint ',' geopoint ')'  { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Box{}, $3, $5); }
-    | GEOSPHERE '(' geopoint ',' double ')' { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Sphere{}, $3, $5); }
+    | GEOSPHERE '(' geopoint ',' coordinate ')' { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Sphere{}, $3, $5); }
     | GEOPOLYGON '(' geopoly_content ')'    { $$ = $3; }
 
 post_query

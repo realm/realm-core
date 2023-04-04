@@ -120,9 +120,10 @@ static inline Geospatial::Type from_capi(realm_geospatial_type_e type)
             return Geospatial::Type::Polygon;
         case RLM_GEOSPATIAL_CENTER_SPHERE:
             return Geospatial::Type::CenterSphere;
-        case RLM_GEOSPATIAL_INVALID:
-            return Geospatial::Type::Invalid;
+        default:
+            break;
     }
+    return Geospatial::Type::Invalid;
 }
 
 static inline GeospatialRef from_capi(realm_geospatial_t val)

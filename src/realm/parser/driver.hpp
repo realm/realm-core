@@ -204,11 +204,10 @@ public:
     };
     struct Sphere {
     };
-    using PointString = std::array<std::string, 3>; // lon, lat, alt
-    GeospatialNode(Box, PointString p1, PointString p2);
-    GeospatialNode(Sphere, PointString p, std::string radius);
-    GeospatialNode(Polygon, PointString p);
-    void add_point_to_polygon(PointString p);
+    GeospatialNode(Box, GeoPoint& p1, GeoPoint& p2);
+    GeospatialNode(Sphere, GeoPoint& p, double radius);
+    GeospatialNode(Polygon, GeoPoint& p);
+    void add_point_to_polygon(GeoPoint& p);
     bool is_constant() final
     {
         return true;
@@ -462,11 +461,18 @@ public:
 
 class GeoWithinNode : public CompareNode {
 public:
-    std::vector<ExpressionNode*> values;
-    GeoWithinNode(ValueNode* left, ValueNode* right)
+    PropertyNode* prop;
+    GeospatialNode* geo = nullptr;
+    std::string argument;
+    GeoWithinNode(PropertyNode* left, GeospatialNode* right)
     {
-        values.emplace_back(left);
-        values.emplace_back(right);
+        prop = left;
+        geo = right;
+    }
+    GeoWithinNode(PropertyNode* left, std::string arg)
+    {
+        prop = left;
+        argument = arg;
     }
     Query visit(ParserDriver*) override;
 };

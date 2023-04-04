@@ -48,7 +48,9 @@
 
   #include <string>
   #include <realm/mixed.hpp>
+  #include <realm/geospatial.hpp>
   #include <array>
+  using realm::GeoPoint;
   namespace realm::query_parser {
     class ParserDriver;
     class ConstantNode;
@@ -82,9 +84,6 @@
   }
   using namespace realm::query_parser;
 
-  static inline std::ostream& operator<<(std::ostream& os, std::array<std::string, 3> point) {
-      return os << "['" << point[0] << "', '" << point[1] << "', '" << point[2] << "']";
-  }
 
 
 # include <cassert>
@@ -443,28 +442,28 @@ namespace yy {
     /// An auxiliary type to compute the largest semantic type.
     union union_type
     {
-      // geopoint
-      char dummy1[sizeof ( std::array<std::string, 3> )];
-
       // aggregate
-      char dummy2[sizeof (AggrNode*)];
+      char dummy1[sizeof (AggrNode*)];
 
       // constant
       // primary_key
-      char dummy3[sizeof (ConstantNode*)];
+      char dummy2[sizeof (ConstantNode*)];
 
       // distinct
       // distinct_param
       // sort
       // sort_param
       // limit
-      char dummy4[sizeof (DescriptorNode*)];
+      char dummy3[sizeof (DescriptorNode*)];
 
       // post_query
-      char dummy5[sizeof (DescriptorOrderingNode*)];
+      char dummy4[sizeof (DescriptorOrderingNode*)];
 
       // expr
-      char dummy6[sizeof (ExpressionNode*)];
+      char dummy5[sizeof (ExpressionNode*)];
+
+      // geopoint
+      char dummy6[sizeof (GeoPoint)];
 
       // geopoly_content
       // geospatial
@@ -503,12 +502,15 @@ namespace yy {
       // direction
       char dummy17[sizeof (bool)];
 
+      // coordinate
+      char dummy18[sizeof (double)];
+
       // comp_type
       // aggr_op
       // equality
       // relational
       // stringop
-      char dummy18[sizeof (int)];
+      char dummy19[sizeof (int)];
 
       // "identifier"
       // "string"
@@ -541,9 +543,8 @@ namespace yy {
       // "@size"
       // "@type"
       // "key or value"
-      // double
       // id
-      char dummy19[sizeof (std::string)];
+      char dummy20[sizeof (std::string)];
     };
 
     /// The size of the largest semantic type.
@@ -749,7 +750,7 @@ namespace yy {
         SYM_aggregate = 80,                      // aggregate
         SYM_simple_prop = 81,                    // simple_prop
         SYM_subquery = 82,                       // subquery
-        SYM_double = 83,                         // double
+        SYM_coordinate = 83,                     // coordinate
         SYM_geopoint = 84,                       // geopoint
         SYM_geopoly_content = 85,                // geopoly_content
         SYM_geospatial = 86,                     // geospatial
@@ -808,10 +809,6 @@ namespace yy {
       {
         switch (this->kind ())
     {
-      case symbol_kind::SYM_geopoint: // geopoint
-        value.move<  std::array<std::string, 3>  > (std::move (that.value));
-        break;
-
       case symbol_kind::SYM_aggregate: // aggregate
         value.move< AggrNode* > (std::move (that.value));
         break;
@@ -835,6 +832,10 @@ namespace yy {
 
       case symbol_kind::SYM_expr: // expr
         value.move< ExpressionNode* > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.move< GeoPoint > (std::move (that.value));
         break;
 
       case symbol_kind::SYM_geopoly_content: // geopoly_content
@@ -885,6 +886,10 @@ namespace yy {
         value.move< bool > (std::move (that.value));
         break;
 
+      case symbol_kind::SYM_coordinate: // coordinate
+        value.move< double > (std::move (that.value));
+        break;
+
       case symbol_kind::SYM_comp_type: // comp_type
       case symbol_kind::SYM_aggr_op: // aggr_op
       case symbol_kind::SYM_equality: // equality
@@ -924,7 +929,6 @@ namespace yy {
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_KEY_VAL: // "key or value"
-      case symbol_kind::SYM_double: // double
       case symbol_kind::SYM_id: // id
         value.move< std::string > (std::move (that.value));
         break;
@@ -947,18 +951,6 @@ namespace yy {
 #else
       basic_symbol (typename Base::kind_type t)
         : Base (t)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t,  std::array<std::string, 3> && v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const  std::array<std::string, 3> & v)
-        : Base (t)
-        , value (v)
       {}
 #endif
 
@@ -1017,6 +1009,18 @@ namespace yy {
       {}
 #else
       basic_symbol (typename Base::kind_type t, const ExpressionNode*& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, GeoPoint&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const GeoPoint& v)
         : Base (t)
         , value (v)
       {}
@@ -1155,6 +1159,18 @@ namespace yy {
 #endif
 
 #if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, double&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const double& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
       basic_symbol (typename Base::kind_type t, int&& v)
         : Base (t)
         , value (std::move (v))
@@ -1222,10 +1238,6 @@ namespace yy {
         // Value type destructor.
 switch (yykind)
     {
-      case symbol_kind::SYM_geopoint: // geopoint
-        value.template destroy<  std::array<std::string, 3>  > ();
-        break;
-
       case symbol_kind::SYM_aggregate: // aggregate
         value.template destroy< AggrNode* > ();
         break;
@@ -1249,6 +1261,10 @@ switch (yykind)
 
       case symbol_kind::SYM_expr: // expr
         value.template destroy< ExpressionNode* > ();
+        break;
+
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.template destroy< GeoPoint > ();
         break;
 
       case symbol_kind::SYM_geopoly_content: // geopoly_content
@@ -1299,6 +1315,10 @@ switch (yykind)
         value.template destroy< bool > ();
         break;
 
+      case symbol_kind::SYM_coordinate: // coordinate
+        value.template destroy< double > ();
+        break;
+
       case symbol_kind::SYM_comp_type: // comp_type
       case symbol_kind::SYM_aggr_op: // aggr_op
       case symbol_kind::SYM_equality: // equality
@@ -1338,7 +1358,6 @@ switch (yykind)
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_KEY_VAL: // "key or value"
-      case symbol_kind::SYM_double: // double
       case symbol_kind::SYM_id: // id
         value.template destroy< std::string > ();
         break;
@@ -2754,7 +2773,7 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 552,     ///< Last index in yytable_.
+      yylast_ = 554,     ///< Last index in yytable_.
       yynnts_ = 35,  ///< Number of nonterminal symbols.
       yyfinal_ = 66 ///< Termination state number.
     };
@@ -2828,10 +2847,6 @@ switch (yykind)
   {
     switch (this->kind ())
     {
-      case symbol_kind::SYM_geopoint: // geopoint
-        value.copy<  std::array<std::string, 3>  > (YY_MOVE (that.value));
-        break;
-
       case symbol_kind::SYM_aggregate: // aggregate
         value.copy< AggrNode* > (YY_MOVE (that.value));
         break;
@@ -2855,6 +2870,10 @@ switch (yykind)
 
       case symbol_kind::SYM_expr: // expr
         value.copy< ExpressionNode* > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.copy< GeoPoint > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_geopoly_content: // geopoly_content
@@ -2905,6 +2924,10 @@ switch (yykind)
         value.copy< bool > (YY_MOVE (that.value));
         break;
 
+      case symbol_kind::SYM_coordinate: // coordinate
+        value.copy< double > (YY_MOVE (that.value));
+        break;
+
       case symbol_kind::SYM_comp_type: // comp_type
       case symbol_kind::SYM_aggr_op: // aggr_op
       case symbol_kind::SYM_equality: // equality
@@ -2944,7 +2967,6 @@ switch (yykind)
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_KEY_VAL: // "key or value"
-      case symbol_kind::SYM_double: // double
       case symbol_kind::SYM_id: // id
         value.copy< std::string > (YY_MOVE (that.value));
         break;
@@ -2980,10 +3002,6 @@ switch (yykind)
     super_type::move (s);
     switch (this->kind ())
     {
-      case symbol_kind::SYM_geopoint: // geopoint
-        value.move<  std::array<std::string, 3>  > (YY_MOVE (s.value));
-        break;
-
       case symbol_kind::SYM_aggregate: // aggregate
         value.move< AggrNode* > (YY_MOVE (s.value));
         break;
@@ -3007,6 +3025,10 @@ switch (yykind)
 
       case symbol_kind::SYM_expr: // expr
         value.move< ExpressionNode* > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.move< GeoPoint > (YY_MOVE (s.value));
         break;
 
       case symbol_kind::SYM_geopoly_content: // geopoly_content
@@ -3057,6 +3079,10 @@ switch (yykind)
         value.move< bool > (YY_MOVE (s.value));
         break;
 
+      case symbol_kind::SYM_coordinate: // coordinate
+        value.move< double > (YY_MOVE (s.value));
+        break;
+
       case symbol_kind::SYM_comp_type: // comp_type
       case symbol_kind::SYM_aggr_op: // aggr_op
       case symbol_kind::SYM_equality: // equality
@@ -3096,7 +3122,6 @@ switch (yykind)
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_KEY_VAL: // "key or value"
-      case symbol_kind::SYM_double: // double
       case symbol_kind::SYM_id: // id
         value.move< std::string > (YY_MOVE (s.value));
         break;

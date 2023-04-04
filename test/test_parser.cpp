@@ -293,6 +293,7 @@ static std::vector<std::string> invalid_queries = {
     "0 contains1",
     "a contains_something",
     "endswith 0",
+    "link geoWithin 5.0"
 
     // atoms/groups
     "0=0)",
@@ -5659,14 +5660,9 @@ TEST(Parser_Geospatial)
     table->add_column_list(*geo_table, "links");
     table->add_column(*table, "self_link");
 
-    auto add_data = [&](Geospatial geo) {
-        Obj top_obj = table->create_object_with_primary_key(ObjectId::gen());
-        Obj geo_obj = top_obj.create_and_set_linked_object(col_link);
-        geo.assign_to(geo_obj);
-    };
     std::vector<Geospatial> point_data = {GeoPoint{0, 0}, GeoPoint{0.5, 0.5}, GeoPoint{1, 1}, GeoPoint{2, 2}};
     for (auto& geo : point_data) {
-        add_data(geo);
+        table->create_object_with_primary_key(ObjectId::gen()).set(col_link, geo);
     }
 
     verify_query(test_context, table, "link geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 1);

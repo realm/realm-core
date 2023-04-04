@@ -96,7 +96,7 @@ struct GeoCenterSphere {
 
 class Geospatial {
 public:
-    enum class Type { Point, Box, Polygon, CenterSphere, Invalid };
+    enum class Type : uint8_t { Point, Box, Polygon, CenterSphere, Invalid };
 
     Geospatial()
         : m_type(Type::Invalid)
@@ -216,16 +216,16 @@ class GeospatialRef {
 public:
     GeospatialRef(const GeoPoint* data, const Geospatial& geo)
         : m_data(data)
-        , m_size(geo.m_points.size())
+        , m_sphere_radius(geo.m_radius_radians ? *geo.m_radius_radians : 0)
+        , m_size(unsigned(geo.m_points.size()))
         , m_type(geo.m_type)
-        , m_sphere_radius(geo.m_radius_radians)
     {
     }
     GeospatialRef(const GeoPoint* data, size_t size, Geospatial::Type type, std::optional<double> sphere_radius)
         : m_data(data)
-        , m_size(size)
+        , m_sphere_radius(sphere_radius ? *sphere_radius : 0)
+        , m_size(unsigned(size))
         , m_type(type)
-        , m_sphere_radius(sphere_radius)
     {
     }
     Geospatial get() const
@@ -242,24 +242,24 @@ public:
                 return Geospatial(GeoBox{m_data[0], m_data[1]});
             case Geospatial::Type::Polygon: {
                 GeoPolygon poly{};
-                for (size_t i = 0; i < m_size; ++i) {
+                for (unsigned i = 0; i < m_size; ++i) {
                     poly.points.push_back(m_data[i]);
                 }
                 return Geospatial{poly};
             }
             case Geospatial::Type::CenterSphere:
                 REALM_ASSERT_EX(m_size == 1, m_size);
-                REALM_ASSERT(m_sphere_radius);
-                return Geospatial(GeoCenterSphere{*m_sphere_radius * Geospatial::c_radius_km, m_data[0]});
+                return Geospatial(GeoCenterSphere{m_sphere_radius * Geospatial::c_radius_km, m_data[0]});
         }
         return Geospatial();
     }
 
 private:
+    // size of struct is now 24
     const GeoPoint* m_data = nullptr;
-    size_t m_size = 0;
+    double m_sphere_radius;
+    unsigned m_size = 0;
     Geospatial::Type m_type = Geospatial::Type::Invalid;
-    std::optional<double> m_sphere_radius;
 };
 
 class GeospatialStorage {

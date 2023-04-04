@@ -745,25 +745,30 @@ Query StringOpsNode::visit(ParserDriver* drv)
 
 Query GeoWithinNode::visit(ParserDriver* drv)
 {
-    auto [left, right] = drv->cmp(values);
+    auto left = prop->visit(drv);
     auto left_type = left->get_type();
-    auto right_type = right->get_type();
-
     if (left_type != type_Link) {
         throw InvalidQueryError(util::format("The left hand side of 'geoWithin' must be a link to geoJSON formatted "
                                              "data. But the provided type is '%1'",
                                              get_data_type_name(left_type)));
     }
-    if (right_type != type_Geospatial) {
-        throw InvalidQueryError(util::format(
-            "The right hand side of 'geoWithin' must be a geospatial constant value. But the provided type is '%1'",
-            get_data_type_name(right_type)));
-    }
-
     auto link_column = dynamic_cast<const Columns<Link>*>(left.get());
-    auto geo_value = dynamic_cast<const ConstantGeospatialValue*>(right.get());
-    if (link_column && geo_value) {
+
+    if (geo) {
+        auto right = geo->visit(drv, type_Int);
+        auto geo_value = dynamic_cast<const ConstantGeospatialValue*>(right.get());
         return link_column->geo_within(geo_value->get_mixed().get<Geospatial>());
+    }
+    else {
+        size_t arg_no = size_t(strtol(argument.substr(1).c_str(), nullptr, 10));
+        auto right_type = drv->m_args.is_argument_null(arg_no) ? DataType(-1) : drv->m_args.type_for_argument(arg_no);
+        if (right_type != type_Geospatial) {
+            throw InvalidQueryError(util::format("The right hand side of 'geoWithin' must be a geospatial constant "
+                                                 "value. But the provided type is '%1'",
+                                                 get_data_type_name(right_type)));
+        }
+        ConstantGeospatialValue const_geo_value(drv->m_args.geospatial_for_argument(arg_no));
+        return link_column->geo_within(const_geo_value.get_mixed().get<Geospatial>());
     }
 
     REALM_UNREACHABLE();
@@ -1322,10 +1327,6 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                                                               drv->m_base_table->get_parent_group()));
                         break;
                     default:
-                        if (type == type_Geospatial || type == type_GeoPoint) {
-                            ret = std::make_unique<ConstantGeospatialValue>(
-                                drv->m_args.geospatial_for_argument(arg_no));
-                        }
                         break;
                 }
             }
@@ -1340,34 +1341,24 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
     return ret;
 }
 
-static GeoPoint convert(const GeospatialNode::PointString& point)
-{
-    if (point[2] == "") {
-        return GeoPoint{string_to<double>(point[0]), string_to<double>(point[1])};
-    }
-    GeoPoint geo{string_to<double>(point[0]), string_to<double>(point[1])};
-    geo.set_altitude(string_to<double>(point[2]));
-    return geo;
-}
-
-GeospatialNode::GeospatialNode(GeospatialNode::Box, GeospatialNode::PointString p1, GeospatialNode::PointString p2)
-    : m_geo{Geospatial{GeoBox{convert(p1), convert(p2)}}}
+GeospatialNode::GeospatialNode(GeospatialNode::Box, GeoPoint& p1, GeoPoint& p2)
+    : m_geo{Geospatial{GeoBox{p1, p2}}}
 {
 }
 
-GeospatialNode::GeospatialNode(Sphere, PointString p, std::string radius)
-    : m_geo{Geospatial{GeoCenterSphere{string_to<double>(radius), convert(p)}}}
+GeospatialNode::GeospatialNode(Sphere, GeoPoint& p, double radius)
+    : m_geo{Geospatial{GeoCenterSphere{radius, p}}}
 {
 }
 
-GeospatialNode::GeospatialNode(Polygon, PointString p)
-    : m_geo(Geospatial{GeoPolygon{convert(p)}})
+GeospatialNode::GeospatialNode(Polygon, GeoPoint& p)
+    : m_geo(Geospatial{GeoPolygon{p}})
 {
 }
 
-void GeospatialNode::add_point_to_polygon(PointString p)
+void GeospatialNode::add_point_to_polygon(GeoPoint& p)
 {
-    m_geo.add_point_to_polygon(convert(p));
+    m_geo.add_point_to_polygon(p);
 }
 
 std::unique_ptr<Subexpr> GeospatialNode::visit(ParserDriver*, DataType)
