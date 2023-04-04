@@ -945,7 +945,14 @@ void File::prealloc(size_t size)
         // so this is some other runtime error and not OutOfDiskSpace
         throw SystemError(err, "ftruncate() inside prealloc() failed");
     }
-#elif REALM_ANDROID || defined(_WIN32)
+#elif defined(_WIN32)
+    // FileEndOfFileInfo will update the logical file size, and also grow the file if necessary
+    FILE_END_OF_FILE_INFO eof_info{};
+    eof_info.EndOfFile.QuadPart = new_size;
+    if (!SetFileInformationByHandle(m_fd, FileEndOfFileInfo, &eof_info, sizeof(eof_info))) {
+        throw SystemError(GetLastError(), "SetFileInformationByHandle(FileEndOfFileInfo) inside prealloc() failed");
+    }
+#elif REALM_ANDROID
 
     consume_space_interlocked();
 
