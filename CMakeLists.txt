@@ -313,7 +313,7 @@ elseif(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 endif()
 set(CATCH_CONFIG_ENABLE_ALL_STRINGMAKERS ON CACHE BOOL "Enable Catch2's optional standard library stringmakers")
 
-add_subdirectory(external/catch EXCLUDE_FROM_ALL)
+add_subdirectory(external EXCLUDE_FROM_ALL)
 
 # Cmake does not let us easily set the deployment target per-target, but Catch2
 # can use modern features because we only run tests on recent OS versions.
