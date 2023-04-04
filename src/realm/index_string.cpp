@@ -1220,8 +1220,8 @@ void StringIndex::find_all_fulltext(std::vector<ObjKey>& result, StringData valu
                         ++m;
                     }
                 }
-                while (r != result.end()) {
-                    r = result.erase(r);
+                if (r != result.end()) {
+                    result.erase(r, result.end());
                 }
             }
 
