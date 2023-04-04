@@ -16,6 +16,8 @@
  *
  **************************************************************************/
 
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
+
 #include <cstring>
 #include <stdexcept>
 #include <system_error>
@@ -109,8 +111,10 @@ void Thread::set_name(const std::string& name)
 #else
     SETTHREADDESCRIPTION = &SetThreadDescription;
 #endif
-    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>, wchar_t> convert;
-    std::wstring name_wide = convert.from_bytes(name);
+    std::wstring name_wide;
+    name_wide.resize(MultiByteToWideChar(CP_UTF8, 0, name.c_str(), name.length(), nullptr, 0));
+    MultiByteToWideChar(CP_UTF8, 0, name.c_str(), name.length(), name_wide.data(),
+                        name_wide.size());
     HRESULT result = SETTHREADDESCRIPTION(GetCurrentThread(), name_wide.data());
     if (REALM_UNLIKELY(!SUCCEEDED(result))) {
         throw std::system_error(result, std::system_category(), "SetThreadDescription failed");
@@ -148,8 +152,9 @@ bool Thread::get_name(std::string& name) noexcept
 #endif
     PWSTR name_wide;
     if (SUCCEEDED(GETTHREADDESCRIPTION(GetCurrentThread(), &name_wide))) {
-        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>, wchar_t> convert;
-        name = convert.to_bytes(name_wide);
+        size_t length_wide = wcslen(name_wide);
+        name.resize(WideCharToMultiByte(CP_UTF8, 0, name_wide, length_wide, nullptr, 0, nullptr, nullptr));
+        WideCharToMultiByte(CP_UTF8, 0, name_wide, length_wide, name.data(), name.size(), nullptr, nullptr);
         LocalFree(name_wide);
     }
     return false;
