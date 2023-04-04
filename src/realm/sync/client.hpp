@@ -14,6 +14,7 @@
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/socket_provider.hpp>
 #include <realm/sync/subscriptions.hpp>
+#include <realm/sync/noinst/migration_store.hpp>
 
 namespace realm::sync {
 
@@ -333,10 +334,6 @@ public:
         /// changeset data in a single integration attempt.
         size_t flx_bootstrap_batch_size_bytes = 1024 * 1024;
 
-        /// Contains the original PBS partition value from before the migration -
-        /// empty if not migrated
-        std::optional<std::string> migrated_partition;
-
         /// Set to true to cause the integration of the first received changeset
         /// (in a DOWNLOAD message) to fail.
         ///
@@ -351,7 +348,8 @@ public:
     /// Note that the session is not fully activated until you call bind().
     /// Also note that if you call set_sync_transact_callback(), it must be
     /// done before calling bind().
-    Session(Client&, std::shared_ptr<DB>, std::shared_ptr<SubscriptionStore>, Config&& = {});
+    Session(Client&, std::shared_ptr<DB>, std::shared_ptr<SubscriptionStore>, std::shared_ptr<MigrationStore>,
+            Config&& = {});
 
     /// This leaves the right-hand side session object detached. See "Thread
     /// safety" section under detach().

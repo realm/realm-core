@@ -841,7 +841,6 @@ void SyncSession::create_sync_session()
     session_config.proxy_config = sync_config.proxy_config;
     session_config.simulate_integration_error = sync_config.simulate_integration_error;
     session_config.flx_bootstrap_batch_size_bytes = sync_config.flx_bootstrap_batch_size_bytes;
-    session_config.migrated_partition = m_migration_store->get_migrated_partition();
 
     if (sync_config.on_sync_client_event_hook) {
         session_config.on_sync_client_event_hook = [hook = sync_config.on_sync_client_event_hook,
@@ -878,7 +877,7 @@ void SyncSession::create_sync_session()
         m_server_requests_action = sync::ProtocolErrorInfo::Action::NoAction;
     }
 
-    m_session = m_client.make_session(m_db, m_flx_subscription_store, std::move(session_config));
+    m_session = m_client.make_session(m_db, m_flx_subscription_store, m_migration_store, std::move(session_config));
 
     std::weak_ptr<SyncSession> weak_self = weak_from_this();
 

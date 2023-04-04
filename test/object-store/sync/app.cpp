@@ -4772,11 +4772,11 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
                              error.what(), session->path());
             }
             else {
-                util::format(std::cerr,
-                             "An unexpected sync error was caught during test: 'app destroyed during token refresh': "
-                             "'%1' for '%2'",
-                             error.what(), session->path());
-                abort();
+                std::string err_msg(util::format("An unexpected sync error was caught during test: 'app destroyed "
+                                                 "during token refresh': '%1' for '%2'",
+                                                 error.what(), session->path()));
+                std::cerr << err_msg << std::endl;
+                throw std::runtime_error(err_msg);
             }
         };
         auto r = Realm::get_shared_realm(config);

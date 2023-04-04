@@ -3003,7 +3003,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     session_config.ssl_trust_certificate_path = util::none;
     session_config.ssl_verify_callback = ssl_verify_callback;
 
-    Session session(client, db, nullptr, std::move(session_config));
+    Session session(client, db, nullptr, nullptr, std::move(session_config));
     session.bind();
     session.wait_for_download_complete_or_client_stopped();
 
@@ -3141,7 +3141,7 @@ TEST(Sync_UploadDownloadProgress_1)
         sess_config.realm_identifier = "/test";
         sess_config.signed_user_token = g_signed_test_user_token;
 
-        Session session(client, db, nullptr, std::move(sess_config));
+        Session session(client, db, nullptr, nullptr, std::move(sess_config));
 
         int number_of_handler_calls = 0;
 
@@ -3414,7 +3414,7 @@ TEST(Sync_UploadDownloadProgress_3)
     config.server_port = server_port;
     config.realm_identifier = "/test";
 
-    Session session(client, db, nullptr, std::move(config));
+    Session session(client, db, nullptr, nullptr, std::move(config));
 
     // entry is used to count the number of calls to
     // progress_handler. At the first call, the server is
@@ -3696,7 +3696,7 @@ TEST(Sync_UploadDownloadProgress_6)
     session_config.signed_user_token = g_signed_test_user_token;
 
     std::mutex mutex;
-    auto session = std::make_unique<Session>(client, db, nullptr, std::move(session_config));
+    auto session = std::make_unique<Session>(client, db, nullptr, nullptr, std::move(session_config));
 
     auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
@@ -5113,7 +5113,7 @@ TEST_IF(Sync_SSL_Certificates, false)
         // Invalid token for the cloud.
         session_config.signed_user_token = g_signed_test_user_token;
 
-        Session session{client, db, nullptr, std::move(session_config)};
+        Session session{client, db, nullptr, nullptr, std::move(session_config)};
 
         auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
             if (state == ConnectionState::disconnected) {
