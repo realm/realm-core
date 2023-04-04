@@ -13,11 +13,7 @@
 #include "s2/base/definer.h"   // For OS_WINDOWS
 
 #include <stddef.h>         // For size_t
-
-// We use our own  local  version of type traits while we're waiting
-// for TR1 type traits to be standardized. Define some macros so that
-// most google3 code doesn't have to work with type traits directly.
-#include "type_traits.h"
+#include <type_traits>
 
 // The swigged version of an abstract class must be concrete if any methods
 // return objects of the abstract type. We keep it abstract in C++ and
@@ -226,7 +222,7 @@ char (&ArraySizeHelper(const T (&array)[N]))[N];
 // variables must themselves be PODs.
 
 #define DECLARE_POD(TypeName)                       \
-namespace base {                                    \
+namespace std {                                    \
 template<> struct is_pod<TypeName> : true_type { }; \
 }                                                   \
 typedef int Dummy_Type_For_DECLARE_POD              \
@@ -242,8 +238,8 @@ typedef int Dummy_Type_For_DECLARE_POD              \
 
 // Declare that TemplateName<T> is a POD whenever T is
 #define PROPAGATE_POD_FROM_TEMPLATE_ARGUMENT(TemplateName)             \
-namespace base {                                                       \
-template <typename T> struct is_pod<TemplateName<T> > : is_pod<T> { }; \
+namespace std {                                                       \
+template <typename T> struct is_pod<TemplateName<T> > : std::is_trivial<T> { }; \
 }                                                                      \
 typedef int Dummy_Type_For_PROPAGATE_POD_FROM_TEMPLATE_ARGUMENT
 
@@ -260,6 +256,6 @@ template <> struct ERROR_TYPE_MUST_BE_POD<true> { };
 #define ENFORCE_POD(TypeName)                                             \
   enum { dummy_##TypeName                                                 \
            = sizeof(ERROR_TYPE_MUST_BE_POD<                               \
-                      base::is_pod<TypeName>::value>) }
+                      std::is_trivial<TypeName>::value>) }
 
 #endif  // BASE_MACROS_H_
