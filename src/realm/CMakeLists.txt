@@ -334,7 +334,7 @@ target_include_directories(Storage INTERFACE
 )
 
 set_source_files_properties(geospatial.cpp PROPERTIES
-    INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/src/external"
+    INCLUDE_DIRECTORIES "${RealmCore_SOURCE_DIR}/src/external"
     # the only flag not supported with pragma diagnostic disable in src file by gcc until 13.
     COMPILE_FLAGS "$<$<CXX_COMPILER_ID:GNU>: -Wno-unknown-pragmas>"
 )
