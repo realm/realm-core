@@ -57,6 +57,17 @@ function(add_cxx_flag_if_supported flag)
     endif()
 endfunction()
 
+function(check_if_cxx_compiler_flag_supported flag out_var)
+    if(flag MATCHES "^-Wno-")
+        # Compilers ignore unknown -Wno-foo flags, so look for -Wfoo instead.
+        string(REPLACE "-Wno-" "-W" check_flag ${flag})
+    else()
+        set(check_flag ${flag})
+    endif()
+
+    check_cxx_compiler_flag(${check_flag} ${out_var})
+endfunction()
+
 function(use_faster_linker)
     # If a linker has already been set, don't override.
     if ("${CMAKE_EXE_LINKER_FLAGS}" MATCHES "-fuse-ld=")
@@ -112,8 +123,7 @@ else()
     # compilers that we still support. It is also harmless, unlike pessimizing moves.
     add_cxx_flag_if_supported(-Wno-redundant-move)
 
-    # MacOS Clang 14.0.3 started enabling unused-but-set-variables by default
-    add_cxx_flag_if_supported(-Wno-unused-but-set-variable)
+    check_if_cxx_compiler_flag_supported(-Wno-unused-but-set-variable HAS-Wno-unused-but-set-variable)
 
     # Ninja buffers output so we need to tell the compiler to use colors even though stdout isn't a tty.
     if("${CMAKE_GENERATOR}" STREQUAL "Ninja")

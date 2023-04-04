@@ -33,6 +33,9 @@ endif()
 set(REALM_PARSER_SOURCES
     driver.cpp
     keypath_mapping.cpp
+) # REALM_PARSER_SOURCES
+
+set(REALM_PARSER_GENERAED
     generated/query_flex.cpp
     generated/query_bison.cpp
 ) # REALM_PARSER_SOURCES
@@ -56,13 +59,21 @@ set(REALM_PARSER_EXTRAS
     query_flex.ll
 )
 
+# Add custom warning flags for generated parser files
+if(HAS-Wno-unused-but-set-variable)
+    foreach(SRC_ IN LISTS REALM_PARSER_GENERAED)
+        get_filename_component(SRC_BASENAME_ ${SRC_} NAME_WE)
+        set_source_files_properties(${SRC_} PROPERTIES COMPILE_OPTIONS "-Wno-unused-but-set-variable")
+    endforeach()
+endif()
+
 if(MSVC)
     set_source_files_properties(generated/query_flex.cpp PROPERTIES COMPILE_OPTIONS "/wd4018")
 else()
     set_source_files_properties(generated/query_flex.cpp PROPERTIES COMPILE_OPTIONS "-Wno-unreachable-code;-Wno-sign-compare")
 endif()
 
-add_library(QueryParser STATIC ${REALM_PARSER_SOURCES} ${REALM_PARSER_HEADERS} ${REALM_PARSER_EXTRAS})
+add_library(QueryParser STATIC ${REALM_PARSER_SOURCES} ${REALM_PARSER_GENERAED} ${REALM_PARSER_HEADERS} ${REALM_PARSER_EXTRAS})
 add_library(realm-parser ALIAS QueryParser)
 add_library(Realm::QueryParser ALIAS QueryParser)
 target_link_libraries(QueryParser PUBLIC Storage)
