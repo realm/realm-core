@@ -25,6 +25,8 @@
 
 #if !defined _WIN32
 #include <unistd.h>
+#else
+#include <codecvt>
 #endif
 
 // "Process shared mutexes" are not officially supported on Android,
@@ -95,6 +97,24 @@ void Thread::set_name(const std::string& name)
     int r = pthread_setname_np(name.data());
     if (REALM_UNLIKELY(r != 0))
         throw std::system_error(r, std::system_category(), "pthread_setname_np() failed");
+#elif defined(_WIN32)
+    // SetThreadDescription was only introduced in Windows 10 1607, so we need to dynamically load it.
+    HRESULT(WINAPI *SETTHREADDESCRIPTION)(HANDLE hThread, PCWSTR threadDescription) = nullptr;
+#if NTDDI_VERSION < NTDDI_WIN10_RS1
+    auto proc_address = GetProcAddress(GetModuleHandle(L"Kernel32.dll"), "SetThreadDescription");
+    if (!proc_address) {
+        return;
+    }
+    SETTHREADDESCRIPTION = reinterpret_cast<decltype(SETTHREADDESCRIPTION)>(proc_address);
+#else
+    SETTHREADDESCRIPTION = &SetThreadDescription;
+#endif
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>, wchar_t> convert;
+    std::wstring name_wide = convert.from_bytes(name);
+    HRESULT result = SETTHREADDESCRIPTION(GetCurrentThread(), name_wide.data());
+    if (REALM_UNLIKELY(!SUCCEEDED(result))) {
+        throw std::system_error(result, std::system_category(), "SetThreadDescription failed");
+    }
 #else
     static_cast<void>(name);
 #endif
@@ -114,6 +134,25 @@ bool Thread::get_name(std::string& name) noexcept
     name_2[max - 1] = '\0';              // Eliminate any risk of buffer overrun in strlen().
     name.assign(name_2, strlen(name_2)); // Throws
     return true;
+#elif defined(_WIN32)
+    // GetThreadDescription was only introduced in Windows 10 1607, so we need to dynamically load it.
+    HRESULT(WINAPI *GETTHREADDESCRIPTION)(HANDLE hThread, PWSTR * threadDescription) = nullptr;
+#if NTDDI_VERSION < NTDDI_WIN10_RS1
+    auto proc_address = GetProcAddress(GetModuleHandle(L"Kernel32.dll"), "GetThreadDescription");
+    if (!proc_address) {
+        return false;
+    }
+    GETTHREADDESCRIPTION = reinterpret_cast<decltype(GETTHREADDESCRIPTION)>(proc_address);
+#else
+    GETTHREADDESCRIPTION = &GetThreadDescription;
+#endif
+    PWSTR name_wide;
+    if (SUCCEEDED(GETTHREADDESCRIPTION(GetCurrentThread(), &name_wide))) {
+        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>, wchar_t> convert;
+        name = convert.to_bytes(name_wide);
+        LocalFree(name_wide);
+    }
+    return false;
 #else
     static_cast<void>(name);
     return false;

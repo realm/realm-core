@@ -230,7 +230,7 @@ void DaemonThread::remove(int fd, RealmCoordinator* coordinator)
 
 void DaemonThread::listen()
 {
-    pthread_setname_np(pthread_self(), "Realm notification listener");
+    util::Thread::set_name("Realm notification listener");
 
     int ret;
 

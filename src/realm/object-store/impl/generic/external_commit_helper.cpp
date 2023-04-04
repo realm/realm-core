@@ -32,6 +32,7 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent, const Realm
                       DBOptions(parent.is_in_memory() ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full,
                                 parent.get_encryption_key().data())))
     , m_thread(std::async(std::launch::async, [=] {
+        util::Thread::set_name("Realm notification listener");
         auto tr = m_sg->start_read();
         while (m_sg->wait_for_change(tr)) {
             tr->end_read();

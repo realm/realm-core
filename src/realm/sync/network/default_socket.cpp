@@ -522,6 +522,7 @@ void DefaultSocketProvider::start()
 
 void DefaultSocketProvider::event_loop()
 {
+    util::Thread::set_name("Realm Sync DefaultSocketProvider");
     m_logger_ptr->trace("Default event loop: thread running");
     // Calls will_destroy_thread() when destroyed
     auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
