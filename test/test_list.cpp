@@ -33,8 +33,8 @@ using namespace std::chrono;
 #include "test.hpp"
 #include "test_types_helper.hpp"
 
-//#include <valgrind/callgrind.h>
-//#define PERFORMACE_TESTING
+// #include <valgrind/callgrind.h>
+// #define PERFORMACE_TESTING
 
 using namespace realm;
 using namespace realm::util;
@@ -667,7 +667,7 @@ TEST(List_NestedListColumns)
     tr->commit_and_continue_as_read();
 }
 
-TEST(List_NestedList)
+TEST(List_NestedList_Insert)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(make_in_realm_history(), path);
@@ -726,4 +726,70 @@ TEST(List_NestedList)
     CHECK_EQUAL(list2->size(), 0);
     CHECK_EQUAL(collection->size(), 0);
     CHECK_EQUAL(collection2->size(), 0);
+}
+
+TEST(List_NestedList_Remove)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(make_in_realm_history(), path);
+    auto tr = db->start_write();
+    auto table = tr->add_table("table");
+    auto list_col = table->add_column(type_Int, "int_list_list", false, {CollectionType::List, CollectionType::List});
+    auto list_col2 = table->add_column(type_Int, "int_dict_list_list", false,
+                                       {CollectionType::Dictionary, CollectionType::List, CollectionType::List});
+
+    CHECK_EQUAL(table->get_nesting_levels(list_col), 1);
+    CHECK_EQUAL(table->get_nesting_levels(list_col2), 2);
+
+    Obj obj = table->create_object();
+
+    auto list = obj.get_collection_list(list_col);
+    CHECK(list->is_empty());
+    auto collection = list->insert_collection(0);
+    dynamic_cast<Lst<Int>*>(collection.get())->add(5);
+
+    auto dict = obj.get_collection_list(list_col2);
+    auto list2 = dict->insert_collection_list("Foo");
+    auto collection2 = list2->insert_collection(0);
+    dynamic_cast<Lst<Int>*>(collection2.get())->add(5);
+
+    tr->commit_and_continue_as_read();
+    CHECK_NOT(list->is_empty());
+    CHECK_EQUAL(obj.get_collection_list(list_col)->get_collection(0)->get_any(0).get_int(), 5);
+    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection2.get())->get(0), 5);
+    // transaction
+    {
+        tr->promote_to_write();
+
+        auto lst = list->get_collection(0);
+        dynamic_cast<Lst<Int>*>(lst.get())->add(47);
+
+        lst = obj.get_collection_list(list_col2)->insert_collection_list("Foo")->get_collection(0);
+        dynamic_cast<Lst<Int>*>(collection2.get())->set(0, 100);
+
+        tr->commit_and_continue_as_read();
+    }
+    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection.get())->get(0), 5);
+    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection.get())->get(1), 47);
+    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection2.get())->get(0), 100);
+
+    CHECK(list->size() == 1);
+    CHECK(dict->size() == 1);
+    CHECK(list2->size() == 1);
+    CHECK(collection->size() == 2);
+    CHECK(collection2->size() == 1);
+
+    tr->promote_to_write();
+    list->remove(0);
+    CHECK_THROW_ANY(dict->remove("Bar"));
+    dict->remove("Foo");
+    tr->verify();
+    tr->commit_and_continue_as_read();
+
+    CHECK_EQUAL(list->size(), 0);
+    CHECK_EQUAL(dict->size(), 0);
+    CHECK_EQUAL(collection->size(), 0);
+    tr->promote_to_write();
+    obj.remove();
+    tr->commit_and_continue_as_read();
 }
