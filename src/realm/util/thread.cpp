@@ -113,8 +113,7 @@ void Thread::set_name(const std::string& name)
 #endif
     std::wstring name_wide;
     name_wide.resize(MultiByteToWideChar(CP_UTF8, 0, name.c_str(), name.length(), nullptr, 0));
-    MultiByteToWideChar(CP_UTF8, 0, name.c_str(), name.length(), name_wide.data(),
-                        name_wide.size());
+    MultiByteToWideChar(CP_UTF8, 0, name.c_str(), name.length(), name_wide.data(), name_wide.size());
     HRESULT result = SETTHREADDESCRIPTION(GetCurrentThread(), name_wide.data());
     if (REALM_UNLIKELY(!SUCCEEDED(result))) {
         throw std::system_error(result, std::system_category(), "SetThreadDescription failed");
