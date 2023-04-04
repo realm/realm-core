@@ -174,7 +174,8 @@ ErrorCategoryImpl g_error_category;
 // in ClientImpl::Connection.
 class SessionWrapper final : public util::AtomicRefCountBase, public SyncTransactReporter {
 public:
-    SessionWrapper(ClientImpl&, DBRef db, std::shared_ptr<SubscriptionStore>, Session::Config);
+    SessionWrapper(ClientImpl&, DBRef db, std::shared_ptr<SubscriptionStore>, std::shared_ptr<MigrationStore>,
+                   Session::Config);
     ~SessionWrapper() noexcept;
 
     ClientReplication& get_replication() noexcept;
@@ -183,6 +184,8 @@ public:
     bool has_flx_subscription_store() const;
     SubscriptionStore* get_flx_subscription_store();
     PendingBootstrapStore* get_flx_pending_bootstrap_store();
+
+    MigrationStore* get_migration_store();
 
     void set_sync_transact_handler(util::UniqueFunction<SyncTransactCallback>);
     void set_progress_handler(util::UniqueFunction<ProgressHandler>);
@@ -259,6 +262,8 @@ private:
     int64_t m_flx_latest_version = 0;
     int64_t m_flx_pending_mark_version = 0;
     std::unique_ptr<PendingBootstrapStore> m_flx_pending_bootstrap_store;
+
+    std::shared_ptr<MigrationStore> m_migration_store;
 
     bool m_initiated = false;
 
@@ -945,6 +950,11 @@ SubscriptionStore* SessionImpl::get_flx_subscription_store()
     return m_wrapper.get_flx_subscription_store();
 }
 
+MigrationStore* SessionImpl::get_migration_store()
+{
+    return m_wrapper.get_migration_store();
+}
+
 void SessionImpl::non_sync_flx_completion(int64_t version)
 {
     m_wrapper.on_flx_sync_version_complete(version);
@@ -1065,7 +1075,7 @@ util::Future<std::string> SessionImpl::send_test_command(std::string body)
 // ################ SessionWrapper ################
 
 SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<SubscriptionStore> flx_sub_store,
-                               Session::Config config)
+                               std::shared_ptr<MigrationStore> migration_store, Session::Config config)
     : m_client{client}
     , m_db(std::move(db))
     , m_replication(m_db->get_replication())
@@ -1086,6 +1096,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_proxy_config{config.proxy_config} // Throws
     , m_debug_hook(std::move(config.on_sync_client_event_hook))
     , m_flx_subscription_store(std::move(flx_sub_store))
+    , m_migration_store(std::move(migration_store))
 {
     REALM_ASSERT(m_db);
     REALM_ASSERT(m_db->get_replication());
@@ -1212,6 +1223,11 @@ SubscriptionStore* SessionWrapper::get_flx_subscription_store()
 PendingBootstrapStore* SessionWrapper::get_flx_pending_bootstrap_store()
 {
     return m_flx_pending_bootstrap_store.get();
+}
+
+MigrationStore* SessionWrapper::get_migration_store()
+{
+    return m_migration_store.get();
 }
 
 inline void SessionWrapper::set_sync_transact_handler(util::UniqueFunction<SyncTransactCallback> handler)
@@ -1919,11 +1935,12 @@ bool Client::decompose_server_url(const std::string& url, ProtocolEnvelope& prot
 }
 
 
-Session::Session(Client& client, DBRef db, std::shared_ptr<SubscriptionStore> flx_sub_store, Config&& config)
+Session::Session(Client& client, DBRef db, std::shared_ptr<SubscriptionStore> flx_sub_store,
+                 std::shared_ptr<MigrationStore> migration_store, Config&& config)
 {
     util::bind_ptr<SessionWrapper> sess;
-    sess.reset(
-        new SessionWrapper{*client.m_impl, std::move(db), std::move(flx_sub_store), std::move(config)}); // Throws
+    sess.reset(new SessionWrapper{*client.m_impl, std::move(db), std::move(flx_sub_store), std::move(migration_store),
+                                  std::move(config)}); // Throws
     // The reference count passed back to the application is implicitly
     // owned by a naked pointer. This is done to avoid exposing
     // implementation details through the header file (that is, through the

@@ -14,6 +14,7 @@
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/socket_provider.hpp>
 #include <realm/sync/subscriptions.hpp>
+#include <realm/sync/noinst/migration_store.hpp>
 
 namespace realm::sync {
 
@@ -347,7 +348,8 @@ public:
     /// Note that the session is not fully activated until you call bind().
     /// Also note that if you call set_sync_transact_callback(), it must be
     /// done before calling bind().
-    Session(Client&, std::shared_ptr<DB>, std::shared_ptr<SubscriptionStore>, Config&& = {});
+    Session(Client&, std::shared_ptr<DB>, std::shared_ptr<SubscriptionStore>, std::shared_ptr<MigrationStore>,
+            Config&& = {});
 
     /// This leaves the right-hand side session object detached. See "Thread
     /// safety" section under detach().

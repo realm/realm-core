@@ -346,7 +346,9 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const Realm
     m_config.audit_config = nullptr;
 
     // Adjust the sync_config if using PBS sync and already in the migrated state
-    m_config.sync_config = m_migration_store->convert_sync_config(m_original_sync_config);
+    if (m_migration_store->is_migrated()) {
+        m_config.sync_config = m_migration_store->convert_sync_config(m_original_sync_config);
+    }
 
     // If using FLX, set up m_flx_subscription_store and the history_write_validator
     if (m_config.sync_config->flx_sync_requested) {
@@ -454,7 +456,7 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
         RealmConfig config = m_config;
         config.path = fresh_path;
         // in case of migrations use the migrated config
-        auto fresh_config = m_migrated_sync_config ? *m_migrated_sync_config : *m_original_sync_config;
+        auto fresh_config = m_migrated_sync_config ? *m_migrated_sync_config : *m_config.sync_config;
         // deep copy the sync config so we don't modify the live session's config
         config.sync_config = std::make_shared<SyncConfig>(fresh_config);
         config.sync_config->client_resync_mode = ClientResyncMode::Manual;
@@ -480,20 +482,23 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
             .then([=](sync::SubscriptionSet::State state) {
                 // Create subscriptions in the fresh realm based on the schema instructions received in the bootstrap
                 // message.
-                if (m_migration_store->is_migrated() && fresh_sub.version() == 0 &&
-                    fresh_sync_session->m_migration_store->create_subscriptions(
-                        *fresh_sub_store, m_migration_store->get_query_string())) {
-                    {
-                        util::CheckedLockGuard lock(m_state_mutex);
-                        // Save a copy of the subscriptions so we add them to the local realm once the
-                        // subscription store is created.
-                        m_active_subscriptions_after_migration = fresh_sub_store->get_latest();
-                    }
-                    return fresh_sub_store->get_latest().get_state_change_notification(
-                        sync::SubscriptionSet::State::Complete);
+                if (server_requests_action != sync::ProtocolErrorInfo::Action::MigrateToFLX ||
+                    !m_migration_store->is_migration_in_progress()) {
+                    return util::Future<sync::SubscriptionSet::State>::make_ready(state);
                 }
 
-                return util::Future<sync::SubscriptionSet::State>::make_ready(state);
+                fresh_sync_session->m_migration_store->create_subscriptions(*fresh_sub_store,
+                                                                            m_migration_store->get_query_string());
+                auto latest_subs = fresh_sub_store->get_latest();
+                {
+                    util::CheckedLockGuard lock(m_state_mutex);
+                    // Save a copy of the subscriptions so we add them to the local realm once the
+                    // subscription store is created.
+                    m_active_subscriptions_after_migration = latest_subs;
+                }
+
+                return latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete);
+
             })
             .get_async([=, weak_self = weak_from_this()](StatusWith<sync::SubscriptionSet::State> s) {
                 // Keep the sync session alive while it's downloading, but then close
@@ -867,24 +872,12 @@ void SyncSession::create_sync_session()
     session_config.proxy_config = sync_config.proxy_config;
     session_config.simulate_integration_error = sync_config.simulate_integration_error;
     session_config.flx_bootstrap_batch_size_bytes = sync_config.flx_bootstrap_batch_size_bytes;
-    session_config.on_sync_client_event_hook =
-        [hook = sync_config.on_sync_client_event_hook,
-         weak_self = weak_from_this()](const SyncClientHookData& data) -> SyncClientHookAction {
-        // In the case of PBS to FLX migrations, create new subscriptions if needed whenever a download message from
-        // state is integrated.
-        if (data.event == SyncClientHookEvent::DownloadMessageIntegrated &&
-            data.batch_state == sync::DownloadBatchState::SteadyState) {
-            if (auto self = weak_self.lock()) {
-                if (auto local_subs_store = self->get_flx_subscription_store()) {
-                    self->m_migration_store->create_subscriptions(*local_subs_store);
-                }
-            }
-        }
-        if (hook) {
-            return hook(weak_self, data);
-        }
-        return SyncClientHookAction::NoAction;
-    };
+    if (sync_config.on_sync_client_event_hook) {
+        session_config.on_sync_client_event_hook = [hook = sync_config.on_sync_client_event_hook,
+                                                    anchor = weak_from_this()](const SyncClientHookData& data) {
+            return hook(anchor, data);
+        };
+    }
 
     {
         std::string sync_route = m_sync_manager->sync_route();
@@ -917,7 +910,7 @@ void SyncSession::create_sync_session()
         m_server_requests_action = sync::ProtocolErrorInfo::Action::NoAction;
     }
 
-    m_session = m_client.make_session(m_db, m_flx_subscription_store, std::move(session_config));
+    m_session = m_client.make_session(m_db, m_flx_subscription_store, m_migration_store, std::move(session_config));
 
     std::weak_ptr<SyncSession> weak_self = weak_from_this();
 
