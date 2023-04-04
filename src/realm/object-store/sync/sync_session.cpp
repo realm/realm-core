@@ -498,7 +498,6 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
                 }
 
                 return latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete);
-
             })
             .get_async([=, weak_self = weak_from_this()](StatusWith<sync::SubscriptionSet::State> s) {
                 // Keep the sync session alive while it's downloading, but then close
