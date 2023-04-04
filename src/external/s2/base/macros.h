@@ -239,7 +239,7 @@ typedef int Dummy_Type_For_DECLARE_POD              \
 // Declare that TemplateName<T> is a POD whenever T is
 #define PROPAGATE_POD_FROM_TEMPLATE_ARGUMENT(TemplateName)             \
 namespace std {                                                       \
-template <typename T> struct is_pod<TemplateName<T> > : std::is_pod<T> { }; \
+template <typename T> struct is_pod<TemplateName<T> > : std::is_trivial<T> { }; \
 }                                                                      \
 typedef int Dummy_Type_For_PROPAGATE_POD_FROM_TEMPLATE_ARGUMENT
 
@@ -256,6 +256,6 @@ template <> struct ERROR_TYPE_MUST_BE_POD<true> { };
 #define ENFORCE_POD(TypeName)                                             \
   enum { dummy_##TypeName                                                 \
            = sizeof(ERROR_TYPE_MUST_BE_POD<                               \
-                      std::is_pod<TypeName>::value>) }
+                      std::is_trivial<TypeName>::value>) }
 
 #endif  // BASE_MACROS_H_
