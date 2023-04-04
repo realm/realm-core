@@ -99,7 +99,7 @@ void Thread::set_name(const std::string& name)
         throw std::system_error(r, std::system_category(), "pthread_setname_np() failed");
 #elif defined(_WIN32)
     // SetThreadDescription was only introduced in Windows 10 1607, so we need to dynamically load it.
-    HRESULT(WINAPI *SETTHREADDESCRIPTION)(HANDLE hThread, PCWSTR threadDescription) = nullptr;
+    HRESULT(WINAPI * SETTHREADDESCRIPTION)(HANDLE hThread, PCWSTR threadDescription) = nullptr;
 #if NTDDI_VERSION < NTDDI_WIN10_RS1
     auto proc_address = GetProcAddress(GetModuleHandle(L"Kernel32.dll"), "SetThreadDescription");
     if (!proc_address) {
@@ -136,7 +136,7 @@ bool Thread::get_name(std::string& name) noexcept
     return true;
 #elif defined(_WIN32)
     // GetThreadDescription was only introduced in Windows 10 1607, so we need to dynamically load it.
-    HRESULT(WINAPI *GETTHREADDESCRIPTION)(HANDLE hThread, PWSTR * threadDescription) = nullptr;
+    HRESULT(WINAPI * GETTHREADDESCRIPTION)(HANDLE hThread, PWSTR * threadDescription) = nullptr;
 #if NTDDI_VERSION < NTDDI_WIN10_RS1
     auto proc_address = GetProcAddress(GetModuleHandle(L"Kernel32.dll"), "GetThreadDescription");
     if (!proc_address) {
