@@ -58,7 +58,7 @@ static void trigger_server_migration(const AppSession& app_session, bool switch_
     REQUIRE(switch_to_flx == status.isMigrated);
 }
 
-// Add a set of count number of Dog objects to the realm
+// Add a set of count number of Object objects to the realm
 static std::vector<ObjectId> fill_test_data(SyncTestFile& config, std::string partition, int start, int count)
 {
     std::vector<ObjectId> ret;
@@ -78,7 +78,7 @@ static std::vector<ObjectId> fill_test_data(SyncTestFile& config, std::string pa
     return ret;
 }
 
-TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
+TEST_CASE("Test server migration and rollback", "[flx][migration]") {
     std::shared_ptr<util::Logger> logger_ptr =
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
@@ -230,7 +230,64 @@ TEST_CASE("Test server migration and rollback", "[flx],[migration]") {
 
 #ifdef REALM_SYNC_PROTOCOL_V8
 
-TEST_CASE("Validate protocol v8 features", "[flx],[migration]") {
+TEST_CASE("Test client migration and rollback", "[flx][migration]") {
+    std::shared_ptr<util::Logger> logger_ptr =
+        std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+
+    const std::string base_url = get_base_url();
+    const std::string partition = "migration-test";
+    const Schema mig_schema{
+        ObjectSchema("Object", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                {"string_field", PropertyType::String | PropertyType::Nullable},
+                                {"realm_id", PropertyType::String | PropertyType::Nullable}}),
+    };
+    auto server_app_config = minimal_app_config(base_url, "server_migrate_rollback", mig_schema);
+    TestAppSession session(create_app(server_app_config));
+    SyncTestFile config(session.app(), partition, server_app_config.schema);
+    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+
+    // Fill some objects
+    auto objects = fill_test_data(config, partition, 1, 5);
+
+    // Wait to upload the data
+    {
+        auto realm = Realm::get_shared_realm(config);
+
+        REQUIRE(!wait_for_upload(*realm));
+        REQUIRE(!wait_for_download(*realm));
+
+        auto table = realm->read_group().get_table("class_Object");
+        CHECK(table->size() == 5);
+    }
+
+    // Migrate to FLX
+    trigger_server_migration(session.app_session(), true, logger_ptr);
+
+    {
+        auto realm = Realm::get_shared_realm(config);
+
+        REQUIRE(!wait_for_download(*realm));
+        REQUIRE(!wait_for_upload(*realm));
+
+        auto table = realm->read_group().get_table("class_Object");
+        CHECK(table->size() == 5);
+    }
+
+    //  Roll back to PBS
+    trigger_server_migration(session.app_session(), false, logger_ptr);
+
+    {
+        auto realm = Realm::get_shared_realm(config);
+
+        REQUIRE(!wait_for_upload(*realm));
+        REQUIRE(!wait_for_download(*realm));
+
+        auto table = realm->read_group().get_table("class_Object");
+        CHECK(table->size() == 5);
+    }
+}
+
+TEST_CASE("Validate protocol v8 features", "[flx][migration]") {
     REQUIRE(sync::get_current_protocol_version() >= 8);
     REQUIRE("com.mongodb.realm-sync#" == sync::get_pbs_websocket_protocol_prefix());
     REQUIRE("com.mongodb.realm-query-sync#" == sync::get_flx_websocket_protocol_prefix());
