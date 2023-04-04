@@ -106,8 +106,8 @@ int main(int argc, const char* argv[])
                     try {
                         realm = realm::Realm::get_shared_realm(config);
                     }
-                    catch (const realm::RealmFileException& e) {
-                        std::cout << "trying to open as a sync Realm\n" << std::endl;
+                    catch (const realm::FileAccessError& e) {
+                        std::cout << "trying to open as a sync Realm\n" << e.what() << "\n" << std::endl;
                         config.force_sync_history = true;
                         realm = realm::Realm::get_shared_realm(config);
                     }

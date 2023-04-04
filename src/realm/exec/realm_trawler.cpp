@@ -537,7 +537,7 @@ private:
     realm::SlabAlloc m_alloc;
 };
 
-std::string human_readable(uint64_t val)
+static std::string human_readable(uint64_t val)
 {
     std::ostringstream out;
     out.precision(3);
@@ -556,7 +556,7 @@ std::string human_readable(uint64_t val)
     return out.str();
 }
 
-uint64_t get_size(const std::vector<Entry>& list)
+static uint64_t get_size(const std::vector<Entry>& list)
 {
     uint64_t sz = 0;
     std::for_each(list.begin(), list.end(), [&](const Entry& e) {
@@ -629,7 +629,7 @@ void Table::print_columns(const Group& group) const
             if (col_key.is_set())
                 type_str += "{}";
             if (col_key.is_dictionary()) {
-                auto key_type = realm::DataType(m_column_types.get_val(i) >> 16);
+                auto key_type = realm::DataType(int(m_column_types.get_val(i)) >> 16);
                 type_str = std::string("{") + get_data_type_name(key_type) + ", " + type_str + "}";
             }
         }
@@ -675,7 +675,7 @@ void Node::init(realm::Allocator& alloc, uint64_t ref)
 
 std::vector<unsigned> path;
 
-std::string print_path()
+static std::string print_path()
 {
     std::string ret = "[" + std::to_string(path[0]);
     for (auto it = path.begin() + 1; it != path.end(); ++it) {
@@ -685,7 +685,7 @@ std::string print_path()
     return ret + "]";
 }
 
-std::vector<Entry> get_nodes(realm::Allocator& alloc, uint64_t ref)
+static std::vector<Entry> get_nodes(realm::Allocator& alloc, uint64_t ref)
 {
     std::vector<Entry> nodes;
     if (ref != 0) {
@@ -1089,7 +1089,7 @@ void RealmFile::changes() const
     }
 }
 
-unsigned int hex_char_to_bin(char c)
+static unsigned int hex_char_to_bin(char c)
 {
     if (c >= '0' && c <= '9')
         return c - '0';
@@ -1100,7 +1100,7 @@ unsigned int hex_char_to_bin(char c)
     throw std::invalid_argument("Illegal key (not a hex digit)");
 }
 
-unsigned int hex_to_bin(char first, char second)
+static unsigned int hex_to_bin(char first, char second)
 {
     return (hex_char_to_bin(first) << 4) | hex_char_to_bin(second);
 }
