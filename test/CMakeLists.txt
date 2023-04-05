@@ -122,8 +122,7 @@ set(CORE_TESTS ${CORE_TEST_SOURCES} ${LARGE_TEST_SOURCES} ${FUZZY_TEST_SOURCES})
 # FIXME: Benchmarks
 
 if (MSVC)
-    append_source_file_compile_options(test_query.cpp /bigobj)
-    append_source_file_compile_options(test_query_big.cpp /bigobj)
+    append_source_file_compile_options(FILES test_query.cpp test_query_big.cpp FLAGS /bigobj)
 endif()
 
 # Resources required for running the tests
