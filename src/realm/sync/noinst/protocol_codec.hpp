@@ -261,11 +261,19 @@ public:
                 connection.receive_error_message(sync::ProtocolErrorInfo{error_code, message, try_again},
                                                  session_ident); // Throws
             }
-            else if (message_type == "log_message") {            // introduced in protocol 8
+            else if (message_type == "log_message") { // introduced in protocol 8
                 auto session_ident = msg.read_next<session_ident_type>();
-                auto log_level = msg.read_next<std::string_view>();
                 auto message_length = msg.read_next<size_t>('\n');
-                auto message_body = msg.read_sized_data<std::string_view>(message_length);
+                auto message_body_str = msg.read_sized_data<std::string_view>(message_length);
+                nlohmann::json message_body;
+                try {
+                    message_body = nlohmann::json::parse(message_body_str);
+                }
+                catch (const nlohmann::json::exception& e) {
+                    return report_error(Error::bad_syntax, "Malformed json in log_message message: \"%1\": %2",
+                                        message_body_str, e.what());
+                }
+
                 static const std::array<std::pair<std::string_view, util::Logger::Level>, 7> name_to_level = {
                     std::make_pair("fatal", util::Logger::Level::fatal),
                     std::make_pair("error", util::Logger::Level::error),
@@ -275,6 +283,23 @@ public:
                     std::make_pair("debug", util::Logger::Level::debug),
                     std::make_pair("trace", util::Logger::Level::trace),
                 };
+
+                std::string_view log_level;
+                if (auto it = message_body.find("level"); it != message_body.end() && it->is_string()) {
+                    log_level = it->get<std::string_view>();
+                }
+                else {
+                    return report_error(Error::bad_syntax,
+                                        "log_message must contain a \"level\" parameter that is a string");
+                }
+                std::string_view msg_text;
+                if (auto it = message_body.find("msg"); it != message_body.end() && it->is_string()) {
+                    msg_text = it->get<std::string_view>();
+                }
+                else {
+                    return report_error(Error::bad_syntax,
+                                        "log_message must contain a \"msg\" parameter that is a string");
+                }
 
                 util::Logger::Level parsed_level;
                 if (auto it = std::find_if(name_to_level.begin(), name_to_level.end(),
@@ -289,7 +314,7 @@ public:
                                         log_level);
                 }
 
-                connection.receive_server_log_message(session_ident, parsed_level, message_body);
+                connection.receive_server_log_message(session_ident, parsed_level, msg_text);
             }
             else if (message_type == "json_error") { // introduced in protocol 4
                 sync::ProtocolErrorInfo info{};
