@@ -43,20 +43,6 @@ elseif(APPLE)
     set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 endif()
 
-function(add_cxx_flag_if_supported flag)
-    if(flag MATCHES "^-Wno-")
-        # Compilers ignore unknown -Wno-foo flags, so look for -Wfoo instead.
-        string(REPLACE "-Wno-" "-W" check_flag ${flag})
-    else()
-        set(check_flag ${flag})
-    endif()
-
-    check_cxx_compiler_flag(${check_flag} HAVE${check_flag})
-    if(HAVE${check_flag})
-        add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${flag}>)
-    endif()
-endfunction()
-
 function(check_if_cxx_compiler_flag_supported flag out_var)
     if(flag MATCHES "^-Wno-")
         # Compilers ignore unknown -Wno-foo flags, so look for -Wfoo instead.
@@ -66,6 +52,22 @@ function(check_if_cxx_compiler_flag_supported flag out_var)
     endif()
 
     check_cxx_compiler_flag(${check_flag} ${out_var})
+endfunction()
+
+function(add_cxx_flag_if_supported flag)
+    check_if_cxx_compiler_flag_supported(${flag} HAVE${flag})
+    if(HAVE${flag})
+        add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${flag}>)
+    endif()
+endfunction()
+
+function(append_source_file_compile_options file property)
+    get_source_file_property(SRC_PROPS_${file} ${file} COMPILE_OPTIONS)
+    if ("${SRC_PROPS_${file}}" STREQUAL "NOTFOUND" OR "${SRC_PROPS_${file}}" STREQUAL "")
+        set_source_files_properties(${file} PROPERTIES COMPILE_OPTIONS "${property}")
+    else()
+        set_source_files_properties(${file} PROPERTIES COMPILE_OPTIONS "${SRC_PROPS_${file}};${property}")
+    endif()
 endfunction()
 
 function(use_faster_linker)
@@ -122,8 +124,6 @@ else()
     # This warning is too agressive. It warns about moves that are not redundant on older
     # compilers that we still support. It is also harmless, unlike pessimizing moves.
     add_cxx_flag_if_supported(-Wno-redundant-move)
-
-    check_if_cxx_compiler_flag_supported(-Wno-unused-but-set-variable HAS-Wno-unused-but-set-variable)
 
     # Ninja buffers output so we need to tell the compiler to use colors even though stdout isn't a tty.
     if("${CMAKE_GENERATOR}" STREQUAL "Ninja")

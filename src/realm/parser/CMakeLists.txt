@@ -59,18 +59,22 @@ set(REALM_PARSER_EXTRAS
     query_flex.ll
 )
 
-# Add custom warning flags for generated parser files
-if(HAS-Wno-unused-but-set-variable)
+# Add custom warning flags for generated parser files if the flag is supported
+set(PARSER_COMPILE_EXTRA -Wno-unused-but-set-variable)
+
+check_if_cxx_compiler_flag_supported(${PARSER_COMPILE_EXTRA} HAVE${PARSER_COMPILE_EXTRA})
+
+if(HAVE${PARSER_COMPILE_EXTRA})
     foreach(SRC_ IN LISTS REALM_PARSER_GENERAED)
-        get_filename_component(SRC_BASENAME_ ${SRC_} NAME_WE)
-        set_source_files_properties(${SRC_} PROPERTIES COMPILE_OPTIONS "-Wno-unused-but-set-variable")
+        append_source_file_compile_options(${SRC_} "${PARSER_COMPILE_EXTRA}")
     endforeach()
 endif()
 
+# Append additional compile options to the generated/query_flex.cpp file
 if(MSVC)
-    set_source_files_properties(generated/query_flex.cpp PROPERTIES COMPILE_OPTIONS "/wd4018")
+    append_source_file_compile_options(generated/query_flex.cpp "/wd4018")
 else()
-    set_source_files_properties(generated/query_flex.cpp PROPERTIES COMPILE_OPTIONS "-Wno-unreachable-code;-Wno-sign-compare")
+    append_source_file_compile_options(generated/query_flex.cpp "-Wno-unreachable-code;-Wno-sign-compare")
 endif()
 
 add_library(QueryParser STATIC ${REALM_PARSER_SOURCES} ${REALM_PARSER_GENERAED} ${REALM_PARSER_HEADERS} ${REALM_PARSER_EXTRAS})
