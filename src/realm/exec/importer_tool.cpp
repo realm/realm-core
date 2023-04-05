@@ -206,7 +206,7 @@ int main(int argc, char* argv[])
         }
     }
     catch (const std::runtime_error& error) {
-        std::cerr << error.what();
+        std::cerr << error.what() << std::endl;
         exit(-1);
     }
 
