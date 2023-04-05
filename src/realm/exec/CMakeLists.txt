@@ -14,35 +14,35 @@ if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
     list(APPEND ExecTargetsToInstall RealmDaemon)
 endif()
 
-add_executable(RealmTrawler EXCLUDE_FROM_ALL realm_trawler.cpp )
+add_executable(RealmTrawler EXCLUDE_FROM_ALL realm_trawler.cpp)
 set_target_properties(RealmTrawler PROPERTIES
     OUTPUT_NAME "realm-trawler"
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
 target_link_libraries(RealmTrawler Storage)
 
-add_executable(RealmEnumerate EXCLUDE_FROM_ALL realm_enumerate.cpp )
+add_executable(RealmEnumerate EXCLUDE_FROM_ALL realm_enumerate.cpp)
 set_target_properties(RealmEnumerate PROPERTIES
     OUTPUT_NAME "realm-enumerate"
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
 target_link_libraries(RealmEnumerate ObjectStore)
 
-add_executable(RealmDecrypt EXCLUDE_FROM_ALL realm_decrypt.cpp )
+add_executable(RealmDecrypt EXCLUDE_FROM_ALL realm_decrypt.cpp)
 set_target_properties(RealmDecrypt PROPERTIES
     OUTPUT_NAME "realm-decrypt"
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
 target_link_libraries(RealmDecrypt Storage)
 
-add_executable(RealmEncrypt EXCLUDE_FROM_ALL realm_encrypt.cpp )
+add_executable(RealmEncrypt EXCLUDE_FROM_ALL realm_encrypt.cpp)
 set_target_properties(RealmEncrypt PROPERTIES
     OUTPUT_NAME "realm-encrypt"
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
 target_link_libraries(RealmEncrypt Storage)
 
-add_executable(RealmBrowser EXCLUDE_FROM_ALL realm_browser.cpp )
+add_executable(RealmBrowser EXCLUDE_FROM_ALL realm_browser.cpp)
 set_target_properties(RealmBrowser PROPERTIES
     OUTPUT_NAME "realm-browser-10"
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
@@ -68,3 +68,8 @@ set_target_properties(RealmDump PROPERTIES
 install(TARGETS ${ExecTargetsToInstall}
         COMPONENT runtime
         DESTINATION bin)
+
+add_custom_target(build_all DEPENDS
+    RealmImporter RealmTrawler RealmEnumerate RealmDecrypt
+    RealmEncrypt RealmBrowser RealmDump)
+add_dependencies(build_all ${ExecTargetsToInstall})
