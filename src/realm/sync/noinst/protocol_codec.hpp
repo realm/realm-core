@@ -261,6 +261,36 @@ public:
                 connection.receive_error_message(sync::ProtocolErrorInfo{error_code, message, try_again},
                                                  session_ident); // Throws
             }
+            else if (message_type == "log_message") {            // introduced in protocol 8
+                auto session_ident = msg.read_next<session_ident_type>();
+                auto log_level = msg.read_next<std::string_view>();
+                auto message_length = msg.read_next<size_t>('\n');
+                auto message_body = msg.read_sized_data<std::string_view>(message_length);
+                static const std::array<std::pair<std::string_view, util::Logger::Level>, 7> name_to_level = {
+                    std::make_pair("fatal", util::Logger::Level::fatal),
+                    std::make_pair("error", util::Logger::Level::error),
+                    std::make_pair("warn", util::Logger::Level::warn),
+                    std::make_pair("info", util::Logger::Level::info),
+                    std::make_pair("detail", util::Logger::Level::detail),
+                    std::make_pair("debug", util::Logger::Level::debug),
+                    std::make_pair("trace", util::Logger::Level::trace),
+                };
+
+                util::Logger::Level parsed_level;
+                if (auto it = std::find_if(name_to_level.begin(), name_to_level.end(),
+                                           [&](const decltype(name_to_level)::value_type& cur) {
+                                               return cur.first == log_level;
+                                           });
+                    it != name_to_level.end()) {
+                    parsed_level = it->second;
+                }
+                else {
+                    return report_error(Error::bad_syntax, "Unknown log level found in log_message: \"%1\"",
+                                        log_level);
+                }
+
+                connection.receive_server_log_message(session_ident, parsed_level, message_body);
+            }
             else if (message_type == "json_error") { // introduced in protocol 4
                 sync::ProtocolErrorInfo info{};
                 info.raw_error_code = msg.read_next<int>();

@@ -1527,6 +1527,22 @@ void Connection::receive_test_command_response(session_ident_type session_ident,
 }
 
 
+void Connection::receive_server_log_message(session_ident_type session_ident, util::Logger::Level level,
+                                            std::string_view message)
+{
+    if (session_ident != 0) {
+        if (auto sess = get_session(session_ident)) {
+            sess->logger.log(level, "Log message from server: \"%1\"", message);
+            return;
+        }
+
+        logger.log(level, "Log message from server for unknown session %1: \"%2\"", session_ident, message);
+    }
+
+    logger.log(level, "Log message from server: \"%1\"", message);
+}
+
+
 void Connection::handle_protocol_error(ClientProtocol::Error error)
 {
     switch (error) {
@@ -2229,7 +2245,7 @@ void Session::send_json_error_message()
     error_body_json["message"] = message;
     protocol.make_json_error_message(out, session_ident, static_cast<int>(protocol_error),
                                      error_body_json.dump()); // Throws
-    m_conn.initiate_write_message(out, this); // Throws
+    m_conn.initiate_write_message(out, this);                 // Throws
 
     m_error_to_send = false;
     enlist_to_send(); // Throws

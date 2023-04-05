@@ -795,6 +795,46 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
     }
 }
 
+TEST_CASE("flx: override path works", "") {
+    FLXSyncTestHarness harness("basic_flx_connect");
+    create_user_and_log_in(harness.app());
+    auto user = harness.app()->current_user();
+    SyncTestFile config(user, harness.schema(), SyncConfig::FLXSyncEnabled{});
+    auto path = [&] {
+        std::string path = "/Users/jreams/Downloads/test_realm_XXXX";
+        auto fd = mkstemp(path.data());
+        REQUIRE(fd != -1);
+        ::close(fd);
+        ::unlink(path.c_str());
+        return path;
+    }();
+    config.path = path;
+    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+
+    auto realm = Realm::get_shared_realm(config);
+    wait_for_download(*realm);
+
+    {
+        auto table = realm->read_group().get_table("class_TopLevel");
+        auto non_queryable_field = table->get_column_key("non_queryable_field");
+        auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+        new_query.insert_or_assign(Query(table).equal(non_queryable_field, StringData("foo")));
+        new_query.commit();
+    }
+
+    auto sw = realm->get_latest_subscription_set()
+                  .get_state_change_notification(sync::SubscriptionSet::State::Complete)
+                  .get_no_throw();
+    REQUIRE_FALSE(sw.is_ok());
+
+    auto file_ident = SyncSession::OnlyForTesting::get_file_ident(*realm->sync_session());
+    const auto& app_session = harness.session().app_session();
+    app_session.admin_api.trigger_client_reset(app_session.server_app_id, file_ident.ident);
+    realm->sync_session()->pause();
+    realm->sync_session()->resume();
+    wait_for_download(*realm);
+}
+
 TEST_CASE("flx: creating an object on a class with no subscription throws", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bad_query", {g_simple_embedded_obj_schema, {"queryable_str_field"}});
     harness.do_with_new_user([&](auto user) {
@@ -2266,10 +2306,8 @@ TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app]") {
 
             CppContext c(realm);
             realm->begin_transaction();
-            Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
-            Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", bar_obj_id}, {"location", "bar"s}}));
+            Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
+            Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", bar_obj_id}, {"location", "bar"s}}));
             realm->commit_transaction();
 
             wait_for_upload(*realm);

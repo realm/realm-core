@@ -495,6 +495,7 @@ private:
     void receive_mark_message(session_ident_type, request_ident_type);
     void receive_unbound_message(session_ident_type);
     void receive_test_command_response(session_ident_type, request_ident_type, std::string_view body);
+    void receive_server_log_message(session_ident_type, util::Logger::Level, std::string_view body);
     void handle_protocol_error(ClientProtocol::Error);
 
     // These are only called from Session class.
