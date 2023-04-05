@@ -274,7 +274,7 @@ public:
                                         message_body_str, e.what());
                 }
 
-                static const std::array<std::pair<std::string_view, util::Logger::Level>, 7> name_to_level = {
+                static constexpr std::array<std::pair<std::string_view, util::Logger::Level>, 7> name_to_level = {
                     std::make_pair("fatal", util::Logger::Level::fatal),
                     std::make_pair("error", util::Logger::Level::error),
                     std::make_pair("warn", util::Logger::Level::warn),
