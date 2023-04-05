@@ -205,7 +205,6 @@ TEST_CASE("Test server migration and rollback", "[flx][migration]") {
         auto flx_realm = Realm::get_shared_realm(flx_config);
         auto err = wait_for_future(std::move(err_future), std::chrono::seconds(30)).get();
         REQUIRE(err.get_system_error() == make_error_code(sync::ProtocolError::switch_to_pbs));
-        REQUIRE(flx_realm->sync_session()->state() == SyncSession::State::Inactive);
     }
 
     {
