@@ -2887,15 +2887,6 @@ RLM_API realm_app_t* realm_app_create(const realm_app_config_t*, const realm_syn
 RLM_API realm_app_t* realm_app_get(const realm_app_config_t*, const realm_sync_client_config_t*);
 
 /**
- * @note this API will be removed and it is now deprecated in favour of realm_app_create
- *
- * Get an existing @a realm_app_t* instance from the cache.
- *
- * @return Cached app instance, or null if no cached app exists for this @a app_id.
- */
-RLM_API realm_app_t* realm_app_get_cached(const char* app_id) RLM_API_NOEXCEPT;
-
-/**
  * Clear all the cached @a realm_app_t* instances in the process.
  *
  * @a realm_app_t* instances will need to be disposed with realm_release()
