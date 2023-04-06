@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <atomic>
+#include <cstdlib>
 
 #include <realm/disable_sync_to_disk.hpp>
 
@@ -37,5 +38,5 @@ void realm::disable_sync_to_disk(bool disable)
 
 bool realm::get_disable_sync_to_disk() noexcept
 {
-    return g_disable_sync_to_disk;
+    return g_disable_sync_to_disk || getenv("REALM_UNSAFE_DISABLE_SYNC_TO_DISK") != nullptr;
 }

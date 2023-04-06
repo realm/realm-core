@@ -23,6 +23,7 @@
 #include <realm/object-store/util/bson/bson.hpp>
 
 #include <ostream>
+#include <cstdlib>
 
 namespace realm {
 
@@ -103,6 +104,13 @@ SyncConfig::SyncConfig(std::shared_ptr<SyncUser> user, FLXSyncEnabled)
     , partition_value()
     , flx_sync_requested(true)
 {
+    if (const char* value = getenv("REALM_FLX_BOOTSTRAP_BATCH_SIZE_BYTES")) {
+        try {
+            flx_bootstrap_batch_size_bytes = std::stoul(value);
+        }
+        catch (...) {
+        }
+    }
 }
 
 } // namespace realm
