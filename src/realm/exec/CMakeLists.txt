@@ -1,4 +1,4 @@
-add_executable(RealmImporter EXCLUDE_FROM_ALL importer_tool.cpp importer.cpp importer.hpp)
+add_executable(RealmImporter importer_tool.cpp importer.cpp importer.hpp)
 set_target_properties(RealmImporter PROPERTIES
     OUTPUT_NAME "realm-importer"
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
@@ -14,35 +14,35 @@ if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
     list(APPEND ExecTargetsToInstall RealmDaemon)
 endif()
 
-add_executable(RealmTrawler EXCLUDE_FROM_ALL realm_trawler.cpp)
+add_executable(RealmTrawler realm_trawler.cpp)
 set_target_properties(RealmTrawler PROPERTIES
     OUTPUT_NAME "realm-trawler"
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
 target_link_libraries(RealmTrawler Storage)
 
-add_executable(RealmEnumerate EXCLUDE_FROM_ALL realm_enumerate.cpp)
+add_executable(RealmEnumerate realm_enumerate.cpp)
 set_target_properties(RealmEnumerate PROPERTIES
     OUTPUT_NAME "realm-enumerate"
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
 target_link_libraries(RealmEnumerate ObjectStore)
 
-add_executable(RealmDecrypt EXCLUDE_FROM_ALL realm_decrypt.cpp)
+add_executable(RealmDecrypt realm_decrypt.cpp)
 set_target_properties(RealmDecrypt PROPERTIES
     OUTPUT_NAME "realm-decrypt"
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
 target_link_libraries(RealmDecrypt Storage)
 
-add_executable(RealmEncrypt EXCLUDE_FROM_ALL realm_encrypt.cpp)
+add_executable(RealmEncrypt realm_encrypt.cpp)
 set_target_properties(RealmEncrypt PROPERTIES
     OUTPUT_NAME "realm-encrypt"
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
 target_link_libraries(RealmEncrypt Storage)
 
-add_executable(RealmBrowser EXCLUDE_FROM_ALL realm_browser.cpp)
+add_executable(RealmBrowser realm_browser.cpp)
 set_target_properties(RealmBrowser PROPERTIES
     OUTPUT_NAME "realm-browser-10"
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
@@ -59,7 +59,7 @@ target_link_libraries(Realm2JSON Storage QueryParser Sync)
 list(APPEND ExecTargetsToInstall Realm2JSON)
 endif()
 
-add_executable(RealmDump EXCLUDE_FROM_ALL realm_dump.c)
+add_executable(RealmDump realm_dump.c)
 set_target_properties(RealmDump PROPERTIES
     OUTPUT_NAME "realm-dump"
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
@@ -76,3 +76,6 @@ add_custom_target(build_all DEPENDS ${OptionalToolsTargets})
 if (ExecTargetsToInstall)
     add_dependencies(build_all ${ExecTargetsToInstall})
 endif()
+
+message("Will try to build tools by default for: ${CMAKE_SYSTEM_NAME}...")
+# set_target_properties(${OptionalToolsTargets} PROPERTIES EXCLUDE_FROM_ALL TRUE)
