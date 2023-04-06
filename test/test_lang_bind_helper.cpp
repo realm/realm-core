@@ -3986,7 +3986,7 @@ struct HandoverControl {
         while (m_handover != nullptr)
             m_changed.wait(lg);
         // std::cout << " -- put " << h << std::endl;
-        m_handover = move(h);
+        m_handover = std::move(h);
         m_changed.notify_all();
     }
     void get(std::unique_ptr<T>& h)
@@ -3996,7 +3996,7 @@ struct HandoverControl {
         while (m_handover == nullptr)
             m_changed.wait(lg);
         // std::cout << " -- get " << m_handover << std::endl;
-        h = move(m_handover);
+        h = std::move(m_handover);
         m_handover = nullptr;
         m_changed.notify_all();
     }
@@ -4005,7 +4005,7 @@ struct HandoverControl {
         LockGuard lg(m_lock);
         if (m_handover == nullptr)
             return false;
-        h = move(m_handover);
+        h = std::move(m_handover);
         m_handover = nullptr;
         m_changed.notify_all();
         return true;
