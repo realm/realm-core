@@ -69,7 +69,10 @@ install(TARGETS ${ExecTargetsToInstall}
         COMPONENT runtime
         DESTINATION bin)
 
-add_custom_target(build_all DEPENDS
-    RealmImporter RealmTrawler RealmEnumerate RealmDecrypt
-    RealmEncrypt RealmBrowser RealmDump)
-add_dependencies(build_all ${ExecTargetsToInstall})
+set(OptionalToolsTargets RealmImporter RealmTrawler RealmEnumerate
+    RealmDecrypt RealmEncrypt RealmBrowser RealmDump)
+
+add_custom_target(build_all DEPENDS ${OptionalToolsTargets})
+if (ExecTargetsToInstall)
+    add_dependencies(build_all ${ExecTargetsToInstall})
+endif()
