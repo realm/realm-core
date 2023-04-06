@@ -950,14 +950,14 @@ SubscriptionStore* SessionImpl::get_flx_subscription_store()
     return m_wrapper.get_flx_subscription_store();
 }
 
-void SessionImpl::non_sync_flx_completion(int64_t version)
-{
-    m_wrapper.on_flx_sync_version_complete(version);
-}
-
 MigrationStore* SessionImpl::get_migration_store()
 {
     return m_wrapper.get_migration_store();
+}
+
+void SessionImpl::on_sync_flx_completion(int64_t version)
+{
+    m_wrapper.on_flx_sync_version_complete(version);
 }
 
 SyncClientHookAction SessionImpl::call_debug_hook(const SyncClientHookData& data)

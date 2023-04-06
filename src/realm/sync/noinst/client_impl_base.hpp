@@ -27,6 +27,7 @@
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/subscriptions.hpp>
 #include <realm/sync/trigger.hpp>
+#include <realm/sync/noinst/migration_store.hpp>
 
 
 namespace realm {
@@ -742,16 +743,15 @@ public:
     /// or after initiation of deactivation.
     void request_download_completion_notification();
 
-    /// \brief Gets or creates the subscription store associated with this Session.
+    /// \brief Gets the subscription store associated with this Session.
     SubscriptionStore* get_flx_subscription_store();
-
 
     /// \brief Gets the migration store associated with this Session.
     MigrationStore* get_migration_store();
 
     /// Update internal client state when a flx subscription becomes complete outside
     /// of the normal sync process. This can happen during client reset.
-    void non_sync_flx_completion(int64_t version);
+    void on_sync_flx_completion(int64_t version);
 
     /// \brief Callback for when a new subscription set has been created for FLX sync.
     void on_new_flx_subscription_set(int64_t new_version);

@@ -1712,6 +1712,12 @@ void Session::on_changesets_integrated(version_type client_version, const SyncPr
     do_recognize_sync_version(client_version); // Allows upload process to resume
     check_for_download_completion();           // Throws
 
+    // If the client migrated from PBS to FLX, create subscriptions when new tables are received from server.
+    if (auto migration_store = get_migration_store(); migration_store && m_is_flx_sync_session) {
+        auto& flx_subscription_store = *get_flx_subscription_store();
+        get_migration_store()->create_subscriptions(flx_subscription_store);
+    }
+
     // Since the deactivation process has not been initiated, the UNBIND
     // message cannot have been sent unless an ERROR message was received.
     REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
@@ -2333,7 +2339,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         // this point forward.
         auto client_reset_operation = std::move(m_client_reset_operation);
         util::UniqueFunction<void(int64_t)> on_flx_subscription_complete = [this](int64_t version) {
-            this->non_sync_flx_completion(version);
+            this->on_sync_flx_completion(version);
         };
         if (!client_reset_operation->finalize(client_file_ident, get_flx_subscription_store(),
                                               std::move(on_flx_subscription_complete))) {
@@ -2362,6 +2368,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
 
         m_upload_target_version = m_last_version_available;
         m_upload_progress = m_progress.upload;
+        m_download_progress = m_progress.download;
         // In recovery mode, there may be new changesets to upload and nothing left to download.
         // In FLX DiscardLocal mode, there may be new commits due to subscription handling.
         // For both, we want to allow uploads again without needing external changes to download first.
@@ -2373,6 +2380,12 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         if (has_pending_client_reset) {
             handle_pending_client_reset_acknowledgement();
         }
+
+        // If a migration is in progress, mark it complete when client reset is completed.
+        if (auto migration_store = get_migration_store()) {
+            migration_store->complete_migration();
+        }
+
         return true;
     };
     // if a client reset happens, it will take care of setting the file ident
