@@ -21,6 +21,7 @@
 
 #include <realm/sync/network/http.hpp>
 #include <realm/util/base64.hpp>
+#include <realm/util/flat_map.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/object-store/sync/app_utils.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
@@ -175,8 +176,7 @@ const static uint64_t default_timeout_ms = 60000;
 const static std::string username_password_provider_key = "local-userpass";
 const static std::string user_api_key_provider_key_path = "api_keys";
 const static int max_http_redirects = 20;
-static std::unordered_map<std::string, std::unordered_map<std::string, SharedApp>>
-    s_apps_cache; // app_id -> base_url -> app
+static util::FlatMap<std::string, util::FlatMap<std::string, SharedApp>> s_apps_cache; // app_id -> base_url -> app
 std::mutex s_apps_mutex;
 
 } // anonymous namespace
