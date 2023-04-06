@@ -5150,3 +5150,51 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app]") {
 
     mock_transport_worker.mark_complete();
 }
+
+TEST_CASE("app: shared instances", "[sync][app]") {
+    App::Config base_config;
+    set_app_config_defaults(base_config, instance_of<UnitTestTransport>);
+
+    SyncClientConfig sync_config;
+    sync_config.metadata_mode = SyncClientConfig::MetadataMode::NoMetadata;
+
+    auto config1 = base_config;
+    config1.app_id = "app1";
+
+    auto config2 = base_config;
+    config2.app_id = "app1";
+    config2.base_url = "https://realm.mongodb.com";
+
+    auto config3 = base_config;
+    config3.app_id = "app2";
+
+    auto config4 = base_config;
+    config4.app_id = "app2";
+    config4.base_url = "http://localhost:9090";
+
+    // should all point to same underlying app
+    auto app1_1 = App::get_shared_app(config1, sync_config);
+    auto app1_2 = App::get_shared_app(config1, sync_config);
+    auto app1_3 = App::get_cached_app(config1.app_id, &config1.base_url);
+    auto app1_4 = App::get_shared_app(config2, sync_config);
+    auto app1_5 = App::get_cached_app(config1.app_id);
+
+    CHECK(app1_1 == app1_2);
+    CHECK(app1_1 == app1_3);
+    CHECK(app1_1 == app1_4);
+    CHECK(app1_1 == app1_5);
+
+    // config3 and config4 should point to different apps
+    auto app2_1 = App::get_shared_app(config3, sync_config);
+    auto app2_2 = App::get_cached_app(config3.app_id, &config3.base_url);
+    auto app2_3 = App::get_shared_app(config4, sync_config);
+    auto app2_4 = App::get_cached_app(config3.app_id);
+
+    CHECK(app2_1 == app2_2);
+    CHECK(app2_1 != app2_3);
+    CHECK(app2_4 != nullptr);
+
+    CHECK(app1_1 != app2_1);
+    CHECK(app1_1 != app2_3);
+    CHECK(app1_1 != app2_4);
+}
