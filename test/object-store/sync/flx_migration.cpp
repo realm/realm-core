@@ -1,9 +1,11 @@
 #include <sync/flx_sync_harness.hpp>
 #include <sync/sync_test_utils.hpp>
 #include <util/baas_admin_api.hpp>
+#include <util/crypt_key.hpp>
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/util/future.hpp>
 
 #include <catch2/catch_all.hpp>
@@ -265,14 +267,14 @@ TEST_CASE("Test client migration and rollback", "[flx][migration]") {
     {
         auto realm = Realm::get_shared_realm(config);
 
-        REQUIRE(!wait_for_download(*realm));
         REQUIRE(!wait_for_upload(*realm));
+        REQUIRE(!wait_for_download(*realm));
 
         auto table = realm->read_group().get_table("class_Object");
         CHECK(table->size() == 5);
     }
 
-    //  Roll back to PBS
+    // Roll back to PBS
     trigger_server_migration(session.app_session(), false, logger_ptr);
 
     {
@@ -283,6 +285,89 @@ TEST_CASE("Test client migration and rollback", "[flx][migration]") {
 
         auto table = realm->read_group().get_table("class_Object");
         CHECK(table->size() == 5);
+    }
+}
+
+TEST_CASE("Test client migration and rollback with recovery", "[flx][migration]") {
+    std::shared_ptr<util::Logger> logger_ptr =
+        std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+
+    const std::string base_url = get_base_url();
+    const std::string partition = "migration-test";
+    const Schema mig_schema{
+        ObjectSchema("Object", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                {"string_field", PropertyType::String | PropertyType::Nullable},
+                                {"realm_id", PropertyType::String | PropertyType::Nullable}}),
+    };
+    auto server_app_config = minimal_app_config(base_url, "server_migrate_rollback", mig_schema);
+    TestAppSession session(create_app(server_app_config));
+    SyncTestFile config(session.app(), partition, server_app_config.schema);
+    config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+
+    // Fill some objects
+    auto objects = fill_test_data(config, partition, 1, 5);
+    // Primary key of the object to recover
+    auto obj_id = ObjectId::gen();
+
+    // Wait to upload the data
+    {
+        auto realm = Realm::get_shared_realm(config);
+
+        REQUIRE(!wait_for_upload(*realm));
+        REQUIRE(!wait_for_download(*realm));
+
+        auto table = realm->read_group().get_table("class_Object");
+        CHECK(table->size() == 5);
+
+        // Close the sync session and make a change. This will be recovered by the migration.
+        realm->sync_session()->force_close();
+        realm->begin_transaction();
+        realm->read_group()
+            .get_table("class_Object")
+            ->create_object_with_primary_key(obj_id)
+            .set("realm_id", partition);
+        realm->commit_transaction();
+    }
+
+    // Migrate to FLX
+    trigger_server_migration(session.app_session(), true, logger_ptr);
+
+    {
+        auto realm = Realm::get_shared_realm(config);
+
+        REQUIRE(!wait_for_upload(*realm));
+        REQUIRE(!wait_for_download(*realm));
+
+        auto table = realm->read_group().get_table("class_Object");
+        CHECK(table->size() == 6);
+    }
+
+    reset_utils::wait_for_object_to_persist_to_atlas(session.app()->current_user(), session.app_session(), "Object",
+                                                     {{"_id", obj_id}});
+
+    //  Roll back to PBS
+    trigger_server_migration(session.app_session(), false, logger_ptr);
+
+    // Open up the realm without the sync client attached and make a change. This will be recovered by the rollback.
+    {
+        DBOptions options;
+        options.encryption_key = test_util::crypt_key();
+        auto realm = DB::create(sync::make_client_replication(), config.path, options);
+
+        auto tr = realm->start_write();
+        tr->get_table("class_Object")->create_object_with_primary_key(ObjectId::gen()).set("realm_id", partition);
+        tr->commit();
+    }
+
+    // Trigger the rollback to PBS
+    {
+        auto realm = Realm::get_shared_realm(config);
+
+        REQUIRE(!wait_for_upload(*realm));
+        REQUIRE(!wait_for_download(*realm));
+
+        auto table = realm->read_group().get_table("class_Object");
+        CHECK(table->size() == 7);
     }
 }
 
