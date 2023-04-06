@@ -16,7 +16,7 @@
 -----------
 
 ### Internals
-* None.
+* Fix compiler warnings with MacOS Clang 14.0.3 ([PR #6467](https://github.com/realm/realm-core/pull/6467))
 
 ----------------------------------------------
 
