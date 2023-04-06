@@ -245,9 +245,21 @@ public:
         SharedApp m_parent;
     };
 
+    /// Retrieve a cached app instance if one was previously generated for `config`'s app_id+base_url combo,
+    /// otherwise generate and return a new instance and persist it in the cache.
     static SharedApp get_shared_app(const Config& config, const SyncClientConfig& sync_client_config);
+
+    /// Generate and return a new app instance for the given config, bypassing the app cache.
     static SharedApp get_uncached_app(const Config& config, const SyncClientConfig& sync_client_config);
-    static std::shared_ptr<App> get_cached_app(const std::string& app_id);
+
+    /// Return a cached app instance if one was previously generated for the `app_id`+`base_url` combo using
+    /// `get_shared_app`.
+    /// If base_url is not provided, and there are multiple cached apps with the same app_id but different base_urls,
+    /// then a random one will be returned.
+    ///
+    /// Prefer using `get_shared_app` to avoid the non-deterministic behavior.
+    static std::shared_ptr<App> get_cached_app(const std::string& app_id,
+                                               const util::Optional<std::string>* base_url = nullptr);
 
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a
