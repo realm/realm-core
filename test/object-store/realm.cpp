@@ -1596,26 +1596,63 @@ TEST_CASE("SharedRealm: async writes") {
     for (int i = 0; i < 2; ++i) {
         SECTION(close_function_names[i]) {
             bool persisted = false;
-            SECTION("before write lock is acquired") {
+            SECTION("while another DB instance holds lock") {
                 DBOptions options;
                 options.encryption_key = config.encryption_key.data();
                 // Acquire the write lock with a different DB instance so that we'll
                 // be stuck in the Requesting stage
-                realm::test_util::BowlOfStonesSemaphore sema;
+                util::BinarySemaphore sema1(0);
+                util::BinarySemaphore sema2(0);
+                auto db = DB::create(make_in_realm_history(), config.path, options);
                 JoiningThread thread([&] {
-                    auto db = DB::create(make_in_realm_history(), config.path, options);
                     auto write = db->start_write();
-                    sema.add_stone();
+                    sema1.release();
 
                     // Wait until the main thread is waiting for the lock.
-                    while (!db->other_writers_waiting_for_lock()) {
-                        millisleep(1);
-                    }
+                    timed_sleeping_wait_for([&] {
+                        return db->other_writers_waiting_for_lock();
+                    });
+                    // We're trying to unlock it while the main thread is waiting
+                    // in close(), so don't unlock too quickly. There isn't a
+                    // deterministic way to do this.
+                    sema2.acquire();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(20));
                     write->close();
                 });
 
                 // Wait for the background thread to have acquired the lock
-                sema.get_stone();
+                sema1.acquire();
+
+                auto scheduler = realm->scheduler();
+                realm->async_begin_transaction([&] {
+                    // We should never get here as the realm is closed
+                    FAIL();
+                });
+                timed_sleeping_wait_for([&] {
+                    return db->other_writers_waiting_for_lock();
+                });
+
+                // close() should block until we can acquire the write lock
+                sema2.release();
+                std::invoke(close_functions[i], *realm);
+
+                thread.join();
+
+                // We may not have released the write lock yet when close()
+                // returns, but it should happen promptly.
+                timed_wait_for([&] {
+                    return db->start_write(/* nonblocking */ true) != nullptr;
+                });
+
+                // Verify that the transaction callback never got enqueued
+                scheduler->invoke([&] {
+                    done = true;
+                });
+                wait_for_done();
+            }
+            SECTION("while another Realm instance holds lock") {
+                auto realm2 = Realm::get_shared_realm(config);
+                realm2->begin_transaction();
 
                 auto scheduler = realm->scheduler();
                 realm->async_begin_transaction([&] {
@@ -1623,14 +1660,10 @@ TEST_CASE("SharedRealm: async writes") {
                     FAIL();
                 });
 
-                // close() should block until we can acquire the write lock
+                // Doesn't have to wait for the write lock because the DB
+                // instance already holds it and we were just waiting for our
+                // turn with it rather than waiting to acquire it
                 std::invoke(close_functions[i], *realm);
-
-                {
-                    // Verify that we released the write lock
-                    auto db = DB::create(make_in_realm_history(), config.path, options);
-                    REQUIRE(db->start_write(/* nonblocking */ true));
-                }
 
                 // Verify that the transaction callback never got enqueued
                 scheduler->invoke([&] {

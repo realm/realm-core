@@ -19,11 +19,13 @@
 #ifndef REALM_TEST_UTILS_HPP
 #define REALM_TEST_UTILS_HPP
 
-#include <catch2/catch_all.hpp>
-#include <catch2/matchers/catch_matchers_all.hpp>
+#include "util/event_loop.hpp"
+
 #include <realm/util/file.hpp>
 #include <realm/util/optional.hpp>
 
+#include <catch2/catch_all.hpp>
+#include <catch2/matchers/catch_matchers_all.hpp>
 #include <functional>
 #include <filesystem>
 namespace fs = std::filesystem;
@@ -145,6 +147,12 @@ bool chmod_supported(const std::string& path);
 int get_permissions(const std::string& path);
 void chmod(const std::string& path, int permissions);
 
+void timed_wait_for(util::FunctionRef<bool()> condition,
+                    std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000));
+
+void timed_sleeping_wait_for(util::FunctionRef<bool()> condition,
+                             std::chrono::milliseconds max_ms = std::chrono::seconds(30),
+                             std::chrono::milliseconds sleep_ms = std::chrono::milliseconds(1));
 } // namespace realm
 
 #define REQUIRE_DIR_EXISTS(macro_path)                                                                               \

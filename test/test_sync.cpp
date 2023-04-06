@@ -178,13 +178,12 @@ TEST(Sync_AsyncWaitForUploadCompletion)
 {
     TEST_DIR(dir);
     TEST_CLIENT_DB(db);
+    BowlOfStonesSemaphore bowl;
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
     Session session = fixture.make_bound_session(db, "/test");
-
     auto wait = [&] {
-        BowlOfStonesSemaphore bowl;
         auto handler = [&](std::error_code ec) {
             if (CHECK_NOT(ec))
                 bowl.add_stone();
@@ -242,11 +241,11 @@ TEST(Sync_AsyncWaitForDownloadCompletion)
     TEST_DIR(dir);
     TEST_CLIENT_DB(db_1);
     TEST_CLIENT_DB(db_2);
+    BowlOfStonesSemaphore bowl;
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
     auto wait = [&](Session& session) {
-        BowlOfStonesSemaphore bowl;
         auto handler = [&](std::error_code ec) {
             if (CHECK_NOT(ec))
                 bowl.add_stone();
@@ -304,11 +303,11 @@ TEST(Sync_AsyncWaitForSyncCompletion)
     TEST_DIR(dir);
     TEST_CLIENT_DB(db_1);
     TEST_CLIENT_DB(db_2);
+    BowlOfStonesSemaphore bowl;
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
     auto wait = [&](Session& session) {
-        BowlOfStonesSemaphore bowl;
         auto handler = [&](std::error_code ec) {
             if (CHECK_NOT(ec))
                 bowl.add_stone();
@@ -352,9 +351,9 @@ TEST(Sync_AsyncWaitCancellation)
 {
     TEST_DIR(dir);
     TEST_CLIENT_DB(db);
+    BowlOfStonesSemaphore bowl;
     ClientServerFixture fixture(dir, test_context);
 
-    BowlOfStonesSemaphore bowl;
     auto upload_completion_handler = [&](std::error_code ec) {
         CHECK_EQUAL(util::error::operation_aborted, ec);
         bowl.add_stone();
@@ -3822,6 +3821,7 @@ TEST(Sync_CancelReconnectDelay)
     TEST_CLIENT_DB(db);
     TEST_CLIENT_DB(db_x);
 
+    BowlOfStonesSemaphore bowl;
     ClientServerFixture::Config fixture_config;
     fixture_config.one_connection_per_session = false;
 
@@ -3830,7 +3830,6 @@ TEST(Sync_CancelReconnectDelay)
         ClientServerFixture fixture{server_dir, test_context, std::move(fixture_config)};
         fixture.start();
 
-        BowlOfStonesSemaphore bowl;
         auto handler = [&](const SessionErrorInfo& info) {
             if (CHECK_EQUAL(info.error_code, ProtocolError::connection_closed))
                 bowl.add_stone();
@@ -3847,12 +3846,11 @@ TEST(Sync_CancelReconnectDelay)
     }
 
     // After connection-level error, and at client-level while connection
-    // object exists (ConnectionImpl in clinet.cpp).
+    // object exists (ConnectionImpl in client.cpp).
     {
         ClientServerFixture fixture{server_dir, test_context, std::move(fixture_config)};
         fixture.start();
 
-        BowlOfStonesSemaphore bowl;
         auto handler = [&](const SessionErrorInfo& info) {
             if (CHECK_EQUAL(info.error_code, ProtocolError::connection_closed))
                 bowl.add_stone();
@@ -3875,7 +3873,6 @@ TEST(Sync_CancelReconnectDelay)
         fixture.start();
 
         {
-            BowlOfStonesSemaphore bowl;
             auto handler = [&](const SessionErrorInfo& info) {
                 if (CHECK_EQUAL(info.error_code, ProtocolError::connection_closed))
                     bowl.add_stone();
@@ -3911,7 +3908,6 @@ TEST(Sync_CancelReconnectDelay)
         Session session_x = fixture.make_bound_session(db_x, "/x");
         session_x.wait_for_download_complete_or_client_stopped();
 
-        BowlOfStonesSemaphore bowl;
         auto handler = [&](const SessionErrorInfo& info) {
             if (CHECK_EQUAL(info.error_code, ProtocolError::illegal_realm_path))
                 bowl.add_stone();
@@ -3934,7 +3930,6 @@ TEST(Sync_CancelReconnectDelay)
         Session session_x = fixture.make_bound_session(db_x, "/x");
         session_x.wait_for_download_complete_or_client_stopped();
 
-        BowlOfStonesSemaphore bowl;
         auto handler = [&](const SessionErrorInfo& info) {
             if (CHECK_EQUAL(info.error_code, ProtocolError::illegal_realm_path))
                 bowl.add_stone();
@@ -4466,9 +4461,8 @@ TEST(Sync_ReconnectAfterPingTimeout)
     config.client_ping_period = 0;  // send ping immediately
     config.client_pong_timeout = 0; // time out immediately
 
-    ClientServerFixture fixture(dir, test_context, std::move(config));
-
     BowlOfStonesSemaphore bowl;
+    ClientServerFixture fixture(dir, test_context, std::move(config));
     auto error_handler = [&](std::error_code ec, bool, const std::string&) {
         if (CHECK_EQUAL(Client::Error::pong_timeout, ec))
             bowl.add_stone();
@@ -4519,9 +4513,9 @@ TEST(Sync_ServerDiscardDeadConnections)
     ClientServerFixture::Config config;
     config.server_connection_reaper_interval = 1; // discard dead connections quickly, FIXME: 0 will not work here :(
 
+    BowlOfStonesSemaphore bowl;
     ClientServerFixture fixture(dir, test_context, std::move(config));
 
-    BowlOfStonesSemaphore bowl;
     auto error_handler = [&](std::error_code ec, bool, const std::string&) {
         bool valid_error = ec == sync::websocket::WebSocketError::websocket_read_error;
         CHECK(valid_error);
@@ -4899,10 +4893,11 @@ TEST(Sync_ConnectionStateChange)
 
     std::vector<ConnectionState> states_1, states_2;
     {
+        BowlOfStonesSemaphore bowl_1, bowl_2;
+
         ClientServerFixture fixture(dir, test_context);
         fixture.start();
 
-        BowlOfStonesSemaphore bowl_1, bowl_2;
         auto listener_1 = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             CHECK_EQUAL(state == ConnectionState::disconnected, bool(error_info));
             states_1.push_back(state);
@@ -4941,10 +4936,10 @@ TEST(Sync_ClientErrorHandler)
 {
     TEST_DIR(dir);
     TEST_CLIENT_DB(db);
+    BowlOfStonesSemaphore bowl;
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    BowlOfStonesSemaphore bowl;
     auto handler = [&](const SessionErrorInfo&) {
         bowl.add_stone();
     };

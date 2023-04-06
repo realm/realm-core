@@ -68,7 +68,7 @@ public:
     // caching may occur.
     virtual bool is_same_as(const Scheduler* other) const noexcept = 0;
 
-    // Check if this scehduler actually can support invoke(). Invoking may be
+    // Check if this scheduler actually can support invoke(). Invoking may be
     // either not implemented, not applicable to a scheduler type, or simply not
     // be possible currently (e.g. if the associated event loop is not actually
     // running).
@@ -129,7 +129,7 @@ public:
     static void set_default_factory(util::UniqueFunction<std::shared_ptr<Scheduler>()>);
 };
 
-// A thread-safe queue of functions to invoke, used in the implemenation of
+// A thread-safe queue of functions to invoke, used in the implementation of
 // some of the schedulers
 class InvocationQueue {
 public:

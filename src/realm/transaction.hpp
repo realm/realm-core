@@ -139,6 +139,12 @@ public:
     // The write mutex is released after full synchronization.
     void async_complete_writes(util::UniqueFunction<void()> when_synchronized = nullptr) REQUIRES(!m_async_mutex);
 
+    // ask for write mutex. Callback takes place when mutex has been acquired.
+    // callback may occur on ANOTHER THREAD. Must not be called if write mutex
+    // has already been acquired.
+    void async_request_write_mutex(util::UniqueFunction<void()>&& when_acquired) REQUIRES(!m_async_mutex);
+    void cancel_async_request_write_mutex() REQUIRES(!m_async_mutex);
+
     // Complete all pending async work and return once the async stage is Idle.
     // If currently in an async write transaction that transaction is cancelled,
     // and any async writes which were committed are synchronized.
@@ -186,7 +192,11 @@ private:
 
     void replicate(Transaction* dest, Replication& repl) const;
     void complete_async_commit();
+    void sync_async_commit() REQUIRES(!m_async_mutex);
     void acquire_write_lock() REQUIRES(!m_async_mutex);
+    void async_write_began() REQUIRES(!m_async_mutex);
+    void wait_for_async_completion(std::unique_lock<std::mutex>&, util::UniqueFunction<void()>&)
+        REQUIRES(m_async_mutex);
 
     void cow_outliers(std::vector<size_t>& progress, size_t evac_limit, size_t work_limit);
     void close_read_with_lock() REQUIRES(!m_async_mutex, db->m_mutex);
@@ -202,11 +212,10 @@ private:
 
     // Mutex is protecting access to members just below
     util::CheckedMutex m_async_mutex;
-    std::condition_variable m_async_cv GUARDED_BY(m_async_mutex);
     AsyncState m_async_stage GUARDED_BY(m_async_mutex) = AsyncState::Idle;
-    std::chrono::steady_clock::time_point m_request_time_point;
-    bool m_waiting_for_write_lock GUARDED_BY(m_async_mutex) = false;
-    bool m_waiting_for_sync GUARDED_BY(m_async_mutex) = false;
+    std::chrono::steady_clock::time_point m_request_start_time GUARDED_BY(m_async_mutex);
+    util::UniqueFunction<void()> m_got_write_completion GUARDED_BY(m_async_mutex);
+    util::UniqueFunction<void()> m_sync_completion GUARDED_BY(m_async_mutex);
 
     DB::TransactStage m_transact_stage = DB::transact_Ready;
 
@@ -362,8 +371,8 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
 
     if (!holds_write_mutex()) {
         if (nonblocking) {
-            bool succes = db->do_try_begin_write();
-            if (!succes) {
+            bool success = db->do_try_begin_write();
+            if (!success) {
                 return false;
             }
         }

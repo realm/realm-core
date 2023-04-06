@@ -240,6 +240,7 @@ set(REALM_INSTALL_HEADERS
     util/random.hpp
     util/safe_int_ops.hpp
     util/scope_exit.hpp
+    util/semaphore.hpp
     util/serializer.hpp
     util/sha_crypto.hpp
     util/span.hpp

@@ -17,13 +17,14 @@
  **************************************************************************/
 
 #include <realm/transaction.hpp>
-#include "impl/copy_replication.hpp"
+
+#include <realm/dictionary.hpp>
+#include <realm/group_writer.hpp>
+#include <realm/impl/copy_replication.hpp>
 #include <realm/list.hpp>
 #include <realm/set.hpp>
-#include <realm/dictionary.hpp>
 #include <realm/table_view.hpp>
-#include <realm/group_writer.hpp>
-
+#include <realm/util/semaphore.hpp>
 namespace {
 
 using namespace realm;
@@ -256,6 +257,7 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
         REALM_ASSERT(!m_oldest_version_not_persisted ||
                      m_read_lock.m_version != m_oldest_version_not_persisted->m_version);
 
+        bool end_write = false;
         {
             util::CheckedLockGuard lock(m_async_mutex);
             REALM_ASSERT(m_async_stage != AsyncState::Syncing);
@@ -264,13 +266,16 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
                     m_async_stage = AsyncState::HasLock;
                 }
                 else {
-                    db->end_write_on_correct_thread();
+                    end_write = true;
                     m_async_stage = AsyncState::Idle;
                 }
             }
             else {
                 m_async_stage = AsyncState::HasCommits;
             }
+        }
+        if (end_write) {
+            db->end_write_on_correct_thread();
         }
 
         // Remap file if it has grown, and update refs in underlying node structure.
@@ -731,50 +736,56 @@ void Transaction::complete_async_commit()
     }
 }
 
+void Transaction::sync_async_commit()
+{
+    complete_async_commit();
+    util::CheckedLockGuard lck(m_async_mutex);
+    m_async_stage = AsyncState::Idle;
+    m_sync_completion();
+    m_sync_completion = nullptr;
+}
+
 void Transaction::async_complete_writes(util::UniqueFunction<void()> when_synchronized)
 {
-    util::CheckedLockGuard lck(m_async_mutex);
+    util::CheckedUniqueLock lck(m_async_mutex);
     if (m_async_stage == AsyncState::HasLock) {
         // Nothing to commit to disk - just release write lock
         m_async_stage = AsyncState::Idle;
+        lck.unlock();
         db->async_end_write();
     }
     else if (m_async_stage == AsyncState::HasCommits) {
         m_async_stage = AsyncState::Syncing;
         m_commit_exception = std::exception_ptr();
-        // get a callback on the helper thread, in which to sync to disk
-        db->async_sync_to_disk([this, cb = std::move(when_synchronized)]() noexcept {
-            complete_async_commit();
-            util::CheckedLockGuard lck(m_async_mutex);
-            m_async_stage = AsyncState::Idle;
-            if (m_waiting_for_sync) {
-                m_waiting_for_sync = false;
-                m_async_cv.notify_all();
-            }
-            else {
-                cb();
-            }
-        });
+        m_sync_completion = std::move(when_synchronized);
+        lck.unlock();
+        db->async_sync_to_disk(this);
+    }
+    else {
+        REALM_ASSERT(m_async_stage == AsyncState::Idle);
     }
 }
 
 void Transaction::prepare_for_close()
 {
-    util::CheckedLockGuard lck(m_async_mutex);
-    switch (m_async_stage) {
-        case AsyncState::Idle:
-            break;
+    util::CheckedUniqueLock lck(m_async_mutex);
+    if (m_async_stage == AsyncState::Requesting) {
+        REALM_ASSERT(m_transact_stage == DB::transact_Reading);
+        REALM_ASSERT(!m_oldest_version_not_persisted);
+        lck.unlock();
+        db->cancel_async_begin_write(this);
+        // While we released the lock, the stage may have changed from Requesting
+        // to HasLock on the background thread if we happened to acquire the
+        // write mutex at the same time as this is happening. No other
+        // transitions are possible.
+        lck.lock();
+    }
 
+    auto stage = m_async_stage;
+    m_async_stage = AsyncState::Idle;
+    switch (stage) {
+        case AsyncState::Idle:
         case AsyncState::Requesting:
-            // We don't have the ability to cancel a wait on the write lock, so
-            // unfortunately we have to wait for it to be acquired.
-            REALM_ASSERT(m_transact_stage == DB::transact_Reading);
-            REALM_ASSERT(!m_oldest_version_not_persisted);
-            m_waiting_for_write_lock = true;
-            m_async_cv.wait(lck.native_handle(), [this]() REQUIRES(m_async_mutex) {
-                return !m_waiting_for_write_lock;
-            });
-            db->end_write_on_correct_thread();
             break;
 
         case AsyncState::HasLock:
@@ -787,6 +798,7 @@ void Transaction::prepare_for_close()
             if (m_oldest_version_not_persisted) {
                 complete_async_commit();
             }
+            lck.unlock();
             db->end_write_on_correct_thread();
             break;
 
@@ -794,50 +806,94 @@ void Transaction::prepare_for_close()
             // We have commits which need to be synced to disk, so do that
             REALM_ASSERT(m_transact_stage == DB::transact_Reading);
             complete_async_commit();
+            lck.unlock();
             db->end_write_on_correct_thread();
             break;
 
         case AsyncState::Syncing:
             // The worker thread is currently writing, so wait for it to complete
             REALM_ASSERT(m_transact_stage == DB::transact_Reading);
-            m_waiting_for_sync = true;
-            m_async_cv.wait(lck.native_handle(), [this]() REQUIRES(m_async_mutex) {
-                return !m_waiting_for_sync;
-            });
+            wait_for_async_completion(lck.native_handle(), m_sync_completion);
             break;
     }
-    m_async_stage = AsyncState::Idle;
+}
+
+void Transaction::wait_for_async_completion(std::unique_lock<std::mutex>& lock,
+                                            util::UniqueFunction<void()>& completion)
+{
+    util::BinarySemaphore sem(0);
+    completion = [&] {
+        sem.release();
+    };
+    lock.unlock();
+    sem.acquire();
+    lock.lock();
+    completion = nullptr;
 }
 
 void Transaction::acquire_write_lock()
 {
-    util::CheckedUniqueLock lck(m_async_mutex);
-    switch (m_async_stage) {
-        case AsyncState::Idle:
-            lck.unlock();
-            db->do_begin_possibly_async_write();
-            return;
+    {
+        util::CheckedUniqueLock lck(m_async_mutex);
+        switch (m_async_stage) {
+            case AsyncState::Idle:
+                break;
 
-        case AsyncState::Requesting:
-            m_waiting_for_write_lock = true;
-            m_async_cv.wait(lck.native_handle(), [this]() REQUIRES(m_async_mutex) {
-                return !m_waiting_for_write_lock;
-            });
-            return;
+            case AsyncState::Requesting:
+                wait_for_async_completion(lck.native_handle(), m_got_write_completion);
+                return;
 
-        case AsyncState::HasLock:
-        case AsyncState::HasCommits:
-            return;
+            case AsyncState::HasLock:
+            case AsyncState::HasCommits:
+                return;
 
-        case AsyncState::Syncing:
-            m_waiting_for_sync = true;
-            m_async_cv.wait(lck.native_handle(), [this]() REQUIRES(m_async_mutex) {
-                return !m_waiting_for_sync;
-            });
-            lck.unlock();
-            db->do_begin_possibly_async_write();
-            break;
+            case AsyncState::Syncing:
+                wait_for_async_completion(lck.native_handle(), m_sync_completion);
+                break;
+        }
     }
+    db->do_begin_possibly_async_write();
+}
+
+void Transaction::async_request_write_mutex(util::UniqueFunction<void()>&& when_acquired)
+{
+    {
+        util::CheckedLockGuard lck(m_async_mutex);
+        if (db->m_logger && db->m_logger->would_log(util::Logger::Level::trace)) {
+            m_request_start_time = std::chrono::steady_clock::now();
+            db->m_logger->log(util::Logger::Level::trace, "Async request write lock");
+        }
+
+        REALM_ASSERT(m_async_stage == AsyncState::Idle);
+        m_async_stage = Transaction::AsyncState::Requesting;
+        m_got_write_completion = std::move(when_acquired);
+    }
+    db->async_begin_write(this);
+}
+
+void Transaction::cancel_async_request_write_mutex()
+{
+    if (db->cancel_async_begin_write(this)) {
+        util::CheckedLockGuard lck(m_async_mutex);
+        REALM_ASSERT(m_async_stage == AsyncState::Requesting);
+        m_async_stage = Transaction::AsyncState::Idle;
+    }
+}
+
+void Transaction::async_write_began()
+{
+    util::CheckedLockGuard lck(m_async_mutex);
+    // If a synchronous transaction happened while we were pending
+    // we may be in HasCommits
+    if (m_async_stage == Transaction::AsyncState::Requesting) {
+        m_async_stage = Transaction::AsyncState::HasLock;
+    }
+    if (db->m_logger) {
+        auto t2 = std::chrono::steady_clock::now();
+        db->m_logger->log(util::Logger::Level::trace, "Got write lock in %1 us",
+                          std::chrono::duration_cast<std::chrono::microseconds>(t2 - m_request_start_time).count());
+    }
+    m_got_write_completion();
 }
 
 void Transaction::do_end_read() noexcept
