@@ -238,7 +238,9 @@ set(REALM_INSTALL_HEADERS
     util/miscellaneous.hpp
     util/optional.hpp
     util/overload.hpp
+    util/platform_info.hpp
     util/priority_queue.hpp
+    util/random.hpp
     util/safe_int_ops.hpp
     util/scope_exit.hpp
     util/serializer.hpp
@@ -272,9 +274,7 @@ set(REALM_NOINST_HEADERS
     util/get_file_size.hpp
     util/json_parser.hpp
     util/load_file.hpp
-    util/platform_info.hpp
     util/quote.hpp
-    util/random.hpp
     util/resource_limits.hpp
     util/scratch_allocator.hpp
     util/signal_blocker.hpp
