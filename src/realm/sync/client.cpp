@@ -481,6 +481,7 @@ void ClientImpl::voluntary_disconnect_all_connections()
         }
         catch (...) {
             promise.set_error(exception_to_status());
+            return;
         }
         promise.emplace_value();
     });
@@ -1822,6 +1823,7 @@ std::string SessionWrapper::get_appservices_connection_id()
 
         if (!self->m_sess) {
             promise.set_error({ErrorCodes::RuntimeError, "session already finalized"});
+            return;
         }
 
         promise.emplace_value(self->m_sess->get_connection().get_active_appservices_connection_id());
