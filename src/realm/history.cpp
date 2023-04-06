@@ -151,7 +151,6 @@ void InRealmHistory::get_changesets(version_type begin_version, version_type end
         buffer[i] = BinaryIterator(m_changesets.get(), offset + i);
 }
 
-
 void InRealmHistory::set_oldest_bound_version(version_type version)
 {
     REALM_ASSERT(version >= m_base_version);

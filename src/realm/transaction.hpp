@@ -448,6 +448,7 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
     size_t file_size = m_read_lock.m_file_size;
 
     _impl::ReversedNoCopyInputStream reversed_in(reverser);
+    // since we had the write lock, we already have the latest encrypted pages in memory
     m_alloc.update_reader_view(file_size); // Throws
     update_allocator_wrappers(false);
     advance_transact(top_ref, reversed_in, false); // Throws

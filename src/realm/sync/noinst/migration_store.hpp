@@ -23,7 +23,6 @@
 #include <realm/sync/config.hpp>
 #include <realm/sync/subscriptions.hpp>
 
-#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -41,31 +40,34 @@ public:
 
     enum class MigrationState {
         NotMigrated,
+        InProgress,
         Migrated,
     };
 
     static MigrationStoreRef create(DBRef db);
 
-    // Converts the configuration from PBS to FLX if in the migrated state, otherwise returns the passed in config
-    // object. If the provided config is configured for FLX, the migration will be canceled and the migration state
-    // will be cleared.
+    // Converts the configuration from PBS to FLX if a migration is in progress or completed, otherwise returns the
+    // passed in config object.
     std::shared_ptr<realm::SyncConfig> convert_sync_config(std::shared_ptr<realm::SyncConfig> config);
 
-    // Called when the server responds with migrate to FLX and stores the FLX
-    // subscription RQL query string
+    // Called when the server responds with migrate to FLX and stores the FLX subscription RQL query string.
     void migrate_to_flx(std::string_view rql_query_string);
 
     // Clear the migrated state
     void cancel_migration();
 
+    bool is_migration_in_progress();
     bool is_migrated();
 
-    std::string_view get_query_string();
+    // Mark the migration complete and update the state. No-op if not in 'InProgress' state.
+    void complete_migration();
 
-    // Generate a new subscription that can be added to the subscription store using
-    // the query string returned from the server and a name that begins with "flx_migrated_"
-    // followed by the class name. If not in the migrated state, nullopt will be returned.
-    std::optional<Subscription> make_subscription(const std::string& object_class_name);
+    std::string get_query_string();
+
+    // Create subscriptions for each table that does not have a subscription.
+    // If subscriptions are created, they are commited and a change of query is sent to the server.
+    void create_subscriptions(const SubscriptionStore& subs_store);
+    void create_subscriptions(const SubscriptionStore& subs_store, const std::string& rql_query_string);
 
 protected:
     explicit MigrationStore(DBRef db);
@@ -78,9 +80,16 @@ protected:
     // Clear the migration store info
     void clear(std::unique_lock<std::mutex> lock);
 
+private:
+    // Generate a new subscription that can be added to the subscription store using
+    // the query string returned from the server and a name that begins with "flx_migrated_"
+    // followed by the class name.
+    Subscription make_subscription(const std::string& object_class_name, const std::string& rql_query_string);
+
     DBRef m_db;
 
     TableKey m_migration_table;
+    ColKey m_migration_started_at;
     ColKey m_migration_completed_at;
     ColKey m_migration_state;
     ColKey m_migration_query_str;

@@ -374,7 +374,8 @@ def doCheckSanity(Map options = [:]) {
               'CC=clang',
               'CXX=clang++',
               'UNITTEST_XML=unit-test-report.xml',
-              "UNITTEST_SUITE_NAME=Linux-${options.buildType}"
+              "UNITTEST_SUITE_NAME=Linux-${options.buildType}",
+              "TSAN_OPTIONS=\"suppressions=${WORKSPACE}/test/tsan.suppress\""
             ]
             buildDockerEnv('testing.Dockerfile').inside(privileged) {
                 withEnv(environment) {
