@@ -668,7 +668,8 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                 REALM_ASSERT(!m_original_sync_config->flx_sync_requested);
                 REALM_ASSERT(error.migration_query_string && !error.migration_query_string->empty());
                 // Original config was PBS, migrating to FLX
-                m_migration_store->migrate_to_flx(*error.migration_query_string, m_original_sync_config->partition_value);
+                m_migration_store->migrate_to_flx(*error.migration_query_string,
+                                                  m_original_sync_config->partition_value);
                 save_sync_config_after_migration();
                 download_fresh_realm(error.server_requests_action);
                 return;

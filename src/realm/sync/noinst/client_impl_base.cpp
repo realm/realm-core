@@ -1964,14 +1964,25 @@ void Session::send_bind_message()
     if (m_is_flx_sync_session) {
         nlohmann::json bind_json_data;
         if (auto migrated_partition = get_migration_store()->get_migrated_partition()) {
-            bind_json_data["partitionKey"] = *migrated_partition;
+            bind_json_data["migratedPartition"] = *migrated_partition;
+        }
+        if (logger.would_log(util::Logger::Level::debug)) {
+            std::string json_data_dump;
+            if (!bind_json_data.empty()) {
+                json_data_dump = bind_json_data.dump();
+            }
+            logger.debug(
+                "Sending: BIND(session_ident=%1, need_client_file_ident=%2 is_subserver=%3 json_data=\"%4\")",
+                session_ident, need_client_file_ident, is_subserver, json_data_dump);
         }
         protocol.make_flx_bind_message(protocol_version, out, session_ident, bind_json_data, empty_access_token,
                                        need_client_file_ident, is_subserver); // Throws
     }
     else {
-        std::string path_data = get_virt_path();
-        protocol.make_pbs_bind_message(protocol_version, out, session_ident, path_data, empty_access_token,
+        std::string server_path = get_virt_path();
+        logger.debug("Sending: BIND(session_ident=%1, need_client_file_ident=%2 is_subserver=%3 server_path=%4)",
+                     session_ident, need_client_file_ident, is_subserver, server_path);
+        protocol.make_pbs_bind_message(protocol_version, out, session_ident, server_path, empty_access_token,
                                        need_client_file_ident, is_subserver); // Throws
     }
     m_conn.initiate_write_message(out, this); // Throws

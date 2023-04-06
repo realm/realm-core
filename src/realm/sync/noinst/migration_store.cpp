@@ -159,7 +159,8 @@ std::shared_ptr<realm::SyncConfig> MigrationStore::convert_sync_config(std::shar
     }
 
     // Once in the migrated state, the partition value cannot change for the same realm file
-    if (m_state == MigrationState::Migrated && m_migrated_partition && m_migrated_partition != config->partition_value) {
+    if (m_state == MigrationState::Migrated && m_migrated_partition &&
+        m_migrated_partition != config->partition_value) {
         throw LogicError(
             ErrorCodes::IllegalOperation,
             util::format("Partition value cannot be changed for migrated realms\n - original: %1\n -   config: %2",
