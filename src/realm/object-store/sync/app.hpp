@@ -257,7 +257,7 @@ public:
     /// If base_url is not provided, and there are multiple cached apps with the same app_id but different base_urls,
     /// then a random one will be returned.
     ///
-    /// Prefer using `get_shared_app` to avoid the non-deterministic behavior.
+    /// Prefer using `get_shared_app` or populating `base_url` to avoid the non-deterministic behavior.
     static std::shared_ptr<App> get_cached_app(const std::string& app_id,
                                                const util::Optional<std::string>* base_url = nullptr);
 

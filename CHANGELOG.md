@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* Allow multiple app instances with the same ID but different base URLs ([#6480](https://github.com/realm/realm-core/pull/6480))
+* `get_shared_app` will now generate unique app instances for configurations with the same app ID but different base URLs. `get_cached_app` now accepts the base URL as an optional second parameter which should be provided to ensure the correct app instance is returned when there are multiple instances of the same app ID with different base URLs. The deprecated `realm_app_get_cached` C api method has been removed ([#6480](https://github.com/realm/realm-core/pull/6480))
 
 ### Fixed
 * Fixed a crash or exception when doing a fulltext search for multiple keywords when the intersection of results is not equal. ([#6465](https://github.com/realm/realm-core/issues/6465) since v13.2.0).
