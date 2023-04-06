@@ -99,6 +99,8 @@ target_link_libraries(Sync PUBLIC Storage)
 
 if(APPLE AND NOT REALM_FORCE_OPENSSL)
     target_link_options(Sync INTERFACE "SHELL:-framework Security")
+elseif(REALM_HAVE_WOLFSSL)
+    target_link_libraries(Sync PUBLIC WolfSSL)
 elseif(REALM_HAVE_OPENSSL)
     target_link_libraries(Sync PUBLIC OpenSSL::SSL)
 endif()

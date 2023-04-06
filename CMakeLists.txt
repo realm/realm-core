@@ -125,7 +125,7 @@ else()
     if(ANDROID)
         add_compile_options(-Wno-uninitialized)
     elseif(${CMAKE_CXX_COMPILER_ID} MATCHES ".*[Cc]lang")
-        # FIXME: Re-introduce -Wold-style-cast 
+        # FIXME: Re-introduce -Wold-style-cast
         add_compile_options(-Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation -Wthread-safety -Wthread-safety-negative -Wmissing-prototypes)
     endif()
 
@@ -162,7 +162,7 @@ if(ANDROID)
     # - `-fomit-frame-pointer` is inherited from NDK r10e.
     # - On some architectures char is unsigned by default. Make it signed
     # - Compile with -Oz in Release because on Android we favor code size over performance
-    # 
+    #
     add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes $<$<CONFIG:Release>:-Oz>)
 endif()
 
@@ -262,11 +262,52 @@ elseif(REALM_ENABLE_ENCRYPTION AND CMAKE_SYSTEM_NAME MATCHES "Linux|Android")
     set(REALM_NEEDS_OPENSSL TRUE)
 endif()
 
-if(REALM_NEEDS_OPENSSL OR REALM_FORCE_OPENSSL)
+# If the system determines we should use openSSL, and the user wants to substitute wolfSSL
+# we allow this combination for only Linux builds
+if(REALM_USE_WOLFSSL)
+    if(REALM_FORCE_OPENSSL)
+        message(FATAL_ERROR "option \"REALM_FORCE_OPENSSL\" incompatible with option \"REALM_USE_WOLFSSL\"")
+    endif()
+
+    if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        message(FATAL_ERROR "WolfSSL support only available on Linux, for now...")
+    endif()
+
+    if(NOT REALM_NEEDS_OPENSSL)
+        message(FATAL_ERROR "WolfSSL support only available for builds that would otherwise use OpenSSL")
+    endif()
+
+    set(REALM_NEEDS_WOLFSSL TRUE)
+    message(STATUS "Using wolfSSL compatibility layer over OpenSSL")
+endif()
+
+
+if(REALM_NEEDS_WOLFSSL AND REALM_NEEDS_OPENSSL)
+    # NOTE: this logic should eventually be changed to point to realm's self-hosted prebuilt WolfSSL
+    # and grab it using realm_aquire_dependency. For now we just allow pointing to an install directory
+    if (NOT REALM_USE_SYSTEM_WOLFSSL)
+        if(NOT DEFINED REALM_WOLFSSL_ROOT_DIR)
+            message(FATAL_ERROR "REALM_WOLFSSL_ROOT_DIR undefined. If you wish to build against the wolfSSL compatibility layer, define this variable \
+            to hold the path to your wolfSSL installation directory using -DREALM_WOLFSSL_ROOT_DIR=/path/to/wolfssl/install/dir")
+        endif()
+        set(WOLFSSL_ROOT_DIR ${REALM_WOLFSSL_ROOT_DIR})
+    else()
+        if(DEFINED REALM_WOLFSSL_ROOT_DIR)
+            message(FATAL_ERROR "option \"REALM_WOLFSSL_ROOT_DIR\" incompatible with option \"REALM_USE_SYSTEM_WOLFSSL\"")
+        endif()
+    endif()
+
+    set(WOLFSSL_USE_STATIC_LIBS ON)
+    find_package(WolfSSL REQUIRED)
+
+    set(REALM_HAVE_WOLFSSL ON)
+    # We also need to set REALM_HAVE_OPENSSL to enable the standard OpenSSL code paths
+    set(REALM_HAVE_OPENSSL ON)
+elseif(REALM_NEEDS_OPENSSL OR REALM_FORCE_OPENSSL)
+    message(STATUS "using OpenSSL")
     if(NOT REALM_USE_SYSTEM_OPENSSL AND (ANDROID OR WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux"))
         # Use our own prebuilt OpenSSL
         realm_acquire_dependency(openssl ${DEP_OPENSSL_VERSION} OPENSSL_CMAKE_INCLUDE_FILE)
-
         include(${OPENSSL_CMAKE_INCLUDE_FILE})
     endif()
 

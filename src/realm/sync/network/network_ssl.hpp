@@ -16,6 +16,17 @@
 #include <realm/util/logger.hpp>
 
 #if REALM_HAVE_OPENSSL
+
+#if REALM_HAVE_WOLFSSL
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+#ifndef WOLFSSL_USER_SETTINGS
+#include <wolfssl/options.h>
+#endif
+#include <wolfssl/wolfcrypt/settings.h>
+#endif
+
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #elif REALM_HAVE_SECURE_TRANSPORT
@@ -482,6 +493,10 @@ private:
 
     template <class Oper>
     std::size_t ssl_perform(Oper oper, std::error_code& ec, Want& want) noexcept;
+
+#if REALM_HAVE_WOLFSSL
+    static void ssl_map_wolfssl_error_codes(int& ret, int& ssl_error, int& sys_error) noexcept;
+#endif
 
     int do_ssl_accept() noexcept;
     int do_ssl_connect() noexcept;
@@ -1148,11 +1163,15 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
     int ssl_error = SSL_get_error(m_ssl, ret);
     int sys_error = int(ERR_get_error());
 
+#if REALM_HAVE_WOLFSSL
+    REALM_ASSERT(!m_bio_error_code || ssl_error == SOCKET_ERROR_E || ssl_error == SOCKET_PEER_CLOSED_E);
+
+    ssl_map_wolfssl_error_codes(ret, ssl_error, sys_error);
+#else
     // Guaranteed by the documentation of SSL_get_error()
     REALM_ASSERT((ret > 0) == (ssl_error == SSL_ERROR_NONE));
-
     REALM_ASSERT(!m_bio_error_code || ssl_error == SSL_ERROR_SYSCALL);
-
+#endif
     // Judging from various comments in the man pages, and from experience with
     // the API, it seems that,
     //
@@ -1239,6 +1258,43 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
     REALM_ASSERT(false);
     return 0;
 }
+
+#if REALM_HAVE_WOLFSSL
+inline void Stream::ssl_map_wolfssl_error_codes(int& ret, int& ssl_error, int& sys_error) noexcept
+{
+    // Map some common wolfSSL error codes to OpenSSL ones
+    // wolfSSL returns a more specific error codes for issues than openSSL's simple
+    // "ssl error" and "syscall error", however realm's tests and some business logic
+    // are written with OpenSSLs errors in mind, so we map them here to be non-intrusive
+    if (ret == WOLFSSL_FATAL_ERROR) {
+        switch (ssl_error) {
+            case SOCKET_ERROR_E:
+                ssl_error = SSL_ERROR_SYSCALL;
+                sys_error = 0;
+                break;
+            case VERIFY_CERT_ERROR:
+            case FATAL_ERROR:
+            case ASN_NO_SIGNER_E:
+                ssl_error = SSL_ERROR_SSL;
+                sys_error = 0;
+                break;
+            default:
+                break;
+        }
+    }
+    else if (ret == WOLFSSL_ERROR_NONE && ssl_error != WOLFSSL_ERROR_NONE) {
+        switch (ssl_error) {
+            case SOCKET_PEER_CLOSED_E:
+                ret = WOLFSSL_FATAL_ERROR;
+                ssl_error = SSL_ERROR_SYSCALL;
+                sys_error = 0;
+                break;
+            default:
+                break;
+        }
+    }
+}
+#endif
 
 inline int Stream::do_ssl_accept() noexcept
 {

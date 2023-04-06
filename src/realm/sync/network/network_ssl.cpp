@@ -14,6 +14,7 @@
 #endif
 #include <openssl/conf.h>
 #include <openssl/x509v3.h>
+#include <openssl/ssl.h>
 #elif REALM_HAVE_SECURE_TRANSPORT
 #include <fstream>
 #include <vector>
@@ -88,7 +89,8 @@ bool verify_certificate_from_root_certs(X509* server_cert, util::Logger* logger)
 #endif // REALM_INCLUDE_CERTS
 
 
-#if REALM_HAVE_OPENSSL && (OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER))
+#if REALM_HAVE_WOLFSSL ||                                                                                            \
+    (REALM_HAVE_OPENSSL && (OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)))
 
 // These must be made to execute before main() is called, i.e., before there is
 // any chance of threads being spawned.
@@ -145,9 +147,13 @@ OpensslInit::~OpensslInit()
     EVP_cleanup();
     CRYPTO_cleanup_all_ex_data();
     CONF_modules_unload(1);
+#if REALM_HAVE_WOLFSSL
+    wolfSSL_Cleanup();
+#endif
 }
 
-#endif // REALM_HAVE_OPENSSL && (OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER))
+#endif // REALM_HAVE_WOLFSSL || (REALM_HAVE_OPENSSL && (OPENSSL_VERSION_NUMBER < 0x10100000L ||
+       // defined(LIBRESSL_VERSION_NUMBER)))
 
 } // unnamed namespace
 
@@ -309,6 +315,11 @@ void Context::ssl_init()
     options |= SSL_OP_NO_COMPRESSION;
     SSL_CTX_set_options(ssl_ctx, options);
 
+#if REALM_HAVE_WOLFSSL
+    // mimic default OpenSSL behavior
+    SSL_CTX_set_verify(ssl_ctx, static_cast<int>(VerifyMode::none), nullptr);
+#endif
+
     m_ssl_ctx = ssl_ctx;
 }
 
@@ -415,6 +426,16 @@ public:
 
     BioMethod()
     {
+#if REALM_HAVE_WOLFSSL
+        bio_method = new BIO_METHOD();
+        bio_method->type = WOLFSSL_BIO_UNDEF;       // byte type
+        bio_method->writeCb = &Stream::bio_write;   // int (*writeCb)(BIO*, const char*, int)
+        bio_method->readCb = &Stream::bio_read;     // int (*readCb)(BIO*, char*, int)
+        bio_method->putsCb = &Stream::bio_puts;     // int (*putsCb)(BIO*, const char*)
+        bio_method->ctrlCb = &Stream::bio_ctrl;     // long (*ctrlCb)(BIO*, int, long, void*)
+        bio_method->createCb = &Stream::bio_create; // int (*createCb)(BIO*)
+        bio_method->freeCb = &Stream::bio_destroy;  // int (*freeCb)(BIO*)
+#else
         bio_method = new BIO_METHOD{
             BIO_TYPE_SOCKET,      // int type
             nullptr,              // const char* name
@@ -427,6 +448,7 @@ public:
             &Stream::bio_destroy, // int (*destroy)(BIO*)
             nullptr               // long (*callback_ctrl)(BIO*, int, bio_info_cb*)
         };
+#endif
     }
 
     ~BioMethod()
@@ -500,7 +522,7 @@ bool check_san(X509* server_cert, const std::string& host_name)
 
         if (current_name->type == GEN_DNS) {
             // Current name is a DNS name
-            char* dns_name = static_cast<char*>(ASN1_STRING_data(current_name->d.dNSName));
+            char* dns_name = reinterpret_cast<char*>(ASN1_STRING_data(current_name->d.dNSName));
 
             // Make sure there isn't an embedded NUL character in the DNS name
             if (static_cast<std::size_t>(ASN1_STRING_length(current_name->d.dNSName)) != std::strlen(dns_name))
@@ -740,6 +762,7 @@ int Stream::verify_callback_using_delegate(int preverify_ok, X509_STORE_CTX* ctx
 void Stream::ssl_init()
 {
     SSL_CTX* ssl_ctx = m_ssl_context.m_ssl_ctx;
+
     SSL* ssl = SSL_new(ssl_ctx);
     if (REALM_UNLIKELY(!ssl)) {
         std::error_code ec(int(ERR_get_error()), openssl_error_category);

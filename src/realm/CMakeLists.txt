@@ -325,7 +325,7 @@ target_include_directories(Storage INTERFACE
 
 # On systems without a built-in SHA-1 implementation (or one provided by a dependency)
 # we need to bundle the public domain implementation.
-if(NOT APPLE AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NOT REALM_HAVE_OPENSSL)
+if(NOT APPLE AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NOT REALM_HAVE_OPENSSL AND NOT REALM_HAVE_WOLFSSL)
     add_library(sha1 OBJECT ../external/sha-1/sha1.c)
     target_include_directories(Storage PRIVATE ../external/sha-1)
     target_sources(Storage PRIVATE $<TARGET_OBJECTS:sha1>)
@@ -334,7 +334,7 @@ endif()
 # On systems without a built-in SHA-2 implementation (or one provided by a dependency)
 # we need to bundle the public domain implementation.
 # Note: This is also used on Windows because Windows lacks a native SHA224 hash needed for realm encryption
-if(NOT APPLE AND NOT REALM_HAVE_OPENSSL OR WIN32)
+if(NOT APPLE AND NOT REALM_HAVE_OPENSSL AND NOT REALM_HAVE_WOLFSSL OR WIN32)
     add_library(sha2 OBJECT ../external/sha-2/sha224.cpp ../external/sha-2/sha256.cpp)
     target_include_directories(Storage PRIVATE ../external/sha-2)
     target_sources(Storage PRIVATE $<TARGET_OBJECTS:sha2>)
@@ -355,8 +355,12 @@ endif()
 
 target_link_libraries(Storage INTERFACE Threads::Threads)
 
-if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE AND REALM_HAVE_OPENSSL)
-    target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
+if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE)
+    if (REALM_HAVE_WOLFSSL)
+        target_link_libraries(Storage PUBLIC WolfSSL)
+    elseif (REALM_HAVE_OPENSSL)
+        target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
+    endif()
 endif()
 
 # Use Zlib if the imported target is defined, otherise use -lz on Apple platforms

@@ -4,6 +4,7 @@
 // Realm-specific configuration
 #cmakedefine01 REALM_HAVE_READDIR64
 #cmakedefine01 REALM_HAVE_OPENSSL
+#cmakedefine01 REALM_HAVE_WOLFSSL
 #cmakedefine01 REALM_HAVE_SECURE_TRANSPORT
 #cmakedefine01 REALM_INCLUDE_CERTS
 #cmakedefine01 REALM_HAVE_DOGLESS
