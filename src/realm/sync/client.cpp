@@ -955,7 +955,7 @@ MigrationStore* SessionImpl::get_migration_store()
     return m_wrapper.get_migration_store();
 }
 
-void SessionImpl::on_sync_flx_completion(int64_t version)
+void SessionImpl::on_flx_sync_version_complete(int64_t version)
 {
     m_wrapper.on_flx_sync_version_complete(version);
 }

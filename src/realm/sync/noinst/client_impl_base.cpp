@@ -2350,7 +2350,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         // this point forward.
         auto client_reset_operation = std::move(m_client_reset_operation);
         util::UniqueFunction<void(int64_t)> on_flx_subscription_complete = [this](int64_t version) {
-            this->on_sync_flx_completion(version);
+            this->on_flx_sync_version_complete(version);
         };
         if (!client_reset_operation->finalize(client_file_ident, get_flx_subscription_store(),
                                               std::move(on_flx_subscription_complete))) {

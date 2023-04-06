@@ -751,7 +751,7 @@ public:
 
     /// Update internal client state when a flx subscription becomes complete outside
     /// of the normal sync process. This can happen during client reset.
-    void on_sync_flx_completion(int64_t version);
+    void on_flx_sync_version_complete(int64_t version);
 
     /// \brief Callback for when a new subscription set has been created for FLX sync.
     void on_new_flx_subscription_set(int64_t new_version);

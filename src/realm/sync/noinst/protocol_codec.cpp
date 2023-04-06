@@ -32,7 +32,6 @@ void ClientProtocol::make_flx_bind_message(int protocol_version, OutputBuffer& o
         json_data_stg = json_data.dump();
     }
 
-    static_cast<void>(protocol_version);
     out << "bind " << session_ident << " " << json_data_stg.size() << " " << signed_user_token.size() << " "
         << int(need_client_file_ident) << " " << int(is_subserver) << "\n"; // Throws
     REALM_ASSERT(!out.fail());
