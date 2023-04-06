@@ -326,39 +326,50 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
     auto schema = std::move(config.schema);
     auto migration_function = std::move(config.migration_function);
     auto initialization_function = std::move(config.initialization_function);
+    auto sync_config = config.sync_config;
     config.schema = {};
 
     realm = Realm::make_shared_realm(std::move(config), version, shared_from_this());
     m_weak_realm_notifiers.emplace_back(realm, config.cache);
 
+    try {
 #ifdef REALM_ENABLE_SYNC
-    if (m_sync_session && m_sync_session->user()->is_logged_in())
-        m_sync_session->revive_if_needed();
+        if (m_sync_session && m_sync_session->user()->is_logged_in())
+            m_sync_session->revive_if_needed();
 
-    if (realm->config().audit_config) {
-        if (m_audit_context)
-            m_audit_context->update_metadata(realm->config().audit_config->metadata);
-        else
-            m_audit_context = make_audit_context(m_db, realm->config());
-    }
+        if (realm->config().audit_config) {
+            if (m_audit_context)
+                m_audit_context->update_metadata(realm->config().audit_config->metadata);
+            else
+                m_audit_context = make_audit_context(m_db, realm->config());
+        }
 #else
-    if (realm->config().audit_config)
-        REALM_TERMINATE("Cannot use Audit interface if Realm Core is built without Sync");
+        if (realm->config().audit_config)
+            REALM_TERMINATE("Cannot use Audit interface if Realm Core is built without Sync");
 #endif
 
-    // Cached frozen Realms need to initialize their schema before releasing
-    // the lock as otherwise they could be read from the cache on another thread
-    // before the schema initialization happens. They'll never perform a write
-    // transaction, so unlike with live Realms this is safe to do.
-    if (config.cache && version && schema) {
-        realm->update_schema(std::move(*schema));
-        schema.reset();
-    }
+        // Cached frozen Realms need to initialize their schema before releasing
+        // the lock as otherwise they could be read from the cache on another thread
+        // before the schema initialization happens. They'll never perform a write
+        // transaction, so unlike with live Realms this is safe to do.
+        if (config.cache && version && schema) {
+            realm->update_schema(std::move(*schema));
+            schema.reset();
+        }
 
-    realm_lock.unlock_unchecked();
-    if (schema) {
-        realm->update_schema(std::move(*schema), config.schema_version, std::move(migration_function),
-                             std::move(initialization_function));
+        realm_lock.unlock_unchecked();
+        if (schema) {
+            realm->update_schema(std::move(*schema), config.schema_version, std::move(migration_function),
+                                 std::move(initialization_function));
+        }
+    }
+    catch (...) {
+#ifdef REALM_ENABLE_SYNC
+        if (sync_config) {
+            m_sync_session->shutdown_and_wait();
+        }
+#endif
+        throw;
     }
 }
 
