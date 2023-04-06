@@ -5157,6 +5157,8 @@ TEST_CASE("app: shared instances", "[sync][app]") {
 
     SyncClientConfig sync_config;
     sync_config.metadata_mode = SyncClientConfig::MetadataMode::NoMetadata;
+    sync_config.base_file_path = util::make_temp_dir() + random_string(10);
+    util::try_make_dir(sync_config.base_file_path);
 
     auto config1 = base_config;
     config1.app_id = "app1";
