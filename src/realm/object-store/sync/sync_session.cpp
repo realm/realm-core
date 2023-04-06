@@ -587,7 +587,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
         // Once the session is inactive, update sync config and subscription store after migration.
         if (server_requests_action == sync::ProtocolErrorInfo::Action::MigrateToFLX ||
             server_requests_action == sync::ProtocolErrorInfo::Action::RevertToPBS) {
-            update_sync_config_after_migration();
+            apply_sync_config_after_migration();
             auto flx_sync_requested = config(&SyncConfig::flx_sync_requested);
             update_subscription_store(flx_sync_requested);
         }
@@ -1300,7 +1300,7 @@ void SyncSession::update_configuration(SyncConfig new_config)
     revive_if_needed();
 }
 
-void SyncSession::update_sync_config_after_migration()
+void SyncSession::apply_sync_config_after_migration()
 {
     // Migration state changed - Update the configuration to
     // match the new sync mode.
@@ -1608,16 +1608,8 @@ void SyncSession::make_active_subscription_set()
     // Create subscription set from the subscriptions used to download the fresh realm after migration.
     auto active_mut_sub = m_flx_subscription_store->get_active().make_mutable_copy();
     active_mut_sub.import(*m_active_subscriptions_after_migration);
-    lock.unlock();
-
-    // Commit without holding the lock to prevent a deadlock.
-    auto active_sub = active_mut_sub.commit();
-
-    lock.lock();
-    // Mark the subscription set complete.
-    auto sub = m_flx_subscription_store->get_mutable_by_version(active_sub.version());
-    sub.update_state(sync::SubscriptionSet::State::Complete);
-    sub.commit();
+    active_mut_sub.update_state(sync::SubscriptionSet::State::Complete);
+    active_mut_sub.commit();
 
     m_active_subscriptions_after_migration.reset();
 }
