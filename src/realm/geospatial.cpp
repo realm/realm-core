@@ -124,20 +124,20 @@ Geospatial Geospatial::from_obj(const Obj& obj, ColKey type_col, ColKey coords_c
 
 Geospatial Geospatial::from_link(const Obj& link)
 {
-    GeoPoint point;
     if (!link) {
-        return Geospatial{point};
+        return Geospatial{};
     }
     ColKey type_col = link.get_table()->get_column_key(StringData(c_geo_point_type_col_name));
     ColKey coords_col = link.get_table()->get_column_key(StringData(c_geo_point_coords_col_name));
     if (!type_col || !coords_col) {
-        return Geospatial{point};
+        return Geospatial{};
     }
     if (!type_is_valid(link.get<String>(type_col))) {
         return Geospatial();
     }
     Lst<double> geo_data = link.get_list<double>(coords_col);
     const size_t num_entries = geo_data.size();
+    GeoPoint point;
     if (num_entries >= 2) {
         point.longitude = geo_data.get(0);
         point.latitude = geo_data.get(1);
@@ -161,8 +161,12 @@ void Geospatial::assign_to(Obj& link) const
         throw InvalidArgument(ErrorCodes::TypeMismatch,
                               util::format("Property %1 doesn't exist", c_geo_point_coords_col_name));
     }
+    if (m_type == Type::Invalid) {
+        link.remove();
+        return;
+    }
     if (m_type != Type::Point) {
-        throw IllegalOperation("The only Geospatial type currently supported is 'point'");
+        throw IllegalOperation("The only Geospatial type currently supported for storage is 'point'");
     }
     if (m_points.size() > 1) {
         throw IllegalOperation("Only one Geospatial point is currently supported");
@@ -192,6 +196,9 @@ void Geospatial::assign_to(Obj& link) const
         else {
             coords.add(*altitude);
         }
+    }
+    else if (coords.size() >= 3) {
+        coords.remove(2, coords.size());
     }
 }
 

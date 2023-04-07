@@ -96,6 +96,7 @@ struct GeoCenterSphere {
 
 class Geospatial {
 public:
+    // keep this type small so it doesn't bloat the size of a Mixed
     enum class Type : uint8_t { Point, Box, Polygon, CenterSphere, Invalid };
 
     Geospatial()
@@ -255,9 +256,9 @@ public:
     }
 
 private:
-    // size of struct is now 24
+    // size of struct is 24; keep this small to not bloat the size of a Mixed
     const GeoPoint* m_data = nullptr;
-    double m_sphere_radius;
+    double m_sphere_radius = 0;
     unsigned m_size = 0;
     Geospatial::Type m_type = Geospatial::Type::Invalid;
 };
