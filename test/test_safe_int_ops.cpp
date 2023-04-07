@@ -26,7 +26,6 @@
 
 #include <cstdint>
 
-#include <realm/util/type_list.hpp>
 #include <realm/util/safe_int_ops.hpp>
 
 #include "util/demangle.hpp"
@@ -563,24 +562,24 @@ void test_two_args(TestContext& test_context, const std::set<super_int>& values)
     }
 }
 
+template <template <typename> typename T, typename... Args>
+void for_each_type(Args&&... args)
+{
+    T<char>::exec(args...);
+    T<signed char>::exec(args...);
+    T<unsigned char>::exec(args...);
+    T<wchar_t>::exec(args...);
+    T<short>::exec(args...);
+    T<unsigned short>::exec(args...);
+    T<int>::exec(args...);
+    T<unsigned>::exec(args...);
+    T<long>::exec(args...);
+    T<unsigned long>::exec(args...);
+    T<long long>::exec(args...);
+    T<unsigned long long>::exec(args...);
+}
 
-typedef void types_01;
-typedef TypeAppend<types_01, char>::type types_02;
-typedef TypeAppend<types_02, signed char>::type types_03;
-typedef TypeAppend<types_03, unsigned char>::type types_04;
-typedef TypeAppend<types_04, wchar_t>::type types_05;
-typedef TypeAppend<types_05, short>::type types_06;
-typedef TypeAppend<types_06, unsigned short>::type types_07;
-typedef TypeAppend<types_07, int>::type types_08;
-typedef TypeAppend<types_08, unsigned>::type types_09;
-typedef TypeAppend<types_09, long>::type types_10;
-typedef TypeAppend<types_10, unsigned long>::type types_11;
-typedef TypeAppend<types_11, long long>::type types_12;
-typedef TypeAppend<types_12, unsigned long long>::type types_13;
-typedef types_13 types;
-
-
-template <class T, int>
+template <class T>
 struct add_min_max {
     static void exec(std::set<super_int>* values)
     {
@@ -590,9 +589,9 @@ struct add_min_max {
     }
 };
 
-template <class T_1, int>
+template <class T_1>
 struct test_two_args_1 {
-    template <class T_2, int>
+    template <class T_2>
     struct test_two_args_2 {
         static void exec(TestContext* test_context, const std::set<super_int>* values)
         {
@@ -601,7 +600,7 @@ struct test_two_args_1 {
     };
     static void exec(TestContext* test_context, const std::set<super_int>* values)
     {
-        ForEachType<types, test_two_args_2>::exec(test_context, values);
+        for_each_type<test_two_args_2>(test_context, values);
     }
 };
 
@@ -617,7 +616,7 @@ TEST_IF(SafeIntOps_General, TEST_DURATION >= 1)
     values.insert(super_int(0));
 
     // Add min and max for all integer types to set (worst case 27)
-    ForEachType<types, add_min_max>::exec(&values);
+    for_each_type<add_min_max>(&values);
 
     // Add x-1 and x+1 to the set for all x in set (worst case 81)
     {
@@ -667,5 +666,5 @@ TEST_IF(SafeIntOps_General, TEST_DURATION >= 1)
     }
     */
 
-    ForEachType<types, test_two_args_1>::exec(&test_context, &values);
+    for_each_type<test_two_args_1>(&test_context, &values);
 }
