@@ -73,7 +73,6 @@ private:
 };
 static_assert(std::is_trivially_copyable_v<MemRef>);
 
-
 /// The common interface for Realm allocators.
 ///
 /// A Realm allocator must associate a 'ref' to each allocated
@@ -424,7 +423,7 @@ inline int_fast64_t from_ref(ref_type v) noexcept
 inline ref_type to_ref(int_fast64_t v) noexcept
 {
     // Check that v is divisible by 8 (64-bit aligned).
-    REALM_ASSERT_DEBUG(v % 8 == 0);
+    REALM_ASSERT_DEBUG_EX(v % 8 == 0, v);
 
     // C++11 standard, paragraph 4.7.2 [conv.integral]:
     // If the destination type is unsigned, the resulting value is the least unsigned integer congruent to the source

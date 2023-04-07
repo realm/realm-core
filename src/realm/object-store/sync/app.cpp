@@ -268,10 +268,8 @@ void App::configure(const SyncClientConfig& sync_client_config)
     }
 }
 
-inline bool App::init_logger()
+bool App::init_logger()
 {
-    // If a log function is called before configure(), a null ptr will be
-    // returned by get_logger()
     if (!m_logger_ptr) {
         m_logger_ptr = m_sync_manager->get_logger();
     }
@@ -280,8 +278,7 @@ inline bool App::init_logger()
 
 bool App::would_log(util::Logger::Level level)
 {
-    init_logger();
-    return m_logger_ptr && m_logger_ptr->would_log(level);
+    return init_logger() && m_logger_ptr->would_log(level);
 }
 
 template <class... Params>

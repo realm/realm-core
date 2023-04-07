@@ -89,6 +89,8 @@ using namespace realm::fixtures;
 
 namespace {
 
+using ErrorInfo = SessionErrorInfo;
+
 class TestServerHistoryContext : public _impl::ServerHistory::Context {
 public:
     std::mt19937_64& server_history_get_random() noexcept override final
@@ -140,7 +142,6 @@ TEST(Sync_BadVirtualPath)
 
     int nerrors = 0;
 
-    using ErrorInfo = Session::ErrorInfo;
     auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
         if (state != ConnectionState::disconnected)
             return;
@@ -575,7 +576,6 @@ TEST(Sync_TokenWithoutExpirationAllowed)
         TEST_CLIENT_DB(db);
         ClientServerFixture fixture(dir, test_context);
 
-        using ErrorInfo = Session::ErrorInfo;
         auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
@@ -785,7 +785,7 @@ struct ExpectChangesetError {
     MultiClientServerFixture& fixture;
     std::string expected_error;
 
-    void operator()(ConnectionState state, util::Optional<Session::ErrorInfo> error_info) const noexcept
+    void operator()(ConnectionState state, util::Optional<ErrorInfo> error_info) const noexcept
     {
         if (state == ConnectionState::disconnected) {
             return;
@@ -3003,7 +3003,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     session_config.ssl_trust_certificate_path = util::none;
     session_config.ssl_verify_callback = ssl_verify_callback;
 
-    Session session(client, db, nullptr, std::move(session_config));
+    Session session(client, db, nullptr, nullptr, std::move(session_config));
     session.bind();
     session.wait_for_download_complete_or_client_stopped();
 
@@ -3141,7 +3141,7 @@ TEST(Sync_UploadDownloadProgress_1)
         sess_config.realm_identifier = "/test";
         sess_config.signed_user_token = g_signed_test_user_token;
 
-        Session session(client, db, nullptr, std::move(sess_config));
+        Session session(client, db, nullptr, nullptr, std::move(sess_config));
 
         int number_of_handler_calls = 0;
 
@@ -3414,7 +3414,7 @@ TEST(Sync_UploadDownloadProgress_3)
     config.server_port = server_port;
     config.realm_identifier = "/test";
 
-    Session session(client, db, nullptr, std::move(config));
+    Session session(client, db, nullptr, nullptr, std::move(config));
 
     // entry is used to count the number of calls to
     // progress_handler. At the first call, the server is
@@ -3696,7 +3696,7 @@ TEST(Sync_UploadDownloadProgress_6)
     session_config.signed_user_token = g_signed_test_user_token;
 
     std::mutex mutex;
-    auto session = std::make_unique<Session>(client, db, nullptr, std::move(session_config));
+    auto session = std::make_unique<Session>(client, db, nullptr, nullptr, std::move(session_config));
 
     auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
@@ -3765,6 +3765,16 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
     // client local BindingCallbackThreadObserver to receive the error message
     auto observer_ptr = std::make_shared<BindingCallbackThreadObserver>(
         std::move(create_thread), std::move(destroy_thread), std::move(handle_error));
+
+    CHECK(observer_ptr->has_handle_error());
+    {
+        auto no_handle_error_ptr = std::make_shared<BindingCallbackThreadObserver>(
+            nullopt, nullopt, nullopt);
+        no_handle_error_ptr->did_create_thread(); // should not crash
+        no_handle_error_ptr->will_destroy_thread(); // should not crash
+        CHECK(!no_handle_error_ptr->has_handle_error()); // no handler, returns false
+        CHECK(!no_handle_error_ptr->handle_error(MultipleSyncAgents())); // no handler, returns false
+    }
 
     TEST_CLIENT_DB(db);
     Client::Config config;
@@ -4886,7 +4896,7 @@ TEST(Sync_ConnectionStateChange)
     TEST_DIR(dir);
     TEST_CLIENT_DB(db_1);
     TEST_CLIENT_DB(db_2);
-    using ErrorInfo = Session::ErrorInfo;
+
     std::vector<ConnectionState> states_1, states_2;
     {
         ClientServerFixture fixture(dir, test_context);
@@ -5103,9 +5113,9 @@ TEST_IF(Sync_SSL_Certificates, false)
         // Invalid token for the cloud.
         session_config.signed_user_token = g_signed_test_user_token;
 
-        Session session{client, db, nullptr, std::move(session_config)};
+        Session session{client, db, nullptr, nullptr, std::move(session_config)};
 
-        auto listener = [&](ConnectionState state, const util::Optional<Session::ErrorInfo>& error_info) {
+        auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
             if (state == ConnectionState::disconnected) {
                 CHECK(error_info);
                 client_logger->debug(
@@ -5182,7 +5192,7 @@ TEST(Sync_BadChangeset)
             wt.commit();
         }
 
-        auto listener = [&](ConnectionState state, const util::Optional<Session::ErrorInfo>& error_info) {
+        auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
@@ -5231,7 +5241,7 @@ TEST(Sync_GoodChangeset_AccentCharacterInFieldName)
             wt.commit();
         }
 
-        auto listener = [&](ConnectionState state, const util::Optional<Session::ErrorInfo>) {
+        auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>) {
             if (state != ConnectionState::disconnected)
                 return;
             did_fail = true;
@@ -6678,6 +6688,180 @@ TEST(Sync_InvalidChangesetFromServer)
                                                        DownloadBatchState::SteadyState, logger, transact),
                    sync::IntegrationException,
                    StringData(e.what()).contains("Failed to parse received changeset: Invalid interned string"));
+}
+
+// Tests that an empty reciprocal changesets is set and retrieved correctly.
+TEST(Sync_SetAndGetEmptyReciprocalChangeset)
+{
+    using namespace realm;
+    using namespace realm::sync::instr;
+    using realm::sync::Changeset;
+
+    TEST_CLIENT_DB(db);
+
+    auto& history = get_history(db);
+    history.set_client_file_ident(SaltedFileIdent{1, 0x1234567812345678}, false);
+    timestamp_type timestamp{1};
+    history.set_local_origin_timestamp_source([&] {
+        return ++timestamp;
+    });
+
+    auto latest_local_verson = [&] {
+        auto tr = db->start_write();
+        // Create schema: single table with array of ints as property.
+        tr->add_table_with_primary_key("class_table", type_Int, "_id")->add_column_list(type_Int, "ints");
+        tr->commit_and_continue_writing();
+
+        // Create object and initialize array.
+        TableRef table = tr->get_table("class_table");
+        auto obj = table->create_object_with_primary_key(42);
+        auto ints = obj.get_list<int64_t>("ints");
+        for (auto i = 0; i < 8; ++i) {
+            ints.insert(i, i);
+        }
+        tr->commit_and_continue_writing();
+
+        // Move element in array.
+        ints.move(7, 2);
+        return tr->commit();
+    }();
+
+    // Create changeset which moves element from index 7 to index 0 in array.
+    // This changeset will discard the previous move (reciprocal changeset), leaving the local reciprocal changesets
+    // with no instructions (empty).
+    Changeset changeset;
+    ArrayMove instr;
+    instr.table = changeset.intern_string("table");
+    instr.object = instr::PrimaryKey{42};
+    instr.field = changeset.intern_string("ints");
+    instr.path.push_back(7);
+    instr.ndx_2 = 0;
+    instr.prior_size = 8;
+    changeset.push_back(instr);
+    changeset.version = 1;
+    changeset.last_integrated_remote_version = latest_local_verson - 1;
+    changeset.origin_timestamp = timestamp;
+    changeset.origin_file_ident = 2;
+
+    ChangesetEncoder::Buffer encoded;
+    std::vector<Transformer::RemoteChangeset> server_changesets_encoded;
+    encode_changeset(changeset, encoded);
+    server_changesets_encoded.emplace_back(changeset.version, changeset.last_integrated_remote_version,
+                                           BinaryData(encoded.data(), encoded.size()), changeset.origin_timestamp,
+                                           changeset.origin_file_ident);
+
+    SyncProgress progress = {};
+    progress.download.server_version = changeset.version;
+    progress.download.last_integrated_client_version = latest_local_verson - 1;
+    progress.latest_server_version.version = changeset.version;
+    progress.latest_server_version.salt = 0x7876543217654321;
+
+    uint_fast64_t downloadable_bytes = 0;
+    VersionInfo version_info;
+    util::StderrLogger logger;
+    auto transact = db->start_read();
+    history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
+                                        DownloadBatchState::SteadyState, logger, transact);
+
+    bool is_compressed = false;
+    auto data = history.get_reciprocal_transform(latest_local_verson, is_compressed);
+    Changeset reciprocal_changeset;
+    ChunkedBinaryInputStream in{data};
+    if (is_compressed) {
+        size_t total_size;
+        auto decompressed = util::compression::decompress_nonportable_input_stream(in, total_size);
+        CHECK(decompressed);
+        sync::parse_changeset(*decompressed, reciprocal_changeset); // Throws
+    }
+    else {
+        sync::parse_changeset(in, reciprocal_changeset); // Throws
+    }
+    // The only instruction in the reciprocal changeset was discarded during OT.
+    CHECK(reciprocal_changeset.empty());
+}
+
+TEST(Sync_TransformAgainstEmptyReciprocalChangeset)
+{
+    TEST_CLIENT_DB(seed_db);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
+
+    {
+        auto tr = seed_db->start_write();
+        // Create schema: single table with array of ints as property.
+        auto table = tr->add_table_with_primary_key("class_table", type_Int, "_id");
+        table->add_column_list(type_Int, "ints");
+        table->add_column(type_String, "string");
+        tr->commit_and_continue_writing();
+
+        // Create object and initialize array.
+        table = tr->get_table("class_table");
+        auto obj = table->create_object_with_primary_key(42);
+        auto ints = obj.get_list<int64_t>("ints");
+        for (auto i = 0; i < 8; ++i) {
+            ints.insert(i, i);
+        }
+        tr->commit();
+    }
+
+    {
+        TEST_DIR(dir);
+        MultiClientServerFixture fixture(3, 1, dir, test_context);
+        fixture.start();
+
+        util::Optional<Session> seed_session = fixture.make_bound_session(0, seed_db, 0, "/test");
+        util::Optional<Session> db_1_session = fixture.make_bound_session(1, db_1, 0, "/test");
+        util::Optional<Session> db_2_session = fixture.make_bound_session(2, db_2, 0, "/test");
+
+        seed_session->wait_for_upload_complete_or_client_stopped();
+        db_1_session->wait_for_download_complete_or_client_stopped();
+        db_2_session->wait_for_download_complete_or_client_stopped();
+        seed_session.reset();
+        db_2_session.reset();
+
+        auto move_element = [&](const DBRef& db, size_t from, size_t to, size_t string_size = 0) {
+            auto wt = db->start_write();
+            auto table = wt->get_table("class_table");
+            auto obj = table->get_object_with_primary_key(42);
+            auto ints = obj.get_list<int64_t>("ints");
+            ints.move(from, to);
+            obj.set("string", std::string(string_size, 'a'));
+            wt->commit();
+        };
+
+        // Client 1 uploads two move instructions.
+        move_element(db_1, 7, 2);
+        move_element(db_1, 7, 6);
+
+        db_1_session->wait_for_upload_complete_or_client_stopped();
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{10});
+
+        // Client 2 uploads two move instructions.
+        // The sync client uploads at most 128 KB of data so we make the first changeset large enough so two upload
+        // messages are sent to the server instead of one. Each change is transformed against the changes from
+        // Client 1.
+
+        // First change discards the first change (move(7, 2)) of Client 1.
+        move_element(db_2, 7, 0, 200 * 1024);
+        // Second change is tranformed against an empty reciprocal changeset as result of the change above.
+        move_element(db_2, 7, 5);
+        db_2_session = fixture.make_bound_session(2, db_2, 0, "/test");
+
+        db_1_session->wait_for_upload_complete_or_client_stopped();
+        db_2_session->wait_for_upload_complete_or_client_stopped();
+
+        db_1_session->wait_for_download_complete_or_client_stopped();
+        db_2_session->wait_for_download_complete_or_client_stopped();
+    }
+
+    ReadTransaction rt_1(db_1);
+    ReadTransaction rt_2(db_2);
+    const Group& group_1 = rt_1;
+    const Group& group_2 = rt_2;
+    group_1.verify();
+    group_2.verify();
+    CHECK(compare_groups(rt_1, rt_2));
 }
 
 } // unnamed namespace

@@ -31,6 +31,7 @@
 #include <realm/util/functional.hpp>
 #include <realm/util/interprocess_condvar.hpp>
 #include <realm/util/interprocess_mutex.hpp>
+#include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/version_id.hpp>
 
 #include <functional>
@@ -119,6 +120,8 @@ class DB;
 using DBRef = std::shared_ptr<DB>;
 
 class DB : public std::enable_shared_from_this<DB> {
+    struct ReadLockInfo;
+
 public:
     // Create a DB and associate it with a file. DB Objects can only be associated with one file,
     // the association determined on creation of the DB Object. The association can be broken by
@@ -174,6 +177,8 @@ public:
         m_replication = repl;
     }
 
+    void set_logger(const std::shared_ptr<util::Logger>& logger) noexcept;
+
     void create_new_history(Replication& repl) REQUIRES(!m_mutex);
     void create_new_history(std::unique_ptr<Replication> repl) REQUIRES(!m_mutex);
 
@@ -228,7 +233,6 @@ public:
     /// enable_wait_for_change() is required. Return true if the database has
     /// changed, false if it might have.
     bool wait_for_change(TransactionRef&);
-
     /// release any thread waiting in wait_for_change().
     void wait_for_change_release();
 
@@ -437,6 +441,7 @@ protected:
 private:
     class AsyncCommitHelper;
     class VersionManager;
+    class EncryptionMarkerObserver;
     class FileVersionManager;
     class InMemoryVersionManager;
     struct SharedInfo;
@@ -471,19 +476,21 @@ private:
     SlabAlloc m_alloc;
     std::unique_ptr<Replication> m_history;
     std::unique_ptr<VersionManager> m_version_manager;
+    std::unique_ptr<EncryptionMarkerObserver> m_marker_observer;
     Replication* m_replication = nullptr;
     size_t m_free_space GUARDED_BY(m_mutex) = 0;
     size_t m_locked_space GUARDED_BY(m_mutex) = 0;
     size_t m_used_space GUARDED_BY(m_mutex) = 0;
-    std::atomic<EvacStage> m_evac_stage = EvacStage::idle;
     std::vector<ReadLockInfo> m_local_locks_held GUARDED_BY(m_mutex); // tracks all read locks held by this DB
+    std::atomic<EvacStage> m_evac_stage = EvacStage::idle;
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer
     std::unique_ptr<SharedInfo> m_in_memory_info;
     SharedInfo* m_info = nullptr;
-    bool m_wait_for_change_enabled = true;  // Initially wait_for_change is enabled
+    bool m_wait_for_change_enabled = true; // Initially wait_for_change is enabled
     bool m_write_transaction_open GUARDED_BY(m_mutex) = false;
     std::string m_db_path;
+    size_t m_path_hash = 0;
     int m_file_format_version = 0;
     util::InterprocessMutex m_writemutex;
     std::unique_ptr<ReadLockInfo> m_fake_read_lock_if_immutable;
@@ -494,6 +501,7 @@ private:
     std::function<void(int, int)> m_upgrade_callback;
     std::shared_ptr<metrics::Metrics> m_metrics;
     std::unique_ptr<AsyncCommitHelper> m_commit_helper;
+    std::shared_ptr<util::Logger> m_logger;
     bool m_is_sync_agent = false;
 
     /// Attach this DB instance to the specified database file.
@@ -608,6 +616,7 @@ private:
     void async_end_write();
     void async_sync_to_disk(util::UniqueFunction<void()> fn);
 
+    friend class SlabAlloc;
     friend class Transaction;
 };
 

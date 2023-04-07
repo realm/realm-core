@@ -56,13 +56,6 @@ TEST_CASE("sync_manager: basic properties and APIs", "[sync]") {
     TestSyncManager init_sync_manager;
     auto app = init_sync_manager.app();
 
-    SECTION("should work for log level") {
-        app->sync_manager()->set_log_level(util::Logger::Level::info);
-        REQUIRE(app->sync_manager()->log_level() == util::Logger::Level::info);
-        app->sync_manager()->set_log_level(util::Logger::Level::error);
-        REQUIRE(app->sync_manager()->log_level() == util::Logger::Level::error);
-    }
-
     SECTION("should not crash on 'reconnect()'") {
         app->sync_manager()->reconnect();
     }
@@ -499,7 +492,23 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
     const std::string realm_path_3 = file_manager.realm_file_path(uuid_3, local_uuid_3, realm_url, partition);
     const std::string realm_path_4 = file_manager.realm_file_path(uuid_4, local_uuid_4, realm_url, partition);
 
+    // On windows you can't delete a realm if the file is open elsewhere.
+#ifdef _WIN32
+    SECTION("Action::DeleteRealm - fails if locked") {
+        SharedRealm locked_realm;
+        create_dummy_realm(realm_path_1, &locked_realm);
+
+        REQUIRE(locked_realm);
+
+        TestSyncManager tsm(config);
+        manager.make_file_action_metadata(realm_path_1, realm_url, "user1", Action::DeleteRealm);
+
+        REQUIRE_FALSE(tsm.app()->sync_manager()->immediately_run_file_actions(realm_path_1));
+    }
+#endif
+
     SECTION("Action::DeleteRealm") {
+
         // Create some file actions
         manager.make_file_action_metadata(realm_path_1, realm_url, "user1", Action::DeleteRealm);
         manager.make_file_action_metadata(realm_path_2, realm_url, "user2", Action::DeleteRealm);

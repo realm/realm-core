@@ -326,6 +326,12 @@ void encryption_note_reader_end(SharedFileInfo& info, const void* reader_id) noe
         }
 }
 
+void encryption_mark_pages_for_IV_check(EncryptedFileMapping* mapping)
+{
+    UniqueLock lock(mapping_mutex);
+    mapping->mark_pages_for_IV_check();
+}
+
 namespace {
 size_t collect_total_workload() // must be called under lock
 {
@@ -551,7 +557,7 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, const FileAttributes&
         f.info->fd = fd_duped;
         f.device = st.st_dev;
         f.inode = st.st_ino;
-#endif
+#endif // conditonal on _WIN32
 
         mappings_by_file.push_back(f); // can't throw due to reserve() above
         it = mappings_by_file.end() - 1;
@@ -685,25 +691,6 @@ void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMo
 
 
 #endif // REALM_ENABLE_ENCRYPTION
-
-void clear_mappings_before_test_forks()
-{
-#if REALM_ENABLE_ENCRYPTION
-#if !REALM_PLATFORM_APPLE
-    if (reclaimer_thread) {
-        reclaimer_shutdown = true;
-        reclaimer_thread->join();
-        reclaimer_thread = nullptr;
-        reclaimer_shutdown = false;
-    }
-#endif
-    UniqueLock lock(mapping_mutex);
-    mappings_by_addr.clear();
-    mappings_by_file.clear();
-    num_decrypted_pages = 0;
-#endif // REALM_ENABLE_ENCRYPTION
-}
-
 
 void* mmap_anon(size_t size)
 {

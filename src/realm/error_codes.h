@@ -275,7 +275,9 @@ typedef enum realm_sync_errno_session {
     RLM_SYNC_ERR_SESSION_INITIAL_SYNC_NOT_COMPLETED = 229,
     RLM_SYNC_ERR_SESSION_WRITE_NOT_ALLOWED = 230,
     RLM_SYNC_ERR_SESSION_COMPENSATING_WRITE = 231,
+    RLM_SYNC_ERR_SESSION_MIGRATE_TO_FLX = 232,
     RLM_SYNC_ERR_SESSION_BAD_PROGRESS = 233,
+    RLM_SYNC_ERR_SESSION_REVERT_TO_PBS = 234,
 } realm_sync_errno_session_e;
 
 typedef enum realm_web_socket_errno {

@@ -48,7 +48,7 @@ Client --> server
     Connection: Upgrade
     Host: <host name>
     Sec-WebSocket-Key: <websocket key>
-    Sec-WebSocket-Protocol: com.mongodb.realm-sync/<protocol version>
+    Sec-WebSocket-Protocol: com.mongodb.realm-sync#<protocol version>
     Sec-WebSocket-Version: 13
     Upgrade: websocket
 
@@ -64,15 +64,19 @@ The HTTP request must also be a valid WebSocket client handshake.
 The rules for the value of `Sec-WebSocket-Protocol` are more complex than shown.
 The value is generally a comma separated list of tokens (see HTTP
 specification). The client specifies a range of supported protocol versions by
-adding `com.mongodb.realm-sync/<from>-<to>` to that list, or just
-`com.mongodb.realm-sync/<from>` if `<from>` and `<to>` are equal. Clients are
+adding `com.mongodb.realm-sync#<from>-<to>` to that list, or just
+`com.mongodb.realm-sync#<from>` if `<from>` and `<to>` are equal. Clients are
 allowed to add multiple overlapping or nonoverlapping ranges.
 
 If at least one of the protocol versions requested by the client, is also
 supported by the server, the server will choose one of those versions to be used
 for the duration of the connection, and add `Sec-WebSocket-Protocol:
-com.mongodb.realm-sync/<protocol version>` to the HTTP response, where
+com.mongodb.realm-sync#<protocol version>` to the HTTP response, where
 `<protocol version>` is the protocol version chosen by the server.
+
+Note: Starting with the update to protocol version 8, the format of the
+`Sec-Websocket-Protocol` has been updated to use `#` instead of `/` to separate
+the protcol class name from the protocol version number.
 
 Param: `<url encoded realm path>` is the url percent encoded Realm
        path.
@@ -594,7 +598,7 @@ Server --> client
     HTTP/1.1 101 Switching Protocols
     Connection: Upgrade
     Sec-WebSocket-Accept: <websocket accept>
-    Sec-WebSocket-Protocol: com.mongodb.realm-sync/<protocol version>
+    Sec-WebSocket-Protocol: com.mongodb.realm-sync#<protocol version>
     Upgrade: websocket
 
 HTTP RESPONSE is sent in response to a [HTTP REQUEST](#http-request) received from the client.
@@ -1021,8 +1025,6 @@ message.
 Param: `<timestamp>` is a copy of the timestamp carried by the corresponding
 [PING](#ping) message.
 
-
-
 Error codes
 -----------
 
@@ -1045,8 +1047,8 @@ The list of errors passed in [ERROR](#error) messages.
 | 110  | Error in decompression (UPLOAD)
 | 111  | Bad syntax in a changeset header (UPLOAD)
 | 112  | Bad size specified in changeset header (UPLOAD)
-| 113  | Bad changesets (UPLOAD)
-
+| 113  | Connected with wrong wire protocol - should switch to FLX sync
+| 114  | Connected with wrong wire protocol - should switch to PBS
 
 ### Session level errors
 
@@ -1077,3 +1079,15 @@ The list of errors passed in [ERROR](#error) messages.
 | 222  | Client file has expired
 | 223  | User mismatch for client file identifier (IDENT)
 | 224  | Too many sessions in connection (BIND)
+| 225  | Invalid schema change (UPLOAD)
+| 226  | Client query is invalid/malformed (IDENT, QUERY)
+| 227  | Client tried to create an object that already exists outside their view (UPLOAD)
+| 228  | Server permissions for this file ident have changed since the last time it was used (IDENT)
+| 229  | Client tried to open a session before initial sync is complete (BIND)
+| 230  | Client attempted a write that is disallowed by permissions, or modifies an \
+object outside the current query - requires client reset (UPLOAD)
+| 231  | Client attempted a write that is disallowed by permissions, or modifies an \
+object outside the current query, and the server undid the modification (UPLOAD)
+| 232  | Server migrated from PBS to FLX - migrate client to FLX (BIND)
+| 233  | Bad progress information (ERROR)
+| 234  | Server rolled back to PBS after FLX migration - revert FLX client migration (BIND)

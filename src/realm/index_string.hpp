@@ -507,6 +507,11 @@ size_t StringIndex::count(T value) const
     return m_array->index_string_count(Mixed(value), m_target_column);
 }
 
+inline Allocator& StringIndex::get_alloc() const noexcept
+{
+    return m_array->get_alloc();
+}
+
 inline void StringIndex::destroy() noexcept
 {
     return m_array->destroy_deep();

@@ -73,6 +73,9 @@ struct DBOptions {
     /// upgrade (rollback the transaction) but the DB will not be opened.
     std::function<void(int, int)> upgrade_callback;
 
+    /// Optionally supply a logger
+    std::shared_ptr<util::Logger> logger;
+
     /// A path to a directory where Realm can write temporary files or pipes to.
     /// This string should include a trailing slash '/'.
     std::string temp_dir = sys_tmp_dir;

@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "realm/data_type.hpp"
-#include "realm/keys.hpp"
-#include "realm/util/optional.hpp"
+#include <realm/data_type.hpp>
+#include <realm/keys.hpp>
+
 #include <memory>
 #include <stdexcept>
 #include <string_view>
@@ -120,19 +120,26 @@ struct SyncMetadataTable {
 void create_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadataTable>* tables);
 void load_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadataTable>* tables);
 
-// SyncMetadataSchemas manages the schema version numbers for different groups of internal tables used
-// within sync.
-class SyncMetadataSchemaVersions {
+class SyncMetadataSchemaVersionsReader {
 public:
-    explicit SyncMetadataSchemaVersions(const TransactionRef& ref);
+    explicit SyncMetadataSchemaVersionsReader(const TransactionRef& ref);
 
-    util::Optional<int64_t> get_version_for(const TransactionRef& tr, std::string_view schema_group_name);
-    void set_version_for(const TransactionRef& tr, std::string_view schema_group_name, int64_t version);
+    std::optional<int64_t> get_version_for(const TransactionRef& tr, std::string_view schema_group_name);
 
-private:
+protected:
     TableKey m_table;
     ColKey m_version_field;
     ColKey m_schema_group_field;
+};
+
+
+// SyncMetadataSchemas manages the schema version numbers for different groups of internal tables used
+// within sync.
+class SyncMetadataSchemaVersions : public SyncMetadataSchemaVersionsReader {
+public:
+    explicit SyncMetadataSchemaVersions(const TransactionRef& ref);
+
+    void set_version_for(const TransactionRef& tr, std::string_view schema_group_name, int64_t version);
 };
 
 } // namespace realm::sync

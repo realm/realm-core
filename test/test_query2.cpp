@@ -5425,6 +5425,8 @@ TEST_TYPES(Query_PrimaryKeySearchForNull, Prop<String>, Prop<Int>, Prop<ObjectId
 TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
 {
     bool has_index = TEST_TYPE::value;
+    constexpr bool exact_match = true;
+    constexpr bool insensitive_match = false;
     Group g;
     auto table = g.add_table("Foo");
     auto origin = g.add_table("Origin");
@@ -5512,29 +5514,62 @@ TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
     CHECK_EQUAL(tv.size(), 3);
     tv = table->where().begins_with(col_any, BinaryData("String2", 7)).find_all(); // 20, 24, 28
     CHECK_EQUAL(tv.size(), 3);
+    tv = table->where().begins_with(col_any, Mixed(75.), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().begins_with(col_any, Mixed(75.), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
 
-    tv = table->where().contains(col_any, StringData("TRIN"), false).find_all();
+    tv = table->where().contains(col_any, StringData("TRIN"), insensitive_match).find_all();
     CHECK_EQUAL(tv.size(), 24);
-    tv = table->where().contains(col_any, Mixed("TRIN"), false).find_all();
+    tv = table->where().contains(col_any, Mixed("TRIN"), insensitive_match).find_all();
     CHECK_EQUAL(tv.size(), 24);
+    tv = table->where().contains(col_any, Mixed("TRIN"), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().contains(col_any, Mixed(75.), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().contains(col_any, Mixed(75.), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
 
     tv = table->where().like(col_any, StringData("Strin*")).find_all();
     CHECK_EQUAL(tv.size(), 24);
+    tv = table->where().like(col_any, Mixed(75.), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().like(col_any, Mixed(75.), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
 
     tv = table->where().ends_with(col_any, StringData("4")).find_all(); // 4, 24, 44, 64, 84
     CHECK_EQUAL(tv.size(), 5);
     char bin[1] = {0x34};
     tv = table->where().ends_with(col_any, BinaryData(bin)).find_all(); // 4, 24, 44, 64, 84
     CHECK_EQUAL(tv.size(), 5);
+    tv = table->where().ends_with(col_any, Mixed(75.), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().ends_with(col_any, Mixed(75.), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
 
-    tv = table->where().equal(col_any, "String2Binary", true).find_all();
+    tv = table->where().equal(col_any, "String2Binary", exact_match).find_all();
     CHECK_EQUAL(tv.size(), 1);
-
-    tv = table->where().equal(col_any, "string2binary", false).find_all();
+    tv = table->where().equal(col_any, "string2binary", exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().equal(col_any, "string2binary", insensitive_match).find_all();
     CHECK_EQUAL(tv.size(), 1);
-
-    tv = table->where().not_equal(col_any, "string2binary", false).find_all();
+    tv = table->where().not_equal(col_any, "string2binary", insensitive_match).find_all();
     CHECK_EQUAL(tv.size(), 99);
+
+    tv = table->where().equal(col_any, StringData(), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = table->where().equal(col_any, StringData(), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+
+    tv = table->where().equal(col_any, Mixed(), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = table->where().equal(col_any, Mixed(), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+
+    tv = table->where().equal(col_any, Mixed(75.), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = table->where().equal(col_any, Mixed(75.), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
 
     tv = (table->column<Mixed>(col_any) == StringData("String48")).find_all();
     CHECK_EQUAL(tv.size(), 1);
@@ -5545,6 +5580,8 @@ TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
 
     tv = (table->column<Mixed>(col_any) == StringData("abcdefgh")).find_all();
     CHECK_EQUAL(tv.size(), 1);
+    tv = (table->column<Mixed>(col_any) == StringData("ABCDEFGH")).find_all();
+    CHECK_EQUAL(tv.size(), 0);
 
     ObjLink link_to_first = table->begin()->get_link();
     tv = (origin->column<Mixed>(col_mixed) == Mixed(link_to_first)).find_all();
@@ -5566,13 +5603,13 @@ TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
     CHECK_EQUAL(tv.size(), 5);
     tv = (origin->link(col_link).column<Mixed>(col_any) > 50).find_all();
     CHECK_EQUAL(tv.size(), 2);
-    tv = (origin->link(col_links).column<Mixed>(col_any).contains("string2bin", false)).find_all();
+    tv = (origin->link(col_links).column<Mixed>(col_any).contains("string2bin", insensitive_match)).find_all();
     CHECK_EQUAL(tv.size(), 1);
-    tv = (origin->link(col_links).column<Mixed>(col_any).like("*ring*", false)).find_all();
+    tv = (origin->link(col_links).column<Mixed>(col_any).like("*ring*", insensitive_match)).find_all();
     CHECK_EQUAL(tv.size(), 10);
-    tv = (origin->link(col_links).column<Mixed>(col_any).begins_with("String", true)).find_all();
+    tv = (origin->link(col_links).column<Mixed>(col_any).begins_with("String", exact_match)).find_all();
     CHECK_EQUAL(tv.size(), 10);
-    tv = (origin->link(col_links).column<Mixed>(col_any).ends_with("g40", true)).find_all();
+    tv = (origin->link(col_links).column<Mixed>(col_any).ends_with("g40", exact_match)).find_all();
     CHECK_EQUAL(tv.size(), 1);
 }
 
@@ -6018,6 +6055,7 @@ TEST(Query_FullTextMulti)
         col, "L’archive ouverte pluridisciplinaire HAL, est destinée au dépôt et à la diffusion de documents "
              "scientifiques de niveau recherche, publiés ou non, émanant des établissements d’enseignement et de "
              "recherche français ou étrangers, des laboratoires publics ou privés.");
+    table->create_object().set(col, "object object object object object duplicates");
 
     int64_t id = 1000;
     for (auto& o : *table) {

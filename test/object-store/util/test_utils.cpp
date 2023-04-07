@@ -76,13 +76,16 @@ std::ostream& operator<<(std::ostream& os, const Exception& e)
     return os;
 }
 
-bool create_dummy_realm(std::string path)
+bool create_dummy_realm(std::string path, std::shared_ptr<Realm>* out)
 {
     Realm::Config config;
     config.path = path;
     try {
-        _impl::RealmCoordinator::get_coordinator(path)->get_realm(config, none);
+        auto realm = _impl::RealmCoordinator::get_coordinator(path)->get_realm(config, none);
         REQUIRE_REALM_EXISTS(path);
+        if (out) {
+            *out = std::move(realm);
+        }
         return true;
     }
     catch (std::exception&) {

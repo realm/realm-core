@@ -197,7 +197,7 @@ TEST(File_ReaderAndWriter)
     File::Map<size_t> read(reader, File::access_ReadOnly, count * sizeof(size_t));
 
     for (size_t i = 0; i < count; i += 100) {
-        realm::util::encryption_read_barrier(write, i);
+        realm::util::encryption_read_barrier(write, i, 1);
         write.get_addr()[i] = i;
         realm::util::encryption_write_barrier(write, i);
         realm::util::encryption_read_barrier(read, i);
@@ -223,7 +223,7 @@ TEST(File_Offset)
         for (size_t i = 0; i < page_count; ++i) {
             File::Map<size_t> map(f, i * size, File::access_ReadWrite, size);
             for (size_t j = 0; j < count_per_page; ++j) {
-                realm::util::encryption_read_barrier(map, j);
+                realm::util::encryption_read_barrier(map, j, 1);
                 map.get_addr()[j] = i * size + j;
                 realm::util::encryption_write_barrier(map, j);
             }
@@ -276,10 +276,10 @@ TEST(File_MultipleWriters)
         }
 
         for (size_t i = 0; i < count; i += increments) {
-            realm::util::encryption_read_barrier(map1, i);
+            realm::util::encryption_read_barrier(map1, i, 1);
             ++map1.get_addr()[i];
             realm::util::encryption_write_barrier(map1, i);
-            realm::util::encryption_read_barrier(map2, i);
+            realm::util::encryption_read_barrier(map2, i, 1);
             ++map2.get_addr()[i];
             realm::util::encryption_write_barrier(map2, i);
         }
@@ -341,7 +341,7 @@ TEST(File_Resize)
     {
         File::Map<unsigned char> m(f, File::access_ReadWrite, page_size() * 2);
         for (unsigned int i = 0; i < page_size() * 2; ++i) {
-            realm::util::encryption_read_barrier(m, i);
+            realm::util::encryption_read_barrier(m, i, 1);
             m.get_addr()[i] = static_cast<unsigned char>(i);
             realm::util::encryption_write_barrier(m, i);
         }
@@ -352,7 +352,7 @@ TEST(File_Resize)
         // encrypted data there, so flush and write a second time
         m.sync();
         for (unsigned int i = 0; i < page_size() * 2; ++i) {
-            realm::util::encryption_read_barrier(m, i);
+            realm::util::encryption_read_barrier(m, i, 1);
             m.get_addr()[i] = static_cast<unsigned char>(i);
             realm::util::encryption_write_barrier(m, i);
         }
@@ -375,7 +375,7 @@ TEST(File_Resize)
     {
         File::Map<unsigned char> m(f, File::access_ReadWrite, page_size() * 2);
         for (unsigned int i = 0; i < page_size() * 2; ++i) {
-            realm::util::encryption_read_barrier(m, i);
+            realm::util::encryption_read_barrier(m, i, 1);
             m.get_addr()[i] = static_cast<unsigned char>(i);
             realm::util::encryption_write_barrier(m, i);
         }

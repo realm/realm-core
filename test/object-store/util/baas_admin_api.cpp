@@ -16,9 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "baas_admin_api.hpp"
-#include "external/mpark/variant.hpp"
-#include "realm/object-store/sync/app_credentials.hpp"
+#include <util/baas_admin_api.hpp>
+
+#include <external/mpark/variant.hpp>
+#include <realm/object-store/sync/app_credentials.hpp>
 
 #if REALM_ENABLE_AUTH_TESTS
 
@@ -28,8 +29,9 @@
 #include <catch2/catch_all.hpp>
 #include <curl/curl.h>
 
-#include "realm/object_id.hpp"
-#include "realm/util/scope_exit.hpp"
+#include <realm/exceptions.hpp>
+#include <realm/object_id.hpp>
+#include <realm/util/scope_exit.hpp>
 
 namespace realm {
 namespace {
@@ -460,7 +462,7 @@ AdminAPISession AdminAPISession::login(const std::string& base_url, const std::s
         login_req_body.dump(),
     };
     auto login_resp = do_http_request(std::move(auth_req));
-    REALM_ASSERT(login_resp.http_status_code == 200);
+    REALM_ASSERT_EX(login_resp.http_status_code == 200, login_resp.http_status_code, login_resp.body);
     auto login_resp_body = nlohmann::json::parse(login_resp.body);
 
     std::string access_token = login_resp_body["access_token"];
@@ -477,21 +479,21 @@ void AdminAPISession::revoke_user_sessions(const std::string& user_id, const std
 {
     auto endpoint = apps()[app_id]["users"][user_id]["logout"];
     auto response = endpoint.put("");
-    REALM_ASSERT(response.http_status_code == 204);
+    REALM_ASSERT_EX(response.http_status_code == 204, response.http_status_code, response.body);
 }
 
 void AdminAPISession::disable_user_sessions(const std::string& user_id, const std::string& app_id) const
 {
     auto endpoint = apps()[app_id]["users"][user_id]["disable"];
     auto response = endpoint.put("");
-    REALM_ASSERT(response.http_status_code == 204);
+    REALM_ASSERT_EX(response.http_status_code == 204, response.http_status_code, response.body);
 }
 
 void AdminAPISession::enable_user_sessions(const std::string& user_id, const std::string& app_id) const
 {
     auto endpoint = apps()[app_id]["users"][user_id]["enable"];
     auto response = endpoint.put("");
-    REALM_ASSERT(response.http_status_code == 204);
+    REALM_ASSERT_EX(response.http_status_code == 204, response.http_status_code, response.body);
 }
 
 // returns false for an invalid/expired access token
@@ -528,7 +530,7 @@ void AdminAPISession::delete_app(const std::string& app_id) const
 {
     auto app_endpoint = apps()[app_id];
     auto resp = app_endpoint.del();
-    REALM_ASSERT(resp.http_status_code == 204);
+    REALM_ASSERT_EX(resp.http_status_code == 204, resp.http_status_code, resp.body);
 }
 
 std::vector<AdminAPISession::Service> AdminAPISession::get_services(const std::string& app_id) const
@@ -571,6 +573,13 @@ void AdminAPISession::trigger_client_reset(const std::string& app_id, int64_t fi
 {
     auto endpoint = apps(APIFamily::Private)[app_id]["sync"]["force_reset"];
     endpoint.put_json(nlohmann::json{{"file_ident", file_ident}});
+}
+
+void AdminAPISession::migrate_to_flx(const std::string& app_id, const std::string& service_id,
+                                     bool migrate_to_flx) const
+{
+    auto endpoint = apps()[app_id]["sync"]["migration"];
+    endpoint.put_json(nlohmann::json{{"serviceId", service_id}, {"action", migrate_to_flx ? "start" : "rollback"}});
 }
 
 static nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
@@ -707,6 +716,29 @@ bool AdminAPISession::is_initial_sync_complete(const std::string& app_id) const
     return false;
 }
 
+AdminAPISession::MigrationStatus AdminAPISession::get_migration_status(const std::string& app_id) const
+{
+    MigrationStatus status;
+    auto progress_endpoint = apps()[app_id]["sync"]["migration"];
+    auto progress_result = progress_endpoint.get_json();
+    auto errorMessage = progress_result["errorMessage"];
+    if (errorMessage.is_string() && !errorMessage.get<std::string>().empty()) {
+        throw Exception(Status{ErrorCodes::RuntimeError, errorMessage.get<std::string>()});
+    }
+    if (!progress_result["statusMessage"].is_string() || !progress_result["isMigrated"].is_boolean()) {
+        throw Exception(
+            Status{ErrorCodes::RuntimeError, util::format("Invalid result returned from migration status request: %1",
+                                                          progress_result.dump(4, 32, true))});
+    }
+
+    status.statusMessage = progress_result["statusMessage"].get<std::string>();
+    status.isMigrated = progress_result["isMigrated"].get<bool>();
+    status.isCancelable = progress_result["isCancelable"].get<bool>();
+    status.isRevertible = progress_result["isRevertible"].get<bool>();
+    status.complete = status.statusMessage.empty();
+    return status;
+}
+
 AdminAPIEndpoint AdminAPISession::apps(APIFamily family) const
 {
     switch (family) {
@@ -835,7 +867,7 @@ AppCreateConfig default_app_config(const std::string& base_url)
 
 AppCreateConfig minimal_app_config(const std::string& base_url, const std::string& name, const Schema& schema)
 {
-    Property partition_key("partition", PropertyType::String | PropertyType::Nullable);
+    Property partition_key("realm_id", PropertyType::String | PropertyType::Nullable);
 
     AppCreateConfig::UserPassAuthConfig user_pass_config{
         true,  "Confirm", "", "http://example.com/confirmEmail", "", "Reset", "http://exmaple.com/resetPassword",

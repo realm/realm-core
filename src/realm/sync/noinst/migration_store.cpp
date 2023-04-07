@@ -16,72 +16,141 @@ constexpr static std::string_view c_flx_subscription_name_prefix("flx_migrated_"
 
 class MigrationStoreInit : public MigrationStore {
 public:
-    explicit MigrationStoreInit(DBRef db,
-                                std::function<void(MigrationStore::MigrationState)>&& on_migration_state_changed)
-        : MigrationStore(std::move(db), std::move(on_migration_state_changed))
+    explicit MigrationStoreInit(DBRef db)
+        : MigrationStore(std::move(db))
     {
     }
 };
 
 } // namespace
 
-MigrationStoreRef
-MigrationStore::create(DBRef db, std::function<void(MigrationStore::MigrationState)>&& on_migration_state_changed)
+MigrationStoreRef MigrationStore::create(DBRef db)
 {
-    return std::make_shared<MigrationStoreInit>(std::move(db), std::move(on_migration_state_changed));
+    return std::make_shared<MigrationStoreInit>(std::move(db));
 }
 
-MigrationStore::MigrationStore(DBRef db,
-                               std::function<void(MigrationStore::MigrationState)>&& on_migration_state_changed)
+MigrationStore::MigrationStore(DBRef db)
     : m_db(std::move(db))
-    , m_on_migration_state_changed(std::move(on_migration_state_changed))
+    , m_state(MigrationState::NotMigrated)
+    , m_query_string{}
 {
+    load_data(true); // read_only, default to NotMigrated if table is not initialized
+}
+
+bool MigrationStore::load_data(bool read_only)
+{
+    if (m_migration_table) {
+        return true; // already initialized
+    }
+
     std::vector<SyncMetadataTable> internal_tables{
         {&m_migration_table,
          c_flx_migration_table,
          {
              {&m_migration_started_at, c_flx_migration_started_at, type_Timestamp},
-             {&m_migration_started_at, c_flx_migration_completed_at, type_Timestamp},
+             {&m_migration_completed_at, c_flx_migration_completed_at, type_Timestamp},
              {&m_migration_state, c_flx_migration_state, type_Int},
              {&m_migration_query_str, c_flx_migration_query_string, type_String},
          }},
     };
 
+    std::optional<int64_t> schema_version;
     auto tr = m_db->start_read();
-    SyncMetadataSchemaVersions schema_versions(tr);
-
-    if (auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_migration_store);
-        !schema_version) {
-        tr->promote_to_write();
-        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_migration_store, c_schema_version);
-        create_sync_metadata_schema(tr, &internal_tables);
-        // create migration object
-        auto migration_store_obj = tr->get_table(m_migration_table)->create_object();
-        migration_store_obj.set(m_migration_state, int64_t(MigrationState::NotStarted));
-        tr->commit_and_continue_as_read();
-        m_state = MigrationState::NotStarted;
+    if (read_only) {
+        // Writing is disabled
+        SyncMetadataSchemaVersionsReader schema_versions(tr);
+        schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_migration_store);
+        if (!schema_version) {
+            return false; // Either table is not initialized or version does not exist
+        }
     }
-    else {
+    else { // writable
+        SyncMetadataSchemaVersions schema_versions(tr);
+        schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_migration_store);
+        // Create the version and metadata_schema if it doesn't exist
+        if (!schema_version) {
+            tr->promote_to_write();
+            schema_versions.set_version_for(tr, internal_schema_groups::c_flx_migration_store, c_schema_version);
+            create_sync_metadata_schema(tr, &internal_tables);
+            tr->commit_and_continue_as_read();
+        }
+    }
+    // Load the metadata schema unless it was just created
+    if (!m_migration_table) {
         if (*schema_version != c_schema_version) {
             throw std::runtime_error("Invalid schema version for flexible sync migration store metadata");
         }
         load_sync_metadata_schema(tr, &internal_tables);
     }
 
-    m_on_migration_state_changed(m_state);
+    REALM_ASSERT(m_migration_table);
+
+    // Read the migration object if exists, or default to not migrated
+    std::lock_guard lock(m_mutex);
+    if (auto migration_table = tr->get_table(m_migration_table); !migration_table->is_empty()) {
+        auto migration_store_obj = migration_table->get_object(0);
+        m_state = static_cast<MigrationState>(migration_store_obj.get<int64_t>(m_migration_state));
+        m_query_string = migration_store_obj.get<String>(m_migration_query_str);
+    }
+    else {
+        m_state = MigrationState::NotMigrated;
+        m_query_string = {};
+    }
+    return true;
+}
+
+bool MigrationStore::is_migration_in_progress()
+{
+    std::lock_guard lock{m_mutex};
+    return m_state == MigrationState::InProgress;
+}
+
+bool MigrationStore::is_migrated()
+{
+    std::lock_guard lock{m_mutex};
+    return m_state == MigrationState::Migrated;
+}
+
+void MigrationStore::complete_migration()
+{
+    // Ensure the migration table has been initialized
+    REALM_ASSERT(load_data());
+
+    std::unique_lock lock{m_mutex};
+    if (m_state != MigrationState::InProgress) {
+        return;
+    }
+
+    m_state = MigrationState::Migrated;
+
+    auto tr = m_db->start_write();
+    auto migration_table = tr->get_table(m_migration_table);
+    REALM_ASSERT(!migration_table->is_empty());
+    auto migration_store_obj = migration_table->get_object(0);
+    migration_store_obj.set(m_migration_state, int64_t(m_state));
+    migration_store_obj.set(m_migration_completed_at, Timestamp{std::chrono::system_clock::now()});
+    tr->commit();
+}
+
+std::string MigrationStore::get_query_string()
+{
+    std::lock_guard lock{m_mutex};
+    return m_query_string;
 }
 
 std::shared_ptr<realm::SyncConfig> MigrationStore::convert_sync_config(std::shared_ptr<realm::SyncConfig> config)
 {
     REALM_ASSERT(config);
+    // If load data failed in the constructor, m_state defaults to NotMigrated
 
-    std::lock_guard lock{m_mutex};
-    if (config->flx_sync_requested) {
-        cancel_migration();
-        return config;
-    }
-    if (m_state == MigrationState::NotStarted) {
-        return config;
+    {
+        std::unique_lock lock{m_mutex};
+        if (config->flx_sync_requested) {
+            return config;
+        }
+        if (m_state == MigrationState::NotMigrated) {
+            return config;
+        }
     }
 
     auto flx_config = std::make_shared<realm::SyncConfig>(*config); // deep copy
@@ -91,52 +160,125 @@ std::shared_ptr<realm::SyncConfig> MigrationStore::convert_sync_config(std::shar
     return flx_config;
 }
 
-void MigrationStore::migrate_to_flx(std::string rql_query_string)
+void MigrationStore::migrate_to_flx(std::string_view rql_query_string)
 {
     REALM_ASSERT(!rql_query_string.empty());
 
-    std::unique_lock lock{m_mutex};
-    m_query_string = rql_query_string;
-    m_state = MigrationState::Completed;
-    lock.unlock();
+    // Ensure the migration table has been initialized
+    REALM_ASSERT(load_data());
 
-    auto tr = m_db->start_write();
-    auto migration_store_obj = tr->get_table(m_migration_table)->get_object(0);
-    migration_store_obj.set(m_migration_query_str, m_query_string);
-    migration_store_obj.set(m_migration_state, int64_t(m_state));
-    migration_store_obj.set(m_migration_completed_at, Timestamp{std::chrono::system_clock::now()});
-    tr->commit();
+    {
+        std::unique_lock lock{m_mutex};
+        // Can call migrate_to_flx multiple times if migration has not completed.
+        REALM_ASSERT(m_state != MigrationState::Migrated);
+        m_query_string = rql_query_string;
+        m_state = MigrationState::InProgress;
 
-    m_on_migration_state_changed(m_state);
+        auto tr = m_db->start_read();
+        auto migration_table = tr->get_table(m_migration_table);
+        // A migration object may exist if the migration was started in a previous session.
+        if (migration_table->is_empty()) {
+            tr->promote_to_write();
+            auto migration_store_obj = migration_table->create_object();
+            migration_store_obj.set(m_migration_query_str, m_query_string);
+            migration_store_obj.set(m_migration_state, int64_t(m_state));
+            migration_store_obj.set(m_migration_started_at, Timestamp{std::chrono::system_clock::now()});
+            tr->commit();
+        }
+        else {
+            auto migration_store_obj = migration_table->get_object(0);
+            auto state = static_cast<MigrationState>(migration_store_obj.get<int64_t>(m_migration_state));
+            auto query_string = migration_store_obj.get<String>(m_migration_query_str);
+            REALM_ASSERT(m_state == state);
+            REALM_ASSERT(m_query_string == query_string);
+        }
+    }
 }
 
 void MigrationStore::cancel_migration()
 {
-    auto tr = m_db->start_write();
-    auto migration_table = tr->get_table(m_migration_table);
-    migration_table->clear();
-    tr->commit();
+    // Ensure the migration table has been initialized
+    REALM_ASSERT(load_data());
 
-    {
-        std::lock_guard lock{m_mutex};
-        m_state = MigrationState::NotStarted;
-    }
-
-    m_on_migration_state_changed(m_state);
+    // Clear the migration state
+    std::unique_lock lock{m_mutex};
+    REALM_ASSERT(m_state == MigrationState::Migrated);
+    clear(std::move(lock)); // releases the lock
 }
 
-std::optional<Subscription> MigrationStore::make_subscription(const std::string& object_class_name)
+void MigrationStore::clear(std::unique_lock<std::mutex>)
 {
-    std::lock_guard lock{m_mutex};
-    if (m_state == MigrationState::NotStarted) {
-        return std::nullopt;
-    }
-    if (object_class_name.empty()) {
-        return std::nullopt;
+    // Make sure the migration table has been initialized before calling clear()
+    REALM_ASSERT(m_migration_table);
+
+    auto tr = m_db->start_read();
+    auto migration_table = tr->get_table(m_migration_table);
+    if (migration_table->is_empty()) {
+        return; // already cleared
     }
 
+    m_state = MigrationState::NotMigrated;
+    m_query_string = {};
+    tr->promote_to_write();
+    migration_table->clear();
+    tr->commit();
+}
+
+Subscription MigrationStore::make_subscription(const std::string& object_class_name,
+                                               const std::string& rql_query_string)
+{
+    REALM_ASSERT(!object_class_name.empty());
+
     std::string subscription_name = c_flx_subscription_name_prefix.data() + object_class_name;
-    return Subscription{subscription_name, object_class_name, m_query_string};
+    return Subscription{subscription_name, object_class_name, rql_query_string};
+}
+
+void MigrationStore::create_subscriptions(const SubscriptionStore& subs_store)
+{
+    if (!is_migrated()) {
+        return;
+    }
+
+    create_subscriptions(subs_store, m_query_string);
+}
+
+void MigrationStore::create_subscriptions(const SubscriptionStore& subs_store, const std::string& rql_query_string)
+{
+    if (rql_query_string.empty()) {
+        return;
+    }
+
+    auto mut_sub = subs_store.get_latest().make_mutable_copy();
+    auto sub_count = mut_sub.size();
+
+    auto tr = m_db->start_read();
+    // List of tables covered by latest subscription set.
+    auto tables = subs_store.get_tables_for_latest(*tr);
+
+    // List of tables in the realm.
+    auto table_keys = tr->get_table_keys();
+    for (const auto& key : table_keys) {
+        if (!tr->table_is_public(key)) {
+            continue;
+        }
+        auto table = tr->get_table(key);
+        if (table->get_table_type() != Table::Type::TopLevel) {
+            continue;
+        }
+        auto object_class_name = table->get_class_name();
+        if (tables.find(object_class_name) == tables.end()) {
+            auto sub = make_subscription(object_class_name, rql_query_string);
+            mut_sub.insert_sub(sub);
+        }
+    }
+
+    // No new subscription was added.
+    if (mut_sub.size() == sub_count) {
+        return;
+    }
+
+    // Commit new subscription set.
+    mut_sub.commit();
 }
 
 } // namespace realm::sync

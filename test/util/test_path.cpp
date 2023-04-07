@@ -18,7 +18,12 @@
 
 #include "test_path.hpp"
 
+#include "misc.hpp"
+#include "spawned_process.hpp"
+
 #include <realm/util/file.hpp>
+#include <realm/db.hpp>
+#include <realm/history.hpp>
 
 #include <algorithm>
 #include <string>
@@ -47,6 +52,7 @@ bool g_keep_files = false;
 
 std::string g_path_prefix;
 std::string g_resource_path;
+std::string g_exe_name;
 
 #ifdef _WIN32
 std::string sanitize_for_file_name(std::string str)
@@ -145,6 +151,10 @@ bool initialize_test_path(int argc, const char* argv[])
     g_path_prefix = directory;
 #endif
 
+    if (argc > 0) {
+        g_exe_name = argv[0];
+    }
+
     if (argc > 1) {
         g_path_prefix = argv[1];
     }
@@ -176,15 +186,25 @@ std::string get_test_resource_path()
     return g_resource_path;
 }
 
+std::string get_test_exe_name()
+{
+    return g_exe_name;
+}
+
 TestPathGuard::TestPathGuard(const std::string& path)
     : m_path(path)
+    , m_do_remove(test_util::SpawnedProcess::is_parent())
 {
-    File::try_remove(m_path);
+    if (m_do_remove) {
+        File::try_remove(m_path);
+    }
 }
 
 TestPathGuard::~TestPathGuard() noexcept
 {
     if (g_keep_files)
+        return;
+    if (!m_do_remove)
         return;
     try {
         if (!m_path.empty())
@@ -264,7 +284,6 @@ DBTestPathGuard::DBTestPathGuard(const std::string& path)
     cleanup();
 }
 
-
 DBTestPathGuard::~DBTestPathGuard() noexcept
 {
     if (!g_keep_files && !m_path.empty())
@@ -273,6 +292,8 @@ DBTestPathGuard::~DBTestPathGuard() noexcept
 
 void DBTestPathGuard::cleanup() const noexcept
 {
+    if (!m_do_remove)
+        return;
     try {
         do_clean_dir(m_path + ".management", ".management");
         if (File::is_dir(m_path + ".management"))
@@ -292,6 +313,23 @@ TestDirNameGenerator::TestDirNameGenerator(std::string path)
 std::string TestDirNameGenerator::next()
 {
     return m_path + "/" + std::to_string(m_counter++);
+}
+
+std::shared_ptr<DB> get_test_db(const std::string& path, const char* crypt_key)
+{
+    const char* str = getenv("UNITTEST_LOG_LEVEL");
+    realm::util::Logger::Level core_log_level = realm::util::Logger::Level::off;
+    if (str && strlen(str) != 0) {
+        std::istringstream in(str);
+        in.imbue(std::locale::classic());
+        in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
+        in >> core_log_level;
+    }
+
+    DBOptions options;
+    options.logger = std::make_shared<util::StderrLogger>(core_log_level);
+    options.encryption_key = crypt_key;
+    return DB::create(make_in_realm_history(), path, options);
 }
 
 } // namespace realm::test_util

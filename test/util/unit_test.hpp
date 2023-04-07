@@ -197,6 +197,13 @@ static const bool running_with_asan = true;
 static const bool running_with_asan = false;
 #endif
 
+#if REALM_ANDROID || REALM_IOS
+// android doesn't implement posix_spawn(), iOS doesn't permit starting another process
+constexpr bool testing_supports_spawn_process = false;
+#else
+constexpr bool testing_supports_spawn_process = !running_with_valgrind && !running_with_tsan && !running_with_asan;
+#endif
+
 //@{
 
 /// These are the four inexact floating point comparisons defined by
