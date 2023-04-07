@@ -147,7 +147,6 @@ public:
     Mixed(UUID) noexcept;
     Mixed(util::Optional<UUID>) noexcept;
     Mixed(const Obj&) noexcept;
-    Mixed(GeoPoint) noexcept;
     Mixed(GeospatialRef) noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
@@ -268,7 +267,6 @@ protected:
         Decimal128 decimal_val;
         ObjLink link_val;
         UUID uuid_val;
-        GeoPoint geopoint_val;
         GeospatialRef geospatial_val;
     };
 
@@ -514,12 +512,6 @@ inline Mixed::Mixed(Decimal128 v)
     else {
         m_type = 0;
     }
-}
-
-inline Mixed::Mixed(GeoPoint geo) noexcept
-{
-    m_type = int(type_GeoPoint) + 1;
-    geopoint_val = geo;
 }
 
 inline Mixed::Mixed(GeospatialRef store) noexcept
@@ -783,11 +775,8 @@ template <>
 inline Geospatial Mixed::get<Geospatial>() const noexcept
 {
     auto type = get_type();
-    REALM_ASSERT_EX(type == type_Geospatial || type == type_GeoPoint, type);
-    if (type == type_GeoPoint) {
-        return geopoint_val;
-    }
-    else if (type == type_Geospatial) {
+    REALM_ASSERT_EX(type == type_Geospatial, type);
+    if (type == type_Geospatial) {
         return geospatial_val.get();
     }
     REALM_UNREACHABLE();

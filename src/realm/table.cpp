@@ -315,8 +315,6 @@ const char* get_data_type_name(DataType type) noexcept
                 return "@type";
             else if (type == type_Geospatial)
                 return "geospatial";
-            else if (type == type_GeoPoint)
-                return "geopoint";
             else if (type == ColumnTypeTraits<null>::id)
                 return "null";
     }
