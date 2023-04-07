@@ -68,7 +68,7 @@ TEST(Array_Example)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     auto create_schema = [](WriteTransaction& tr) {
-        TableRef foobar = tr.add_table("class_foobar");
+        TableRef foobar = tr.get_group().add_table_with_primary_key("class_foobar", type_Int, "id");
         foobar->add_column(type_Int, "foo");
         foobar->add_column_list(type_Int, "bar");
     };
@@ -77,7 +77,7 @@ TEST(Array_Example)
     client_2->create_schema(create_schema);
 
     client_1->transaction([](Peer& p) {
-        Obj obj = p.table("class_foobar")->create_object();
+        Obj obj = p.table("class_foobar")->create_object_with_primary_key(1);
         auto bar = p.table("class_foobar")->get_column_key("bar");
 
         auto foo = p.table("class_foobar")->get_column_key("foo");

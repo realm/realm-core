@@ -124,18 +124,6 @@
 #define REALM_DIAG_IGNORE_UNSIGNED_MINUS()
 #endif
 
-/* Compiler is MSVC (Microsoft Visual C++) */
-#if defined(_MSC_VER) && _MSC_VER >= 1600
-#define REALM_HAVE_AT_LEAST_MSVC_10_2010 1
-#endif
-#if defined(_MSC_VER) && _MSC_VER >= 1700
-#define REALM_HAVE_AT_LEAST_MSVC_11_2012 1
-#endif
-#if defined(_MSC_VER) && _MSC_VER >= 1800
-#define REALM_HAVE_AT_LEAST_MSVC_12_2013 1
-#endif
-
-
 /* The way to specify that a function never returns. */
 #if REALM_HAVE_AT_LEAST_GCC(4, 8) || REALM_HAVE_CLANG_FEATURE(cxx_attributes)
 #define REALM_NORETURN [[noreturn]]
@@ -252,8 +240,10 @@
 /* Device (iPhone or iPad) or simulator. */
 #define REALM_IOS 1
 #define REALM_APPLE_DEVICE !TARGET_OS_SIMULATOR
+#define REALM_MACCATALYST TARGET_OS_MACCATALYST
 #else
 #define REALM_IOS 0
+#define REALM_MACCATALYST 0
 #endif
 #if TARGET_OS_WATCH == 1
 /* Device (Apple Watch) or simulator. */
@@ -271,6 +261,7 @@
 #endif
 #else
 #define REALM_PLATFORM_APPLE 0
+#define REALM_MACCATALYST 0
 #define REALM_IOS 0
 #define REALM_WATCHOS 0
 #define REALM_TVOS 0
@@ -303,6 +294,18 @@
 #define REALM_ARCHITECTURE_X86_64 1
 #else
 #define REALM_ARCHITECTURE_X86_64 0
+#endif
+
+#if defined(__arm__) || defined(_M_ARM)
+#define REALM_ARCHITECTURE_ARM32 1
+#else
+#define REALM_ARCHITECTURE_ARM32 0
+#endif
+
+#if defined(__aarch64__) || defined(_M_ARM64) || defined(_M_ARM64EC)
+#define REALM_ARCHITECTURE_ARM64 1
+#else
+#define REALM_ARCHITECTURE_ARM64 0
 #endif
 
 // Address Sanitizer

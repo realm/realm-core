@@ -26,6 +26,7 @@
 #include <vector>
 
 #include <realm/alloc_slab.hpp>
+#include <realm/array.hpp>
 #include <realm/group.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/util/file.hpp>
@@ -443,32 +444,6 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
         alloc.purge_old_mappings(5, 5);
     }
 }
-
-namespace {
-
-class TestSlabAlloc : public SlabAlloc {
-
-public:
-    size_t test_get_upper_section_boundary(size_t start_pos)
-    {
-        return get_upper_section_boundary(start_pos);
-    }
-    size_t test_get_lower_section_boundary(size_t start_pos)
-    {
-        return get_lower_section_boundary(start_pos);
-    }
-    size_t test_get_section_base(size_t index)
-    {
-        return get_section_base(index);
-    }
-    size_t test_get_section_index(size_t ref)
-    {
-        return get_section_index(ref);
-    }
-};
-
-} // end anonymous namespace
-
 
 // This test reproduces the sporadic issue that was seen for large refs (addresses)
 // on 32-bit iPhone 5 Simulator runs on certain host machines.

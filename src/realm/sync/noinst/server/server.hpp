@@ -8,10 +8,10 @@
 #include <set>
 #include <exception>
 
-#include <realm/util/network.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/time.hpp>
+#include <realm/sync/network/network.hpp>
 #include <realm/sync/noinst/server/clock.hpp>
 #include <realm/sync/noinst/server/crypto_server.hpp>
 #include <realm/sync/client.hpp>
@@ -84,7 +84,7 @@ public:
         /// logger is specified, the server will use an instance of
         /// util::StderrLogger with the log level threshold set to
         /// util::Logger::Level::info.
-        util::Logger* logger = nullptr;
+        std::shared_ptr<util::Logger> logger;
 
         /// A unique id of this server. Used in the backup protocol to tell
         /// slaves apart.
@@ -188,7 +188,7 @@ public:
         /// `/proc/sys/net/core/somaxconn`). You can change the value of that
         /// parameter using `sysctl -w net.core.somaxconn=...`. It is usually
         /// 128 by default.
-        int listen_backlog = util::network::Acceptor::max_connections;
+        int listen_backlog = network::Acceptor::max_connections;
 
         /// Set the `TCP_NODELAY` option on all TCP/IP sockets. This disables
         /// the Nagle algorithm. Disabling it, can in some cases be used to
@@ -271,7 +271,7 @@ public:
     void start(const std::string& listen_address, const std::string& listen_port, bool reuse_address = true);
 
     /// Return the resolved and bound endpoint of the listening socket.
-    util::network::Endpoint listen_endpoint() const;
+    network::Endpoint listen_endpoint() const;
 
     /// Run the internal network event-loop of the server. At most one thread
     /// may execute run() at any given time. It is an error if run() is called

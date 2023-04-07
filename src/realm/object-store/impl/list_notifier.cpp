@@ -28,11 +28,9 @@ using namespace realm::_impl;
 ListNotifier::ListNotifier(std::shared_ptr<Realm> realm, CollectionBase const& list, PropertyType type)
     : CollectionNotifier(std::move(realm))
     , m_type(type)
-    , m_table(list.get_table()->get_key())
-    , m_col(list.get_col_key())
-    , m_obj(list.get_owner_key())
     , m_prev_size(list.size())
 {
+    attach(list);
 }
 
 void ListNotifier::release_data() noexcept
@@ -41,11 +39,17 @@ void ListNotifier::release_data() noexcept
     CollectionNotifier::release_data();
 }
 
-void ListNotifier::do_attach_to(Transaction& sg)
+void ListNotifier::reattach()
 {
+    attach(*m_list);
+}
+
+void ListNotifier::attach(CollectionBase const& src)
+{
+    auto& tr = transaction();
     try {
-        auto obj = sg.get_table(m_table)->get_object(m_obj);
-        m_list = obj.get_collection_ptr(m_col);
+        auto obj = tr.get_table(src.get_table()->get_key())->get_object(src.get_owner_key());
+        m_list = obj.get_collection_ptr(src.get_col_key());
     }
     catch (const KeyNotFound&) {
         m_list = nullptr;
@@ -57,7 +61,7 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     if (!m_list || !m_list->is_attached())
         return false; // origin row was deleted after the notification was added
 
-    info.lists.push_back({m_table, m_obj, m_col, &m_change});
+    info.lists.push_back({m_list->get_table()->get_key(), m_list->get_owner_key(), m_list->get_col_key(), &m_change});
 
     m_info = &info;
 

@@ -5,7 +5,7 @@
 namespace realm::c_api {
 
 RLM_API realm_schema_t* realm_schema_new(const realm_class_info_t* classes, size_t num_classes,
-                                         const realm_property_info** class_properties)
+                                         const realm_property_info_t** class_properties)
 {
     return wrap_err([&]() {
         std::vector<ObjectSchema> object_schemas;
@@ -213,7 +213,8 @@ RLM_API bool realm_get_property(const realm_t* realm, realm_class_key_t class_ke
             }
         }
 
-        throw InvalidPropertyKeyException{"Invalid property key for this class"};
+        auto& shared_realm = *realm;
+        throw InvalidColumnKey{shared_realm->read_group().get_class_name(TableKey(class_key))};
     });
 }
 

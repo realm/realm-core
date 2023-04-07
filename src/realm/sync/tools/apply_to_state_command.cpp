@@ -95,9 +95,16 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger, bo
     ret.progress.latest_server_version.salt = msg.read_next<sync::salt_type>();
     ret.progress.upload.client_version = msg.read_next<sync::version_type>();
     ret.progress.upload.last_integrated_server_version = msg.read_next<sync::version_type>();
-    ret.query_version = is_flx_sync ? msg.read_next<int64_t>() : 0;
-    auto last_in_batch = is_flx_sync ? msg.read_next<bool>() : true;
-    ret.batch_state = last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
+    if (is_flx_sync) {
+        ret.query_version = msg.read_next<int64_t>();
+        auto last_in_batch = msg.read_next<bool>();
+        ret.batch_state =
+            last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
+    }
+    else {
+        ret.query_version = 0;
+        ret.batch_state = sync::DownloadBatchState::SteadyState;
+    }
     ret.downloadable_bytes = msg.read_next<int64_t>();
     auto is_body_compressed = msg.read_next<bool>();
     auto uncompressed_body_size = msg.read_next<size_t>();
@@ -241,13 +248,8 @@ int main(int argc, const char** argv)
     CliFlag flx_sync_arg(arg_parser, "flx-sync", 'f');
     auto arg_results = arg_parser.parse(argc, argv);
 
-    std::unique_ptr<RootLogger> logger = std::make_unique<StderrLogger>(); // Throws
-    if (verbose_arg) {
-        logger->set_level_threshold(Logger::Level::all);
-    }
-    else {
-        logger->set_level_threshold(Logger::Level::error);
-    }
+    std::unique_ptr<Logger> logger =
+        std::make_unique<StderrLogger>(verbose_arg ? Logger::Level::all : Logger::Level::error);
 
     if (help_arg) {
         print_usage(arg_results.program_name);
@@ -291,10 +293,11 @@ int main(int argc, const char** argv)
         mpark::visit(realm::util::overload{
                          [&](const DownloadMessage& download_message) {
                              realm::sync::VersionInfo version_info;
+                             auto transact = bool(flx_sync_arg) ? local_db->start_write() : local_db->start_read();
                              history.integrate_server_changesets(download_message.progress,
                                                                  &download_message.downloadable_bytes,
                                                                  download_message.changesets, version_info,
-                                                                 download_message.batch_state, *logger, nullptr);
+                                                                 download_message.batch_state, *logger, transact);
                          },
                          [&](const UploadMessage& upload_message) {
                              for (const auto& changeset : upload_message.changesets) {

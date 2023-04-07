@@ -83,6 +83,15 @@ RLM_API bool realm_list_insert(realm_list_t* list, size_t index, realm_value_t v
     });
 }
 
+RLM_API bool realm_list_move(realm_list_t* list, size_t from_index, size_t to_index)
+{
+    return wrap_err([&]() {
+        list->move(from_index, to_index);
+        return true;
+    });
+}
+
+
 RLM_API bool realm_list_set(realm_list_t* list, size_t index, realm_value_t value)
 {
     return wrap_err([&]() {
@@ -149,7 +158,7 @@ RLM_API realm_list_t* realm_list_from_thread_safe_reference(const realm_t* realm
     return wrap_err([&]() {
         auto ltsr = dynamic_cast<realm_list::thread_safe_reference*>(tsr);
         if (!ltsr) {
-            throw std::logic_error{"Thread safe reference type mismatch"};
+            throw LogicError{ErrorCodes::IllegalOperation, "Thread safe reference type mismatch"};
         }
 
         auto list = ltsr->resolve<List>(*realm);

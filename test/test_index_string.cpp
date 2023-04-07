@@ -263,7 +263,7 @@ TEST(StringIndex_NonIndexable)
     table->add_column(type_Binary, "binary");
 
     for (auto col : table->get_column_keys()) {
-        CHECK_LOGIC_ERROR(table->add_search_index(col), LogicError::illegal_combination);
+        CHECK_LOGIC_ERROR(table->add_search_index(col), ErrorCodes::IllegalOperation);
     }
 }
 
@@ -1790,6 +1790,15 @@ TEST(StringIndex_QuerySingleObject)
     CHECK_EQUAL(q.count(), 0);
 }
 
+TEST(StringIndex_MixedNonEmptyTable)
+{
+    Group g;
+    auto table = g.add_table("foo");
+    auto col = table->add_column(type_Mixed, "any");
+    table->create_object().set(col, Mixed("abcdefgh"));
+    table->add_search_index(col);
+}
+
 TEST(StringIndex_MixedEqualBitPattern)
 {
     Group g;
@@ -1828,8 +1837,18 @@ TEST(StringIndex_MixedEqualBitPattern)
 
 TEST(Unicode_Casemap)
 {
-    std::string inp = "A very old house 🏠 is on 🔥, we have to save the 🦄";
-    auto out = case_map(inp, true);
+    std::string inp = "±ÀÁÂÃÄÅÆÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝß×÷";
+    auto out = case_map(inp, false);
+    if (CHECK(out)) {
+        CHECK_EQUAL(*out, "±àáâãäåæèéêëìíîïñòóôõöøùúûüýß×÷");
+    }
+    out = case_map(*out, true);
+    if (CHECK(out)) {
+        CHECK_EQUAL(*out, inp);
+    }
+
+    inp = "A very old house 🏠 is on 🔥, we have to save the 🦄";
+    out = case_map(inp, true);
     if (CHECK(out)) {
         CHECK_EQUAL(*out, "A VERY OLD HOUSE 🏠 IS ON 🔥, WE HAVE TO SAVE THE 🦄");
     }

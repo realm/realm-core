@@ -233,13 +233,15 @@ int realm_c_api_tests(const char* file)
     CHECK_ERROR();
     assert(num_bars == 0);
 
-    assert(realm_refresh(realm));
+    bool did_refresh = false;
+    assert(realm_refresh(realm, &did_refresh));
     CHECK_ERROR();
+    assert(!did_refresh);
 
     realm_object_create(realm, foo_info.key);
     realm_error_t err;
     assert(realm_get_last_error(&err));
-    assert(err.error == RLM_ERR_NOT_IN_A_TRANSACTION);
+    assert(err.error == RLM_ERR_WRONG_TRANSACTION_STATE);
     realm_clear_last_error();
 
     realm_object_t* foo_1;

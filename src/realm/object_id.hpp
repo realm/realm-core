@@ -43,12 +43,12 @@ public:
     /**
      * Constructs an ObjectId from 24 hex characters.
      */
-    ObjectId(const char* init) noexcept;
+    explicit ObjectId(StringData init) noexcept;
 
     /**
      * Constructs an ObjectID from an array of 12 unsigned bytes
      */
-    ObjectId(const ObjectIdBytes& init) noexcept;
+    explicit ObjectId(const ObjectIdBytes& init) noexcept;
 
     /**
      * Constructs an ObjectId with the specified inputs, and a random number

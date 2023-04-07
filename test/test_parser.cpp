@@ -407,6 +407,26 @@ TEST(Parser_invalid_queries)
 }
 
 static Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
+                          std::vector<mpark::variant<Mixed, std::vector<Mixed>>> args, size_t num_results,
+                          query_parser::KeyPathMapping mapping = {})
+{
+    Query q = t->query(query_string, args, mapping);
+
+    size_t q_count = q.count();
+    CHECK_EQUAL(q_count, num_results);
+    std::string description = q.get_description();
+    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    Query q2 = t->query(description, args, mapping);
+
+    size_t q2_count = q2.count();
+    CHECK_EQUAL(q2_count, num_results);
+    if (q_count != num_results || q2_count != num_results) {
+        std::cout << "the query for the above failure is: '" << description << "'" << std::endl;
+    }
+    return q2;
+}
+
+static Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
                           size_t num_results, query_parser::KeyPathMapping mapping = {})
 {
     realm::query_parser::NoArguments args;
@@ -514,13 +534,13 @@ TEST(Parser_ConstrainedQuery)
     CHECK_EQUAL(q.count(), 1);
     q.and_query(t->column<Int>(int_col) <= 0);
     CHECK_EQUAL(q.count(), 1);
-    CHECK_THROW(q.get_description(), SerialisationError);
+    CHECK_THROW(q.get_description(), SerializationError);
 
     Query q2(t, list_0);
     CHECK_EQUAL(q2.count(), 2);
     q2.and_query(t->column<Int>(int_col) <= 0);
     CHECK_EQUAL(q2.count(), 1);
-    CHECK_THROW(q2.get_description(), SerialisationError);
+    CHECK_THROW(q2.get_description(), SerializationError);
 }
 
 TEST(Parser_basic_serialisation)
@@ -553,6 +573,7 @@ TEST(Parser_basic_serialisation)
 
     Query q = t->where();
 
+    // constant values
     verify_query(test_context, t, "time == NULL", 1);
     verify_query(test_context, t, "time == NIL", 1);
     verify_query(test_context, t, "time != NULL", 4);
@@ -579,6 +600,23 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "fees BETWEEN {2.20, 2.25}", 3);
     verify_query(test_context, t, "fees = 2 || fees = 3 || fees = 4", 1);
     verify_query(test_context, t, "fees = 0 || fees = 1", 0);
+
+    // params
+    verify_query(test_context, t, "time == $0", {null()}, 1);
+    verify_query(test_context, t, "time != $0", {null()}, 4);
+    verify_query(test_context, t, "age > $0", {2}, 2);
+    verify_query(test_context, t, "!(age >= $0)", {2}, 2);
+    verify_query(test_context, t, "!(age => $0)", {2}, 2);
+    verify_query(test_context, t, "$0 <= age", {3}, 2);
+    verify_query(test_context, t, "$0 =< age", {3}, 2);
+    verify_query(test_context, t, "age > $0 and age < $1", {2, 4}, 1);
+    verify_query(test_context, t, "age = $0 || age == $1", {1, 3}, 2);
+    verify_query(test_context, t, "fees = $0 || fees = $1", {1.2, 2.23}, 1);
+    verify_query(test_context, t, "fees = $0 || fees = $1", {2, 3}, 1);
+    verify_query(test_context, t, "fees BETWEEN {$0, $1}", {2, 3}, 4);
+    verify_query(test_context, t, "fees BETWEEN {$0, $1}", {2.2, 2.25}, 3);
+    verify_query(test_context, t, "fees = $0 || fees = $1 || fees = $2", {2, 3, 4}, 1);
+    verify_query(test_context, t, "fees = $0 || fees = $1", {0, 1}, 0);
 
     verify_query(test_context, t, "fees != 2.22 && fees > 2.2", 3);
     verify_query(test_context, t, "fees > 2.0E0", 4);
@@ -637,7 +675,7 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "age > 2 AND !TRUEPREDICATE", 0);
 
     CHECK_THROW_EX(
-        verify_query(test_context, t, "buddy.age > $0", 0), std::out_of_range,
+        verify_query(test_context, t, "buddy.age > $0", 0), query_parser::InvalidQueryArgError,
         CHECK_EQUAL(std::string(e.what()), "Attempt to retreive an argument when no arguments were given"));
     CHECK_THROW_EX(verify_query(test_context, t, "age == infinity", 0), query_parser::InvalidQueryError,
                    CHECK_EQUAL(std::string(e.what()), "Infinity not supported for int"));
@@ -3826,6 +3864,7 @@ TEST(Parser_OperatorIN)
     }
 
     // RHS is a constant list
+    verify_query(test_context, t, "customer_id IN {}", 0);
     verify_query(test_context, t, "customer_id IN {0, 1, 2}", 3);
     verify_query(test_context, t, "NOT customer_id IN {0}", 2);
     verify_query(test_context, t, "customer_id != {0}", 2);
@@ -3852,6 +3891,36 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "fav_item.name endswith {'lk', 'EAL', 'GeS'}", 1);
     verify_query(test_context, t, "fav_item.name endswith[c] {'lk', 'EAL', 'GeS'}", 2);
     verify_query(test_context, t, "fav_item.name like {'*lk', '*zz*'}", 2);
+
+    // RHS is a param
+    using Vec = std::vector<Mixed>;
+    verify_query(test_context, t, "customer_id IN $0", {Vec{}}, 0);
+    verify_query(test_context, t, "customer_id IN $0", {Vec{0, 1, 2}}, 3);
+    verify_query(test_context, t, "NOT customer_id IN $0", {Vec{0}}, 2);
+    verify_query(test_context, t, "customer_id != $0", {Vec{0}}, 2);
+    verify_query(test_context, t, "customer_id != $0", {Vec{0, 1}}, 3);
+    verify_query(test_context, t, "NOT customer_id IN $0", {Vec{0, 1}}, 1);
+    verify_query(test_context, t, "customer_id != $0", {Vec{0, 1, 2}}, 3);
+    verify_query(test_context, t, "customer_id > $0", {Vec{0, 1}}, 2);
+    verify_query(test_context, t, "customer_id > $0", {Vec{4, 5, 6}}, 0);
+    verify_query(test_context, t, "customer_id < $0", {Vec{0, 1}}, 1);
+    verify_query(test_context, t, "customer_id < $0", {Vec{0}}, 0);
+    verify_query(test_context, t, "customer_id >= $0", {Vec{0, 1}}, 3);
+    verify_query(test_context, t, "customer_id >= $0", {Vec{2, 3, 4}}, 1);
+    verify_query(test_context, t, "customer_id <= $0", {Vec{0, 1}}, 2);
+    verify_query(test_context, t, "customer_id <= $0", {Vec{-1}}, 0);
+
+    verify_query(test_context, t, "fav_item.name IN $0", {Vec{"milk", "oranges", "cereal"}}, 2);
+    verify_query(test_context, t, "fav_item.price IN $0", {Vec{6.5, 9.5}}, 1);
+    verify_query(test_context, t, "fav_item.name IN $0",
+                 {Vec{0, null{}, -1, "not found", 3.14, ObjectId("000000000000000000000000")}}, 0);
+    verify_query(test_context, t, "fav_item.name != $0", {Vec{"milk", "oranges"}}, 3);
+    verify_query(test_context, t, "NOT fav_item.name IN $0", {Vec{"milk", "oranges"}}, 1);
+    verify_query(test_context, t, "fav_item.name contains[c] $0", {Vec{"ILK", "Range"}}, 2);
+    verify_query(test_context, t, "fav_item.name beginswith[c] $0", {Vec{"MIL", "CERe"}}, 1);
+    verify_query(test_context, t, "fav_item.name endswith $0", {Vec{"lk", "EAL", "GeS"}}, 1);
+    verify_query(test_context, t, "fav_item.name endswith[c] $0", {Vec{"lk", "EAL", "GeS"}}, 2);
+    verify_query(test_context, t, "fav_item.name like $0", {Vec{"*lk", "*zz*"}}, 2);
 
     std::vector<Mixed> int_list = {0, 1, 2};
     std::vector<Mixed> strings_list = {"milk", "oranges", "cereal"};
@@ -3978,7 +4047,7 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "NONE items.price * 2 > ANY items.price", 0);
 
     // unsupported combinations
-    CHECK_THROW(verify_query(test_context, t, "{1, 2, 3, 4, 5, 6} * {1, 2, 3} == items.price", 1), std::logic_error);
+    CHECK_THROW(verify_query(test_context, t, "{1, 2, 3, 4, 5, 6} * {1, 2, 3} == items.price", 1), LogicError);
     CHECK_THROW(verify_query(test_context, t, "{8, 10}.@size >= ANY items.price", 3), query_parser::SyntaxError);
     CHECK_THROW(verify_query(test_context, t, "{8, 10}.@max >= ANY items.price", 3), query_parser::SyntaxError);
     CHECK_THROW(verify_query(test_context, t, "{8, 10}.@min >= ANY items.price", 3), query_parser::SyntaxError);
@@ -5577,6 +5646,66 @@ TEST(Parser_PrimaryKey)
     q = linking->query(query_string);
     CHECK_EQUAL(q.count(), 1);
     CHECK_EQUAL(q.get_description(), query_string);
+}
+
+TEST(Parser_RecursiveLogial)
+{
+    using util::serializer::print_value;
+    Group g;
+    auto table = g.add_table_with_primary_key("table", type_ObjectId, "id");
+    table->create_object_with_primary_key(ObjectId());
+
+    {
+        std::vector<Mixed> args = {ObjectId(), ObjectId::gen(), ObjectId::gen()};
+        verify_query_sub(test_context, table,
+                         "TRUEPREDICATE AND (id == $1 OR id == $2 OR id == $0) AND TRUEPREDICATE", args, 1);
+        verify_query_sub(
+            test_context, table,
+            "(id == $1 OR id == $2 OR id == $0) AND (TRUEPREDICATE AND id == $0 AND id == $0) AND TRUEPREDICATE",
+            args, 1);
+        verify_query_sub(
+            test_context, table,
+            "(id == $1 OR id == $2 OR id == $0) AND (FALSEPREDICATE AND id == $0 AND id == $0) AND TRUEPREDICATE",
+            args, 0);
+        verify_query_sub(test_context, table,
+                         "(id == $1 OR id == $2 OR FALSEPREDICATE) AND (TRUEPREDICATE AND id == $0 AND id == $0) AND "
+                         "TRUEPREDICATE",
+                         args, 0);
+        verify_query_sub(
+            test_context, table,
+            "(id == $1 OR id == $2 OR id == $0) AND (TRUEPREDICATE AND id == $0 AND id == $0) AND FALSEPREDICATE",
+            args, 0);
+    }
+
+    constexpr size_t num_args = 1000;
+    std::vector<Mixed> args;
+    args.reserve(num_args);
+    for (size_t i = 0; i < num_args; ++i) {
+        args.push_back(ObjectId::gen());
+    }
+
+    std::string base_query;
+    for (size_t i = 0; i < 1000; ++i) {
+        base_query += util::format("%1id = $%2", i == 0 ? "" : " OR ", i);
+    }
+    // minimum size to trigger a stack overflow on "my" machine in debug mode
+    constexpr size_t num_repeats = 53;
+    std::string query = "FALSEPREDICATE";
+    query.reserve(query.size() + ((4 + base_query.size()) * num_repeats));
+    for (size_t i = 0; i < num_repeats; ++i) {
+        query.append(" OR ");
+        query.append(base_query);
+    }
+    Query q = table->query(query, args, {});
+    size_t q_count = q.count();
+    CHECK_EQUAL(q_count, 0);
+
+    query.append(util::format(" OR id = oid(%1)", ObjectId()));
+    query.append(" OR ");
+    query.append(base_query);
+    q = table->query(query, args, {});
+    q_count = q.count();
+    CHECK_EQUAL(q_count, 1);
 }
 
 #endif // TEST_PARSER

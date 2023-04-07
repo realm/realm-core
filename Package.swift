@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "12.10.0"
+let versionStr = "13.9.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -102,6 +102,11 @@ let notSyncServerSources: [String] = [
     "realm/sync/instruction_applier.cpp",
     "realm/sync/instruction_replication.cpp",
     "realm/sync/instructions.cpp",
+    "realm/sync/network/default_socket.cpp",
+    "realm/sync/network/http.cpp",
+    "realm/sync/network/network.cpp",
+    "realm/sync/network/network_ssl.cpp",
+    "realm/sync/network/websocket.cpp",
     "realm/sync/noinst/changeset_index.cpp",
     "realm/sync/noinst/client_history_impl.cpp",
     "realm/sync/noinst/client_impl_base.cpp",
@@ -109,6 +114,7 @@ let notSyncServerSources: [String] = [
     "realm/sync/noinst/client_reset_operation.cpp",
     "realm/sync/noinst/client_reset_recovery.cpp",
     "realm/sync/noinst/compact_changesets.cpp",
+    "realm/sync/noinst/migration_store.cpp",
     "realm/sync/noinst/pending_bootstrap_store.cpp",
     "realm/sync/noinst/protocol_codec.cpp",
     "realm/sync/noinst/sync_metadata_schema.cpp",
@@ -117,9 +123,9 @@ let notSyncServerSources: [String] = [
     "realm/sync/subscriptions.cpp",
     "realm/sync/transform.cpp",
     "realm/table.cpp",
-    "realm/table_cluster_tree.cpp",
     "realm/table_ref.cpp",
     "realm/table_view.cpp",
+    "realm/tokenizer.cpp",
     "realm/transaction.cpp",
     "realm/unicode.cpp",
     "realm/util",
@@ -509,7 +515,6 @@ let package = Package(
                 "backup.cpp",
                 "benchmarks",
                 "c_api",
-                "mongodb",
                 "notifications-fuzzer",
                 "query.json",
                 "sync-metadata-v4.realm",

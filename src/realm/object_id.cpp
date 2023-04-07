@@ -56,7 +56,7 @@ bool ObjectId::is_valid_str(StringData str) noexcept
            std::all_of(str.data(), str.data() + str.size(), [](unsigned char c) { return std::isxdigit(c); });
 }
 
-ObjectId::ObjectId(const char* init) noexcept
+ObjectId::ObjectId(StringData init) noexcept
 {
     char buf[3] = "";
     REALM_ASSERT(is_valid_str(init));

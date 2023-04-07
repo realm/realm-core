@@ -63,6 +63,7 @@ ResultsNotifier::ResultsNotifier(Results& target)
     , m_descriptor_ordering(target.get_descriptor_ordering())
     , m_target_is_in_table_order(target.is_in_table_order())
 {
+    reattach();
 }
 
 void ResultsNotifier::release_data() noexcept
@@ -233,10 +234,10 @@ bool ResultsNotifier::prepare_to_deliver()
     return true;
 }
 
-void ResultsNotifier::do_attach_to(Transaction& sg)
+void ResultsNotifier::reattach()
 {
     if (m_query->get_table())
-        m_query = sg.import_copy_of(*m_query, PayloadPolicy::Move);
+        m_query = transaction().import_copy_of(*m_query, PayloadPolicy::Move);
 }
 
 ListResultsNotifier::ListResultsNotifier(Results& target)
@@ -374,8 +375,8 @@ bool ListResultsNotifier::prepare_to_deliver()
     return true;
 }
 
-void ListResultsNotifier::do_attach_to(Transaction& sg)
+void ListResultsNotifier::reattach()
 {
     if (m_list->is_attached())
-        m_list = sg.import_copy_of(*m_list);
+        m_list = transaction().import_copy_of(*m_list);
 }

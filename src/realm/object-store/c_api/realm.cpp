@@ -1,6 +1,7 @@
 #include <realm/object-store/c_api/types.hpp>
 #include "realm.hpp"
 
+
 realm_callback_token_realm::~realm_callback_token_realm()
 {
     realm::c_api::CBindingContext::get(*m_realm).realm_changed_callbacks().remove(m_token);
@@ -167,20 +168,24 @@ RLM_API bool realm_rollback(realm_t* realm)
     });
 }
 
-RLM_API unsigned int realm_async_begin_write(realm_t* realm, realm_async_begin_write_func_t callback,
-                                             realm_userdata_t userdata, realm_free_userdata_func_t userdata_free,
-                                             bool notify_only)
+RLM_API bool realm_async_begin_write(realm_t* realm, realm_async_begin_write_func_t callback,
+                                     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free,
+                                     bool notify_only, unsigned int* transaction_id)
 {
     auto cb = [callback, userdata = UserdataPtr{userdata, userdata_free}]() {
         callback(userdata.get());
     };
     return wrap_err([&]() {
-        return (*realm)->async_begin_transaction(std::move(cb), notify_only);
+        auto id = (*realm)->async_begin_transaction(std::move(cb), notify_only);
+        if (transaction_id)
+            *transaction_id = id;
+        return true;
     });
 }
 
-RLM_API unsigned int realm_async_commit(realm_t* realm, realm_async_commit_func_t callback, realm_userdata_t userdata,
-                                        realm_free_userdata_func_t userdata_free, bool allow_grouping)
+RLM_API bool realm_async_commit(realm_t* realm, realm_async_commit_func_t callback, realm_userdata_t userdata,
+                                realm_free_userdata_func_t userdata_free, bool allow_grouping,
+                                unsigned int* transaction_id)
 {
     auto cb = [callback, userdata = UserdataPtr{userdata, userdata_free}](std::exception_ptr err) {
         if (err) {
@@ -196,7 +201,10 @@ RLM_API unsigned int realm_async_commit(realm_t* realm, realm_async_commit_func_
         }
     };
     return wrap_err([&]() {
-        return (*realm)->async_commit_transaction(std::move(cb), allow_grouping);
+        auto id = (*realm)->async_commit_transaction(std::move(cb), allow_grouping);
+        if (transaction_id)
+            *transaction_id = id;
+        return true;
     });
 }
 
@@ -239,14 +247,23 @@ RLM_API realm_refresh_callback_token_t* realm_add_realm_refresh_callback(realm_t
     if (!latest_snapshot_version)
         return nullptr;
 
+    const auto current_version = (*realm)->current_transaction_version();
+    if (!current_version || *latest_snapshot_version <= (*current_version).version)
+        return nullptr;
+
     auto& refresh_callbacks = CBindingContext::get(*realm).realm_pending_refresh_callbacks();
     return new realm_refresh_callback_token(realm, refresh_callbacks.add(*latest_snapshot_version, std::move(func)));
 }
 
-RLM_API bool realm_refresh(realm_t* realm)
+RLM_API bool realm_refresh(realm_t* realm, bool* did_refresh)
 {
     return wrap_err([&]() {
-        (*realm)->refresh();
+        bool result = (*realm)->refresh();
+        if (did_refresh) {
+            *did_refresh = result;
+        }
+
+        // the call succeeded
         return true;
     });
 }
@@ -263,8 +280,12 @@ RLM_API bool realm_compact(realm_t* realm, bool* did_compact)
 {
     return wrap_err([&]() {
         auto& p = **realm;
-        if (did_compact)
-            *did_compact = p.compact();
+        bool result = p.compact();
+        if (did_compact) {
+            *did_compact = result;
+        }
+
+        // the call succeeded
         return true;
     });
 }
@@ -280,13 +301,13 @@ RLM_API bool realm_remove_table(realm_t* realm, const char* table_name, bool* ta
             const auto& schema = (*realm)->schema();
             const auto& object_schema = schema.find(table_name);
             if (object_schema != schema.end()) {
-                throw std::logic_error("Attempt to remove a table that is currently part of the schema");
+                throw LogicError(ErrorCodes::InvalidSchemaChange,
+                                 "Attempt to remove a table that is currently part of the schema");
             }
             (*realm)->read_group().remove_table(table->get_key());
             *table_deleted = true;
         }
         return true;
-        ;
     });
 }
 
@@ -295,7 +316,7 @@ RLM_API realm_t* realm_from_thread_safe_reference(realm_thread_safe_reference_t*
     return wrap_err([&]() {
         auto rtsr = dynamic_cast<shared_realm::thread_safe_reference*>(tsr);
         if (!rtsr) {
-            throw std::logic_error{"Thread safe reference type mismatch"};
+            throw LogicError{ErrorCodes::IllegalOperation, "Thread safe reference type mismatch"};
         }
 
         // FIXME: This moves out of the ThreadSafeReference, so it isn't

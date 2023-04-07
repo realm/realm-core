@@ -16,8 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/object-store/results.hpp>
 #include <realm/object-store/sectioned_results.hpp>
+
+#include <realm/exceptions.hpp>
 
 namespace realm {
 
@@ -41,7 +42,7 @@ static SectionedResults::SectionKeyFunc builtin_comparison(Results& results, Res
                 };
             }
         default:
-            throw std::logic_error("Builtin section algorithm not implemented.");
+            throw LogicError(ErrorCodes::IllegalOperation, "Builtin section algorithm not implemented.");
     }
 }
 
@@ -267,46 +268,42 @@ Section* ResultsSection::get_if_valid() const
         return &it->second;
 }
 
+Section* ResultsSection::get_section() const
+{
+    Section* section = get_if_valid();
+    if (!section)
+        throw StaleAccessor("Access to invalidated Results objects");
+    return section;
+}
 
 Mixed ResultsSection::operator[](size_t idx) const
 {
-    auto is_valid = get_if_valid();
-    if (!is_valid)
-        throw Results::InvalidatedException();
-    auto& section = *is_valid;
-    auto size = section.indices.size();
+    Section* section = get_section();
+    auto size = section->indices.size();
     if (idx >= size)
-        std::out_of_range(util::format("Requested index %1 greater than max %2", idx, size - 1));
-    return m_parent->m_results.get_any(section.indices[idx]);
+        throw OutOfBounds(util::format("ResultsSection[]"), idx, size);
+    return m_parent->m_results.get_any(section->indices[idx]);
 }
 
 Mixed ResultsSection::key()
 {
     if (!is_valid())
-        throw std::logic_error("This ResultsSection is not in a valid state.");
+        throw StaleAccessor("Access to invalidated Results objects");
     return m_key;
 }
 
 size_t ResultsSection::index()
 {
-    auto is_valid = get_if_valid();
-    if (!is_valid)
-        throw std::logic_error("This ResultsSection is not in a valid state.");
-    auto& section = *is_valid;
-    return section.index;
+    return get_section()->index;
 }
 
 size_t ResultsSection::size()
 {
-    auto is_valid = get_if_valid();
-    if (!is_valid)
-        throw Results::InvalidatedException();
-    auto& section = *is_valid;
-    return section.indices.size();
+    return get_section()->indices.size();
 }
 
 NotificationToken ResultsSection::add_notification_callback(SectionedResultsNotificatonCallback callback,
-                                                            KeyPathArray key_path_array) &
+                                                            std::optional<KeyPathArray> key_path_array) &
 {
     return m_parent->add_notification_callback_for_section(m_key, std::move(callback), key_path_array);
 }
@@ -330,6 +327,7 @@ void SectionedResults::calculate_sections_if_required()
         return;
     if ((m_results.is_frozen() || !m_results.has_changed()) && m_has_performed_initial_evalutation)
         return;
+
     {
         util::CheckedUniqueLock lock(m_results.m_mutex);
         m_results.ensure_up_to_date();
@@ -374,7 +372,7 @@ void SectionedResults::calculate_sections()
         // Disallow links as section keys. It would be uncommon to use them to begin with
         // and if the object acting as the key was deleted bad things would happen.
         if (key.is_type(type_Link, type_TypedLink)) {
-            throw std::logic_error("Links are not supported as section keys.");
+            throw InvalidArgument("Links are not supported as section keys.");
         }
 
         auto it = m_sections.find(key);
@@ -413,8 +411,7 @@ void SectionedResults::calculate_sections()
 size_t SectionedResults::size()
 {
     util::CheckedUniqueLock lock(m_mutex);
-    if (!is_valid())
-        throw Results::InvalidatedException();
+    check_valid();
     calculate_sections_if_required();
     return m_sections.size();
 }
@@ -423,7 +420,7 @@ ResultsSection SectionedResults::operator[](size_t idx)
 {
     auto s = size();
     if (idx >= s)
-        throw OutOfBoundsIndexException(idx, s);
+        throw OutOfBounds("SectionedResults[]", idx, s);
     util::CheckedUniqueLock lock(m_mutex);
     auto it = m_current_section_index_to_key_lookup.find(idx);
     REALM_ASSERT(it != m_current_section_index_to_key_lookup.end());
@@ -434,25 +431,24 @@ ResultsSection SectionedResults::operator[](size_t idx)
 ResultsSection SectionedResults::operator[](Mixed key)
 {
     util::CheckedUniqueLock lock(m_mutex);
-    if (!is_valid())
-        throw Results::InvalidatedException();
+    check_valid();
     calculate_sections_if_required();
-    auto it = m_sections.find(key);
-    if (it == m_sections.end()) {
-        throw std::logic_error("Key does not exist for any sections.");
+    if (auto it = m_sections.find(key); it != m_sections.end()) {
+        return ResultsSection(this, it->second.key);
     }
-    return ResultsSection(this, it->second.key);
+
+    throw InvalidArgument(util::format("Section key %1 not found.", key));
 }
 
 NotificationToken SectionedResults::add_notification_callback(SectionedResultsNotificatonCallback callback,
-                                                              KeyPathArray key_path_array) &
+                                                              std::optional<KeyPathArray> key_path_array) &
 {
     return m_results.add_notification_callback(SectionedResultsNotificationHandler(*this, std::move(callback)),
                                                std::move(key_path_array));
 }
 
 NotificationToken SectionedResults::add_notification_callback_for_section(
-    Mixed section_key, SectionedResultsNotificatonCallback callback, KeyPathArray key_path_array)
+    Mixed section_key, SectionedResultsNotificatonCallback callback, std::optional<KeyPathArray> key_path_array)
 {
     return m_results.add_notification_callback(
         SectionedResultsNotificationHandler(*this, std::move(callback), section_key), std::move(key_path_array));
@@ -503,6 +499,11 @@ bool SectionedResults::is_valid() const
     return m_results.is_valid();
 }
 
+void SectionedResults::check_valid() const
+{
+    m_results.validate_read();
+}
+
 bool SectionedResults::is_frozen() const
 {
     return m_results.is_frozen();
@@ -519,13 +520,4 @@ void SectionedResults::reset_section_callback(SectionKeyFunc section_callback)
     m_previous_key_to_index_lookup.clear();
     m_prev_section_index_to_key.clear();
 }
-
-SectionedResults::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
-    : std::out_of_range(c == 0 ? util::format("Requested index %1 in empty SectionedResults", r)
-                               : util::format("Requested index %1 greater than max %2", r, c - 1))
-    , requested(r)
-    , valid_count(c)
-{
-}
-
 } // namespace realm

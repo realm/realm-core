@@ -49,6 +49,7 @@ private:
 
     const long m_max_open_files;
     const util::Optional<std::array<char, 64>> m_encryption_key;
+    // The ServerFileAccessCache is tied to the lifetime of the Server, so no shared_ptr needed
     util::Logger& m_logger;
     ServerHistory::Context& m_history_context;
 

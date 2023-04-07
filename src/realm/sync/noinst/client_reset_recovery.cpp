@@ -423,6 +423,13 @@ void RecoverLocalChangesetsHandler::process_changesets(const std::vector<ClientH
 
         sync::Changeset parsed_changeset;
         sync::parse_changeset(*decompressed, parsed_changeset); // Throws
+#if REALM_DEBUG
+        if (m_logger.would_log(util::Logger::Level::trace)) {
+            std::stringstream dumped_changeset;
+            parsed_changeset.print(dumped_changeset);
+            m_logger.trace("Recovering changeset: %1", dumped_changeset.str());
+        }
+#endif
 
         InstructionApplier::begin_apply(parsed_changeset, &m_logger);
         for (auto instr : parsed_changeset) {
@@ -831,7 +838,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::AddColumn& ins
     catch (const BadChangesetError& err) {
         handle_error(
             util::format("While recovering during client reset, an AddColumn instruction could not be applied: '%1'",
-                         err.message()));
+                         err.reason()));
     }
 }
 

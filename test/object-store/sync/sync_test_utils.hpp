@@ -32,6 +32,9 @@
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_templated.hpp>
+
 // disable the tests that rely on having baas available on the network
 // but allow opt-in by building with REALM_ENABLE_AUTH_TESTS=1
 #ifndef REALM_ENABLE_AUTH_TESTS
@@ -48,7 +51,26 @@ void timed_wait_for(util::FunctionRef<bool()> condition,
                     std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000));
 
 void timed_sleeping_wait_for(util::FunctionRef<bool()> condition,
-                             std::chrono::milliseconds max_ms = std::chrono::seconds(30));
+                             std::chrono::milliseconds max_ms = std::chrono::seconds(30),
+                             std::chrono::milliseconds sleep_ms = std::chrono::milliseconds(1));
+
+class ReturnsTrueWithinTimeLimit : public Catch::Matchers::MatcherGenericBase {
+public:
+    ReturnsTrueWithinTimeLimit(std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000))
+        : m_max_ms(max_ms)
+    {
+    }
+
+    bool match(util::FunctionRef<bool()> condition) const;
+
+    std::string describe() const override
+    {
+        return util::format("PredicateReturnsTrueAfter %1ms", m_max_ms.count());
+    }
+
+private:
+    std::chrono::milliseconds m_max_ms;
+};
 
 template <typename T>
 struct TimedFutureState : public util::AtomicRefCountBase {
@@ -131,6 +153,8 @@ struct AutoVerifiedEmailCredentials : app::AppCredentials {
 
 AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app);
 
+void wait_for_advance(Realm& realm);
+
 #endif // REALM_ENABLE_AUTH_TESTS
 
 #endif // REALM_ENABLE_SYNC
@@ -147,9 +171,13 @@ Obj create_object(Realm& realm, StringData object_type, util::Optional<ObjectId>
 
 struct TestClientReset {
     using Callback = util::UniqueFunction<void(const SharedRealm&)>;
+    using InitialObjectCallback = util::UniqueFunction<ObjectId(const SharedRealm&)>;
     TestClientReset(const Realm::Config& local_config, const Realm::Config& remote_config);
     virtual ~TestClientReset();
     TestClientReset* setup(Callback&& on_setup);
+
+    // Only used in FLX sync client reset tests.
+    TestClientReset* populate_initial_object(InitialObjectCallback&& callback);
     TestClientReset* make_local_changes(Callback&& changes_local);
     TestClientReset* make_remote_changes(Callback&& changes_remote);
     TestClientReset* on_post_local_changes(Callback&& post_local);
@@ -165,6 +193,7 @@ protected:
     realm::Realm::Config m_remote_config;
 
     Callback m_on_setup;
+    InitialObjectCallback m_populate_initial_object;
     Callback m_make_local_changes;
     Callback m_make_remote_changes;
     Callback m_on_post_local;
@@ -184,6 +213,12 @@ std::unique_ptr<TestClientReset> make_baas_client_reset(const Realm::Config& loc
 std::unique_ptr<TestClientReset> make_baas_flx_client_reset(const Realm::Config& local_config,
                                                             const Realm::Config& remote_config,
                                                             const TestAppSession& test_app_session);
+
+void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const AppSession& app_session,
+                                         const std::string& schema_name, const bson::BsonDocument& filter_bson);
+
+void trigger_client_reset(const AppSession& app_session);
+void trigger_client_reset(const AppSession& app_session, const SharedRealm& realm);
 #endif // REALM_ENABLE_AUTH_TESTS
 
 #endif // REALM_ENABLE_SYNC

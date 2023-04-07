@@ -136,6 +136,23 @@ static_assert(!col_type_OldStringEnum.is_valid());
 static_assert(!col_type_OldTable.is_valid());
 static_assert(!col_type_OldDateTime.is_valid());
 
+enum class IndexType { None, General, Fulltext };
+
+inline std::ostream& operator<<(std::ostream& ostr, IndexType type)
+{
+    switch (type) {
+        case IndexType::None:
+            ostr << "no index";
+            break;
+        case IndexType::General:
+            ostr << "search index";
+            break;
+        case IndexType::Fulltext:
+            ostr << "fulltext index";
+            break;
+    }
+    return ostr;
+}
 
 // Column attributes can be combined using bitwise or.
 enum ColumnAttr {
@@ -164,6 +181,9 @@ enum ColumnAttr {
 
     /// Each element is a set of values
     col_attr_Set = 128,
+
+    /// Specifies that elements in the column are full-text indexed
+    col_attr_FullText_Indexed = 256,
 
     /// Either list, dictionary, or set
     col_attr_Collection = 128 + 64 + 32

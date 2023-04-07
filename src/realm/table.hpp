@@ -19,6 +19,7 @@
 #ifndef REALM_TABLE_HPP
 #define REALM_TABLE_HPP
 
+#include "external/mpark/variant.hpp"
 #include <algorithm>
 #include <map>
 #include <utility>
@@ -32,10 +33,9 @@
 #include <realm/table_ref.hpp>
 #include <realm/spec.hpp>
 #include <realm/query.hpp>
-#include <realm/table_cluster_tree.hpp>
+#include <realm/cluster_tree.hpp>
 #include <realm/keys.hpp>
 #include <realm/global_key.hpp>
-#include <realm/index_string.hpp>
 
 // Only set this to one when testing the code paths that exercise object ID
 // hash collisions. It artificially limits the "optimistic" local ID to use
@@ -60,6 +60,7 @@ class ColKeys;
 struct GlobalKey;
 class LinkChain;
 class Subexpr;
+class StringIndex;
 
 struct Link {
 };
@@ -68,6 +69,9 @@ typedef Link BackLink;
 
 namespace _impl {
 class TableFriend;
+}
+namespace util {
+class Logger;
 }
 namespace metrics {
 class QueryInfo;
@@ -174,7 +178,7 @@ public:
     void check_column(ColKey col_key) const
     {
         if (REALM_UNLIKELY(!valid_column(col_key)))
-            throw LogicError(LogicError::column_does_not_exist);
+            throw InvalidColumnKey();
     }
     // Change the type of a table. Only allowed to switch to/from TopLevel from/to Embedded.
     void set_table_type(Type new_type, bool handle_backlinks = false);
@@ -200,8 +204,16 @@ public:
     ///
     /// \param col_key The key of a column of the table.
 
-    bool has_search_index(ColKey col_key) const noexcept;
-    void add_search_index(ColKey col_key);
+    IndexType search_index_type(ColKey col_key) const noexcept;
+    bool has_search_index(ColKey col_key) const noexcept
+    {
+        return search_index_type(col_key) == IndexType::General;
+    }
+    void add_search_index(ColKey col_key, IndexType type = IndexType::General);
+    void add_fulltext_index(ColKey col_key)
+    {
+        add_search_index(col_key, IndexType::Fulltext);
+    }
     void remove_search_index(ColKey col_key);
 
     void enumerate_string_column(ColKey col_key);
@@ -326,15 +338,15 @@ public:
     // - turns the object into a tombstone if links exist
     // - otherwise works just as remove_object()
     ObjKey invalidate_object(ObjKey key);
-    Obj get_tombstone(ObjKey key) const
+    Obj try_get_tombstone(ObjKey key) const
     {
         REALM_ASSERT(key.is_unresolved());
         REALM_ASSERT(m_tombstones);
-        return m_tombstones->get(key);
+        return m_tombstones->try_get_obj(key);
     }
 
     void clear();
-    using Iterator = TableClusterTree::Iterator;
+    using Iterator = ClusterTree::Iterator;
     Iterator begin() const;
     Iterator end() const;
     void remove_object(const Iterator& it)
@@ -395,8 +407,6 @@ public:
     StringIndex* get_search_index(ColKey col) const noexcept
     {
         check_column(col);
-        if (!has_search_index(col))
-            return nullptr;
         return m_index_accessors[col.get_index().val].get();
     }
     template <class T>
@@ -429,6 +439,8 @@ public:
     TableView find_all_binary(ColKey col_key, BinaryData value) const;
     TableView find_all_null(ColKey col_key);
     TableView find_all_null(ColKey col_key) const;
+
+    TableView find_all_fulltext(ColKey col_key, StringData value) const;
 
     TableView get_sorted_view(ColKey col_key, bool ascending = true);
     TableView get_sorted_view(ColKey col_key, bool ascending = true) const;
@@ -511,7 +523,7 @@ private:
     void change_nullability(ColKey from, ColKey to, bool throw_on_null);
     template <class F, class T>
     void change_nullability_list(ColKey from, ColKey to, bool throw_on_null);
-    Obj create_linked_object(GlobalKey = {});
+    Obj create_linked_object();
     // Change the embedded property of a table. If switching to being embedded, the table must
     // not have a primary key and all objects must have exactly 1 backlink.
     void set_embedded(bool embedded, bool handle_backlinks);
@@ -547,11 +559,13 @@ public:
     }
     Query where(const DictionaryLinkValues& dictionary_of_links) const;
 
-    Query query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments = {}) const;
+    Query query(const std::string& query_string,
+                const std::vector<mpark::variant<Mixed, std::vector<Mixed>>>& arguments = {}) const;
     Query query(const std::string& query_string, const std::vector<Mixed>& arguments) const;
     Query query(const std::string& query_string, const std::vector<Mixed>& arguments,
                 const query_parser::KeyPathMapping& mapping) const;
-    Query query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments,
+    Query query(const std::string& query_string,
+                const std::vector<mpark::variant<Mixed, std::vector<Mixed>>>& arguments,
                 const query_parser::KeyPathMapping& mapping) const;
     Query query(const std::string& query_string, query_parser::Arguments& arguments,
                 const query_parser::KeyPathMapping&) const;
@@ -609,14 +623,6 @@ public:
     ///
     /// See operator==().
     bool operator!=(const Table& t) const;
-
-    /// Compute the sum of the sizes in number of bytes of all the array nodes
-    /// that currently make up this table. See also
-    /// Group::compute_aggregate_byte_size().
-    ///
-    /// If this table accessor is the detached state, this function returns
-    /// zero.
-    size_t compute_aggregated_byte_size() const noexcept;
 
     // Debug
     void verify() const;
@@ -685,8 +691,8 @@ private:
         m_alloc.refresh_ref_translation();
     }
     Spec m_spec;                                    // 1st slot in m_top
-    TableClusterTree m_clusters;                    // 3rd slot in m_top
-    std::unique_ptr<TableClusterTree> m_tombstones; // 13th slot in m_top
+    ClusterTree m_clusters;                         // 3rd slot in m_top
+    std::unique_ptr<ClusterTree> m_tombstones;      // 13th slot in m_top
     TableKey m_key;                                 // 4th slot in m_top
     Array m_index_refs;                             // 5th slot in m_top
     Array m_opposite_table;                         // 7th slot in m_top
@@ -716,6 +722,7 @@ private:
     bool migrate_objects(); // Returns true if there are no links to migrate
     void migrate_links();
     void finalize_migration(ColKey pk_col_key);
+    void migrate_sets_and_dictionaries();
 
     /// Disable copying assignment.
     ///
@@ -744,7 +751,7 @@ private:
     void erase_root_column(ColKey col_key);
     ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name, DataType key_type = DataType(0));
     void do_erase_root_column(ColKey col_key);
-    void do_add_search_index(ColKey col_key);
+    void do_add_search_index(ColKey col_key, IndexType type);
 
     bool has_any_embedded_objects();
     void set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column);
@@ -799,10 +806,8 @@ private:
     void nullify_links(CascadeState&);
     void remove_recursive(CascadeState&);
 
-    /// Used by query. Follows chain of link columns and returns final target table
-    const Table* get_link_chain_target(const std::vector<ColKey>&) const;
-
     Replication* get_repl() const noexcept;
+    util::Logger* get_logger() const noexcept;
 
     void set_ndx_in_parent(size_t ndx_in_parent) noexcept;
 
@@ -861,7 +866,6 @@ private:
     friend class Transaction;
     friend class Cluster;
     friend class ClusterTree;
-    friend class TableClusterTree;
     friend class ColKeyIterator;
     friend class Obj;
     friend class LnkLst;
@@ -983,8 +987,8 @@ public:
     {
         auto ck = m_current_table->get_column_key(col_name);
         if (!ck) {
-            throw std::runtime_error(
-                util::format("'%1' has no property '%2'", m_current_table->get_class_name(), col_name));
+            throw LogicError(ErrorCodes::InvalidProperty,
+                             util::format("'%1' has no property '%2'", m_current_table->get_class_name(), col_name));
         }
         add(ck);
         return *this;
@@ -1010,11 +1014,13 @@ public:
             ct = col_type_Link;
         if constexpr (std::is_same_v<T, Dictionary>) {
             if (!col_key.is_dictionary())
-                throw LogicError(LogicError::type_mismatch);
+                throw LogicError(ErrorCodes::TypeMismatch, "Not a dictionary");
         }
         else {
             if (ct != ColumnTypeTraits<T>::column_id)
-                throw LogicError(LogicError::type_mismatch);
+                throw LogicError(ErrorCodes::TypeMismatch,
+                                 util::format("Expected %1 to be a %2", m_current_table->get_column_name(col_key),
+                                              ColumnTypeTraits<T>::column_id));
         }
 
         if (std::is_same<T, Link>::value || std::is_same<T, LnkLst>::value || std::is_same<T, BackLink>::value) {
@@ -1173,46 +1179,6 @@ inline DataType Table::get_dictionary_key_type(ColKey column_key) const noexcept
     return m_spec.get_dictionary_key_type(spec_ndx);
 }
 
-
-inline Table::Table(Allocator& alloc)
-    : m_alloc(alloc)
-    , m_top(m_alloc)
-    , m_spec(m_alloc)
-    , m_clusters(this, m_alloc, top_position_for_cluster_tree)
-    , m_index_refs(m_alloc)
-    , m_opposite_table(m_alloc)
-    , m_opposite_column(m_alloc)
-    , m_repl(&g_dummy_replication)
-    , m_own_ref(this, alloc.get_instance_version())
-{
-    m_spec.set_parent(&m_top, top_position_for_spec);
-    m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
-    m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
-    m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
-
-    ref_type ref = create_empty_table(m_alloc); // Throws
-    ArrayParent* parent = nullptr;
-    size_t ndx_in_parent = 0;
-    init(ref, parent, ndx_in_parent, true, false);
-}
-
-inline Table::Table(Replication* const* repl, Allocator& alloc)
-    : m_alloc(alloc)
-    , m_top(m_alloc)
-    , m_spec(m_alloc)
-    , m_clusters(this, m_alloc, top_position_for_cluster_tree)
-    , m_index_refs(m_alloc)
-    , m_opposite_table(m_alloc)
-    , m_opposite_column(m_alloc)
-    , m_repl(repl)
-    , m_own_ref(this, alloc.get_instance_version())
-{
-    m_spec.set_parent(&m_top, top_position_for_spec);
-    m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
-    m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
-    m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
-    m_cookie = cookie_created;
-}
 
 inline void Table::revive(Replication* const* repl, Allocator& alloc, bool writable)
 {
@@ -1396,11 +1362,6 @@ public:
     static void batch_erase_rows(Table& table, const KeyColumn& keys)
     {
         table.batch_erase_rows(keys); // Throws
-    }
-    // Temporary hack
-    static Obj create_linked_object(Table& table, GlobalKey id)
-    {
-        return table.create_linked_object(id);
     }
     static ObjKey global_to_local_object_id_hashed(const Table& table, GlobalKey global_id)
     {

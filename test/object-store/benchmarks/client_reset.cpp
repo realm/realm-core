@@ -139,7 +139,7 @@ struct BenchmarkLocalClientReset : public reset_utils::TestClientReset {
         Transaction& wt_local = (Transaction&)m_local->read_group();
         VersionID current_local_version = wt_local.get_version_of_current_transaction();
 
-        TestLogger logger;
+        util::NullLogger logger;
         if (m_mode == ClientResyncMode::Recover) {
             auto history_local = dynamic_cast<sync::ClientHistory*>(wt_local.get_replication()->_get_history_write());
             std::vector<sync::ClientHistory::LocalChange> local_changes =

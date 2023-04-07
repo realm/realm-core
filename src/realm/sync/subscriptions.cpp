@@ -57,72 +57,111 @@ constexpr static std::string_view c_flx_sub_query_str_field("query");
 
 using OptionalString = util::Optional<std::string>;
 
+enum class SubscriptionStateForStorage : int64_t {
+    // The subscription set has been persisted locally but has not been acknowledged by the server yet.
+    Pending = 1,
+    // The server is currently sending the initial state that represents this subscription set to the client.
+    Bootstrapping = 2,
+    // This subscription set is the active subscription set that is currently being synchronized with the server.
+    Complete = 3,
+    // An error occurred while processing this subscription set on the server. Check error_str() for details.
+    Error = 4,
+    // The last bootstrap message containing the initial state for this subscription set has been received. The
+    // client is awaiting a mark message to mark this subscription as fully caught up to history.
+    AwaitingMark = 6,
+};
+
+SubscriptionSet::State state_from_storage(int64_t value)
+{
+    switch (static_cast<SubscriptionStateForStorage>(value)) {
+        case SubscriptionStateForStorage::Pending:
+            return SubscriptionSet::State::Pending;
+        case SubscriptionStateForStorage::Bootstrapping:
+            return SubscriptionSet::State::Bootstrapping;
+        case SubscriptionStateForStorage::AwaitingMark:
+            return SubscriptionSet::State::AwaitingMark;
+        case SubscriptionStateForStorage::Complete:
+            return SubscriptionSet::State::Complete;
+        case SubscriptionStateForStorage::Error:
+            return SubscriptionSet::State::Error;
+        default:
+            throw std::runtime_error(util::format("Invalid state for SubscriptionSet stored on disk: %1", value));
+    }
+}
+
+int64_t state_to_storage(SubscriptionSet::State state)
+{
+    switch (state) {
+        case SubscriptionSet::State::Pending:
+            return static_cast<int64_t>(SubscriptionStateForStorage::Pending);
+        case SubscriptionSet::State::Bootstrapping:
+            return static_cast<int64_t>(SubscriptionStateForStorage::Bootstrapping);
+        case SubscriptionSet::State::AwaitingMark:
+            return static_cast<int64_t>(SubscriptionStateForStorage::AwaitingMark);
+        case SubscriptionSet::State::Complete:
+            return static_cast<int64_t>(SubscriptionStateForStorage::Complete);
+        case SubscriptionSet::State::Error:
+            return static_cast<int64_t>(SubscriptionStateForStorage::Error);
+        default:
+            REALM_UNREACHABLE();
+    }
+}
+
+size_t state_to_order(SubscriptionSet::State needle)
+{
+    using State = SubscriptionSet::State;
+    switch (needle) {
+        case State::Uncommitted:
+            return 0;
+        case State::Pending:
+            return 1;
+        case State::Bootstrapping:
+            return 2;
+        case State::AwaitingMark:
+            return 3;
+        case State::Complete:
+            return 4;
+        case State::Error:
+            return 5;
+        case State::Superseded:
+            return 6;
+    }
+    REALM_UNREACHABLE();
+}
+
 } // namespace
 
 Subscription::Subscription(const SubscriptionStore* parent, Obj obj)
-    : m_id(obj.get<ObjectId>(parent->m_sub_id))
-    , m_created_at(obj.get<Timestamp>(parent->m_sub_created_at))
-    , m_updated_at(obj.get<Timestamp>(parent->m_sub_updated_at))
-    , m_name(obj.is_null(parent->m_sub_name) ? OptionalString(util::none)
-                                             : OptionalString{obj.get<String>(parent->m_sub_name)})
-    , m_object_class_name(obj.get<String>(parent->m_sub_object_class_name))
-    , m_query_string(obj.get<String>(parent->m_sub_query_str))
+    : id(obj.get<ObjectId>(parent->m_sub_id))
+    , created_at(obj.get<Timestamp>(parent->m_sub_created_at))
+    , updated_at(obj.get<Timestamp>(parent->m_sub_updated_at))
+    , name(obj.is_null(parent->m_sub_name) ? OptionalString(util::none)
+                                           : OptionalString{obj.get<String>(parent->m_sub_name)})
+    , object_class_name(obj.get<String>(parent->m_sub_object_class_name))
+    , query_string(obj.get<String>(parent->m_sub_query_str))
 {
 }
 
 Subscription::Subscription(util::Optional<std::string> name, std::string object_class_name, std::string query_str)
-    : m_id(ObjectId::gen())
-    , m_created_at(std::chrono::system_clock::now())
-    , m_updated_at(m_created_at)
-    , m_name(std::move(name))
-    , m_object_class_name(std::move(object_class_name))
-    , m_query_string(std::move(query_str))
+    : id(ObjectId::gen())
+    , created_at(std::chrono::system_clock::now())
+    , updated_at(created_at)
+    , name(std::move(name))
+    , object_class_name(std::move(object_class_name))
+    , query_string(std::move(query_str))
 {
 }
 
-ObjectId Subscription::id() const
-{
-    return m_id;
-}
 
-Timestamp Subscription::created_at() const
-{
-    return m_created_at;
-}
-
-Timestamp Subscription::updated_at() const
-{
-    return m_updated_at;
-}
-
-bool Subscription::has_name() const
-{
-    return static_cast<bool>(m_name);
-}
-
-std::string_view Subscription::name() const
-{
-    if (!m_name) {
-        return std::string_view{};
-    }
-    return *m_name;
-}
-
-std::string_view Subscription::object_class_name() const
-{
-    return m_object_class_name;
-}
-
-std::string_view Subscription::query_string() const
-{
-    return m_query_string;
-}
-
-SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj)
+SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj,
+                                 MakingMutableCopy making_mutable_copy)
     : m_mgr(mgr)
+    , m_cur_version(tr.get_version())
+    , m_version(obj.get_primary_key().get_int())
 {
-    if (obj.is_valid()) {
-        load_from_database(tr, std::move(obj));
+    REALM_ASSERT(obj.is_valid());
+    if (!making_mutable_copy) {
+        load_from_database(std::move(obj));
     }
 }
 
@@ -133,13 +172,11 @@ SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, int
 {
 }
 
-void SubscriptionSet::load_from_database(const Transaction& tr, Obj obj)
+void SubscriptionSet::load_from_database(Obj obj)
 {
     auto mgr = get_flx_subscription_store(); // Throws
 
-    m_cur_version = tr.get_version();
-    m_version = obj.get_primary_key().get_int();
-    m_state = static_cast<State>(obj.get<int64_t>(mgr->m_sub_set_state));
+    m_state = state_from_storage(obj.get<int64_t>(mgr->m_sub_set_state));
     m_error_str = obj.get<String>(mgr->m_sub_set_error_str);
     m_snapshot_version = static_cast<DB::version_type>(obj.get<int64_t>(mgr->m_sub_set_snapshot_version));
     auto sub_list = obj.get_linklist(mgr->m_sub_set_subscriptions);
@@ -185,7 +222,7 @@ size_t SubscriptionSet::size() const
     return m_subs.size();
 }
 
-Subscription SubscriptionSet::at(size_t index) const
+const Subscription& SubscriptionSet::at(size_t index) const
 {
     return m_subs.at(index);
 }
@@ -200,24 +237,29 @@ SubscriptionSet::const_iterator SubscriptionSet::end() const
     return m_subs.end();
 }
 
-SubscriptionSet::const_iterator SubscriptionSet::find(StringData name) const
+const Subscription* SubscriptionSet::find(StringData name) const
 {
-    return std::find_if(begin(), end(), [&](const Subscription& sub) {
-        return sub.name() == name;
-    });
+    for (auto&& sub : *this) {
+        if (sub.name == name)
+            return &sub;
+    }
+    return nullptr;
 }
 
-SubscriptionSet::const_iterator SubscriptionSet::find(const Query& query) const
+const Subscription* SubscriptionSet::find(const Query& query) const
 {
     const auto query_desc = query.get_description();
     const auto table_name = Group::table_name_to_class_name(query.get_table()->get_name());
-    return std::find_if(begin(), end(), [&](const Subscription& sub) {
-        return sub.object_class_name() == table_name && sub.query_string() == query_desc;
-    });
+    for (auto&& sub : *this) {
+        if (sub.object_class_name == table_name && sub.query_string == query_desc)
+            return &sub;
+    }
+    return nullptr;
 }
 
-MutableSubscriptionSet::MutableSubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj)
-    : SubscriptionSet(mgr, *tr, obj)
+MutableSubscriptionSet::MutableSubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj,
+                                               MakingMutableCopy making_mutable_copy)
+    : SubscriptionSet(mgr, *tr, obj, making_mutable_copy)
     , m_tr(std::move(tr))
     , m_obj(std::move(obj))
     , m_old_state(state())
@@ -227,18 +269,8 @@ MutableSubscriptionSet::MutableSubscriptionSet(std::weak_ptr<const SubscriptionS
 void MutableSubscriptionSet::check_is_mutable() const
 {
     if (m_tr->get_transact_stage() != DB::transact_Writing) {
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactionState("Not a write transaction");
     }
-}
-
-MutableSubscriptionSet::iterator MutableSubscriptionSet::begin()
-{
-    return m_subs.begin();
-}
-
-MutableSubscriptionSet::iterator MutableSubscriptionSet::end()
-{
-    return m_subs.end();
 }
 
 MutableSubscriptionSet::iterator MutableSubscriptionSet::erase(const_iterator it)
@@ -246,6 +278,26 @@ MutableSubscriptionSet::iterator MutableSubscriptionSet::erase(const_iterator it
     check_is_mutable();
     REALM_ASSERT(it != end());
     return m_subs.erase(it);
+}
+
+bool MutableSubscriptionSet::erase(StringData name)
+{
+    check_is_mutable();
+    auto ptr = find(name);
+    if (!ptr)
+        return false;
+    m_subs.erase(m_subs.begin() + (ptr - &m_subs.front()));
+    return true;
+}
+
+bool MutableSubscriptionSet::erase(const Query& query)
+{
+    check_is_mutable();
+    auto ptr = find(query);
+    if (!ptr)
+        return false;
+    m_subs.erase(m_subs.begin() + (ptr - &m_subs.front()));
+    return true;
 }
 
 void MutableSubscriptionSet::clear()
@@ -266,9 +318,10 @@ MutableSubscriptionSet::insert_or_assign_impl(iterator it, util::Optional<std::s
 {
     check_is_mutable();
     if (it != end()) {
-        it->m_object_class_name = std::move(object_class_name);
-        it->m_query_string = std::move(query_str);
-        it->m_updated_at = Timestamp{std::chrono::system_clock::now()};
+        auto& sub = m_subs[it - begin()];
+        sub.object_class_name = std::move(object_class_name);
+        sub.query_string = std::move(query_str);
+        sub.updated_at = Timestamp{std::chrono::system_clock::now()};
 
         return {it, false};
     }
@@ -284,7 +337,7 @@ std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_ass
     auto table_name = Group::table_name_to_class_name(query.get_table()->get_name());
     auto query_str = query.get_description();
     auto it = std::find_if(begin(), end(), [&](const Subscription& sub) {
-        return (sub.has_name() && sub.name() == name);
+        return sub.name == name;
     });
 
     return insert_or_assign_impl(it, std::string{name}, std::move(table_name), std::move(query_str));
@@ -295,7 +348,7 @@ std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_ass
     auto table_name = Group::table_name_to_class_name(query.get_table()->get_name());
     auto query_str = query.get_description();
     auto it = std::find_if(begin(), end(), [&](const Subscription& sub) {
-        return (sub.name().empty() && sub.object_class_name() == table_name && sub.query_string() == query_str);
+        return (!sub.name && sub.object_class_name == table_name && sub.query_string == query_str);
     });
 
     return insert_or_assign_impl(it, util::none, std::move(table_name), std::move(query_str));
@@ -313,6 +366,9 @@ void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::s
 {
     check_is_mutable();
     auto old_state = state();
+    if (error_str && new_state != State::Error) {
+        throw std::logic_error("Cannot supply an error message for a subscription set when state is not Error");
+    }
     switch (new_state) {
         case State::Uncommitted:
             throw std::logic_error("cannot set subscription set state to uncommitted");
@@ -330,17 +386,11 @@ void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::s
             m_error_str = std::string{*error_str};
             break;
         case State::Bootstrapping:
-            if (error_str) {
-                throw std::logic_error(
-                    "Cannot supply an error message for a subscription set when state is not Error");
-            }
+            [[fallthrough]];
+        case State::AwaitingMark:
             m_state = new_state;
             break;
         case State::Complete: {
-            if (error_str) {
-                throw std::logic_error(
-                    "Cannot supply an error message for a subscription set when state is not Error");
-            }
             auto mgr = get_flx_subscription_store(); // Throws
             m_state = new_state;
             mgr->supercede_prior_to(m_tr, version());
@@ -405,9 +455,9 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
     // If we've already reached the desired state, or if the subscription is in an error state,
     // we can return a ready future immediately.
     if (cur_state == State::Error) {
-        return util::Future<State>::make_ready(Status{ErrorCodes::RuntimeError, err_str});
+        return util::Future<State>::make_ready(Status{ErrorCodes::SubscriptionFailed, err_str});
     }
-    else if (cur_state >= notify_when) {
+    else if (state_to_order(cur_state) >= state_to_order(notify_when)) {
         return util::Future<State>::make_ready(cur_state);
     }
 
@@ -418,6 +468,19 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
     auto [promise, future] = util::make_promise_future<State>();
     mgr->m_pending_notifications.emplace_back(version(), std::move(promise), notify_when);
     return std::move(future);
+}
+
+void SubscriptionSet::get_state_change_notification(
+    State notify_when, util::UniqueFunction<void(util::Optional<State>, util::Optional<Status>)> cb) const
+{
+    get_state_change_notification(notify_when).get_async([cb = std::move(cb)](StatusWith<State> result) {
+        if (result.is_ok()) {
+            cb(result.get_value(), {});
+        }
+        else {
+            cb({}, result.get_status());
+        }
+    });
 }
 
 void MutableSubscriptionSet::process_notifications()
@@ -431,8 +494,10 @@ void MutableSubscriptionSet::process_notifications()
     mgr->m_pending_notifications_cv.wait(lk, [&] {
         return mgr->m_outstanding_requests == 0;
     });
+
     for (auto it = mgr->m_pending_notifications.begin(); it != mgr->m_pending_notifications.end();) {
-        if ((it->version == my_version && (new_state == State::Error || new_state >= it->notify_when)) ||
+        if ((it->version == my_version &&
+             (new_state == State::Error || state_to_order(new_state) >= state_to_order(it->notify_when))) ||
             (new_state == State::Complete && it->version < my_version)) {
             to_finish.splice(to_finish.end(), mgr->m_pending_notifications, it++);
         }
@@ -449,7 +514,7 @@ void MutableSubscriptionSet::process_notifications()
 
     for (auto& req : to_finish) {
         if (new_state == State::Error && req.version == my_version) {
-            req.promise.set_error({ErrorCodes::RuntimeError, error_str()});
+            req.promise.set_error({ErrorCodes::SubscriptionFailed, std::string_view(error_str())});
         }
         else if (req.version < my_version) {
             req.promise.emplace_value(State::Superseded);
@@ -460,7 +525,7 @@ void MutableSubscriptionSet::process_notifications()
     }
 }
 
-SubscriptionSet MutableSubscriptionSet::commit() &&
+SubscriptionSet MutableSubscriptionSet::commit()
 {
     if (m_tr->get_transact_stage() != DB::transact_Writing) {
         throw std::logic_error("SubscriptionSet is not in a commitable state");
@@ -478,17 +543,17 @@ SubscriptionSet MutableSubscriptionSet::commit() &&
         for (const auto& sub : m_subs) {
             auto new_sub =
                 obj_sub_list.create_and_insert_linked_object(obj_sub_list.is_empty() ? 0 : obj_sub_list.size());
-            new_sub.set(mgr->m_sub_id, sub.id());
-            new_sub.set(mgr->m_sub_created_at, sub.created_at());
-            new_sub.set(mgr->m_sub_updated_at, sub.updated_at());
-            if (sub.m_name) {
-                new_sub.set(mgr->m_sub_name, StringData(sub.name()));
+            new_sub.set(mgr->m_sub_id, sub.id);
+            new_sub.set(mgr->m_sub_created_at, sub.created_at);
+            new_sub.set(mgr->m_sub_updated_at, sub.updated_at);
+            if (sub.name) {
+                new_sub.set(mgr->m_sub_name, StringData(*sub.name));
             }
-            new_sub.set(mgr->m_sub_object_class_name, StringData(sub.object_class_name()));
-            new_sub.set(mgr->m_sub_query_str, StringData(sub.query_string()));
+            new_sub.set(mgr->m_sub_object_class_name, StringData(sub.object_class_name));
+            new_sub.set(mgr->m_sub_query_str, StringData(sub.query_string));
         }
     }
-    m_obj.set(mgr->m_sub_set_state, static_cast<int64_t>(m_state));
+    m_obj.set(mgr->m_sub_set_state, state_to_storage(m_state));
     if (!m_error_str.empty()) {
         m_obj.set(mgr->m_sub_set_error_str, StringData(m_error_str));
     }
@@ -513,13 +578,13 @@ std::string SubscriptionSet::to_ext_json() const
 
     util::FlatMap<std::string, std::vector<std::string>> table_to_query;
     for (const auto& sub : *this) {
-        std::string table_name(sub.object_class_name());
+        std::string table_name(sub.object_class_name);
         auto& queries_for_table = table_to_query.at(table_name);
-        auto query_it = std::find(queries_for_table.begin(), queries_for_table.end(), sub.query_string());
+        auto query_it = std::find(queries_for_table.begin(), queries_for_table.end(), sub.query_string);
         if (query_it != queries_for_table.end()) {
             continue;
         }
-        queries_for_table.emplace_back(sub.query_string());
+        queries_for_table.emplace_back(sub.query_string);
     }
 
     if (table_to_query.empty()) {
@@ -624,11 +689,11 @@ SubscriptionSet SubscriptionStore::get_latest() const
 {
     auto tr = m_db->start_frozen();
     auto sub_sets = tr->get_table(m_sub_set_table);
-    if (sub_sets->is_empty()) {
-        return SubscriptionSet(weak_from_this(), *tr, Obj{});
-    }
-    auto latest_id = *sub_sets->max(sub_sets->get_primary_key_column());
-    auto latest_obj = sub_sets->get_object_with_primary_key(latest_id);
+    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    REALM_ASSERT(!sub_sets->is_empty());
+
+    auto latest_id = sub_sets->max(sub_sets->get_primary_key_column())->get_int();
+    auto latest_obj = sub_sets->get_object_with_primary_key(Mixed{latest_id});
 
     return SubscriptionSet(weak_from_this(), *tr, latest_obj);
 }
@@ -637,45 +702,51 @@ SubscriptionSet SubscriptionStore::get_active() const
 {
     auto tr = m_db->start_frozen();
     auto sub_sets = tr->get_table(m_sub_set_table);
-    if (sub_sets->is_empty()) {
-        return SubscriptionSet(weak_from_this(), *tr, Obj{});
-    }
+    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    REALM_ASSERT(!sub_sets->is_empty());
 
     DescriptorOrdering descriptor_ordering;
     descriptor_ordering.append_sort(SortDescriptor{{{sub_sets->get_primary_key_column()}}, {false}});
     descriptor_ordering.append_limit(LimitDescriptor{1});
     auto res = sub_sets->where()
-                   .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Complete))
+                   .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::Complete))
+                   .Or()
+                   .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::AwaitingMark))
                    .find_all(descriptor_ordering);
 
+    // If there is no active subscription yet, return the zero'th subscription.
     if (res.is_empty()) {
-        return SubscriptionSet(weak_from_this(), *tr, Obj{});
+        return SubscriptionSet(weak_from_this(), *tr, sub_sets->get_object_with_primary_key(int64_t(0)));
     }
     return SubscriptionSet(weak_from_this(), *tr, res.get_object(0));
 }
 
-std::pair<int64_t, int64_t> SubscriptionStore::get_active_and_latest_versions() const
+SubscriptionStore::VersionInfo SubscriptionStore::get_version_info() const
 {
     auto tr = m_db->start_read();
     auto sub_sets = tr->get_table(m_sub_set_table);
-    if (sub_sets->is_empty()) {
-        return {0, 0};
-    }
+    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    REALM_ASSERT(!sub_sets->is_empty());
 
-    auto latest_id = *sub_sets->max(sub_sets->get_primary_key_column());
+    VersionInfo ret;
+    ret.latest = sub_sets->max(sub_sets->get_primary_key_column())->get_int();
     DescriptorOrdering descriptor_ordering;
     descriptor_ordering.append_sort(SortDescriptor{{{sub_sets->get_primary_key_column()}}, {false}});
     descriptor_ordering.append_limit(LimitDescriptor{1});
+
     auto res = sub_sets->where()
-                   .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Complete))
+                   .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::Complete))
+                   .Or()
+                   .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::AwaitingMark))
                    .find_all(descriptor_ordering);
+    ret.active = res.is_empty() ? SubscriptionSet::EmptyVersion : res.get_object(0).get_primary_key().get_int();
 
-    if (res.is_empty()) {
-        return {-1, latest_id.get_int()};
-    }
+    res = sub_sets->where()
+              .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::AwaitingMark))
+              .find_all(descriptor_ordering);
+    ret.pending_mark = res.is_empty() ? SubscriptionSet::EmptyVersion : res.get_object(0).get_primary_key().get_int();
 
-    auto active_id = res.get_object(0).get_primary_key();
-    return {active_id.get_int(), latest_id.get_int()};
+    return ret;
 }
 
 util::Optional<SubscriptionStore::PendingSubscription>
@@ -683,18 +754,17 @@ SubscriptionStore::get_next_pending_version(int64_t last_query_version, DB::vers
 {
     auto tr = m_db->start_read();
     auto sub_sets = tr->get_table(m_sub_set_table);
-    if (sub_sets->is_empty()) {
-        return util::none;
-    }
+    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    REALM_ASSERT(!sub_sets->is_empty());
 
     DescriptorOrdering descriptor_ordering;
     descriptor_ordering.append_sort(SortDescriptor{{{sub_sets->get_primary_key_column()}}, {true}});
     auto res = sub_sets->where()
                    .greater(sub_sets->get_primary_key_column(), last_query_version)
                    .group()
-                   .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Pending))
+                   .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::Pending))
                    .Or()
-                   .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Bootstrapping))
+                   .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::Bootstrapping))
                    .end_group()
                    .greater_equal(m_sub_set_snapshot_version, static_cast<int64_t>(after_client_version))
                    .find_all(descriptor_ordering);
@@ -761,11 +831,11 @@ SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
 SubscriptionStore::TableSet SubscriptionStore::get_tables_for_latest(const Transaction& tr) const
 {
     auto sub_sets = tr.get_table(m_sub_set_table);
-    if (sub_sets->is_empty()) {
-        return {};
-    }
-    auto latest_id = *sub_sets->max(sub_sets->get_primary_key_column());
-    auto latest_obj = sub_sets->get_object_with_primary_key(latest_id);
+    // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
+    REALM_ASSERT(!sub_sets->is_empty());
+
+    auto latest_id = sub_sets->max(sub_sets->get_primary_key_column())->get_int();
+    auto latest_obj = sub_sets->get_object_with_primary_key(Mixed{latest_id});
 
     TableSet ret;
     auto subs = latest_obj.get_linklist(m_sub_set_subscriptions);
@@ -822,7 +892,8 @@ MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSe
     auto new_pk = sub_sets->max(sub_sets->get_primary_key_column())->get_int() + 1;
 
     MutableSubscriptionSet new_set_obj(weak_from_this(), std::move(new_tr),
-                                       sub_sets->create_object_with_primary_key(Mixed{new_pk}));
+                                       sub_sets->create_object_with_primary_key(Mixed{new_pk}),
+                                       SubscriptionSet::MakingMutableCopy{true});
     for (const auto& sub : set) {
         new_set_obj.insert_sub(sub);
     }

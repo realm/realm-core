@@ -25,16 +25,25 @@
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/functional.hpp>
 
+#include <unordered_map>
+#include <unordered_set>
+
 namespace realm {
 namespace util {
 
-void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key);
+struct FileAttributes {
+    FileDesc fd;
+    std::string path;
+    File::AccessMode access;
+    const char* encryption_key = nullptr;
+};
+
+void* mmap(const FileAttributes& file, size_t size, size_t offset);
 void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
                  const char* enc_key);
 void* mmap_reserve(FileDesc fd, size_t size, size_t offset);
 void munmap(void* addr, size_t size);
-void* mremap(FileDesc fd, size_t file_offset, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size,
-             const char* encryption_key);
+void* mremap(const FileAttributes& file, size_t file_offset, void* old_addr, size_t old_size, size_t new_size);
 void msync(FileDesc fd, void* addr, size_t size);
 void* mmap_anon(size_t size);
 
@@ -72,14 +81,6 @@ inline void set_page_reclaim_governor_to_default()
     set_page_reclaim_governor(nullptr);
 }
 
-// There are several globals that rely on being process specific.
-// The unit tests which use fork() should start with empty mappings.
-// This also resets the page reclaimer thread because if fork happens while
-// running with the global mutex `mapping_mutex` locked, the child process
-// will hang due to that mutex never being unlocked.
-// We do not support fork() in production.
-void clear_mappings_before_test_forks();
-
 // Retrieves the number of in memory decrypted pages, across all open files.
 size_t get_num_decrypted_pages();
 
@@ -92,30 +93,27 @@ SharedFileInfo* get_file_info_for_file(File& file);
 
 // This variant allows the caller to obtain direct access to the encrypted file mapping
 // for optimization purposes.
-void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key,
-           EncryptedFileMapping*& mapping);
+void* mmap(const FileAttributes& file, size_t size, size_t offset, EncryptedFileMapping*& mapping);
 void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
                  const char* enc_key, EncryptedFileMapping* mapping);
 
-void* mmap_reserve(FileDesc fd, size_t size, File::AccessMode am, size_t offset, const char* enc_key,
-                   EncryptedFileMapping*& mapping);
+void* mmap_reserve(const FileAttributes& file, size_t size, size_t offset, EncryptedFileMapping*& mapping);
 
-EncryptedFileMapping* reserve_mapping(void* addr, FileDesc fd, size_t offset, File::AccessMode access,
-                                      const char* encryption_key);
+EncryptedFileMapping* reserve_mapping(void* addr, const FileAttributes& file, size_t offset);
 
 void extend_encrypted_mapping(EncryptedFileMapping* mapping, void* addr, size_t offset, size_t old_size,
                               size_t new_size);
 void remove_encrypted_mapping(void* addr, size_t size);
 void do_encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size,
-                                EncryptedFileMapping* mapping, bool allow_missing);
+                                EncryptedFileMapping* mapping, bool to_modify);
 
 void do_encryption_write_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping);
 
 void inline encryption_read_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping,
-                                    HeaderToSize header_to_size = nullptr)
+                                    HeaderToSize header_to_size = nullptr, bool to_modify = false)
 {
     if (REALM_UNLIKELY(mapping))
-        do_encryption_read_barrier(addr, size, header_to_size, mapping, true);
+        do_encryption_read_barrier(addr, size, header_to_size, mapping, to_modify);
 }
 
 void inline encryption_read_barrier_for_write(const void* addr, size_t size, EncryptedFileMapping* mapping)
@@ -140,10 +138,10 @@ void inline encryption_flush(EncryptedFileMapping* mapping)
 }
 
 inline void do_encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size,
-                                       EncryptedFileMapping* mapping, bool allow_missing)
+                                       EncryptedFileMapping* mapping, bool to_modify)
 {
     UniqueLock lock(mapping_mutex);
-    mapping->read_barrier(addr, size, header_to_size, allow_missing);
+    mapping->read_barrier(addr, size, header_to_size, to_modify);
 }
 
 inline void do_encryption_write_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping)
@@ -187,6 +185,7 @@ void encryption_write_barrier(const File::Map<T>& map, size_t index, size_t num_
         do_encryption_write_barrier(map.get_addr() + index, sizeof(T) * num_elements, mapping);
     }
 }
+void encryption_mark_pages_for_IV_check(EncryptedFileMapping* mapping);
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept;
 File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept;

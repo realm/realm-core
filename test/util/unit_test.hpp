@@ -197,6 +197,13 @@ static const bool running_with_asan = true;
 static const bool running_with_asan = false;
 #endif
 
+#if REALM_ANDROID || REALM_IOS
+// android doesn't implement posix_spawn(), iOS doesn't permit starting another process
+constexpr bool testing_supports_spawn_process = false;
+#else
+constexpr bool testing_supports_spawn_process = !running_with_valgrind && !running_with_tsan && !running_with_asan;
+#endif
+
 //@{
 
 /// These are the four inexact floating point comparisons defined by
@@ -328,7 +335,7 @@ public:
         /// to util::Logger::Level::info. The log level threshold selected for a
         /// specified base logger will be ignored. The specified base logger
         /// does not have to be thread safe.
-        util::Logger* logger = nullptr;
+        std::shared_ptr<util::Logger> logger;
 
         /// The log level threshold to use for the intra test loggers
         /// (TestContext::logger).
@@ -483,7 +490,7 @@ public:
     /// use inside the associated unit test. The log level of this logger is
     /// specified via TestList::Config::intra_test_log_level. See also
     /// ThreadContext::report_logger.
-    util::Logger& logger;
+    std::shared_ptr<util::Logger> logger;
 
     bool check_cond(bool cond, const char* file, long line, const char* macro_name, const char* cond_text);
 
@@ -578,13 +585,14 @@ public:
 
     /// The thread specific logger to be used by custom reporters. See also
     /// SharedContext::report_logger and TestContext::logger.
+    const std::shared_ptr<util::Logger> report_logger_ptr;
     util::Logger& report_logger;
 
     ThreadContext(const ThreadContext&) = delete;
     ThreadContext& operator=(const ThreadContext&) = delete;
 
 protected:
-    ThreadContext(SharedContext&, int thread_index, util::Logger&);
+    ThreadContext(SharedContext&, int thread_index, const std::shared_ptr<util::Logger>&);
 };
 
 
@@ -596,13 +604,14 @@ public:
 
     /// The thread non-specific logger to be used by custom reporters. See also
     /// ThreadContext::report_logger.
+    const std::shared_ptr<util::Logger> report_logger_ptr;
     util::Logger& report_logger;
 
     SharedContext(const SharedContext&) = delete;
     SharedContext& operator=(const SharedContext&) = delete;
 
 protected:
-    SharedContext(const TestList&, int num_recurrences, int num_threads, util::Logger&);
+    SharedContext(const TestList& tl, int nr, int nt, const std::shared_ptr<util::Logger>& rl_ptr);
 };
 
 
@@ -770,6 +779,25 @@ void to_string(const T& value, std::string& str)
 }
 
 template <class T>
+void to_string(const std::vector<T>& value, std::string& str)
+{
+    std::ostringstream out;
+    SetPrecision<T, std::is_floating_point<T>::value>::exec(out);
+
+    out << "{";
+    bool first = true;
+    for (auto& v : value) {
+        if (!first) {
+            out << ", ";
+        }
+        out << v;
+        first = false;
+    }
+    out << "}";
+    str = out.str();
+}
+
+template <class T>
 void to_string(const std::optional<T>& value, std::string& str)
 {
     // FIXME: Put string values in quotes, and escape non-printables as well as '"' and '\\'.
@@ -911,18 +939,20 @@ inline bool TestContext::check_definitely_greater(long double a, long double b, 
     return check_inexact_compare(cond, a, b, eps, file, line, "CHECK_DEFINITELY_GREATER", a_text, b_text, eps_text);
 }
 
-inline ThreadContext::ThreadContext(SharedContext& sc, int ti, util::Logger& rl)
+inline ThreadContext::ThreadContext(SharedContext& sc, int ti, const std::shared_ptr<util::Logger>& rl_ptr)
     : shared_context(sc)
     , thread_index(ti)
-    , report_logger(rl)
+    , report_logger_ptr(rl_ptr)
+    , report_logger(*report_logger_ptr)
 {
 }
 
-inline SharedContext::SharedContext(const TestList& tl, int nr, int nt, util::Logger& rl)
+inline SharedContext::SharedContext(const TestList& tl, int nr, int nt, const std::shared_ptr<util::Logger>& rl_ptr)
     : test_list(tl)
     , num_recurrences(nr)
     , num_threads(nt)
-    , report_logger(rl)
+    , report_logger_ptr(rl_ptr)
+    , report_logger(*report_logger_ptr)
 {
 }
 
@@ -934,7 +964,7 @@ inline TestBase::TestBase(TestContext& context)
 template <class... Params>
 inline void TestBase::log(const char* message, Params&&... params)
 {
-    test_context.logger.info(message, std::forward<Params>(params)...); // Throws
+    test_context.logger->info(message, std::forward<Params>(params)...); // Throws
 }
 
 

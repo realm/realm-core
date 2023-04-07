@@ -46,7 +46,7 @@ public:
     // session they occured in, this will drop/clear all data when the bootstrap store is constructed.
     //
     // Underneath this creates a table which stores each download message's changesets.
-    explicit PendingBootstrapStore(DBRef db, util::Logger* logger);
+    explicit PendingBootstrapStore(DBRef db, util::Logger& logger);
 
     PendingBootstrapStore(const PendingBootstrapStore&) = delete;
     PendingBootstrapStore& operator=(const PendingBootstrapStore&) = delete;
@@ -59,12 +59,19 @@ public:
         std::vector<Transformer::RemoteChangeset> changesets;
         std::vector<util::AppendBuffer<char>> changeset_data;
         util::Optional<SyncProgress> progress;
-        size_t remaining = 0;
+        size_t remaining_changesets = 0;
     };
 
     // Returns the next batch (download message) of changesets if it exists. The transaction must be in the reading
     // state.
     PendingBatch peek_pending(size_t limit_in_bytes);
+
+    struct PendingBatchStats {
+        int64_t query_version = 0;
+        size_t pending_changesets = 0;
+        size_t pending_changeset_bytes = 0;
+    };
+    PendingBatchStats pending_stats();
 
     // Removes the first set of changesets from the current pending bootstrap batch. The transaction must be in the
     // writing state.
@@ -79,7 +86,8 @@ public:
 
 private:
     DBRef m_db;
-    util::Logger* m_logger;
+    // The pending_bootstrap_store is tied to the lifetime of a session, so a shared_ptr is not needed
+    util::Logger& m_logger;
     _impl::ClientProtocol m_client_protocol;
 
     TableKey m_cursor_table;

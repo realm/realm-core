@@ -211,7 +211,7 @@ void Group::set_size() const noexcept
     int retval = 0;
     if (is_attached() && m_table_names.is_attached()) {
         size_t max_index = m_tables.size();
-        REALM_ASSERT(max_index < (1 << 16));
+        REALM_ASSERT_EX(max_index < (1 << 16), max_index);
         for (size_t j = 0; j < max_index; ++j) {
             RefOrTagged rot = m_tables.get_as_ref_or_tagged(j);
             if (rot.is_ref() && rot.get_as_ref()) {
@@ -329,7 +329,7 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     // individual file format versions.
 
     if (requested_history_type == Replication::hist_None) {
-        if (current_file_format_version == 22) {
+        if (current_file_format_version == 23) {
             // We are able to open these file formats in RO mode
             return current_file_format_version;
         }
@@ -401,15 +401,16 @@ int Group::read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std
         case 0:
             file_format_ok = (top_ref == 0);
             break;
-        case 11:
-        case 20:
-        case 21:
         case g_current_file_format_version:
             file_format_ok = true;
             break;
     }
     if (REALM_UNLIKELY(!file_format_ok))
-        throw FileFormatUpgradeRequired("Realm file needs upgrade before opening in RO mode", path);
+        throw FileAccessError(ErrorCodes::FileFormatUpgradeRequired,
+                              util::format("Realm file at path '%1' cannot be opened in read-only mode because it "
+                                           "has a file format version (%2) which requires an upgrade",
+                                           path, file_format_version),
+                              path);
     return file_format_version;
 }
 
@@ -458,14 +459,6 @@ Group::~Group() noexcept
         m_local_alloc->detach();
 }
 
-
-void Group::remap(size_t new_file_size)
-{
-    m_alloc.update_reader_view(new_file_size); // Throws
-    update_allocator_wrappers(m_is_writable);
-}
-
-
 void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable)
 {
     m_alloc.update_reader_view(new_file_size); // Throws
@@ -479,7 +472,8 @@ void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bo
     update_refs(new_top_ref);
 }
 
-void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
+void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc, std::optional<size_t> read_lock_file_size,
+                               std::optional<uint_fast64_t> read_lock_version)
 {
     size_t top_size = arr.size();
     ref_type top_ref = arr.get_ref();
@@ -491,7 +485,8 @@ void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
         case 7:
         case 9:
         case 10:
-        case 11: {
+        case 11:
+        case 12: {
             ref_type table_names_ref = arr.get_as_ref_or_tagged(s_table_name_ndx).get_as_ref();
             ref_type tables_ref = arr.get_as_ref_or_tagged(s_table_refs_ndx).get_as_ref();
             auto logical_file_size = arr.get_as_ref_or_tagged(s_file_size_ndx).get_as_int();
@@ -499,8 +494,9 @@ void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
             // Logical file size must never exceed actual file size.
             auto file_size = alloc.get_baseline();
             if (logical_file_size > file_size) {
-                std::string err = "Invalid logical file size: " + util::to_string(logical_file_size) +
-                                  ", actual file size: " + util::to_string(file_size);
+                std::string err = util::format("Invalid logical file size: %1, actual file size: %2, read lock file "
+                                               "size: %3, read lock version: %4",
+                                               logical_file_size, file_size, read_lock_file_size, read_lock_version);
                 throw InvalidDatabase(err, "");
             }
             // First two entries must be valid refs pointing inside the file
@@ -508,22 +504,27 @@ void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
                 return ref == 0 || (ref & 7) || ref > logical_file_size;
             };
             if (invalid_ref(table_names_ref) || invalid_ref(tables_ref)) {
-                std::string err = "Invalid top array (top_ref, [0], [1]): " + util::to_string(top_ref) + ", " +
-                                  util::to_string(table_names_ref) + ", " + util::to_string(tables_ref);
+                std::string err = util::format(
+                    "Invalid top array (top_ref, [0], [1]): %1, %2, %3, read lock size: %4, read lock version: %5",
+                    top_ref, table_names_ref, tables_ref, read_lock_file_size, read_lock_version);
                 throw InvalidDatabase(err, "");
             }
             break;
         }
         default: {
-            std::string err = "Invalid top array size (ref: " + util::to_string(top_ref) +
-                              ", size: " + util::to_string(top_size) + ")";
+            auto logical_file_size = arr.get_as_ref_or_tagged(s_file_size_ndx).get_as_int();
+            std::string err =
+                util::format("Invalid top array size (ref: %1, array size: %2) file size: %3, read "
+                             "lock size: %4, read lock version: %5",
+                             top_ref, top_size, logical_file_size, read_lock_file_size, read_lock_version);
             throw InvalidDatabase(err, "");
             break;
         }
     }
 }
 
-void Group::attach(ref_type top_ref, bool writable, bool create_group_when_missing)
+void Group::attach(ref_type top_ref, bool writable, bool create_group_when_missing, size_t file_size,
+                   uint_fast64_t version)
 {
     REALM_ASSERT(!m_top.is_attached());
     if (create_group_when_missing)
@@ -538,7 +539,7 @@ void Group::attach(ref_type top_ref, bool writable, bool create_group_when_missi
 
     if (top_ref != 0) {
         m_top.init_from_ref(top_ref);
-        validate_top_array(m_top, m_alloc);
+        validate_top_array(m_top, m_alloc, file_size, version);
         m_table_names.init_from_parent();
         m_tables.init_from_parent();
     }
@@ -594,8 +595,7 @@ void Group::update_num_objects()
 #endif // REALM_METRICS
 }
 
-
-void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable)
+void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, VersionID version)
 {
     REALM_ASSERT_3(new_top_ref, <, new_file_size);
     REALM_ASSERT(!is_attached());
@@ -612,7 +612,7 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writa
     // nodes to attached them to. In the case of write transactions, the nodes
     // have to be created, as they have to be ready for being modified.
     bool create_group_when_missing = writable;
-    attach(new_top_ref, writable, create_group_when_missing); // Throws
+    attach(new_top_ref, writable, create_group_when_missing, new_file_size, version.version); // Throws
 }
 
 
@@ -681,8 +681,7 @@ Table* Group::do_get_table(StringData name)
 TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable,
                                            Table::Type table_type)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     check_table_name_uniqueness(name);
 
     auto table = do_add_table(name, table_type, false);
@@ -704,7 +703,7 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
 Table* Group::do_add_table(StringData name, Table::Type table_type, bool do_repl)
 {
     if (!m_is_writable)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw LogicError(ErrorCodes::ReadOnlyDB, "Database not writable");
 
     // get new key and index
     // find first empty spot:
@@ -720,7 +719,7 @@ Table* Group::do_add_table(StringData name, Table::Type table_type, bool do_repl
     TableKey key = TableKey((tag << 16) | j);
 
     if (REALM_UNLIKELY(name.size() > max_table_name_length))
-        throw LogicError(LogicError::table_name_too_long);
+        throw InvalidArgument(ErrorCodes::InvalidName, util::format("Name too long: %1", name));
 
     using namespace _impl;
     size_t table_ndx = key2ndx(key);
@@ -804,8 +803,7 @@ void Group::recycle_table_accessor(Table* to_be_recycled)
 
 void Group::remove_table(StringData name)
 {
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     size_t table_ndx = m_table_names.find_first(name);
     if (table_ndx == not_found)
         throw NoSuchTable();
@@ -816,8 +814,7 @@ void Group::remove_table(StringData name)
 
 void Group::remove_table(TableKey key)
 {
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
 
     size_t table_ndx = key2ndx_checked(key);
     remove_table(table_ndx, key);
@@ -827,10 +824,9 @@ void Group::remove_table(TableKey key)
 void Group::remove_table(size_t table_ndx, TableKey key)
 {
     if (!m_is_writable)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw LogicError(ErrorCodes::ReadOnlyDB, "Database not writable");
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
-    if (table_ndx >= m_tables.size())
-        throw LogicError(LogicError::table_index_out_of_range);
+    REALM_ASSERT(table_ndx < m_tables.size());
     TableRef table = get_table(key);
 
     // In principle we could remove a table even if it is the target of link
@@ -840,7 +836,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     // require that a removed table does not contain foreigh origin backlink
     // columns.
     if (table->is_cross_table_link_target())
-        throw CrossTableLinkTarget();
+        throw CrossTableLinkTarget(table->get_name());
 
     // There is no easy way for Group::TransactAdvancer to handle removal of
     // tables that contain foreign target table link columns, because that
@@ -884,8 +880,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
 
 void Group::rename_table(StringData name, StringData new_name, bool require_unique_name)
 {
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     size_t table_ndx = m_table_names.find_first(name);
     if (table_ndx == not_found)
         throw NoSuchTable();
@@ -895,10 +890,9 @@ void Group::rename_table(StringData name, StringData new_name, bool require_uniq
 
 void Group::rename_table(TableKey key, StringData new_name, bool require_unique_name)
 {
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     if (!m_is_writable)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw LogicError(ErrorCodes::ReadOnlyDB, "Database not writable");
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     if (require_unique_name && has_table(new_name))
         throw TableNameInUse();
@@ -912,7 +906,7 @@ Obj Group::get_object(ObjLink link)
 {
     auto target_table = get_table(link.get_table_key());
     ObjKey key = link.get_obj_key();
-    TableClusterTree* ct = key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+    ClusterTree* ct = key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
     return ct->get(key);
 }
 
@@ -924,13 +918,13 @@ void Group::validate(ObjLink link) const
         const ClusterTree* ct =
             target_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
         if (!ct->is_valid(target_key)) {
-            throw LogicError(LogicError::target_row_index_out_of_range);
+            throw InvalidArgument(ErrorCodes::KeyNotFound, "Target object not found");
         }
         if (target_table->is_embedded()) {
-            throw LogicError(LogicError::wrong_kind_of_table);
+            throw IllegalOperation("Cannot link to embedded object");
         }
         if (target_table->is_asymmetric()) {
-            throw LogicError(LogicError::wrong_kind_of_table);
+            throw IllegalOperation("Cannot link to ephemeral object");
         }
     }
 }
@@ -1031,7 +1025,7 @@ BinaryData Group::write_to_mem() const
 
     auto buffer = std::unique_ptr<char[]>(new (std::nothrow) char[max_size]);
     if (!buffer)
-        throw util::bad_alloc();
+        throw Exception(ErrorCodes::OutOfMemory, "Could not allocate memory while dumping to memory");
     MemoryOutputStream out; // Throws
     out.set_buffer(buffer.get(), buffer.get() + max_size);
     write(out); // Throws
@@ -1207,8 +1201,7 @@ bool Group::operator==(const Group& g) const
 }
 void Group::schema_to_json(std::ostream& out, std::map<std::string, std::string>* opt_renames) const
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
 
     std::map<std::string, std::string> renames;
     if (opt_renames) {
@@ -1235,8 +1228,7 @@ void Group::schema_to_json(std::ostream& out, std::map<std::string, std::string>
 void Group::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* opt_renames,
                     JSONOutputMode output_mode) const
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
 
     std::map<std::string, std::string> renames;
     if (opt_renames) {
@@ -1267,54 +1259,6 @@ void Group::to_json(std::ostream& out, size_t link_depth, std::map<std::string, 
     }
 
     out << "}" << std::endl;
-}
-
-namespace {
-
-size_t size_of_tree_from_ref(ref_type ref, Allocator& alloc)
-{
-    if (ref) {
-        Array a(alloc);
-        a.init_from_ref(ref);
-        MemStats stats;
-        a.stats(stats);
-        return stats.allocated;
-    }
-    else
-        return 0;
-}
-} // namespace
-
-size_t Group::compute_aggregated_byte_size(SizeAggregateControl ctrl) const noexcept
-{
-    SlabAlloc& alloc = *const_cast<SlabAlloc*>(&m_alloc);
-    if (!m_top.is_attached())
-        return 0;
-    size_t used = 0;
-    if (ctrl & SizeAggregateControl::size_of_state) {
-        MemStats stats;
-        m_table_names.stats(stats);
-        m_tables.stats(stats);
-        used = stats.allocated + m_top.get_byte_size();
-        used += sizeof(SlabAlloc::Header);
-    }
-    if (ctrl & SizeAggregateControl::size_of_freelists) {
-        if (m_top.size() >= 6) {
-            auto ref = m_top.get_as_ref_or_tagged(3).get_as_ref();
-            used += size_of_tree_from_ref(ref, alloc);
-            ref = m_top.get_as_ref_or_tagged(4).get_as_ref();
-            used += size_of_tree_from_ref(ref, alloc);
-            ref = m_top.get_as_ref_or_tagged(5).get_as_ref();
-            used += size_of_tree_from_ref(ref, alloc);
-        }
-    }
-    if (ctrl & SizeAggregateControl::size_of_history) {
-        if (m_top.size() >= 9) {
-            auto ref = m_top.get_as_ref_or_tagged(8).get_as_ref();
-            used += size_of_tree_from_ref(ref, alloc);
-        }
-    }
-    return used;
 }
 
 size_t Group::get_used_space() const noexcept
@@ -1587,18 +1531,11 @@ void Group::advance_transact(ref_type new_top_ref, util::NoCopyInputStream& in, 
 void Group::prepare_top_for_history(int history_type, int history_schema_version, uint64_t file_ident)
 {
     REALM_ASSERT(m_file_format_version >= 7);
-    if (m_top.size() < s_group_max_size) {
-        REALM_ASSERT(m_top.size() <= s_hist_type_ndx);
-        while (m_top.size() < s_hist_type_ndx) {
-            m_top.add(0); // Throws
-        }
-        ref_type history_ref = 0;                                    // No history yet
-        m_top.add(RefOrTagged::make_tagged(history_type));           // Throws
-        m_top.add(RefOrTagged::make_ref(history_ref));               // Throws
-        m_top.add(RefOrTagged::make_tagged(history_schema_version)); // Throws
-        m_top.add(RefOrTagged::make_tagged(file_ident));             // Throws
+    while (m_top.size() < s_hist_type_ndx) {
+        m_top.add(0); // Throws
     }
-    else {
+
+    if (m_top.size() > s_hist_version_ndx) {
         int stored_history_type = int(m_top.get_as_ref_or_tagged(s_hist_type_ndx).get_as_int());
         int stored_history_schema_version = int(m_top.get_as_ref_or_tagged(s_hist_version_ndx).get_as_int());
         if (stored_history_type != Replication::hist_None) {
@@ -1607,6 +1544,21 @@ void Group::prepare_top_for_history(int history_type, int history_schema_version
         }
         m_top.set(s_hist_type_ndx, RefOrTagged::make_tagged(history_type));              // Throws
         m_top.set(s_hist_version_ndx, RefOrTagged::make_tagged(history_schema_version)); // Throws
+    }
+    else {
+        // No history yet
+        REALM_ASSERT(m_top.size() == s_hist_type_ndx);
+        ref_type history_ref = 0;                                    // No history yet
+        m_top.add(RefOrTagged::make_tagged(history_type));           // Throws
+        m_top.add(RefOrTagged::make_ref(history_ref));               // Throws
+        m_top.add(RefOrTagged::make_tagged(history_schema_version)); // Throws
+    }
+
+    if (m_top.size() > s_sync_file_id_ndx) {
+        m_top.set(s_sync_file_id_ndx, RefOrTagged::make_tagged(file_ident));
+    }
+    else {
+        m_top.add(RefOrTagged::make_tagged(file_ident)); // Throws
     }
 }
 
@@ -1789,8 +1741,7 @@ void Group::verify() const
     // marked as free before the file was opened.
     MemUsageVerifier mem_usage_2(ref_begin, immutable_ref_end, mutable_ref_end, baseline);
     {
-        REALM_ASSERT_EX(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7 || m_top.size() == 10 ||
-                            m_top.size() == 11,
+        REALM_ASSERT_EX(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7 || m_top.size() >= 10,
                         m_top.size());
         Allocator& alloc = m_top.get_alloc();
         Array pos(alloc), len(alloc), ver(alloc);

@@ -21,6 +21,7 @@
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/collection_notifications.hpp>
@@ -28,16 +29,13 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/object.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 
 #include <realm/group.hpp>
 #include <realm/util/any.hpp>
-
-#if REALM_ENABLE_AUTH_TESTS
-#include "sync/flx_sync_harness.hpp"
-#endif // REALM_ENABLE_AUTH_TESTS
 
 #include <cstdint>
 
@@ -163,6 +161,7 @@ TEST_CASE("object") {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
+    config.schema_mode = SchemaMode::AdditiveExplicit;
     config.schema = Schema{
         {"table",
          {
@@ -329,7 +328,7 @@ TEST_CASE("object") {
             advance_and_notify(*r);
         };
 
-        auto require_change = [&](Object& object, KeyPathArray key_path_array = {}) {
+        auto require_change = [&](Object& object, std::optional<KeyPathArray> key_path_array = std::nullopt) {
             auto token = object.add_notification_callback(
                 [&](CollectionChangeSet c) {
                     change = c;
@@ -339,7 +338,7 @@ TEST_CASE("object") {
             return token;
         };
 
-        auto require_no_change = [&](Object& object, KeyPathArray key_path_array = {}) {
+        auto require_no_change = [&](Object& object, std::optional<KeyPathArray> key_path_array = std::nullopt) {
             bool first = true;
             auto token = object.add_notification_callback(
                 [&](CollectionChangeSet) {
@@ -485,7 +484,8 @@ TEST_CASE("object") {
             write([&] {
                 obj.remove();
             });
-            REQUIRE_THROWS(require_change(object));
+            REQUIRE_EXCEPTION(require_change(object), InvalidatedObject,
+                              "Accessing object of type table which has been invalidated or deleted");
         }
 
         SECTION("keypath filtered notifications") {
@@ -724,6 +724,79 @@ TEST_CASE("object") {
                 }
             }
 
+            SECTION("callback with empty keypatharray") {
+                SECTION("modifying origin table 'table2', property 'value' "
+                        "while observing related table 'table', property 'value 1' "
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_origin, KeyPathArray());
+
+                    write([&] {
+                        object_origin.set_column_value("value", 105);
+                    });
+                }
+
+                SECTION("modifying related table 'table', property 'value 1' "
+                        "while observing related table 'table', property 'value 1' "
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_origin, KeyPathArray());
+
+                    write([&] {
+                        object_target.set_column_value("value 1", 205);
+                    });
+                }
+
+                SECTION("modifying related table 'table', property 'value 2' "
+                        "while observing related table 'table', property 'value 1' "
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_origin, KeyPathArray());
+
+                    write([&] {
+                        object_target.set_column_value("value 2", 205);
+                    });
+                }
+            }
+
+            SECTION("callback with empty keypatharray, backlinks") {
+                SECTION("modifying backlinked table 'table2', property 'value' "
+                        "with empty KeyPathArray "
+                        "-> DOES not send a notification") {
+                    auto token_with_shallow_subscribtion = require_no_change(object_target, KeyPathArray());
+                    write([&] {
+                        object_origin.set_column_value("value", 105);
+                    });
+                }
+                SECTION("modifying backlinked table 'table2', property 'link' "
+                        "with empty KeyPathArray "
+                        "-> does NOT send a notification") {
+                    auto token_with_empty_key_path_array = require_no_change(object_target, KeyPathArray());
+                    write([&] {
+                        Obj obj_target2 = table_target->create_object_with_primary_key(300);
+                        Object object_target2(r, obj_target2);
+                        object_origin.set_property_value(d, "link", std::any(object_target2));
+                    });
+                }
+                SECTION("adding a new origin pointing to the target "
+                        "with empty KeyPathArray "
+                        "-> does NOT send a notification") {
+                    auto token_with_empty_key_path_array = require_no_change(object_target, KeyPathArray());
+                    write([&] {
+                        Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
+                        Object object_origin2(r, obj_origin2);
+                        object_origin2.set_property_value(d, "link", std::any(object_target));
+                    });
+                }
+                SECTION("adding a new origin pointing to the target "
+                        "with empty KeyPathArray "
+                        "-> does NOT send a notification") {
+                    auto token_with_empty_key_path_array = require_no_change(object_target, KeyPathArray());
+                    write([&] {
+                        Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
+                        Object object_origin2(r, obj_origin2);
+                        object_origin2.set_property_value(d, "link", std::any(object_target));
+                    });
+                }
+            }
+
             SECTION("callbacks on objects with link depth > 4") {
                 r->begin_transaction();
 
@@ -909,6 +982,38 @@ TEST_CASE("object") {
                             Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
                             Object object_origin2(r, obj_origin2);
                             object_origin2.set_property_value(d, "link", std::any(object_target));
+                        });
+                        REQUIRE_INDICES(change.modifications, 0);
+                        REQUIRE(change.columns.size() == 1);
+                        REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
+                    }
+                    SECTION("changes to backlink are reported both to origin and destination object") {
+                        Object object_origin2;
+                        write([&] {
+                            Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
+                            object_origin2 = Object{r, obj_origin2};
+                        });
+
+                        // add a backlink
+                        auto token_with_backlink = require_change(object_target, key_path_array_target_backlink);
+                        write([&] {
+                            object_origin2.set_property_value(d, "link", util::Any(object_target));
+                        });
+                        REQUIRE_INDICES(change.modifications, 0);
+                        REQUIRE(change.columns.size() == 1);
+                        REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
+
+                        // nullify a backlink
+                        write([&] {
+                            object_origin2.set_property_value(d, "link", std::any());
+                        });
+                        REQUIRE_INDICES(change.modifications, 0);
+                        REQUIRE(change.columns.size() == 1);
+                        REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
+
+                        // remove a backlink
+                        write([&] {
+                            table_origin->remove_object(object_origin2.obj().get_key());
                         });
                         REQUIRE_INDICES(change.modifications, 0);
                         REQUIRE(change.columns.size() == 1);
@@ -1139,10 +1244,8 @@ TEST_CASE("object") {
     }
 
     SECTION("create throws for missing values if there is no default") {
-        REQUIRE_THROWS(create(AnyDict{
-            {"_id", INT64_C(1)},
-            {"float", 6.6f},
-        }));
+        REQUIRE_EXCEPTION(create(AnyDict{{"_id", INT64_C(1)}, {"float", 6.6f}}), MissingPropertyValue,
+                          "Missing value for property 'all types.bool'");
     }
 
     SECTION("create always sets the PK first") {
@@ -1599,22 +1702,25 @@ TEST_CASE("object") {
             {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
             {"dictionary", AnyDict{{"key", "value"s}}},
         });
-        REQUIRE_THROWS(create(AnyDict{
-            {"_id", INT64_C(1)},
-            {"bool", true},
-            {"int", INT64_C(5)},
-            {"float", 2.2f},
-            {"double", 3.3},
-            {"string", "hello"s},
-            {"data", "olleh"s},
-            {"date", Timestamp(10, 20)},
-            {"object", AnyDict{{"_id", INT64_C(10)}, {"value", INT64_C(10)}}},
-            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
-            {"object id", ObjectId("000000000000000000000001")},
-            {"decimal", Decimal128("1.23e45")},
-            {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
-            {"dictionary", AnyDict{{"key", "value"s}}},
-        }));
+        REQUIRE_EXCEPTION(create(AnyDict{
+                              {"_id", INT64_C(1)},
+                              {"bool", true},
+                              {"int", INT64_C(5)},
+                              {"float", 2.2f},
+                              {"double", 3.3},
+                              {"string", "hello"s},
+                              {"data", "olleh"s},
+                              {"date", Timestamp(10, 20)},
+                              {"object", AnyDict{{"_id", INT64_C(10)}, {"value", INT64_C(10)}}},
+                              {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
+                              {"object id", ObjectId("000000000000000000000001")},
+                              {"decimal", Decimal128("1.23e45")},
+                              {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
+                              {"dictionary", AnyDict{{"key", "value"s}}},
+                          }),
+                          ObjectAlreadyExists,
+                          "Attempting to create an object of type 'all types' with an existing primary key value "
+                          "'not implemented'");
     }
 
     SECTION("create with explicit null pk does not fall back to default") {
@@ -1666,6 +1772,24 @@ TEST_CASE("object") {
         create(AnyDict{{"_id", std::any()}}, "nullable object id pk");
         create(AnyDict{{"_id", ObjectId::gen()}}, "nullable object id pk");
         REQUIRE(Results(r, r->read_group().get_table("class_nullable object id pk")).size() == 2);
+    }
+
+    SECTION("create only requires properties explicitly in the schema") {
+        config.schema = Schema{{"all types", {{"_id", PropertyType::Int, Property::IsPrimary{true}}}}};
+        auto subset_realm = Realm::get_shared_realm(config);
+        subset_realm->begin_transaction();
+        REQUIRE_NOTHROW(Object::create(d, subset_realm, "all types", std::any(AnyDict{{"_id", INT64_C(123)}})));
+        subset_realm->commit_transaction();
+
+        r->refresh();
+        auto obj = *r->read_group().get_table("class_all types")->begin();
+        REQUIRE(obj.get<int64_t>("_id") == 123);
+
+        // Other columns should have the default unset values
+        REQUIRE(obj.get<bool>("bool") == false);
+        REQUIRE(obj.get<int64_t>("int") == 0);
+        REQUIRE(obj.get<float>("float") == 0);
+        REQUIRE(obj.get<StringData>("string") == "");
     }
 
     SECTION("getters and setters") {
@@ -1748,13 +1872,17 @@ TEST_CASE("object") {
         auto linking = util::any_cast<Results>(linkobj.get_property_value<std::any>(d, "origin"));
         REQUIRE(linking.size() == 1);
 
-        REQUIRE_THROWS(obj.set_property_value(d, "_id", std::any(INT64_C(5))));
-        REQUIRE_THROWS(obj.set_property_value(d, "not a property", std::any(INT64_C(5))));
+        REQUIRE_EXCEPTION(obj.set_property_value(d, "_id", std::any(INT64_C(5))), ModifyPrimaryKey,
+                          "Cannot modify primary key after creation: 'all types._id'");
+        REQUIRE_EXCEPTION(obj.set_property_value(d, "not a property", std::any(INT64_C(5))), InvalidProperty,
+                          "Property 'all types.not a property' does not exist");
 
         r->commit_transaction();
 
-        REQUIRE_THROWS(obj.get_property_value<std::any>(d, "not a property"));
-        REQUIRE_THROWS(obj.set_property_value(d, "int", std::any(INT64_C(5))));
+        REQUIRE_EXCEPTION(obj.get_property_value<std::any>(d, "not a property"), InvalidProperty,
+                          "Property 'all types.not a property' does not exist");
+        REQUIRE_EXCEPTION(obj.set_property_value(d, "int", std::any(INT64_C(5))), WrongTransactionState,
+                          "Cannot modify managed objects outside of a write transaction.");
     }
 
     SECTION("setter has correct create policy") {
@@ -1927,6 +2055,56 @@ TEST_CASE("object") {
 #endif
 }
 
+TEST_CASE("Multithreaded object notifications") {
+    InMemoryTestFile config;
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({{"object", {{"value", PropertyType::Int}}}});
+
+    r->begin_transaction();
+    auto obj = r->read_group().get_table("class_object")->create_object();
+    r->commit_transaction();
+
+    Object object(r, obj);
+    int64_t value = 0;
+    auto token = object.add_notification_callback([&](auto) {
+        value = obj.get<int64_t>("value");
+    });
+    constexpr const int end_value = 1000;
+
+    // Try to verify that the notification machinery pins all versions that it
+    // needs to pin by performing a large number of very small writes on a
+    // background thread while the main thread is continously advancing via
+    // each of the three ways to advance reads.
+    JoiningThread thread([&] {
+        // Not actually frozen, but we need to disable thread-checks for libuv platforms
+        config.scheduler = util::Scheduler::make_frozen(VersionID());
+        auto r = Realm::get_shared_realm(config);
+        auto obj = *r->read_group().get_table("class_object")->begin();
+        for (int i = 0; i <= end_value; ++i) {
+            r->begin_transaction();
+            obj.set<int64_t>("value", i);
+            r->commit_transaction();
+        }
+    });
+
+    SECTION("notify()") {
+        REQUIRE_NOTHROW(util::EventLoop::main().run_until([&] {
+            return value == end_value;
+        }));
+    }
+    SECTION("refresh()") {
+        while (value < end_value) {
+            REQUIRE_NOTHROW(r->refresh());
+        }
+    }
+    SECTION("begin_transaction()") {
+        while (value < end_value) {
+            REQUIRE_NOTHROW(r->begin_transaction());
+            r->cancel_transaction();
+        }
+    }
+}
+
 TEST_CASE("Embedded Object") {
     Schema schema{
         {"all types",
@@ -1993,9 +2171,8 @@ TEST_CASE("Embedded Object") {
 
         SECTION("throws when given a managed object") {
             realm->begin_transaction();
-            REQUIRE_THROWS_WITH(
-                obj.set_property_value(ctx, "object", obj.get_property_value<std::any>(ctx, "object")),
-                "Cannot set a link to an existing managed embedded object");
+            REQUIRE_EXCEPTION(obj.set_property_value(ctx, "object", obj.get_property_value<std::any>(ctx, "object")),
+                              InvalidArgument, "Cannot set a link to an existing managed embedded object");
             realm->cancel_transaction();
         }
 
@@ -2169,33 +2346,25 @@ TEST_CASE("Embedded Object") {
     }
 }
 
-#if REALM_ENABLE_AUTH_TESTS
+#if REALM_ENABLE_SYNC
 
 TEST_CASE("Asymmetric Object") {
     Schema schema{
         {"asymmetric",
          ObjectSchema::ObjectType::TopLevelAsymmetric,
-         {
-             {"_id", PropertyType::Int, Property::IsPrimary{true}},
-             {"location", PropertyType::Int},
-             {"reading", PropertyType::Int},
-         }},
+         {{"_id", PropertyType::Int, Property::IsPrimary{true}}}},
         {"asymmetric_link",
          ObjectSchema::ObjectType::TopLevelAsymmetric,
          {
              {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"location", PropertyType::Mixed | PropertyType::Nullable},
          }},
-        {"table",
-         {
-             {"_id", PropertyType::Int, Property::IsPrimary{true}},
-             {"location", PropertyType::Int},
-             {"reading", PropertyType::Int},
-         }},
+        {"table", {{"_id", PropertyType::Int, Property::IsPrimary{true}}}},
     };
 
-    realm::app::FLXSyncTestHarness harness("asymmetric_sync", {schema});
-    SyncTestFile config(harness.app()->current_user(), schema, SyncConfig::FLXSyncEnabled{});
+    TestSyncManager tsm({}, {/*.start_immediately =*/false});
+    SyncTestFile config(tsm.fake_user(), schema, SyncConfig::FLXSyncEnabled{});
+    config.sync_config->flx_sync_requested = true;
 
     auto realm = Realm::get_shared_realm(config);
     {
@@ -2213,35 +2382,24 @@ TEST_CASE("Asymmetric Object") {
     };
 
     SECTION("Basic object creation") {
-        auto obj = create(
-            AnyDict{
-                {"_id", INT64_C(1)},
-                {"location", INT64_C(10)},
-                {"reading", INT64_C(20)},
-            },
-            "asymmetric");
+        auto obj = create(AnyDict{{"_id", INT64_C(1)}}, "asymmetric");
         // Object returned is not valid.
         REQUIRE(!obj.obj().is_valid());
         // Object gets deleted immediately.
-        REQUIRE(Results(realm, realm->read_group().get_table("class_table")).size() == 0);
+        REQUIRE(ObjectStore::is_empty(realm->read_group()));
     }
 
     SECTION("Outgoing link not allowed") {
-        auto obj = create(
-            AnyDict{
-                {"_id", INT64_C(1)},
-                {"location", INT64_C(10)},
-                {"reading", INT64_C(20)},
-            },
-            "table");
+        auto obj = create(AnyDict{{"_id", INT64_C(1)}}, "table");
         auto table = realm->read_group().get_table("class_table");
-        REQUIRE_THROWS(create(
-            AnyDict{
-                {"_id", INT64_C(1)},
-                {"location", Mixed(ObjLink{table->get_key(), obj.obj().get_key()})},
-            },
-            "asymmetric_link"));
+        REQUIRE_EXCEPTION(create(
+                              AnyDict{
+                                  {"_id", INT64_C(1)},
+                                  {"location", Mixed(ObjLink{table->get_key(), obj.obj().get_key()})},
+                              },
+                              "asymmetric_link"),
+                          IllegalOperation, "Links not allowed in asymmetric tables");
     }
 }
 
-#endif // REALM_ENABLE_AUTH_TESTS
+#endif // REALM_ENABLE_SYNC

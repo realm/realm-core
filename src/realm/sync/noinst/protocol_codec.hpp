@@ -183,9 +183,7 @@ public:
 
     class UploadMessageBuilder {
     public:
-        util::Logger& logger;
-
-        UploadMessageBuilder(util::Logger& logger, OutputBuffer& body_buffer, std::vector<char>& compression_buffer,
+        UploadMessageBuilder(OutputBuffer& body_buffer, std::vector<char>& compression_buffer,
                              util::compression::CompressMemoryArena& compress_memory_arena);
 
         void add_changeset(version_type client_version, version_type server_version, timestamp_type origin_timestamp,
@@ -202,7 +200,7 @@ public:
         util::compression::CompressMemoryArena& m_compress_memory_arena;
     };
 
-    UploadMessageBuilder make_upload_message_builder(util::Logger& logger);
+    UploadMessageBuilder make_upload_message_builder();
 
     void make_unbind_message(OutputBuffer&, session_ident_type session_ident);
 
@@ -275,8 +273,8 @@ public:
                     info.client_reset_recovery_is_disabled = json["isRecoveryModeDisabled"];
                     info.try_again = json["tryAgain"];
                     info.message = json["message"];
-                    info.log_url = util::make_optional<std::string>(json["logURL"]);
-                    info.should_client_reset = util::make_optional<bool>(json["shouldClientReset"]);
+                    info.log_url = std::make_optional<std::string>(json["logURL"]);
+                    info.should_client_reset = std::make_optional<bool>(json["shouldClientReset"]);
                     info.server_requests_action = string_to_action(json["action"]); // Throws
 
                     if (auto backoff_interval = json.find("backoffIntervalSec"); backoff_interval != json.end()) {
@@ -287,6 +285,18 @@ public:
                             std::chrono::seconds{json.at("backoffMaxDelaySec").get<int>()};
                         info.resumption_delay_interval->resumption_delay_backoff_multiplier =
                             json.at("backoffMultiplier").get<int>();
+                    }
+
+                    if (info.raw_error_code == static_cast<int>(sync::ProtocolError::migrate_to_flx)) {
+                        auto query_string = json.find("partitionQuery");
+                        if (query_string == json.end() || !query_string->is_string() ||
+                            query_string->get<std::string_view>().empty()) {
+                            return report_error(
+                                Error::bad_syntax,
+                                "Missing/invalid partition query string in migrate to flexible sync error response");
+                        }
+
+                        info.migration_query_string.emplace(query_string->get<std::string_view>());
                     }
 
                     if (auto rejected_updates = json.find("rejectedUpdates"); rejected_updates != json.end()) {
@@ -310,6 +320,11 @@ public:
                             cwei.primary_key = sync::parse_base64_encoded_primary_key(pk);
                             info.compensating_writes.push_back(std::move(cwei));
                         }
+
+                        info.compensating_write_server_version =
+                            json.at("compensatingWriteServerVersion").get<int64_t>();
+                        info.compensating_write_rejected_client_version =
+                            json.at("rejectedClientVersion").get<int64_t>();
                     }
                 }
                 catch (const nlohmann::json::exception& e) {
@@ -483,6 +498,8 @@ private:
             {"DeleteRealm", action::DeleteRealm},
             {"ClientReset", action::ClientReset},
             {"ClientResetNoRecovery", action::ClientResetNoRecovery},
+            {"MigrateToFLX", action::MigrateToFLX},
+            {"RevertToPBS", action::RevertToPBS},
         };
 
         if (auto action_it = mapping.find(action_string); action_it != mapping.end()) {
@@ -600,7 +617,7 @@ public:
     template <class Connection>
     void parse_message_received(Connection& connection, std::string_view msg_data)
     {
-        util::Logger& logger = connection.logger;
+        auto& logger = connection.logger;
 
         auto report_error = [&](Error err, const auto fmt, auto&&... args) {
             logger.error(fmt, std::forward<decltype(args)>(args)...);

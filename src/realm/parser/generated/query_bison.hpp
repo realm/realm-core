@@ -46,12 +46,12 @@
 # define YY_YY_GENERATED_QUERY_BISON_HPP_INCLUDED
 // "%code requires" blocks.
 
-  # include <string>
+  #include <string>
+  #include <realm/mixed.hpp>
   namespace realm::query_parser {
     class ParserDriver;
     class ConstantNode;
     class ListNode;
-    class PropertyNode;
     class PostOpNode;
     class AggrNode;
     class ExpressionNode;
@@ -64,8 +64,19 @@
     class PathNode;
     class DescriptorOrderingNode;
     class DescriptorNode;
-    class PropNode;
+    class PropertyNode;
     class SubqueryNode;
+    struct PathElem {
+        std::string id;
+        Mixed index;
+        std::string buffer;
+        PathElem() {}
+        PathElem(const PathElem& other);
+        PathElem& operator=(const PathElem& other);
+        PathElem(std::string s) : id(s) {}
+        PathElem(std::string s, Mixed i) : id(s), index(i) { index.use_buffer(buffer); }
+    };
+
   }
   using namespace realm::query_parser;
 
@@ -426,7 +437,7 @@ namespace yy {
     /// An auxiliary type to compute the largest semantic type.
     union union_type
     {
-      // aggr_op
+      // aggregate
       char dummy1[sizeof (AggrNode*)];
 
       // constant
@@ -450,16 +461,17 @@ namespace yy {
       // list_content
       char dummy6[sizeof (ListNode*)];
 
+      // path_elem
+      char dummy7[sizeof (PathElem)];
+
       // path
-      char dummy7[sizeof (PathNode*)];
+      char dummy8[sizeof (PathNode*)];
 
       // post_op
-      char dummy8[sizeof (PostOpNode*)];
-
-      // simple_prop
-      char dummy9[sizeof (PropNode*)];
+      char dummy9[sizeof (PostOpNode*)];
 
       // prop
+      // simple_prop
       char dummy10[sizeof (PropertyNode*)];
 
       // query
@@ -479,6 +491,7 @@ namespace yy {
       char dummy15[sizeof (bool)];
 
       // comp_type
+      // aggr_op
       // equality
       // relational
       // stringop
@@ -501,6 +514,7 @@ namespace yy {
       // "beginswith"
       // "endswith"
       // "contains"
+      // "fulltext"
       // "like"
       // "between"
       // "in"
@@ -513,7 +527,6 @@ namespace yy {
       // "@size"
       // "@type"
       // "key or value"
-      // path_elem
       // id
       char dummy17[sizeof (std::string)];
     };
@@ -603,18 +616,19 @@ namespace yy {
     TOK_BEGINSWITH = 296,          // "beginswith"
     TOK_ENDSWITH = 297,            // "endswith"
     TOK_CONTAINS = 298,            // "contains"
-    TOK_LIKE = 299,                // "like"
-    TOK_BETWEEN = 300,             // "between"
-    TOK_IN = 301,                  // "in"
-    TOK_OBJ = 302,                 // "obj"
-    TOK_SORT = 303,                // "sort"
-    TOK_DISTINCT = 304,            // "distinct"
-    TOK_LIMIT = 305,               // "limit"
-    TOK_ASCENDING = 306,           // "ascending"
-    TOK_DESCENDING = 307,          // "descending"
-    TOK_SIZE = 308,                // "@size"
-    TOK_TYPE = 309,                // "@type"
-    TOK_KEY_VAL = 310              // "key or value"
+    TOK_TEXT = 299,                // "fulltext"
+    TOK_LIKE = 300,                // "like"
+    TOK_BETWEEN = 301,             // "between"
+    TOK_IN = 302,                  // "in"
+    TOK_OBJ = 303,                 // "obj"
+    TOK_SORT = 304,                // "sort"
+    TOK_DISTINCT = 305,            // "distinct"
+    TOK_LIMIT = 306,               // "limit"
+    TOK_ASCENDING = 307,           // "ascending"
+    TOK_DESCENDING = 308,          // "descending"
+    TOK_SIZE = 309,                // "@size"
+    TOK_TYPE = 310,                // "@type"
+    TOK_KEY_VAL = 311              // "key or value"
       };
       /// Backward compatibility alias (Bison 3.6).
       typedef token_kind_type yytokentype;
@@ -631,7 +645,7 @@ namespace yy {
     {
       enum symbol_kind_type
       {
-        YYNTOKENS = 68, ///< Number of tokens.
+        YYNTOKENS = 69, ///< Number of tokens.
         SYM_YYEMPTY = -2,
         SYM_YYEOF = 0,                           // "end of file"
         SYM_YYerror = 1,                         // error
@@ -677,60 +691,62 @@ namespace yy {
         SYM_BEGINSWITH = 41,                     // "beginswith"
         SYM_ENDSWITH = 42,                       // "endswith"
         SYM_CONTAINS = 43,                       // "contains"
-        SYM_LIKE = 44,                           // "like"
-        SYM_BETWEEN = 45,                        // "between"
-        SYM_IN = 46,                             // "in"
-        SYM_OBJ = 47,                            // "obj"
-        SYM_SORT = 48,                           // "sort"
-        SYM_DISTINCT = 49,                       // "distinct"
-        SYM_LIMIT = 50,                          // "limit"
-        SYM_ASCENDING = 51,                      // "ascending"
-        SYM_DESCENDING = 52,                     // "descending"
-        SYM_SIZE = 53,                           // "@size"
-        SYM_TYPE = 54,                           // "@type"
-        SYM_KEY_VAL = 55,                        // "key or value"
-        SYM_56_ = 56,                            // '+'
-        SYM_57_ = 57,                            // '-'
-        SYM_58_ = 58,                            // '*'
-        SYM_59_ = 59,                            // '/'
-        SYM_60_ = 60,                            // '('
-        SYM_61_ = 61,                            // ')'
-        SYM_62_ = 62,                            // '['
-        SYM_63_ = 63,                            // ']'
-        SYM_64_ = 64,                            // '.'
-        SYM_65_ = 65,                            // ','
-        SYM_66_ = 66,                            // '{'
-        SYM_67_ = 67,                            // '}'
-        SYM_YYACCEPT = 68,                       // $accept
-        SYM_final = 69,                          // final
-        SYM_query = 70,                          // query
-        SYM_compare = 71,                        // compare
-        SYM_expr = 72,                           // expr
-        SYM_value = 73,                          // value
-        SYM_prop = 74,                           // prop
-        SYM_simple_prop = 75,                    // simple_prop
-        SYM_subquery = 76,                       // subquery
-        SYM_post_query = 77,                     // post_query
-        SYM_distinct = 78,                       // distinct
-        SYM_distinct_param = 79,                 // distinct_param
-        SYM_sort = 80,                           // sort
-        SYM_sort_param = 81,                     // sort_param
-        SYM_limit = 82,                          // limit
-        SYM_direction = 83,                      // direction
-        SYM_list = 84,                           // list
-        SYM_list_content = 85,                   // list_content
-        SYM_constant = 86,                       // constant
-        SYM_primary_key = 87,                    // primary_key
-        SYM_boolexpr = 88,                       // boolexpr
-        SYM_comp_type = 89,                      // comp_type
-        SYM_post_op = 90,                        // post_op
-        SYM_aggr_op = 91,                        // aggr_op
-        SYM_equality = 92,                       // equality
-        SYM_relational = 93,                     // relational
-        SYM_stringop = 94,                       // stringop
-        SYM_path = 95,                           // path
-        SYM_path_elem = 96,                      // path_elem
-        SYM_id = 97                              // id
+        SYM_TEXT = 44,                           // "fulltext"
+        SYM_LIKE = 45,                           // "like"
+        SYM_BETWEEN = 46,                        // "between"
+        SYM_IN = 47,                             // "in"
+        SYM_OBJ = 48,                            // "obj"
+        SYM_SORT = 49,                           // "sort"
+        SYM_DISTINCT = 50,                       // "distinct"
+        SYM_LIMIT = 51,                          // "limit"
+        SYM_ASCENDING = 52,                      // "ascending"
+        SYM_DESCENDING = 53,                     // "descending"
+        SYM_SIZE = 54,                           // "@size"
+        SYM_TYPE = 55,                           // "@type"
+        SYM_KEY_VAL = 56,                        // "key or value"
+        SYM_57_ = 57,                            // '+'
+        SYM_58_ = 58,                            // '-'
+        SYM_59_ = 59,                            // '*'
+        SYM_60_ = 60,                            // '/'
+        SYM_61_ = 61,                            // '('
+        SYM_62_ = 62,                            // ')'
+        SYM_63_ = 63,                            // '.'
+        SYM_64_ = 64,                            // ','
+        SYM_65_ = 65,                            // '{'
+        SYM_66_ = 66,                            // '}'
+        SYM_67_ = 67,                            // '['
+        SYM_68_ = 68,                            // ']'
+        SYM_YYACCEPT = 69,                       // $accept
+        SYM_final = 70,                          // final
+        SYM_query = 71,                          // query
+        SYM_compare = 72,                        // compare
+        SYM_expr = 73,                           // expr
+        SYM_value = 74,                          // value
+        SYM_prop = 75,                           // prop
+        SYM_aggregate = 76,                      // aggregate
+        SYM_simple_prop = 77,                    // simple_prop
+        SYM_subquery = 78,                       // subquery
+        SYM_post_query = 79,                     // post_query
+        SYM_distinct = 80,                       // distinct
+        SYM_distinct_param = 81,                 // distinct_param
+        SYM_sort = 82,                           // sort
+        SYM_sort_param = 83,                     // sort_param
+        SYM_limit = 84,                          // limit
+        SYM_direction = 85,                      // direction
+        SYM_list = 86,                           // list
+        SYM_list_content = 87,                   // list_content
+        SYM_constant = 88,                       // constant
+        SYM_primary_key = 89,                    // primary_key
+        SYM_boolexpr = 90,                       // boolexpr
+        SYM_comp_type = 91,                      // comp_type
+        SYM_post_op = 92,                        // post_op
+        SYM_aggr_op = 93,                        // aggr_op
+        SYM_equality = 94,                       // equality
+        SYM_relational = 95,                     // relational
+        SYM_stringop = 96,                       // stringop
+        SYM_path = 97,                           // path
+        SYM_path_elem = 98,                      // path_elem
+        SYM_id = 99                              // id
       };
     };
 
@@ -765,7 +781,7 @@ namespace yy {
       {
         switch (this->kind ())
     {
-      case symbol_kind::SYM_aggr_op: // aggr_op
+      case symbol_kind::SYM_aggregate: // aggregate
         value.move< AggrNode* > (std::move (that.value));
         break;
 
@@ -795,6 +811,10 @@ namespace yy {
         value.move< ListNode* > (std::move (that.value));
         break;
 
+      case symbol_kind::SYM_path_elem: // path_elem
+        value.move< PathElem > (std::move (that.value));
+        break;
+
       case symbol_kind::SYM_path: // path
         value.move< PathNode* > (std::move (that.value));
         break;
@@ -803,11 +823,8 @@ namespace yy {
         value.move< PostOpNode* > (std::move (that.value));
         break;
 
-      case symbol_kind::SYM_simple_prop: // simple_prop
-        value.move< PropNode* > (std::move (that.value));
-        break;
-
       case symbol_kind::SYM_prop: // prop
+      case symbol_kind::SYM_simple_prop: // simple_prop
         value.move< PropertyNode* > (std::move (that.value));
         break;
 
@@ -833,6 +850,7 @@ namespace yy {
         break;
 
       case symbol_kind::SYM_comp_type: // comp_type
+      case symbol_kind::SYM_aggr_op: // aggr_op
       case symbol_kind::SYM_equality: // equality
       case symbol_kind::SYM_relational: // relational
       case symbol_kind::SYM_stringop: // stringop
@@ -856,6 +874,7 @@ namespace yy {
       case symbol_kind::SYM_BEGINSWITH: // "beginswith"
       case symbol_kind::SYM_ENDSWITH: // "endswith"
       case symbol_kind::SYM_CONTAINS: // "contains"
+      case symbol_kind::SYM_TEXT: // "fulltext"
       case symbol_kind::SYM_LIKE: // "like"
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_IN: // "in"
@@ -868,7 +887,6 @@ namespace yy {
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_KEY_VAL: // "key or value"
-      case symbol_kind::SYM_path_elem: // path_elem
       case symbol_kind::SYM_id: // id
         value.move< std::string > (std::move (that.value));
         break;
@@ -967,6 +985,18 @@ namespace yy {
 #endif
 
 #if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, PathElem&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const PathElem& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
       basic_symbol (typename Base::kind_type t, PathNode*&& v)
         : Base (t)
         , value (std::move (v))
@@ -985,18 +1015,6 @@ namespace yy {
       {}
 #else
       basic_symbol (typename Base::kind_type t, const PostOpNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, PropNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const PropNode*& v)
         : Base (t)
         , value (v)
       {}
@@ -1119,6 +1137,10 @@ namespace yy {
                     { }
         break;
 
+      case symbol_kind::SYM_aggr_op: // aggr_op
+                    { }
+        break;
+
       case symbol_kind::SYM_equality: // equality
                     { }
         break;
@@ -1138,7 +1160,7 @@ namespace yy {
         // Value type destructor.
 switch (yykind)
     {
-      case symbol_kind::SYM_aggr_op: // aggr_op
+      case symbol_kind::SYM_aggregate: // aggregate
         value.template destroy< AggrNode* > ();
         break;
 
@@ -1168,6 +1190,10 @@ switch (yykind)
         value.template destroy< ListNode* > ();
         break;
 
+      case symbol_kind::SYM_path_elem: // path_elem
+        value.template destroy< PathElem > ();
+        break;
+
       case symbol_kind::SYM_path: // path
         value.template destroy< PathNode* > ();
         break;
@@ -1176,11 +1202,8 @@ switch (yykind)
         value.template destroy< PostOpNode* > ();
         break;
 
-      case symbol_kind::SYM_simple_prop: // simple_prop
-        value.template destroy< PropNode* > ();
-        break;
-
       case symbol_kind::SYM_prop: // prop
+      case symbol_kind::SYM_simple_prop: // simple_prop
         value.template destroy< PropertyNode* > ();
         break;
 
@@ -1206,6 +1229,7 @@ switch (yykind)
         break;
 
       case symbol_kind::SYM_comp_type: // comp_type
+      case symbol_kind::SYM_aggr_op: // aggr_op
       case symbol_kind::SYM_equality: // equality
       case symbol_kind::SYM_relational: // relational
       case symbol_kind::SYM_stringop: // stringop
@@ -1229,6 +1253,7 @@ switch (yykind)
       case symbol_kind::SYM_BEGINSWITH: // "beginswith"
       case symbol_kind::SYM_ENDSWITH: // "endswith"
       case symbol_kind::SYM_CONTAINS: // "contains"
+      case symbol_kind::SYM_TEXT: // "fulltext"
       case symbol_kind::SYM_LIKE: // "like"
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_IN: // "in"
@@ -1241,7 +1266,6 @@ switch (yykind)
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_KEY_VAL: // "key or value"
-      case symbol_kind::SYM_path_elem: // path_elem
       case symbol_kind::SYM_id: // id
         value.template destroy< std::string > ();
         break;
@@ -1347,12 +1371,12 @@ switch (yykind)
                    || tok == 42
                    || tok == 47
                    || (40 <= tok && tok <= 41)
-                   || tok == 91
-                   || tok == 93
                    || tok == 46
                    || tok == 44
                    || tok == 123
-                   || tok == 125);
+                   || tok == 125
+                   || tok == 91
+                   || tok == 93);
 #endif
       }
 #if 201103L <= YY_CPLUSPLUS
@@ -2077,6 +2101,21 @@ switch (yykind)
 #if 201103L <= YY_CPLUSPLUS
       static
       symbol_type
+      make_TEXT (std::string v)
+      {
+        return symbol_type (token::TOK_TEXT, std::move (v));
+      }
+#else
+      static
+      symbol_type
+      make_TEXT (const std::string& v)
+      {
+        return symbol_type (token::TOK_TEXT, v);
+      }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+      static
+      symbol_type
       make_LIKE (std::string v)
       {
         return symbol_type (token::TOK_LIKE, std::move (v));
@@ -2582,9 +2621,9 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 455,     ///< Last index in yytable_.
-      yynnts_ = 30,  ///< Number of nonterminal symbols.
-      yyfinal_ = 48 ///< Termination state number.
+      yylast_ = 551,     ///< Last index in yytable_.
+      yynnts_ = 31,  ///< Number of nonterminal symbols.
+      yyfinal_ = 66 ///< Termination state number.
     };
 
 
@@ -2608,15 +2647,15 @@ switch (yykind)
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-      60,    61,    58,    56,    65,    57,    64,    59,     2,     2,
+      61,    62,    59,    57,    64,    58,    63,    60,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,    62,     2,    63,     2,     2,     2,     2,     2,     2,
+       2,    67,     2,    68,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,    66,     2,    67,     2,     2,     2,     2,
+       2,     2,     2,    65,     2,    66,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -2635,10 +2674,10 @@ switch (yykind)
       25,    26,    27,    28,    29,    30,    31,    32,    33,    34,
       35,    36,    37,    38,    39,    40,    41,    42,    43,    44,
       45,    46,    47,    48,    49,    50,    51,    52,    53,    54,
-      55
+      55,    56
     };
     // Last valid token kind.
-    const int code_max = 310;
+    const int code_max = 311;
 
     if (t <= 0)
       return symbol_kind::SYM_YYEOF;
@@ -2656,7 +2695,7 @@ switch (yykind)
   {
     switch (this->kind ())
     {
-      case symbol_kind::SYM_aggr_op: // aggr_op
+      case symbol_kind::SYM_aggregate: // aggregate
         value.copy< AggrNode* > (YY_MOVE (that.value));
         break;
 
@@ -2686,6 +2725,10 @@ switch (yykind)
         value.copy< ListNode* > (YY_MOVE (that.value));
         break;
 
+      case symbol_kind::SYM_path_elem: // path_elem
+        value.copy< PathElem > (YY_MOVE (that.value));
+        break;
+
       case symbol_kind::SYM_path: // path
         value.copy< PathNode* > (YY_MOVE (that.value));
         break;
@@ -2694,11 +2737,8 @@ switch (yykind)
         value.copy< PostOpNode* > (YY_MOVE (that.value));
         break;
 
-      case symbol_kind::SYM_simple_prop: // simple_prop
-        value.copy< PropNode* > (YY_MOVE (that.value));
-        break;
-
       case symbol_kind::SYM_prop: // prop
+      case symbol_kind::SYM_simple_prop: // simple_prop
         value.copy< PropertyNode* > (YY_MOVE (that.value));
         break;
 
@@ -2724,6 +2764,7 @@ switch (yykind)
         break;
 
       case symbol_kind::SYM_comp_type: // comp_type
+      case symbol_kind::SYM_aggr_op: // aggr_op
       case symbol_kind::SYM_equality: // equality
       case symbol_kind::SYM_relational: // relational
       case symbol_kind::SYM_stringop: // stringop
@@ -2747,6 +2788,7 @@ switch (yykind)
       case symbol_kind::SYM_BEGINSWITH: // "beginswith"
       case symbol_kind::SYM_ENDSWITH: // "endswith"
       case symbol_kind::SYM_CONTAINS: // "contains"
+      case symbol_kind::SYM_TEXT: // "fulltext"
       case symbol_kind::SYM_LIKE: // "like"
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_IN: // "in"
@@ -2759,7 +2801,6 @@ switch (yykind)
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_KEY_VAL: // "key or value"
-      case symbol_kind::SYM_path_elem: // path_elem
       case symbol_kind::SYM_id: // id
         value.copy< std::string > (YY_MOVE (that.value));
         break;
@@ -2795,7 +2836,7 @@ switch (yykind)
     super_type::move (s);
     switch (this->kind ())
     {
-      case symbol_kind::SYM_aggr_op: // aggr_op
+      case symbol_kind::SYM_aggregate: // aggregate
         value.move< AggrNode* > (YY_MOVE (s.value));
         break;
 
@@ -2825,6 +2866,10 @@ switch (yykind)
         value.move< ListNode* > (YY_MOVE (s.value));
         break;
 
+      case symbol_kind::SYM_path_elem: // path_elem
+        value.move< PathElem > (YY_MOVE (s.value));
+        break;
+
       case symbol_kind::SYM_path: // path
         value.move< PathNode* > (YY_MOVE (s.value));
         break;
@@ -2833,11 +2878,8 @@ switch (yykind)
         value.move< PostOpNode* > (YY_MOVE (s.value));
         break;
 
-      case symbol_kind::SYM_simple_prop: // simple_prop
-        value.move< PropNode* > (YY_MOVE (s.value));
-        break;
-
       case symbol_kind::SYM_prop: // prop
+      case symbol_kind::SYM_simple_prop: // simple_prop
         value.move< PropertyNode* > (YY_MOVE (s.value));
         break;
 
@@ -2863,6 +2905,7 @@ switch (yykind)
         break;
 
       case symbol_kind::SYM_comp_type: // comp_type
+      case symbol_kind::SYM_aggr_op: // aggr_op
       case symbol_kind::SYM_equality: // equality
       case symbol_kind::SYM_relational: // relational
       case symbol_kind::SYM_stringop: // stringop
@@ -2886,6 +2929,7 @@ switch (yykind)
       case symbol_kind::SYM_BEGINSWITH: // "beginswith"
       case symbol_kind::SYM_ENDSWITH: // "endswith"
       case symbol_kind::SYM_CONTAINS: // "contains"
+      case symbol_kind::SYM_TEXT: // "fulltext"
       case symbol_kind::SYM_LIKE: // "like"
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_IN: // "in"
@@ -2898,7 +2942,6 @@ switch (yykind)
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_KEY_VAL: // "key or value"
-      case symbol_kind::SYM_path_elem: // path_elem
       case symbol_kind::SYM_id: // id
         value.move< std::string > (YY_MOVE (s.value));
         break;

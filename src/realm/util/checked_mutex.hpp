@@ -45,6 +45,8 @@
 
 #define CAPABILITY(x) REALM_THREAD_ANNOTATION_ATTRIBUTE__(capability(x))
 
+#define RETURN_CAPABILITY(x) REALM_THREAD_ANNOTATION_ATTRIBUTE__(return_capability(x))
+
 #define SCOPED_CAPABILITY REALM_THREAD_ANNOTATION_ATTRIBUTE__(scoped_lockable)
 
 #define GUARDED_BY(x) REALM_THREAD_ANNOTATION_ATTRIBUTE__(guarded_by(x))
@@ -137,7 +139,7 @@ class CAPABILITY("mutex") CheckedMutex {
 public:
     CheckedMutex() = default;
 
-    // Required for REQUIRE(!m); do not actually call
+    // Required for REQUIRES(!m); do not actually call
     CheckedMutex const& operator!() const
     {
         return *this;

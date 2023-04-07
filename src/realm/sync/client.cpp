@@ -8,6 +8,7 @@
 #include "realm/util/optional.hpp"
 #include <realm/sync/client.hpp>
 #include <realm/sync/config.hpp>
+#include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/sync/noinst/pending_bootstrap_store.hpp>
@@ -173,7 +174,8 @@ ErrorCategoryImpl g_error_category;
 // in ClientImpl::Connection.
 class SessionWrapper final : public util::AtomicRefCountBase, public SyncTransactReporter {
 public:
-    SessionWrapper(ClientImpl&, DBRef db, std::shared_ptr<SubscriptionStore>, Session::Config);
+    SessionWrapper(ClientImpl&, DBRef db, std::shared_ptr<SubscriptionStore>, std::shared_ptr<MigrationStore>,
+                   Session::Config);
     ~SessionWrapper() noexcept;
 
     ClientReplication& get_replication() noexcept;
@@ -183,13 +185,15 @@ public:
     SubscriptionStore* get_flx_subscription_store();
     PendingBootstrapStore* get_flx_pending_bootstrap_store();
 
+    MigrationStore* get_migration_store();
+
     void set_sync_transact_handler(util::UniqueFunction<SyncTransactCallback>);
     void set_progress_handler(util::UniqueFunction<ProgressHandler>);
     void set_connection_state_change_listener(util::UniqueFunction<ConnectionStateChangeListener>);
 
     void initiate();
-    void initiate(ProtocolEnvelope, std::string server_address, port_type server_port, std::string virt_path,
-                  std::string signed_access_token);
+
+    void force_close();
 
     void nonsync_transact_notify(version_type new_version);
     void cancel_reconnect_delay();
@@ -214,6 +218,8 @@ public:
 
     util::Future<std::string> send_test_command(std::string body);
 
+    void handle_pending_client_reset_acknowledgement();
+
 private:
     ClientImpl& m_client;
     DBRef m_db;
@@ -228,6 +234,7 @@ private:
     const bool m_simulate_integration_error;
     const Optional<std::string> m_ssl_trust_certificate_path;
     const std::function<SyncConfig::SSLVerifyCallback> m_ssl_verify_callback;
+    const size_t m_flx_bootstrap_batch_size_bytes;
 
     // This one is different from null when, and only when the session wrapper
     // is in ClientImpl::m_abandoned_session_wrappers.
@@ -247,12 +254,16 @@ private:
     util::UniqueFunction<ConnectionStateChangeListener> m_connection_state_change_listener;
 
     std::function<SyncClientHookAction(SyncClientHookData data)> m_debug_hook;
+    bool m_in_debug_hook = false;
 
     std::shared_ptr<SubscriptionStore> m_flx_subscription_store;
     int64_t m_flx_active_version = 0;
     int64_t m_flx_last_seen_version = 0;
     int64_t m_flx_latest_version = 0;
+    int64_t m_flx_pending_mark_version = 0;
     std::unique_ptr<PendingBootstrapStore> m_flx_pending_bootstrap_store;
+
+    std::shared_ptr<MigrationStore> m_migration_store;
 
     bool m_initiated = false;
 
@@ -272,6 +283,8 @@ private:
     // have been abandoned already, but in that case,
     // finalize_before_actualization() has already been called.
     bool m_actualized = false;
+
+    bool m_force_closed = false;
 
     bool m_suspended = false;
 
@@ -387,14 +400,13 @@ SessionWrapperStack::~SessionWrapperStack()
 
 ClientImpl::~ClientImpl()
 {
-    bool client_destroyed_while_still_running = m_running;
-    REALM_ASSERT_RELEASE(!client_destroyed_while_still_running);
-
     // Since no other thread is allowed to be accessing this client or any of
     // its subobjects at this time, no mutex locking is necessary.
 
+    shutdown_and_wait();
     // Session wrappers are removed from m_unactualized_session_wrappers as they
     // are abandoned.
+    REALM_ASSERT(m_stopped);
     REALM_ASSERT(m_unactualized_session_wrappers.empty());
 }
 
@@ -402,7 +414,12 @@ ClientImpl::~ClientImpl()
 void ClientImpl::cancel_reconnect_delay()
 {
     // Thread safety required
-    auto handler = [this] {
+    post([this](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw Exception(status);
+
         for (auto& p : m_server_slots) {
             ServerSlot& slot = p.second;
             if (m_one_connection_per_session) {
@@ -425,8 +442,7 @@ void ClientImpl::cancel_reconnect_delay()
                 }
             }
         }
-    };
-    get_service().post(std::move(handler)); // Throws
+    }); // Throws
 }
 
 
@@ -435,7 +451,7 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
     // Thread safety required
 
     {
-        util::LockGuard lock{m_mutex};
+        std::lock_guard lock{m_mutex};
         m_sessions_terminated = false;
     }
 
@@ -451,21 +467,25 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
     // invoked. Then the session wrapper will have been added to
     // `m_abandoned_session_wrappers`, and an invocation of
     // actualize_and_finalize_session_wrappers() will have been scheduled. The
-    // guarantees mentioned in the documentation of network::Trigger then ensure
+    // guarantees mentioned in the documentation of Trigger then ensure
     // that at least one execution of actualize_and_finalize_session_wrappers()
     // will happen after the session wrapper has been added to
     // `m_abandoned_session_wrappers`, but before the post handler submitted
     // below gets to execute.
-    auto handler = [this] {
-        util::LockGuard lock{m_mutex};
+    post([this](Status status) mutable {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw Exception(status);
+
+        std::lock_guard lock{m_mutex};
         m_sessions_terminated = true;
         m_wait_or_client_stopped_cond.notify_all();
-    };
-    get_service().post(std::move(handler)); // Throws
+    }); // Throws
 
     bool completion_condition_was_satisfied;
     {
-        util::LockGuard lock{m_mutex};
+        std::unique_lock lock{m_mutex};
         while (!m_sessions_terminated && !m_stopped)
             m_wait_or_client_stopped_cond.wait(lock);
         completion_condition_was_satisfied = !m_stopped;
@@ -474,31 +494,41 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
 }
 
 
-void ClientImpl::stop() noexcept
+void ClientImpl::drain_connections_on_loop()
 {
-    util::LockGuard lock{m_mutex};
-    if (m_stopped)
+    post([this](Status status) mutable {
+        REALM_ASSERT(status.is_ok());
+        drain_connections();
+    });
+}
+
+void ClientImpl::shutdown_and_wait()
+{
+    shutdown();
+    std::unique_lock lock{m_drain_mutex};
+    if (m_drained) {
         return;
-    m_stopped = true;
-    m_wait_or_client_stopped_cond.notify_all();
-    m_service.stop();
+    }
+
+    logger.debug("Waiting for %1 connections to drain", m_num_connections);
+    m_drain_cv.wait(lock, [&] {
+        return m_num_connections == 0 && m_outstanding_posts == 0;
+    });
+
+    m_drained = true;
 }
 
-
-void ClientImpl::run()
+void ClientImpl::shutdown() noexcept
 {
-    auto ta = util::make_temp_assign(m_running, true);
-    m_service.run(); // Throws
-}
+    {
+        std::lock_guard lock{m_mutex};
+        if (m_stopped)
+            return;
+        m_stopped = true;
+        m_wait_or_client_stopped_cond.notify_all();
+    }
 
-
-void ClientImpl::start_keep_running_timer()
-{
-    auto handler = [this](std::error_code ec) {
-        if (ec != util::error::operation_aborted)
-            start_keep_running_timer();
-    };
-    m_keep_running_timer.async_wait(std::chrono::hours(1000), std::move(handler)); // Throws
+    drain_connections_on_loop();
 }
 
 
@@ -506,7 +536,8 @@ void ClientImpl::register_unactualized_session_wrapper(SessionWrapper* wrapper, 
 {
     // Thread safety required.
 
-    util::LockGuard lock{m_mutex};
+    std::lock_guard lock{m_mutex};
+    REALM_ASSERT(m_actualize_and_finalize);
     m_unactualized_session_wrappers.emplace(wrapper, std::move(endpoint)); // Throws
     bool retrigger = !m_actualize_and_finalize_needed;
     m_actualize_and_finalize_needed = true;
@@ -520,7 +551,7 @@ void ClientImpl::register_unactualized_session_wrapper(SessionWrapper* wrapper, 
     // register_abandoned_session_wrapper(), and when one thread calls one of
     // them and another thread call the other.
     if (retrigger)
-        m_actualize_and_finalize.trigger();
+        m_actualize_and_finalize->trigger();
 }
 
 
@@ -528,7 +559,8 @@ void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrappe
 {
     // Thread safety required.
 
-    util::LockGuard lock{m_mutex};
+    std::lock_guard lock{m_mutex};
+    REALM_ASSERT(m_actualize_and_finalize);
 
     // If the session wrapper has not yet been actualized (on the event loop
     // thread), it can be immediately finalized. This ensures that we will
@@ -547,7 +579,7 @@ void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrappe
     // mutex. See implementation of register_unactualized_session_wrapper() for
     // details.
     if (retrigger)
-        m_actualize_and_finalize.trigger();
+        m_actualize_and_finalize->trigger();
 }
 
 
@@ -556,11 +588,13 @@ void ClientImpl::actualize_and_finalize_session_wrappers()
 {
     std::map<SessionWrapper*, ServerEndpoint> unactualized_session_wrappers;
     SessionWrapperStack abandoned_session_wrappers;
+    bool stopped;
     {
-        util::LockGuard lock{m_mutex};
+        std::lock_guard lock{m_mutex};
         m_actualize_and_finalize_needed = false;
         swap(m_unactualized_session_wrappers, unactualized_session_wrappers);
         swap(m_abandoned_session_wrappers, abandoned_session_wrappers);
+        stopped = m_stopped;
     }
     // Note, we need to finalize old session wrappers before we actualize new
     // ones. This ensures that deactivation of old sessions is initiated before
@@ -568,6 +602,13 @@ void ClientImpl::actualize_and_finalize_session_wrappers()
     // not see two overlapping sessions for the same local Realm file.
     while (util::bind_ptr<SessionWrapper> wrapper = abandoned_session_wrappers.pop())
         wrapper->finalize(); // Throws
+    if (stopped) {
+        for (auto& p : unactualized_session_wrappers) {
+            SessionWrapper& wrapper = *p.first;
+            wrapper.finalize_before_actualization();
+        }
+        return;
+    }
     for (auto& p : unactualized_session_wrappers) {
         SessionWrapper& wrapper = *p.first;
         ServerEndpoint server_endpoint = std::move(p.second);
@@ -609,6 +650,10 @@ ClientImpl::get_connection(ServerEndpoint endpoint, const std::string& authoriza
     }
     m_prev_connection_ident = ident;
     was_created = true;
+    {
+        std::lock_guard lk(m_drain_mutex);
+        ++m_num_connections;
+    }
     return conn;
 }
 
@@ -633,11 +678,22 @@ void ClientImpl::remove_connection(ClientImpl::Connection& conn) noexcept
         REALM_ASSERT(&*j->second == &conn);
         server_slot.alt_connections.erase(j);
     }
+
+    {
+        std::lock_guard lk(m_drain_mutex);
+        REALM_ASSERT(m_num_connections);
+        --m_num_connections;
+        m_drain_cv.notify_all();
+    }
 }
 
 
 // ################ SessionImpl ################
 
+void SessionImpl::force_close()
+{
+    m_wrapper.force_close();
+}
 
 void SessionImpl::on_connection_state_changed(ConnectionState state,
                                               const util::Optional<SessionErrorInfo>& error_info)
@@ -728,6 +784,11 @@ void SessionImpl::on_resumed()
     m_wrapper.on_resumed(); // Throws
 }
 
+void SessionImpl::handle_pending_client_reset_acknowledgement()
+{
+    m_wrapper.handle_pending_client_reset_acknowledgement();
+}
+
 
 bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, DownloadBatchState batch_state,
                                                 int64_t query_version, const ReceivedChangesets& received_changesets)
@@ -743,7 +804,18 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     }
 
     bool new_batch = false;
-    bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets, &new_batch);
+    try {
+        bootstrap_store->add_batch(query_version, std::move(maybe_progress), received_changesets, &new_batch);
+    }
+    catch (const LogicError& ex) {
+        if (ex.code() == ErrorCodes::LimitExceeded) {
+            IntegrationException ex(ClientError::bad_changeset_size,
+                                    "bootstrap changeset too large to store in pending bootstrap store");
+            on_integration_failure(ex);
+            return true;
+        }
+        throw;
+    }
 
     // If we've started a new batch and there is more to come, call on_flx_sync_progress to mark the subscription as
     // bootstrapping.
@@ -751,10 +823,12 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
         on_flx_sync_progress(query_version, DownloadBatchState::MoreToCome);
     }
 
-    if (call_debug_hook(SyncClientHookEvent::BootstrapMessageProcessed, progress, query_version, batch_state,
-                        received_changesets.size()) == SyncClientHookAction::EarlyReturn) {
+    auto hook_action = call_debug_hook(SyncClientHookEvent::BootstrapMessageProcessed, progress, query_version,
+                                       batch_state, received_changesets.size());
+    if (hook_action == SyncClientHookAction::EarlyReturn) {
         return true;
     }
+    REALM_ASSERT(hook_action == SyncClientHookAction::NoAction);
 
     if (batch_state == DownloadBatchState::MoreToCome) {
         return true;
@@ -773,7 +847,6 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
 
 void SessionImpl::process_pending_flx_bootstrap()
 {
-    constexpr size_t batch_size_in_bytes = 1024 * 1024;
     if (!m_is_flx_sync_session) {
         return;
     }
@@ -781,20 +854,34 @@ void SessionImpl::process_pending_flx_bootstrap()
     if (!bootstrap_store->has_pending()) {
         return;
     }
+
+    auto pending_batch_stats = bootstrap_store->pending_stats();
+    logger.info("Begin processing pending FLX bootstrap for query version %1. (changesets: %2, original total "
+                "changeset size: %3)",
+                pending_batch_stats.query_version, pending_batch_stats.pending_changesets,
+                pending_batch_stats.pending_changeset_bytes);
     auto& history = access_realm().get_history();
     VersionInfo new_version;
     SyncProgress progress;
     int64_t query_version = -1;
+    size_t changesets_processed = 0;
+
+    // Used to commit each batch after it was transformed.
+    TransactionRef transact = get_db()->start_write();
     while (bootstrap_store->has_pending()) {
-        auto pending_batch = bootstrap_store->peek_pending(batch_size_in_bytes);
+        auto start_time = std::chrono::steady_clock::now();
+        auto pending_batch = bootstrap_store->peek_pending(m_wrapper.m_flx_bootstrap_batch_size_bytes);
         if (!pending_batch.progress) {
             logger.info("Incomplete pending bootstrap found for query version %1", pending_batch.query_version);
+            // Close the write transation before clearing the bootstrap store to avoid a deadlock because the
+            // bootstrap store requires a write transaction itself.
+            transact->close();
             bootstrap_store->clear();
             return;
         }
 
         auto batch_state =
-            pending_batch.remaining > 0 ? DownloadBatchState::MoreToCome : DownloadBatchState::LastInBatch;
+            pending_batch.remaining_changesets > 0 ? DownloadBatchState::MoreToCome : DownloadBatchState::LastInBatch;
         uint64_t downloadable_bytes = 0;
         query_version = pending_batch.query_version;
         bool simulate_integration_error =
@@ -803,29 +890,38 @@ void SessionImpl::process_pending_flx_bootstrap()
             throw IntegrationException(ClientError::bad_changeset, "simulated failure");
         }
 
-
         history.integrate_server_changesets(
             *pending_batch.progress, &downloadable_bytes, pending_batch.changesets, new_version, batch_state, logger,
-            [&](const TransactionRef& tr, size_t count) {
-                REALM_ASSERT_3(count, <=, pending_batch.changesets.size());
-                bootstrap_store->pop_front_pending(tr, count);
+            transact,
+            [&](const TransactionRef& tr, util::Span<Changeset> changesets_applied) {
+                REALM_ASSERT_3(changesets_applied.size(), <=, pending_batch.changesets.size());
+                bootstrap_store->pop_front_pending(tr, changesets_applied.size());
             },
             get_transact_reporter());
         progress = *pending_batch.progress;
+        changesets_processed += pending_batch.changesets.size();
+        auto duration = std::chrono::steady_clock::now() - start_time;
 
-        REALM_ASSERT(call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
-                                     batch_state, pending_batch.changesets.size()) == SyncClientHookAction::NoAction);
+        auto action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
+                                      batch_state, pending_batch.changesets.size());
+        REALM_ASSERT(action == SyncClientHookAction::NoAction);
 
         logger.info("Integrated %1 changesets from pending bootstrap for query version %2, producing client version "
-                    "%3. %4 changesets remaining in bootstrap",
+                    "%3 in %4 ms. %5 changesets remaining in bootstrap",
                     pending_batch.changesets.size(), pending_batch.query_version, new_version.realm_version,
-                    pending_batch.remaining);
+                    std::chrono::duration_cast<std::chrono::milliseconds>(duration).count(),
+                    pending_batch.remaining_changesets);
     }
     on_changesets_integrated(new_version.realm_version, progress);
 
     REALM_ASSERT_3(query_version, !=, -1);
     m_wrapper.on_sync_progress();
     on_flx_sync_progress(query_version, DownloadBatchState::LastInBatch);
+
+    auto action = call_debug_hook(SyncClientHookEvent::BootstrapProcessed, progress, query_version,
+                                  DownloadBatchState::LastInBatch, changesets_processed);
+    // NoAction/EarlyReturn are both valid no-op actions to take here.
+    REALM_ASSERT(action == SyncClientHookAction::NoAction || action == SyncClientHookAction::EarlyReturn);
 }
 
 void SessionImpl::on_new_flx_subscription_set(int64_t new_version)
@@ -854,9 +950,41 @@ SubscriptionStore* SessionImpl::get_flx_subscription_store()
     return m_wrapper.get_flx_subscription_store();
 }
 
+MigrationStore* SessionImpl::get_migration_store()
+{
+    return m_wrapper.get_migration_store();
+}
+
 void SessionImpl::non_sync_flx_completion(int64_t version)
 {
     m_wrapper.on_flx_sync_version_complete(version);
+}
+
+SyncClientHookAction SessionImpl::call_debug_hook(const SyncClientHookData& data)
+{
+    // Make sure we don't call the debug hook recursively.
+    if (m_wrapper.m_in_debug_hook) {
+        return SyncClientHookAction::NoAction;
+    }
+    m_wrapper.m_in_debug_hook = true;
+    auto in_hook_guard = util::make_scope_exit([&]() noexcept {
+        m_wrapper.m_in_debug_hook = false;
+    });
+
+    auto action = m_wrapper.m_debug_hook(data);
+    switch (action) {
+        case realm::SyncClientHookAction::SuspendWithRetryableError: {
+            SessionErrorInfo err_info(make_error_code(ProtocolError::other_session_error), "hook requested error",
+                                      true);
+            err_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
+
+            auto err_processing_err = receive_error_message(err_info);
+            REALM_ASSERT(!err_processing_err);
+            return SyncClientHookAction::EarlyReturn;
+        }
+        default:
+            return action;
+    }
 }
 
 SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, const SyncProgress& progress,
@@ -873,7 +1001,25 @@ SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, con
     data.progress = progress;
     data.num_changesets = num_changesets;
     data.query_version = query_version;
-    return m_wrapper.m_debug_hook(data);
+
+    return call_debug_hook(data);
+}
+
+SyncClientHookAction SessionImpl::call_debug_hook(SyncClientHookEvent event, const ProtocolErrorInfo& error_info)
+{
+    if (REALM_LIKELY(!m_wrapper.m_debug_hook)) {
+        return SyncClientHookAction::NoAction;
+    }
+
+    SyncClientHookData data;
+    data.event = event;
+    data.batch_state = DownloadBatchState::SteadyState;
+    data.progress = m_progress;
+    data.num_changesets = 0;
+    data.query_version = 0;
+    data.error_info = &error_info;
+
+    return call_debug_hook(data);
 }
 
 bool SessionImpl::is_steady_state_download_message(DownloadBatchState batch_state, int64_t query_version)
@@ -912,7 +1058,12 @@ util::Future<std::string> SessionImpl::send_test_command(std::string body)
 
     auto pf = util::make_promise_future<std::string>();
 
-    get_client().get_service().post([this, promise = std::move(pf.promise), body = std::move(body)]() mutable {
+    get_client().post([this, promise = std::move(pf.promise), body = std::move(body)](Status status) mutable {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw Exception(status);
+
         auto id = ++m_last_pending_test_command_ident;
         m_pending_test_commands.push_back(PendingTestCommand{id, std::move(body), std::move(promise)});
         ensure_enlisted_to_send();
@@ -924,7 +1075,7 @@ util::Future<std::string> SessionImpl::send_test_command(std::string body)
 // ################ SessionWrapper ################
 
 SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<SubscriptionStore> flx_sub_store,
-                               Session::Config config)
+                               std::shared_ptr<MigrationStore> migration_store, Session::Config config)
     : m_client{client}
     , m_db(std::move(db))
     , m_replication(m_db->get_replication())
@@ -937,6 +1088,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_simulate_integration_error{config.simulate_integration_error}
     , m_ssl_trust_certificate_path{std::move(config.ssl_trust_certificate_path)}
     , m_ssl_verify_callback{std::move(config.ssl_verify_callback)}
+    , m_flx_bootstrap_batch_size_bytes(config.flx_bootstrap_batch_size_bytes)
     , m_http_request_path_prefix{std::move(config.service_identifier)}
     , m_virt_path{std::move(config.realm_identifier)}
     , m_signed_access_token{std::move(config.signed_user_token)}
@@ -944,14 +1096,17 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_proxy_config{config.proxy_config} // Throws
     , m_debug_hook(std::move(config.on_sync_client_event_hook))
     , m_flx_subscription_store(std::move(flx_sub_store))
+    , m_migration_store(std::move(migration_store))
 {
     REALM_ASSERT(m_db);
     REALM_ASSERT(m_db->get_replication());
     REALM_ASSERT(dynamic_cast<ClientReplication*>(m_db->get_replication()));
 
     if (m_flx_subscription_store) {
-        std::tie(m_flx_active_version, m_flx_latest_version) =
-            m_flx_subscription_store->get_active_and_latest_versions();
+        auto versions_info = m_flx_subscription_store->get_version_info();
+        m_flx_active_version = versions_info.active;
+        m_flx_latest_version = versions_info.latest;
+        m_flx_pending_mark_version = versions_info.pending_mark;
     }
 }
 
@@ -984,26 +1139,31 @@ void SessionWrapper::on_new_flx_subscription_set(int64_t new_version)
         return;
     }
 
-    m_client.get_service().post([new_version, this] {
-        REALM_ASSERT(m_actualized);
-        if (REALM_UNLIKELY(!m_sess)) {
+    auto self = util::bind_ptr<SessionWrapper>(this);
+    m_client.post([new_version, self = std::move(self)](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw Exception(status);
+        REALM_ASSERT(self->m_actualized);
+        if (REALM_UNLIKELY(!self->m_sess)) {
             return; // Already finalized
         }
-
-        m_sess->recognize_sync_version(m_db->get_version_of_latest_snapshot());
-        m_flx_latest_version = new_version;
-        m_sess->on_new_flx_subscription_set(new_version);
+        auto& sess = *self->m_sess;
+        sess.recognize_sync_version(self->m_db->get_version_of_latest_snapshot());
+        self->m_flx_latest_version = new_version;
+        sess.on_new_flx_subscription_set(new_version);
     });
 }
 
 void SessionWrapper::on_flx_sync_error(int64_t version, std::string_view err_msg)
 {
     REALM_ASSERT(m_flx_latest_version != 0);
-    REALM_ASSERT(m_flx_latest_version <= version);
+    REALM_ASSERT(m_flx_latest_version >= version);
 
     auto mut_subs = get_flx_subscription_store()->get_mutable_by_version(version);
     mut_subs.update_state(SubscriptionSet::State::Error, err_msg);
-    std::move(mut_subs).commit();
+    mut_subs.commit();
 }
 
 void SessionWrapper::on_flx_sync_version_complete(int64_t version)
@@ -1032,7 +1192,13 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
                 return;
             }
             on_flx_sync_version_complete(new_version);
-            new_state = SubscriptionSet::State::Complete;
+            if (new_version == 0) {
+                new_state = SubscriptionSet::State::Complete;
+            }
+            else {
+                new_state = SubscriptionSet::State::AwaitingMark;
+                m_flx_pending_mark_version = new_version;
+            }
             break;
         case DownloadBatchState::MoreToCome:
             if (m_flx_last_seen_version == new_version) {
@@ -1046,7 +1212,7 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
 
     auto mut_subs = get_flx_subscription_store()->get_mutable_by_version(new_version);
     mut_subs.update_state(new_state);
-    std::move(mut_subs).commit();
+    mut_subs.commit();
 }
 
 SubscriptionStore* SessionWrapper::get_flx_subscription_store()
@@ -1057,6 +1223,11 @@ SubscriptionStore* SessionWrapper::get_flx_subscription_store()
 PendingBootstrapStore* SessionWrapper::get_flx_pending_bootstrap_store()
 {
     return m_flx_pending_bootstrap_store.get();
+}
+
+MigrationStore* SessionWrapper::get_migration_store()
+{
+    return m_migration_store.get();
 }
 
 inline void SessionWrapper::set_sync_transact_handler(util::UniqueFunction<SyncTransactCallback> handler)
@@ -1083,21 +1254,7 @@ SessionWrapper::set_connection_state_change_listener(util::UniqueFunction<Connec
 
 inline void SessionWrapper::initiate()
 {
-    // FIXME: Storing connection related information in the session object seems
-    // unnecessary and goes against the idea that a session should be truely
-    // lightweight (when many share a single connection). The original idea was
-    // that all connection related information is passed directly from the
-    // caller of initiate() to the connection constructor.
     do_initiate(m_protocol_envelope, m_server_address, m_server_port); // Throws
-}
-
-
-inline void SessionWrapper::initiate(ProtocolEnvelope protocol, std::string server_address, port_type server_port,
-                                     std::string virt_path, std::string signed_access_token)
-{
-    m_virt_path = std::move(virt_path);
-    m_signed_access_token = std::move(signed_access_token);
-    do_initiate(protocol, std::move(server_address), server_port); // Throws
 }
 
 
@@ -1107,15 +1264,19 @@ void SessionWrapper::nonsync_transact_notify(version_type new_version)
     REALM_ASSERT(m_initiated);
 
     util::bind_ptr<SessionWrapper> self{this};
-    auto handler = [self = std::move(self), new_version] {
+    m_client.post([self = std::move(self), new_version](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw Exception(status);
+
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
             return; // Already finalized
         SessionImpl& sess = *self->m_sess;
         sess.recognize_sync_version(new_version); // Throws
         self->report_progress();                  // Throws
-    };
-    m_client.get_service().post(std::move(handler)); // Throws
+    });                                           // Throws
 }
 
 
@@ -1125,7 +1286,12 @@ void SessionWrapper::cancel_reconnect_delay()
     REALM_ASSERT(m_initiated);
 
     util::bind_ptr<SessionWrapper> self{this};
-    auto handler = [self = std::move(self)] {
+    m_client.post([self = std::move(self)](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw Exception(status);
+
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
             return; // Already finalized
@@ -1133,8 +1299,7 @@ void SessionWrapper::cancel_reconnect_delay()
         sess.cancel_resumption_delay(); // Throws
         ClientImpl::Connection& conn = sess.get_connection();
         conn.cancel_reconnect_delay(); // Throws
-    };
-    m_client.get_service().post(std::move(handler)); // Throws
+    });                                // Throws
 }
 
 void SessionWrapper::async_wait_for(bool upload_completion, bool download_completion,
@@ -1144,8 +1309,13 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
     REALM_ASSERT(m_initiated);
 
     util::bind_ptr<SessionWrapper> self{this};
-    auto handler_2 = [self = std::move(self), handler = std::move(handler), upload_completion,
-                      download_completion]() mutable {
+    m_client.post([self = std::move(self), handler = std::move(handler), upload_completion,
+                   download_completion](Status status) mutable {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw Exception(status);
+
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess)) {
             // Already finalized
@@ -1171,8 +1341,7 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
             sess.request_upload_completion_notification(); // Throws
         if (download_completion)
             sess.request_download_completion_notification(); // Throws
-    };
-    m_client.get_service().post(std::move(handler_2)); // Throws
+    });                                                      // Throws
 }
 
 
@@ -1183,12 +1352,17 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
 
     std::int_fast64_t target_mark;
     {
-        util::LockGuard lock{m_client.m_mutex};
+        std::lock_guard lock{m_client.m_mutex};
         target_mark = ++m_target_upload_mark;
     }
 
     util::bind_ptr<SessionWrapper> self{this};
-    auto handler = [self = std::move(self), target_mark] {
+    m_client.post([self = std::move(self), target_mark](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw Exception(status);
+
         REALM_ASSERT(self->m_actualized);
         // The session wrapper may already have been finalized. This can only
         // happen if it was abandoned, but in that case, the call of
@@ -1201,12 +1375,11 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
             SessionImpl& sess = *self->m_sess;
             sess.request_upload_completion_notification(); // Throws
         }
-    };
-    m_client.get_service().post(std::move(handler)); // Throws
+    }); // Throws
 
     bool completion_condition_was_satisfied;
     {
-        util::LockGuard lock{m_client.m_mutex};
+        std::unique_lock lock{m_client.m_mutex};
         while (m_reached_upload_mark < target_mark && !m_client.m_stopped)
             m_client.m_wait_or_client_stopped_cond.wait(lock);
         completion_condition_was_satisfied = !m_client.m_stopped;
@@ -1222,12 +1395,17 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
 
     std::int_fast64_t target_mark;
     {
-        util::LockGuard lock{m_client.m_mutex};
+        std::lock_guard lock{m_client.m_mutex};
         target_mark = ++m_target_download_mark;
     }
 
     util::bind_ptr<SessionWrapper> self{this};
-    auto handler = [self = std::move(self), target_mark] {
+    m_client.post([self = std::move(self), target_mark](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw Exception(status);
+
         REALM_ASSERT(self->m_actualized);
         // The session wrapper may already have been finalized. This can only
         // happen if it was abandoned, but in that case, the call of
@@ -1240,12 +1418,11 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
             SessionImpl& sess = *self->m_sess;
             sess.request_download_completion_notification(); // Throws
         }
-    };
-    m_client.get_service().post(std::move(handler)); // Throws
+    }); // Throws
 
     bool completion_condition_was_satisfied;
     {
-        util::LockGuard lock{m_client.m_mutex};
+        std::unique_lock lock{m_client.m_mutex};
         while (m_reached_download_mark < target_mark && !m_client.m_stopped)
             m_client.m_wait_or_client_stopped_cond.wait(lock);
         completion_condition_was_satisfied = !m_client.m_stopped;
@@ -1259,7 +1436,12 @@ void SessionWrapper::refresh(std::string signed_access_token)
     // Thread safety required
     REALM_ASSERT(m_initiated);
 
-    m_client.get_service().post([self = util::bind_ptr(this), token = std::move(signed_access_token)] {
+    m_client.post([self = util::bind_ptr(this), token = std::move(signed_access_token)](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw Exception(status);
+
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
             return; // Already finalized
@@ -1299,16 +1481,15 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         was_created); // Throws
     try {
         // FIXME: This only makes sense when each session uses a separate connection.
-        conn.update_connect_info(m_http_request_path_prefix, m_signed_access_token);      // Throws
-        std::unique_ptr<SessionImpl> sess_2 = std::make_unique<SessionImpl>(*this, conn); // Throws
-        SessionImpl& sess = *sess_2;
+        conn.update_connect_info(m_http_request_path_prefix, m_signed_access_token);    // Throws
+        std::unique_ptr<SessionImpl> sess = std::make_unique<SessionImpl>(*this, conn); // Throws
         if (sync_mode == SyncServerMode::FLX) {
-            m_flx_pending_bootstrap_store = std::make_unique<PendingBootstrapStore>(m_db, &sess.logger);
+            m_flx_pending_bootstrap_store = std::make_unique<PendingBootstrapStore>(m_db, sess->logger);
         }
 
-        sess.logger.detail("Binding '%1' to '%2'", m_db->get_path(), m_virt_path); // Throws
-        m_sess = &sess;
-        conn.activate_session(std::move(sess_2)); // Throws
+        sess->logger.detail("Binding '%1' to '%2'", m_db->get_path(), m_virt_path); // Throws
+        m_sess = sess.get();
+        conn.activate_session(std::move(sess)); // Throws
 
         m_actualized = true;
     }
@@ -1334,17 +1515,35 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         report_progress(); // Throws
 }
 
+void SessionWrapper::force_close()
+{
+    REALM_ASSERT(m_actualized);
+    REALM_ASSERT(m_sess);
+    m_force_closed = true;
+
+    ClientImpl::Connection& conn = m_sess->get_connection();
+    conn.initiate_session_deactivation(m_sess); // Throws
+
+    // Delete the pending bootstrap store since it uses a reference to the logger in m_sess
+    m_flx_pending_bootstrap_store.reset();
+    m_sess = nullptr;
+    m_connection_state_change_listener = {};
+}
 
 // Must be called from event loop thread
 void SessionWrapper::finalize()
 {
     REALM_ASSERT(m_actualized);
-    REALM_ASSERT(m_sess);
 
-    ClientImpl::Connection& conn = m_sess->get_connection();
-    conn.initiate_session_deactivation(m_sess); // Throws
+    if (!m_force_closed) {
+        REALM_ASSERT(m_sess);
+        ClientImpl::Connection& conn = m_sess->get_connection();
+        conn.initiate_session_deactivation(m_sess); // Throws
 
-    m_sess = nullptr;
+        // Delete the pending bootstrap store since it uses a reference to the logger in m_sess
+        m_flx_pending_bootstrap_store.reset();
+        m_sess = nullptr;
+    }
 
     // The Realm file can be closed now, as no access to the Realm file is
     // supposed to happen on behalf of a session after initiation of
@@ -1380,6 +1579,7 @@ void SessionWrapper::finalize()
 inline void SessionWrapper::finalize_before_actualization() noexcept
 {
     m_actualized = true;
+    m_force_closed = true;
 }
 
 
@@ -1417,7 +1617,7 @@ void SessionWrapper::on_upload_completion()
         m_download_completion_handlers.push_back(std::move(handler)); // Throws
         m_sync_completion_handlers.pop_back();
     }
-    util::LockGuard lock{m_client.m_mutex};
+    std::lock_guard lock{m_client.m_mutex};
     if (m_staged_upload_mark > m_reached_upload_mark) {
         m_reached_upload_mark = m_staged_upload_mark;
         m_client.m_wait_or_client_stopped_cond.notify_all();
@@ -1438,7 +1638,17 @@ void SessionWrapper::on_download_completion()
         m_upload_completion_handlers.push_back(std::move(handler)); // Throws
         m_sync_completion_handlers.pop_back();
     }
-    util::LockGuard lock{m_client.m_mutex};
+
+    if (m_flx_subscription_store && m_flx_pending_mark_version != SubscriptionSet::EmptyVersion) {
+        m_sess->logger.debug("Marking query version %1 as complete after receiving MARK message",
+                             m_flx_pending_mark_version);
+        auto mutable_subs = m_flx_subscription_store->get_mutable_by_version(m_flx_pending_mark_version);
+        mutable_subs.update_state(SubscriptionSet::State::Complete);
+        mutable_subs.commit();
+        m_flx_pending_mark_version = SubscriptionSet::EmptyVersion;
+    }
+
+    std::lock_guard lock{m_client.m_mutex};
     if (m_staged_download_mark > m_reached_download_mark) {
         m_reached_download_mark = m_staged_download_mark;
         m_client.m_wait_or_client_stopped_cond.notify_all();
@@ -1523,6 +1733,49 @@ util::Future<std::string> SessionWrapper::send_test_command(std::string body)
     return m_sess->send_test_command(std::move(body));
 }
 
+void SessionWrapper::handle_pending_client_reset_acknowledgement()
+{
+    auto pending_reset = [&] {
+        auto ft = m_db->start_frozen();
+        return _impl::client_reset::has_pending_reset(ft);
+    }();
+    REALM_ASSERT(pending_reset);
+    m_sess->logger.info("Tracking pending client reset of type \"%1\" from %2", pending_reset->type,
+                        pending_reset->time);
+    util::bind_ptr<SessionWrapper> self(this);
+    async_wait_for(true, true, [self = std::move(self), pending_reset = *pending_reset](std::error_code ec) {
+        if (ec == util::error::operation_aborted) {
+            return;
+        }
+        auto& logger = self->m_sess->logger;
+        if (ec) {
+            logger.error("Error while tracking client reset acknowledgement: %1", ec.message());
+            return;
+        }
+
+        auto wt = self->m_db->start_write();
+        auto cur_pending_reset = _impl::client_reset::has_pending_reset(wt);
+        if (!cur_pending_reset) {
+            logger.debug(
+                "Was going to remove client reset tracker for type \"%1\" from %2, but it was already removed",
+                pending_reset.type, pending_reset.time);
+            return;
+        }
+        else if (cur_pending_reset->type != pending_reset.type || cur_pending_reset->time != pending_reset.time) {
+            logger.debug(
+                "Was going to remove client reset tracker for type \"%1\" from %2, but found type \"%3\" from %4.",
+                pending_reset.type, pending_reset.time, cur_pending_reset->type, cur_pending_reset->time);
+        }
+        else {
+            logger.debug("Client reset of type \"%1\" from %2 has been acknowledged by the server. "
+                         "Removing cycle detection tracker.",
+                         pending_reset.type, pending_reset.time);
+        }
+        _impl::client_reset::remove_pending_client_resets(wt);
+        wt->commit();
+    });
+}
+
 // ################ ClientImpl::Connection ################
 
 ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ident, ServerEndpoint endpoint,
@@ -1533,30 +1786,35 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
                                    std::function<SSLVerifyCallback> ssl_verify_callback,
                                    Optional<ProxyConfig> proxy_config, ReconnectInfo reconnect_info,
                                    SyncServerMode sync_mode)
-    : logger{make_logger_prefix(ident), client.logger} // Throws
+    : logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(ident), client.logger_ptr)} // Throws
+    , logger{*logger_ptr}
     , m_client{client}
     , m_protocol_envelope{std::get<0>(endpoint)}
     , m_address{std::get<1>(endpoint)}
     , m_port{std::get<2>(endpoint)}
-    , m_verify_servers_ssl_certificate{verify_servers_ssl_certificate}
-    , m_ssl_trust_certificate_path{std::move(ssl_trust_certificate_path)}
-    , m_ssl_verify_callback{std::move(ssl_verify_callback)}
-    , m_proxy_config{std::move(proxy_config)}
+    , m_verify_servers_ssl_certificate{verify_servers_ssl_certificate}    // DEPRECATED
+    , m_ssl_trust_certificate_path{std::move(ssl_trust_certificate_path)} // DEPRECATED
+    , m_ssl_verify_callback{std::move(ssl_verify_callback)}               // DEPRECATED
+    , m_proxy_config{std::move(proxy_config)}                             // DEPRECATED
     , m_reconnect_info{reconnect_info}
     , m_sync_mode(sync_mode)
     , m_ident{ident}
     , m_server_endpoint{std::move(endpoint)}
-    , m_authorization_header_name{authorization_header_name}
-    , m_custom_http_headers{custom_http_headers}
+    , m_authorization_header_name{authorization_header_name} // DEPRECATED
+    , m_custom_http_headers{custom_http_headers}             // DEPRECATED
 {
-    auto handler = [this] {
+    m_on_idle = m_client.create_trigger([this](Status status) {
+        if (status == ErrorCodes::OperationAborted)
+            return;
+        else if (!status.is_ok())
+            throw Exception(status);
+
         REALM_ASSERT(m_activated);
         if (m_state == ConnectionState::disconnected && m_num_active_sessions == 0) {
             on_idle(); // Throws
             // Connection object may be destroyed now.
         }
-    };
-    m_on_idle = util::network::Trigger{client.get_service(), std::move(handler)}; // Throws
+    });
 }
 
 inline connection_ident_type ClientImpl::Connection::get_ident() const noexcept
@@ -1622,6 +1880,9 @@ std::string ClientImpl::Connection::make_logger_prefix(connection_ident_type ide
 void ClientImpl::Connection::report_connection_state_change(ConnectionState state,
                                                             util::Optional<SessionErrorInfo> error_info)
 {
+    if (m_force_closed) {
+        return;
+    }
     auto handler = [=](ClientImpl::Session& sess) {
         SessionImpl& sess_2 = static_cast<SessionImpl&>(sess);
         sess_2.on_connection_state_changed(state, error_info); // Throws
@@ -1645,17 +1906,15 @@ Client::Client(Client&& client) noexcept
 Client::~Client() noexcept {}
 
 
-void Client::run()
+void Client::shutdown() noexcept
 {
-    m_impl->run(); // Throws
+    m_impl->shutdown();
 }
 
-
-void Client::stop() noexcept
+void Client::shutdown_and_wait()
 {
-    m_impl->stop();
+    m_impl->shutdown_and_wait();
 }
-
 
 void Client::cancel_reconnect_delay()
 {
@@ -1676,11 +1935,12 @@ bool Client::decompose_server_url(const std::string& url, ProtocolEnvelope& prot
 }
 
 
-Session::Session(Client& client, DBRef db, std::shared_ptr<SubscriptionStore> flx_sub_store, Config&& config)
+Session::Session(Client& client, DBRef db, std::shared_ptr<SubscriptionStore> flx_sub_store,
+                 std::shared_ptr<MigrationStore> migration_store, Config&& config)
 {
     util::bind_ptr<SessionWrapper> sess;
-    sess.reset(
-        new SessionWrapper{*client.m_impl, std::move(db), std::move(flx_sub_store), std::move(config)}); // Throws
+    sess.reset(new SessionWrapper{*client.m_impl, std::move(db), std::move(flx_sub_store), std::move(migration_store),
+                                  std::move(config)}); // Throws
     // The reference count passed back to the application is implicitly
     // owned by a naked pointer. This is done to avoid exposing
     // implementation details through the header file (that is, through the
@@ -1710,27 +1970,6 @@ void Session::set_connection_state_change_listener(util::UniqueFunction<Connecti
 void Session::bind()
 {
     m_impl->initiate(); // Throws
-}
-
-
-void Session::bind(std::string server_url, std::string signed_access_token)
-{
-    ClientImpl& client = m_impl->get_client();
-    ProtocolEnvelope protocol = {};
-    std::string address;
-    port_type port = {};
-    std::string path;
-    if (!client.decompose_server_url(server_url, protocol, address, port, path)) // Throws
-        throw BadServerUrl();
-    bind(std::move(address), std::move(path), std::move(signed_access_token), port, protocol); // Throws
-}
-
-
-void Session::bind(std::string server_address, std::string realm_identifier, std::string signed_access_token,
-                   port_type server_port, ProtocolEnvelope protocol)
-{
-    m_impl->initiate(protocol, std::move(server_address), server_port, std::move(realm_identifier),
-                     std::move(signed_access_token)); // Throws
 }
 
 
@@ -1794,10 +2033,81 @@ const std::error_category& client_error_category() noexcept
     return g_error_category;
 }
 
-
 std::error_code make_error_code(ClientError error_code) noexcept
 {
     return std::error_code{int(error_code), g_error_category};
+}
+
+ProtocolError client_error_to_protocol_error(ClientError error_code)
+{
+    switch (error_code) {
+        case ClientError::bad_changeset:
+            return ProtocolError::bad_changeset;
+        case ClientError::bad_progress:
+            return ProtocolError::bad_progress;
+        case ClientError::bad_changeset_size:
+            return ProtocolError::bad_changeset_size;
+        case ClientError::connection_closed:
+            return ProtocolError::connection_closed;
+        case ClientError::unknown_message:
+            return ProtocolError::unknown_message;
+        case ClientError::bad_syntax:
+            return ProtocolError::bad_syntax;
+        case ClientError::limits_exceeded:
+            return ProtocolError::limits_exceeded;
+        case ClientError::bad_session_ident:
+            return ProtocolError::bad_session_ident;
+        case ClientError::bad_message_order:
+            return ProtocolError::bad_message_order;
+        case ClientError::bad_client_file_ident:
+            return ProtocolError::bad_client_file_ident;
+        case ClientError::bad_changeset_header_syntax:
+            return ProtocolError::bad_changeset_header_syntax;
+        case ClientError::bad_origin_file_ident:
+            return ProtocolError::bad_origin_file_ident;
+        case ClientError::bad_server_version:
+            return ProtocolError::bad_server_version;
+        case ClientError::bad_client_version:
+            return ProtocolError::bad_client_version;
+
+        case ClientError::bad_error_code:
+            [[fallthrough]];
+        case ClientError::bad_request_ident:
+            [[fallthrough]];
+        case ClientError::bad_compression:
+            [[fallthrough]];
+        case ClientError::ssl_server_cert_rejected:
+            [[fallthrough]];
+        case ClientError::bad_client_file_ident_salt:
+            [[fallthrough]];
+        case ClientError::bad_file_ident:
+            [[fallthrough]];
+        case ClientError::connect_timeout:
+            [[fallthrough]];
+        case ClientError::bad_timestamp:
+            [[fallthrough]];
+        case ClientError::bad_protocol_from_server:
+            [[fallthrough]];
+        case ClientError::client_too_old_for_server:
+            [[fallthrough]];
+        case ClientError::client_too_new_for_server:
+            [[fallthrough]];
+        case ClientError::protocol_mismatch:
+            [[fallthrough]];
+        case ClientError::missing_protocol_feature:
+            [[fallthrough]];
+        case ClientError::http_tunnel_failed:
+            return ProtocolError::other_error;
+
+        case ClientError::auto_client_reset_failure:
+            [[fallthrough]];
+        case ClientError::pong_timeout:
+            [[fallthrough]];
+        case ClientError::bad_state_message:
+            return ProtocolError::other_session_error;
+    }
+
+    return ProtocolError::other_error;
 }
 
 std::ostream& operator<<(std::ostream& os, ProxyConfig::Type proxyType)

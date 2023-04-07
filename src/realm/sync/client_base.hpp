@@ -4,6 +4,7 @@
 #include <realm/transaction.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/sync/socket_provider.hpp>
 #include <realm/util/functional.hpp>
 
 namespace realm::sync {
@@ -61,9 +62,8 @@ struct ClientReset {
     realm::ClientResyncMode mode;
     DBRef fresh_copy;
     bool recovery_is_allowed = true;
-    util::UniqueFunction<void(std::string path)> notify_before_client_reset;
-    util::UniqueFunction<void(std::string path, VersionID before_version, bool did_recover)>
-        notify_after_client_reset;
+    util::UniqueFunction<void(VersionID)> notify_before_client_reset;
+    util::UniqueFunction<void(VersionID before_version, bool did_recover)> notify_after_client_reset;
 };
 
 /// \brief Protocol errors discovered by the client.
@@ -74,43 +74,45 @@ struct ClientReset {
 /// sessions.
 enum class ClientError {
     // clang-format off
-    connection_closed           = 100, ///< Connection closed (no error)
-    unknown_message             = 101, ///< Unknown type of input message
-    bad_syntax                  = 102, ///< Bad syntax in input message head
-    limits_exceeded             = 103, ///< Limits exceeded in input message
-    bad_session_ident           = 104, ///< Bad session identifier in input message
-    bad_message_order           = 105, ///< Bad input message order
-    bad_client_file_ident       = 106, ///< Bad client file identifier (IDENT)
-    bad_progress                = 107, ///< Bad progress information (DOWNLOAD)
-    bad_changeset_header_syntax = 108, ///< Bad syntax in changeset header (DOWNLOAD)
-    bad_changeset_size          = 109, ///< Bad changeset size in changeset header (DOWNLOAD)
-    bad_origin_file_ident       = 110, ///< Bad origin file identifier in changeset header (DOWNLOAD)
-    bad_server_version          = 111, ///< Bad server version in changeset header (DOWNLOAD)
-    bad_changeset               = 112, ///< Bad changeset (DOWNLOAD)
-    bad_request_ident           = 113, ///< Bad request identifier (MARK)
-    bad_error_code              = 114, ///< Bad error code (ERROR),
-    bad_compression             = 115, ///< Bad compression (DOWNLOAD)
-    bad_client_version          = 116, ///< Bad last integrated client version in changeset header (DOWNLOAD)
-    ssl_server_cert_rejected    = 117, ///< SSL server certificate rejected
-    pong_timeout                = 118, ///< Timeout on reception of PONG respone message
-    bad_client_file_ident_salt  = 119, ///< Bad client file identifier salt (IDENT)
-    bad_file_ident              = 120, ///< Bad file identifier (ALLOC)
-    connect_timeout             = 121, ///< Sync connection was not fully established in time
-    bad_timestamp               = 122, ///< Bad timestamp (PONG)
-    bad_protocol_from_server    = 123, ///< Bad or missing protocol version information from server
-    client_too_old_for_server   = 124, ///< Protocol version negotiation failed: Client is too old for server
-    client_too_new_for_server   = 125, ///< Protocol version negotiation failed: Client is too new for server
-    protocol_mismatch           = 126, ///< Protocol version negotiation failed: No version supported by both client and server
-    bad_state_message           = 127, ///< Bad values in state message (STATE)
-    missing_protocol_feature    = 128, ///< Requested feature missing in negotiated protocol version
-    http_tunnel_failed          = 131, ///< Failed to establish HTTP tunnel with configured proxy
-    auto_client_reset_failure   = 132, ///< A fatal error was encountered which prevents completion of a client reset
+    connection_closed           = RLM_SYNC_ERR_CLIENT_CONNECTION_CLOSED          , ///< Connection closed (no error)
+    unknown_message             = RLM_SYNC_ERR_CLIENT_UNKNOWN_MESSAGE            , ///< Unknown type of input message
+    bad_syntax                  = RLM_SYNC_ERR_CLIENT_BAD_SYNTAX                 , ///< Bad syntax in input message head
+    limits_exceeded             = RLM_SYNC_ERR_CLIENT_LIMITS_EXCEEDED            , ///< Limits exceeded in input message
+    bad_session_ident           = RLM_SYNC_ERR_CLIENT_BAD_SESSION_IDENT          , ///< Bad session identifier in input message
+    bad_message_order           = RLM_SYNC_ERR_CLIENT_BAD_MESSAGE_ORDER          , ///< Bad input message order
+    bad_client_file_ident       = RLM_SYNC_ERR_CLIENT_BAD_CLIENT_FILE_IDENT      , ///< Bad client file identifier (IDENT)
+    bad_progress                = RLM_SYNC_ERR_CLIENT_BAD_PROGRESS               , ///< Bad progress information (DOWNLOAD)
+    bad_changeset_header_syntax = RLM_SYNC_ERR_CLIENT_BAD_CHANGESET_HEADER_SYNTAX, ///< Bad syntax in changeset header (DOWNLOAD)
+    bad_changeset_size          = RLM_SYNC_ERR_CLIENT_BAD_CHANGESET_SIZE         , ///< Bad changeset size in changeset header (DOWNLOAD)
+    bad_origin_file_ident       = RLM_SYNC_ERR_CLIENT_BAD_ORIGIN_FILE_IDENT      , ///< Bad origin file identifier in changeset header (DOWNLOAD)
+    bad_server_version          = RLM_SYNC_ERR_CLIENT_BAD_SERVER_VERSION         , ///< Bad server version in changeset header (DOWNLOAD)
+    bad_changeset               = RLM_SYNC_ERR_CLIENT_BAD_CHANGESET              , ///< Bad changeset (DOWNLOAD)
+    bad_request_ident           = RLM_SYNC_ERR_CLIENT_BAD_REQUEST_IDENT          , ///< Bad request identifier (MARK)
+    bad_error_code              = RLM_SYNC_ERR_CLIENT_BAD_ERROR_CODE             , ///< Bad error code (ERROR),
+    bad_compression             = RLM_SYNC_ERR_CLIENT_BAD_COMPRESSION            , ///< Bad compression (DOWNLOAD)
+    bad_client_version          = RLM_SYNC_ERR_CLIENT_BAD_CLIENT_VERSION         , ///< Bad last integrated client version in changeset header (DOWNLOAD)
+    ssl_server_cert_rejected    = RLM_SYNC_ERR_CLIENT_SSL_SERVER_CERT_REJECTED   , ///< SSL server certificate rejected
+    pong_timeout                = RLM_SYNC_ERR_CLIENT_PONG_TIMEOUT               , ///< Timeout on reception of PONG respone message
+    bad_client_file_ident_salt  = RLM_SYNC_ERR_CLIENT_BAD_CLIENT_FILE_IDENT_SALT , ///< Bad client file identifier salt (IDENT)
+    bad_file_ident              = RLM_SYNC_ERR_CLIENT_BAD_FILE_IDENT             , ///< Bad file identifier (ALLOC)
+    connect_timeout             = RLM_SYNC_ERR_CLIENT_CONNECT_TIMEOUT            , ///< Sync connection was not fully established in time
+    bad_timestamp               = RLM_SYNC_ERR_CLIENT_BAD_TIMESTAMP              , ///< Bad timestamp (PONG)
+    bad_protocol_from_server    = RLM_SYNC_ERR_CLIENT_BAD_PROTOCOL_FROM_SERVER   , ///< Bad or missing protocol version information from server
+    client_too_old_for_server   = RLM_SYNC_ERR_CLIENT_CLIENT_TOO_OLD_FOR_SERVER  , ///< Protocol version negotiation failed: Client is too old for server
+    client_too_new_for_server   = RLM_SYNC_ERR_CLIENT_CLIENT_TOO_NEW_FOR_SERVER  , ///< Protocol version negotiation failed: Client is too new for server
+    protocol_mismatch           = RLM_SYNC_ERR_CLIENT_PROTOCOL_MISMATCH          , ///< Protocol version negotiation failed: No version supported by both client and server
+    bad_state_message           = RLM_SYNC_ERR_CLIENT_BAD_STATE_MESSAGE          , ///< Bad values in state message (STATE)
+    missing_protocol_feature    = RLM_SYNC_ERR_CLIENT_MISSING_PROTOCOL_FEATURE   , ///< Requested feature missing in negotiated protocol version
+    http_tunnel_failed          = RLM_SYNC_ERR_CLIENT_HTTP_TUNNEL_FAILED         , ///< Failed to establish HTTP tunnel with configured proxy
+    auto_client_reset_failure   = RLM_SYNC_ERR_CLIENT_AUTO_CLIENT_RESET_FAILURE  , ///< A fatal error was encountered which prevents completion of a client reset
     // clang-format on
 };
 
 const std::error_category& client_error_category() noexcept;
 
 std::error_code make_error_code(ClientError) noexcept;
+
+ProtocolError client_error_to_protocol_error(ClientError);
 } // namespace realm::sync
 
 namespace std {
@@ -133,47 +135,17 @@ static constexpr milliseconds_type default_fast_reconnect_limit = 60000;    // 1
 using RoundtripTimeHandler = void(milliseconds_type roundtrip_time);
 
 struct ClientConfig {
-    /// An optional custom platform description to be sent to server as part
-    /// of a user agent description (HTTP `User-Agent` header).
-    ///
-    /// If left empty, the platform description will be whatever is returned
-    /// by util::get_platform_info().
-    std::string user_agent_platform_info;
-
-    /// Optional information about the application to be added to the user
-    /// agent description as sent to the server. The intention is that the
-    /// application describes itself using the following (rough) syntax:
-    ///
-    ///     <application info>  ::=  (<space> <layer>)*
-    ///     <layer>             ::=  <name> "/" <version> [<space> <details>]
-    ///     <name>              ::=  (<alnum>)+
-    ///     <version>           ::=  <digit> (<alnum> | "." | "-" | "_")*
-    ///     <details>           ::=  <parentherized>
-    ///     <parentherized>     ::=  "(" (<nonpar> | <parentherized>)* ")"
-    ///
-    /// Where `<space>` is a single space character, `<digit>` is a decimal
-    /// digit, `<alnum>` is any alphanumeric character, and `<nonpar>` is
-    /// any character other than `(` and `)`.
-    ///
-    /// When multiple levels are present, the innermost layer (the one that
-    /// is closest to this API) should appear first.
-    ///
-    /// Example:
-    ///
-    ///     RealmJS/2.13.0 RealmStudio/2.9.0
-    ///
-    /// Note: The user agent description is not intended for machine
-    /// interpretation, but should still follow the specified syntax such
-    /// that it remains easily interpretable by human beings.
-    std::string user_agent_application_info;
-
     /// An optional logger to be used by the client. If no logger is
     /// specified, the client will use an instance of util::StderrLogger
     /// with the log level threshold set to util::Logger::Level::info. The
     /// client does not require a thread-safe logger, and it guarantees that
     /// all logging happens either on behalf of the constructor or on behalf
     /// of the invocation of run().
-    util::Logger* logger = nullptr;
+    std::shared_ptr<util::Logger> logger;
+
+    // The SyncSocket instance used by the Sync Client for event synchronization
+    // and creating WebSockets. If not provided the default implementation will be used.
+    std::shared_ptr<sync::SyncSocketProvider> socket_provider;
 
     /// Use ports 80 and 443 by default instead of 7800 and 7801
     /// respectively. Ideally, these default ports should have been made

@@ -12,8 +12,11 @@ namespace sync {
 
 using InternStrings = std::vector<StringBufferRange>;
 
-struct BadChangesetError : ExceptionWithBacktrace<std::runtime_error> {
-    using ExceptionWithBacktrace<std::runtime_error>::ExceptionWithBacktrace;
+struct BadChangesetError : Exception {
+    BadChangesetError(const std::string& msg)
+        : Exception(ErrorCodes::BadChangeset, util::format("%1. Please contact support.", msg))
+    {
+    }
 };
 
 struct Changeset {
@@ -58,7 +61,6 @@ struct Changeset {
     struct IteratorImpl;
     using iterator = IteratorImpl<false>;
     using const_iterator = IteratorImpl<true>;
-    using value_type = Instruction;
     iterator begin() noexcept;
     iterator end() noexcept;
     const_iterator begin() const noexcept;

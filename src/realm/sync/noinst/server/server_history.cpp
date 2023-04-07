@@ -1203,7 +1203,7 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
         Transformer& transformer = m_context.get_transformer(); // Throws
         transformer.transform_remote_changesets(transform_hist, m_local_file_ident, current_server_version,
                                                 parsed_transformed_changesets, std::move(apply),
-                                                &logger); // Throws
+                                                logger); // Throws
 
         for (std::size_t i = 0; i < num_changesets; ++i) {
             REALM_ASSERT(get_instruction_encoder().buffer().size() == 0);

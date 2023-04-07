@@ -4422,8 +4422,8 @@ TEST(Query_ColumnDeletionSimple)
     foo.remove_column(col_int0);
 
     size_t x = 0;
-    CHECK_LOGIC_ERROR(x = q1.count(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(x = q1.count(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), ErrorCodes::InvalidProperty);
     CHECK_EQUAL(x, 0);
     CHECK_EQUAL(tv1.size(), 0);
 
@@ -4434,8 +4434,8 @@ TEST(Query_ColumnDeletionSimple)
     CHECK_EQUAL(tv2.size(), 2);
 
     x = 0;
-    CHECK_LOGIC_ERROR(x = q3.count(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv3.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(x = q3.count(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv3.sync_if_needed(), ErrorCodes::InvalidProperty);
     CHECK_EQUAL(x, 0);
     CHECK_EQUAL(tv3.size(), 0);
 }
@@ -4485,9 +4485,9 @@ TEST(Query_ColumnDeletionExpression)
 
     foo.remove_column(col_int0);
     size_t x = 0;
-    CHECK_LOGIC_ERROR(x = q.count(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(x = q.count(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), ErrorCodes::InvalidProperty);
     CHECK_EQUAL(x, 0);
     CHECK_EQUAL(tv.size(), 0);
 
@@ -4499,8 +4499,8 @@ TEST(Query_ColumnDeletionExpression)
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv1.size(), 1);
     foo.remove_column(col_date3);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), ErrorCodes::InvalidProperty);
 
     // StringNodeBase
     q = foo.column<String>(col_str4) == StringData("Hello, world");
@@ -4510,22 +4510,22 @@ TEST(Query_ColumnDeletionExpression)
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv1.size(), 4);
     foo.remove_column(col_str4);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), ErrorCodes::InvalidProperty);
 
     // FloatDoubleNode
     q = foo.column<Float>(col_float5) > 0.0f;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     foo.remove_column(col_float5);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), ErrorCodes::InvalidProperty);
 
     // BinaryNode
     q = foo.column<Binary>(col_bin6) != BinaryData("Binary", 6);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 4);
     foo.remove_column(col_bin6);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), ErrorCodes::InvalidProperty);
 }
 
 
@@ -4573,12 +4573,12 @@ TEST(Query_ColumnDeletionLinks)
     CHECK_EQUAL(tv.size(), 1);
     // remove link column, disaster
     bar->remove_column(col_link0);
-    CHECK_LOGIC_ERROR(bar->check_column(col_link0), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(bar->check_column(col_link0), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), ErrorCodes::InvalidProperty);
     foo->remove_column(col_link1);
-    CHECK_LOGIC_ERROR(foo->check_column(col_link1), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(q1.count(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(q2.count(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(foo->check_column(col_link1), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(q1.count(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(q2.count(), ErrorCodes::InvalidProperty);
 }
 
 
@@ -5425,6 +5425,8 @@ TEST_TYPES(Query_PrimaryKeySearchForNull, Prop<String>, Prop<Int>, Prop<ObjectId
 TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
 {
     bool has_index = TEST_TYPE::value;
+    constexpr bool exact_match = true;
+    constexpr bool insensitive_match = false;
     Group g;
     auto table = g.add_table("Foo");
     auto origin = g.add_table("Origin");
@@ -5512,29 +5514,62 @@ TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
     CHECK_EQUAL(tv.size(), 3);
     tv = table->where().begins_with(col_any, BinaryData("String2", 7)).find_all(); // 20, 24, 28
     CHECK_EQUAL(tv.size(), 3);
+    tv = table->where().begins_with(col_any, Mixed(75.), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().begins_with(col_any, Mixed(75.), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
 
-    tv = table->where().contains(col_any, StringData("TRIN"), false).find_all();
+    tv = table->where().contains(col_any, StringData("TRIN"), insensitive_match).find_all();
     CHECK_EQUAL(tv.size(), 24);
-    tv = table->where().contains(col_any, Mixed("TRIN"), false).find_all();
+    tv = table->where().contains(col_any, Mixed("TRIN"), insensitive_match).find_all();
     CHECK_EQUAL(tv.size(), 24);
+    tv = table->where().contains(col_any, Mixed("TRIN"), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().contains(col_any, Mixed(75.), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().contains(col_any, Mixed(75.), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
 
     tv = table->where().like(col_any, StringData("Strin*")).find_all();
     CHECK_EQUAL(tv.size(), 24);
+    tv = table->where().like(col_any, Mixed(75.), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().like(col_any, Mixed(75.), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
 
     tv = table->where().ends_with(col_any, StringData("4")).find_all(); // 4, 24, 44, 64, 84
     CHECK_EQUAL(tv.size(), 5);
     char bin[1] = {0x34};
     tv = table->where().ends_with(col_any, BinaryData(bin)).find_all(); // 4, 24, 44, 64, 84
     CHECK_EQUAL(tv.size(), 5);
+    tv = table->where().ends_with(col_any, Mixed(75.), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().ends_with(col_any, Mixed(75.), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
 
-    tv = table->where().equal(col_any, "String2Binary", true).find_all();
+    tv = table->where().equal(col_any, "String2Binary", exact_match).find_all();
     CHECK_EQUAL(tv.size(), 1);
-
-    tv = table->where().equal(col_any, "string2binary", false).find_all();
+    tv = table->where().equal(col_any, "string2binary", exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().equal(col_any, "string2binary", insensitive_match).find_all();
     CHECK_EQUAL(tv.size(), 1);
-
-    tv = table->where().not_equal(col_any, "string2binary", false).find_all();
+    tv = table->where().not_equal(col_any, "string2binary", insensitive_match).find_all();
     CHECK_EQUAL(tv.size(), 99);
+
+    tv = table->where().equal(col_any, StringData(), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = table->where().equal(col_any, StringData(), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+
+    tv = table->where().equal(col_any, Mixed(), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = table->where().equal(col_any, Mixed(), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+
+    tv = table->where().equal(col_any, Mixed(75.), insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = table->where().equal(col_any, Mixed(75.), exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
 
     tv = (table->column<Mixed>(col_any) == StringData("String48")).find_all();
     CHECK_EQUAL(tv.size(), 1);
@@ -5545,6 +5580,8 @@ TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
 
     tv = (table->column<Mixed>(col_any) == StringData("abcdefgh")).find_all();
     CHECK_EQUAL(tv.size(), 1);
+    tv = (table->column<Mixed>(col_any) == StringData("ABCDEFGH")).find_all();
+    CHECK_EQUAL(tv.size(), 0);
 
     ObjLink link_to_first = table->begin()->get_link();
     tv = (origin->column<Mixed>(col_mixed) == Mixed(link_to_first)).find_all();
@@ -5566,13 +5603,13 @@ TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
     CHECK_EQUAL(tv.size(), 5);
     tv = (origin->link(col_link).column<Mixed>(col_any) > 50).find_all();
     CHECK_EQUAL(tv.size(), 2);
-    tv = (origin->link(col_links).column<Mixed>(col_any).contains("string2bin", false)).find_all();
+    tv = (origin->link(col_links).column<Mixed>(col_any).contains("string2bin", insensitive_match)).find_all();
     CHECK_EQUAL(tv.size(), 1);
-    tv = (origin->link(col_links).column<Mixed>(col_any).like("*ring*", false)).find_all();
+    tv = (origin->link(col_links).column<Mixed>(col_any).like("*ring*", insensitive_match)).find_all();
     CHECK_EQUAL(tv.size(), 10);
-    tv = (origin->link(col_links).column<Mixed>(col_any).begins_with("String", true)).find_all();
+    tv = (origin->link(col_links).column<Mixed>(col_any).begins_with("String", exact_match)).find_all();
     CHECK_EQUAL(tv.size(), 10);
-    tv = (origin->link(col_links).column<Mixed>(col_any).ends_with("g40", true)).find_all();
+    tv = (origin->link(col_links).column<Mixed>(col_any).ends_with("g40", exact_match)).find_all();
     CHECK_EQUAL(tv.size(), 1);
 }
 
@@ -5849,6 +5886,220 @@ TEST(Query_links_to_with_bpnode_split)
         Query q2 = origin->where().links_to(col_link, it->get_key());
         CHECK_EQUAL(q2.count(), 1);
     }
+}
+
+TEST(Query_FullText)
+{
+    Group g;
+    auto table = g.add_table("table");
+    auto col = table->add_column(type_String, "text");
+
+    // Add before index creation
+    table->create_object().set(col, " This is a test, with  spaces!");
+    Obj obj2 = table->create_object().set(col, "Ål, ø og 你好世界Æbler"); // "Hello world" should be filtered out
+    Obj obj3 = table->create_object().set(
+        col,
+        "An object database (also object-oriented database management system) is a database management system in "
+        "which information is represented in the form of objects as used in object-oriented programming. Object "
+        "databases are different from relational databases which are table-oriented. Object-relational databases "
+        "are a hybrid of both approaches.");
+    table->create_object().set(
+        col,
+        "Object database management systems grew out of research during the early to mid-1970s into having "
+        "intrinsic database management support for graph-structured objects. The term 'object-oriented database "
+        "system' first appeared around 1985.[4] Notable research projects included Encore-Ob/Server (Brown "
+        "University), EXODUS (University of Wisconsin–Madison), IRIS (Hewlett-Packard), ODE (Bell Labs), ORION "
+        "(Microelectronics and Computer Technology Corporation or MCC), Vodak (GMD-IPSI), and Zeitgeist (Texas "
+        "Instruments). The ORION project had more published papers than any of the other efforts. Won Kim of MCC "
+        "compiled the best of those papers in a book published by The MIT Press.");
+    table->create_object().set(
+        col, "Lilleø er i mange år blevet anvendt til græsning af Askø-bøndernes kreaturer. I 1788 blev en del af "
+             "Askøs gårde flyttet til Lilleø, og tre gårde eksisterer fortsat på øen. Hovederhvervet på Lilleø er i "
+             "dag frugtavl, og der dyrkes især æbler, pærer og blommer.");
+
+    // Create the fulltext index
+    table->add_fulltext_index(col);
+    CHECK_EQUAL(table->search_index_type(col), IndexType::Fulltext);
+
+    table->create_object().set(col, "Alle elsker John");
+    table->create_object().set(col, "Johns ven kender John godt");
+    table->create_object().set(col, "Ich wohne in Großarl");
+
+    auto tv = table->where().fulltext(col, "object").find_all();
+    CHECK_EQUAL(2, tv.size());
+
+    // Add after index creation
+    auto k5 =
+        table->create_object()
+            .set(
+                col,
+                "Early commercial products included Gemstone (Servio Logic, name changed to GemStone Systems), Gbase "
+                "(Graphael), and Vbase (Ontologic). The early to mid-1990s saw additional commercial products enter "
+                "the market. These included ITASCA (Itasca Systems), Jasmine (Fujitsu, marketed by Computer "
+                "Associates), Matisse (Matisse Software), Objectivity/DB (Objectivity, Inc.), ObjectStore (Progress "
+                "Software, acquired from eXcelon which was originally Object Design), ONTOS (Ontos, Inc., name "
+                "changed from Ontologic), O2[6] (O2 Technology, merged with several companies, acquired by Informix, "
+                "which was in turn acquired by IBM), POET (now FastObjects from Versant which acquired Poet Software)"
+                ", Versant Object Database (Versant Corporation), VOSS (Logic Arts) and JADE (Jade Software "
+                "Corporation). Some of these products remain on the market and have been joined by new open source "
+                "and commercial products such as InterSystems Caché.")
+            .get_key();
+
+    tv.sync_if_needed();
+    CHECK_EQUAL(3, tv.size());
+
+    // Add another
+    table->create_object().set(
+        col, "As the usage of web-based technology increases with the implementation of Intranets and extranets, "
+             "companies have a vested interest in OODBMSs to display their complex data. Using a DBMS that has been "
+             "specifically designed to store data as objects gives an advantage to those companies that are geared "
+             "towards multimedia presentation or organizations that utilize computer-aided design (CAD).[3]");
+
+    tv.sync_if_needed();
+    CHECK_EQUAL(3, tv.size());
+
+    // Delete one
+    table->remove_object(k5);
+    tv.sync_if_needed();
+    CHECK_EQUAL(2, tv.size());
+
+    tv = table->where().fulltext(col, "hybrid").find_all();
+    CHECK_EQUAL(1, tv.size());
+
+    // Change value in place
+    obj3.set(
+        col,
+        "Object database management systems added the concept of persistence to object programming languages. The "
+        "early commercial products were integrated with various languages: GemStone (Smalltalk), Gbase (LISP), Vbase "
+        "(COP) and VOSS (Virtual Object Storage System for Smalltalk). For much of the 1990s, C++ dominated the "
+        "commercial object database management market. Vendors added Java in the late 1990s and more recently, C#.");
+
+    tv = table->where().fulltext(col, "hybrid").find_all();
+    CHECK_EQUAL(0, tv.size());
+
+    tv = table->where().fulltext(col, "Gemstone").find_all();
+    CHECK_EQUAL(1, tv.size());
+
+    tv = table->where().fulltext(col, "æbler").find_all();
+    CHECK_EQUAL(2, tv.size());
+
+    table->create_object().set(
+        col, "The song \"Supercalifragilisticexpialidocious\" is from the 1964 Disney musical film \"Mary Poppins\"");
+
+    tv = table->where().fulltext(col, "supercalifragilisticexpialidocious mary").find_all();
+    CHECK_EQUAL(1, tv.size());
+
+    obj2.remove();
+    tv.sync_if_needed();
+    CHECK_EQUAL(1, tv.size());
+
+    tv = table->where().fulltext(col, "Johns").find_all();
+    CHECK_EQUAL(1, tv.size());
+    tv = table->where().fulltext(col, "John").find_all();
+    CHECK_EQUAL(2, tv.size());
+    tv = table->where().fulltext(col, "Großarl").find_all();
+    CHECK_EQUAL(1, tv.size());
+
+    table->clear();
+    CHECK(table->get_search_index(col)->is_empty());
+}
+
+TEST(Query_FullTextMulti)
+{
+    Group g;
+    auto table = g.add_table("table");
+    auto origin = g.add_table_with_primary_key("origin", type_Int, "id");
+    auto col_link = origin->add_column_list(*table, "link");
+    auto col = table->add_column(type_String, "text");
+    table->add_fulltext_index(col);
+
+    table->create_object().set(
+        col,
+        "An object database (also object-oriented database management system) is a database management system in "
+        "which information is represented in the form of objects as used in object-oriented programming. Object "
+        "databases are different from relational databases which are table-oriented. Object-relational databases "
+        "are a hybrid of both approaches.");
+    table->create_object().set(
+        col,
+        "Object database management systems grew out of research during the early to mid-1970s into having "
+        "intrinsic database management support for graph-structured objects. The term 'object-oriented database "
+        "system' first appeared around 1985.[4] Notable research projects included Encore-Ob/Server (Brown "
+        "University), EXODUS (University of Wisconsin–Madison), IRIS (Hewlett-Packard), ODE (Bell Labs), ORION "
+        "(Microelectronics and Computer Technology Corporation or MCC), Vodak (GMD-IPSI), and Zeitgeist (Texas "
+        "Instruments). The ORION project had more published papers than any of the other efforts. Won Kim of MCC "
+        "compiled the best of those papers in a book published by The MIT Press.");
+    table->create_object().set(
+        col,
+        "Early commercial products included Gemstone (Servio Logic, name changed to GemStone Systems), Gbase "
+        "(Graphael), and Vbase (Ontologic). The early to mid-1990s saw additional commercial products enter the "
+        "market. These included ITASCA (Itasca Systems), Jasmine (Fujitsu, marketed by Computer Associates), Matisse "
+        "(Matisse Software), Objectivity/DB (Objectivity, Inc.), ObjectStore (Progress Software, acquired from "
+        "eXcelon which was originally Object Design), ONTOS (Ontos, Inc., name changed from Ontologic), O2[6] (O2 "
+        "Technology, merged with several companies, acquired by Informix, which was in turn acquired by IBM), POET "
+        "(now FastObjects from Versant which acquired Poet Software), Versant Object Database (Versant Corporation), "
+        "VOSS (Logic Arts) and JADE (Jade Software Corporation). Some of these products remain on the market and "
+        "have been joined by new open source and commercial products such as InterSystems Caché.");
+    table->create_object().set(
+        col, "As the usage of web-based technology increases with the implementation of Intranets and extranets, "
+             "companies have a vested interest in OODBMSs to display their complex data. Using a DBMS that has been "
+             "specifically designed to store data as objects gives an advantage to those companies that are geared "
+             "towards multimedia presentation or organizations that utilize computer-aided design (CAD).[3]");
+    table->create_object().set(
+        col,
+        "Object database management systems added the concept of persistence to object programming languages. The "
+        "early commercial products were integrated with various languages: GemStone (Smalltalk), Gbase (LISP), Vbase "
+        "(COP) and VOSS (Virtual Object Storage System for Smalltalk). For much of the 1990s, C++ dominated the "
+        "commercial object database management market. Vendors added Java in the late 1990s and more recently, C#.");
+
+    table->create_object().set(
+        col, "L’archive ouverte pluridisciplinaire HAL, est destinée au dépôt et à la diffusion de documents "
+             "scientifiques de niveau recherche, publiés ou non, émanant des établissements d’enseignement et de "
+             "recherche français ou étrangers, des laboratoires publics ou privés.");
+    table->create_object().set(col, "object object object object object duplicates");
+
+    int64_t id = 1000;
+    for (auto& o : *table) {
+        auto ll = origin->create_object_with_primary_key(id++).get_linklist(col_link);
+        ll.add(o.get_key());
+    }
+
+    // search with multiple terms
+    auto tv = table->where().fulltext(col, "object gemstone").find_all();
+    CHECK_EQUAL(2, tv.size());
+
+    // over links
+    tv = origin->link(col_link).column<String>(col).fulltext("object gemstone").find_all();
+    CHECK_EQUAL(2, tv.size());
+
+    tv = origin->query("link.text TEXT 'object gemstone'").find_all();
+    CHECK_EQUAL(2, tv.size());
+
+    // through LnkLst
+    auto obj = tv.get_object(0);
+    auto ll = obj.get_linklist(col_link);
+    tv = table->where(ll).fulltext(col, "object gemstone").find_all();
+    CHECK_EQUAL(1, tv.size());
+
+    // Diacritics ignorant
+    tv = table->where().fulltext(col, "depot emanant").find_all();
+    CHECK_EQUAL(1, tv.size());
+
+    // search for combination that is not present
+    tv = table->where().fulltext(col, "object data").find_all();
+    CHECK_EQUAL(0, tv.size());
+
+    // many terms
+    tv = table->where().fulltext(col, "object database management brown").find_all();
+    CHECK_EQUAL(1, tv.size());
+
+    tv = table->query("text TEXT 'object database management brown'").find_all();
+    CHECK_EQUAL(1, tv.size());
+
+    while (table->size() > 0) {
+        table->begin()->remove();
+    }
+
+    CHECK(table->get_search_index(col)->is_empty());
 }
 
 #endif // TEST_QUERY

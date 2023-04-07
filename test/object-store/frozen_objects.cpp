@@ -43,21 +43,6 @@
 
 #include <realm/util/scope_exit.hpp>
 
-namespace realm {
-class TestHelper {
-public:
-    static DBRef& get_db(SharedRealm const& shared_realm)
-    {
-        return Realm::Internal::get_db(*shared_realm);
-    }
-
-    static void begin_read(SharedRealm const& shared_realm, VersionID version)
-    {
-        Realm::Internal::begin_read(*shared_realm, version);
-    }
-};
-} // namespace realm
-
 using namespace realm;
 using util::any_cast;
 
@@ -102,12 +87,14 @@ TEST_CASE("Freeze Realm", "[freeze_realm]") {
 
     SECTION("auto_refresh") {
         REQUIRE(!frozen_realm->auto_refresh());
-        REQUIRE_THROWS(frozen_realm->set_auto_refresh(true));
+        REQUIRE_EXCEPTION(frozen_realm->set_auto_refresh(true), WrongTransactionState,
+                          "Auto-refresh cannot be enabled for frozen Realms.");
         REQUIRE(!frozen_realm->auto_refresh());
     }
 
     SECTION("begin_transaction() throws") {
-        REQUIRE_THROWS(frozen_realm->begin_transaction());
+        REQUIRE_EXCEPTION(frozen_realm->begin_transaction(), WrongTransactionState,
+                          "Can't perform transactions on a frozen Realm");
     }
 
     SECTION("can call methods on another thread") {
@@ -179,7 +166,9 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     }
 
     SECTION("add_notification throws") {
-        REQUIRE_THROWS(frozen_results.add_notification_callback([&](CollectionChangeSet) {}));
+        REQUIRE_EXCEPTION(frozen_results.add_notification_callback([&](CollectionChangeSet) {}),
+                          WrongTransactionState,
+                          "Notifications are not available on frozen collections since they do not change.");
     }
 
     SECTION("Result constructor - Empty") {
@@ -189,7 +178,8 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         JoiningThread thread([&] {
             REQUIRE(frozen_res.is_frozen());
             REQUIRE(frozen_res.size() == 0);
-            REQUIRE_THROWS(frozen_res.get_any(0));
+            REQUIRE_EXCEPTION(frozen_res.get_any(0), OutOfBounds,
+                              "Requested index 0 calling get_any() on Results when empty");
         });
     }
 
@@ -351,8 +341,12 @@ TEST_CASE("Freeze List", "[freeze_list]") {
     }
 
     SECTION("add_notification throws") {
-        REQUIRE_THROWS(frozen_link_list.add_notification_callback([&](CollectionChangeSet) {}));
-        REQUIRE_THROWS(frozen_primitive_list.add_notification_callback([&](CollectionChangeSet) {}));
+        REQUIRE_EXCEPTION(frozen_link_list.add_notification_callback([&](CollectionChangeSet) {}),
+                          WrongTransactionState,
+                          "Notifications are not available on frozen collections since they do not change.");
+        REQUIRE_EXCEPTION(frozen_primitive_list.add_notification_callback([&](CollectionChangeSet) {}),
+                          WrongTransactionState,
+                          "Notifications are not available on frozen collections since they do not change.");
     }
 
     SECTION("read across threads") {
@@ -371,6 +365,122 @@ TEST_CASE("Freeze List", "[freeze_list]") {
         realm->close();
         REQUIRE(DB::call_with_lock(config.path, [](auto) {}));
     }
+}
+
+TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
+
+#ifdef REALM_DEBUG
+    constexpr int num_pending_transactions = 10;
+    constexpr int num_iterations = 100;
+    constexpr int num_objects = 5;
+#else
+    constexpr int num_pending_transactions = 100;
+    constexpr int num_iterations = 10000;
+    constexpr int num_objects = 20;
+#endif
+    constexpr int num_checks_pr_trans = 10;
+    constexpr int num_trans_forgotten_rapidly = 5;
+    struct Entry {
+        SharedRealm realm;
+        Object o;
+        ObjKey link;
+        int64_t linked_value;
+        int64_t value;
+        NotificationToken token;
+    };
+    std::vector<Entry> refs;
+    refs.resize(num_pending_transactions);
+    TestFile config;
+
+    config.schema_version = 1;
+    config.automatic_change_notifications = true;
+    config.cache = false;
+    config.schema = Schema{
+        {"table", {{"value", PropertyType::Int}, {"link", PropertyType::Object | PropertyType::Nullable, "table"}}}};
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_table");
+    auto table_key = table->get_key();
+    auto col = table->get_column_key("value");
+    auto link_col = table->get_column_key("link");
+    realm->begin_transaction();
+    for (int j = 0; j < num_objects; ++j) {
+        auto o = table->create_object(ObjKey(j));
+        o.set(col, j);
+        o.set(link_col, o.get_key());
+    }
+    realm->commit_transaction();
+    int notifications = 0;
+    // SharedRealm captured = realm->freeze(); // Realm::get_shared_realm(config);
+    // force readlock allocation NOW!
+    // captured->read_group();
+    for (int j = 0; j < num_iterations; ++j) {
+
+        // pick a random earlier transaction
+        int trans_number = (unsigned)random_int() % num_pending_transactions;
+        auto& entry = refs[trans_number];
+
+        // refresh chosen transaction so as to trigger notifications.
+        if (entry.realm && !entry.realm->is_frozen()) {
+            auto& r = entry.realm;
+            REALM_ASSERT(r->is_in_read_transaction());
+            auto before = r->current_transaction_version();
+            r->refresh();
+            auto after = r->current_transaction_version();
+            REALM_ASSERT(before != after);
+        }
+
+        // set up and save a new realm for later refresh, replacing the old one
+        // which we refreshed above
+        int should_freeze = (random_int() % 5) != 0; // freeze 80%
+        auto realm2 = should_freeze ? realm->freeze() : Realm::get_shared_realm(config);
+        entry.realm = realm2;
+        int key = (unsigned)random_int() % num_objects;
+        auto table2 = realm2->read_group().get_table(table_key);
+        auto& o = entry.o;
+        o = Object(realm2, table2->get_object(key));
+        entry.value = o.obj().get<Int>(col);
+        entry.link = o.obj().get<ObjKey>(link_col);
+        auto linked = table2->get_object(entry.link);
+        entry.linked_value = linked.get<Int>(col);
+        // add a dummy notification callback to later exercise the notification machinery
+        if (!entry.realm->is_frozen()) {
+            entry.token = o.add_notification_callback([&](CollectionChangeSet) {
+                ++notifications;
+            });
+        }
+        // create a number of new transactions.....
+        for (int i = 0; i < num_trans_forgotten_rapidly; ++i) {
+            realm->begin_transaction();
+            auto key = ObjKey((unsigned)random_int() % num_objects);
+            auto o = table->get_object(key);
+            o.set(col, o.get<Int>(col) + j + 42);
+            int link = (unsigned)random_int() % num_objects;
+            o.set(link_col, ObjKey(link));
+            realm->commit_transaction();
+        }
+        // verify a number of randomly selected saved transactions
+        for (int k = 0; k < num_checks_pr_trans; ++k) {
+            auto& entry = refs[(unsigned)random_int() % num_pending_transactions];
+            if (entry.realm) {
+                CHECK(entry.value == entry.o.obj().get<Int>(col));
+                auto link = entry.o.obj().get<ObjKey>(link_col);
+                CHECK(link == entry.link);
+                auto table = entry.realm->read_group().get_table(table_key);
+                auto linked_value = table->get_object(link).get<Int>(col);
+                CHECK(entry.linked_value == linked_value);
+            }
+        }
+    }
+    // captured.reset();
+    realm->begin_transaction();
+    realm->commit_transaction();
+    realm->begin_transaction();
+    realm->commit_transaction();
+    refs.clear();
+    realm->begin_transaction();
+    realm->commit_transaction();
+    realm->begin_transaction();
+    realm->commit_transaction();
 }
 
 TEST_CASE("Freeze Object", "[freeze_object]") {
@@ -416,7 +526,8 @@ TEST_CASE("Freeze Object", "[freeze_object]") {
     }
 
     SECTION("add_notification throws") {
-        REQUIRE_THROWS(frozen_obj.add_notification_callback([&](CollectionChangeSet) {}));
+        REQUIRE_EXCEPTION(frozen_obj.add_notification_callback([&](CollectionChangeSet) {}), WrongTransactionState,
+                          "Notifications are not available on frozen collections since they do not change.");
     }
 
     SECTION("read across threads") {
@@ -491,8 +602,12 @@ TEST_CASE("Freeze dictionary", "[freeze_dictionary]") {
     }
 
     SECTION("add_notification throws") {
-        REQUIRE_THROWS(frozen_obj_dict.add_notification_callback([&](CollectionChangeSet) {}));
-        REQUIRE_THROWS(frozen_int_dict.add_notification_callback([&](CollectionChangeSet) {}));
+        REQUIRE_EXCEPTION(frozen_obj_dict.add_notification_callback([&](CollectionChangeSet) {}),
+                          WrongTransactionState,
+                          "Notifications are not available on frozen collections since they do not change.");
+        REQUIRE_EXCEPTION(frozen_int_dict.add_notification_callback([&](CollectionChangeSet) {}),
+                          WrongTransactionState,
+                          "Notifications are not available on frozen collections since they do not change.");
     }
 
     SECTION("read across threads") {

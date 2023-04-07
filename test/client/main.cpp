@@ -33,7 +33,6 @@
 #include <realm/util/buffer.hpp>
 #include <realm/util/random.hpp>
 #include <realm/util/thread.hpp>
-#include <realm/util/network.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/load_file.hpp>
@@ -45,6 +44,7 @@
 #include <realm/util/json_parser.hpp>
 #include <realm/sync/impl/clock.hpp>
 #include <realm/version.hpp>
+#include <realm/sync/network/network.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/client.hpp>
 
@@ -126,24 +126,6 @@ std::uniform_int_distribution<T> make_distr(T min, T max)
 }
 
 
-class ThresholdOverrideLogger : public util::RootLogger {
-public:
-    ThresholdOverrideLogger(util::Logger& base_logger)
-        : util::RootLogger{}
-        , m_base_logger{base_logger}
-    {
-    }
-
-    void do_log(Logger::Level level, std::string message) override final
-    {
-        util::Logger::do_log(m_base_logger, level, message);
-    }
-
-private:
-    util::Logger& m_base_logger;
-};
-
-
 class MainEventLoop {
 public:
     MainEventLoop(sync::Client&, bool interactive);
@@ -221,14 +203,14 @@ inline void MainEventLoop::end_of_test_proc() noexcept
 
 
 struct PeerControl {
-    PeerControl(util::network::Service&);
+    PeerControl(sync::network::Service&);
     int phase_ndx = 0;
     int transact_ndx = 0;
     int download_wait_ndx = 0;
-    util::network::DeadlineTimer transact_timer;
+    sync::network::DeadlineTimer transact_timer;
 };
 
-inline PeerControl::PeerControl(util::network::Service& service)
+inline PeerControl::PeerControl(sync::network::Service& service)
     : transact_timer{service}
 {
 }
@@ -1074,17 +1056,17 @@ int main(int argc, char* argv[])
         util::set_soft_rlimit(util::Resource::core_dump_size, -1);
 
     util::Thread::set_name("main");
-    std::unique_ptr<util::Logger> root_logger;
+    std::shared_ptr<util::Logger> root_logger;
     if (log_timestamps) {
         util::TimestampStderrLogger::Config config;
         config.precision = util::TimestampStderrLogger::Precision::milliseconds;
         config.format = "%FT%T";
-        root_logger = std::make_unique<util::TimestampStderrLogger>(std::move(config));
+        root_logger = std::make_shared<util::TimestampStderrLogger>(std::move(config), log_level);
     }
     else {
-        root_logger = std::make_unique<util::StderrLogger>();
+        root_logger = std::make_shared<util::StderrLogger>(log_level);
     }
-    util::ThreadSafeLogger logger{*root_logger, log_level};
+    util::ThreadSafeLogger logger{root_logger};
     logger.info("Test client started");
 
     Metrics metrics{metrics_prefix, statsd_address, statsd_port};
@@ -1094,12 +1076,10 @@ int main(int argc, char* argv[])
 
     Peer::Context* context_ptr = nullptr;
 
-    ThresholdOverrideLogger sync_base_logger{logger};
-    sync_base_logger.set_level_threshold(sync_log_level);
-    util::PrefixLogger sync_logger{"Sync: ", sync_base_logger};
     sync::Client::Config config;
     config.user_agent_application_info = "TestClient/" REALM_VERSION_STRING;
-    config.logger = &sync_logger;
+    config.logger = std::make_shared<util::PrefixLogger>("Sync: ", logger);
+    config.logger->set_level_threshold(sync_log_level); // Overrides the default local level of the prefix logger
     config.one_connection_per_session = connection_per_session;
     config.dry_run = dry_run;
     config.ping_keepalive_period = time_between_pings;
@@ -1119,7 +1099,7 @@ int main(int argc, char* argv[])
 
     sync::ProtocolEnvelope protocol_envelope;
     std::string server_address;
-    util::network::Endpoint::port_type server_port = 0;
+    sync::network::Endpoint::port_type server_port = 0;
     if (have_server_url) {
         std::string path;
         bool good_url =
@@ -1139,9 +1119,8 @@ int main(int argc, char* argv[])
             auth_ssl = true;
             break;
     }
-    util::PrefixLogger auth_logger{"Auth: ", sync_base_logger};
     sync::auth::Client::Config auth_config;
-    auth_config.logger = &auth_logger;
+    auth_config.logger = std::make_shared<util::PrefixLogger>("Auth: ", logger);
     auth_config.request_base_path = request_base_path;
     sync::auth::Client auth{auth_ssl, server_address, server_port, app_id, std::move(auth_config)};
 
@@ -1158,7 +1137,7 @@ int main(int argc, char* argv[])
     util::Optional<std::string> ssl_trust_certificate_path =
         (ssl_trust_cert == "" ? util::none : util::Optional<std::string>(ssl_trust_cert));
 
-    util::network::Service test_proc_service;
+    sync::network::Service test_proc_service;
 
     auto on_sync_error = [&](bool is_fatal) {
         switch (abort_on_error) {
@@ -1188,7 +1167,7 @@ int main(int argc, char* argv[])
         std::string username;
         std::vector<std::string> queries;
     };
-    std::string host_name = util::network::host_name();
+    std::string host_name = sync::network::host_name();
     std::unique_ptr<PeerParams[]> peer_params = std::make_unique<PeerParams[]>(num_peers);
     {
         int peer_ndx = 0;
@@ -1571,7 +1550,7 @@ int main(int argc, char* argv[])
         }
     };
 
-    util::network::DeadlineTimer growth_timer{test_proc_service};
+    sync::network::DeadlineTimer growth_timer{test_proc_service};
     int current_num_peers = 0;
     int growth_ndx = 0;
     std::function<void()> grow = [&] {
@@ -1608,7 +1587,7 @@ int main(int argc, char* argv[])
         test_proc_service.post(func);
     }
 
-    util::network::DeadlineTimer keep_alive_timer{test_proc_service};
+    sync::network::DeadlineTimer keep_alive_timer{test_proc_service};
     std::function<void()> sched_keep_alive_wait;
     sched_keep_alive_wait = [&] {
         auto handler = [&](std::error_code ec) {

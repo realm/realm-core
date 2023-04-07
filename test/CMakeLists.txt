@@ -2,9 +2,10 @@ add_subdirectory(util)
 add_custom_target(benchmarks)
 add_subdirectory(object-store)
 
-# AFL not yet supported by Windows
+# AFL and LIBFUZZER not yet supported by Windows
 if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
     add_subdirectory(fuzzy)
+    add_subdirectory(realm-fuzzer)
 endif()
 
 add_subdirectory(benchmark-common-tasks)
@@ -38,6 +39,7 @@ set(CORE_TEST_SOURCES
     test_column_float.cpp
     test_column_string.cpp
     test_column_timestamp.cpp
+    test_compaction.cpp
     test_db.cpp
     test_decimal128.cpp
     test_destroy_guard.cpp
@@ -120,7 +122,7 @@ set(CORE_TESTS ${CORE_TEST_SOURCES} ${LARGE_TEST_SOURCES} ${FUZZY_TEST_SOURCES})
 # FIXME: Benchmarks
 
 if (MSVC)
-    set_source_files_properties(test_query.cpp test_query_big.cpp PROPERTIES COMPILE_FLAGS /bigobj)
+    append_source_file_compile_options(FILES test_query.cpp test_query_big.cpp FLAGS /bigobj)
 endif()
 
 # Resources required for running the tests
@@ -179,12 +181,12 @@ if(REALM_ENABLE_SYNC)
         test_instruction_replication.cpp
         test_lang_bind_helper_sync.cpp
         test_noinst_server_dir.cpp
-        test_server_history.cpp
         test_stable_ids.cpp
         test_sync.cpp
         test_sync_auth.cpp
         test_sync_history_migration.cpp
         test_sync_subscriptions.cpp
+        test_sync_pending_bootstraps.cpp
         test_transform.cpp
         test_util_buffer_stream.cpp
         test_util_circular_buffer.cpp

@@ -50,6 +50,7 @@ blank   [ \t\r]
 (?i:beginswith)             return yy::parser::make_BEGINSWITH(yytext);
 (?i:endswith)               return yy::parser::make_ENDSWITH(yytext);
 (?i:contains)               return yy::parser::make_CONTAINS(yytext);
+(?i:text)                   return yy::parser::make_TEXT(yytext);
 (?i:like)                   return yy::parser::make_LIKE(yytext);
 (?i:between)                return yy::parser::make_BETWEEN(yytext);
 (?i:truepredicate)          return yy::parser::make_TRUEPREDICATE (); 

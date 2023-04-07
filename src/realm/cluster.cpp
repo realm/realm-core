@@ -17,7 +17,6 @@
  **************************************************************************/
 
 #include "realm/cluster.hpp"
-#include "realm/dictionary_cluster_tree.hpp"
 #include "realm/array_integer.hpp"
 #include "realm/array_basic.hpp"
 #include "realm/array_bool.hpp"
@@ -190,11 +189,11 @@ void Cluster::create()
                 do_create<ArrayBacklink>(col_key);
                 break;
             default:
-                throw LogicError(LogicError::illegal_type);
+                REALM_UNREACHABLE();
         }
         return IteratorControl::AdvanceToNext;
     };
-    m_tree_top.for_each_and_every_column(column_initialize);
+    m_tree_top.m_owner->for_each_and_every_column(column_initialize);
 
     // By specifying the minimum size, we ensure that the array has a capacity
     // to hold m_size 64 bit refs.
@@ -311,12 +310,12 @@ inline void Cluster::do_insert_mixed(size_t ndx, ColKey col_key, Mixed init_valu
         // be handled in Dictionary::insert function
         if (Table* origin_table = const_cast<Table*>(m_tree_top.get_owning_table())) {
             if (origin_table->is_asymmetric()) {
-                throw LogicError(LogicError::wrong_kind_of_table);
+                throw IllegalOperation("Object value not supported in asymmetric table");
             }
             ObjLink link = init_value.get<ObjLink>();
             auto target_table = origin_table->get_parent_group()->get_table(link.get_table_key());
             if (target_table->is_asymmetric()) {
-                throw LogicError(LogicError::wrong_kind_of_table);
+                throw IllegalOperation("Ephemeral object value not supported");
             }
             ColKey backlink_col_key = target_table->find_or_add_backlink_column(col_key, origin_table->get_key());
             target_table->get_object(link.get_obj_key()).add_backlink(backlink_col_key, origin_key);
@@ -436,7 +435,7 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
         }
         return IteratorControl::AdvanceToNext;
     };
-    m_tree_top.for_each_and_every_column(insert_in_column);
+    m_tree_top.m_owner->for_each_and_every_column(insert_in_column);
 }
 
 template <class T>
@@ -525,7 +524,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
         }
         return IteratorControl::AdvanceToNext;
     };
-    m_tree_top.for_each_and_every_column(move_from_column);
+    m_tree_top.m_owner->for_each_and_every_column(move_from_column);
     for (size_t i = ndx; i < m_keys.size(); i++) {
         new_leaf->m_keys.add(m_keys.get(i) - offset);
     }
@@ -645,7 +644,7 @@ void Cluster::insert_column(ColKey col_key)
             do_insert_column<ArrayBacklink>(col_key, nullable);
             break;
         default:
-            throw LogicError(LogicError::illegal_type);
+            REALM_UNREACHABLE();
             break;
     }
 }
@@ -944,7 +943,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
         }
         return IteratorControl::AdvanceToNext;
     };
-    m_tree_top.for_each_and_every_column(erase_in_column);
+    m_tree_top.m_owner->for_each_and_every_column(erase_in_column);
 
     // Any remaining backlink columns to erase from?
     for (auto k : backlink_column_keys)
@@ -1179,11 +1178,9 @@ void Cluster::verify() const
                 sz = arr.size();
             }
             for (size_t n = 0; n < sz; n++) {
-                if (arr.get(n)) {
-                    auto key_type = get_owning_table()->get_dictionary_key_type(col_key);
-                    DictionaryClusterTree cluster(&arr, key_type, get_alloc(), n);
-                    cluster.init_from_parent();
-                    cluster.verify();
+                if (auto ref = arr.get(n)) {
+                    Dictionary dict(get_alloc(), col_key, to_ref(ref));
+                    dict.verify();
                 }
             }
             return IteratorControl::AdvanceToNext;
@@ -1296,7 +1293,7 @@ void Cluster::verify() const
         return IteratorControl::AdvanceToNext;
     };
 
-    m_tree_top.for_each_and_every_column(verify_column);
+    m_tree_top.m_owner->for_each_and_every_column(verify_column);
 #endif
 }
 
@@ -1317,7 +1314,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
             key_value = int64_t(i);
         }
         std::cout << lead << "key: " << std::hex << key_value + key_offset << std::dec;
-        m_tree_top.for_each_and_every_column([&](ColKey col) {
+        m_tree_top.m_owner->for_each_and_every_column([&](ColKey col) {
             size_t j = col.get_index().val + 1;
             if (col.get_attrs().test(col_attr_List)) {
                 ref_type ref = Array::get_as_ref(j);

@@ -2,6 +2,7 @@
 #ifdef TEST_UTIL_FILE
 
 #include <realm/util/file.hpp>
+#include <filesystem>
 
 #include "test.hpp"
 #include <cstdio>
@@ -63,7 +64,8 @@ TEST(Utils_File_dir)
     try {
         make_dir(dir_name);
     }
-    catch (const File::Exists& e) {
+    catch (const FileAccessError& e) {
+        CHECK_EQUAL(e.code(), ErrorCodes::FileAlreadyExists);
         CHECK_EQUAL(e.get_path(), dir_name);
         dir_exists = File::is_dir(dir_name);
     }
@@ -74,7 +76,7 @@ TEST(Utils_File_dir)
     try {
         make_dir("/foobar");
     }
-    catch (const File::AccessError& e) {
+    catch (const FileAccessError& e) {
         CHECK_EQUAL(e.get_path(), "/foobar");
         perm_denied = true;
     }
@@ -84,7 +86,7 @@ TEST(Utils_File_dir)
     try {
         remove_dir("/usr");
     }
-    catch (const File::AccessError& e) {
+    catch (const FileAccessError& e) {
         CHECK_EQUAL(e.get_path(), "/usr");
         perm_denied = true;
     }
@@ -96,7 +98,8 @@ TEST(Utils_File_dir)
     try {
         remove_dir(dir_name);
     }
-    catch (const File::NotFound& e) {
+    catch (const FileAccessError& e) {
+        CHECK_EQUAL(e.code(), ErrorCodes::FileNotFound);
         CHECK_EQUAL(e.get_path(), dir_name);
         dir_exists = false;
     }
@@ -114,9 +117,10 @@ TEST(Utils_File_dir)
 
 TEST(Utils_File_dir_unicode)
 {
-    // Test make_dir and remove_dir with paths that include special characters
-    // This would previously fail on Windows
-    std::string dir_name = File::resolve("temporäreDatei", test_util::get_test_path_prefix());
+    using std::filesystem::u8path;
+
+    constexpr char all_the_unicode[] = u8"фоо-бар Λορεμ ლორემ 植物 החלל جمعت søren";
+    std::string dir_name = File::resolve(all_the_unicode, test_util::get_test_path_prefix());
 
     // Create directory
     bool dir_exists = File::is_dir(dir_name);
@@ -126,18 +130,28 @@ TEST(Utils_File_dir_unicode)
     try {
         make_dir(dir_name);
     }
-    catch (const File::Exists& e) {
+    catch (const FileAccessError& e) {
+        CHECK_EQUAL(e.code(), ErrorCodes::FileAlreadyExists);
         CHECK_EQUAL(e.get_path(), dir_name);
         dir_exists = File::is_dir(dir_name);
     }
     CHECK(dir_exists);
+
+    // Double-check using filesystem facilities with enforce UTF-8 handling
+    CHECK(std::filesystem::exists(u8path(test_util::get_test_path_prefix()) / u8path(all_the_unicode)));
+
+    // Create file
+    File f(File::resolve("test.realm", dir_name), File::mode_Write);
+    f.close();
+    File::remove(f.get_path());
 
     // Remove directory
     remove_dir(dir_name);
     try {
         remove_dir(dir_name);
     }
-    catch (const File::NotFound& e) {
+    catch (const FileAccessError& e) {
+        CHECK_EQUAL(e.code(), ErrorCodes::FileNotFound);
         CHECK_EQUAL(e.get_path(), dir_name);
         dir_exists = false;
     }
@@ -157,7 +171,15 @@ TEST(Utils_File_resolve)
 {
     std::string res;
     res = File::resolve("", "");
+
+#if REALM_HAVE_STD_FILESYSTEM
+    // The std::filesystem-based implementation canonicalizes the resolved path in terms of '.' and '..'
+    // This doesn't affect the actual behavior of the file APIs since 'some/dir/.' == 'some/dir'
+    // but it does produce a different string value.
+    CHECK_EQUAL(res, "");
+#else
     CHECK_EQUAL(res, ".");
+#endif
 
 #ifdef _WIN32
     res = File::resolve("C:\\foo\\bar", "dir");
@@ -189,47 +211,6 @@ TEST(Utils_File_resolve)
     res = File::resolve("../baz", "/foo/bar");
     CHECK_EQUAL(res, "/foo/baz");
     */
-}
-
-#ifndef _WIN32 // An open file cannot be deleted on Windows
-TEST(Utils_File_remove_open)
-{
-    if (test_util::test_dir_is_exfat())
-        return;
-
-    std::string file_name = File::resolve("FooBar", test_util::get_test_path_prefix());
-    File f(file_name, File::mode_Write);
-
-    CHECK_EQUAL(f.is_removed(), false);
-    std::remove(file_name.c_str());
-    CHECK_EQUAL(f.is_removed(), true);
-}
-#endif
-
-TEST(Utils_File_RemoveDirRecursive)
-{
-    TEST_DIR(dir_0);
-    auto touch = [](const std::string& path) {
-        File(path, File::mode_Write);
-    };
-    std::string dir_1  = File::resolve("dir_1",  dir_0);
-    make_dir(dir_1);
-    std::string dir_2  = File::resolve("dir_2",  dir_1);
-    make_dir(dir_2);
-    std::string dir_3  = File::resolve("dir_3",  dir_2);
-    make_dir(dir_3);
-    std::string file_1 = File::resolve("file_1", dir_2);
-    touch(file_1);
-    std::string dir_4  = File::resolve("dir_4",  dir_2);
-    make_dir(dir_4);
-    std::string file_2 = File::resolve("file_2", dir_2);
-    touch(file_2);
-    std::string file_3 = File::resolve("file_3", dir_3);
-    touch(file_3);
-    std::string file_4 = File::resolve("file_4", dir_4);
-    touch(file_4);
-    remove_dir_recursive(dir_1);
-    remove_dir(dir_0);
 }
 
 TEST(Utils_File_TryRemoveDirRecursive)
@@ -307,6 +288,20 @@ TEST(Utils_File_ForEach)
         CHECK_EQUAL(dir_2_4,  files[5].first);
         CHECK_EQUAL("file_6", files[5].second);
     }
+}
+
+TEST(Utils_File_Lock)
+{
+    TEST_DIR(dir);
+    util::try_make_dir(dir);
+    auto file = File::resolve("test", dir);
+    File f1(file, File::mode_Write);
+    File f2(file);
+    CHECK(f1.try_rw_lock_exclusive());
+    CHECK_NOT(f2.try_rw_lock_shared());
+    f1.rw_unlock();
+    CHECK(f1.try_rw_lock_shared());
+    CHECK_NOT(f2.try_rw_lock_exclusive());
 }
 
 #endif

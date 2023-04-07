@@ -7,6 +7,7 @@ set(SYNC_SOURCES
     noinst/client_reset_operation.cpp
     noinst/client_reset_recovery.cpp
     noinst/compact_changesets.cpp
+    noinst/migration_store.cpp
     noinst/pending_bootstrap_store.cpp
     noinst/protocol_codec.cpp
     noinst/sync_metadata_schema.cpp
@@ -22,10 +23,11 @@ set(SYNC_SOURCES
     protocol.cpp
     subscriptions.cpp
     transform.cpp
-    ../util/network_ssl.cpp
-    ../util/network.cpp
-    ../util/websocket.cpp
-    ../util/ez_websocket.cpp
+    network/default_socket.cpp
+    network/http.cpp
+    network/network.cpp
+    network/network_ssl.cpp
+    network/websocket.cpp
 )
 
 set(IMPL_INSTALL_HEADERS
@@ -34,12 +36,14 @@ set(IMPL_INSTALL_HEADERS
 )
 
 set(SYNC_INSTALL_HEADERS
+    binding_callback_thread_observer.hpp
     config.hpp
     changeset_encoder.hpp
     changeset_parser.hpp
     changeset.hpp
     client.hpp
     client_base.hpp
+    socket_provider.hpp
     history.hpp
     instruction_applier.hpp
     instruction_replication.hpp
@@ -50,9 +54,17 @@ set(SYNC_INSTALL_HEADERS
     transform.hpp
 )
 
+set(SYNC_NETWORK_INSTALL_HEADERS
+    network/default_socket.hpp
+    network/http.hpp
+    network/network.hpp
+    network/network_ssl.hpp
+    network/websocket.hpp
+)
+
 set(NOINST_HEADERS
-    ../util/http.hpp
-    ../util/websocket.hpp
+    trigger.hpp
+
     noinst/changeset_index.hpp
     noinst/client_history_impl.hpp
     noinst/client_impl_base.hpp
@@ -61,6 +73,7 @@ set(NOINST_HEADERS
     noinst/client_reset_recovery.hpp
     noinst/compact_changesets.hpp
     noinst/integer_codec.hpp
+    noinst/migration_store.hpp
     noinst/pending_bootstrap_store.hpp
     noinst/protocol_codec.hpp
     noinst/root_certs.hpp
@@ -82,7 +95,7 @@ target_link_libraries(Sync PUBLIC Storage)
 
 if(APPLE AND NOT REALM_FORCE_OPENSSL)
     target_link_options(Sync INTERFACE "SHELL:-framework Security")
-else()
+elseif(REALM_HAVE_OPENSSL)
     target_link_libraries(Sync PUBLIC OpenSSL::SSL)
 endif()
 
@@ -109,6 +122,10 @@ install(FILES ${IMPL_INSTALL_HEADERS}
 
 install(FILES ${SYNC_INSTALL_HEADERS}
         DESTINATION include/realm/sync
+        COMPONENT devel)
+
+install(FILES ${SYNC_NETWORK_INSTALL_HEADERS}
+        DESTINATION include/realm/sync/network
         COMPONENT devel)
 
 install(FILES ${UTIL_INSTALL_HEADERS}

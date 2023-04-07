@@ -22,6 +22,8 @@
 #include <cstddef>
 #include <sstream>
 
+#include <realm/util/span.hpp>
+
 namespace realm {
 namespace util {
 
@@ -47,6 +49,9 @@ public:
     /// of the stream buffer, or since the last invocation of reset()
     /// (std::basic_streambuf::pptr() - std::basic_streambuf::pbase()).
     std::size_t size() const noexcept;
+
+    util::Span<C> as_span() noexcept;
+    util::Span<const C> as_span() const noexcept;
 };
 
 
@@ -68,6 +73,9 @@ public:
 
     /// Calls BasicResettableExpandableOutputStreambuf::size().
     std::size_t size() const noexcept;
+
+    util::Span<C> as_span() noexcept;
+    util::Span<const C> as_span() const noexcept;
 
 private:
     BasicResettableExpandableOutputStreambuf<C, T, A> m_streambuf;
@@ -109,6 +117,18 @@ inline std::size_t BasicResettableExpandableOutputStreambuf<C, T, A>::size() con
 }
 
 template <class C, class T, class A>
+inline util::Span<C> BasicResettableExpandableOutputStreambuf<C, T, A>::as_span() noexcept
+{
+    return util::Span<C>(data(), size());
+}
+
+template <class C, class T, class A>
+inline util::Span<const C> BasicResettableExpandableOutputStreambuf<C, T, A>::as_span() const noexcept
+{
+    return util::Span<const C>(data(), size());
+}
+
+template <class C, class T, class A>
 inline BasicResettableExpandableBufferOutputStream<C, T, A>::BasicResettableExpandableBufferOutputStream()
     : std::basic_ostream<C, T>(&m_streambuf) // Throws
 {
@@ -138,6 +158,18 @@ template <class C, class T, class A>
 inline std::size_t BasicResettableExpandableBufferOutputStream<C, T, A>::size() const noexcept
 {
     return m_streambuf.size();
+}
+
+template <class C, class T, class A>
+inline util::Span<C> BasicResettableExpandableBufferOutputStream<C, T, A>::as_span() noexcept
+{
+    return util::Span<C>(m_streambuf.data(), m_streambuf.size());
+}
+
+template <class C, class T, class A>
+inline util::Span<const C> BasicResettableExpandableBufferOutputStream<C, T, A>::as_span() const noexcept
+{
+    return util::Span<const C>(m_streambuf.data(), m_streambuf.size());
 }
 
 } // namespace util

@@ -29,6 +29,29 @@
 using namespace realm;
 using namespace realm::util;
 
+namespace Catch {
+template <>
+struct StringMaker<SyncSession::State> {
+    static std::string convert(SyncSession::State state)
+    {
+        switch (state) {
+            case SyncSession::State::Active:
+                return "Active";
+            case SyncSession::State::Dying:
+                return "Dying";
+            case SyncSession::State::Inactive:
+                return "Inactive";
+            case SyncSession::State::WaitingForAccessToken:
+                return "WaitingForAccessToken";
+            case SyncSession::State::Paused:
+                return "Paused";
+            default:
+                return "Unknown";
+        }
+    }
+};
+} // namespace Catch
+
 inline bool sessions_are_active(const SyncSession& session)
 {
     return session.state() == SyncSession::State::Active;

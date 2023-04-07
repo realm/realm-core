@@ -19,16 +19,59 @@
 #include <realm/util/logger.hpp>
 
 #include <iostream>
+#include <mutex>
 
 namespace realm::util {
+
+namespace {
+auto& s_logger_mutex = *new std::mutex;
+std::shared_ptr<util::Logger> s_default_logger;
+std::atomic<Logger::Level> s_default_level = Logger::Level::info;
+} // anonymous namespace
+
+void Logger::set_default_logger(std::shared_ptr<util::Logger> logger) noexcept
+{
+    std::lock_guard lock(s_logger_mutex);
+    s_default_logger = logger;
+}
+
+std::shared_ptr<util::Logger>& Logger::get_default_logger() noexcept
+{
+    std::lock_guard lock(s_logger_mutex);
+    if (!s_default_logger) {
+        s_default_logger = std::make_shared<StderrLogger>();
+        s_default_logger->set_level_threshold(s_default_level);
+    }
+
+    return s_default_logger;
+}
+
+void Logger::set_default_level_threshold(Level level) noexcept
+{
+    std::lock_guard lock(s_logger_mutex);
+    s_default_level = level;
+    if (s_default_logger)
+        s_default_logger->set_level_threshold(level);
+}
+
+Logger::Level Logger::get_default_level_threshold() noexcept
+{
+    return s_default_level.load(std::memory_order_relaxed);
+}
 
 const char* Logger::get_level_prefix(Level level) noexcept
 {
     switch (level) {
+        case Level::off:
+            [[fallthrough]];
         case Level::all:
+            [[fallthrough]];
         case Level::trace:
+            [[fallthrough]];
         case Level::debug:
+            [[fallthrough]];
         case Level::detail:
+            [[fallthrough]];
         case Level::info:
             break;
         case Level::warn:
@@ -37,33 +80,34 @@ const char* Logger::get_level_prefix(Level level) noexcept
             return "ERROR: ";
         case Level::fatal:
             return "FATAL: ";
-        case Level::off:
-            break;
     }
     return "";
 }
 
 void StderrLogger::do_log(Level level, const std::string& message)
 {
+    // std::cerr is unbuffered, so no need to flush
     std::cerr << get_level_prefix(level) << message << '\n'; // Throws
-    std::cerr.flush();                                       // Throws
 }
 
 void StreamLogger::do_log(Level level, const std::string& message)
 {
-    m_out << get_level_prefix(level) << message << '\n'; // Throws
-    m_out.flush();                                       // Throws
+    m_out << get_level_prefix(level) << message << std::endl; // Throws
 }
 
 void ThreadSafeLogger::do_log(Level level, const std::string& message)
 {
     LockGuard l(m_mutex);
-    Logger::do_log(m_base_logger, level, message); // Throws
+    Logger::do_log(*m_base_logger_ptr, level, message); // Throws
 }
 
 void PrefixLogger::do_log(Level level, const std::string& message)
 {
-    Logger::do_log(m_base_logger, level, m_prefix + message); // Throws
+    Logger::do_log(m_chained_logger, level, m_prefix + message); // Throws
 }
 
+void LocalThresholdLogger::do_log(Logger::Level level, std::string const& message)
+{
+    Logger::do_log(*m_chained_logger, level, message); // Throws
+}
 } // namespace realm::util

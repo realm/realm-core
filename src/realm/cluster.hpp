@@ -54,11 +54,19 @@ public:
     FieldValues() {}
     FieldValues(std::initializer_list<FieldValue>);
     void insert(ColKey k, Mixed val, bool is_default = false);
-    auto begin() const
+    auto begin() const noexcept
     {
         return m_values.begin();
     }
-    auto end() const
+    auto end() const noexcept
+    {
+        return m_values.end();
+    }
+    auto begin() noexcept
+    {
+        return m_values.begin();
+    }
+    auto end() noexcept
     {
         return m_values.end();
     }
@@ -298,7 +306,6 @@ public:
 
 private:
     friend class ClusterTree;
-    friend class TableClusterTree;
 
     static constexpr size_t s_key_ref_or_size_index = 0;
     static constexpr size_t s_first_col_index = 1;

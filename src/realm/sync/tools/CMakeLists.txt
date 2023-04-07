@@ -11,12 +11,6 @@ set_target_properties(InspectorPrintChangeset PROPERTIES
                       DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
 target_link_libraries(InspectorPrintChangeset Sync Storage)
 
-add_executable(StatCommand stat_command.cpp)
-set_target_properties(StatCommand PROPERTIES
-                      OUTPUT_NAME "realm-stat"
-                      DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
-target_link_libraries(StatCommand Sync Storage)
-
 add_executable(ApplyToStateCommand apply_to_state_command.cpp)
 set_target_properties(ApplyToStateCommand PROPERTIES
                       OUTPUT_NAME "realm-apply-to-state"
@@ -30,7 +24,6 @@ set_target_properties(HistCommand PROPERTIES
 target_link_libraries(HistCommand Sync Storage)
 
 install(TARGETS
-    StatCommand
     HistCommand
     ApplyToStateCommand
     InspectorInspectClientRealm

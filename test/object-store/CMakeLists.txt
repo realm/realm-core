@@ -1,5 +1,6 @@
 set(HEADERS
     ../util/crypt_key.hpp
+    ../util/spawned_process.hpp
     ../util/test_path.hpp
     util/event_loop.hpp
     util/index_helpers.hpp
@@ -32,6 +33,7 @@ set(SOURCES
     c_api/c_api.c
 
     ../util/crypt_key.cpp
+    ../util/spawned_process.cpp
     ../util/test_path.cpp
     util/event_loop.cpp
     util/test_file.cpp
@@ -56,6 +58,7 @@ if(REALM_ENABLE_SYNC)
         bson.cpp
         sync/client_reset.cpp
         sync/file.cpp
+        sync/flx_migration.cpp
         sync/flx_sync.cpp
         sync/metadata.cpp
         sync/remote_mongo_tests.cpp
@@ -90,6 +93,7 @@ add_bundled_test(ObjectStoreTests)
 if(REALM_ENABLE_SYNC)
     target_link_libraries(ObjectStoreTests SyncServer)
     option(REALM_ENABLE_AUTH_TESTS "" OFF)
+    option(REALM_SYNC_PROTOCOL_V8 "" OFF)
     if(REALM_ENABLE_AUTH_TESTS)
         if(NOT REALM_MONGODB_ENDPOINT)
             message(FATAL_ERROR "REALM_MONGODB_ENDPOINT must be set when specifying REALM_ENABLE_AUTH_TESTS.")
@@ -103,16 +107,19 @@ if(REALM_ENABLE_SYNC)
         find_package(CURL REQUIRED)
         target_link_libraries(ObjectStoreTests CURL::libcurl)
     endif()
+    if(REALM_SYNC_PROTOCOL_V8)
+        target_compile_definitions(ObjectStoreTests PRIVATE REALM_SYNC_PROTOCOL_V8=1)
+    endif()
 endif()
 
-if(REALM_TEST_SYNC_LOGGING)
+if(REALM_TEST_LOGGING)
     target_compile_definitions(ObjectStoreTests PRIVATE
-        TEST_ENABLE_SYNC_LOGGING=1
+        TEST_ENABLE_LOGGING=1
     )
 
-    if(REALM_TEST_SYNC_LOGGING_LEVEL)
+    if(REALM_TEST_LOGGING_LEVEL)
         target_compile_definitions(ObjectStoreTests PRIVATE
-            TEST_ENABLE_SYNC_LOGGING_LEVEL=${REALM_TEST_SYNC_LOGGING_LEVEL}
+            TEST_LOGGING_LEVEL=${REALM_TEST_LOGGING_LEVEL}
         )
     endif()
 endif()

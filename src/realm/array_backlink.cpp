@@ -21,6 +21,7 @@
 #include <realm/table.hpp>
 #include <realm/group.hpp>
 #include <realm/list.hpp>
+#include <realm/set.hpp>
 #include <realm/dictionary.hpp>
 
 using namespace realm;
@@ -194,19 +195,32 @@ void ArrayBacklink::verify() const
     ColKey src_col_key = target_table->get_opposite_column(backlink_col_key);
 
     // Verify that each backlink has a corresponding forward link
-    ColumnAttrMask src_attr = src_col_key.get_attrs();
     for (size_t i = 0; i < size(); ++i) {
         ObjKey target_key = cluster->get_real_key(i);
+        ObjLink target_link(target_table->get_key(), target_key);
         auto cnt = get_backlink_count(i);
         for (size_t j = 0; j < cnt; ++j) {
             Obj src_obj = src_table->get_object(get_backlink(i, j));
-            if (src_attr.test(col_attr_List)) {
+            if (src_col_key.is_dictionary()) {
+                REALM_ASSERT(src_obj.get_dictionary_ptr(src_col_key)->find_any(target_link) != npos);
+                continue;
+            }
+
+            if (src_col_key.get_type() == col_type_Mixed) {
+                if (src_col_key.is_collection()) {
+                    REALM_ASSERT(src_obj.get_collection_ptr(src_col_key)->find_any(target_link) != npos);
+                }
+                else {
+                    REALM_ASSERT(src_obj.get<Mixed>(src_col_key).get_link() == target_link);
+                }
+                continue;
+            }
+
+            if (src_col_key.is_list()) {
                 REALM_ASSERT(src_obj.get_list<ObjKey>(src_col_key).find_first(target_key) != npos);
             }
-            else if (src_attr.test(col_attr_Dictionary)) {
-                // The link is stored as type_TypedLink in Dictionary
-                ObjLink link(target_table->get_key(), target_key);
-                REALM_ASSERT(src_obj.get_dictionary(src_col_key).find_any(link) != npos);
+            else if (src_col_key.is_set()) {
+                REALM_ASSERT(src_obj.get_set<ObjKey>(src_col_key).find(target_key) != npos);
             }
             else {
                 REALM_ASSERT(src_obj.get_unfiltered_link(src_col_key) == target_key);

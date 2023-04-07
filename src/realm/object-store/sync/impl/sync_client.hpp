@@ -19,9 +19,9 @@
 #ifndef REALM_OS_SYNC_CLIENT_HPP
 #define REALM_OS_SYNC_CLIENT_HPP
 
-#include <realm/object-store/binding_callback_thread_observer.hpp>
-
 #include <realm/sync/client.hpp>
+#include <realm/sync/network/default_socket.hpp>
+#include <realm/util/platform_info.hpp>
 #include <realm/util/scope_exit.hpp>
 
 #include <thread>
@@ -37,15 +37,23 @@ namespace realm {
 namespace _impl {
 
 struct SyncClient {
-    SyncClient(std::unique_ptr<util::Logger> logger, SyncClientConfig const& config,
+    SyncClient(const std::shared_ptr<util::Logger>& logger, SyncClientConfig const& config,
                std::weak_ptr<const SyncManager> weak_sync_manager)
-        : m_client([&] {
+        : m_socket_provider([&]() -> std::shared_ptr<sync::SyncSocketProvider> {
+            if (config.socket_provider) {
+                return config.socket_provider;
+            }
+            auto user_agent = util::format("RealmSync/%1 (%2) %3 %4", REALM_VERSION_STRING, util::get_platform_info(),
+                                           config.user_agent_binding_info, config.user_agent_application_info);
+            return std::make_shared<sync::websocket::DefaultSocketProvider>(
+                logger, std::move(user_agent), config.default_socket_provider_thread_observer);
+        }())
+        , m_client([&] {
             sync::Client::Config c;
-            c.logger = logger.get();
+            c.logger = logger;
+            c.socket_provider = m_socket_provider;
             c.reconnect_mode = config.reconnect_mode;
             c.one_connection_per_session = !config.multiplex_sessions;
-            c.user_agent_application_info =
-                util::format("%1 %2", config.user_agent_binding_info, config.user_agent_application_info);
 
             // Only set the timeouts if they have sensible values
             if (config.timeouts.connect_timeout >= 1000)
@@ -61,24 +69,8 @@ struct SyncClient {
 
             return c;
         }())
-        , m_logger(std::move(logger))
-        , m_thread([this] {
-            if (g_binding_callback_thread_observer) {
-                g_binding_callback_thread_observer->did_create_thread();
-                auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
-                    g_binding_callback_thread_observer->will_destroy_thread();
-                });
-                try {
-                    m_client.run(); // Throws
-                }
-                catch (std::exception const& e) {
-                    g_binding_callback_thread_observer->handle_error(e);
-                }
-            }
-            else {
-                m_client.run(); // Throws
-            }
-        }) // Throws
+        , m_logger_ptr(logger)
+        , m_logger(*m_logger_ptr)
 #if NETWORK_REACHABILITY_AVAILABLE
         , m_reachability_observer(none, [weak_sync_manager](const NetworkReachabilityStatus status) {
             if (status != NotReachable) {
@@ -89,7 +81,7 @@ struct SyncClient {
         })
     {
         if (!m_reachability_observer.start_observing())
-            m_logger->error("Failed to set up network reachability observer");
+            m_logger.error("Failed to set up network reachability observer");
     }
 #else
     {
@@ -104,16 +96,16 @@ struct SyncClient {
 
     void stop()
     {
-        m_client.stop();
-        if (m_thread.joinable())
-            m_thread.join();
+        m_client.shutdown();
     }
 
     std::unique_ptr<sync::Session> make_session(std::shared_ptr<DB> db,
                                                 std::shared_ptr<sync::SubscriptionStore> flx_sub_store,
+                                                std::shared_ptr<sync::MigrationStore> migration_store,
                                                 sync::Session::Config config)
     {
-        return std::make_unique<sync::Session>(m_client, std::move(db), std::move(flx_sub_store), std::move(config));
+        return std::make_unique<sync::Session>(m_client, std::move(db), std::move(flx_sub_store),
+                                               std::move(migration_store), std::move(config));
     }
 
     bool decompose_server_url(const std::string& url, sync::ProtocolEnvelope& protocol, std::string& address,
@@ -127,15 +119,13 @@ struct SyncClient {
         m_client.wait_for_session_terminations_or_client_stopped();
     }
 
-    ~SyncClient()
-    {
-        stop();
-    }
+    ~SyncClient() {}
 
 private:
+    std::shared_ptr<sync::SyncSocketProvider> m_socket_provider;
     sync::Client m_client;
-    const std::unique_ptr<util::Logger> m_logger;
-    std::thread m_thread;
+    std::shared_ptr<util::Logger> m_logger_ptr;
+    util::Logger& m_logger;
 #if NETWORK_REACHABILITY_AVAILABLE
     NetworkReachabilityObserver m_reachability_observer;
 #endif

@@ -16,16 +16,11 @@ using namespace realm;
 
 namespace {
 
-class MuteLogger : public util::RootLogger {
-public:
-    void do_log(Level, const std::string&) override final {}
-};
-
 
 class TableCompareLogger : public util::Logger {
 public:
     TableCompareLogger(StringData table_name, util::Logger& base_logger) noexcept
-        : util::Logger{base_logger.level_threshold}
+        : util::Logger(base_logger.get_level_threshold())
         , m_table_name{table_name}
         , m_base_logger{base_logger}
     {
@@ -54,7 +49,7 @@ private:
 class ObjectCompareLogger : public util::Logger {
 public:
     ObjectCompareLogger(sync::PrimaryKey oid, util::Logger& base_logger) noexcept
-        : util::Logger{base_logger.level_threshold}
+        : util::Logger(base_logger.get_level_threshold())
         , m_oid{oid}
         , m_base_logger{base_logger}
     {
@@ -964,7 +959,7 @@ namespace realm::test_util {
 
 bool compare_tables(const Table& table_1, const Table& table_2)
 {
-    MuteLogger logger;
+    util::NullLogger logger;
     return compare_tables(table_1, table_2, logger);
 }
 
@@ -1044,7 +1039,7 @@ bool compare_tables(const Table& table_1, const Table& table_2, util::Logger& lo
 
 bool compare_groups(const Transaction& group_1, const Transaction& group_2)
 {
-    MuteLogger logger;
+    util::NullLogger logger;
     return compare_groups(group_1, group_2, logger);
 }
 

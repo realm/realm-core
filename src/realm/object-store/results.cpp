@@ -31,6 +31,15 @@
 #include <stdexcept>
 
 namespace realm {
+[[noreturn]] static void unsupported_operation(ColKey column, Table const& table, const char* operation)
+{
+    auto type = ObjectSchema::from_core_type(column);
+    std::string_view collection_type = column.is_collection() ? collection_type_name(column) : "property";
+    const char* column_type = string_for_property_type(type & ~PropertyType::Collection);
+    throw IllegalOperation(util::format("Operation '%1' not supported for %2%3 %4 '%5.%6'", operation, column_type,
+                                        column.is_nullable() ? "?" : "", collection_type, table.get_class_name(),
+                                        table.get_column_name(column)));
+}
 
 Results::Results() = default;
 Results::~Results() = default;
@@ -123,14 +132,14 @@ void Results::validate_read() const
 {
     // is_valid ensures that we're on the correct thread.
     if (!is_valid())
-        throw InvalidatedException();
+        throw StaleAccessor("Access to invalidated Results objects");
 }
 
 void Results::validate_write() const
 {
     validate_read();
     if (!m_realm || !m_realm->is_in_transaction())
-        throw InvalidTransactionException("Must be in a write transaction");
+        throw WrongTransactionState("Must be in a write transaction");
 }
 
 size_t Results::size()
@@ -435,7 +444,7 @@ Mixed Results::get_any(size_t ndx)
             return Mixed(ObjLink(m_table->get_key(), obj_key));
         }
     }
-    throw OutOfBoundsIndexException{ndx, do_size()};
+    throw OutOfBounds{"get_any() on Results", ndx, do_size()};
 }
 
 std::pair<StringData, Mixed> Results::get_dictionary_element(size_t ndx)
@@ -450,7 +459,7 @@ std::pair<StringData, Mixed> Results::get_dictionary_element(size_t ndx)
         auto val = dict.get_pair(ndx);
         return {val.first.get_string(), val.second};
     }
-    throw OutOfBoundsIndexException{ndx, dict.size()};
+    throw OutOfBounds{"get_dictionary_element() on Results", ndx, dict.size()};
 }
 
 template <typename T>
@@ -460,7 +469,7 @@ T Results::get(size_t row_ndx)
     if (auto row = try_get<T>(row_ndx)) {
         return *row;
     }
-    throw OutOfBoundsIndexException{row_ndx, do_size()};
+    throw OutOfBounds{"get() on Results", row_ndx, do_size()};
 }
 
 template <typename T>
@@ -488,28 +497,29 @@ void Results::evaluate_query_if_needed(bool wants_notifications)
 }
 
 template <>
-size_t Results::index_of(Obj const& row)
+size_t Results::index_of(Obj const& obj)
 {
     util::CheckedUniqueLock lock(m_mutex);
     validate_read();
     ensure_up_to_date();
-    if (!row.is_valid()) {
-        throw DetatchedAccessorException{};
+    if (!obj.is_valid()) {
+        throw StaleAccessor{"Attempting to access an invalid object"};
     }
-    if (m_table && row.get_table() != m_table) {
-        throw IncorrectTableException(ObjectStore::object_type_for_table_name(m_table->get_name()),
-                                      ObjectStore::object_type_for_table_name(row.get_table()->get_name()));
+    if (m_table && obj.get_table() != m_table) {
+        throw InvalidArgument(ErrorCodes::ObjectTypeMismatch,
+                              util::format("Object of type '%1' does not match Results type '%2'",
+                                           obj.get_table()->get_class_name(), m_table->get_class_name()));
     }
 
     switch (m_mode) {
         case Mode::Empty:
         case Mode::Table:
-            return m_table->get_object_ndx(row.get_key());
+            return m_table->get_object_ndx(obj.get_key());
         case Mode::Collection:
-            return m_collection->find_any(row.get_key());
+            return m_collection->find_any(obj.get_key());
         case Mode::Query:
         case Mode::TableView:
-            return m_table_view.find_by_source_ndx(row.get_key());
+            return m_table_view.find_by_source_ndx(obj.get_key());
     }
     REALM_COMPILER_HINT_UNREACHABLE();
 }
@@ -608,10 +618,10 @@ util::Optional<Mixed> Results::aggregate(ColKey column, const char* name, Aggreg
     // which is the collection if it's not a link collection and the target
     // of the links otherwise
     if (m_mode == Mode::Collection && do_get_type() != PropertyType::Object) {
-        throw UnsupportedColumnTypeException(m_collection->get_col_key(), m_collection->get_table(), name);
+        unsupported_operation(m_collection->get_col_key(), *m_collection->get_table(), name);
     }
     else {
-        throw UnsupportedColumnTypeException{column, *m_table, name};
+        unsupported_operation(column, *m_table, name);
     }
 }
 
@@ -638,7 +648,7 @@ util::Optional<Mixed> Results::sum(ColKey column)
 
 util::Optional<Mixed> Results::average(ColKey column)
 {
-    return aggregate(column, "avg", [column](auto&& helper) {
+    return aggregate(column, "average", [column](auto&& helper) {
         return helper.avg(column);
     });
 }
@@ -792,7 +802,7 @@ static std::vector<ColKey> parse_keypath(StringData keypath, Schema const& schem
 {
     auto check = [&](bool condition, const char* fmt, auto... args) {
         if (!condition) {
-            throw std::invalid_argument(
+            throw InvalidArgument(
                 util::format("Cannot sort on key path '%1': %2.", keypath, util::format(fmt, args...)));
         }
     };
@@ -811,7 +821,7 @@ static std::vector<ColKey> parse_keypath(StringData keypath, Schema const& schem
         StringData key(begin, sep - begin);
         begin = sep + (sep != end);
 
-        auto prop = object_schema->property_for_name(key);
+        auto prop = object_schema->property_for_public_name(key);
         check(prop, "property '%1.%2' does not exist", object_schema->name, key);
         check(is_sortable_type(prop->type), "property '%1.%2' is of unsupported type '%3'", object_schema->name, key,
               string_for_property_type(prop->type));
@@ -836,10 +846,10 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
     auto type = get_type();
     if (type != PropertyType::Object) {
         if (keypaths.size() != 1)
-            throw std::invalid_argument(util::format("Cannot sort array of '%1' on more than one key path",
-                                                     string_for_property_type(type & ~PropertyType::Flags)));
+            throw InvalidArgument(util::format("Cannot sort array of '%1' on more than one key path",
+                                               string_for_property_type(type & ~PropertyType::Flags)));
         if (keypaths[0].first != "self")
-            throw std::invalid_argument(
+            throw InvalidArgument(
                 util::format("Cannot sort on key path '%1': arrays of '%2' can only be sorted on 'self'",
                              keypaths[0].first, string_for_property_type(type & ~PropertyType::Flags)));
         return sort({{{}}, {keypaths[0].second}});
@@ -870,7 +880,7 @@ Results Results::sort(SortDescriptor&& sort) const
 Results Results::filter(Query&& q) const
 {
     if (m_descriptor_ordering.will_apply_limit())
-        throw UnimplementedOperationException("Filtering a Results with a limit is not yet implemented");
+        throw IllegalOperation("Filtering a Results with a limit is not yet implemented");
     return Results(m_realm, get_query().and_query(std::move(q)), m_descriptor_ordering);
 }
 
@@ -911,10 +921,10 @@ Results Results::distinct(std::vector<std::string> const& keypaths) const
     auto type = get_type();
     if (type != PropertyType::Object) {
         if (keypaths.size() != 1)
-            throw std::invalid_argument(util::format("Cannot sort array of '%1' on more than one key path",
-                                                     string_for_property_type(type & ~PropertyType::Flags)));
+            throw InvalidArgument(util::format("Cannot sort array of '%1' on more than one key path",
+                                               string_for_property_type(type & ~PropertyType::Flags)));
         if (keypaths[0] != "self")
-            throw std::invalid_argument(
+            throw InvalidArgument(
                 util::format("Cannot sort on key path '%1': arrays of '%2' can only be sorted on 'self'", keypaths[0],
                              string_for_property_type(type & ~PropertyType::Flags)));
         return distinct(DistinctDescriptor({{ColKey()}}));
@@ -983,7 +993,8 @@ void Results::prepare_async(ForCallback force) NO_THREAD_SAFETY_ANALYSIS
         return;
     if (m_update_policy == UpdatePolicy::Never) {
         if (force)
-            throw std::logic_error("Cannot create asynchronous query for snapshotted Results.");
+            throw LogicError(ErrorCodes::IllegalOperation,
+                             "Cannot create asynchronous query for snapshotted Results.");
         return;
     }
 
@@ -1005,7 +1016,8 @@ void Results::prepare_async(ForCallback force) NO_THREAD_SAFETY_ANALYSIS
     _impl::RealmCoordinator::register_notifier(m_notifier);
 }
 
-NotificationToken Results::add_notification_callback(CollectionChangeCallback callback, KeyPathArray key_path_array) &
+NotificationToken Results::add_notification_callback(CollectionChangeCallback callback,
+                                                     std::optional<KeyPathArray> key_path_array) &
 {
     prepare_async(ForCallback{true});
     return {m_notifier, m_notifier->add_callback(std::move(callback), std::move(key_path_array))};
@@ -1094,69 +1106,6 @@ Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
 bool Results::is_frozen() const
 {
     return !m_realm || m_realm->is_frozen();
-}
-
-Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
-    : std::out_of_range(c == 0 ? util::format("Requested index %1 in empty Results", r)
-                               : util::format("Requested index %1 greater than max %2", r, c - 1))
-    , requested(r)
-    , valid_count(c)
-{
-}
-
-Results::IncorrectTableException::IncorrectTableException(StringData e, StringData a)
-    : std::logic_error(util::format("Object of type '%1' does not match Results type '%2'", a, e))
-    , expected(e)
-    , actual(a)
-{
-}
-
-static std::string unsupported_operation_msg(ColKey column, Table const& table, const char* operation)
-{
-    auto type = ObjectSchema::from_core_type(column);
-    const char* column_type = string_for_property_type(type & ~PropertyType::Collection);
-    if (is_array(type))
-        return util::format("Cannot %1 '%2' array: operation not supported", operation, column_type);
-    if (is_set(type))
-        return util::format("Cannot %1 '%2' set: operation not supported", operation, column_type);
-    if (is_dictionary(type))
-        return util::format("Cannot %1 '%2' dictionary: operation not supported", operation, column_type);
-    return util::format("Cannot %1 property '%2': operation not supported for '%3' properties", operation,
-                        table.get_column_name(column), column_type);
-}
-
-Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, Table const& table,
-                                                                        const char* operation)
-    : std::logic_error(unsupported_operation_msg(column, table, operation))
-    , column_key(column)
-    , column_name(table.get_column_name(column))
-    , property_type(ObjectSchema::from_core_type(column) & ~PropertyType::Collection)
-{
-}
-
-
-Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, ConstTableRef table,
-                                                                        const char* operation)
-    : UnsupportedColumnTypeException(column, *table, operation)
-{
-}
-
-Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, TableView const& tv,
-                                                                        const char* operation)
-    : UnsupportedColumnTypeException(column, *tv.get_target_table(), operation)
-{
-}
-
-Results::InvalidPropertyException::InvalidPropertyException(StringData object_type, StringData property_name)
-    : std::logic_error(util::format("Property '%1.%2' does not exist", object_type, property_name))
-    , object_type(object_type)
-    , property_name(property_name)
-{
-}
-
-Results::UnimplementedOperationException::UnimplementedOperationException(const char* msg)
-    : std::logic_error(msg)
-{
 }
 
 } // namespace realm

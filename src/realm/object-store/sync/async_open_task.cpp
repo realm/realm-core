@@ -34,14 +34,14 @@ AsyncOpenTask::AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinato
 
 void AsyncOpenTask::start(util::UniqueFunction<void(ThreadSafeReference, std::exception_ptr)> callback)
 {
-    util::CheckedLockGuard lock(m_mutex);
+    util::CheckedUniqueLock lock(m_mutex);
     if (!m_session)
         return;
-
-    m_session->revive_if_needed();
+    auto session = m_session;
+    lock.unlock();
 
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
-    m_session->wait_for_download_completion([callback = std::move(callback), self, this](std::error_code ec) {
+    session->wait_for_download_completion([callback = std::move(callback), self, this](Status status) {
         std::shared_ptr<_impl::RealmCoordinator> coordinator;
         {
             util::CheckedLockGuard lock(m_mutex);
@@ -56,8 +56,8 @@ void AsyncOpenTask::start(util::UniqueFunction<void(ThreadSafeReference, std::ex
             coordinator = std::move(m_coordinator);
         }
 
-        if (ec)
-            return callback({}, std::make_exception_ptr(std::system_error(ec)));
+        if (!status.is_ok())
+            return callback({}, std::make_exception_ptr(Exception(status)));
 
         ThreadSafeReference realm;
         try {
@@ -68,6 +68,8 @@ void AsyncOpenTask::start(util::UniqueFunction<void(ThreadSafeReference, std::ex
         }
         callback(std::move(realm), nullptr);
     });
+
+    session->revive_if_needed();
 }
 
 void AsyncOpenTask::cancel()
@@ -92,7 +94,7 @@ void AsyncOpenTask::cancel()
     // thus deadlocking.
     if (session) {
         // Does a better way exists for canceling the download?
-        session->log_out();
+        session->force_close();
     }
 }
 

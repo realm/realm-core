@@ -39,7 +39,6 @@
 
 #include <realm/util/features.h>
 #include <realm/util/platform_info.hpp>
-#include <realm/util/parent_dir.hpp>
 #include <realm.hpp>
 #include <realm/utilities.hpp>
 #include <realm/disable_sync_to_disk.hpp>
@@ -180,23 +179,6 @@ long get_num_open_files()
 #endif
     return -1;
 }
-
-/*
-void fix_test_libexec_path(const char* argv_0)
-{
-    std::string path;
-    if (const char* str = getenv("UNITTEST_LIBEXEC_PATH")) {
-        path = str;
-    }
-    else {
-        std::string test_dir = util::parent_dir(argv_0);
-        std::string root_dir = util::File::resolve("..",  test_dir);
-        std::string src_dir  = util::File::resolve("src", root_dir);
-        path = util::File::resolve("realm", src_dir);
-    }
-    set_test_libexec_path(path);
-}
-*/
 
 void set_random_seed()
 {
@@ -387,13 +369,14 @@ void put_time(std::ostream& out, const std::tm& tm, const char* format)
 }
 
 
-bool run_tests(util::Logger* logger)
+bool run_tests(const std::shared_ptr<realm::util::Logger>& logger = nullptr)
 {
     {
         const char* str = getenv("UNITTEST_KEEP_FILES");
         if (str && strlen(str) != 0)
             keep_test_files();
     }
+    const bool running_spawned_process = getenv("REALM_SPAWNED");
 
     TestList::Config config;
     config.logger = logger;
@@ -416,13 +399,15 @@ bool run_tests(util::Logger* logger)
             bool bad = !in || in.get() != std::char_traits<char>::eof() || config.num_threads < 1;
             if (bad)
                 throw std::runtime_error("Bad number of threads");
-            if (config.num_threads > 1)
+            if (config.num_threads > 1 && !running_spawned_process)
                 std::cout << "Number of test threads: " << config.num_threads << "\n\n";
         }
         else {
             config.num_threads = std::thread::hardware_concurrency();
-            std::cout << "Number of test threads: " << config.num_threads << " (default)\n";
-            std::cout << "(Use UNITTEST_THREADS=1 to serialize testing) \n\n";
+            if (!running_spawned_process) {
+                std::cout << "Number of test threads: " << config.num_threads << " (default)\n";
+                std::cout << "(Use UNITTEST_THREADS=1 to serialize testing) \n\n";
+            }
         }
     }
 
@@ -545,12 +530,12 @@ bool run_tests(util::Logger* logger)
 } // anonymous namespace
 
 
-int test_all(util::Logger* logger)
+int test_all(const std::shared_ptr<realm::util::Logger>& logger)
 {
     // General note: Some Github clients on Windows will interfere with the .realm files created by unit tests (the
     // git client will attempt to access the files when it sees that new files have been created). This may cause
     // very rare/sporadic segfaults and asserts. If the temporary directory path is outside revision control, there
-    // is no problem. Otherwise we need two things fulfilled: 1) The directory must be in .gitignore, and also 2) 
+    // is no problem. Otherwise we need two things fulfilled: 1) The directory must be in .gitignore, and also 2)
     // The directory must be newly created and not added to git.
 
     // Disable buffering on std::cout so that progress messages can be related to
@@ -585,9 +570,9 @@ int test_all(util::Logger* logger)
     set_always_encrypt();
 
     fix_max_open_files();
-    // fix_test_libexec_path(argv[0]);
 
-    display_build_config();
+    if (!getenv("REALM_SPAWNED"))
+        display_build_config();
 
     long num_open_files = get_num_open_files();
 
@@ -607,8 +592,8 @@ int test_all(util::Logger* logger)
     }
 
 #ifdef _MSC_VER
-    // We don't want forked processes (see winfork() to require user interaction).
-    if(!getenv("REALM_FORKED"))
+    // We don't want spawned processes (see spawned_process.hpp to require user interaction).
+    if (!getenv("REALM_SPAWNED"))
         getchar(); // wait for key
 #endif
 

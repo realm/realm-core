@@ -127,7 +127,7 @@ public:
      * callback via `remove_callback`.
      */
     NotificationToken add_notification_callback(CollectionChangeCallback callback,
-                                                KeyPathArray key_path_array = {}) &;
+                                                std::optional<KeyPathArray> key_path_array = std::nullopt) &;
 
     template <typename ValueType>
     void set_column_value(StringData prop_name, ValueType&& value)
@@ -209,35 +209,35 @@ private:
     void validate_property_for_setter(Property const&) const;
 };
 
-struct InvalidatedObjectException : public std::logic_error {
+struct InvalidatedObjectException : public LogicError {
     InvalidatedObjectException(const std::string& object_type);
     const std::string object_type;
 };
 
-struct InvalidPropertyException : public std::logic_error {
+struct InvalidPropertyException : public LogicError {
     InvalidPropertyException(const std::string& object_type, const std::string& property_name);
     const std::string object_type;
     const std::string property_name;
 };
 
-struct MissingPropertyValueException : public std::logic_error {
+struct MissingPropertyValueException : public LogicError {
     MissingPropertyValueException(const std::string& object_type, const std::string& property_name);
     const std::string object_type;
     const std::string property_name;
 };
 
-struct MissingPrimaryKeyException : public std::logic_error {
+struct MissingPrimaryKeyException : public LogicError {
     MissingPrimaryKeyException(const std::string& object_type);
     const std::string object_type;
 };
 
-struct ReadOnlyPropertyException : public std::logic_error {
+struct ReadOnlyPropertyException : public LogicError {
     ReadOnlyPropertyException(const std::string& object_type, const std::string& property_name);
     const std::string object_type;
     const std::string property_name;
 };
 
-struct ModifyPrimaryKeyException : public std::logic_error {
+struct ModifyPrimaryKeyException : public LogicError {
     ModifyPrimaryKeyException(const std::string& object_type, const std::string& property_name);
     const std::string object_type;
     const std::string property_name;

@@ -34,8 +34,8 @@ namespace realm::_impl {
 // state Realm download.
 class ClientResetOperation {
 public:
-    using CallbackBeforeType = util::UniqueFunction<void(std::string)>;
-    using CallbackAfterType = util::UniqueFunction<void(std::string, VersionID, bool)>;
+    using CallbackBeforeType = util::UniqueFunction<void(VersionID)>;
+    using CallbackAfterType = util::UniqueFunction<void(VersionID, bool)>;
 
     ClientResetOperation(util::Logger& logger, DBRef db, DBRef db_fresh, ClientResyncMode mode,
                          CallbackBeforeType notify_before, CallbackAfterType notify_after, bool recovery_is_allowed);
@@ -54,6 +54,7 @@ public:
 private:
     void clean_up_state() noexcept;
 
+    // The lifetime of this class is within a Session, so no need for a shared_ptr
     util::Logger& m_logger;
     DBRef m_db;
     DBRef m_db_fresh;

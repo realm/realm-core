@@ -45,7 +45,7 @@ BID_UINT128 to_BID_UINT128(const Decimal128& val)
 
 } // namespace
 
-Decimal128::Decimal128()
+Decimal128::Decimal128() noexcept
     : Decimal128(0)
 {
 }
@@ -1355,7 +1355,7 @@ void realm_binary64_to_bid128(BID_UINT128* pres, double* px, _IDEC_flags* pfpsf)
 
 /*******************************************************************************************************************/
 
-Decimal128::Decimal128(double val, RoundTo rounding_precision)
+Decimal128::Decimal128(double val, RoundTo rounding_precision) noexcept
 {
     // The logic below is ported from MongoDB Decimal128 implementation
     uint64_t largest_coeff = (rounding_precision == RoundTo::Digits7) ? 9999999 : 999999999999999;
@@ -1411,12 +1411,12 @@ Decimal128::Decimal128(double val, RoundTo rounding_precision)
     }
 }
 
-Decimal128::Decimal128(int val)
+Decimal128::Decimal128(int val) noexcept
     : Decimal128(static_cast<int64_t>(val))
 {
 }
 
-Decimal128::Decimal128(int64_t val)
+Decimal128::Decimal128(int64_t val) noexcept
 {
     constexpr uint64_t expon = uint64_t(DECIMAL_EXPONENT_BIAS_128) << DECIMAL_COEFF_HIGH_BITS;
     if (val < 0) {
@@ -1429,7 +1429,7 @@ Decimal128::Decimal128(int64_t val)
     }
 }
 
-Decimal128::Decimal128(uint64_t val)
+Decimal128::Decimal128(uint64_t val) noexcept
 {
     BID_UINT64 tmp(val);
     BID_UINT128 expanded;
@@ -1437,7 +1437,7 @@ Decimal128::Decimal128(uint64_t val)
     memcpy(this, &expanded, sizeof(*this));
 }
 
-Decimal128::Decimal128(Bid64 val)
+Decimal128::Decimal128(Bid64 val) noexcept
 {
     unsigned flags = 0;
     BID_UINT64 x(val.w);
@@ -1446,7 +1446,7 @@ Decimal128::Decimal128(Bid64 val)
     memcpy(this, &tmp, sizeof(*this));
 }
 
-Decimal128::Decimal128(Bid128 coefficient, int exponent, bool sign)
+Decimal128::Decimal128(Bid128 coefficient, int exponent, bool sign) noexcept
 {
     uint64_t sign_x = sign ? MASK_SIGN : 0;
     m_value = coefficient;
@@ -1454,7 +1454,7 @@ Decimal128::Decimal128(Bid128 coefficient, int exponent, bool sign)
     m_value.w[1] |= (sign_x | (tmp << DECIMAL_COEFF_HIGH_BITS));
 }
 
-Decimal128::Decimal128(StringData init)
+Decimal128::Decimal128(StringData init) noexcept
 {
     unsigned flags = 0;
     BID_UINT128 tmp;
@@ -1468,7 +1468,7 @@ Decimal128::Decimal128(null) noexcept
     m_value.w[1] = 0x7c00000000000000;
 }
 
-Decimal128 Decimal128::nan(const char* init)
+Decimal128 Decimal128::nan(const char* init) noexcept
 {
     Bid128 val;
     val.w[0] = strtol(init, nullptr, 10);
@@ -1476,17 +1476,17 @@ Decimal128 Decimal128::nan(const char* init)
     return Decimal128(val);
 }
 
-bool Decimal128::is_null() const
+bool Decimal128::is_null() const noexcept
 {
     return m_value.w[0] == 0xaa && m_value.w[1] == 0x7c00000000000000;
 }
 
-bool Decimal128::is_nan() const
+bool Decimal128::is_nan() const noexcept
 {
     return (m_value.w[1] & 0x7c00000000000000ull) == 0x7c00000000000000ull;
 }
 
-bool Decimal128::to_int(int64_t& i) const
+bool Decimal128::to_int(int64_t& i) const noexcept
 {
     BID_SINT64 res;
     unsigned flags = 0;
@@ -1500,7 +1500,7 @@ bool Decimal128::to_int(int64_t& i) const
 }
 
 
-bool Decimal128::operator==(const Decimal128& rhs) const
+bool Decimal128::operator==(const Decimal128& rhs) const noexcept
 {
     if (is_null() && rhs.is_null()) {
         return true;
@@ -1510,15 +1510,23 @@ bool Decimal128::operator==(const Decimal128& rhs) const
     BID_UINT128 l = to_BID_UINT128(*this);
     BID_UINT128 r = to_BID_UINT128(rhs);
     bid128_quiet_equal(&ret, &l, &r, &flags);
-    return ret != 0;
+    if (ret) {
+        return true;
+    }
+    bool lhs_is_nan = is_nan();
+    bool rhs_is_nan = rhs.is_nan();
+    if (lhs_is_nan && rhs_is_nan) {
+        return m_value.w[1] == rhs.m_value.w[1] && m_value.w[0] == rhs.m_value.w[0];
+    }
+    return 0;
 }
 
-bool Decimal128::operator!=(const Decimal128& rhs) const
+bool Decimal128::operator!=(const Decimal128& rhs) const noexcept
 {
     return !(*this == rhs);
 }
 
-int Decimal128::compare(const Decimal128& rhs) const
+int Decimal128::compare(const Decimal128& rhs) const noexcept
 {
     unsigned flags = 0;
     int ret;
@@ -1551,27 +1559,27 @@ int Decimal128::compare(const Decimal128& rhs) const
     return lhs_is_nan ? -1 : 1;
 }
 
-bool Decimal128::operator<(const Decimal128& rhs) const
+bool Decimal128::operator<(const Decimal128& rhs) const noexcept
 {
     return compare(rhs) < 0;
 }
 
-bool Decimal128::operator>(const Decimal128& rhs) const
+bool Decimal128::operator>(const Decimal128& rhs) const noexcept
 {
     return compare(rhs) > 0;
 }
 
-bool Decimal128::operator<=(const Decimal128& rhs) const
+bool Decimal128::operator<=(const Decimal128& rhs) const noexcept
 {
     return compare(rhs) <= 0;
 }
 
-bool Decimal128::operator>=(const Decimal128& rhs) const
+bool Decimal128::operator>=(const Decimal128& rhs) const noexcept
 {
     return compare(rhs) >= 0;
 }
 
-static Decimal128 do_multiply(BID_UINT128 x, BID_UINT128 mul)
+static Decimal128 do_multiply(BID_UINT128 x, BID_UINT128 mul) noexcept
 {
     unsigned flags = 0;
     BID_UINT128 res;
@@ -1579,27 +1587,27 @@ static Decimal128 do_multiply(BID_UINT128 x, BID_UINT128 mul)
     return to_decimal128(res);
 }
 
-Decimal128 Decimal128::operator*(int64_t mul) const
+Decimal128 Decimal128::operator*(int64_t mul) const noexcept
 {
     BID_UINT128 x = to_BID_UINT128(*this);
     BID_UINT128 y = to_BID_UINT128(Decimal128(mul));
     return do_multiply(x, y);
 }
 
-Decimal128 Decimal128::operator*(size_t mul) const
+Decimal128 Decimal128::operator*(size_t mul) const noexcept
 {
     Decimal128 tmp_mul(static_cast<uint64_t>(mul));
     return do_multiply(to_BID_UINT128(*this), to_BID_UINT128(tmp_mul));
 }
 
-Decimal128 Decimal128::operator*(int mul) const
+Decimal128 Decimal128::operator*(int mul) const noexcept
 {
     BID_UINT128 x = to_BID_UINT128(*this);
     BID_UINT128 y = to_BID_UINT128(Decimal128(mul));
     return do_multiply(x, y);
 }
 
-Decimal128 Decimal128::operator*(Decimal128 mul) const
+Decimal128 Decimal128::operator*(Decimal128 mul) const noexcept
 {
     BID_UINT128 x = to_BID_UINT128(*this);
     BID_UINT128 y = to_BID_UINT128(mul);
@@ -1614,34 +1622,34 @@ static Decimal128 do_divide(BID_UINT128 x, BID_UINT128 div)
     return to_decimal128(res);
 }
 
-Decimal128 Decimal128::operator/(int64_t div) const
+Decimal128 Decimal128::operator/(int64_t div) const noexcept
 {
     BID_UINT128 x = to_BID_UINT128(*this);
     BID_UINT128 y = to_BID_UINT128(Decimal128(div));
     return do_divide(x, y);
 }
 
-Decimal128 Decimal128::operator/(size_t div) const
+Decimal128 Decimal128::operator/(size_t div) const noexcept
 {
     Decimal128 tmp_div(static_cast<uint64_t>(div));
     return do_divide(to_BID_UINT128(*this), to_BID_UINT128(tmp_div));
 }
 
-Decimal128 Decimal128::operator/(int div) const
+Decimal128 Decimal128::operator/(int div) const noexcept
 {
     BID_UINT128 x = to_BID_UINT128(*this);
     BID_UINT128 y = to_BID_UINT128(Decimal128(div));
     return do_divide(x, y);
 }
 
-Decimal128 Decimal128::operator/(Decimal128 div) const
+Decimal128 Decimal128::operator/(Decimal128 div) const noexcept
 {
     BID_UINT128 x = to_BID_UINT128(*this);
     BID_UINT128 y = to_BID_UINT128(div);
     return do_divide(x, y);
 }
 
-Decimal128& Decimal128::operator+=(Decimal128 rhs)
+Decimal128& Decimal128::operator+=(Decimal128 rhs) noexcept
 {
     unsigned flags = 0;
     BID_UINT128 x = to_BID_UINT128(*this);
@@ -1653,7 +1661,7 @@ Decimal128& Decimal128::operator+=(Decimal128 rhs)
     return *this;
 }
 
-Decimal128& Decimal128::operator-=(Decimal128 rhs)
+Decimal128& Decimal128::operator-=(Decimal128 rhs) noexcept
 {
     unsigned flags = 0;
     BID_UINT128 x = to_BID_UINT128(*this);
@@ -1674,7 +1682,7 @@ bool Decimal128::is_valid_str(StringData str) noexcept
     return (tmp.w[1] & 0x7c00000000000000ull) != 0x7c00000000000000ull;
 }
 
-std::string Decimal128::to_string() const
+std::string Decimal128::to_string() const noexcept
 {
     if (is_null()) {
         return "NULL";
@@ -1737,7 +1745,7 @@ auto Decimal128::to_bid64() const -> Bid64
     BID_UINT128 tmp = to_BID_UINT128(*this);
     bid128_to_bid64(&buffer, &tmp, &flags);
     if (flags & ~BID_INEXACT_EXCEPTION)
-        throw std::overflow_error("Decimal128::to_bid64 failed");
+        throw RuntimeError(ErrorCodes::RangeError, "Decimal128::to_bid64 failed");
     return Bid64(buffer);
 }
 

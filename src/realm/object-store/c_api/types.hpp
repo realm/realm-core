@@ -20,90 +20,38 @@
 #include <realm/object-store/sync/impl/sync_client.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
+#include <realm/sync/binding_callback_thread_observer.hpp>
 #endif
 
 #include <stdexcept>
 #include <string>
 
 namespace realm::c_api {
-
-struct NotClonableException : std::exception {
-    const char* what() const noexcept
+class NotClonable : public RuntimeError {
+public:
+    NotClonable()
+        : RuntimeError(ErrorCodes::NotCloneable, "Not clonable")
     {
-        return "Not clonable";
     }
 };
 
-struct ImmutableException : std::exception {
-    const char* what() const noexcept
-    {
-        return "Immutable object";
-    }
-};
-
-
-struct UnexpectedPrimaryKeyException : std::logic_error {
-    using std::logic_error::logic_error;
-};
-
-struct DuplicatePrimaryKeyException : std::logic_error {
-    using std::logic_error::logic_error;
-};
-
-struct InvalidPropertyKeyException : std::logic_error {
-    using std::logic_error::logic_error;
-};
-struct CallbackFailed : std::runtime_error {
+class CallbackFailed : public RuntimeError {
+public:
     // SDK-provided opaque error value when error == RLM_ERR_CALLBACK with a callout to
     // realm_register_user_code_callback_error()
     void* usercode_error{nullptr};
 
     CallbackFailed()
-        : std::runtime_error("User-provided callback failed")
+        : RuntimeError(ErrorCodes::CallbackFailed, "User-provided callback failed")
     {
     }
 
-    CallbackFailed(void* usercode_error)
-        : std::runtime_error("User-provided callback failed")
-        , usercode_error(usercode_error)
+    CallbackFailed(void* str)
+        : CallbackFailed()
     {
+        usercode_error = str;
     }
 };
-
-//// FIXME: BEGIN EXCEPTIONS THAT SHOULD BE MOVED INTO OBJECT STORE
-
-struct WrongPrimaryKeyTypeException : std::logic_error {
-    WrongPrimaryKeyTypeException(const std::string& object_type)
-        : std::logic_error(util::format("Wrong primary key type for '%1'", object_type))
-        , object_type(object_type)
-    {
-    }
-    const std::string object_type;
-};
-
-struct NotNullableException : std::logic_error {
-    NotNullableException(const std::string& object_type, const std::string& property_name)
-        : std::logic_error(util::format("Property '%2' of class '%1' cannot be NULL", object_type, property_name))
-        , object_type(object_type)
-        , property_name(property_name)
-    {
-    }
-    const std::string object_type;
-    const std::string property_name;
-};
-
-struct PropertyTypeMismatch : std::logic_error {
-    PropertyTypeMismatch(const std::string& object_type, const std::string& property_name)
-        : std::logic_error(util::format("Type mismatch for property '%2' of class '%1'", object_type, property_name))
-        , object_type(object_type)
-        , property_name(property_name)
-    {
-    }
-    const std::string object_type;
-    const std::string property_name;
-};
-
-//// FIXME: END EXCEPTIONS THAT SHOULD BE MOVED INTO OBJECT STORE
 
 struct WrapC {
     static constexpr uint64_t s_cookie_value = 0xdeadbeefdeadbeef;
@@ -119,7 +67,7 @@ struct WrapC {
 
     virtual WrapC* clone() const
     {
-        throw NotClonableException();
+        throw NotClonable();
     }
 
     virtual bool is_frozen() const
@@ -134,9 +82,27 @@ struct WrapC {
 
     virtual realm_thread_safe_reference_t* get_thread_safe_reference() const
     {
-        throw std::logic_error{"Thread safe references cannot be created for this object type"};
+        throw LogicError{ErrorCodes::IllegalOperation,
+                         "Thread safe references cannot be created for this object type"};
     }
 };
+
+struct FreeUserdata {
+    realm_free_userdata_func_t m_func;
+    FreeUserdata(realm_free_userdata_func_t func = nullptr)
+        : m_func(func)
+    {
+    }
+    void operator()(void* ptr)
+    {
+        if (m_func) {
+            (m_func)(ptr);
+        }
+    }
+};
+
+using UserdataPtr = std::unique_ptr<void, FreeUserdata>;
+using SharedUserdata = std::shared_ptr<void>;
 
 } // namespace realm::c_api
 
@@ -467,13 +433,24 @@ struct realm_collection_changes : realm::c_api::WrapC, realm::CollectionChangeSe
     }
 };
 
+struct realm_dictionary_changes : realm::c_api::WrapC, realm::DictionaryChangeSet {
+    explicit realm_dictionary_changes(realm::DictionaryChangeSet changes)
+        : realm::DictionaryChangeSet(std::move(changes))
+    {
+    }
+
+    realm_dictionary_changes* clone() const override
+    {
+        return new realm_dictionary_changes{static_cast<const realm::DictionaryChangeSet&>(*this)};
+    }
+};
+
 struct realm_notification_token : realm::c_api::WrapC, realm::NotificationToken {
     explicit realm_notification_token(realm::NotificationToken token)
         : realm::NotificationToken(std::move(token))
     {
     }
 };
-
 
 struct realm_callback_token : realm::c_api::WrapC {
 protected:
@@ -583,6 +560,29 @@ struct realm_results : realm::c_api::WrapC, realm::Results {
 };
 
 #if REALM_ENABLE_SYNC
+struct realm_async_open_task_progress_notification_token : realm::c_api::WrapC {
+    realm_async_open_task_progress_notification_token(std::shared_ptr<realm::AsyncOpenTask> task, uint64_t token)
+        : task(task)
+        , token(token)
+    {
+    }
+    ~realm_async_open_task_progress_notification_token();
+    std::shared_ptr<realm::AsyncOpenTask> task;
+    uint64_t token;
+};
+
+struct realm_sync_session_connection_state_notification_token : realm::c_api::WrapC {
+    realm_sync_session_connection_state_notification_token(std::shared_ptr<realm::SyncSession> session,
+                                                           uint64_t token)
+        : session(session)
+        , token(token)
+    {
+    }
+    ~realm_sync_session_connection_state_notification_token();
+    std::shared_ptr<realm::SyncSession> session;
+    uint64_t token;
+};
+
 struct realm_http_transport : realm::c_api::WrapC, std::shared_ptr<realm::app::GenericNetworkTransport> {
     realm_http_transport(std::shared_ptr<realm::app::GenericNetworkTransport> transport)
         : std::shared_ptr<realm::app::GenericNetworkTransport>(std::move(transport))
@@ -750,6 +750,144 @@ struct realm_mongodb_collection : realm::c_api::WrapC, realm::app::MongoCollecti
         : realm::app::MongoCollection(std::move(collection))
     {
     }
+};
+
+struct realm_sync_socket : realm::c_api::WrapC, std::shared_ptr<realm::sync::SyncSocketProvider> {
+    explicit realm_sync_socket(std::shared_ptr<realm::sync::SyncSocketProvider> ptr)
+        : std::shared_ptr<realm::sync::SyncSocketProvider>(std::move(ptr))
+    {
+    }
+
+    realm_sync_socket* clone() const override
+    {
+        return new realm_sync_socket{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_sync_socket*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+
+struct realm_websocket_observer : realm::c_api::WrapC, std::shared_ptr<realm::sync::WebSocketObserver> {
+    explicit realm_websocket_observer(std::shared_ptr<realm::sync::WebSocketObserver> ptr)
+        : std::shared_ptr<realm::sync::WebSocketObserver>(std::move(ptr))
+    {
+    }
+
+    realm_websocket_observer* clone() const override
+    {
+        return new realm_websocket_observer{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_websocket_observer*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+
+struct realm_sync_socket_callback : realm::c_api::WrapC,
+                                    std::shared_ptr<realm::sync::SyncSocketProvider::FunctionHandler> {
+    explicit realm_sync_socket_callback(std::shared_ptr<realm::sync::SyncSocketProvider::FunctionHandler> ptr)
+        : std::shared_ptr<realm::sync::SyncSocketProvider::FunctionHandler>(std::move(ptr))
+    {
+    }
+
+    realm_sync_socket_callback* clone() const override
+    {
+        return new realm_sync_socket_callback{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_sync_socket_callback*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+
+struct CBindingThreadObserver : public realm::BindingCallbackThreadObserver {
+public:
+    CBindingThreadObserver(realm_on_object_store_thread_callback_t on_thread_create,
+                           realm_on_object_store_thread_callback_t on_thread_destroy,
+                           realm_on_object_store_error_callback_t on_error, realm_userdata_t userdata,
+                           realm_free_userdata_func_t free_userdata)
+        : m_create_callback_func{on_thread_create}
+        , m_destroy_callback_func{on_thread_destroy}
+        , m_error_callback_func{on_error}
+        , m_user_data{userdata, [&free_userdata] {
+                          if (free_userdata)
+                              return free_userdata;
+                          else
+                              return CBindingThreadObserver::m_default_free_userdata;
+                      }()}
+    {
+    }
+
+    virtual ~CBindingThreadObserver() = default;
+
+    void did_create_thread() override
+    {
+        if (m_create_callback_func)
+            m_create_callback_func(m_user_data.get());
+    }
+
+    void will_destroy_thread() override
+    {
+        if (m_destroy_callback_func)
+            m_destroy_callback_func(m_user_data.get());
+    }
+
+    bool handle_error(std::exception const& e) override
+    {
+        if (!m_error_callback_func)
+            return false;
+
+        return m_error_callback_func(m_user_data.get(), e.what());
+    }
+
+    bool has_handle_error() override
+    {
+        return bool(m_error_callback_func);
+    }
+
+    /// {@
+    /// For testing: Return the values in this CBindingThreadObserver for comparing if two objects
+    /// have the same callback functions and userdata ptr values.
+    inline realm_on_object_store_thread_callback_t test_get_create_callback_func() const noexcept
+    {
+        return m_create_callback_func;
+    }
+    inline realm_on_object_store_thread_callback_t test_get_destroy_callback_func() const noexcept
+    {
+        return m_destroy_callback_func;
+    }
+    inline realm_on_object_store_error_callback_t test_get_error_callback_func() const noexcept
+    {
+        return m_error_callback_func;
+    }
+    inline realm_userdata_t test_get_userdata_ptr() const noexcept
+    {
+        return m_user_data.get();
+    }
+    /// @}
+
+protected:
+    CBindingThreadObserver() = default;
+
+    static constexpr realm_free_userdata_func_t m_default_free_userdata = [](realm_userdata_t) {};
+
+    realm_on_object_store_thread_callback_t m_create_callback_func = nullptr;
+    realm_on_object_store_thread_callback_t m_destroy_callback_func = nullptr;
+    realm_on_object_store_error_callback_t m_error_callback_func = nullptr;
+    realm::c_api::UserdataPtr m_user_data;
 };
 
 #endif // REALM_ENABLE_SYNC

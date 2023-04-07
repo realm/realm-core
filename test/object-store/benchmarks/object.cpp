@@ -29,6 +29,7 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
 #include <realm/db.hpp>
 #include <realm/query_engine.hpp>
@@ -322,10 +323,9 @@ TEST_CASE("Benchmark object", "[benchmark]") {
 
             r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
-                std::stringstream name;
-                name << "person_" << i;
+                auto name = util::format("person_", i);
                 AnyDict person{
-                    {"name", name.str()},
+                    {"name", name},
                     {"age", static_cast<int64_t>(i)},
                 };
                 Object::create(d, r, person_schema, util::Any(person), CreatePolicy::ForceCreate);
@@ -359,10 +359,9 @@ TEST_CASE("Benchmark object", "[benchmark]") {
 
             r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
-                std::stringstream name;
-                name << "person_" << i;
+                auto name = util::format("person_", i);
                 AnyDict person{
-                    {"name", name.str()},
+                    {"name", name},
                     {"age", static_cast<int64_t>(i)},
                 };
                 Object::create(d, r, person_schema, util::Any(person), CreatePolicy::ForceCreate);
@@ -400,10 +399,9 @@ TEST_CASE("Benchmark object", "[benchmark]") {
 
             r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
-                std::stringstream name;
-                name << "person_" << i;
+                auto name = util::format("person_", i);
                 AnyDict person{
-                    {"name", name.str()},
+                    {"name", name},
                     {"age", static_cast<int64_t>(i)},
                 };
                 Object::create(d, r, person_schema, util::Any(person), CreatePolicy::ForceCreate);
@@ -420,10 +418,9 @@ TEST_CASE("Benchmark object", "[benchmark]") {
 
             r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
-                std::stringstream name;
-                name << "person_" << i;
+                auto name = util::format("person_", i);
                 AnyDict person{
-                    {"name", name.str()}, {"age", static_cast<int64_t>(i + 1)}, // age differs
+                    {"name", name}, {"age", static_cast<int64_t>(i + 1)}, // age differs
                 };
                 Object::create(d, r, person_schema, util::Any(person), CreatePolicy::UpdateModified);
             }
@@ -558,10 +555,9 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
                 size_t index = i + start_index;
-                std::stringstream name;
-                name << "person_" << index;
+                auto name = util::format("person_", index);
                 AnyDict person{
-                    {"name", name.str()},
+                    {"name", name},
                     {"age", static_cast<int64_t>(index)},
                 };
                 Object::create(d, r, person_schema, util::Any(person), CreatePolicy::ForceCreate);
@@ -677,10 +673,9 @@ TEST_CASE("Benchmark object", "[benchmark]") {
 
             r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
-                std::stringstream name;
-                name << "person_" << i;
+                auto name = util::format("person_", i);
                 AnyDict person{
-                    {"name", name.str()},
+                    {"name", name},
                     {"age", static_cast<int64_t>(i * 2)},
                 };
                 Object::create(d, r, person_schema, util::Any(person), CreatePolicy::ForceCreate);
@@ -713,4 +708,33 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             REQUIRE(result.size() == num_objects);
         };
     }
+}
+
+TEST_CASE("Benchmark object notification delivery", "[benchmark]") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
+    config.cache = false;
+    auto r = Realm::get_shared_realm(config);
+
+    r->begin_transaction();
+    auto obj = r->read_group().get_table("class_object")->create_object();
+    r->commit_transaction();
+
+    Object object(r, obj);
+    auto token = object.add_notification_callback([&](auto) {});
+
+    BENCHMARK("refresh after minimal change") {
+        constexpr const int end_value = 1000;
+        auto r2 = Realm::get_shared_realm(config);
+        auto obj2 = *r2->read_group().get_table("class_object")->begin();
+        for (int i = 0; i < end_value; ++i) {
+            r2->begin_transaction();
+            obj2.set<int64_t>("value", i);
+            r2->commit_transaction();
+            r->refresh();
+        }
+    };
 }

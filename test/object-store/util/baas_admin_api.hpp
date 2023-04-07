@@ -67,13 +67,16 @@ public:
     static AdminAPISession login(const std::string& base_url, const std::string& username,
                                  const std::string& password);
 
-    AdminAPIEndpoint apps() const;
+    enum class APIFamily { Admin, Private };
+    AdminAPIEndpoint apps(APIFamily family = APIFamily::Admin) const;
     void revoke_user_sessions(const std::string& user_id, const std::string& app_id) const;
     void disable_user_sessions(const std::string& user_id, const std::string& app_id) const;
     void enable_user_sessions(const std::string& user_id, const std::string& app_id) const;
     bool verify_access_token(const std::string& access_token, const std::string& app_id) const;
     void set_development_mode_to(const std::string& app_id, bool enable) const;
     void delete_app(const std::string& app_id) const;
+    void trigger_client_reset(const std::string& app_id, int64_t file_ident) const;
+    void migrate_to_flx(const std::string& app_id, const std::string& service_id, bool migrate_to_flx) const;
 
     struct Service {
         std::string id;
@@ -100,6 +103,7 @@ public:
             }
         }
     };
+
     std::vector<Service> get_services(const std::string& app_id) const;
     std::vector<std::string> get_errors(const std::string& app_id) const;
     Service get_sync_service(const std::string& app_id) const;
@@ -114,6 +118,17 @@ public:
                                           ServiceConfig sync_config, bool disable) const;
     bool is_sync_enabled(const std::string& app_id) const;
     bool is_sync_terminated(const std::string& app_id) const;
+    bool is_initial_sync_complete(const std::string& app_id) const;
+
+    struct MigrationStatus {
+        std::string statusMessage;
+        bool isMigrated = false;
+        bool isCancelable = false;
+        bool isRevertible = false;
+        bool complete = false;
+    };
+
+    MigrationStatus get_migration_status(const std::string& app_id) const;
 
     const std::string& base_url() const noexcept
     {
@@ -154,16 +169,44 @@ struct AppCreateConfig {
         bool run_reset_function;
     };
 
-    struct FLXSyncRole {
-        std::string name;
-        nlohmann::json apply_when = nlohmann::json::object();
+    struct ServiceRoleDocumentFilters {
         nlohmann::json read;
         nlohmann::json write;
     };
 
+    // ServiceRole represents the set of permissions used MongoDB-based services (Flexible Sync, DataAPI, GraphQL,
+    // etc.). In flexible sync, roles are assigned on a per-table, per-session basis by the server. NB: there are
+    // restrictions on the role configuration when used with flexible sync. See
+    // https://www.mongodb.com/docs/atlas/app-services/rules/sync-compatibility/ for more information.
+    struct ServiceRole {
+        std::string name;
+
+        // apply_when describes when a role applies. Set it to an empty JSON expression ("{}") if
+        // the role should always apply
+        nlohmann::json apply_when = nlohmann::json::object();
+
+        // document_filters describe which objects can be read from/written to, as
+        // specified by the below read and write expressions. Set both to true to give read/write
+        // access on all objects
+        ServiceRoleDocumentFilters document_filters;
+
+        // insert_filter and delete_filter describe which objects can be created and erased by the client,
+        // respectively. Set both to true if all objects can be created/erased by the client
+        nlohmann::json insert_filter;
+        nlohmann::json delete_filter;
+
+        // read and write describe the permissions for "read-all-fields"/"write-all-fields" behavior. Set both to true
+        // if all fields should have read/write access
+        nlohmann::json read;
+        nlohmann::json write;
+
+        // NB: for more granular field-level permissions, the "fields" and "additional_fields" keys can be included in
+        // a service role to describe which fields individually can be read/written. These fields have been omitted
+        // here for simplicity
+    };
+
     struct FLXSyncConfig {
         std::vector<std::string> queryable_fields;
-        std::vector<FLXSyncRole> default_roles;
     };
 
     std::string app_name;
@@ -186,6 +229,8 @@ struct AppCreateConfig {
     bool enable_api_key_auth = false;
     bool enable_anonymous_auth = false;
     bool enable_custom_token_auth = false;
+
+    std::vector<ServiceRole> service_roles;
 };
 
 AppCreateConfig default_app_config(const std::string& base_url);
@@ -236,9 +281,8 @@ inline app::App::Config get_config(Factory factory, const AppSession& app_sessio
             util::none,
             util::Optional<std::string>("A Local App Version"),
             util::none,
-            "Object Store Platform Tests",
-            "Object Store Platform Version Blah",
-            "An sdk version"};
+            {"Object Store Platform Tests", "Object Store Platform Version Blah", "An sdk version", "An sdk name",
+             "A cpu arch", "A device name", "A device version", "A framework name", "A framework version"}};
 }
 
 } // namespace realm

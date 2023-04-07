@@ -113,9 +113,9 @@ public:
     /// \param encryption_key 32-byte key used to encrypt and decrypt
     /// the database file, or nullptr to disable encryption.
     ///
-    /// \throw util::File::AccessError If the file could not be
+    /// \throw FileAccessError If the file could not be
     /// opened. If the reason corresponds to one of the exception
-    /// types that are derived from util::File::AccessError, the
+    /// types that are derived from FileAccessError, the
     /// derived exception type is thrown. Note that InvalidDatabase is
     /// among these derived exception types.
     explicit Group(const std::string& file, const char* encryption_key = nullptr);
@@ -280,6 +280,10 @@ public:
     bool has_table(StringData name) const noexcept;
     TableKey find_table(StringData name) const noexcept;
     StringData get_table_name(TableKey key) const;
+    StringData get_class_name(TableKey key) const
+    {
+        return table_name_to_class_name(get_table_name(key));
+    }
     bool table_is_public(TableKey key) const;
     static StringData table_name_to_class_name(StringData table_name)
     {
@@ -353,9 +357,9 @@ public:
     ///
     /// \param write_history Indicates if you want the Sync Client History to
     /// be written to the file (only relevant for synchronized files).
-    /// \throw util::File::AccessError If the file could not be
+    /// \throw FileAccessError If the file could not be
     /// opened. If the reason corresponds to one of the exception
-    /// types that are derived from util::File::AccessError, the
+    /// types that are derived from FileAccessError, the
     /// derived exception type is thrown. In particular,
     /// util::File::Exists will be thrown if the file exists already.
     void write(const std::string& path, const char* encryption_key = nullptr, uint64_t version = 0,
@@ -489,22 +493,6 @@ public:
         return !(*this == g);
     }
 
-    /// Control of what to include when computing memory usage
-    enum SizeAggregateControl {
-        size_of_state = 1,     ///< size of tables, indexes, toplevel array
-        size_of_history = 2,   ///< size of the in-file history compartment
-        size_of_freelists = 4, ///< size of the freelists
-        size_of_all = 7
-    };
-    /// Compute the sum of the sizes in number of bytes of all the array nodes
-    /// that currently make up this group. When this group represents a snapshot
-    /// in a Realm file (such as during a read transaction via a Transaction
-    /// instance), this function computes the footprint of that snapshot within
-    /// the Realm file.
-    ///
-    /// If this group accessor is the detached state, this function returns
-    /// zero.
-    size_t compute_aggregated_byte_size(SizeAggregateControl ctrl = SizeAggregateControl::size_of_all) const noexcept;
     /// Return the size taken up by the current snapshot. This is in contrast to
     /// the number returned by DB::get_stats() which will return the
     /// size of the last snapshot done in that DB. If the snapshots are
@@ -528,6 +516,21 @@ public:
 #endif
 
 protected:
+    static constexpr size_t s_table_name_ndx = 0;
+    static constexpr size_t s_table_refs_ndx = 1;
+    static constexpr size_t s_file_size_ndx = 2;
+    static constexpr size_t s_free_pos_ndx = 3;
+    static constexpr size_t s_free_size_ndx = 4;
+    static constexpr size_t s_free_version_ndx = 5;
+    static constexpr size_t s_version_ndx = 6;
+    static constexpr size_t s_hist_type_ndx = 7;
+    static constexpr size_t s_hist_ref_ndx = 8;
+    static constexpr size_t s_hist_version_ndx = 9;
+    static constexpr size_t s_sync_file_id_ndx = 10;
+    static constexpr size_t s_evacuation_point_ndx = 11;
+
+    static constexpr size_t s_group_max_size = 12;
+
     virtual Replication* const* get_repl() const
     {
         return &Table::g_dummy_replication;
@@ -573,6 +576,7 @@ private:
     ///    9th   History ref          (optional)             4
     ///   10th   History version      (optional)             7
     ///   11th   Sync File Id         (optional)            10
+    ///   12th   Evacuation point     (optional)            22
     ///
     /// </pre>
     ///
@@ -615,20 +619,6 @@ private:
     std::vector<ToDeleteRef> m_objects_to_delete;
     size_t m_total_rows;
 
-    static constexpr size_t s_table_name_ndx = 0;
-    static constexpr size_t s_table_refs_ndx = 1;
-    static constexpr size_t s_file_size_ndx = 2;
-    static constexpr size_t s_free_pos_ndx = 3;
-    static constexpr size_t s_free_size_ndx = 4;
-    static constexpr size_t s_free_version_ndx = 5;
-    static constexpr size_t s_version_ndx = 6;
-    static constexpr size_t s_hist_type_ndx = 7;
-    static constexpr size_t s_hist_ref_ndx = 8;
-    static constexpr size_t s_hist_version_ndx = 9;
-    static constexpr size_t s_sync_file_id_ndx = 10;
-
-    static constexpr size_t s_group_max_size = 11;
-
     Group(SlabAlloc* alloc) noexcept;
     void init_array_parents() noexcept;
 
@@ -643,7 +633,8 @@ private:
     /// underlying node structure. If `top_ref` is zero and \a
     /// create_group_when_missing is true, create a new node structure that
     /// represents an empty group, and attach this group accessor to it.
-    void attach(ref_type top_ref, bool writable, bool create_group_when_missing);
+    void attach(ref_type top_ref, bool writable, bool create_group_when_missing, size_t file_size = -1,
+                uint_fast64_t version = -1);
 
     /// Detach this group accessor from the underlying node structure. If this
     /// group accessors is already in the detached state, this function does
@@ -652,14 +643,13 @@ private:
 
     /// \param writable Must be set to true when, and only when attaching for a
     /// write transaction.
-    void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable);
+    void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, VersionID version);
 
     void create_empty_group();
     void remove_table(size_t table_ndx, TableKey key);
 
     void reset_free_space_tracking();
 
-    void remap(size_t new_file_size);
     void remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable);
 
     /// Recursively update refs stored in all cached array
@@ -785,6 +775,8 @@ private:
     ///  22 Object keys are no longer generated from primary key values. Search index
     ///     reintroduced.
     ///
+    ///  23 Layout of Set and Dictionary changed.
+    ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in Group::open() and DB::do_open, the file
     /// format selection logic in
@@ -792,7 +784,7 @@ private:
     /// upgrade logic in Group::upgrade_file_format(), AND the lists of accepted
     /// file formats and the version deletion list residing in "backup_restore.cpp"
 
-    static constexpr int g_current_file_format_version = 22;
+    static constexpr int g_current_file_format_version = 23;
 
     int get_file_format_version() const noexcept;
     void set_file_format_version(int) noexcept;
@@ -807,7 +799,11 @@ private:
     static void get_version_and_history_info(const Array& top, _impl::History::version_type& version,
                                              int& history_type, int& history_schema_version) noexcept;
     static ref_type get_history_ref(const Array& top) noexcept;
-
+    static size_t get_logical_file_size(const Array& top) noexcept;
+    size_t get_logical_file_size() const noexcept
+    {
+        return get_logical_file_size(m_top);
+    }
     void clear_history();
     void set_history_schema_version(int version);
     template <class Accessor>
@@ -816,7 +812,9 @@ private:
     template <class Accessor>
     void prepare_history_parent(Accessor& history_root, int history_type, int history_schema_version,
                                 uint64_t file_ident);
-    static void validate_top_array(const Array& arr, const SlabAlloc& alloc);
+    static void validate_top_array(const Array& arr, const SlabAlloc& alloc,
+                                   std::optional<size_t> read_lock_file_size = util::none,
+                                   std::optional<uint_fast64_t> read_lock_version = util::none);
 
     size_t find_table_index(StringData name) const noexcept;
     TableKey ndx2key(size_t ndx) const;
@@ -829,6 +827,11 @@ private:
         if (m_table_names.find_first(name) != not_found)
             throw TableNameInUse();
     }
+    void check_attached() const
+    {
+        if (!is_attached())
+            throw StaleAccessor("Stale transaction");
+    }
 
     friend class Table;
     friend class GroupWriter;
@@ -840,6 +843,7 @@ private:
     friend class Transaction;
     friend class TableKeyIterator;
     friend class CascadeState;
+    friend class SlabAlloc;
 };
 
 class TableKeyIterator {
@@ -953,8 +957,7 @@ inline TableKey Group::find_table(StringData name) const noexcept
 
 inline TableRef Group::get_table(TableKey key)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     auto ndx = key2ndx_checked(key);
     Table* table = do_get_table(ndx); // Throws
     return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
@@ -962,8 +965,7 @@ inline TableRef Group::get_table(TableKey key)
 
 inline ConstTableRef Group::get_table(TableKey key) const
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     auto ndx = key2ndx_checked(key);
     const Table* table = do_get_table(ndx); // Throws
     return ConstTableRef(table, table ? table->m_alloc.get_instance_version() : 0);
@@ -971,24 +973,21 @@ inline ConstTableRef Group::get_table(TableKey key) const
 
 inline TableRef Group::get_table(StringData name)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     Table* table = do_get_table(name); // Throws
     return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
 inline ConstTableRef Group::get_table(StringData name) const
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     const Table* table = do_get_table(name); // Throws
     return ConstTableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
 inline TableRef Group::add_table(StringData name, Table::Type table_type)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     check_table_name_uniqueness(name);
     Table* table = do_add_table(name, table_type); // Throws
     return TableRef(table, table->m_alloc.get_instance_version());
@@ -997,8 +996,7 @@ inline TableRef Group::add_table(StringData name, Table::Type table_type)
 inline TableRef Group::get_or_add_table(StringData name, Table::Type table_type, bool* was_added)
 {
     REALM_ASSERT(table_type != Table::Type::Embedded);
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     auto table = do_get_table(name);
     if (was_added)
         *was_added = !table;
@@ -1016,7 +1014,7 @@ inline TableRef Group::get_or_add_table_with_primary_key(StringData name, DataTy
         if (!table->get_primary_key_column() || table->get_column_name(table->get_primary_key_column()) != pk_name ||
             table->is_nullable(table->get_primary_key_column()) != nullable ||
             table->get_table_type() != table_type) {
-            throw std::runtime_error("Inconsistent schema");
+            return {};
         }
         return table;
     }
@@ -1085,6 +1083,15 @@ inline ref_type Group::get_history_ref(const Array& top) noexcept
     }
     return 0;
 }
+
+inline size_t Group::get_logical_file_size(const Array& top) noexcept
+{
+    if (top.is_attached() && top.size() > s_file_size_ndx) {
+        return (size_t)top.get_as_ref_or_tagged(s_file_size_ndx).get_as_int();
+    }
+    return 0;
+}
+
 
 inline void Group::set_sync_file_id(uint64_t id)
 {

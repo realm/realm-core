@@ -4,6 +4,7 @@ set(REALM_FFI_SOURCES
     config.cpp
     dictionary.cpp
     error.cpp
+    logging.cpp
     notifications.cpp
     object.cpp
     list.cpp
@@ -24,8 +25,8 @@ if(REALM_ENABLE_SYNC)
     list(APPEND REALM_FFI_SOURCES
         app.cpp
         http.cpp
-        logging.cpp
         sync.cpp
+        socket_provider.cpp
     )
 endif()
 

@@ -16,9 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "baas_admin_api.hpp"
-#include "external/mpark/variant.hpp"
-#include "realm/object-store/sync/app_credentials.hpp"
+#include <util/baas_admin_api.hpp>
+
+#include <external/mpark/variant.hpp>
+#include <realm/object-store/sync/app_credentials.hpp>
 
 #if REALM_ENABLE_AUTH_TESTS
 
@@ -28,8 +29,9 @@
 #include <catch2/catch_all.hpp>
 #include <curl/curl.h>
 
-#include "realm/object_id.hpp"
-#include "realm/util/scope_exit.hpp"
+#include <realm/exceptions.hpp>
+#include <realm/object_id.hpp>
+#include <realm/util/scope_exit.hpp>
 
 namespace realm {
 namespace {
@@ -71,11 +73,12 @@ class BaasRuleBuilder {
 public:
     using IncludePropCond = util::UniqueFunction<bool(const Property&)>;
     BaasRuleBuilder(const Schema& schema, const Property& partition_key, const std::string& service_name,
-                    const std::string& db_name)
+                    const std::string& db_name, bool is_flx_sync)
         : m_schema(schema)
         , m_partition_key(partition_key)
         , m_mongo_service_name(service_name)
         , m_mongo_db_name(db_name)
+        , m_is_flx_sync(is_flx_sync)
     {
     }
 
@@ -84,13 +87,12 @@ public:
                                                bool clear_path = false);
     nlohmann::json object_schema_to_baas_schema(const ObjectSchema& obj_schema, IncludePropCond include_prop);
 
-    nlohmann::json generic_baas_rule(const std::string& schema_name);
-
 private:
     const Schema& m_schema;
     const Property& m_partition_key;
     const std::string& m_mongo_service_name;
     const std::string& m_mongo_db_name;
+    const bool m_is_flx_sync;
     nlohmann::json m_relationships;
     std::vector<std::string> m_current_path;
 };
@@ -99,7 +101,7 @@ nlohmann::json BaasRuleBuilder::object_schema_to_jsonschema(const ObjectSchema& 
                                                             const IncludePropCond& include_prop, bool clear_path)
 {
     nlohmann::json required = nlohmann::json::array();
-    nlohmann::json properties;
+    nlohmann::json properties = nlohmann::json::object();
     for (const auto& prop : obj_schema.persisted_properties) {
         if (include_prop && !include_prop(prop)) {
             continue;
@@ -181,32 +183,18 @@ nlohmann::json BaasRuleBuilder::object_schema_to_baas_schema(const ObjectSchema&
 
     auto schema_json = object_schema_to_jsonschema(obj_schema, include_prop, true);
     auto& prop_sub_obj = schema_json["properties"];
-    if (!prop_sub_obj.contains(m_partition_key.name)) {
+    if (!prop_sub_obj.contains(m_partition_key.name) && !m_is_flx_sync) {
         prop_sub_obj.emplace(m_partition_key.name, property_to_jsonschema(m_partition_key, include_prop));
         if (!is_nullable(m_partition_key.type)) {
             schema_json["required"].push_back(m_partition_key.name);
         }
     }
-    std::string test = schema_json.dump();
     return {
         {"schema", schema_json},
         {"metadata", nlohmann::json::object({{"database", m_mongo_db_name},
                                              {"collection", obj_schema.name},
                                              {"data_source", m_mongo_service_name}})},
         {"relationships", m_relationships},
-    };
-}
-
-nlohmann::json BaasRuleBuilder::generic_baas_rule(const std::string& schema_name)
-{
-    return {
-        {"database", m_mongo_db_name},
-        {"collection", schema_name},
-        {"roles", nlohmann::json::array({{{"name", "default"},
-                                          {"apply_when", nlohmann::json::object()},
-                                          {"insert", true},
-                                          {"delete", true},
-                                          {"additional_fields", nlohmann::json::object()}}})},
     };
 }
 
@@ -474,7 +462,7 @@ AdminAPISession AdminAPISession::login(const std::string& base_url, const std::s
         login_req_body.dump(),
     };
     auto login_resp = do_http_request(std::move(auth_req));
-    REALM_ASSERT(login_resp.http_status_code == 200);
+    REALM_ASSERT_EX(login_resp.http_status_code == 200, login_resp.http_status_code, login_resp.body);
     auto login_resp_body = nlohmann::json::parse(login_resp.body);
 
     std::string access_token = login_resp_body["access_token"];
@@ -491,21 +479,21 @@ void AdminAPISession::revoke_user_sessions(const std::string& user_id, const std
 {
     auto endpoint = apps()[app_id]["users"][user_id]["logout"];
     auto response = endpoint.put("");
-    REALM_ASSERT(response.http_status_code == 204);
+    REALM_ASSERT_EX(response.http_status_code == 204, response.http_status_code, response.body);
 }
 
 void AdminAPISession::disable_user_sessions(const std::string& user_id, const std::string& app_id) const
 {
     auto endpoint = apps()[app_id]["users"][user_id]["disable"];
     auto response = endpoint.put("");
-    REALM_ASSERT(response.http_status_code == 204);
+    REALM_ASSERT_EX(response.http_status_code == 204, response.http_status_code, response.body);
 }
 
 void AdminAPISession::enable_user_sessions(const std::string& user_id, const std::string& app_id) const
 {
     auto endpoint = apps()[app_id]["users"][user_id]["enable"];
     auto response = endpoint.put("");
-    REALM_ASSERT(response.http_status_code == 204);
+    REALM_ASSERT_EX(response.http_status_code == 204, response.http_status_code, response.body);
 }
 
 // returns false for an invalid/expired access token
@@ -542,7 +530,7 @@ void AdminAPISession::delete_app(const std::string& app_id) const
 {
     auto app_endpoint = apps()[app_id];
     auto resp = app_endpoint.del();
-    REALM_ASSERT(resp.http_status_code == 204);
+    REALM_ASSERT_EX(resp.http_status_code == 204, resp.http_status_code, resp.body);
 }
 
 std::vector<AdminAPISession::Service> AdminAPISession::get_services(const std::string& app_id) const
@@ -579,6 +567,19 @@ AdminAPISession::Service AdminAPISession::get_sync_service(const std::string& ap
     });
     REALM_ASSERT(sync_service != services.end());
     return *sync_service;
+}
+
+void AdminAPISession::trigger_client_reset(const std::string& app_id, int64_t file_ident) const
+{
+    auto endpoint = apps(APIFamily::Private)[app_id]["sync"]["force_reset"];
+    endpoint.put_json(nlohmann::json{{"file_ident", file_ident}});
+}
+
+void AdminAPISession::migrate_to_flx(const std::string& app_id, const std::string& service_id,
+                                     bool migrate_to_flx) const
+{
+    auto endpoint = apps()[app_id]["sync"]["migration"];
+    endpoint.put_json(nlohmann::json{{"serviceId", service_id}, {"action", migrate_to_flx ? "start" : "rollback"}});
 }
 
 static nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
@@ -699,9 +700,56 @@ bool AdminAPISession::is_sync_terminated(const std::string& app_id) const
     return state_result["state"].get<std::string>().empty();
 }
 
-AdminAPIEndpoint AdminAPISession::apps() const
+bool AdminAPISession::is_initial_sync_complete(const std::string& app_id) const
 {
-    return AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps", m_base_url, m_group_id), m_access_token);
+    auto progress_endpoint = apps()[app_id]["sync"]["progress"];
+    auto progress_result = progress_endpoint.get_json();
+    if (auto it = progress_result.find("progress"); it != progress_result.end() && it->is_object() && !it->empty()) {
+        for (auto& elem : *it) {
+            auto is_complete = elem["complete"];
+            if (!is_complete.is_boolean() || !is_complete.get<bool>()) {
+                return false;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+AdminAPISession::MigrationStatus AdminAPISession::get_migration_status(const std::string& app_id) const
+{
+    MigrationStatus status;
+    auto progress_endpoint = apps()[app_id]["sync"]["migration"];
+    auto progress_result = progress_endpoint.get_json();
+    auto errorMessage = progress_result["errorMessage"];
+    if (errorMessage.is_string() && !errorMessage.get<std::string>().empty()) {
+        throw Exception(Status{ErrorCodes::RuntimeError, errorMessage.get<std::string>()});
+    }
+    if (!progress_result["statusMessage"].is_string() || !progress_result["isMigrated"].is_boolean()) {
+        throw Exception(
+            Status{ErrorCodes::RuntimeError, util::format("Invalid result returned from migration status request: %1",
+                                                          progress_result.dump(4, 32, true))});
+    }
+
+    status.statusMessage = progress_result["statusMessage"].get<std::string>();
+    status.isMigrated = progress_result["isMigrated"].get<bool>();
+    status.isCancelable = progress_result["isCancelable"].get<bool>();
+    status.isRevertible = progress_result["isRevertible"].get<bool>();
+    status.complete = status.statusMessage.empty();
+    return status;
+}
+
+AdminAPIEndpoint AdminAPISession::apps(APIFamily family) const
+{
+    switch (family) {
+        case APIFamily::Admin:
+            return AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps", m_base_url, m_group_id),
+                                    m_access_token);
+        case APIFamily::Private:
+            return AdminAPIEndpoint(util::format("%1/api/private/v1.0/groups/%2/apps", m_base_url, m_group_id),
+                                    m_access_token);
+    }
+    REALM_UNREACHABLE();
 }
 
 AppCreateConfig default_app_config(const std::string& base_url)
@@ -819,7 +867,7 @@ AppCreateConfig default_app_config(const std::string& base_url)
 
 AppCreateConfig minimal_app_config(const std::string& base_url, const std::string& name, const Schema& schema)
 {
-    Property partition_key("partition", PropertyType::String | PropertyType::Nullable);
+    Property partition_key("realm_id", PropertyType::String | PropertyType::Nullable);
 
     AppCreateConfig::UserPassAuthConfig user_pass_config{
         true,  "Confirm", "", "http://example.com/confirmEmail", "", "Reset", "http://exmaple.com/resetPassword",
@@ -843,6 +891,7 @@ AppCreateConfig minimal_app_config(const std::string& base_url, const std::strin
         util::none,                  // disable custom auth
         true,                        // enable api key auth
         true,                        // enable anonymous auth
+        {},                          // no service roles on the default rule
     };
 }
 
@@ -955,30 +1004,10 @@ AppSession create_app(const AppCreateConfig& config)
                 asymmetric_tables.emplace_back(obj_schema.name);
             }
         }
-        auto default_roles = nlohmann::json::array();
-        if (config.flx_sync_config->default_roles.empty()) {
-            default_roles = nlohmann::json::array(
-                {{{"name", "all"}, {"applyWhen", nlohmann::json::object()}, {"read", true}, {"write", true}}});
-        }
-        else {
-            std::transform(config.flx_sync_config->default_roles.begin(), config.flx_sync_config->default_roles.end(),
-                           std::back_inserter(default_roles), [](const AppCreateConfig::FLXSyncRole& role_def) {
-                               nlohmann::json ret{{"name", role_def.name}, {"applyWhen", role_def.apply_when}};
-                               ret["read"] = role_def.read;
-                               ret["write"] = role_def.write;
-                               return ret;
-                           });
-        }
         mongo_service_def["config"]["flexible_sync"] = {{"state", "enabled"},
                                                         {"database_name", config.mongo_dbname},
                                                         {"queryable_fields_names", queryable_fields},
-                                                        {"asymmetric_tables", asymmetric_tables},
-                                                        {"permissions",
-                                                         {{"rules", nlohmann::json::object()},
-                                                          {
-                                                              "defaultRoles",
-                                                              default_roles,
-                                                          }}}};
+                                                        {"asymmetric_tables", asymmetric_tables}};
     }
     else {
         sync_config = nlohmann::json{
@@ -1000,7 +1029,6 @@ AppSession create_app(const AppCreateConfig& config)
 
     auto create_mongo_service_resp = services.post_json(std::move(mongo_service_def));
     std::string mongo_service_id = create_mongo_service_resp["_id"];
-    auto rules = services[mongo_service_id]["rules"];
     auto schemas = app["schemas"];
 
     auto pk_and_queryable_only = [&](const Property& prop) {
@@ -1014,18 +1042,54 @@ AppSession create_app(const AppCreateConfig& config)
         return prop.name == "_id" || prop.name == config.partition_key.name;
     };
 
-    // Create the rules in two passes: first populate just the primary key and
+    // Create the schemas in two passes: first populate just the primary key and
     // partition key, then add the rest of the properties. This ensures that the
     // targest of links exist before adding the links.
     std::vector<std::pair<std::string, const ObjectSchema*>> object_schema_to_create;
-    BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname);
+    BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname,
+                                 static_cast<bool>(config.flx_sync_config));
     for (const auto& obj_schema : config.schema) {
         auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema, pk_and_queryable_only);
         auto schema_create_resp = schemas.post_json(schema_to_create);
         object_schema_to_create.push_back({schema_create_resp["_id"], &obj_schema});
-
-        rules.post_json(rule_builder.generic_baas_rule(obj_schema.name));
     }
+
+    auto default_rule = services[mongo_service_id]["default_rule"];
+    auto service_roles = nlohmann::json::array();
+    if (config.service_roles.empty()) {
+        service_roles = nlohmann::json::array({{{"name", "default"},
+                                                {"apply_when", nlohmann::json::object()},
+                                                {"document_filters",
+                                                 {
+                                                     {"read", true},
+                                                     {"write", true},
+                                                 }},
+                                                {"read", true},
+                                                {"write", true},
+                                                {"insert", true},
+                                                {"delete", true}}});
+    }
+    else {
+        std::transform(config.service_roles.begin(), config.service_roles.end(), std::back_inserter(service_roles),
+                       [](const AppCreateConfig::ServiceRole& role_def) {
+                           nlohmann::json ret{
+                               {"name", role_def.name},
+                               {"apply_when", role_def.apply_when},
+                               {"document_filters",
+                                {
+                                    {"read", role_def.document_filters.read},
+                                    {"write", role_def.document_filters.write},
+                                }},
+                               {"insert", role_def.insert_filter},
+                               {"delete", role_def.delete_filter},
+                               {"read", role_def.read},
+                               {"write", role_def.write},
+                           };
+                           return ret;
+                       });
+    }
+
+    default_rule.post_json({{"roles", service_roles}});
 
     for (const auto& [id, obj_schema] : object_schema_to_create) {
         auto schema_to_create = rule_builder.object_schema_to_baas_schema(*obj_schema, nullptr);
@@ -1044,17 +1108,22 @@ AppSession create_app(const AppCreateConfig& config)
 
     app["sync"]["config"].put_json({{"development_mode_enabled", config.dev_mode_enabled}});
 
+    auto rules = services[mongo_service_id]["rules"];
     rules.post_json({
         {"database", config.mongo_dbname},
         {"collection", "UserData"},
         {"roles",
-         {{
-             {"name", "default"},
-             {"apply_when", nlohmann::json::object()},
-             {"insert", true},
-             {"delete", true},
-             {"additional_fields", nlohmann::json::object()},
-         }}},
+         {{{"name", "default"},
+           {"apply_when", nlohmann::json::object()},
+           {"document_filters",
+            {
+                {"read", true},
+                {"write", true},
+            }},
+           {"read", true},
+           {"write", true},
+           {"insert", true},
+           {"delete", true}}}},
     });
 
     app["custom_user_data"].patch_json({

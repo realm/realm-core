@@ -20,7 +20,9 @@
 
 #include "util/baas_admin_api.hpp"
 
+#include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_store.hpp>
+#include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
@@ -38,8 +40,8 @@ std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error)
         os << "(none)";
     }
     else {
-        os << "AppError(error_code=" << error->error_code
-           << ", http_status_code=" << error->http_status_code.value_or(0) << ", message=\"" << error->message
+        os << "AppError(error_code=" << error->code()
+           << ", http_status_code=" << error->additional_status_code.value_or(0) << ", message=\"" << error->reason()
            << "\", link_to_server_logs=\"" << error->link_to_server_logs << "\")";
     }
     return os;
@@ -67,6 +69,24 @@ bool results_contains_original_name(SyncFileActionMetadataResults& results, cons
     return false;
 }
 
+bool ReturnsTrueWithinTimeLimit::match(util::FunctionRef<bool()> condition) const
+{
+    const auto wait_start = std::chrono::steady_clock::now();
+    bool predicate_returned_true = false;
+    util::EventLoop::main().run_until([&] {
+        if (std::chrono::steady_clock::now() - wait_start > m_max_ms) {
+            return true;
+        }
+        auto ret = condition();
+        if (ret) {
+            predicate_returned_true = true;
+        }
+        return ret;
+    });
+
+    return predicate_returned_true;
+}
+
 void timed_wait_for(util::FunctionRef<bool()> condition, std::chrono::milliseconds max_ms)
 {
     const auto wait_start = std::chrono::steady_clock::now();
@@ -78,14 +98,15 @@ void timed_wait_for(util::FunctionRef<bool()> condition, std::chrono::millisecon
     });
 }
 
-void timed_sleeping_wait_for(util::FunctionRef<bool()> condition, std::chrono::milliseconds max_ms)
+void timed_sleeping_wait_for(util::FunctionRef<bool()> condition, std::chrono::milliseconds max_ms,
+                             std::chrono::milliseconds sleep_ms)
 {
     const auto wait_start = std::chrono::steady_clock::now();
     while (!condition()) {
         if (std::chrono::steady_clock::now() - wait_start > max_ms) {
             throw std::runtime_error(util::format("timed_sleeping_wait_for exceeded %1 ms", max_ms.count()));
         }
-        millisleep(1);
+        std::this_thread::sleep_for(sleep_ms);
     }
 }
 
@@ -183,6 +204,35 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app)
                                      REQUIRE(!error);
                                  });
     return creds;
+}
+
+void wait_for_advance(Realm& realm)
+{
+    struct Context : BindingContext {
+        Realm& realm;
+        DB::version_type target_version;
+        bool& done;
+        Context(Realm& realm, bool& done)
+            : realm(realm)
+            , target_version(*realm.latest_snapshot_version())
+            , done(done)
+        {
+        }
+
+        void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
+        {
+            if (realm.read_transaction_version().version >= target_version) {
+                done = true;
+            }
+        }
+    };
+
+    bool done = false;
+    realm.m_binding_context = std::make_unique<Context>(realm, done);
+    timed_wait_for([&] {
+        return done;
+    });
+    realm.m_binding_context = nullptr;
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
@@ -303,10 +353,10 @@ struct FakeLocalClientReset : public TestClientReset {
             }
             remote_realm->commit_transaction();
 
-            TestLogger logger;
             sync::SaltedFileIdent fake_ident{1, 123456789};
             auto local_db = TestHelper::get_db(local_realm);
             auto remote_db = TestHelper::get_db(remote_realm);
+            util::StderrLogger logger(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
             using _impl::client_reset::perform_client_reset_diff;
             constexpr bool recovery_is_allowed = true;
             perform_client_reset_diff(local_db, remote_db, fake_ident, logger, m_mode, recovery_is_allowed, nullptr,
@@ -328,8 +378,8 @@ private:
 
 #if REALM_ENABLE_AUTH_TESTS
 
-static void wait_for_object_to_persist(std::shared_ptr<SyncUser> user, const AppSession& app_session,
-                                       const std::string& schema_name, const bson::BsonDocument& filter_bson)
+void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const AppSession& app_session,
+                                         const std::string& schema_name, const bson::BsonDocument& filter_bson)
 {
     // While at this point the object has been sync'd successfully, we must also
     // wait for it to appear in the backing database before terminating sync
@@ -340,22 +390,58 @@ static void wait_for_object_to_persist(std::shared_ptr<SyncUser> user, const App
     app::MongoClient remote_client = user->mongo_client("BackingDB");
     app::MongoDatabase db = remote_client.db(app_session.config.mongo_dbname);
     app::MongoCollection object_coll = db[schema_name];
-    uint64_t count_external = 0;
 
     timed_sleeping_wait_for(
         [&]() -> bool {
-            if (count_external == 0) {
-                object_coll.count(filter_bson, [&](uint64_t count, util::Optional<app::AppError> error) {
-                    REQUIRE(!error);
-                    count_external = count;
-                });
-            }
-            if (count_external == 0) {
-                millisleep(2000); // don't spam the server too much
-            }
-            return count_external > 0;
+            auto pf = util::make_promise_future<uint64_t>();
+            object_coll.count(filter_bson, [promise = std::move(pf.promise)](
+                                               uint64_t count, util::Optional<app::AppError> error) mutable {
+                REQUIRE(!error);
+                if (error) {
+                    promise.set_error({ErrorCodes::RuntimeError, error->reason()});
+                }
+                else {
+                    promise.emplace_value(count);
+                }
+            });
+            return pf.future.get() > 0;
         },
-        std::chrono::minutes(15));
+        std::chrono::minutes(15), std::chrono::milliseconds(500));
+}
+
+void trigger_client_reset(const AppSession& app_session)
+{
+    // cause a client reset by restarting the sync service
+    // this causes the server's sync history to be resynthesized
+    auto baas_sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
+    auto baas_sync_config = app_session.admin_api.get_config(app_session.server_app_id, baas_sync_service);
+
+    REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+    app_session.admin_api.disable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
+    timed_sleeping_wait_for([&] {
+        return app_session.admin_api.is_sync_terminated(app_session.server_app_id);
+    });
+    app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
+    REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+    if (app_session.config.dev_mode_enabled) { // dev mode is not sticky across a reset
+        app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
+    }
+
+    // In FLX sync, the server won't let you connect until the initial sync is complete. With PBS tho, we need
+    // to make sure we've actually copied all the data from atlas into the realm history before we do any of
+    // our remote changes.
+    if (!app_session.config.flx_sync_config) {
+        timed_sleeping_wait_for([&] {
+            return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
+        });
+    }
+}
+
+void trigger_client_reset(const AppSession& app_session, const SharedRealm& realm)
+{
+    auto file_ident = SyncSession::OnlyForTesting::get_file_ident(*realm->sync_session());
+    REQUIRE(file_ident.ident != 0);
+    app_session.admin_api.trigger_client_reset(app_session.server_app_id, file_ident.ident);
 }
 
 struct BaasClientReset : public TestClientReset {
@@ -376,6 +462,17 @@ struct BaasClientReset : public TestClientReset {
                      *(partition_value.end() - 1) == '"');
         partition_value = partition_value.substr(1, partition_value.size() - 2);
         Partition partition = {app_session.config.partition_key.name, partition_value};
+
+        // There is a race in PBS where if initial sync is still in-progress while you're creating the initial
+        // object below, you may end up creating it in your local realm, uploading it, have the translator process
+        // the upload, then initial sync the processed object, and then send it back to you as an erase/create
+        // object instruction.
+        //
+        // So just don't try to do anything until initial sync is done and we're sure the server is in a stable
+        // state.
+        timed_sleeping_wait_for([&] {
+            return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
+        });
 
         auto realm = Realm::get_shared_realm(m_local_config);
         auto session = sync_manager->get_existing_session(realm->config().path);
@@ -400,10 +497,7 @@ struct BaasClientReset : public TestClientReset {
             wait_for_upload(*realm);
             wait_for_download(*realm);
 
-            wait_for_object_to_persist(m_local_config.sync_config->user, app_session, object_schema_name,
-                                       {{pk_col_name, m_pk_driving_reset}, {"value", last_synced_value}});
-
-            session->log_out();
+            session->pause();
 
             realm->begin_transaction();
             obj.set(col, 4);
@@ -413,20 +507,7 @@ struct BaasClientReset : public TestClientReset {
             realm->commit_transaction();
         }
 
-        // cause a client reset by restarting the sync service
-        // this causes the server's sync history to be resynthesized
-        auto baas_sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
-        auto baas_sync_config = app_session.admin_api.get_config(app_session.server_app_id, baas_sync_service);
-        REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
-        app_session.admin_api.disable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
-        timed_sleeping_wait_for([&] {
-            return app_session.admin_api.is_sync_terminated(app_session.server_app_id);
-        });
-        app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
-        REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
-        if (app_session.config.dev_mode_enabled) { // dev mode is not sticky across a reset
-            app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
-        }
+        trigger_client_reset(app_session, realm);
 
         {
             auto realm2 = Realm::get_shared_realm(m_remote_config);
@@ -468,7 +549,7 @@ struct BaasClientReset : public TestClientReset {
         }
 
         // Resuming sync on the first realm should now result in a client reset
-        session->revive_if_needed();
+        session->resume();
         if (m_on_post_local) {
             m_on_post_local(realm);
         }
@@ -503,38 +584,28 @@ struct BaasFLXClientReset : public TestClientReset {
 
         auto realm = Realm::get_shared_realm(m_local_config);
         auto session = realm->sync_session();
-        const ObjectId pk_of_added_object("123456789000000000000000");
-        {
-            if (m_on_setup) {
-                m_on_setup(realm);
+        if (m_on_setup) {
+            m_on_setup(realm);
+        }
+
+        ObjectId pk_of_added_object = [&] {
+            if (m_populate_initial_object) {
+                return m_populate_initial_object(realm);
             }
+
+            auto ret = ObjectId::gen();
             constexpr bool create_object = true;
-            subscribe_to_object_by_id(realm, pk_of_added_object, create_object);
+            subscribe_to_object_by_id(realm, ret, create_object);
+            return ret;
+        }();
 
-            wait_for_object_to_persist(m_local_config.sync_config->user, app_session,
-                                       std::string(c_object_schema_name),
-                                       {{std::string(c_id_col_name), pk_of_added_object}});
-            session->log_out();
+        session->pause();
 
-            if (m_make_local_changes) {
-                m_make_local_changes(realm);
-            }
+        if (m_make_local_changes) {
+            m_make_local_changes(realm);
         }
 
-        // cause a client reset by restarting the sync service
-        // this causes the server's sync history to be resynthesized
-        auto baas_sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
-        auto baas_sync_config = app_session.admin_api.get_config(app_session.server_app_id, baas_sync_service);
-        REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
-        app_session.admin_api.disable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
-        timed_sleeping_wait_for([&] {
-            return app_session.admin_api.is_sync_terminated(app_session.server_app_id);
-        });
-        app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
-        REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
-        if (app_session.config.dev_mode_enabled) { // dev mode is not sticky across a reset
-            app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
-        }
+        trigger_client_reset(app_session, realm);
 
         {
             auto realm2 = Realm::get_shared_realm(m_remote_config);
@@ -569,7 +640,7 @@ struct BaasFLXClientReset : public TestClientReset {
         }
 
         // Resuming sync on the first realm should now result in a client reset
-        session->revive_if_needed();
+        session->resume();
         if (m_on_post_local) {
             m_on_post_local(realm);
         }
@@ -594,12 +665,13 @@ private:
         Query query_for_added_object = table->where().equal(id_col, pk);
         mut_subs.insert_or_assign(query_for_added_object);
         auto subs = std::move(mut_subs).commit();
+        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         if (create_object) {
             realm->begin_transaction();
             table->create_object_with_primary_key(pk, {{str_col, "initial value"}});
             realm->commit_transaction();
         }
-        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        wait_for_upload(*realm);
     }
 
     void load_initial_data(SharedRealm realm)
@@ -659,6 +731,12 @@ TestClientReset* TestClientReset::make_local_changes(Callback&& changes_local)
     m_make_local_changes = std::move(changes_local);
     return this;
 }
+TestClientReset* TestClientReset::populate_initial_object(InitialObjectCallback&& callback)
+{
+    m_populate_initial_object = std::move(callback);
+    return this;
+}
+
 TestClientReset* TestClientReset::make_remote_changes(Callback&& changes_remote)
 {
     m_make_remote_changes = std::move(changes_remote);

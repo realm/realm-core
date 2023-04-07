@@ -1,8 +1,8 @@
-#include "realm/exceptions.hpp"
-#include "realm/object_id.hpp"
-#include "realm/sync/noinst/sync_metadata_schema.hpp"
-#include "realm/sync/subscriptions.hpp"
-#include "realm/sync/noinst/client_history_impl.hpp"
+#include <realm/exceptions.hpp>
+#include <realm/object_id.hpp>
+#include <realm/sync/noinst/sync_metadata_schema.hpp>
+#include <realm/sync/subscriptions.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 
 #include "test.hpp"
 #include "util/test_path.hpp"
@@ -44,7 +44,7 @@ TEST(Sync_SubscriptionStoreBasic)
         auto latest = store->get_latest();
         CHECK(latest.begin() == latest.end());
         CHECK_EQUAL(latest.size(), 0);
-        CHECK(latest.find("a sub") == latest.end());
+        CHECK(latest.find("a sub") == nullptr);
         CHECK_EQUAL(latest.version(), 0);
         CHECK(latest.error_str().is_null());
         // The "0" query is "Pending" from beginning since it gets created in the initial constructor
@@ -62,21 +62,21 @@ TEST(Sync_SubscriptionStoreBasic)
         auto&& [it, inserted] = out.insert_or_assign("a sub", query_a);
         CHECK(inserted);
         CHECK_NOT(it == out.end());
-        CHECK_EQUAL(it->name(), "a sub");
-        CHECK_EQUAL(it->object_class_name(), "a");
-        CHECK_EQUAL(it->query_string(), query_a.get_description());
+        CHECK_EQUAL(it->name, "a sub");
+        CHECK_EQUAL(it->object_class_name, "a");
+        CHECK_EQUAL(it->query_string, query_a.get_description());
 
         std::tie(it, inserted) =
             out.insert_or_assign(Query(read_tr->get_table(fixture.a_table_key)).equal(fixture.foo_col, "bizz"));
         CHECK_NOT(it == out.end());
         CHECK(inserted);
 
-        CHECK_EQUAL(it->name(), std::string_view{});
-        StringData name(it->name());
+        CHECK_EQUAL(it->name, util::Optional<std::string>());
+        StringData name(it->name);
         CHECK(name.is_null());
-        anon_sub_id = it->id();
+        anon_sub_id = it->id;
 
-        std::move(out).commit();
+        out.commit();
     }
 
     // Destroy the DB and reload it and make sure we can get the subscriptions we set in the previous block.
@@ -91,21 +91,20 @@ TEST(Sync_SubscriptionStoreBasic)
         auto set = store->get_latest();
         CHECK_EQUAL(set.version(), 1);
         CHECK_EQUAL(set.size(), 2);
-        auto it = set.find(query_a);
-        CHECK_NOT(it == set.end());
-        CHECK_EQUAL(it->name(), "a sub");
-        CHECK_EQUAL(it->object_class_name(), "a");
-        CHECK_EQUAL(it->query_string(), query_a.get_description());
+        auto ptr = set.find(query_a);
+        CHECK(ptr);
+        CHECK_EQUAL(ptr->name, "a sub");
+        CHECK_EQUAL(ptr->object_class_name, "a");
+        CHECK_EQUAL(ptr->query_string, query_a.get_description());
 
         // Make sure we can't get a subscription set that doesn't exist.
-        auto it_end = set.find("b subs");
-        CHECK(it_end == set.end());
+        CHECK(set.find("b subs") == nullptr);
 
         auto anon_sub_it = std::find_if(set.begin(), set.end(), [&](const Subscription& sub) {
-            return sub.id() == anon_sub_id;
+            return sub.id == anon_sub_id;
         });
         CHECK_NOT(anon_sub_it == set.end());
-        CHECK_EQUAL(anon_sub_it->name(), std::string_view{});
+        CHECK_EQUAL(anon_sub_it->name, util::Optional<std::string>());
     }
 }
 
@@ -129,7 +128,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
         CHECK_NOT(it == out.end());
 
         out.update_state(SubscriptionSet::State::Complete);
-        std::move(out).commit();
+        out.commit();
     }
 
     // Clone the completed set and update it to have a new query.
@@ -139,7 +138,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
         CHECK_EQUAL(new_set.version(), 2);
         new_set.clear();
         new_set.insert_or_assign("b sub", query_b);
-        std::move(new_set).commit();
+        new_set.commit();
 
         // Mutating a MutableSubscriptionSet that's already been committed should throw a LogicError
         CHECK_THROW(new_set_copy.clear(), LogicError);
@@ -157,18 +156,18 @@ TEST(Sync_SubscriptionStoreStateUpdates)
         CHECK_EQUAL(latest.state(), SubscriptionSet::State::Pending);
 
         auto it_a = active.begin();
-        CHECK_EQUAL(it_a->query_string(), query_a.get_description());
-        CHECK_EQUAL(it_a->name(), "a sub");
+        CHECK_EQUAL(it_a->query_string, query_a.get_description());
+        CHECK_EQUAL(it_a->name, "a sub");
         auto it_b = latest.begin();
-        CHECK_EQUAL(it_b->name(), "b sub");
-        CHECK_EQUAL(it_b->query_string(), query_b.get_description());
+        CHECK_EQUAL(it_b->name, "b sub");
+        CHECK_EQUAL(it_b->query_string, query_b.get_description());
     }
 
     // Mark the version 2 set as complete.
     {
         auto latest_mutable = store->get_mutable_by_version(2);
         latest_mutable.update_state(SubscriptionSet::State::Complete);
-        std::move(latest_mutable).commit();
+        latest_mutable.commit();
     }
 
     // There should now only be one set, version 2, that is complete. Trying to get version 1 should throw an error.
@@ -190,14 +189,14 @@ TEST(Sync_SubscriptionStoreStateUpdates)
         std::string new_sub_name = ObjectId::gen().to_string();
         auto&& [inserted_it, inserted] = set.insert_or_assign(new_sub_name, query_a);
         CHECK(inserted);
-        CHECK_EQUAL(inserted_it->name(), new_sub_name);
+        CHECK_EQUAL(inserted_it->name, new_sub_name);
         CHECK_EQUAL(set.size(), 2);
         auto it = set.begin();
-        CHECK_EQUAL(it->name(), "b sub");
+        CHECK_EQUAL(it->name, "b sub");
         it = set.erase(it);
         CHECK_NOT(it == set.end());
         CHECK_EQUAL(set.size(), 1);
-        CHECK_EQUAL(it->name(), new_sub_name);
+        CHECK_EQUAL(it->name, new_sub_name);
         it = set.erase(it);
         CHECK(it == set.end());
         CHECK_EQUAL(set.size(), 0);
@@ -222,25 +221,25 @@ TEST(Sync_SubscriptionStoreUpdateExisting)
         auto [it, inserted] = out.insert_or_assign(sub_name, query_a);
         CHECK(inserted);
         CHECK_NOT(it == out.end());
-        id_of_inserted = it->id();
+        id_of_inserted = it->id;
         CHECK_NOT_EQUAL(id_of_inserted, ObjectId{});
 
         std::tie(it, inserted) = out.insert_or_assign(sub_name, query_b);
         CHECK(!inserted);
         CHECK_NOT(it == out.end());
-        CHECK_EQUAL(it->object_class_name(), "a");
-        CHECK_EQUAL(it->query_string(), query_b.get_description());
-        CHECK_EQUAL(it->id(), id_of_inserted);
-        std::move(out).commit();
+        CHECK_EQUAL(it->object_class_name, "a");
+        CHECK_EQUAL(it->query_string, query_b.get_description());
+        CHECK_EQUAL(it->id, id_of_inserted);
+        out.commit();
     }
     {
         auto set = store->get_latest().make_mutable_copy();
         CHECK_EQUAL(set.size(), 1);
         auto it = std::find_if(set.begin(), set.end(), [&](const Subscription& sub) {
-            return sub.id() == id_of_inserted;
+            return sub.id == id_of_inserted;
         });
         CHECK_NOT(it == set.end());
-        CHECK_EQUAL(it->name(), sub_name);
+        CHECK_EQUAL(it->name, sub_name);
     }
 }
 
@@ -260,22 +259,22 @@ TEST(Sync_SubscriptionStoreAssignAnonAndNamed)
         auto out = store->get_latest().make_mutable_copy();
         auto [it, inserted] = out.insert_or_assign("a sub", query_a);
         CHECK(inserted);
-        auto named_id = it->id();
+        auto named_id = it->id;
 
         std::tie(it, inserted) = out.insert_or_assign(query_a);
         CHECK(inserted);
-        CHECK_NOT_EQUAL(it->id(), named_id);
+        CHECK_NOT_EQUAL(it->id, named_id);
         CHECK_EQUAL(out.size(), 2);
 
         std::tie(it, inserted) = out.insert_or_assign(query_b);
         CHECK(inserted);
-        named_id = it->id();
+        named_id = it->id;
 
         std::tie(it, inserted) = out.insert_or_assign("", query_b);
         CHECK(inserted);
-        CHECK(it->has_name());
-        CHECK_EQUAL(it->name(), "");
-        CHECK_NOT_EQUAL(it->id(), named_id);
+        CHECK(it->name);
+        CHECK_EQUAL(it->name, "");
+        CHECK_NOT_EQUAL(it->id, named_id);
         CHECK_EQUAL(out.size(), 4);
     }
 }
@@ -289,17 +288,17 @@ TEST(Sync_SubscriptionStoreNotifications)
     std::vector<util::Future<SubscriptionSet::State>> notification_futures;
     auto sub_set = store->get_latest().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Pending));
-    sub_set = std::move(sub_set).commit().make_mutable_copy();
+    sub_set = sub_set.commit().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping));
-    sub_set = std::move(sub_set).commit().make_mutable_copy();
+    sub_set = sub_set.commit().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping));
-    sub_set = std::move(sub_set).commit().make_mutable_copy();
+    sub_set = sub_set.commit().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
-    sub_set = std::move(sub_set).commit().make_mutable_copy();
+    sub_set = sub_set.commit().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
-    sub_set = std::move(sub_set).commit().make_mutable_copy();
+    sub_set = sub_set.commit().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
-    std::move(sub_set).commit();
+    sub_set.commit();
 
     // This should complete immediately because transitioning to the Pending state happens when you commit.
     CHECK_EQUAL(notification_futures[0].get(), SubscriptionSet::State::Pending);
@@ -324,7 +323,7 @@ TEST(Sync_SubscriptionStoreNotifications)
     // Update the state to complete - skipping the bootstrapping phase entirely.
     sub_set = store->get_mutable_by_version(3);
     sub_set.update_state(SubscriptionSet::State::Complete);
-    std::move(sub_set).commit();
+    sub_set.commit();
 
     // Now we should be able to get the future result because we updated the state and skipped the bootstrapping
     // phase.
@@ -337,7 +336,7 @@ TEST(Sync_SubscriptionStoreNotifications)
     sub_set = store->get_mutable_by_version(4);
     sub_set.update_state(SubscriptionSet::State::Bootstrapping);
     sub_set.update_state(SubscriptionSet::State::Error, std::string_view(error_msg));
-    std::move(sub_set).commit();
+    sub_set.commit();
 
     CHECK_EQUAL(old_sub_set.state(), SubscriptionSet::State::Pending);
     CHECK(old_sub_set.error_str().is_null());
@@ -348,13 +347,13 @@ TEST(Sync_SubscriptionStoreNotifications)
     // This should return a non-OK Status with the error message we set on the subscription set.
     auto err_res = notification_futures[3].get_no_throw();
     CHECK_NOT(err_res.is_ok());
-    CHECK_EQUAL(err_res.get_status().code(), ErrorCodes::RuntimeError);
+    CHECK_EQUAL(err_res.get_status().code(), ErrorCodes::SubscriptionFailed);
     CHECK_EQUAL(err_res.get_status().reason(), error_msg);
 
     // Getting a ready future on a set that's already in the error state should also return immediately with an error.
     err_res = store->get_by_version(4).get_state_change_notification(SubscriptionSet::State::Complete).get_no_throw();
     CHECK_NOT(err_res.is_ok());
-    CHECK_EQUAL(err_res.get_status().code(), ErrorCodes::RuntimeError);
+    CHECK_EQUAL(err_res.get_status().code(), ErrorCodes::SubscriptionFailed);
     CHECK_EQUAL(err_res.get_status().reason(), error_msg);
 
     // When a higher version supercedes an older one - i.e. you send query sets for versions 5/6 and the server starts
@@ -367,7 +366,7 @@ TEST(Sync_SubscriptionStoreNotifications)
 
     sub_set = store->get_mutable_by_version(6);
     sub_set.update_state(SubscriptionSet::State::Complete);
-    std::move(sub_set).commit();
+    sub_set.commit();
 
     CHECK_EQUAL(notification_futures[4].get(), SubscriptionSet::State::Superseded);
     CHECK_EQUAL(notification_futures[5].get(), SubscriptionSet::State::Complete);
@@ -387,12 +386,12 @@ TEST(Sync_SubscriptionStoreNotifications)
     // not explicitly refreshed (i.e. is reading from a snapshot from before the state change), that it can still
     // return a ready future.
     auto mut_set = store->get_latest().make_mutable_copy();
-    auto waitable_set = std::move(mut_set).commit();
+    auto waitable_set = mut_set.commit();
 
     {
         mut_set = store->get_mutable_by_version(waitable_set.version());
         mut_set.update_state(SubscriptionSet::State::Complete);
-        std::move(mut_set).commit();
+        mut_set.commit();
     }
 
     auto fut = waitable_set.get_state_change_notification(SubscriptionSet::State::Complete);
@@ -432,15 +431,15 @@ TEST(Sync_SubscriptionStoreInternalSchemaMigration)
     util::File::copy(path.string(), sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
     auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
-    auto [active_version, latest_version] = store->get_active_and_latest_versions();
+    auto [active_version, latest_version, pending_mark_version] = store->get_version_info();
     CHECK_EQUAL(active_version, latest_version);
     auto active = store->get_active();
     CHECK_EQUAL(active.version(), 1);
     CHECK_EQUAL(active.state(), SubscriptionSet::State::Complete);
     CHECK_EQUAL(active.size(), 1);
     auto sub = active.at(0);
-    CHECK_EQUAL(sub.id(), ObjectId("62742ab959d7f2e48f59f75d"));
-    CHECK_EQUAL(sub.object_class_name(), "TopLevel");
+    CHECK_EQUAL(sub.id, ObjectId("62742ab959d7f2e48f59f75d"));
+    CHECK_EQUAL(sub.object_class_name, "TopLevel");
 
     auto tr = fixture.db->start_read();
     SyncMetadataSchemaVersions versions(tr);
@@ -458,24 +457,24 @@ TEST(Sync_SubscriptionStoreNextPendingVersion)
     auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
 
     auto mut_sub_set = store->get_latest().make_mutable_copy();
-    auto sub_set = std::move(mut_sub_set).commit();
+    auto sub_set = mut_sub_set.commit();
     auto complete_set = sub_set.version();
 
     mut_sub_set = sub_set.make_mutable_copy();
-    sub_set = std::move(mut_sub_set).commit();
+    sub_set = mut_sub_set.commit();
     auto bootstrapping_set = sub_set.version();
 
     mut_sub_set = sub_set.make_mutable_copy();
-    sub_set = std::move(mut_sub_set).commit();
+    sub_set = mut_sub_set.commit();
     auto pending_set = sub_set.version();
 
     mut_sub_set = store->get_mutable_by_version(complete_set);
     mut_sub_set.update_state(SubscriptionSet::State::Complete);
-    std::move(mut_sub_set).commit();
+    mut_sub_set.commit();
 
     mut_sub_set = store->get_mutable_by_version(bootstrapping_set);
     mut_sub_set.update_state(SubscriptionSet::State::Bootstrapping);
-    std::move(mut_sub_set).commit();
+    mut_sub_set.commit();
 
     auto pending_version = store->get_next_pending_version(0, DB::version_type{});
     CHECK(pending_version);
@@ -508,7 +507,7 @@ TEST(Sync_SubscriptionStoreSubSetHasTable)
     auto mut_sub_set = store->get_latest().make_mutable_copy();
     mut_sub_set.insert_or_assign(query_a);
     mut_sub_set.insert_or_assign(query_b);
-    auto sub_set = std::move(mut_sub_set).commit();
+    auto sub_set = mut_sub_set.commit();
 
     read_tr->advance_read();
     table_set = store->get_tables_for_latest(*read_tr);
@@ -516,8 +515,8 @@ TEST(Sync_SubscriptionStoreSubSetHasTable)
     CHECK(table_set.find("fake_table_that_doesnt_exist") == table_set.end());
 
     mut_sub_set = sub_set.make_mutable_copy();
-    mut_sub_set.erase(mut_sub_set.find(query_a));
-    sub_set = std::move(mut_sub_set).commit();
+    mut_sub_set.erase(query_a);
+    sub_set = mut_sub_set.commit();
 
     read_tr->advance_read();
     table_set = store->get_tables_for_latest(*read_tr);
@@ -525,12 +524,182 @@ TEST(Sync_SubscriptionStoreSubSetHasTable)
     CHECK(table_set.find("fake_table_that_doesnt_exist") == table_set.end());
 
     mut_sub_set = sub_set.make_mutable_copy();
-    mut_sub_set.erase(mut_sub_set.find(query_b));
-    sub_set = std::move(mut_sub_set).commit();
+    mut_sub_set.erase(query_b);
+    sub_set = mut_sub_set.commit();
 
     read_tr->advance_read();
     table_set = store->get_tables_for_latest(*read_tr);
     CHECK(table_set.empty());
+}
+
+// Copied from sync_metadata_schema.cpp
+constexpr static std::string_view c_flx_metadata_table("flx_metadata");
+constexpr static std::string_view c_meta_schema_version_field("schema_version");
+
+static void create_legacy_metadata_schema(DBRef db, int64_t version)
+{
+    // Create the legacy table
+    TableKey legacy_table_key;
+    ColKey legacy_version_key;
+    std::vector<SyncMetadataTable> legacy_table_def{
+        {&legacy_table_key, c_flx_metadata_table, {{&legacy_version_key, c_meta_schema_version_field, type_Int}}}};
+    auto tr = db->start_write();
+    create_sync_metadata_schema(tr, &legacy_table_def);
+    tr->commit_and_continue_writing();
+    auto legacy_meta_table = tr->get_table(legacy_table_key);
+    auto legacy_object = legacy_meta_table->create_object();
+    // Set the legacy version, which will be converted to the flx subscription store version
+    legacy_object.set(legacy_version_key, version);
+    tr->commit();
+}
+
+TEST(Sync_SyncMetadataSchemaVersionsReader)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    DBRef db = DB::create(make_client_replication(), sub_store_path);
+    std::string schema_group_name = "schema_group_name";
+    int64_t version = 123;
+    int64_t legacy_version = 345;
+
+    {
+        auto tr = db->start_read();
+        // Verify opening a reader on an unitialized versions table returns uninitialized
+        SyncMetadataSchemaVersionsReader reader(tr);
+        auto schema_version = reader.get_version_for(tr, schema_group_name);
+        CHECK(!schema_version);
+    }
+
+    {
+        auto tr = db->start_read();
+        // Initialize the schema versions table and set a schema version
+        SyncMetadataSchemaVersions schema_versions(tr);
+        tr->promote_to_write();
+        schema_versions.set_version_for(tr, schema_group_name, version);
+        tr->commit_and_continue_as_read();
+        auto schema_version = schema_versions.get_version_for(tr, schema_group_name);
+        CHECK(schema_version);
+        CHECK(*schema_version == version);
+    }
+
+    {
+        auto tr = db->start_read();
+        // Verify opening a reader on an initialized versions table returns initialized
+        SyncMetadataSchemaVersionsReader reader(tr);
+        auto schema_version = reader.get_version_for(tr, schema_group_name);
+        CHECK(schema_version);
+        CHECK(*schema_version == version);
+    }
+
+    // Create the legacy metadata schema table
+    create_legacy_metadata_schema(db, legacy_version);
+    {
+        auto tr = db->start_read();
+        // Verify opening a reader with legacy data returns uninitialized
+        SyncMetadataSchemaVersionsReader reader(tr);
+        auto schema_version = reader.get_version_for(tr, schema_group_name);
+        CHECK(!schema_version);
+    }
+
+    // Test case where both tables exist in database
+    {
+        auto tr = db->start_read();
+        // Initialize the schema versions table and verify the converted flx subscription store version
+        SyncMetadataSchemaVersions schema_versions(tr);
+        auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_subscription_store);
+        CHECK(schema_version);
+        CHECK(*schema_version == legacy_version);
+        // Verify the legacy table has been deleted after the conversion
+        CHECK(!tr->has_table(c_flx_metadata_table));
+    }
+}
+
+TEST(Sync_SyncMetadataSchemaVersions)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    DBRef db = DB::create(make_client_replication(), sub_store_path);
+    int64_t flx_version = 234, flx_version2 = 77777;
+    int64_t btstrp_version = 567, btstrp_version2 = 888888;
+    int64_t mig_version = 890, mig_version2 = 9999999;
+
+    auto check_version = [this, &db](SyncMetadataSchemaVersionsReader& schema_versions,
+                                     const std::string_view& group_name, int64_t expected_version) {
+        auto tr = db->start_read();
+        auto schema_version = schema_versions.get_version_for(tr, group_name);
+        CHECK(schema_version);
+        CHECK(*schema_version == expected_version);
+    };
+
+    {
+        // Initialize the table and write values
+        auto tr = db->start_read();
+        SyncMetadataSchemaVersions schema_versions(tr);
+        tr->promote_to_write();
+        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_subscription_store, flx_version);
+        schema_versions.set_version_for(tr, internal_schema_groups::c_pending_bootstraps, btstrp_version);
+        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_migration_store, mig_version);
+        tr->commit();
+
+        check_version(schema_versions, internal_schema_groups::c_flx_subscription_store, flx_version);
+        check_version(schema_versions, internal_schema_groups::c_pending_bootstraps, btstrp_version);
+        check_version(schema_versions, internal_schema_groups::c_flx_migration_store, mig_version);
+    }
+
+    {
+        // Re-read the data and verify the values
+        auto tr = db->start_read();
+        SyncMetadataSchemaVersions schema_versions(tr);
+
+        check_version(schema_versions, internal_schema_groups::c_flx_subscription_store, flx_version);
+        check_version(schema_versions, internal_schema_groups::c_pending_bootstraps, btstrp_version);
+        check_version(schema_versions, internal_schema_groups::c_flx_migration_store, mig_version);
+    }
+
+    {
+        // Write new values and verify the values
+        auto tr = db->start_read();
+        SyncMetadataSchemaVersions schema_versions(tr);
+        tr->promote_to_write();
+        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_subscription_store, flx_version2);
+        tr->commit_and_continue_writing();
+        schema_versions.set_version_for(tr, internal_schema_groups::c_pending_bootstraps, btstrp_version2);
+        tr->commit_and_continue_writing();
+        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_migration_store, mig_version2);
+        tr->commit();
+
+        check_version(schema_versions, internal_schema_groups::c_flx_subscription_store, flx_version2);
+        check_version(schema_versions, internal_schema_groups::c_pending_bootstraps, btstrp_version2);
+        check_version(schema_versions, internal_schema_groups::c_flx_migration_store, mig_version2);
+    }
+
+    {
+        // Re-read the data and verify the new values with a reader
+        auto tr = db->start_read();
+        SyncMetadataSchemaVersionsReader schema_versions(tr);
+
+        check_version(schema_versions, internal_schema_groups::c_flx_subscription_store, flx_version2);
+        check_version(schema_versions, internal_schema_groups::c_pending_bootstraps, btstrp_version2);
+        check_version(schema_versions, internal_schema_groups::c_flx_migration_store, mig_version2);
+    }
+}
+
+TEST(Sync_SyncMetadataSchemaVersions_LegacyTable)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    DBRef db = DB::create(make_client_replication(), sub_store_path);
+    int64_t version = 678;
+
+    // Create the legacy metadata schema table
+    create_legacy_metadata_schema(db, version);
+    {
+        auto tr = db->start_read();
+        // Converts the legacy table to the unified table
+        SyncMetadataSchemaVersions schema_versions(tr);
+        auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_subscription_store);
+        CHECK(schema_version);
+        CHECK(*schema_version == version);
+        // Verify the legacy table has been deleted after the conversion
+        CHECK(!tr->has_table(c_flx_metadata_table));
+    }
 }
 
 } // namespace realm::sync

@@ -20,6 +20,7 @@
 #include "test_utils.hpp"
 
 #include <realm/util/base64.hpp>
+#include <realm/util/demangle.hpp>
 #include <realm/util/file.hpp>
 #include <realm/string_data.hpp>
 
@@ -39,13 +40,52 @@
 
 namespace realm {
 
-bool create_dummy_realm(std::string path)
+bool ExceptionMatcher<void>::match(Exception const& ex) const
+{
+    return ex.code() == m_code && ex.what() == m_message;
+}
+
+std::string ExceptionMatcher<void>::describe() const
+{
+    return util::format("Exception(%1, \"%2\")", ErrorCodes::error_string(m_code), m_message);
+}
+
+bool OutOfBoundsMatcher::match(OutOfBounds const& ex) const
+{
+    return ex.code() == ErrorCodes::OutOfBounds && ex.index == m_index && ex.size == m_size && ex.what() == m_message;
+}
+
+std::string OutOfBoundsMatcher::describe() const
+{
+    return util::format("OutOfBounds(index=%1, size=%2, \"%3\")", m_index, m_size, m_message);
+}
+
+bool LogicErrorMatcher::match(LogicError const& ex) const
+{
+    return ex.code() == m_code;
+}
+
+std::string LogicErrorMatcher::describe() const
+{
+    return util::format("LogicError(%1)", ErrorCodes::error_string(m_code));
+}
+
+std::ostream& operator<<(std::ostream& os, const Exception& e)
+{
+    os << util::get_type_name(e) << "(" << e.code_string() << ", \"" << e.what() << "\")";
+    return os;
+}
+
+bool create_dummy_realm(std::string path, std::shared_ptr<Realm>* out)
 {
     Realm::Config config;
     config.path = path;
     try {
-        _impl::RealmCoordinator::get_coordinator(path)->get_realm(config, none);
+        auto realm = _impl::RealmCoordinator::get_coordinator(path)->get_realm(config, none);
         REQUIRE_REALM_EXISTS(path);
+        if (out) {
+            *out = std::move(realm);
+        }
         return true;
     }
     catch (std::exception&) {
@@ -111,6 +151,25 @@ std::string encode_fake_jwt(const std::string& in, util::Optional<int64_t> exp, 
     return encoded_prefix + "." + encoded_body + "." + suffix;
 }
 
+std::string random_string(std::string::size_type length)
+{
+    static auto& chrs = "abcdefghijklmnopqrstuvwxyz"
+                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    thread_local static std::mt19937 rg{std::random_device{}()};
+    thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
+    std::string s;
+    s.reserve(length);
+    while (length--)
+        s += chrs[pick(rg)];
+    return s;
+}
+
+int64_t random_int()
+{
+    thread_local std::mt19937_64 rng(std::random_device{}());
+    return rng();
+}
+
 static bool file_is_on_exfat(const std::string& path)
 {
 #if REALM_PLATFORM_APPLE
@@ -169,17 +228,6 @@ void chmod(const std::string& path, int permissions)
     static_cast<void>(path);
     static_cast<void>(permissions);
 #endif
-}
-
-std::string get_parent_directory(const std::string& path)
-{
-    std::string parent;
-    size_t last_sep_pos = path.rfind('/', path.size());
-    if (last_sep_pos != std::string::npos) {
-        parent = path.substr(0, last_sep_pos);
-    }
-    REALM_ASSERT_EX(!parent.empty(), path);
-    return parent;
 }
 
 } // namespace realm

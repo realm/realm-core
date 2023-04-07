@@ -1,13 +1,15 @@
 #include <thread>
 
-#include <realm/util/network_ssl.hpp>
+#include <realm/sync/network/network_ssl.hpp>
+#include <realm/util/future.hpp>
 
 #include "test.hpp"
 #include "util/semaphore.hpp"
 
-using namespace realm::util;
+using namespace realm;
+using namespace realm::sync;
 using namespace realm::test_util;
-
+using namespace realm::util;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -51,11 +53,11 @@ network::Endpoint bind_acceptor(network::Acceptor& acceptor)
     return ep;
 }
 
-void connect_sockets(network::Socket& socket_1, network::Socket& socket_2)
+void connect_sockets(network::Socket& server_socket, network::Socket& client_socket)
 {
-    network::Service& service_1 = socket_1.get_service();
-    network::Service& service_2 = socket_2.get_service();
-    network::Acceptor acceptor(service_1);
+    network::Service& server_service = server_socket.get_service();
+    network::Service& client_service = client_socket.get_service();
+    network::Acceptor acceptor(server_service);
     network::Endpoint ep = bind_acceptor(acceptor);
     bool accept_occurred = false, connect_occurred = false;
     auto accept_handler = [&](std::error_code ec) {
@@ -66,16 +68,24 @@ void connect_sockets(network::Socket& socket_1, network::Socket& socket_2)
         REALM_ASSERT(!ec);
         connect_occurred = true;
     };
-    acceptor.async_accept(socket_1, std::move(accept_handler));
-    socket_2.async_connect(ep, std::move(connect_handler));
-    if (&service_1 == &service_2) {
-        service_1.run();
+    server_service.post([&](Status status) {
+        if (!status.is_ok())
+            return;
+        acceptor.async_accept(server_socket, std::move(accept_handler));
+    });
+    client_service.post([&](Status status) {
+        if (!status.is_ok())
+            return;
+        client_socket.async_connect(ep, std::move(connect_handler));
+    });
+    if (&server_service == &client_service) {
+        server_service.run();
     }
     else {
         std::thread thread{[&] {
-            service_1.run();
+            server_service.run();
         }};
-        service_2.run();
+        client_service.run();
         thread.join();
     }
     REALM_ASSERT(accept_occurred);
@@ -104,8 +114,16 @@ void connect_ssl_streams(network::ssl::Stream& server_stream, network::ssl::Stre
         REALM_ASSERT(!ec);
         client_handshake_occurred = true;
     };
-    server_stream.async_handshake(std::move(server_handshake_handler));
-    client_stream.async_handshake(std::move(client_handshake_handler));
+    server_service.post([&](Status status) {
+        if (!status.is_ok())
+            return;
+        server_stream.async_handshake(std::move(server_handshake_handler));
+    });
+    client_service.post([&](Status status) {
+        if (!status.is_ok())
+            return;
+        client_stream.async_handshake(std::move(client_handshake_handler));
+    });
     if (&server_service == &client_service) {
         server_service.run();
     }
@@ -148,7 +166,7 @@ public:
     }
 
     // Must be called by thread associated with `client_service`
-    void delay_client(realm::util::UniqueFunction<void()> handler, int n = 512)
+    void delay_client(UniqueFunction<void()> handler, int n = 512)
     {
         m_handler = std::move(handler);
         m_num = n;
@@ -159,7 +177,7 @@ private:
     network::Socket m_server_socket, m_client_socket;
     char m_server_char = 0, m_client_char = 0;
     int m_num;
-    realm::util::UniqueFunction<void()> m_handler;
+    UniqueFunction<void()> m_handler;
 
     void initiate_server_read()
     {
@@ -196,7 +214,7 @@ private:
     void initiate_client_write()
     {
         if (m_num <= 0) {
-            realm::util::UniqueFunction<void()> handler = std::move(m_handler);
+            UniqueFunction<void()> handler = std::move(m_handler);
             m_handler = nullptr;
             handler();
             return;
@@ -246,8 +264,8 @@ TEST(Util_Network_SSL_Handshake)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
     connect_sockets(socket_1, socket_2);
 
     auto connector = [&] {
@@ -277,8 +295,8 @@ TEST(Util_Network_SSL_AsyncHandshake)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
     connect_sockets(socket_1, socket_2);
 
     bool connect_completed = false;
@@ -309,8 +327,8 @@ TEST(Util_Network_SSL_ReadWriteShutdown)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     const char* message = "hello";
@@ -346,8 +364,8 @@ TEST(Util_Network_SSL_AsyncReadWriteShutdown)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     const char* message = "hello";
@@ -388,8 +406,8 @@ TEST(Util_Network_SSL_PrematureEndOfInputOnHandshakeRead)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
     connect_sockets(socket_1, socket_2);
 
     socket_1.shutdown(network::Socket::shutdown_send);
@@ -434,8 +452,8 @@ TEST(Util_Network_SSL_BrokenPipeOnHandshakeWrite)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
     connect_sockets(socket_1, socket_2);
 
     socket_1.close();
@@ -474,8 +492,8 @@ TEST(Util_Network_SSL_EndOfInputOnRead)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
     ssl_stream_2.shutdown();
     socket_2.shutdown(network::Socket::shutdown_send);
@@ -493,8 +511,8 @@ TEST(Util_Network_SSL_PrematureEndOfInputOnRead)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     socket_2.shutdown(network::Socket::shutdown_send);
@@ -513,8 +531,8 @@ TEST(Util_Network_SSL_BrokenPipeOnWrite)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     socket_1.close();
@@ -547,8 +565,8 @@ TEST(Util_Network_SSL_BrokenPipeOnShutdown)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     socket_1.close();
@@ -581,8 +599,8 @@ TEST(Util_Network_SSL_ShutdownBeforeCloseNotifyReceived)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     // Shut down peer 1's writing side before it has received a shutdown alert
@@ -600,8 +618,8 @@ TEST(Util_Network_SSL_ShutdownAfterCloseNotifyReceived)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     // Make sure peer 2 gets an SSL shutdown alert.
@@ -627,8 +645,8 @@ TEST(Util_Network_SSL_WriteAfterCloseNotifyReceived)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     // Shut down peer 1's writing side, such that peer 2 gets an SSL shutdown
@@ -655,8 +673,8 @@ TEST(Util_Network_SSL_BasicSendAndReceive)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     // Make peer 2 Write a message.
@@ -675,6 +693,108 @@ TEST(Util_Network_SSL_BasicSendAndReceive)
 }
 
 
+#if REALM_HAVE_SECURE_TRANSPORT
+
+template <typename ReadHandler, typename ReadError>
+void run_ssl_nonzero_length_test(test_util::unit_test::TestContext& test_context, ReadHandler&& read_handler,
+                                 ReadError&& read_error_callback)
+{
+    network::Service service;
+    network::DeadlineTimer run_timer{service};
+    network::Socket socket_1{service};
+    network::Socket socket_2{service};
+    network::ssl::Context ssl_context_1;
+    network::ssl::Context ssl_context_2;
+    configure_server_ssl_context_for_test(ssl_context_1);
+    network::ssl::Stream ssl_stream_1 = {socket_1, ssl_context_1, network::ssl::Stream::server};
+    network::ssl::Stream ssl_stream_2 = {socket_2, ssl_context_2, network::ssl::Stream::client};
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
+    connect_ssl_streams(ssl_stream_1, ssl_stream_2);
+    network::ReadAheadBuffer rab;
+
+    char buffer[50];
+
+    auto service_thread = std::thread([&test_context, &service, &run_timer]() {
+        run_timer.async_wait(std::chrono::seconds(10), [&test_context](Status status) {
+            if (!status.is_ok())
+                return;
+            test_context.logger->info("run_ssl_nonzero_length_test: service timed out");
+            abort(); // fail the test if the timer expires
+        });
+        service.run();
+    });
+
+    auto [r_promise, read_future] = util::make_promise_future<void>();
+    auto async_read_handler = [&test_context, read_promise = std::move(r_promise),
+                               handler = std::move(read_handler)](std::error_code ec, std::size_t n) mutable {
+        CHECK_NOT_EQUAL(n, 50);
+        handler(test_context, ec, n);
+        read_promise.emplace_value();
+    };
+
+    // Set the error before the read
+    service.post([&](Status status) {
+        if (!status.is_ok())
+            return;
+
+        read_error_callback(test_context, ssl_stream_2);
+        ssl_stream_2.async_read(buffer, 50, rab, std::move(async_read_handler));
+    });
+    read_future.get();
+
+    // Shut down stream
+    auto [s_promise, shutdown_future] = util::make_promise_future<void>();
+    auto shutdown_handler = [&test_context, shutdown_promise = std::move(s_promise)](std::error_code ec) mutable {
+        CHECK_EQUAL(std::error_code(), ec);
+        shutdown_promise.emplace_value();
+    };
+    service.post([&](Status status) {
+        if (!status.is_ok())
+            return;
+
+        ssl_stream_1.async_shutdown(std::move(shutdown_handler));
+    });
+    shutdown_future.get();
+
+    // Stop the service thread after shutdown is complete
+    service.stop();
+    service_thread.join();
+}
+
+TEST(Util_Network_SSL_Nonzero_Length_Error)
+{
+    using MockSSLError = network::ssl::Stream::MockSSLError;
+    auto&& read_handler = [](test_util::unit_test::TestContext& test_context, std::error_code ec, std::size_t n) {
+        CHECK_EQUAL(util::MiscExtErrors::premature_end_of_input, ec);
+        test_context.logger->info("Util_Network_SSL_Nonzero_Length_Error: n: %1", n);
+        CHECK_EQUAL(0, n);
+    };
+    auto&& read_error_callback = [](test_util::unit_test::TestContext&, network::ssl::Stream& ssl_stream_2) {
+        ssl_stream_2.set_mock_ssl_perform_error(
+            std::make_unique<MockSSLError>(MockSSLError::Operation::read, static_cast<int>(errSSLClosedAbort), 0));
+    };
+    run_ssl_nonzero_length_test(test_context, std::move(read_handler), std::move(read_error_callback));
+}
+
+
+TEST(Util_Network_SSL_Nonzero_Length_EndOfInput)
+{
+    auto&& read_handler = [](test_util::unit_test::TestContext& test_context, std::error_code ec, std::size_t n) {
+        CHECK_EQUAL(util::MiscExtErrors::end_of_input, ec);
+        test_context.logger->info("Util_Network_SSL_Nonzero_Length_EndOfInput: n: %1", n);
+        CHECK_EQUAL(6, n);
+    };
+    auto&& read_error_callback = [](test_util::unit_test::TestContext&, network::ssl::Stream& ssl_stream_2) {
+        using MockSSLError = network::ssl::Stream::MockSSLError;
+        ssl_stream_2.set_mock_ssl_perform_error(
+            std::make_unique<MockSSLError>(MockSSLError::Operation::read, static_cast<int>(errSSLClosedGraceful), 6));
+    };
+    run_ssl_nonzero_length_test(test_context, std::move(read_handler), std::move(read_error_callback));
+}
+#endif
+
+
 TEST(Util_Network_SSL_StressTest)
 {
     network::Service service_1, service_2;
@@ -684,8 +804,8 @@ TEST(Util_Network_SSL_StressTest)
     configure_server_ssl_context_for_test(ssl_context_1);
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
     connect_ssl_streams(ssl_stream_1, ssl_stream_2);
 
     constexpr size_t original_size = 0x100000; // 1MiB
@@ -729,24 +849,23 @@ TEST(Util_Network_SSL_StressTest)
         network::DeadlineTimer read_timer{service};
         network::DeadlineTimer write_timer{service};
         bool read_done = false, write_done = false;
-        realm::util::UniqueFunction<void()> shedule_cancellation = [&] {
-            auto handler = [&](std::error_code ec) {
-                REALM_ASSERT(!ec || ec == error::operation_aborted);
-                if (ec == error::operation_aborted)
+        UniqueFunction<void()> shedule_cancellation = [&] {
+            cancellation_timer.async_wait(std::chrono::microseconds(10), [&](Status status) {
+                REALM_ASSERT(status.is_ok() || status == ErrorCodes::OperationAborted);
+                if (status == ErrorCodes::OperationAborted)
                     return;
                 if (read_done && write_done)
                     return;
                 ssl_stream.lowest_layer().cancel();
                 ++stats.num_cancellations;
                 shedule_cancellation();
-            };
-            cancellation_timer.async_wait(std::chrono::microseconds(10), std::move(handler));
+            });
         };
         //        shedule_cancellation();
         char* read_begin = read_buffer.get();
         char* read_end = read_buffer.get() + original_size;
         int num_read_cycles = 0;
-        realm::util::UniqueFunction<void()> read = [&] {
+        UniqueFunction<void()> read = [&] {
             if (read_begin == read_end) {
                 log("<R%1>", id);
                 CHECK(std::equal(read_original, read_original + original_size, read_buffer.get()));
@@ -771,11 +890,10 @@ TEST(Util_Network_SSL_StressTest)
                     read_begin += n;
                 }
                 if (delayed_read_write_dist(prng) == 0) {
-                    auto handler_2 = [&](std::error_code ec) {
-                        REALM_ASSERT(!ec);
+                    read_timer.async_wait(std::chrono::microseconds(100), [&](Status status) {
+                        REALM_ASSERT(status.is_ok());
                         read();
-                    };
-                    read_timer.async_wait(std::chrono::microseconds(100), std::move(handler_2));
+                    });
                 }
                 else {
                     read();
@@ -792,7 +910,7 @@ TEST(Util_Network_SSL_StressTest)
         const char* write_begin = write_original;
         const char* write_end = write_original + original_size;
         int num_write_cycles = 0;
-        realm::util::UniqueFunction<void()> write = [&] {
+        UniqueFunction<void()> write = [&] {
             if (write_begin == write_end) {
                 log("<W%1>", id);
                 ++num_write_cycles;
@@ -816,11 +934,10 @@ TEST(Util_Network_SSL_StressTest)
                     write_begin += n;
                 }
                 if (delayed_read_write_dist(prng) == 0) {
-                    auto handler_2 = [&](std::error_code ec) {
-                        REALM_ASSERT(!ec);
+                    write_timer.async_wait(std::chrono::microseconds(100), [&](Status status) {
+                        REALM_ASSERT(status.is_ok());
                         write();
-                    };
-                    write_timer.async_wait(std::chrono::microseconds(100), std::move(handler_2));
+                    });
                 }
                 else {
                     write();
@@ -879,10 +996,10 @@ TEST(Util_Network_SSL_Certificate_CN_SAN)
 
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
 
-    ssl_stream_2.set_verify_mode(realm::util::network::ssl::VerifyMode::peer);
+    ssl_stream_2.set_verify_mode(network::ssl::VerifyMode::peer);
 
     // We expect success because the certificate is signed for www.example.com
     // in both Common Name and SAN.
@@ -924,10 +1041,10 @@ TEST(Util_Network_SSL_Certificate_SAN)
 
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
 
-    ssl_stream_2.set_verify_mode(realm::util::network::ssl::VerifyMode::peer);
+    ssl_stream_2.set_verify_mode(network::ssl::VerifyMode::peer);
 
     ssl_stream_2.set_host_name("support.example.com");
 
@@ -971,10 +1088,10 @@ TEST(Util_Network_SSL_Certificate_CN)
 
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
 
-    ssl_stream_2.set_verify_mode(realm::util::network::ssl::VerifyMode::peer);
+    ssl_stream_2.set_verify_mode(network::ssl::VerifyMode::peer);
 
     ssl_stream_2.set_host_name("www.example.com");
 
@@ -1019,10 +1136,10 @@ TEST(Util_Network_SSL_Certificate_IP)
 
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
 
-    ssl_stream_2.set_verify_mode(realm::util::network::ssl::VerifyMode::peer);
+    ssl_stream_2.set_verify_mode(network::ssl::VerifyMode::peer);
 
     ssl_stream_2.set_host_name("127.0.0.1");
 
@@ -1070,10 +1187,10 @@ TEST(Util_Network_SSL_Certificate_Failure)
 
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
-    ssl_stream_1.set_logger(&test_context.logger);
-    ssl_stream_2.set_logger(&test_context.logger);
+    ssl_stream_1.set_logger(test_context.logger.get());
+    ssl_stream_2.set_logger(test_context.logger.get());
 
-    ssl_stream_2.set_verify_mode(realm::util::network::ssl::VerifyMode::peer);
+    ssl_stream_2.set_verify_mode(network::ssl::VerifyMode::peer);
 
     // We expect failure because the certificate is signed for www.example.com
     ssl_stream_2.set_host_name("www.another-example.com");

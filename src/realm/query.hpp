@@ -56,6 +56,7 @@ class Array;
 class Expression;
 class Group;
 class Transaction;
+class LinkMap;
 
 namespace metrics {
 class QueryInfo;
@@ -210,6 +211,8 @@ public:
     Query& ends_with(ColKey column_key, StringData value, bool case_sensitive = true);
     Query& contains(ColKey column_key, StringData value, bool case_sensitive = true);
     Query& like(ColKey column_key, StringData value, bool case_sensitive = true);
+    Query& fulltext(ColKey column_key, StringData value);
+    Query& fulltext(ColKey column_key, StringData value, const LinkMap&);
 
     // These are shortcuts for equal(StringData(c_str)) and
     // not_equal(StringData(c_str)), and are needed to avoid unwanted
@@ -306,8 +309,10 @@ public:
     // or empty vector if the query is not associated with a table.
     TableVersions sync_view_if_needed() const;
 
+    std::string validate() const;
+
     std::string get_description() const;
-    std::string get_description(util::serializer::SerialisationState& state) const;
+    std::string get_description_safe() const noexcept;
 
     Query& set_ordering(util::bind_ptr<DescriptorOrdering> ordering);
     // This will remove the ordering from the Query object
@@ -322,6 +327,7 @@ private:
     size_t find_internal(size_t start = 0, size_t end = size_t(-1)) const;
     void handle_pending_not();
     void set_table(TableRef tr);
+    std::string get_description(util::serializer::SerialisationState& state) const;
 
 public:
     std::unique_ptr<Query> clone_for_handover(Transaction* tr, PayloadPolicy policy) const

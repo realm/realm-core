@@ -179,7 +179,7 @@ public:
     virtual size_t transform_remote_changesets(TransformHistory&, file_ident_type local_file_ident,
                                                version_type current_local_version, util::Span<Changeset> changesets,
                                                util::UniqueFunction<bool(const Changeset*)> changeset_applier,
-                                               util::Logger* = nullptr) = 0;
+                                               util::Logger&) = 0;
 
     virtual ~Transformer() noexcept {}
 };
@@ -203,7 +203,7 @@ public:
     TransformerImpl();
 
     size_t transform_remote_changesets(TransformHistory&, file_ident_type, version_type, util::Span<Changeset>,
-                                       util::UniqueFunction<bool(const Changeset*)>, util::Logger*) override;
+                                       util::UniqueFunction<bool(const Changeset*)>, util::Logger&) override;
 
     struct Side;
     struct MajorSide;
@@ -214,7 +214,7 @@ protected:
                                   std::size_t their_size,
                                   // our_changesets is a pointer-pointer because these changesets
                                   // are held by the reciprocal transform cache.
-                                  Changeset** our_changesets, std::size_t our_size, util::Logger* logger);
+                                  Changeset** our_changesets, std::size_t our_size, util::Logger& logger);
 
 private:
     std::map<version_type, Changeset> m_reciprocal_transform_cache;
@@ -294,11 +294,6 @@ public:
         : std::runtime_error(message)
     {
     }
-};
-
-class SchemaMismatchError : public TransformError {
-public:
-    using TransformError::TransformError;
 };
 
 inline Transformer::RemoteChangeset::RemoteChangeset(version_type rv, version_type lv, ChunkedBinaryData d,
