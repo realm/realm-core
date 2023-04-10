@@ -2760,6 +2760,10 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     increasing_delay = false;
                 }
             }
+            // fail if the first delay isn't longer than half a second
+            if (delay_times.size() <= 1 || delay_times[1] < 500) {
+                increasing_delay = false;
+            }
             if (!increasing_delay) {
                 std::cerr << "delay times are not increasing: ";
                 for (auto& delay : delay_times) {
