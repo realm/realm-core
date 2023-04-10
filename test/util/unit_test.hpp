@@ -34,7 +34,6 @@
 #include <realm/util/features.h>
 #include <realm/util/logger.hpp>
 #include <realm/util/safe_int_ops.hpp>
-#include <realm/util/type_traits.hpp>
 
 
 #define TEST(name) TEST_IF(name, true)
