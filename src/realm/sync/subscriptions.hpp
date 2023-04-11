@@ -97,7 +97,8 @@ public:
         // This subscription set is the active subscription set that is currently being synchronized with the server.
         Complete,
         // An error occurred while processing this subscription set on the server. Check error_str() for details.
-        // This is also used if the subscription store is not available, such as when rolling back a FLX migrated client.
+        // This is also used if the subscription store is not available, such as when rolling back a FLX migrated
+        // client.
         Error,
         // The server responded to a later subscription set to this one and this one has been trimmed from the
         // local storage of subscription sets.
@@ -201,7 +202,7 @@ protected:
                              MakingMutableCopy making_mutable_copy = MakingMutableCopy(false));
     // Used to create a SubscriptionSet response when an error occurs during processing
     // (e.g. SubscriptionStore was destroyed or the operation was aborted/returned an error)
-    explicit SubscriptionSet(const Status& , std::optional<int64_t> = std::nullopt);
+    explicit SubscriptionSet(const Status&, std::optional<int64_t> = std::nullopt);
 
     void load_from_database(Obj obj);
 
@@ -399,10 +400,11 @@ protected:
 
     // If an error occurs while getting a Mutable SubscriptionSet, return a MutableSubscriptionSet whose state is
     // Error and the error_str() is set.
-    static MutableSubscriptionSet make_error_mutsubset(const Status& error, TransactionRef tr, std::optional<int64_t> = std::nullopt);
+    static MutableSubscriptionSet make_error_mutsubset(const Status& error, TransactionRef tr,
+                                                       std::optional<int64_t> = std::nullopt);
 
     void do_notify_all_pending(Status, std::unique_lock<std::mutex> notify_lock);
-    
+
     bool is_active() const;
 
     friend class MutableSubscriptionSet;

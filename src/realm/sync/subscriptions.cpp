@@ -461,7 +461,8 @@ MutableSubscriptionSet SubscriptionSet::make_mutable_copy()
         return mgr->make_mutable_copy(*this);
     }
     else {
-        return SubscriptionStore::make_error_mutsubset({ErrorCodes::OperationAborted, c_flx_sub_store_terminated}, nullptr);
+        return SubscriptionStore::make_error_mutsubset({ErrorCodes::OperationAborted, c_flx_sub_store_terminated},
+                                                       nullptr);
     }
 }
 
@@ -1061,7 +1062,8 @@ MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSe
 {
     auto new_tr = m_db->start_write();
     if (!is_active()) {
-        return SubscriptionStore::make_error_mutsubset({ErrorCodes::OperationAborted, c_flx_sub_store_terminated}, nullptr);
+        return SubscriptionStore::make_error_mutsubset({ErrorCodes::OperationAborted, c_flx_sub_store_terminated},
+                                                       nullptr);
     }
 
     auto sub_sets = new_tr->get_table(m_sub_set_table);
@@ -1077,7 +1079,8 @@ MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSe
     return new_set_obj;
 }
 
-MutableSubscriptionSet SubscriptionStore::make_error_mutsubset(const Status& error, TransactionRef tr, std::optional<int64_t> version)
+MutableSubscriptionSet SubscriptionStore::make_error_mutsubset(const Status& error, TransactionRef tr,
+                                                               std::optional<int64_t> version)
 {
     return MutableSubscriptionSet(error, tr, version);
 }
