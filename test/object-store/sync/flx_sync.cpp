@@ -1236,6 +1236,9 @@ TEST_CASE("flx: geospatial", "[sync][flx][app]") {
         return new_query.commit();
     };
 
+    // TODO: when this test starts failing because the server implements the new
+    // syntax, then we should implement an actual geospatial FLX query test here
+    /*
     auto check_failed_status = [](auto status) {
         CHECK(!status.is_ok());
         if (status.get_status().reason().find("Client provided query with bad syntax:") == std::string::npos ||
@@ -1244,9 +1247,6 @@ TEST_CASE("flx: geospatial", "[sync][flx][app]") {
         }
     };
 
-    // TODO: when this test starts failing because the server implements the new
-    // syntax, then we should implement an actual geospatial FLX query test here
-    /*
     SECTION("Server doesn't support GEOWITHIN yet") {
         harness->do_with_new_realm([&](SharedRealm realm) {
             auto subs = create_subscription(realm, "class_restaurant", "location", [](Query q, ColKey c) {
