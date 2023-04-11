@@ -675,15 +675,10 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                 return;
             case sync::ProtocolErrorInfo::Action::RevertToPBS:
                 // If the client was updated to use FLX natively, but the server was rolled back to PBS,
-                // propagate the error up to the user
+                // the server should be sending "SwitchToFLX", throw exception if this error is received.
                 if (m_original_sync_config->flx_sync_requested) {
-                    // Update error to the "switch to PBS" connect error
-                    error = sync::SessionErrorInfo(make_error_code(sync::ProtocolError::switch_to_pbs),
-                                                   "Server rolled back after flexible sync migration - cannot "
-                                                   "connect with flexible sync config",
-                                                   false);
-                    next_state = NextStateAfterError::error;
-                    break;
+                    throw std::logic_error("Received 'RevertToPBS' from server after rollback while client is "
+                                           "natively using FLX - expected 'SwitchToPBS'");
                 }
                 // Original config was PBS, cancel the migration
                 m_migration_store->cancel_migration();
