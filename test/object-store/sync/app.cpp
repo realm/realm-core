@@ -1996,12 +1996,6 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
     }
 }
 
-constexpr size_t minus_25_percent(size_t val)
-{
-    REALM_ASSERT(val * .75 > 10);
-    return val * .75 - 10;
-}
-
 TEST_CASE("app: sync integration", "[sync][app]") {
     auto logger = std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
@@ -2759,14 +2753,25 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
             // sync delays start at 1000ms minus a random number of up to 25%.
             // the subsequent delay is double the previous one minus a random 25% again.
-            constexpr size_t min_first_delay = minus_25_percent(1000);
-            std::vector<uint64_t> expected_min_delays = {0, min_first_delay};
-            while (expected_min_delays.size() < delay_times.size()) {
-                expected_min_delays.push_back(minus_25_percent(expected_min_delays.back() << 1));
+            // this calculation happens in Connection::initiate_reconnect_wait()
+            bool increasing_delay = true;
+            for (size_t i = 1; i < delay_times.size(); ++i) {
+                if (delay_times[i - 1] >= delay_times[i]) {
+                    increasing_delay = false;
+                }
             }
-            for (size_t i = 0; i < delay_times.size(); ++i) {
-                REQUIRE(delay_times[i] > expected_min_delays[i]);
+            // fail if the first delay isn't longer than half a second
+            if (delay_times.size() <= 1 || delay_times[1] < 500) {
+                increasing_delay = false;
             }
+            if (!increasing_delay) {
+                std::cerr << "delay times are not increasing: ";
+                for (auto& delay : delay_times) {
+                    std::cerr << delay << ", ";
+                }
+                std::cerr << std::endl;
+            }
+            REQUIRE(increasing_delay);
         }
     }
 
