@@ -158,7 +158,7 @@ typedef struct realm_timestamp {
     int32_t nanoseconds;
 } realm_timestamp_t;
 
-typedef struct realm_decimal128 {
+typedef struct alignas(16) realm_decimal128 {
     uint64_t w[2];
 } realm_decimal128_t;
 
