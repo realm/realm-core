@@ -411,7 +411,9 @@ TEST(Sync_SubscriptionStoreRefreshSubscriptionSetInvalid)
     store.reset();
 
     // Throws since the SubscriptionStore is gone.
-    CHECK_THROW(latest->refresh(), std::logic_error);
+    latest->refresh();
+    CHECK_EQUAL(latest->state(), SubscriptionSet::State::Error);
+    CHECK_EQUAL(latest->get_error(), Status(ErrorCodes::OperationAborted, "Subscription store has been terminated."));
 }
 
 TEST(Sync_SubscriptionStoreInternalSchemaMigration)

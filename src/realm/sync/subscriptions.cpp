@@ -55,6 +55,8 @@ constexpr static std::string_view c_flx_sub_name_field("name");
 constexpr static std::string_view c_flx_sub_object_class_field("object_class");
 constexpr static std::string_view c_flx_sub_query_str_field("query");
 
+constexpr static std::string_view c_flx_sub_store_terminated("Subscription store has been terminated.");
+
 using OptionalString = util::Optional<std::string>;
 
 enum class SubscriptionStateForStorage : int64_t {
@@ -172,12 +174,27 @@ SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, int
 {
 }
 
+SubscriptionSet::SubscriptionSet(const Status& error, std::optional<int64_t> version)
+    : m_version(version ? *version : 0)
+    , m_state(State::Error)
+    , m_error{error}
+{
+}
+
 void SubscriptionSet::load_from_database(Obj obj)
 {
     auto mgr = get_flx_subscription_store(); // Throws
 
+    // do nothing if the subscription store could not be retrieved
+    if (!mgr) {
+        return;
+    }
+
     m_state = state_from_storage(obj.get<int64_t>(mgr->m_sub_set_state));
-    m_error_str = obj.get<String>(mgr->m_sub_set_error_str);
+    if (m_state == State::Error) {
+        auto err_str = obj.get<String>(mgr->m_sub_set_error_str);
+        set_error({ErrorCodes::SubscriptionFailed, err_str});
+    }
     m_snapshot_version = static_cast<DB::version_type>(obj.get<int64_t>(mgr->m_sub_set_snapshot_version));
     auto sub_list = obj.get_linklist(mgr->m_sub_set_subscriptions);
     m_subs.clear();
@@ -186,12 +203,26 @@ void SubscriptionSet::load_from_database(Obj obj)
     }
 }
 
-std::shared_ptr<const SubscriptionStore> SubscriptionSet::get_flx_subscription_store() const
+std::shared_ptr<const SubscriptionStore> SubscriptionSet::get_flx_subscription_store()
 {
-    if (auto mgr = m_mgr.lock()) {
+    if (auto mgr = m_mgr.lock(); mgr && mgr->is_active()) {
         return mgr;
     }
-    throw std::logic_error("Active SubscriptionSet without a SubscriptionStore");
+    if (!get_error()) {
+        set_error({ErrorCodes::OperationAborted, c_flx_sub_store_terminated});
+    }
+    return nullptr;
+}
+
+SubscriptionSet SubscriptionSet::make_error_subset(const Status& error, std::optional<int64_t> version)
+{
+    return SubscriptionSet(error, version);
+}
+
+void SubscriptionSet::set_error(const Status& error)
+{
+    m_state = State::Error;
+    m_error.emplace(error);
 }
 
 int64_t SubscriptionSet::version() const
@@ -211,10 +242,15 @@ SubscriptionSet::State SubscriptionSet::state() const
 
 StringData SubscriptionSet::error_str() const
 {
-    if (m_error_str.empty()) {
+    if (!m_error || m_error->reason().empty()) {
         return StringData{};
     }
-    return m_error_str;
+    return m_error->reason();
+}
+
+std::optional<Status> SubscriptionSet::get_error() const
+{
+    return m_error;
 }
 
 size_t SubscriptionSet::size() const
@@ -266,8 +302,18 @@ MutableSubscriptionSet::MutableSubscriptionSet(std::weak_ptr<const SubscriptionS
 {
 }
 
+MutableSubscriptionSet::MutableSubscriptionSet(const Status& error, TransactionRef tr, std::optional<int64_t> version)
+    : SubscriptionSet(error, version)
+    , m_tr(std::move(tr))
+    , m_old_state(state())
+{
+}
+
 void MutableSubscriptionSet::check_is_mutable() const
 {
+    if (!m_tr) {
+        return;
+    }
     if (m_tr->get_transact_stage() != DB::transact_Writing) {
         throw WrongTransactionState("Not a write transaction");
     }
@@ -369,6 +415,9 @@ void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::s
     if (error_str && new_state != State::Error) {
         throw std::logic_error("Cannot supply an error message for a subscription set when state is not Error");
     }
+    if (old_state == State::Error) {
+        throw std::logic_error("Cannot change state once subscription set is in error state");
+    }
     switch (new_state) {
         case State::Uncommitted:
             throw std::logic_error("cannot set subscription set state to uncommitted");
@@ -381,9 +430,7 @@ void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::s
             if (!error_str) {
                 throw std::logic_error("Must supply an error message when setting a subscription to the error state");
             }
-
-            m_state = new_state;
-            m_error_str = std::string{*error_str};
+            set_error({ErrorCodes::SubscriptionFailed, *error_str});
             break;
         case State::Bootstrapping:
             [[fallthrough]];
@@ -392,8 +439,10 @@ void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::s
             break;
         case State::Complete: {
             auto mgr = get_flx_subscription_store(); // Throws
-            m_state = new_state;
-            mgr->supercede_prior_to(m_tr, version());
+            if (mgr) {
+                m_state = new_state;
+                mgr->supercede_prior_to(m_tr, version());
+            }
             break;
         }
         case State::Superseded:
@@ -405,32 +454,48 @@ void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::s
     }
 }
 
-MutableSubscriptionSet SubscriptionSet::make_mutable_copy() const
+MutableSubscriptionSet SubscriptionSet::make_mutable_copy()
 {
     auto mgr = get_flx_subscription_store(); // Throws
-    return mgr->make_mutable_copy(*this);
+    if (mgr) {
+        return mgr->make_mutable_copy(*this);
+    }
+    else {
+        return SubscriptionStore::make_error_mutsubset({ErrorCodes::OperationAborted, c_flx_sub_store_terminated}, nullptr);
+    }
 }
 
 void SubscriptionSet::refresh()
 {
     auto mgr = get_flx_subscription_store(); // Throws
-    if (mgr->would_refresh(m_cur_version)) {
+    if (mgr && mgr->would_refresh(m_cur_version)) {
         *this = mgr->get_by_version(version());
     }
 }
 
 util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notification(State notify_when) const
 {
-    auto mgr = get_flx_subscription_store(); // Throws
+    // Grab the subscription store directly since we can't update the state in this function
+    auto mgr = m_mgr.lock();
+
+    // Has the subscription store been terminated?
+    if (!mgr) {
+        return util::Future<State>::make_ready(Status{ErrorCodes::OperationAborted, c_flx_sub_store_terminated});
+    }
 
     std::unique_lock<std::mutex> lk(mgr->m_pending_notifications_mutex);
+    // Has the subscription store been terminated?
+    if (!mgr->m_active) {
+        return util::Future<State>::make_ready(Status{ErrorCodes::OperationAborted, c_flx_sub_store_terminated});
+    }
+
     // If we've already been superceded by another version getting completed, then we should skip registering
     // a notification because it may never fire.
     if (mgr->m_min_outstanding_version > version()) {
         return util::Future<State>::make_ready(State::Superseded);
     }
 
-    // Begin by blocking process_notifications from starting to fill futures. No matter the outcome, we'll
+    // Begin by blocking process_notifications from starting to fill futures. No matter the outcome, wπe'll
     // unblock process_notifications() at the end of this function via the guard we construct below.
     mgr->m_outstanding_requests++;
     auto guard = util::make_scope_exit([&]() noexcept {
@@ -443,19 +508,20 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
     lk.unlock();
 
     State cur_state = state();
-    StringData err_str = error_str();
+    auto error = get_error();
 
     // If there have been writes to the database since this SubscriptionSet was created, we need to fetch
     // the updated version from the DB to know the true current state and maybe return a ready future.
     if (m_cur_version < mgr->m_db->get_version_of_latest_snapshot()) {
         auto refreshed_self = mgr->get_by_version(version());
         cur_state = refreshed_self.state();
-        err_str = refreshed_self.error_str();
+        error = refreshed_self.get_error();
     }
     // If we've already reached the desired state, or if the subscription is in an error state,
     // we can return a ready future immediately.
     if (cur_state == State::Error) {
-        return util::Future<State>::make_ready(Status{ErrorCodes::SubscriptionFailed, err_str});
+        REALM_ASSERT(error);
+        return util::Future<State>::make_ready(*error);
     }
     else if (state_to_order(cur_state) >= state_to_order(notify_when)) {
         return util::Future<State>::make_ready(cur_state);
@@ -489,11 +555,19 @@ void MutableSubscriptionSet::process_notifications()
     auto new_state = state();
     auto my_version = version();
 
+    // Has the subscription store been terminated?
+    if (!mgr)
+        return;
+
     std::list<SubscriptionStore::NotificationRequest> to_finish;
     std::unique_lock<std::mutex> lk(mgr->m_pending_notifications_mutex);
     mgr->m_pending_notifications_cv.wait(lk, [&] {
         return mgr->m_outstanding_requests == 0;
     });
+
+    // Has the subscription store been terminated while waiting?
+    if (!mgr->m_active)
+        return;
 
     for (auto it = mgr->m_pending_notifications.begin(); it != mgr->m_pending_notifications.end();) {
         if ((it->version == my_version &&
@@ -531,6 +605,16 @@ SubscriptionSet MutableSubscriptionSet::commit()
         throw std::logic_error("SubscriptionSet is not in a commitable state");
     }
     auto mgr = get_flx_subscription_store(); // Throws
+    // state will be error if the subscription store was terminated (i.e. mgr is null)
+    if (state() == State::Error) {
+        auto error = get_error();
+        REALM_ASSERT(error);
+        if (error->code() == ErrorCodes::OperationAborted) {
+            return SubscriptionSet::make_error_subset(*error, version());
+        }
+    }
+
+    REALM_ASSERT(mgr);
 
     if (m_old_state == State::Uncommitted) {
         if (m_state == State::Uncommitted) {
@@ -554,8 +638,8 @@ SubscriptionSet MutableSubscriptionSet::commit()
         }
     }
     m_obj.set(mgr->m_sub_set_state, state_to_storage(m_state));
-    if (!m_error_str.empty()) {
-        m_obj.set(mgr->m_sub_set_error_str, StringData(m_error_str));
+    if (m_error && m_error->code() == ErrorCodes::SubscriptionFailed) {
+        m_obj.set(mgr->m_sub_set_error_str, StringData(m_error->reason()));
     }
 
     const auto flx_version = version();
@@ -687,6 +771,10 @@ SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t
 
 SubscriptionSet SubscriptionStore::get_latest() const
 {
+    if (!is_active()) {
+        return SubscriptionSet::make_error_subset({ErrorCodes::OperationAborted, c_flx_sub_store_terminated});
+    }
+
     auto tr = m_db->start_frozen();
     auto sub_sets = tr->get_table(m_sub_set_table);
     // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
@@ -700,6 +788,10 @@ SubscriptionSet SubscriptionStore::get_latest() const
 
 SubscriptionSet SubscriptionStore::get_active() const
 {
+    if (!is_active()) {
+        return SubscriptionSet::make_error_subset({ErrorCodes::OperationAborted, c_flx_sub_store_terminated});
+    }
+
     auto tr = m_db->start_frozen();
     auto sub_sets = tr->get_table(m_sub_set_table);
     // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
@@ -723,6 +815,10 @@ SubscriptionSet SubscriptionStore::get_active() const
 
 SubscriptionStore::VersionInfo SubscriptionStore::get_version_info() const
 {
+    if (!is_active()) {
+        return {};
+    }
+
     auto tr = m_db->start_read();
     auto sub_sets = tr->get_table(m_sub_set_table);
     // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
@@ -752,6 +848,10 @@ SubscriptionStore::VersionInfo SubscriptionStore::get_version_info() const
 util::Optional<SubscriptionStore::PendingSubscription>
 SubscriptionStore::get_next_pending_version(int64_t last_query_version, DB::version_type after_client_version) const
 {
+    if (!is_active()) {
+        return std::nullopt;
+    }
+
     auto tr = m_db->start_read();
     auto sub_sets = tr->get_table(m_sub_set_table);
     // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
@@ -781,6 +881,10 @@ SubscriptionStore::get_next_pending_version(int64_t last_query_version, DB::vers
 
 std::vector<SubscriptionSet> SubscriptionStore::get_pending_subscriptions() const
 {
+    if (!is_active()) {
+        return {};
+    }
+
     std::vector<SubscriptionSet> subscriptions_to_recover;
     auto active_sub = get_active();
     auto cur_query_version = active_sub.version();
@@ -796,6 +900,56 @@ std::vector<SubscriptionSet> SubscriptionStore::get_pending_subscriptions() cons
         subscriptions_to_recover.push_back(get_by_version(cur_query_version));
     }
     return subscriptions_to_recover;
+}
+
+void SubscriptionStore::notify_all_pending(Status error)
+{
+    std::unique_lock<std::mutex> lk(m_pending_notifications_mutex);
+    do_notify_all_pending(error, std::move(lk));
+}
+
+void SubscriptionStore::do_notify_all_pending(Status error, std::unique_lock<std::mutex> notify_lock)
+{
+    std::list<SubscriptionStore::NotificationRequest> to_finish;
+
+    // If get_state_change_notification() is in progress, wait for it to be done before continuing
+    // Hold up the process_notifications() and supercede_all_except() until this function completes
+    m_outstanding_requests++;
+    auto guard = util::make_scope_exit([&]() noexcept {
+        if (!notify_lock.owns_lock()) {
+            notify_lock.lock();
+        }
+        --m_outstanding_requests;
+        m_pending_notifications_cv.notify_one();
+    });
+
+    m_pending_notifications_cv.wait(notify_lock, [&] {
+        return m_outstanding_requests == 1;
+    });
+
+    to_finish.swap(m_pending_notifications);
+    notify_lock.unlock();
+
+    for (auto& req : to_finish) {
+        req.promise.set_error(error);
+    }
+}
+
+void SubscriptionStore::terminate()
+{
+    std::unique_lock<std::mutex> lk(m_pending_notifications_mutex);
+    m_active = false;
+    auto tr = m_db->start_write();
+    auto sub_sets = tr->get_table(m_sub_set_table);
+    sub_sets->clear();
+    tr->commit();
+    do_notify_all_pending({ErrorCodes::OperationAborted, c_flx_sub_store_terminated}, std::move(lk));
+}
+
+bool SubscriptionStore::is_active() const
+{
+    std::lock_guard<std::mutex> lk(m_pending_notifications_mutex);
+    return m_active;
 }
 
 MutableSubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version_id)
@@ -814,6 +968,10 @@ SubscriptionSet SubscriptionStore::get_by_version(int64_t version_id) const
 SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
                                                        util::Optional<DB::VersionID> db_version) const
 {
+    if (!is_active()) {
+        return SubscriptionSet::make_error_subset({ErrorCodes::OperationAborted, c_flx_sub_store_terminated});
+    }
+
     auto tr = m_db->start_frozen(db_version.value_or(VersionID{}));
     auto sub_sets = tr->get_table(m_sub_set_table);
     try {
@@ -830,6 +988,11 @@ SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
 
 SubscriptionStore::TableSet SubscriptionStore::get_tables_for_latest(const Transaction& tr) const
 {
+    if (!is_active()) {
+        // Return empty table set if subscription store has been terminated
+        return {};
+    }
+
     auto sub_sets = tr.get_table(m_sub_set_table);
     // There should always be at least one SubscriptionSet - the zero'th subscription set for schema instructions.
     REALM_ASSERT(!sub_sets->is_empty());
@@ -849,6 +1012,9 @@ SubscriptionStore::TableSet SubscriptionStore::get_tables_for_latest(const Trans
 
 void SubscriptionStore::supercede_prior_to(TransactionRef tr, int64_t version_id) const
 {
+    if (!is_active()) {
+        return;
+    }
     auto sub_sets = tr->get_table(m_sub_set_table);
     Query remove_query(sub_sets);
     remove_query.less(sub_sets->get_primary_key_column(), version_id);
@@ -857,6 +1023,9 @@ void SubscriptionStore::supercede_prior_to(TransactionRef tr, int64_t version_id
 
 void SubscriptionStore::supercede_all_except(MutableSubscriptionSet& mut_sub) const
 {
+    if (!is_active()) {
+        return;
+    }
     auto version_to_keep = mut_sub.version();
     supercede_prior_to(mut_sub.m_tr, version_to_keep);
 
@@ -865,6 +1034,10 @@ void SubscriptionStore::supercede_all_except(MutableSubscriptionSet& mut_sub) co
     m_pending_notifications_cv.wait(lk, [&] {
         return m_outstanding_requests == 0;
     });
+    // Has the subscription store been reset?
+    if (!m_active)
+        return;
+
     for (auto it = m_pending_notifications.begin(); it != m_pending_notifications.end();) {
         if (it->version != version_to_keep) {
             to_finish.splice(to_finish.end(), m_pending_notifications, it++);
@@ -887,6 +1060,9 @@ void SubscriptionStore::supercede_all_except(MutableSubscriptionSet& mut_sub) co
 MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSet& set) const
 {
     auto new_tr = m_db->start_write();
+    if (!is_active()) {
+        return SubscriptionStore::make_error_mutsubset({ErrorCodes::OperationAborted, c_flx_sub_store_terminated}, nullptr);
+    }
 
     auto sub_sets = new_tr->get_table(m_sub_set_table);
     auto new_pk = sub_sets->max(sub_sets->get_primary_key_column())->get_int() + 1;
@@ -901,8 +1077,16 @@ MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSe
     return new_set_obj;
 }
 
+MutableSubscriptionSet SubscriptionStore::make_error_mutsubset(const Status& error, TransactionRef tr, std::optional<int64_t> version)
+{
+    return MutableSubscriptionSet(error, tr, version);
+}
+
 bool SubscriptionStore::would_refresh(DB::version_type version) const noexcept
 {
+    if (!is_active()) {
+        return false;
+    }
     return version < m_db->get_version_of_latest_snapshot();
 }
 

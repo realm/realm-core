@@ -1328,7 +1328,8 @@ void SyncSession::update_subscription_store(bool flx_sync_requested)
     if (!flx_sync_requested) {
         if (m_flx_subscription_store) {
             // Empty the subscription store and cancel any pending subscription notification
-            // waiters - will be done in a separate PR
+            // waiters
+            m_flx_subscription_store->terminate();
             m_flx_subscription_store.reset();
             lock.unlock();
             auto tr = m_db->start_write();
