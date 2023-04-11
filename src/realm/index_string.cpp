@@ -1198,30 +1198,39 @@ void StringIndex::find_all_fulltext(std::vector<ObjKey>& result, StringData valu
             IntegerColumn indexes(m_array->get_alloc(), ref_type(res.payload));
 
             if (result.empty()) {
+                result.reserve(res.end_ndx - res.start_ndx);
                 for (size_t i = res.start_ndx; i < res.end_ndx; ++i) {
                     result.emplace_back(indexes.get(i));
                 }
             }
             else {
-                auto r = result.begin();
-                size_t m = res.start_ndx;
+                size_t s = 0, i = 0, m = res.start_ndx;
 
                 // only keep intersection
-                while (r != result.end() && m < res.end_ndx) {
-                    auto key_val = indexes.get(m);
-                    if (r->value < key_val) {
-                        r = result.erase(r); // remove if match is not in new set
+                for (; i < result.size() && m < res.end_ndx;) {
+                    ObjKey& key = result[i];
+                    auto idx_val = indexes.get(m);
+
+                    if (key.value < idx_val) { // remove if match is not in new set
+                        ++i;
                     }
-                    else if (r->value > key_val) {
+                    else if (key.value > idx_val) {
                         ++m; // ignore new matches
                     }
                     else {
-                        ++r;
+                        if (s < i)
+                            result[s] = key;
+
+                        ++s;
                         ++m;
+                        ++i;
                     }
                 }
-                if (r != result.end()) {
-                    result.erase(r, result.end());
+
+                if (s < i && s < result.size()) {
+                    auto b = result.begin();
+                    std::advance(b, s);
+                    result.erase(b, result.end());
                 }
             }
 
