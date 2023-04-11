@@ -234,9 +234,6 @@ class S2LatLngRect : public S2Region {
   // The point 'p' does not need to be normalized.
   bool Contains(S2Point const& p) const;
 
-  virtual void Encode(Encoder* const encoder) const;
-  virtual bool Decode(Decoder* const decoder);
-
  private:
   // Return true if the edge AB intersects the given edge of constant
   // longitude.
@@ -267,12 +264,12 @@ class S2LatLngRect : public S2Region {
 inline S2LatLngRect::S2LatLngRect(S2LatLng const& lo, S2LatLng const& hi)
   : lat_(lo.lat().radians(), hi.lat().radians()),
     lng_(lo.lng().radians(), hi.lng().radians()) {
-  DCHECK(is_valid()) << lo << ", " << hi;
+        DCHECK_EX(is_valid(), lo, hi);
 }
 
 inline S2LatLngRect::S2LatLngRect(R1Interval const& lat, S1Interval const& lng)
   : lat_(lat), lng_(lng) {
-  DCHECK(is_valid()) << lat << ", " << lng;
+  DCHECK_EX(is_valid(), lat, lng);
 }
 
 inline S2LatLngRect::S2LatLngRect()

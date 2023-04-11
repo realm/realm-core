@@ -111,6 +111,10 @@ functions:
           set_cmake_var realm_vars REALM_TEST_LOGGING BOOL On
           set_cmake_var realm_vars REALM_TEST_LOGGING_LEVEL STRING "debug"
 
+          if [ -n "${enable_sync_v8|}" ]; then
+              set_cmake_var realm_vars REALM_SYNC_PROTOCOL_V8 BOOL On
+          fi
+
           GENERATOR="${cmake_generator}"
           if [ -z "${cmake_generator|}" ]; then
               GENERATOR="Ninja Multi-Config"
@@ -198,6 +202,7 @@ functions:
           if [[ -n "${run_with_encryption}" ]]; then
               export UNITTEST_ENCRYPT_ALL=1
           fi
+          export TSAN_OPTIONS="suppressions=$(pwd)/test/tsan.suppress"
 
           cd build
           $CTEST -C ${cmake_build_type|Debug} $TEST_FLAGS
@@ -625,7 +630,7 @@ tasks:
                 export DEVELOPER_DIR="${xcode_developer_dir}"
             fi
 
-            ./evergreen/install_baas.sh -w ./baas-work-dir -b afb2fc14ccb8f4fcadeeecb091bab834d119baba 2>&1 | tee install_baas_output.log
+            ./evergreen/install_baas.sh -w ./baas-work-dir -b b530bafb31a2c59bcf9ae48bd0ac1ba625ae130b 2>&1 | tee install_baas_output.log
         fi
 
   - command: shell.exec
@@ -785,6 +790,22 @@ task_groups:
   tasks:
   - fuzzer
 
+- name: object-store-tests-v8
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - func: "compile"
+    vars:
+      long_running_test_duration: 2
+      target_to_build: ObjectStoreTests
+  teardown_task:
+  - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
+  tasks:
+  - object-store-tests
+
 buildvariants:
 - name: ubuntu2004
   display_name: "Ubuntu 20.04 x86_64 (Clang 11)"
@@ -882,6 +903,25 @@ buildvariants:
     distros:
     - ubuntu2004-large
   - name: long-running-tests
+
+- name: ubuntu2004-asan-sync-v8
+  display_name: "Ubuntu 20.04 x86_64 SyncV8 (Clang 11 ASAN)"
+  run_on: ubuntu2004-small
+  expansions:
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    run_tests_against_baas: On
+    enable_asan: On
+    enable_sync_v8: On
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+    llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
+  tasks:
+  - name: object-store-tests-v8
+    distros:
+    - ubuntu2004-large
 
 - name: ubuntu2004-tsan
   display_name: "Ubuntu 20.04 x86_64 (Clang 11 TSAN)"

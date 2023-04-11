@@ -315,7 +315,7 @@ class Matrix3x3 {
   // Matrix inversion
   inline Self Inverse(void) const {
     VType det = Det();
-    CHECK(det != 0) << " Can't inverse. Determinant = 0.";
+    CHECK(det != 0); // " Can't inverse. Determinant = 0.";
     return (1/det) * ComatrixTransposed();
   }
 

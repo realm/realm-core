@@ -32,7 +32,6 @@
 #include "s2/base/basictypes.h"
 #include "s2/base/logging.h"
 #include "s2/base/template_util.h"
-#include "s2/base/type_traits.h"
 #include "s2/util/math/mathutil.h"
 #include "s2/util/math/vector3.h"
 #include "s2/util/math/vector4.h"
@@ -219,7 +218,7 @@ typename Vector2<VType>::FloatType Vector2<VType>::Angle(const Self &v) const {
 
 template <typename VType>
 Vector2<VType> Vector2<VType>::Normalize() const {
-  COMPILE_ASSERT(!base::is_integral<VType>::value, must_be_floating_point);
+  COMPILE_ASSERT(!std::is_integral<VType>::value, must_be_floating_point);
   VType n = Norm();
   if (n != 0) {
     n = 1.0 / n;
@@ -282,7 +281,7 @@ Vector2<VType> Vector2<VType>::Fabs() const {
 
 template <typename VType>
 Vector2<VType> Vector2<VType>::Abs() const {
-  COMPILE_ASSERT(base::is_integral<VType>::value, use_Fabs_for_float_types);
+  COMPILE_ASSERT(std::is_integral<VType>::value, use_Fabs_for_float_types);
   COMPILE_ASSERT(static_cast<VType>(-1) == -1, type_must_be_signed);
   COMPILE_ASSERT(sizeof(VType) <= sizeof(int), Abs_truncates_to_int);
   return Self(abs(c_[0]), abs(c_[1]));

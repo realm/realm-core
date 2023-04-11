@@ -6055,6 +6055,7 @@ TEST(Query_FullTextMulti)
         col, "L’archive ouverte pluridisciplinaire HAL, est destinée au dépôt et à la diffusion de documents "
              "scientifiques de niveau recherche, publiés ou non, émanant des établissements d’enseignement et de "
              "recherche français ou étrangers, des laboratoires publics ou privés.");
+    table->create_object().set(col, "object object object object object duplicates");
 
     int64_t id = 1000;
     for (auto& o : *table) {

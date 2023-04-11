@@ -17,7 +17,6 @@ using std::make_pair;
 #include <vector>
 using std::vector;
 
-#include "base/scoped_ptr.h"
 #include "base/basictypes.h"
 #include "s2.h"
 #include "s1angle.h"
@@ -274,7 +273,7 @@ class S2PolygonBuilder {
   S2PolygonBuilderOptions options_;
 
   // This is only used for debugging purposes.
-  scoped_ptr<Matrix3x3_d> debug_matrix_;
+  std::unique_ptr<Matrix3x3_d> debug_matrix_;
 
   // The current set of edges, grouped by origin.  The set of destination
   // vertices is a multiset so that the same edge can be present more than
@@ -282,7 +281,7 @@ class S2PolygonBuilder {
   // but this representation is a bit more convenient.
   typedef multiset<S2Point> VertexSet;
   typedef hash_map<S2Point, VertexSet> EdgeSet;
-  scoped_ptr<EdgeSet> edges_;
+  std::unique_ptr<EdgeSet> edges_;
 
   // Unique collection of the starting (first) vertex of all edges,
   // in the order they are added to edges_.

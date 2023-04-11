@@ -23,8 +23,6 @@ using std::vector;
 
 #include "base/integral_types.h"
 #include "base/logging.h"
-#include "base/stringprintf.h"
-#include "strings/strutil.h"
 #include "s2.h"
 #include "s2latlng.h"
 #include "util/math/mathutil.h"
@@ -172,34 +170,6 @@ S2CellId S2CellId::advance_wrap(int64 steps) const {
 S2CellId S2CellId::FromFacePosLevel(int face, uint64 pos, int level) {
   S2CellId cell((static_cast<uint64>(face) << kPosBits) + (pos | 1));
   return cell.parent(level);
-}
-
-string S2CellId::ToToken() const {
-  // Simple implementation: convert the id to hex and strip trailing zeros.
-  // Using hex has the advantage that the tokens are case-insensitive, all
-  // characters are alphanumeric, no characters require any special escaping
-  // in Mustang queries, and it's easy to compare cell tokens against the
-  // feature ids of the corresponding features.
-  //
-  // Using base 64 would produce slightly shorter tokens, but for typical cell
-  // sizes used during indexing (up to level 15 or so) the average savings
-  // would be less than 2 bytes per cell which doesn't seem worth it.
-
-  char digits[17];
-  FastHex64ToBuffer(id_, digits);
-  for (int len = 16; len > 0; --len) {
-    if (digits[len-1] != '0') {
-      return string(digits, len);
-    }
-  }
-  return "X";  // Invalid hex string.
-}
-
-S2CellId S2CellId::FromToken(string const& token) {
-  if (token.size() > 16) return S2CellId::None();
-  char digits[17] = "0000000000000000";
-  memcpy(digits, token.data(), token.size());
-  return S2CellId(ParseLeadingHex64Value(digits, 0));
 }
 
 inline int S2CellId::STtoIJ(double s) {
@@ -535,7 +505,7 @@ S2CellId S2CellId::FromString(const string& str) {
 
 string S2CellId::ToString() const {
   if (!is_valid()) {
-    return StringPrintf("Invalid: %016llx", id());
+    return realm::util::format("Invalid: %1", id());
   }
   string out;
   out.reserve(2 + level());
@@ -543,17 +513,6 @@ string S2CellId::ToString() const {
   out.push_back('f');
   for (int current_level = 1; current_level <= level(); ++current_level) {
     out.push_back(intToChar(child_position(current_level)));
-  }
-  return out;
-}
-
-string S2CellId::slowToString() const {
-  if (!is_valid()) {
-    return StringPrintf("Invalid: %016llx", id());
-  }
-  string out = IntToString(face(), "%df");
-  for (int current_level = 1; current_level <= level(); ++current_level) {
-    out += IntToString(child_position(current_level), "%d");
   }
   return out;
 }

@@ -123,7 +123,8 @@ Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB:
     set_metrics(db->m_metrics);
     set_transact_stage(stage);
     m_alloc.note_reader_start(this);
-    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable);
+    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable,
+                  VersionID{rli.m_version, rli.m_reader_idx});
 }
 
 Transaction::~Transaction()
@@ -272,7 +273,7 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
             }
         }
 
-        // Remap file if it has grown, and update refs in underlying node structure
+        // Remap file if it has grown, and update refs in underlying node structure.
         remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false); // Throws
         return VersionID{version, new_read_lock.m_reader_idx};
     }

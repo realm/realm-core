@@ -265,10 +265,6 @@ class S2Polygon : public S2Region {
   // The point 'p' does not need to be normalized.
   bool Contains(S2Point const& p) const;
 
-  virtual void Encode(Encoder* const encoder) const;
-  virtual bool Decode(Decoder* const decoder);
-  virtual bool DecodeWithinScope(Decoder* const decoder);
-
  private:
   // Internal constructor that does *not* take ownership of its argument.
   explicit S2Polygon(S2Loop* loop);
@@ -277,11 +273,6 @@ class S2Polygon : public S2Region {
   // This map is built during initialization of multi-loop polygons to
   // determine which are shells and which are holes, and then discarded.
   typedef map<S2Loop*, vector<S2Loop*> > LoopMap;
-
-  // Internal implementation of the Decode and DecodeWithinScope methods above.
-  // The within_scope parameter specifies whether to call DecodeWithinScope
-  // on the loops.
-  bool DecodeInternal(Decoder* const decoder, bool within_scope);
 
   // Internal implementation of intersect/subtract polyline functions above.
   void InternalClipPolyline(bool invert,

@@ -80,7 +80,8 @@ namespace {
 // 12      Change `number_of_versions` to an atomic rather than guarding it
 //         with a lock.
 // 13      New impl of VersionList and added mutex for it (former RingBuffer)
-const uint_fast16_t g_shared_info_version = 13;
+// 14      Added field for tracking ongoing encrypted writes
+const uint_fast16_t g_shared_info_version = 14;
 
 
 struct VersionList {
@@ -258,6 +259,17 @@ struct VersionList {
         REALM_ASSERT(oldest_live_v != std::numeric_limits<uint64_t>::max());
     }
 
+#if REALM_DEBUG
+    void dump()
+    {
+        util::format(std::cout, "VersionList has %1 entries: \n", entries);
+        for (auto* rc = data(); rc < data() + entries; ++rc) {
+            util::format(std::cout, "[%1]: version %2, live: %3, full: %4, frozen: %5\n", index_of(*rc), rc->version,
+                         rc->count_live, rc->count_full, rc->count_frozen);
+        }
+    }
+#endif // REALM_DEBUG
+
     constexpr static uint32_t nil = (uint32_t)-1;
     const static int init_readers_size = 32;
     uint32_t entries;
@@ -382,9 +394,8 @@ struct alignas(8) DB::SharedInfo {
     uint64_t latest_version_number; // Offset 16
 
     /// Pid of process initiating the session, but only if that process runs
-    /// with encryption enabled, zero otherwise. Other processes cannot join a
-    /// session wich uses encryption, because interprocess sharing is not
-    /// supported by our current encryption mechanisms.
+    /// with encryption enabled, zero otherwise. This was used to prevent
+    /// multiprocess encryption until support for that was added.
     uint64_t session_initiator_pid = 0; // Offset 24
 
     std::atomic<uint64_t> number_of_versions; // Offset 32
@@ -426,6 +437,8 @@ struct alignas(8) DB::SharedInfo {
     InterprocessCondVar::SharedPart pick_next_writer;
     std::atomic<uint32_t> next_ticket;
     std::atomic<uint32_t> next_served = 0;
+    std::atomic<uint64_t> writing_page_offset;
+    std::atomic<uint64_t> write_counter;
 
     // IMPORTANT: The VersionList MUST be the last field in SharedInfo - see above.
     VersionList readers;
@@ -618,7 +631,7 @@ public:
                 r2.current_top = read_lock.m_top_ref;
                 r2.count_full = r2.count_live = r2.count_frozen = 0;
             }
-            REALM_ASSERT(field_for_type(r2, type) == 0);
+            REALM_ASSERT_EX(field_for_type(r2, type) == 0, type, r2.count_full, r2.count_live, r2.count_frozen);
             field_for_type(r2, type) = 1;
         }
 
@@ -707,6 +720,34 @@ private:
         }
     }
 
+    void mark_page_for_writing(uint64_t page_offset) REQUIRES(!m_info_mutex)
+    {
+        util::CheckedLockGuard info_lock(m_info_mutex);
+        m_info->writing_page_offset = page_offset + 1;
+        m_info->write_counter++;
+    }
+    void clear_writing_marker() REQUIRES(!m_info_mutex)
+    {
+        util::CheckedLockGuard info_lock(m_info_mutex);
+        m_info->write_counter++;
+        m_info->writing_page_offset = 0;
+    }
+    // returns false if no page is marked.
+    // if a page is marked, returns true and optionally the offset of the page marked for writing
+    // in all cases returns optionally the write counter
+    bool observe_writer(uint64_t* page_offset, uint64_t* write_counter) REQUIRES(!m_info_mutex)
+    {
+        util::CheckedLockGuard info_lock(m_info_mutex);
+        if (write_counter) {
+            *write_counter = m_info->write_counter;
+        }
+        uint64_t marked = m_info->writing_page_offset;
+        if (marked && page_offset) {
+            *page_offset = marked - 1;
+        }
+        return marked != 0;
+    }
+
 protected:
     util::InterprocessMutex& m_mutex;
     util::CheckedMutex m_local_readers_mutex;
@@ -718,6 +759,7 @@ protected:
 
     virtual void ensure_reader_mapping(unsigned int required = -1) REQUIRES(m_info_mutex) = 0;
     virtual void expand_version_list(unsigned new_entries) REQUIRES(m_info_mutex) = 0;
+    friend class DB::EncryptionMarkerObserver;
 };
 
 class DB::FileVersionManager final : public DB::VersionManager {
@@ -773,7 +815,47 @@ private:
     }
 
     File& m_file;
-    File::Map<SharedInfo> m_reader_map;
+    File::Map<DB::SharedInfo> m_reader_map;
+
+    friend class DB::EncryptionMarkerObserver;
+};
+
+// adapter class for marking/observing encrypted writes
+class DB::EncryptionMarkerObserver : public util::WriteMarker, public util::WriteObserver {
+public:
+    EncryptionMarkerObserver(DB::VersionManager& vm)
+        : vm(vm)
+    {
+    }
+    bool no_concurrent_writer_seen() override
+    {
+        uint64_t tmp_write_count;
+        auto page_may_have_been_written = vm.observe_writer(nullptr, &tmp_write_count);
+        if (tmp_write_count != last_seen_count) {
+            page_may_have_been_written = true;
+            last_seen_count = tmp_write_count;
+        }
+        if (page_may_have_been_written) {
+            calls_since_last_writer_observed = 0;
+            return false;
+        }
+        ++calls_since_last_writer_observed;
+        constexpr size_t max_calls = 5; // an arbitrary handful, > 1
+        return (calls_since_last_writer_observed >= max_calls);
+    }
+    void mark(uint64_t pos) override
+    {
+        vm.mark_page_for_writing(pos);
+    }
+    void unmark() override
+    {
+        vm.clear_writing_marker();
+    }
+
+private:
+    DB::VersionManager& vm;
+    uint64_t last_seen_count = 0;
+    size_t calls_since_last_writer_observed = 0;
 };
 
 class DB::InMemoryVersionManager final : public DB::VersionManager {
@@ -1072,8 +1154,9 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
 
             cfg.encryption_key = options.encryption_key;
             ref_type top_ref;
+            m_marker_observer = std::make_unique<EncryptionMarkerObserver>(*version_manager);
             try {
-                top_ref = alloc.attach_file(path, cfg); // Throws
+                top_ref = alloc.attach_file(path, cfg, m_marker_observer.get()); // Throws
             }
             catch (const SlabAlloc::Retry&) {
                 // On a SlabAlloc::Retry file mappings are already unmapped, no
@@ -1272,19 +1355,6 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                 // Realm file.
                 if (info->history_schema_version != openers_hist_schema_version)
                     throw RuntimeError(ErrorCodes::IncompatibleSession, "History schema version not consistent");
-#ifdef _WIN32
-                uint64_t pid = GetCurrentProcessId();
-#else
-                uint64_t pid = getpid();
-#endif
-
-                if (options.encryption_key && info->session_initiator_pid != pid) {
-                    std::stringstream ss;
-                    ss << path << ": Encrypted interprocess sharing is currently unsupported."
-                       << "DB has been opened by pid: " << info->session_initiator_pid << ". Current pid is " << pid
-                       << ".";
-                    throw Exception(ErrorCodes::IllegalOperation, ss.str());
-                }
 
                 // We need per session agreement among all participants on the
                 // target Realm file format. From a technical perspective, the
@@ -1367,7 +1437,6 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
         m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
     }
 #endif // REALM_METRICS
-
     m_alloc.set_read_only(true);
 }
 
@@ -1482,7 +1551,6 @@ void DB::create_new_history(std::unique_ptr<Replication> repl)
     m_history = std::move(repl);
 }
 
-
 // WARNING / FIXME: compact() should NOT be exposed publicly on Windows because it's not crash safe! It may
 // corrupt your database if something fails.
 // Tracked by https://github.com/realm/realm-core/issues/4111
@@ -1596,7 +1664,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         cfg.clear_file = false;
         cfg.encryption_key = write_key;
         ref_type top_ref;
-        top_ref = m_alloc.attach_file(m_db_path, cfg);
+        top_ref = m_alloc.attach_file(m_db_path, cfg, m_marker_observer.get());
         m_alloc.convert_from_streaming_form(top_ref);
         m_alloc.init_mapping_management(info->latest_version_number);
         info->number_of_versions = 1;
@@ -1687,7 +1755,7 @@ void DB::release_all_read_locks() noexcept
 // directly.
 void DB::close(bool allow_open_read_transactions)
 {
-    // make helper thread terminate
+    // make helper thread(s) terminate
     m_commit_helper.reset();
 
     if (m_fake_read_lock_if_immutable) {
@@ -2391,7 +2459,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     transaction.update_num_objects();
 #endif // REALM_METRICS
 
-    GroupWriter out(transaction, Durability(info->durability)); // Throws
+    GroupWriter out(transaction, Durability(info->durability), m_marker_observer.get()); // Throws
     out.set_versions(new_version, top_refs, any_new_unreachables);
     auto t1 = std::chrono::steady_clock::now();
     auto commit_size = m_alloc.get_commit_size();
@@ -2600,6 +2668,7 @@ TransactionRef DB::start_write(bool nonblocking)
         ReadLockInfo read_lock = grab_read_lock(ReadLockInfo::Live, VersionID());
         ReadLockGuard g(*this, read_lock);
         read_lock.check();
+
         tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Writing);
         tr->set_file_format_version(get_file_format_version());
         version_type current_version = read_lock.m_version;

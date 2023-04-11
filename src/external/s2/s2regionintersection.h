@@ -51,10 +51,6 @@ class S2RegionIntersection : public S2Region {
   bool Contains(S2Point const& p) const;
   virtual bool Contains(S2Cell const& cell) const;
   virtual bool MayIntersect(S2Cell const& cell) const;
-  virtual void Encode(Encoder* const encoder) const {
-    S2LOG(FATAL) << "Unimplemented";
-  }
-  virtual bool Decode(Decoder* const decoder) { return false; }
 
  private:
   // Internal constructor used only by Clone() that makes a deep copy of

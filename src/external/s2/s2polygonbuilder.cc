@@ -226,7 +226,7 @@ S2Loop* S2PolygonBuilder::AssembleLoop(S2Point const& v0, S2Point const& v1,
       }
 
       if (options_.undirected_edges() && !loop->IsNormalized()) {
-        scoped_ptr<S2Loop> deleter(loop);  // XXX for debugging
+        std::unique_ptr<S2Loop> deleter(loop);  // XXX for debugging
         return AssembleLoop(path[1], path[0], unused_edges);
       }
       return loop;

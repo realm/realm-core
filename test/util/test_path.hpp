@@ -76,8 +76,8 @@ bool test_dir_is_exfat();
 std::string get_test_resource_path();
 
 /// This function is thread-safe as long as there are no concurrent invocations
-/// of set_test_libexec_path().
-std::string get_test_libexec_path();
+/// of initialize_test_path
+std::string get_test_exe_name();
 
 // This is an adapter class which replaces dragging in the whole test framework
 // by implementing the `get_test_name()` method from the TestContext class.
@@ -112,6 +112,7 @@ public:
 
 protected:
     std::string m_path;
+    bool m_do_remove;
 };
 
 /// The constructor creates the directory if it does not already exist, then

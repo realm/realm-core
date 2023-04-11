@@ -26,23 +26,6 @@ set(S2_SOURCES
     s2regionunion.cc
 )
 
-set(S2_BASE_SOURCES
-    base/int128.cc
-    base/logging.cc
-    base/stringprintf.cc
-    base/strtoint.cc
-)
-
-set(S2_STRINGS_SOURCES
-    strings/split.cc
-    strings/strutil.cc
-)
-
-set(S2_UTIL_CODING_SOURCES
-    util/coding/coder.cc
-    util/coding/varint.cc
-)
-
 set(S2_UTIL_MATH_SOURCES
     util/math/mathutil.cc
     util/math/mathlimits.cc
@@ -50,9 +33,6 @@ set(S2_UTIL_MATH_SOURCES
 
 add_library(s2geometry OBJECT
     ${S2_SOURCES}
-    ${S2_BASE_SOURCES}
-    ${S2_STRINGS_SOURCES}
-    ${S2_UTIL_CODING_SOURCES}
     ${S2_UTIL_MATH_SOURCES}
 )
 

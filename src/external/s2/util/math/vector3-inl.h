@@ -38,7 +38,6 @@ using std::reverse;
 #include "s2/base/basictypes.h"
 #include "s2/base/logging.h"
 #include "s2/base/template_util.h"
-#include "s2/base/type_traits.h"
 #include "s2/util/math/mathutil.h"
 #include "s2/util/math/vector2.h"
 #include "s2/util/math/vector4.h"
@@ -280,7 +279,7 @@ typename Vector3<VType>::FloatType Vector3<VType>::Norm(void) const {
 
 template <typename VType>
 Vector3<VType> Vector3<VType>::Normalize() const {
-  COMPILE_ASSERT(!base::is_integral<VType>::value, must_be_floating_point);
+  COMPILE_ASSERT(!std::is_integral<VType>::value, must_be_floating_point);
   VType n = Norm();
   if (n != 0) {
     n = 1.0 / n;
@@ -341,7 +340,7 @@ Vector3<VType> Vector3<VType>::Fabs() const {
 
 template <typename VType>
 Vector3<VType> Vector3<VType>::Abs() const {
-  COMPILE_ASSERT(base::is_integral<VType>::value, use_Fabs_for_float_types);
+  COMPILE_ASSERT(std::is_integral<VType>::value, use_Fabs_for_float_types);
   COMPILE_ASSERT(static_cast<VType>(-1) == -1, type_must_be_signed);
   COMPILE_ASSERT(sizeof(VType) <= sizeof(int), Abs_truncates_to_int);
   return Self(abs(c_[0]), abs(c_[1]), abs(c_[2]));

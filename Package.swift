@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "13.8.0"
+let versionStr = "13.9.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -392,6 +392,7 @@ let package = Package(
             publicHeadersPath: ".",
             cxxSettings: ([
                 .headerSearchPath(".."),
+                .headerSearchPath("../.."),
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "RealmCore",

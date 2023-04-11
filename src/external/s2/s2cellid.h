@@ -16,11 +16,21 @@ using std::vector;
 
 #include "base/basictypes.h"
 #include "base/logging.h"
-#include "base/port.h"  // for HASH_NAMESPACE_DECLARATION_START
 #include "s2.h"
 #include "util/math/vector2.h"
 
 class S2LatLng;
+
+// The following defines were salvaged from base/port.h
+#if (defined(COMPILER_GCC3) || defined(COMPILER_ICC) || defined(OS_MACOSX)) && !defined(SWIG)
+//
+// Prevent the compiler from padding a structure to natural alignment
+//
+#define PACKED __attribute__ ((packed))
+#else
+#define PACKED
+#endif // GCC
+
 
 // An S2CellId is a 64-bit unsigned integer that uniquely identifies a
 // cell in the S2 cell decomposition.  It has the following format:
@@ -223,24 +233,10 @@ class S2CellId {
   inline static S2CellId Begin(int level);
   inline static S2CellId End(int level);
 
-  // Methods to encode and decode cell ids to compact text strings suitable
-  // for display or indexing.  Cells at lower levels (i.e. larger cells) are
-  // encoded into fewer characters.  The maximum token length is 16.
-  //
-  // ToToken() returns a string by value for convenience; the compiler
-  // does this without intermediate copying in most cases.
-  //
-  // These methods guarantee that FromToken(ToToken(x)) == x even when
-  // "x" is an invalid cell id.  All tokens are alphanumeric strings.
-  // FromToken() returns S2CellId::None() for malformed inputs.
-  string ToToken() const;
-  static S2CellId FromToken(string const& token);
-
   // Creates a debug human readable string. Used for << and available for direct
   // usage as well.
   string ToString() const;
   string toString() const { return ToString(); }
-  string slowToString() const;
   static S2CellId FromString(const string& str);
 
   // Return the four cells that are adjacent across the cell's four edges.

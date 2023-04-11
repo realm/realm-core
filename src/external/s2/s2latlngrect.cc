@@ -10,7 +10,6 @@ using std::reverse;
 #include "s2latlngrect.h"
 
 #include "base/logging.h"
-#include "util/coding/coder.h"
 #include "s2cap.h"
 #include "s2cell.h"
 #include "s2edgeutil.h"
@@ -30,8 +29,8 @@ S2LatLngRect S2LatLngRect::FromPoint(S2LatLng const& p) {
 
 S2LatLngRect S2LatLngRect::FromPointPair(S2LatLng const& p1,
                                          S2LatLng const& p2) {
-  DCHECK(p1.is_valid()) << p1;
-  DCHECK(p2.is_valid()) << p2;
+  DCHECK_EX(p1.is_valid(), p1);
+  DCHECK_EX(p2.is_valid(), p2);
   return S2LatLngRect(R1Interval::FromPointPair(p1.lat().radians(),
                                                 p2.lat().radians()),
                       S1Interval::FromPointPair(p1.lng().radians(),
@@ -205,34 +204,6 @@ bool S2LatLngRect::Contains(S2Cell const& cell) const {
 bool S2LatLngRect::MayIntersect(S2Cell const& cell) const {
   // This test is cheap but is NOT exact (see s2latlngrect.h).
   return Intersects(cell.GetRectBound());
-}
-
-void S2LatLngRect::Encode(Encoder* encoder) const {
-  encoder->Ensure(40);  // sufficient
-
-  encoder->put8(kCurrentEncodingVersionNumber);
-  encoder->putdouble(lat_.lo());
-  encoder->putdouble(lat_.hi());
-  encoder->putdouble(lng_.lo());
-  encoder->putdouble(lng_.hi());
-
-  DCHECK_GE(encoder->avail(), 0);
-}
-
-bool S2LatLngRect::Decode(Decoder* decoder) {
-  unsigned char version = decoder->get8();
-  if (version > kCurrentEncodingVersionNumber) return false;
-
-  double lat_lo = decoder->getdouble();
-  double lat_hi = decoder->getdouble();
-  lat_ = R1Interval(lat_lo, lat_hi);
-  double lng_lo = decoder->getdouble();
-  double lng_hi = decoder->getdouble();
-  lng_ = S1Interval(lng_lo, lng_hi);
-
-  DCHECK(is_valid());
-
-  return decoder->avail() >= 0;
 }
 
 bool S2LatLngRect::IntersectsLngEdge(S2Point const& a, S2Point const& b,
