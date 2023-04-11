@@ -22,6 +22,8 @@
 #include <realm/keys.hpp>
 #include <realm/string_data.hpp>
 
+#include <climits>
+#include <cmath>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -121,7 +123,7 @@ public:
 
     bool operator==(const Geospatial& other) const
     {
-        return m_type == other.m_type && m_points == other.m_points;
+        return m_type == other.m_type && m_points == other.m_points && get_radius() == other.get_radius();
     }
     bool operator!=(const Geospatial& other) const
     {
@@ -143,7 +145,18 @@ private:
     std::optional<std::string> m_invalid_type;
 
     std::vector<GeoPoint> m_points;
-    std::optional<double> m_radius_radians;
+
+    double m_radius_radians = get_nan();
+
+    constexpr static double get_nan()
+    {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+
+    std::optional<double> get_radius() const
+    {
+        return std::isnan(m_radius_radians) ? std::optional<double>{} : m_radius_radians;
+    }
 
     mutable std::shared_ptr<S2Region> m_region;
     S2Region& get_region() const;
