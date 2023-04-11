@@ -7,11 +7,11 @@ namespace realm::sync {
 namespace {
 constexpr static int c_schema_version = 1;
 constexpr static std::string_view c_flx_migration_table("flx_migration");
-constexpr static std::string_view c_flx_migration_started_at("flx_migration_started_at");
-constexpr static std::string_view c_flx_migration_completed_at("flx_migration_completed_at");
-constexpr static std::string_view c_flx_migration_state("flx_migration_state");
-constexpr static std::string_view c_flx_migration_query_string("flx_migration_query_string");
-constexpr static std::string_view c_flx_migration_original_partition("flx_migration_original_partition");
+constexpr static std::string_view c_flx_migration_started_at("started_at");
+constexpr static std::string_view c_flx_migration_completed_at("completed_at");
+constexpr static std::string_view c_flx_migration_state("state");
+constexpr static std::string_view c_flx_migration_query_string("query_string");
+constexpr static std::string_view c_flx_migration_original_partition("original_partition");
 constexpr static std::string_view c_flx_subscription_name_prefix("flx_migrated_");
 
 class MigrationStoreInit : public MigrationStore {
