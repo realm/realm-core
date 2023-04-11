@@ -199,6 +199,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case UserDisabled:
         case UserNotFound:
         case UserpassTokenInvalid:
+        case InvalidServerResponse:
         case ValueAlreadyExists:
         case ValueDuplicateName:
         case ValueNotFound:
@@ -362,6 +363,7 @@ static const MapElem string_to_error_code[] = {
     {"UserDisabled", ErrorCodes::UserDisabled},
     {"UserNotFound", ErrorCodes::UserNotFound},
     {"UserpassTokenInvalid", ErrorCodes::UserpassTokenInvalid},
+    {"InvalidServerResponse", ErrorCodes::InvalidServerResponse},
     {"ValueAlreadyExists", ErrorCodes::ValueAlreadyExists},
     {"ValueDuplicateName", ErrorCodes::ValueDuplicateName},
     {"ValueNotFound", ErrorCodes::ValueNotFound},
