@@ -54,6 +54,7 @@
 namespace realm::util {
 
 class EncryptedFileMapping;
+class WriteObserver;
 
 /// Create the specified directory in the file system.
 ///
@@ -668,10 +669,12 @@ private:
         MapBase& operator=(const MapBase&) = delete;
 
         // Use
-        void map(const File&, AccessMode, size_t size, int map_flags, size_t offset = 0);
+        void map(const File&, AccessMode, size_t size, int map_flags, size_t offset = 0,
+                 util::WriteObserver* observer = nullptr);
         // reserve address space for later mapping operations.
         // returns false if reservation can't be done.
-        bool try_reserve(const File&, AccessMode, size_t size, size_t offset = 0);
+        bool try_reserve(const File&, AccessMode, size_t size, size_t offset = 0,
+                         util::WriteObserver* observer = nullptr);
         void remap(const File&, AccessMode, size_t size, int map_flags);
         void unmap() noexcept;
         // fully update any process shared representation (e.g. buffer cache).
@@ -719,10 +722,11 @@ template <class T>
 class File::Map : private MapBase {
 public:
     /// Equivalent to calling map() on a default constructed instance.
-    explicit Map(const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0);
+    explicit Map(const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0,
+                 util::WriteObserver* observer = nullptr);
 
-    explicit Map(const File&, size_t offset, AccessMode = access_ReadOnly, size_t size = sizeof(T),
-                 int map_flags = 0);
+    explicit Map(const File&, size_t offset, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0,
+                 util::WriteObserver* observer = nullptr);
 
     /// Create an instance that is not initially attached to a memory
     /// mapped file.
@@ -765,14 +769,16 @@ public:
     /// attached to a memory mapped file has undefined behavior. The
     /// returned pointer is the same as what will subsequently be
     /// returned by get_addr().
-    T* map(const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0, size_t offset = 0);
+    T* map(const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0, size_t offset = 0,
+           util::WriteObserver* observer = nullptr);
 
     /// See File::unmap(). This function is idempotent, that is, it is
     /// valid to call it regardless of whether this instance is
     /// currently attached to a memory mapped file.
     void unmap() noexcept;
 
-    bool try_reserve(const File&, AccessMode a = access_ReadOnly, size_t size = sizeof(T), size_t offset = 0);
+    bool try_reserve(const File&, AccessMode a = access_ReadOnly, size_t size = sizeof(T), size_t offset = 0,
+                     util::WriteObserver* observer = nullptr);
 
     /// See File::remap().
     ///
@@ -1098,15 +1104,16 @@ inline File::MapBase::~MapBase() noexcept
 
 
 template <class T>
-inline File::Map<T>::Map(const File& f, AccessMode a, size_t size, int map_flags)
+inline File::Map<T>::Map(const File& f, AccessMode a, size_t size, int map_flags, util::WriteObserver* observer)
 {
-    map(f, a, size, map_flags);
+    map(f, a, size, map_flags, 0, observer);
 }
 
 template <class T>
-inline File::Map<T>::Map(const File& f, size_t offset, AccessMode a, size_t size, int map_flags)
+inline File::Map<T>::Map(const File& f, size_t offset, AccessMode a, size_t size, int map_flags,
+                         util::WriteObserver* observer)
 {
-    map(f, a, size, map_flags, offset);
+    map(f, a, size, map_flags, offset, observer);
 }
 
 template <class T>
@@ -1115,16 +1122,18 @@ inline File::Map<T>::Map() noexcept
 }
 
 template <class T>
-inline T* File::Map<T>::map(const File& f, AccessMode a, size_t size, int map_flags, size_t offset)
+inline T* File::Map<T>::map(const File& f, AccessMode a, size_t size, int map_flags, size_t offset,
+                            util::WriteObserver* observer)
 {
-    MapBase::map(f, a, size, map_flags, offset);
+    MapBase::map(f, a, size, map_flags, offset, observer);
     return static_cast<T*>(m_addr);
 }
 
 template <class T>
-inline bool File::Map<T>::try_reserve(const File& f, AccessMode a, size_t size, size_t offset)
+inline bool File::Map<T>::try_reserve(const File& f, AccessMode a, size_t size, size_t offset,
+                                      util::WriteObserver* observer)
 {
-    return MapBase::try_reserve(f, a, size, offset);
+    return MapBase::try_reserve(f, a, size, offset, observer);
 }
 
 template <class T>

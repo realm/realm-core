@@ -26,11 +26,14 @@
 #include <atomic>
 #include <mutex>
 
+#include <realm/util/checked_mutex.hpp>
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
+#include <realm/util/functional.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/alloc.hpp>
 #include <realm/disable_sync_to_disk.hpp>
+#include <realm/version_id.hpp>
 
 namespace realm {
 
@@ -40,7 +43,7 @@ class GroupWriter;
 
 namespace util {
 struct SharedFileInfo;
-}
+} // namespace util
 
 /// Thrown by Group and DB constructors if the specified file
 /// (or memory buffer) does not appear to contain a valid Realm
@@ -148,7 +151,7 @@ public:
     ///
     /// \throw FileAccessError
     /// \throw SlabAlloc::Retry
-    ref_type attach_file(const std::string& file_path, Config& cfg);
+    ref_type attach_file(const std::string& file_path, Config& cfg, util::WriteObserver* write_observer = nullptr);
 
     /// If the attached file is in streaming form, convert it to normal form.
     ///
@@ -386,6 +389,8 @@ protected:
     /// which is inside the range from 'start_pos' to 'start_pos'+'free_chunk_size'
     /// If found return the position, if not return 0.
     size_t find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) const noexcept;
+
+    void schedule_refresh_of_outdated_encrypted_pages();
 
 private:
     enum AttachMode {
@@ -673,6 +678,7 @@ private:
     Slabs m_slabs;
     std::vector<MemBuffer> m_virtual_file_buffer;
     Chunks m_free_read_only;
+    util::WriteObserver* m_write_observer = nullptr;
     size_t m_commit_size = 0;
     size_t m_virtual_file_size = 0;
 
@@ -702,8 +708,8 @@ private:
 
     static bool ref_less_than_slab_ref_end(ref_type, const Slab&) noexcept;
 
-    friend class Group;
     friend class DB;
+    friend class Group;
     friend class GroupWriter;
 };
 

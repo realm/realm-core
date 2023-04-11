@@ -16,13 +16,33 @@
  *
  **************************************************************************/
 
+#ifndef REALM_AES_CRYPTOR_HPP
+#define REALM_AES_CRYPTOR_HPP
+
 #include <array>
 #include <cstddef>
 #include <memory>
 #include <realm/util/features.h>
 #include <cstdint>
 #include <vector>
+
 #include <realm/util/file.hpp>
+#include <realm/util/flat_map.hpp>
+
+namespace realm::util {
+class WriteObserver {
+public:
+    virtual bool no_concurrent_writer_seen() = 0;
+    virtual ~WriteObserver() {}
+};
+
+class WriteMarker {
+public:
+    virtual void mark(uint64_t page_offset) = 0;
+    virtual void unmark() = 0;
+    virtual ~WriteMarker() {}
+};
+} // namespace realm::util
 
 #if REALM_ENABLE_ENCRYPTION
 
@@ -43,6 +63,8 @@ namespace realm::util {
 struct iv_table;
 class EncryptedFileMapping;
 
+enum class IVRefreshState { UpToDate, RequiresRefresh };
+
 class AESCryptor {
 public:
     AESCryptor(const uint8_t* key);
@@ -50,9 +72,11 @@ public:
 
     void set_file_size(off_t new_size);
 
-    size_t read(FileDesc fd, off_t pos, char* dst, size_t size);
+    size_t read(FileDesc fd, off_t pos, char* dst, size_t size, WriteObserver* observer = nullptr);
     void try_read_block(FileDesc fd, off_t pos, char* dst) noexcept;
-    void write(FileDesc fd, off_t pos, const char* src, size_t size) noexcept;
+    void write(FileDesc fd, off_t pos, const char* src, size_t size, WriteMarker* marker = nullptr) noexcept;
+    util::FlatMap<size_t, IVRefreshState> refresh_ivs(FileDesc fd, off_t data_pos, size_t page_ndx_in_file_expected,
+                                                      size_t end_page_ndx_in_file);
 
     void check_key(const uint8_t* key);
 
@@ -70,6 +94,8 @@ private:
 #endif
     };
 
+    enum class IVLookupMode { UseCache, Refetch };
+
 #if REALM_PLATFORM_APPLE
     CCCryptorRef m_encr;
     CCCryptorRef m_decr;
@@ -84,10 +110,11 @@ private:
     std::vector<iv_table> m_iv_buffer;
     std::unique_ptr<char[]> m_rw_buffer;
     std::unique_ptr<char[]> m_dst_buffer;
+    std::vector<iv_table> m_iv_buffer_cache;
 
-    bool check_hmac(const void* data, size_t len, const uint8_t* hmac) const;
+    bool check_hmac(const void* data, size_t len, const std::array<uint8_t, 28>& hmac) const;
     void crypt(EncryptionMode mode, off_t pos, char* dst, const char* src, const char* stored_iv) noexcept;
-    iv_table& get_iv_table(FileDesc fd, off_t data_pos) noexcept;
+    iv_table& get_iv_table(FileDesc fd, off_t data_pos, IVLookupMode mode = IVLookupMode::UseCache) noexcept;
     void handle_error();
 };
 
@@ -112,3 +139,4 @@ struct SharedFileInfo {
 } // namespace realm::util
 
 #endif // REALM_ENABLE_ENCRYPTION
+#endif // REALM_AES_CRYPTOR_HPP
