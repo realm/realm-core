@@ -188,7 +188,6 @@ void MigrationStore::migrate_to_flx(std::string_view rql_query_string, std::stri
         m_state = MigrationState::InProgress;
         m_query_string.emplace(rql_query_string);
         m_migrated_partition.emplace(partition_value);
-        // m_migrated_partition was set during convert_sync_config() before migration
 
         auto tr = m_db->start_read();
         auto migration_table = tr->get_table(m_migration_table);
