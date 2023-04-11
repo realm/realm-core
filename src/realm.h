@@ -6,6 +6,7 @@
 #ifndef REALM_H
 #define REALM_H
 
+#include <stdalign.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -159,7 +160,7 @@ typedef struct realm_timestamp {
 } realm_timestamp_t;
 
 typedef struct realm_decimal128 {
-    _Alignas(16) uint64_t w[2];
+    alignas(16) uint64_t w[2];
 } realm_decimal128_t;
 
 typedef struct realm_link {
