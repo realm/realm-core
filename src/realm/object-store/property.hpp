@@ -114,7 +114,10 @@ struct Property {
              std::string public_name = "");
 
     // Nested collections
-    Property(std::string name, PropertyType type, const NestedTypes& nested_types, std::string public_name = "");
+    // Although a collection property cannot be indexed, we need the flag anyway to differentiate from
+    // the linking object Property constructor.
+    Property(std::string name, PropertyType type, const NestedTypes& nested_types, IsIndexed indexed = false,
+             std::string public_name = "");
     Property(std::string name, PropertyType type, const NestedTypes& nested_types, std::string object_type,
              std::string link_origin_property_name = "", std::string public_name = "");
 
@@ -345,13 +348,14 @@ inline Property::Property(std::string name, PropertyType type, std::string objec
 {
 }
 
-inline Property::Property(std::string name, PropertyType type, const NestedTypes& nested_types,
+inline Property::Property(std::string name, PropertyType type, const NestedTypes& nested_types, IsIndexed indexed,
                           std::string public_name)
     : name(std::move(name))
     , public_name(std::move(public_name))
     , type(type)
     , nested_types(nested_types)
 {
+    REALM_ASSERT(indexed == IsIndexed{false});
 }
 
 inline Property::Property(std::string name, PropertyType type, const NestedTypes& nested_types,
@@ -392,15 +396,15 @@ inline std::string Property::type_string() const
         switch (type) {
             case CollectionType::List:
                 nested += "array<";
-                closing_brackets += ">";
                 break;
             case CollectionType::Dictionary:
                 nested += "dictionary<string,";
-                closing_brackets += ">";
                 break;
-            default:
+            case CollectionType::Set:
+                REALM_UNREACHABLE();
                 break;
         }
+        closing_brackets += ">";
     }
 
     if (is_array(type)) {

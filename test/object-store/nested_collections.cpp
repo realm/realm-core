@@ -37,6 +37,9 @@ TEST_CASE("nested-list", "[nested-collections]") {
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
+        {"target", {{"value", PropertyType::Int}}},
+        {"list_of_linklist",
+         {{"nested_linklist", PropertyType::Array | PropertyType::Object, {CollectionType::List}, "target"}}},
         {"list_of_list", {{"nested_list", PropertyType::Array | PropertyType::Int, {CollectionType::List}}}},
         {"list_of_set", {{"nested_set", PropertyType::Set | PropertyType::Int, {CollectionType::List}}}},
         {"list_of_list_list",
@@ -48,14 +51,18 @@ TEST_CASE("nested-list", "[nested-collections]") {
            PropertyType::Array | PropertyType::Int,
            {CollectionType::List, CollectionType::Dictionary}}}},
     });
+
+    auto target = r->read_group().get_table("class_target");
     auto table1 = r->read_group().get_table("class_list_of_list");
     auto table2 = r->read_group().get_table("class_list_of_set");
     auto table3 = r->read_group().get_table("class_list_of_list_list");
     auto table4 = r->read_group().get_table("class_list_of_dictonary_list");
+    auto table5 = r->read_group().get_table("class_list_of_linklist");
     REQUIRE(table1);
     REQUIRE(table2);
     REQUIRE(table3);
     REQUIRE(table4);
+    REQUIRE(table5);
 
     // TODO use object store API
     r->begin_transaction();
@@ -104,6 +111,17 @@ TEST_CASE("nested-list", "[nested-collections]") {
     REQUIRE(storage_list4->size() == 1);
     REQUIRE(collection4->size() == 1);
     REQUIRE(collection4_dict->size() == 1);
+
+    // list of linklist
+    auto target_obj = target->create_object();
+    auto link_obj = table5->create_object();
+    auto link_col_key = table5->get_column_key("nested_linklist");
+    auto list5 = link_obj.get_collection_list(link_col_key);
+    CHECK(list5->is_empty());
+    auto collection_list5 = list5->insert_collection(0);
+    auto link_list = dynamic_cast<LnkLst*>(collection_list5.get());
+    link_list->add(target_obj.get_key());
+    REQUIRE(link_list->size() == 1);
 
     r->commit_transaction();
 }
