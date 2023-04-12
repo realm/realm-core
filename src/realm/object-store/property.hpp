@@ -114,12 +114,8 @@ struct Property {
              std::string public_name = "");
 
     // Nested collections
-    // Although a collection property cannot be indexed, we need the flag anyway to differentiate from
-    // the linking object Property constructor.
-    Property(std::string name, PropertyType type, const NestedTypes& nested_types, IsIndexed indexed = false,
+    Property(std::string name, PropertyType type, const NestedTypes& nested_types, std::string object_type = "",
              std::string public_name = "");
-    Property(std::string name, PropertyType type, const NestedTypes& nested_types, std::string object_type,
-             std::string link_origin_property_name = "", std::string public_name = "");
 
     Property(Property const&) = default;
     Property(Property&&) noexcept = default;
@@ -348,25 +344,16 @@ inline Property::Property(std::string name, PropertyType type, std::string objec
 {
 }
 
-inline Property::Property(std::string name, PropertyType type, const NestedTypes& nested_types, IsIndexed indexed,
-                          std::string public_name)
-    : name(std::move(name))
-    , public_name(std::move(public_name))
-    , type(type)
-    , nested_types(nested_types)
-{
-    REALM_ASSERT(indexed == IsIndexed{false});
-}
-
 inline Property::Property(std::string name, PropertyType type, const NestedTypes& nested_types,
-                          std::string object_type, std::string link_origin_property_name, std::string public_name)
+                          std::string target_type, std::string public_name)
     : name(std::move(name))
     , public_name(std::move(public_name))
     , type(type)
-    , object_type(std::move(object_type))
-    , link_origin_property_name(std::move(link_origin_property_name))
+    , object_type(std::move(target_type))
     , nested_types(nested_types)
 {
+    REALM_ASSERT(is_collection(type));
+    REALM_ASSERT((type == PropertyType::Object) == (object_type.size() != 0));
 }
 
 inline bool Property::type_is_indexable() const noexcept
@@ -447,7 +434,8 @@ inline bool operator==(Property const& lft, Property const& rgt)
     return to_underlying(lft.type) == to_underlying(rgt.type) && lft.is_primary == rgt.is_primary &&
            lft.requires_index() == rgt.requires_index() &&
            lft.requires_fulltext_index() == rgt.requires_fulltext_index() && lft.name == rgt.name &&
-           lft.object_type == rgt.object_type && lft.link_origin_property_name == rgt.link_origin_property_name;
+           lft.object_type == rgt.object_type && lft.link_origin_property_name == rgt.link_origin_property_name &&
+           lft.nested_types == rgt.nested_types;
 }
 } // namespace realm
 
