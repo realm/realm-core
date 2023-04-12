@@ -67,12 +67,12 @@ static inline Timestamp from_capi(realm_timestamp_t ts)
 static inline realm_decimal128_t to_capi(const Decimal128& dec)
 {
     auto raw = dec.raw();
-    return realm_decimal128_t{{raw->w[0], raw->w[1]}};
+    return realm_decimal128_t{raw->w[0], raw->w[1]};
 }
 
 static inline Decimal128 from_capi(realm_decimal128_t dec)
 {
-    return Decimal128{Decimal128::Bid128{{dec.w[0], dec.w[1]}}};
+    return Decimal128{Decimal128::Bid128{dec.w[0], dec.w[1]}};
 }
 
 static inline realm_object_id_t to_capi(ObjectId object_id)
