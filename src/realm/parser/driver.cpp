@@ -767,8 +767,12 @@ Query GeoWithinNode::visit(ParserDriver* drv)
                                                  "value. But the provided type is '%1'",
                                                  get_data_type_name(right_type)));
         }
-        ConstantGeospatialValue const_geo_value(drv->m_args.geospatial_for_argument(arg_no));
-        return link_column->geo_within(const_geo_value.get_mixed().get<Geospatial>());
+        Geospatial geo = drv->m_args.geospatial_for_argument(arg_no);
+        if (!geo.is_valid()) {
+            throw InvalidQueryError(
+                util::format("The right hand side of 'geoWithin' must be a valid Geospatial value, got '%1'", geo));
+        }
+        return link_column->geo_within(geo);
     }
 
     REALM_UNREACHABLE();

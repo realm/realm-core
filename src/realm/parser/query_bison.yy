@@ -8,10 +8,12 @@
 %define parse.assert
 
 %code requires {
+  #include <memory>
   #include <string>
   #include <realm/mixed.hpp>
   #include <realm/geospatial.hpp>
   #include <array>
+  #include <optional>
   using realm::GeoPoint;
   namespace realm::query_parser {
     class ParserDriver;
@@ -138,7 +140,9 @@ using namespace realm::query_parser;
 %type  <double> coordinate
 %type  <ConstantNode*> constant primary_key
 %type  <GeospatialNode*> geospatial geopoly_content
-%type  <GeoPoint> geopoint
+// std::optional<GeoPoint> is necessary because GeoPoint has deleted its default constructor
+// but bison must push a default value to the stack, even though it will be overwritten by a real value
+%type  <std::optional<GeoPoint>> geopoint
 %type  <ListNode*> list list_content
 %type  <AggrNode*> aggregate
 %type  <SubqueryNode*> subquery 
@@ -158,10 +162,14 @@ using namespace realm::query_parser;
 
 %destructor { } <int>
 
-%printer { yyo << "['" << $$.longitude << "', '" << $$.latitude;
-           if (auto alt = $$.get_altitude())
+%printer {
+           if (!$$) {
+               yyo << "null";
+           } else {
+             yyo << "['" << $$->longitude << "', '" << $$->latitude;
+             if (auto alt = $$->get_altitude())
                yyo << "', '" << *alt; 
-           yyo << "']"; }  <GeoPoint>;
+             yyo << "']"; }}  <std::optional<GeoPoint>>;
 %printer { yyo << $$.id; } <PathElem>;
 %printer { yyo << $$; } <*>;
 %printer { yyo << "<>"; } <>;
@@ -249,12 +257,12 @@ geopoint
     | '[' coordinate ',' coordinate ',' FLOAT ']' { $$ = GeoPoint{$2, $4, strtod($6.c_str(), nullptr)}; }
 
 geopoly_content
-    : geopoint { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Polygon{}, $1); }
-    | geopoly_content ',' geopoint { $1->add_point_to_polygon($3); $$ = $1; }
+    : geopoint { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Polygon{}, *$1); }
+    | geopoly_content ',' geopoint { $1->add_point_to_polygon(*$3); $$ = $1; }
 
 geospatial
-    : GEOBOX '(' geopoint ',' geopoint ')'  { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Box{}, $3, $5); }
-    | GEOSPHERE '(' geopoint ',' coordinate ')' { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Sphere{}, $3, $5); }
+    : GEOBOX '(' geopoint ',' geopoint ')'  { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Box{}, *$3, *$5); }
+    | GEOSPHERE '(' geopoint ',' coordinate ')' { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Sphere{}, *$3, $5); }
     | GEOPOLYGON '(' geopoly_content ')'    { $$ = $3; }
 
 post_query

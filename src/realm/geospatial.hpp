@@ -34,12 +34,7 @@ class Obj;
 class TableRef;
 
 struct GeoPoint {
-    GeoPoint()
-        : longitude(0)
-        , latitude(0)
-        , altitude(c_null_altitude)
-    {
-    }
+    GeoPoint() = delete;
     GeoPoint(double lon, double lat)
         : longitude(lon)
         , latitude(lat)
@@ -79,7 +74,11 @@ struct GeoBox {
 
 struct GeoPolygon {
     GeoPolygon(std::initializer_list<GeoPoint>&& l)
-        : points(l)
+        : points(std::move(l))
+    {
+    }
+    GeoPolygon(std::vector<GeoPoint>&& p)
+        : points(std::move(p))
     {
     }
     GeoPolygon(std::vector<GeoPoint> p)
@@ -231,10 +230,10 @@ public:
     }
     Geospatial get() const
     {
-        REALM_ASSERT(m_data);
+        REALM_ASSERT(m_data || m_type == Geospatial::Type::Invalid);
         switch (m_type) {
             case Geospatial::Type::Invalid:
-                return Geospatial(); // FIXME: error handling, should this throw instead?
+                return Geospatial();
             case Geospatial::Type::Point:
                 REALM_ASSERT_EX(m_size == 1, m_size);
                 return Geospatial(m_data[0]);
@@ -262,6 +261,7 @@ private:
     unsigned m_size = 0;
     Geospatial::Type m_type = Geospatial::Type::Invalid;
 };
+static_assert(sizeof(GeospatialRef) <= 24, "consider the impacts on Mixed when increasing GeospatialRef size");
 
 class GeospatialStorage {
 public:

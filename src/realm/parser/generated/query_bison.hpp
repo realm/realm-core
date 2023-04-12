@@ -46,10 +46,12 @@
 # define YY_YY_GENERATED_QUERY_BISON_HPP_INCLUDED
 // "%code requires" blocks.
 
+  #include <memory>
   #include <string>
   #include <realm/mixed.hpp>
   #include <realm/geospatial.hpp>
   #include <array>
+  #include <optional>
   using realm::GeoPoint;
   namespace realm::query_parser {
     class ParserDriver;
@@ -462,55 +464,55 @@ namespace yy {
       // expr
       char dummy5[sizeof (ExpressionNode*)];
 
-      // geopoint
-      char dummy6[sizeof (GeoPoint)];
-
       // geopoly_content
       // geospatial
-      char dummy7[sizeof (GeospatialNode*)];
+      char dummy6[sizeof (GeospatialNode*)];
 
       // list
       // list_content
-      char dummy8[sizeof (ListNode*)];
+      char dummy7[sizeof (ListNode*)];
 
       // path_elem
-      char dummy9[sizeof (PathElem)];
+      char dummy8[sizeof (PathElem)];
 
       // path
-      char dummy10[sizeof (PathNode*)];
+      char dummy9[sizeof (PathNode*)];
 
       // post_op
-      char dummy11[sizeof (PostOpNode*)];
+      char dummy10[sizeof (PostOpNode*)];
 
       // prop
       // simple_prop
-      char dummy12[sizeof (PropertyNode*)];
+      char dummy11[sizeof (PropertyNode*)];
 
       // query
       // compare
-      char dummy13[sizeof (QueryNode*)];
+      char dummy12[sizeof (QueryNode*)];
 
       // subquery
-      char dummy14[sizeof (SubqueryNode*)];
+      char dummy13[sizeof (SubqueryNode*)];
 
       // boolexpr
-      char dummy15[sizeof (TrueOrFalseNode*)];
+      char dummy14[sizeof (TrueOrFalseNode*)];
 
       // value
-      char dummy16[sizeof (ValueNode*)];
+      char dummy15[sizeof (ValueNode*)];
 
       // direction
-      char dummy17[sizeof (bool)];
+      char dummy16[sizeof (bool)];
 
       // coordinate
-      char dummy18[sizeof (double)];
+      char dummy17[sizeof (double)];
 
       // comp_type
       // aggr_op
       // equality
       // relational
       // stringop
-      char dummy19[sizeof (int)];
+      char dummy18[sizeof (int)];
+
+      // geopoint
+      char dummy19[sizeof (std::optional<GeoPoint>)];
 
       // "identifier"
       // "string"
@@ -834,10 +836,6 @@ namespace yy {
         value.move< ExpressionNode* > (std::move (that.value));
         break;
 
-      case symbol_kind::SYM_geopoint: // geopoint
-        value.move< GeoPoint > (std::move (that.value));
-        break;
-
       case symbol_kind::SYM_geopoly_content: // geopoly_content
       case symbol_kind::SYM_geospatial: // geospatial
         value.move< GeospatialNode* > (std::move (that.value));
@@ -896,6 +894,10 @@ namespace yy {
       case symbol_kind::SYM_relational: // relational
       case symbol_kind::SYM_stringop: // stringop
         value.move< int > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.move< std::optional<GeoPoint> > (std::move (that.value));
         break;
 
       case symbol_kind::SYM_ID: // "identifier"
@@ -1009,18 +1011,6 @@ namespace yy {
       {}
 #else
       basic_symbol (typename Base::kind_type t, const ExpressionNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, GeoPoint&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const GeoPoint& v)
         : Base (t)
         , value (v)
       {}
@@ -1183,6 +1173,18 @@ namespace yy {
 #endif
 
 #if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, std::optional<GeoPoint>&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const std::optional<GeoPoint>& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
       basic_symbol (typename Base::kind_type t, std::string&& v)
         : Base (t)
         , value (std::move (v))
@@ -1263,10 +1265,6 @@ switch (yykind)
         value.template destroy< ExpressionNode* > ();
         break;
 
-      case symbol_kind::SYM_geopoint: // geopoint
-        value.template destroy< GeoPoint > ();
-        break;
-
       case symbol_kind::SYM_geopoly_content: // geopoly_content
       case symbol_kind::SYM_geospatial: // geospatial
         value.template destroy< GeospatialNode* > ();
@@ -1325,6 +1323,10 @@ switch (yykind)
       case symbol_kind::SYM_relational: // relational
       case symbol_kind::SYM_stringop: // stringop
         value.template destroy< int > ();
+        break;
+
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.template destroy< std::optional<GeoPoint> > ();
         break;
 
       case symbol_kind::SYM_ID: // "identifier"
@@ -2872,10 +2874,6 @@ switch (yykind)
         value.copy< ExpressionNode* > (YY_MOVE (that.value));
         break;
 
-      case symbol_kind::SYM_geopoint: // geopoint
-        value.copy< GeoPoint > (YY_MOVE (that.value));
-        break;
-
       case symbol_kind::SYM_geopoly_content: // geopoly_content
       case symbol_kind::SYM_geospatial: // geospatial
         value.copy< GeospatialNode* > (YY_MOVE (that.value));
@@ -2934,6 +2932,10 @@ switch (yykind)
       case symbol_kind::SYM_relational: // relational
       case symbol_kind::SYM_stringop: // stringop
         value.copy< int > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.copy< std::optional<GeoPoint> > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_ID: // "identifier"
@@ -3027,10 +3029,6 @@ switch (yykind)
         value.move< ExpressionNode* > (YY_MOVE (s.value));
         break;
 
-      case symbol_kind::SYM_geopoint: // geopoint
-        value.move< GeoPoint > (YY_MOVE (s.value));
-        break;
-
       case symbol_kind::SYM_geopoly_content: // geopoly_content
       case symbol_kind::SYM_geospatial: // geospatial
         value.move< GeospatialNode* > (YY_MOVE (s.value));
@@ -3089,6 +3087,10 @@ switch (yykind)
       case symbol_kind::SYM_relational: // relational
       case symbol_kind::SYM_stringop: // stringop
         value.move< int > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.move< std::optional<GeoPoint> > (YY_MOVE (s.value));
         break;
 
       case symbol_kind::SYM_ID: // "identifier"

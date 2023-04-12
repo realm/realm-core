@@ -219,10 +219,6 @@ namespace yy {
         value.YY_MOVE_OR_COPY< ExpressionNode* > (YY_MOVE (that.value));
         break;
 
-      case symbol_kind::SYM_geopoint: // geopoint
-        value.YY_MOVE_OR_COPY< GeoPoint > (YY_MOVE (that.value));
-        break;
-
       case symbol_kind::SYM_geopoly_content: // geopoly_content
       case symbol_kind::SYM_geospatial: // geospatial
         value.YY_MOVE_OR_COPY< GeospatialNode* > (YY_MOVE (that.value));
@@ -281,6 +277,10 @@ namespace yy {
       case symbol_kind::SYM_relational: // relational
       case symbol_kind::SYM_stringop: // stringop
         value.YY_MOVE_OR_COPY< int > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.YY_MOVE_OR_COPY< std::optional<GeoPoint> > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_ID: // "identifier"
@@ -358,10 +358,6 @@ namespace yy {
         value.move< ExpressionNode* > (YY_MOVE (that.value));
         break;
 
-      case symbol_kind::SYM_geopoint: // geopoint
-        value.move< GeoPoint > (YY_MOVE (that.value));
-        break;
-
       case symbol_kind::SYM_geopoly_content: // geopoly_content
       case symbol_kind::SYM_geospatial: // geospatial
         value.move< GeospatialNode* > (YY_MOVE (that.value));
@@ -420,6 +416,10 @@ namespace yy {
       case symbol_kind::SYM_relational: // relational
       case symbol_kind::SYM_stringop: // stringop
         value.move< int > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.move< std::optional<GeoPoint> > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_ID: // "identifier"
@@ -497,10 +497,6 @@ namespace yy {
         value.copy< ExpressionNode* > (that.value);
         break;
 
-      case symbol_kind::SYM_geopoint: // geopoint
-        value.copy< GeoPoint > (that.value);
-        break;
-
       case symbol_kind::SYM_geopoly_content: // geopoly_content
       case symbol_kind::SYM_geospatial: // geospatial
         value.copy< GeospatialNode* > (that.value);
@@ -559,6 +555,10 @@ namespace yy {
       case symbol_kind::SYM_relational: // relational
       case symbol_kind::SYM_stringop: // stringop
         value.copy< int > (that.value);
+        break;
+
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.copy< std::optional<GeoPoint> > (that.value);
         break;
 
       case symbol_kind::SYM_ID: // "identifier"
@@ -634,10 +634,6 @@ namespace yy {
         value.move< ExpressionNode* > (that.value);
         break;
 
-      case symbol_kind::SYM_geopoint: // geopoint
-        value.move< GeoPoint > (that.value);
-        break;
-
       case symbol_kind::SYM_geopoly_content: // geopoly_content
       case symbol_kind::SYM_geospatial: // geospatial
         value.move< GeospatialNode* > (that.value);
@@ -696,6 +692,10 @@ namespace yy {
       case symbol_kind::SYM_relational: // relational
       case symbol_kind::SYM_stringop: // stringop
         value.move< int > (that.value);
+        break;
+
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.move< std::optional<GeoPoint> > (that.value);
         break;
 
       case symbol_kind::SYM_ID: // "identifier"
@@ -1092,10 +1092,14 @@ namespace yy {
         break;
 
       case symbol_kind::SYM_geopoint: // geopoint
-                 { yyo << "['" << yysym.value.template as < GeoPoint > ().longitude << "', '" << yysym.value.template as < GeoPoint > ().latitude;
-           if (auto alt = yysym.value.template as < GeoPoint > ().get_altitude())
+                 {
+           if (!yysym.value.template as < std::optional<GeoPoint> > ()) {
+               yyo << "null";
+           } else {
+             yyo << "['" << yysym.value.template as < std::optional<GeoPoint> > ()->longitude << "', '" << yysym.value.template as < std::optional<GeoPoint> > ()->latitude;
+             if (auto alt = yysym.value.template as < std::optional<GeoPoint> > ()->get_altitude())
                yyo << "', '" << *alt; 
-           yyo << "']"; }
+             yyo << "']"; }}
         break;
 
       case symbol_kind::SYM_geopoly_content: // geopoly_content
@@ -1439,10 +1443,6 @@ namespace yy {
         yylhs.value.emplace< ExpressionNode* > ();
         break;
 
-      case symbol_kind::SYM_geopoint: // geopoint
-        yylhs.value.emplace< GeoPoint > ();
-        break;
-
       case symbol_kind::SYM_geopoly_content: // geopoly_content
       case symbol_kind::SYM_geospatial: // geospatial
         yylhs.value.emplace< GeospatialNode* > ();
@@ -1501,6 +1501,10 @@ namespace yy {
       case symbol_kind::SYM_relational: // relational
       case symbol_kind::SYM_stringop: // stringop
         yylhs.value.emplace< int > ();
+        break;
+
+      case symbol_kind::SYM_geopoint: // geopoint
+        yylhs.value.emplace< std::optional<GeoPoint> > ();
         break;
 
       case symbol_kind::SYM_ID: // "identifier"
@@ -1707,27 +1711,27 @@ namespace yy {
     break;
 
   case 37: // geopoint: '[' coordinate ',' coordinate ']'
-                                        { yylhs.value.as < GeoPoint > () = GeoPoint{yystack_[3].value.as < double > (), yystack_[1].value.as < double > ()}; }
+                                        { yylhs.value.as < std::optional<GeoPoint> > () = GeoPoint{yystack_[3].value.as < double > (), yystack_[1].value.as < double > ()}; }
     break;
 
   case 38: // geopoint: '[' coordinate ',' coordinate ',' "float" ']'
-                                                  { yylhs.value.as < GeoPoint > () = GeoPoint{yystack_[5].value.as < double > (), yystack_[3].value.as < double > (), strtod(yystack_[1].value.as < std::string > ().c_str(), nullptr)}; }
+                                                  { yylhs.value.as < std::optional<GeoPoint> > () = GeoPoint{yystack_[5].value.as < double > (), yystack_[3].value.as < double > (), strtod(yystack_[1].value.as < std::string > ().c_str(), nullptr)}; }
     break;
 
   case 39: // geopoly_content: geopoint
-               { yylhs.value.as < GeospatialNode* > () = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Polygon{}, yystack_[0].value.as < GeoPoint > ()); }
+               { yylhs.value.as < GeospatialNode* > () = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Polygon{}, *yystack_[0].value.as < std::optional<GeoPoint> > ()); }
     break;
 
   case 40: // geopoly_content: geopoly_content ',' geopoint
-                                   { yystack_[2].value.as < GeospatialNode* > ()->add_point_to_polygon(yystack_[0].value.as < GeoPoint > ()); yylhs.value.as < GeospatialNode* > () = yystack_[2].value.as < GeospatialNode* > (); }
+                                   { yystack_[2].value.as < GeospatialNode* > ()->add_point_to_polygon(*yystack_[0].value.as < std::optional<GeoPoint> > ()); yylhs.value.as < GeospatialNode* > () = yystack_[2].value.as < GeospatialNode* > (); }
     break;
 
   case 41: // geospatial: "geobox" '(' geopoint ',' geopoint ')'
-                                            { yylhs.value.as < GeospatialNode* > () = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Box{}, yystack_[3].value.as < GeoPoint > (), yystack_[1].value.as < GeoPoint > ()); }
+                                            { yylhs.value.as < GeospatialNode* > () = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Box{}, *yystack_[3].value.as < std::optional<GeoPoint> > (), *yystack_[1].value.as < std::optional<GeoPoint> > ()); }
     break;
 
   case 42: // geospatial: "geosphere" '(' geopoint ',' coordinate ')'
-                                                { yylhs.value.as < GeospatialNode* > () = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Sphere{}, yystack_[3].value.as < GeoPoint > (), yystack_[1].value.as < double > ()); }
+                                                { yylhs.value.as < GeospatialNode* > () = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Sphere{}, *yystack_[3].value.as < std::optional<GeoPoint> > (), yystack_[1].value.as < double > ()); }
     break;
 
   case 43: // geospatial: "geopolygon" '(' geopoly_content ')'
@@ -2706,19 +2710,19 @@ namespace yy {
   const short
   parser::yyrline_[] =
   {
-       0,   179,   179,   182,   183,   184,   185,   186,   187,   190,
-     191,   196,   197,   198,   199,   204,   205,   206,   209,   210,
-     211,   212,   213,   214,   217,   218,   219,   220,   221,   224,
-     225,   228,   232,   238,   241,   244,   245,   248,   249,   252,
-     253,   256,   257,   258,   261,   262,   263,   264,   266,   269,
-     270,   272,   275,   276,   278,   281,   282,   284,   285,   288,
-     289,   290,   293,   294,   295,   296,   297,   298,   299,   300,
-     301,   302,   303,   304,   305,   306,   314,   315,   316,   317,
-     318,   321,   322,   325,   326,   327,   330,   331,   332,   335,
-     336,   337,   338,   341,   342,   343,   346,   347,   348,   349,
-     352,   353,   354,   355,   358,   359,   362,   363,   364,   365,
-     368,   369,   370,   371,   372,   373,   374,   375,   376,   377,
-     378,   379,   380,   381,   382
+       0,   187,   187,   190,   191,   192,   193,   194,   195,   198,
+     199,   204,   205,   206,   207,   212,   213,   214,   217,   218,
+     219,   220,   221,   222,   225,   226,   227,   228,   229,   232,
+     233,   236,   240,   246,   249,   252,   253,   256,   257,   260,
+     261,   264,   265,   266,   269,   270,   271,   272,   274,   277,
+     278,   280,   283,   284,   286,   289,   290,   292,   293,   296,
+     297,   298,   301,   302,   303,   304,   305,   306,   307,   308,
+     309,   310,   311,   312,   313,   314,   322,   323,   324,   325,
+     326,   329,   330,   333,   334,   335,   338,   339,   340,   343,
+     344,   345,   346,   349,   350,   351,   354,   355,   356,   357,
+     360,   361,   362,   363,   366,   367,   370,   371,   372,   373,
+     376,   377,   378,   379,   380,   381,   382,   383,   384,   385,
+     386,   387,   388,   389,   390
   };
 
   void

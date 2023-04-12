@@ -5664,19 +5664,24 @@ TEST(Parser_Geospatial)
     for (auto& geo : point_data) {
         table->create_object_with_primary_key(ObjectId::gen()).set(col_link, geo);
     }
+    // add one object with a null link
+    table->create_object_with_primary_key(ObjectId::gen());
 
     verify_query(test_context, table, "link geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 1);
     verify_query(test_context, table, "link geoWithin geoBox([0.2, 0.2, 0.2], [0.7, 0.7, 0.7])", 1);
     verify_query(test_context, table, "link geoWithin geoSphere([0.3, 0.3], 1000.0)", 4);
     verify_query(test_context, table, "link geoWithin geoSphere([0.3, 0.3, 0.3], 1000.0)", 4);
     verify_query(test_context, table, "link geoWithin geoPolygon([0.0, 0.0], [1.0, 0.0], [1, 1], [0, 1])", 1);
+    verify_query(test_context, table, "link == NULL", 1);
 
     GeoBox box{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}};
     GeoCenterSphere sphere{1000, GeoPoint{0.3, 0.3}};
     GeoPolygon polygon{{GeoPoint{0, 0}, GeoPoint{1, 0}, GeoPoint{1, 1}, GeoPoint{0, 1}}};
-    GeospatialStorage store{box, sphere, polygon};
-    std::vector<Mixed> args = {store.get(0), store.get(1), store.get(2),         Mixed{realm::null()},
-                               Mixed{1.2},   Mixed{1000},  Mixed{"string value"}};
+    Geospatial invalid;
+    Geospatial point{GeoPoint{0, 0}};
+    GeospatialStorage store{box, sphere, polygon, invalid};
+    std::vector<Mixed> args = {store.get(0),         store.get(1), store.get(2), store.get(3),
+                               Mixed{realm::null()}, Mixed{1.2},   Mixed{1000},  Mixed{"string value"}};
     verify_query_sub(test_context, table, "link GEOWITHIN $0", args, 1);
     verify_query_sub(test_context, table, "link GEOWITHIN $1", args, 4);
     verify_query_sub(test_context, table, "link GEOWITHIN $2", args, 1);
@@ -5706,21 +5711,25 @@ TEST(Parser_Geospatial)
                              "Invalid predicate: 'link geoWithin 'test string'': syntax error, unexpected string") !=
                          std::string::npos));
     CHECK_THROW_EX(
-        verify_query_sub(test_context, table, "link GEOWITHIN $3", args, 1), query_parser::InvalidQueryError,
+        verify_query_sub(test_context, table, "link GEOWITHIN $4", args, 1), query_parser::InvalidQueryError,
         CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
                                          "But the provided type is 'null'") != std::string::npos));
     CHECK_THROW_EX(
-        verify_query_sub(test_context, table, "link GEOWITHIN $4", args, 1), query_parser::InvalidQueryError,
+        verify_query_sub(test_context, table, "link GEOWITHIN $5", args, 1), query_parser::InvalidQueryError,
         CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
                                          "But the provided type is 'double'") != std::string::npos));
     CHECK_THROW_EX(
-        verify_query_sub(test_context, table, "link GEOWITHIN $5", args, 1), query_parser::InvalidQueryError,
+        verify_query_sub(test_context, table, "link GEOWITHIN $6", args, 1), query_parser::InvalidQueryError,
         CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
                                          "But the provided type is 'int'") != std::string::npos));
     CHECK_THROW_EX(
-        verify_query_sub(test_context, table, "link GEOWITHIN $6", args, 1), query_parser::InvalidQueryError,
+        verify_query_sub(test_context, table, "link GEOWITHIN $7", args, 1), query_parser::InvalidQueryError,
         CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
                                          "But the provided type is 'string'") != std::string::npos));
+    CHECK_THROW_EX(verify_query_sub(test_context, table, "link GEOWITHIN $3", args, 0),
+                   query_parser::InvalidQueryError,
+                   CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a valid "
+                                                    "Geospatial value, got 'NULL'") != std::string::npos));
 }
 
 TEST(Parser_RecursiveLogial)

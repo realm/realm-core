@@ -109,17 +109,13 @@ Geospatial Geospatial::from_obj(const Obj& obj, ColKey type_col, ColKey coords_c
     }
 
     Lst<double> coords = obj.get_list<double>(coords_col);
-    GeoPoint geo;
-    if (coords.size() >= 1) {
-        geo.longitude = coords[0];
+    if (coords.size() < 2) {
+        return Geospatial(); // invalid
     }
-    if (coords.size() >= 2) {
-        geo.latitude = coords[1];
+    if (coords.size() > 2) {
+        return GeoPoint{coords[0], coords[1], coords[2]};
     }
-    if (coords.size() >= 3) {
-        geo.set_altitude(coords[2]);
-    }
-    return geo;
+    return GeoPoint{coords[0], coords[1]};
 }
 
 Geospatial Geospatial::from_link(const Obj& link)
@@ -137,15 +133,13 @@ Geospatial Geospatial::from_link(const Obj& link)
     }
     Lst<double> geo_data = link.get_list<double>(coords_col);
     const size_t num_entries = geo_data.size();
-    GeoPoint point;
-    if (num_entries >= 2) {
-        point.longitude = geo_data.get(0);
-        point.latitude = geo_data.get(1);
+    if (num_entries < 2) {
+        return Geospatial(); // invalid
     }
-    if (num_entries >= 3) {
-        point.set_altitude(geo_data.get(2));
+    if (num_entries > 2) {
+        return GeoPoint{geo_data[0], geo_data[1], geo_data[2]};
     }
-    return Geospatial{point};
+    return GeoPoint{geo_data[0], geo_data[1]};
 }
 
 void Geospatial::assign_to(Obj& link) const
