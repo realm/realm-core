@@ -254,7 +254,8 @@ Subscription MigrationStore::make_subscription(const std::string& object_class_n
 
 void MigrationStore::create_subscriptions(const SubscriptionStore& subs_store)
 {
-    if (!is_migrated()) {
+    std::unique_lock lock{m_mutex};
+    if (m_state != MigrationState::Migrated) {
         return;
     }
 
