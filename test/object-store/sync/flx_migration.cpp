@@ -205,18 +205,8 @@ TEST_CASE("Migration store", "[flx][migration]") {
     }
 
     SECTION("Migration store subscriptions", "[flx][migration]") {
-        // Start the migration and check the state
-        migration_store->migrate_to_flx(rql_string, migrated_partition);
-        check_migration_in_progress(migration_store);
-
-        // Complete the migration and check the state - should be not migrated
-        migration_store->complete_migration();
-        check_migration_complete(migration_store);
-
         auto sub_store = sync::SubscriptionStore::create(mig_db, [](int64_t) {});
         auto orig_version = sub_store->get_latest().version();
-        auto query_string = migration_store->get_query_string();
-        REQUIRE(query_string);
 
         // Create some dummy tables
         {
@@ -226,7 +216,35 @@ TEST_CASE("Migration store", "[flx][migration]") {
             tr->commit();
         }
 
-        // Create subscriptions for known tables
+        // No subscriptions are created in the NotMigrated state
+        migration_store->create_subscriptions(*sub_store);
+        {
+            auto subs = sub_store->get_latest();
+            REQUIRE(subs.size() == 0);
+            REQUIRE(subs.version() == orig_version);
+        }
+
+        // Start the migration and check the state
+        migration_store->migrate_to_flx(rql_string, migrated_partition);
+        check_migration_in_progress(migration_store);
+
+        // No subscriptions are created in the InProgress state
+        migration_store->create_subscriptions(*sub_store);
+        {
+            auto subs = sub_store->get_latest();
+            REQUIRE(subs.size() == 0);
+            REQUIRE(subs.version() == orig_version);
+        }
+
+        // Complete the migration and check the state
+        migration_store->complete_migration();
+        check_migration_complete(migration_store);
+
+        auto query_string = migration_store->get_query_string();
+        REQUIRE(query_string);
+
+        // Create subscriptions for known tables once the migration store is in
+        // Migrated state
         migration_store->create_subscriptions(*sub_store);
         {
             auto subs = sub_store->get_latest();
