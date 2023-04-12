@@ -58,8 +58,16 @@ struct GeoPolygon {
 };
 
 struct GeoCenterSphere {
-    double radius_km = 0.0;
+    double radius_radians = 0.0;
     GeoPoint center;
+
+    // Equatorial radius of earth.
+    static const double c_radius_meters;
+
+    static GeoCenterSphere from_kms(double km, GeoPoint&& p)
+    {
+        return GeoCenterSphere{km * 1000 / c_radius_meters, p};
+    }
 };
 
 class Geospatial {
@@ -84,7 +92,7 @@ public:
     Geospatial(GeoCenterSphere centerSphere)
         : m_type(Type::CenterSphere)
         , m_points({centerSphere.center})
-        , m_radius_radians(centerSphere.radius_km / c_radius_km)
+        , m_radius_radians(centerSphere.radius_radians)
     {
     }
 
@@ -137,8 +145,6 @@ public:
     constexpr static std::string_view c_geo_point_type_col_name = "type";
     constexpr static std::string_view c_geo_point_coords_col_name = "coordinates";
     constexpr static std::string_view c_types[] = {"Point", "Box", "Polygon", "CenterSphere"};
-
-    static const double c_radius_km;
 
 private:
     Type m_type;

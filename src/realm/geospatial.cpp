@@ -60,7 +60,8 @@ static bool type_is_valid(std::string str_type)
 
 namespace realm {
 
-const double Geospatial::c_radius_km = 6371.01;
+// src/mongo/db/geo/geoconstants.h
+const double GeoCenterSphere::c_radius_meters = 6378100.0;
 
 Geospatial Geospatial::from_obj(const Obj& obj, ColKey type_col, ColKey coords_col)
 {
