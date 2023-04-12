@@ -675,7 +675,8 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                 return;
             case sync::ProtocolErrorInfo::Action::RevertToPBS:
                 // If the client was updated to use FLX natively, but the server was rolled back to PBS,
-                // the server should be sending "SwitchToFLX", throw exception if this error is received.
+                // the server should be sending switch_to_flx_sync; throw exception if this error is not
+                // received.
                 if (m_original_sync_config->flx_sync_requested) {
                     throw LogicError(ErrorCodes::InvalidServerResponse,
                                      "Received 'RevertToPBS' from server after rollback while client is natively "
