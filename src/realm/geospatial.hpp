@@ -44,11 +44,20 @@ struct GeoPoint {
     }
 };
 
+// Construct a rectangle from minimum and maximum latitudes and longitudes.
+// If lo.lng() > hi.lng(), the rectangle spans the 180 degree longitude
+// line. Both points must be normalized, with lo.lat() <= hi.lat().
+// The rectangle contains all the points p such that 'lo' <= p <= 'hi',
+// where '<=' is defined in the obvious way.
 struct GeoBox {
-    GeoPoint p1;
-    GeoPoint p2;
+    GeoPoint lo;
+    GeoPoint hi;
 };
 
+// A simple spherical polygon. It consists of a single
+// chain of vertices where the first vertex is implicitly connected to the
+// last. Chain of vertices is defined to have a CCW orientation, i.e. the interior
+// of the polygon is on the left side of the edges.
 struct GeoPolygon {
     GeoPolygon(std::initializer_list<GeoPoint>&& l)
         : points(l)
@@ -81,7 +90,7 @@ public:
     }
     Geospatial(GeoBox box)
         : m_type(Type::Box)
-        , m_points({box.p1, box.p2})
+        , m_points({box.lo, box.hi})
     {
     }
     Geospatial(GeoPolygon polygon)
