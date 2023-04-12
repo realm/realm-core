@@ -487,8 +487,12 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
                     return util::Future<sync::SubscriptionSet::State>::make_ready(state);
                 }
 
-                fresh_sync_session->m_migration_store->create_subscriptions(*fresh_sub_store,
-                                                                            m_migration_store->get_query_string());
+                // fresh_sync_session is using a new realm file that doesn't have the migration_store info
+                // so the query string from the local migration store will need to be provided
+                auto query_string = m_migration_store->get_query_string();
+                REALM_ASSERT(query_string);
+                fresh_sync_session->m_migration_store->create_subscriptions(*fresh_sub_store, *query_string);
+
                 auto latest_subs = fresh_sub_store->get_latest();
                 {
                     util::CheckedLockGuard lock(m_state_mutex);
@@ -664,21 +668,19 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                 REALM_ASSERT(!m_original_sync_config->flx_sync_requested);
                 REALM_ASSERT(error.migration_query_string && !error.migration_query_string->empty());
                 // Original config was PBS, migrating to FLX
-                m_migration_store->migrate_to_flx(*error.migration_query_string);
+                m_migration_store->migrate_to_flx(*error.migration_query_string,
+                                                  m_original_sync_config->partition_value);
                 save_sync_config_after_migration();
                 download_fresh_realm(error.server_requests_action);
                 return;
             case sync::ProtocolErrorInfo::Action::RevertToPBS:
                 // If the client was updated to use FLX natively, but the server was rolled back to PBS,
-                // propagate the error up to the user
+                // the server should be sending switch_to_flx_sync; throw exception if this error is not
+                // received.
                 if (m_original_sync_config->flx_sync_requested) {
-                    // Update error to the "switch to PBS" connect error
-                    error = sync::SessionErrorInfo(make_error_code(sync::ProtocolError::switch_to_pbs),
-                                                   "Server rolled back after flexible sync migration - cannot "
-                                                   "connect with flexible sync config",
-                                                   false);
-                    next_state = NextStateAfterError::error;
-                    break;
+                    throw LogicError(ErrorCodes::InvalidServerResponse,
+                                     "Received 'RevertToPBS' from server after rollback while client is natively "
+                                     "using FLX - expected 'SwitchToPBS'");
                 }
                 // Original config was PBS, cancel the migration
                 m_migration_store->cancel_migration();
@@ -871,6 +873,7 @@ void SyncSession::create_sync_session()
     session_config.proxy_config = sync_config.proxy_config;
     session_config.simulate_integration_error = sync_config.simulate_integration_error;
     session_config.flx_bootstrap_batch_size_bytes = sync_config.flx_bootstrap_batch_size_bytes;
+
     if (sync_config.on_sync_client_event_hook) {
         session_config.on_sync_client_event_hook = [hook = sync_config.on_sync_client_event_hook,
                                                     anchor = weak_from_this()](const SyncClientHookData& data) {

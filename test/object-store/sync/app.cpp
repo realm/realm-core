@@ -4770,18 +4770,18 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
         config.sync_config->error_handler = [](std::shared_ptr<SyncSession> session, SyncError error) mutable {
             // Ignore websocket errors, since there's not really an app out there...
             if (error.reason().find("Bad WebSocket") != std::string::npos ||
-                error.reason().find("ConnectionFailed") != std::string::npos) {
+                error.reason().find("Connection Failed") != std::string::npos) {
                 util::format(std::cerr,
                              "An expected possible WebSocket error was caught during test: 'app destroyed during "
                              "token refresh': '%1' for '%2'",
                              error.what(), session->path());
             }
             else {
-                util::format(std::cerr,
-                             "An unexpected sync error was caught during test: 'app destroyed during token refresh': "
-                             "'%1' for '%2'",
-                             error.what(), session->path());
-                abort();
+                std::string err_msg(util::format("An unexpected sync error was caught during test: 'app destroyed "
+                                                 "during token refresh': '%1' for '%2'",
+                                                 error.what(), session->path()));
+                std::cerr << err_msg << std::endl;
+                throw std::runtime_error(err_msg);
             }
         };
         auto r = Realm::get_shared_realm(config);

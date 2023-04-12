@@ -7,11 +7,11 @@ namespace realm::sync {
 namespace {
 constexpr static int c_schema_version = 1;
 constexpr static std::string_view c_flx_migration_table("flx_migration");
-constexpr static std::string_view c_flx_migration_started_at("flx_migration_started_at");
-constexpr static std::string_view c_flx_migration_completed_at("flx_migration_completed_at");
-constexpr static std::string_view c_flx_migration_state("flx_migration_state");
-constexpr static std::string_view c_flx_migration_query_string("flx_migration_query_string");
-
+constexpr static std::string_view c_flx_migration_started_at("started_at");
+constexpr static std::string_view c_flx_migration_completed_at("completed_at");
+constexpr static std::string_view c_flx_migration_state("state");
+constexpr static std::string_view c_flx_migration_query_string("query_string");
+constexpr static std::string_view c_flx_migration_original_partition("original_partition");
 constexpr static std::string_view c_flx_subscription_name_prefix("flx_migrated_");
 
 class MigrationStoreInit : public MigrationStore {
@@ -32,7 +32,6 @@ MigrationStoreRef MigrationStore::create(DBRef db)
 MigrationStore::MigrationStore(DBRef db)
     : m_db(std::move(db))
     , m_state(MigrationState::NotMigrated)
-    , m_query_string{}
 {
     load_data(true); // read_only, default to NotMigrated if table is not initialized
 }
@@ -51,6 +50,7 @@ bool MigrationStore::load_data(bool read_only)
              {&m_migration_completed_at, c_flx_migration_completed_at, type_Timestamp},
              {&m_migration_state, c_flx_migration_state, type_Int},
              {&m_migration_query_str, c_flx_migration_query_string, type_String},
+             {&m_migration_partition, c_flx_migration_original_partition, type_String},
          }},
     };
 
@@ -91,10 +91,12 @@ bool MigrationStore::load_data(bool read_only)
         auto migration_store_obj = migration_table->get_object(0);
         m_state = static_cast<MigrationState>(migration_store_obj.get<int64_t>(m_migration_state));
         m_query_string = migration_store_obj.get<String>(m_migration_query_str);
+        m_migrated_partition = migration_store_obj.get<String>(m_migration_partition);
     }
     else {
         m_state = MigrationState::NotMigrated;
-        m_query_string = {};
+        m_query_string.reset();
+        m_migrated_partition.reset();
     }
     return true;
 }
@@ -132,9 +134,17 @@ void MigrationStore::complete_migration()
     tr->commit();
 }
 
-std::string MigrationStore::get_query_string()
+std::optional<std::string> MigrationStore::get_migrated_partition()
 {
     std::lock_guard lock{m_mutex};
+    // This will be valid if migration in progress or complete
+    return m_migrated_partition;
+}
+
+std::optional<std::string> MigrationStore::get_query_string()
+{
+    std::lock_guard lock{m_mutex};
+    // This will be valid if migration in progress or complete
     return m_query_string;
 }
 
@@ -143,14 +153,18 @@ std::shared_ptr<realm::SyncConfig> MigrationStore::convert_sync_config(std::shar
     REALM_ASSERT(config);
     // If load data failed in the constructor, m_state defaults to NotMigrated
 
-    {
-        std::unique_lock lock{m_mutex};
-        if (config->flx_sync_requested) {
-            return config;
-        }
-        if (m_state == MigrationState::NotMigrated) {
-            return config;
-        }
+    std::unique_lock lock{m_mutex};
+    if (config->flx_sync_requested || m_state == MigrationState::NotMigrated) {
+        return config;
+    }
+
+    // Once in the migrated state, the partition value cannot change for the same realm file
+    if (m_state == MigrationState::Migrated && m_migrated_partition &&
+        m_migrated_partition != config->partition_value) {
+        throw LogicError(
+            ErrorCodes::IllegalOperation,
+            util::format("Partition value cannot be changed for migrated realms\n - original: %1\n -   config: %2",
+                         m_migrated_partition, config->partition_value));
     }
 
     auto flx_config = std::make_shared<realm::SyncConfig>(*config); // deep copy
@@ -160,7 +174,7 @@ std::shared_ptr<realm::SyncConfig> MigrationStore::convert_sync_config(std::shar
     return flx_config;
 }
 
-void MigrationStore::migrate_to_flx(std::string_view rql_query_string)
+void MigrationStore::migrate_to_flx(std::string_view rql_query_string, std::string_view partition_value)
 {
     REALM_ASSERT(!rql_query_string.empty());
 
@@ -171,8 +185,9 @@ void MigrationStore::migrate_to_flx(std::string_view rql_query_string)
         std::unique_lock lock{m_mutex};
         // Can call migrate_to_flx multiple times if migration has not completed.
         REALM_ASSERT(m_state != MigrationState::Migrated);
-        m_query_string = rql_query_string;
         m_state = MigrationState::InProgress;
+        m_query_string.emplace(rql_query_string);
+        m_migrated_partition.emplace(partition_value);
 
         auto tr = m_db->start_read();
         auto migration_table = tr->get_table(m_migration_table);
@@ -180,8 +195,9 @@ void MigrationStore::migrate_to_flx(std::string_view rql_query_string)
         if (migration_table->is_empty()) {
             tr->promote_to_write();
             auto migration_store_obj = migration_table->create_object();
-            migration_store_obj.set(m_migration_query_str, m_query_string);
+            migration_store_obj.set(m_migration_query_str, *m_query_string);
             migration_store_obj.set(m_migration_state, int64_t(m_state));
+            migration_store_obj.set(m_migration_partition, *m_migrated_partition);
             migration_store_obj.set(m_migration_started_at, Timestamp{std::chrono::system_clock::now()});
             tr->commit();
         }
@@ -189,8 +205,10 @@ void MigrationStore::migrate_to_flx(std::string_view rql_query_string)
             auto migration_store_obj = migration_table->get_object(0);
             auto state = static_cast<MigrationState>(migration_store_obj.get<int64_t>(m_migration_state));
             auto query_string = migration_store_obj.get<String>(m_migration_query_str);
+            auto migrated_partition = migration_store_obj.get<String>(m_migration_partition);
             REALM_ASSERT(m_state == state);
             REALM_ASSERT(m_query_string == query_string);
+            REALM_ASSERT(m_migrated_partition == migrated_partition);
         }
     }
 }
@@ -218,7 +236,8 @@ void MigrationStore::clear(std::unique_lock<std::mutex>)
     }
 
     m_state = MigrationState::NotMigrated;
-    m_query_string = {};
+    m_query_string.reset();
+    m_migrated_partition.reset();
     tr->promote_to_write();
     migration_table->clear();
     tr->commit();
@@ -239,7 +258,8 @@ void MigrationStore::create_subscriptions(const SubscriptionStore& subs_store)
         return;
     }
 
-    create_subscriptions(subs_store, m_query_string);
+    REALM_ASSERT(m_query_string);
+    create_subscriptions(subs_store, *m_query_string);
 }
 
 void MigrationStore::create_subscriptions(const SubscriptionStore& subs_store, const std::string& rql_query_string)
