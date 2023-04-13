@@ -140,7 +140,8 @@ public:
 
     bool operator==(const Geospatial& other) const
     {
-        return m_type == other.m_type && m_points == other.m_points && get_radius() == other.get_radius();
+        return m_type == other.m_type && m_points == other.m_points &&
+               ((!is_radius_valid() && !other.is_radius_valid()) || (m_radius_radians == other.m_radius_radians));
     }
     bool operator!=(const Geospatial& other) const
     {
@@ -168,9 +169,9 @@ private:
         return std::numeric_limits<double>::quiet_NaN();
     }
 
-    std::optional<double> get_radius() const
+    bool is_radius_valid() const
     {
-        return std::isnan(m_radius_radians) ? std::optional<double>{} : m_radius_radians;
+        return !std::isnan(m_radius_radians);
     }
 
     mutable std::shared_ptr<S2Region> m_region;
