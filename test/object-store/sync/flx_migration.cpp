@@ -84,6 +84,7 @@ static std::vector<ObjectId> fill_test_data(SyncTestFile& config, std::optional<
     return ret;
 }
 
+
 TEST_CASE("Test server migration and rollback", "[flx][migration]") {
     std::shared_ptr<util::Logger> logger_ptr =
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
