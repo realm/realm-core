@@ -199,6 +199,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case UserDisabled:
         case UserNotFound:
         case UserpassTokenInvalid:
+        case InvalidServerResponse:
         case ValueAlreadyExists:
         case ValueDuplicateName:
         case ValueNotFound:
@@ -293,6 +294,7 @@ static const MapElem string_to_error_code[] = {
     {"InvalidQueryArg", ErrorCodes::InvalidQueryArg},
     {"InvalidSchemaChange", ErrorCodes::InvalidSchemaChange},
     {"InvalidSchemaVersion", ErrorCodes::InvalidSchemaVersion},
+    {"InvalidServerResponse", ErrorCodes::InvalidServerResponse},
     {"InvalidSession", ErrorCodes::InvalidSession},
     {"InvalidSortDescriptor", ErrorCodes::InvalidSortDescriptor},
     {"InvalidTableRef", ErrorCodes::InvalidTableRef},

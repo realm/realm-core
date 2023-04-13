@@ -19,8 +19,9 @@
 #include <realm/sync/network/default_socket.hpp>
 #include <realm/util/span.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
+#include <realm/sync/noinst/migration_store.hpp>
+#include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/protocol.hpp>
@@ -750,7 +751,7 @@ public:
 
     /// Update internal client state when a flx subscription becomes complete outside
     /// of the normal sync process. This can happen during client reset.
-    void non_sync_flx_completion(int64_t version);
+    void on_flx_sync_version_complete(int64_t version);
 
     /// \brief Callback for when a new subscription set has been created for FLX sync.
     void on_new_flx_subscription_set(int64_t new_version);
