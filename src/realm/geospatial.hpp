@@ -55,9 +55,9 @@ struct GeoPoint {
 
     bool operator==(const GeoPoint& other) const
     {
-        return (longitude == other.longitude || (std::isnan(longitude) && std::isnan(other.longitude)) 
-            && (latitude == other.latitude || (std::isnan(latitude) && std::isnan(other.latitude)) 
-            && ((!has_altitude() && !other.has_altitude()) || altitude == other.altitude);
+        return (longitude == other.longitude || (std::isnan(longitude) && std::isnan(other.longitude))) &&
+               (latitude == other.latitude || (std::isnan(latitude) && std::isnan(other.latitude))) &&
+               ((!has_altitude() && !other.has_altitude()) || altitude == other.altitude);
     }
 
     bool is_valid() const
