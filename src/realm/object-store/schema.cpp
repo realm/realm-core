@@ -250,6 +250,10 @@ static void compare(ObjectSchema const& existing_schema, ObjectSchema const& tar
             changes.emplace_back(schema_change::RemoveProperty{&existing_schema, &current_prop});
             continue;
         }
+        if (current_prop.nested_types != target_prop->nested_types) {
+            changes.emplace_back(schema_change::ChangePropertyType{&existing_schema, &current_prop, target_prop});
+            continue;
+        }
         if (current_prop.type != target_prop->type || current_prop.object_type != target_prop->object_type ||
             is_array(current_prop.type) != is_array(target_prop->type) ||
             is_set(current_prop.type) != is_set(target_prop->type) ||
