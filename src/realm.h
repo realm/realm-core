@@ -6,7 +6,6 @@
 #ifndef REALM_H
 #define REALM_H
 
-#include <stdalign.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -47,6 +46,13 @@
 #define RLM_ANON_UNION_MEMBER(name) name
 #else
 #define RLM_ANON_UNION_MEMBER(name)
+#endif
+
+// MSVC17 does not support C11's alignas/_Alignas correctly, but it does support __declspec(align).
+#ifdef _MSC_VER
+#define REALM_ALIGN(n) __declspec(align(n))
+#else
+#define REALM_ALIGN(n) __attribute__((aligned(n)))
 #endif
 
 // Some platforms can benefit from redefining the userdata type to another type known to the tooling.
@@ -159,8 +165,8 @@ typedef struct realm_timestamp {
     int32_t nanoseconds;
 } realm_timestamp_t;
 
-typedef struct realm_decimal128 {
-    alignas(16) uint64_t w[2];
+typedef struct REALM_ALIGN(16) realm_decimal128 {
+    uint64_t w[2];
 } realm_decimal128_t;
 
 typedef struct realm_link {
@@ -176,8 +182,8 @@ typedef struct realm_uuid {
     uint8_t bytes[16];
 } realm_uuid_t;
 
-typedef struct realm_value {
-    alignas(16) union {
+typedef struct REALM_ALIGN(16) realm_value {
+    union {
         int64_t integer;
         bool boolean;
         realm_string_t string;
