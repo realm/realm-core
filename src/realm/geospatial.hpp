@@ -22,6 +22,8 @@
 #include <realm/keys.hpp>
 #include <realm/string_data.hpp>
 
+#include <climits>
+#include <cmath>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -38,7 +40,6 @@ struct GeoPoint {
     GeoPoint(double lon, double lat)
         : longitude(lon)
         , latitude(lat)
-        , altitude(c_null_altitude)
     {
     }
     GeoPoint(double lon, double lat, double alt)
@@ -47,24 +48,42 @@ struct GeoPoint {
         , altitude(alt)
     {
     }
-    double longitude = 0;
-    double latitude = 0;
+
+    double longitude = get_nan();
+    double latitude = get_nan();
+    double altitude = get_nan();
+
     bool operator==(const GeoPoint& other) const
     {
-        return longitude == other.longitude && latitude == other.latitude && get_altitude() == other.get_altitude();
-    }
-    std::optional<double> get_altitude() const noexcept
-    {
-        return altitude == c_null_altitude ? std::optional<double>{} : altitude;
-    }
-    void set_altitude(std::optional<double> val) noexcept
-    {
-        altitude = val.value_or(c_null_altitude);
+        return (longitude == other.longitude || (std::isnan(longitude) && std::isnan(other.longitude))) &&
+               (latitude == other.latitude || (std::isnan(latitude) && std::isnan(other.latitude))) &&
+               ((!has_altitude() && !other.has_altitude()) || altitude == other.altitude);
     }
 
-private:
-    double altitude = c_null_altitude;
-    static constexpr double c_null_altitude = std::numeric_limits<double>::max();
+    bool is_valid() const
+    {
+        return !std::isnan(longitude) && !std::isnan(latitude);
+    }
+
+    bool has_altitude() const
+    {
+        return !std::isnan(altitude);
+    }
+
+    std::optional<double> get_altitude() const noexcept
+    {
+        return std::isnan(altitude) ? std::optional<double>{} : altitude;
+    }
+
+    void set_altitude(std::optional<double> val) noexcept
+    {
+        altitude = val.value_or(get_nan());
+    }
+
+    constexpr static double get_nan()
+    {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
 };
 
 struct GeoBox {
