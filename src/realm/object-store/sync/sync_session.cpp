@@ -337,18 +337,6 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const Realm
                          SyncManager* sync_manager)
     : m_config{config}
     , m_db{std::move(db)}
-    , m_subscription_store_base{sync::SubscriptionStore::create(
-          m_db,
-          [this](int64_t new_version) {
-              util::CheckedLockGuard lk(m_state_mutex);
-              if (m_state != State::Active && m_state != State::WaitingForAccessToken) {
-                  return;
-              }
-              // There may be no session yet (i.e., waiting to refresh the access token).
-              if (m_session) {
-                  m_session->on_new_flx_sync_subscription(new_version);
-              }
-          })}
     , m_original_sync_config{m_config.sync_config}
     , m_migration_store{sync::MigrationStore::create(m_db)}
     , m_client(client)
@@ -1359,9 +1347,9 @@ void SyncSession::update_subscription_store(bool flx_sync_requested)
         if (m_flx_subscription_store) {
             // Empty the subscription store and cancel any pending subscription notification
             // waiters
-            m_flx_subscription_store->terminate();
-            m_flx_subscription_store.reset();
+            auto subscription_store = std::move(m_flx_subscription_store);
             lock.unlock();
+            subscription_store->terminate();
             auto tr = m_db->start_write();
             history.set_write_validator_factory(nullptr);
             tr->rollback();
@@ -1390,6 +1378,23 @@ void SyncSession::update_subscription_store(bool flx_sync_requested)
 void SyncSession::create_subscription_store()
 {
     REALM_ASSERT(!m_flx_subscription_store);
+
+    // Create the main subscription store instance when this is first called - this will
+    // remain valid afterwards for the life of the SyncSession, but m_flx_subscription_store
+    // will be reset when rolling back to PBS after a client FLX migration
+    if (!m_subscription_store_base) {
+        m_subscription_store_base = sync::SubscriptionStore::create(m_db, [this](int64_t new_version) {
+            util::CheckedLockGuard lk(m_state_mutex);
+            if (m_state != State::Active && m_state != State::WaitingForAccessToken) {
+                return;
+            }
+            // There may be no session yet (i.e., waiting to refresh the access token).
+            if (m_session) {
+                m_session->on_new_flx_sync_subscription(new_version);
+            }
+        });
+    }
+
     // m_subscription_store_base is always around for the life of SyncSession, but the
     // m_flx_subscription_store is set when using FLX.
     m_flx_subscription_store = m_subscription_store_base;

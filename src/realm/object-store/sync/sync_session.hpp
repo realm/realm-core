@@ -446,7 +446,10 @@ private:
     mutable util::CheckedMutex m_config_mutex;
     RealmConfig m_config GUARDED_BY(m_config_mutex);
     const std::shared_ptr<DB> m_db;
-    const std::shared_ptr<sync::SubscriptionStore> m_subscription_store_base;
+    // The subscription store base is lazily created when needed, but never destroyed
+    std::shared_ptr<sync::SubscriptionStore> m_subscription_store_base GUARDED_BY(m_state_mutex);
+    // m_flx_subscription_store will either point to m_subscription_store_base if currently using FLX
+    // or set to nullptr if currently using PBS (mutable for client PBS->FLX migration)
     std::shared_ptr<sync::SubscriptionStore> m_flx_subscription_store GUARDED_BY(m_state_mutex);
     std::optional<sync::SubscriptionSet> m_active_subscriptions_after_migration GUARDED_BY(m_state_mutex);
     // Original sync config for reverting back to PBS if FLX migration is rolled back
