@@ -257,9 +257,9 @@ struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
 
     static std::vector<realm::Mixed> expected_sorted()
     {
-        return {Mixed{util::none},    Mixed{int64_t(1)},        Mixed{double(2.2)},
-                Mixed{float(3.3)},    Mixed{Decimal128("300")}, Mixed{BinaryData("a", 1)},
-                Mixed{"hello world"}, Mixed{Timestamp(1, 1)},   Mixed{ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")},
+        return {Mixed{util::none},         Mixed{int64_t(1)},        Mixed{double(2.2)},
+                Mixed{float(3.3)},         Mixed{Decimal128("300")}, Mixed{"hello world"},
+                Mixed{BinaryData("a", 1)}, Mixed{Timestamp(1, 1)},   Mixed{ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")},
                 Mixed{realm::UUID()}};
     }
 
