@@ -72,6 +72,12 @@ public:
     void create_subscriptions(const SubscriptionStore& subs_store);
     void create_subscriptions(const SubscriptionStore& subs_store, const std::string& rql_query_string);
 
+    // Create a subscription set used as sentinel. No-op if not in 'Migrated' state.
+    // This method is idempotent (i.e, at most one subscription set can be createad during the lifetime of a
+    // migration)
+    void create_sentinel_subscription_set(const SubscriptionStore& subs_store);
+    std::optional<int64_t> get_sentinel_subscription_set_version();
+
 protected:
     explicit MigrationStore(DBRef db);
 
@@ -97,6 +103,7 @@ private:
     ColKey m_migration_state;
     ColKey m_migration_query_str;
     ColKey m_migration_partition;
+    ColKey m_sentinel_query_version;
 
     std::mutex m_mutex;
     // Current migration state
@@ -105,6 +112,9 @@ private:
     std::optional<std::string> m_query_string;
     // The original PBS partition string before the migration
     std::optional<std::string> m_migrated_partition;
+    // The version of the subscription set used as a sentinel so we know when to stop uploading unsynced changes
+    // before updating to native FLX.
+    std::optional<int64_t> m_sentinel_subscription_set_version;
 };
 
 } // namespace realm::sync

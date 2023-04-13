@@ -1916,6 +1916,29 @@ void Session::send_message()
     if (m_target_download_mark > m_last_download_mark_sent)
         return send_mark_message(); // Throws
 
+    auto is_upload_allowed = [&]() -> bool {
+        if (!m_is_flx_sync_session) {
+            return true;
+        }
+
+        auto migration_store = get_migration_store();
+        if (!migration_store) {
+            return true;
+        }
+
+        auto sentinel_query_version = migration_store->get_sentinel_subscription_set_version();
+        if (!sentinel_query_version) {
+            return true;
+        }
+
+        // Do not allow upload if the last query sent is the sentinel one used by the migration store.
+        return m_last_sent_flx_query_version != *sentinel_query_version;
+    };
+
+    if (!is_upload_allowed()) {
+        return;
+    }
+
     auto check_pending_flx_version = [&]() -> bool {
         if (!m_is_flx_sync_session) {
             return false;
@@ -2054,8 +2077,8 @@ void Session::send_query_change_message()
     auto sub_store = get_flx_subscription_store();
     auto latest_sub_set = sub_store->get_by_version(m_pending_flx_sub_set->query_version);
     auto latest_queries = latest_sub_set.to_ext_json();
-    logger.debug("Sending: QUERY(query_version=%1, query_size=%2, query=\"%3\"", latest_sub_set.version(),
-                 latest_queries.size(), latest_queries);
+    logger.debug("Sending: QUERY(query_version=%1, query_size=%2, query=\"%3\", snapshot_version=%4",
+                 latest_sub_set.version(), latest_queries.size(), latest_queries, latest_sub_set.snapshot_version());
 
     OutputBuffer& out = m_conn.get_output_buffer();
     session_ident_type session_ident = get_ident();
@@ -2411,9 +2434,9 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
     }
     if (!did_client_reset) {
         repl.get_history().set_client_file_ident(client_file_ident, m_fix_up_object_ids); // Throws
-        this->m_progress.download.last_integrated_client_version = 0;
-        this->m_progress.upload.client_version = 0;
-        this->m_last_version_selected_for_upload = 0;
+        m_progress.download.last_integrated_client_version = 0;
+        m_progress.upload.client_version = 0;
+        m_last_version_selected_for_upload = 0;
     }
 
     // Ready to send the IDENT message

@@ -532,7 +532,6 @@ private:
     ReconnectInfo m_reconnect_info;
     int m_negotiated_protocol_version = 0;
     SyncServerMode m_sync_mode = SyncServerMode::PBS;
-    bool m_is_flx_sync_connection = false;
 
     ConnectionState m_state = ConnectionState::disconnected;
 
