@@ -17,20 +17,23 @@
 
 using namespace realm;
 
-static void trigger_server_migration(const AppSession& app_session, bool switch_to_flx,
+enum MigrationMode { MigrateToFLX, RollbackToPBS };
+
+static void trigger_server_migration(const AppSession& app_session, MigrationMode switch_mode,
                                      const std::shared_ptr<util::Logger>& logger)
 {
     auto baas_sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
 
     REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
-    app_session.admin_api.migrate_to_flx(app_session.server_app_id, baas_sync_service.id, switch_to_flx);
+    app_session.admin_api.migrate_to_flx(app_session.server_app_id, baas_sync_service.id,
+                                         switch_mode == MigrateToFLX);
 
     // While the server migration is in progress, the server cannot be used - wait until the migration
     // is complete. migrated with be populated with the 'isMigrated' value from the complete response
     AdminAPISession::MigrationStatus status;
     std::string last_status;
-    std::string op_stg = [switch_to_flx] {
-        if (switch_to_flx)
+    std::string op_stg = [switch_mode] {
+        if (switch_mode == MigrateToFLX)
             return "PBS->FLX Server migration";
         else
             return "FLX->PBS Server rollback";
@@ -57,7 +60,7 @@ static void trigger_server_migration(const AppSession& app_session, bool switch_
     if (logger) {
         logger->debug("%1 complete", op_stg);
     }
-    REQUIRE(switch_to_flx == status.isMigrated);
+    REQUIRE((switch_mode == MigrateToFLX) == status.isMigrated);
 }
 
 // Add a set of count number of Object objects to the realm
@@ -144,7 +147,7 @@ TEST_CASE("Test server migration and rollback", "[flx][migration]") {
     }
 
     // Migrate to FLX
-    trigger_server_migration(session.app_session(), true, logger_ptr);
+    trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
 
     {
         SyncTestFile flx_config(session.app()->current_user(), server_app_config.schema,
@@ -195,7 +198,7 @@ TEST_CASE("Test server migration and rollback", "[flx][migration]") {
     }
 
     // Roll back to PBS
-    trigger_server_migration(session.app_session(), false, logger_ptr);
+    trigger_server_migration(session.app_session(), RollbackToPBS, logger_ptr);
 
     // Try to connect as FLX
     {
@@ -264,11 +267,11 @@ TEST_CASE("Test client migration and rollback", "[flx][migration]") {
         REQUIRE(!wait_for_download(*realm));
 
         auto table = realm->read_group().get_table("class_Object");
-        CHECK(table->size() == 5);
+        REQUIRE(table->size() == 5);
     }
 
     // Migrate to FLX
-    trigger_server_migration(session.app_session(), true, logger_ptr);
+    trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
 
     {
         auto realm = Realm::get_shared_realm(config);
@@ -277,11 +280,11 @@ TEST_CASE("Test client migration and rollback", "[flx][migration]") {
         REQUIRE(!wait_for_download(*realm));
 
         auto table = realm->read_group().get_table("class_Object");
-        CHECK(table->size() == 5);
+        REQUIRE(table->size() == 5);
     }
 
     // Roll back to PBS
-    trigger_server_migration(session.app_session(), false, logger_ptr);
+    trigger_server_migration(session.app_session(), RollbackToPBS, logger_ptr);
 
     {
         auto realm = Realm::get_shared_realm(config);
@@ -290,7 +293,7 @@ TEST_CASE("Test client migration and rollback", "[flx][migration]") {
         REQUIRE(!wait_for_download(*realm));
 
         auto table = realm->read_group().get_table("class_Object");
-        CHECK(table->size() == 5);
+        REQUIRE(table->size() == 5);
     }
 }
 
@@ -323,7 +326,7 @@ TEST_CASE("Test client migration and rollback with recovery", "[flx][migration]"
         REQUIRE(!wait_for_download(*realm));
 
         auto table = realm->read_group().get_table("class_Object");
-        CHECK(table->size() == 5);
+        REQUIRE(table->size() == 5);
 
         // Close the sync session and make a change. This will be recovered by the migration.
         realm->sync_session()->force_close();
@@ -336,7 +339,7 @@ TEST_CASE("Test client migration and rollback with recovery", "[flx][migration]"
     }
 
     // Migrate to FLX
-    trigger_server_migration(session.app_session(), true, logger_ptr);
+    trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
 
     {
         auto realm = Realm::get_shared_realm(config);
@@ -345,7 +348,7 @@ TEST_CASE("Test client migration and rollback with recovery", "[flx][migration]"
         REQUIRE(!wait_for_download(*realm));
 
         auto table = realm->read_group().get_table("class_Object");
-        CHECK(table->size() == 6);
+        REQUIRE(table->size() == 6);
         realm->begin_transaction();
         auto pending_object = realm->read_group().get_table("class_Object")->get_object_with_primary_key(obj_id);
         REQUIRE(pending_object.get<String>("string_field") == "partition-set-during-sync-upload");
@@ -356,7 +359,7 @@ TEST_CASE("Test client migration and rollback with recovery", "[flx][migration]"
                                                      {{"_id", obj_id}});
 
     //  Roll back to PBS
-    trigger_server_migration(session.app_session(), false, logger_ptr);
+    trigger_server_migration(session.app_session(), RollbackToPBS, logger_ptr);
 
     // Open up the realm without the sync client attached and make a change. This will be recovered by the rollback.
     {
@@ -379,7 +382,37 @@ TEST_CASE("Test client migration and rollback with recovery", "[flx][migration]"
         REQUIRE(!wait_for_download(*realm));
 
         auto table = realm->read_group().get_table("class_Object");
-        CHECK(table->size() == 7);
+        REQUIRE(table->size() == 7);
+
+        // Verify the internal sync session subscription store has been cleared
+        auto session = realm->sync_session();
+        REQUIRE(session);
+        auto sub_store = SyncSession::OnlyForTesting::get_subscription_store_base(*session);
+        REQUIRE(sub_store);
+        auto active_subs = sub_store->get_latest();
+        REQUIRE(active_subs.size() == 0);
+        REQUIRE(active_subs.version() == 0);
+    }
+
+    //  Migrate back to FLX
+    trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
+
+    // Verify data has been sync'ed and there is only 1 subscription for the Object table
+    {
+        auto realm = Realm::get_shared_realm(config);
+
+        REQUIRE(!wait_for_upload(*realm));
+        REQUIRE(!wait_for_download(*realm));
+
+        auto table = realm->read_group().get_table("class_Object");
+        REQUIRE(table->size() == 7);
+        auto session = realm->sync_session();
+        REQUIRE(session);
+        auto sub_store = session->get_flx_subscription_store();
+        REQUIRE(sub_store);
+        auto active_subs = sub_store->get_active();
+        REQUIRE(active_subs.size() == 1);
+        REQUIRE(active_subs.find("flx_migrated_Object"));
     }
 }
 

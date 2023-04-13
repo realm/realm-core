@@ -1280,6 +1280,12 @@ std::shared_ptr<sync::SubscriptionStore> SyncSession::get_flx_subscription_store
     return m_flx_subscription_store;
 }
 
+std::shared_ptr<sync::SubscriptionStore> SyncSession::get_subscription_store_base()
+{
+    util::CheckedLockGuard lock(m_state_mutex);
+    return m_subscription_store_base;
+}
+
 sync::SaltedFileIdent SyncSession::get_file_ident() const
 {
     auto repl = m_db->get_replication();

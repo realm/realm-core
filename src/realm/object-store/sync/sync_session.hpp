@@ -309,6 +309,11 @@ public:
         {
             return session.get_file_ident();
         }
+
+        static std::shared_ptr<sync::SubscriptionStore> get_subscription_store_base(SyncSession& session)
+        {
+            return session.get_subscription_store_base();
+        }
     };
 
 private:
@@ -431,6 +436,9 @@ private:
 
     // Create active subscription set after PBS -> FLX migration to cover the data.
     void make_active_subscription_set() REQUIRES(!m_state_mutex);
+
+    // Return the subscription_store_base - to be used only for testing
+    std::shared_ptr<sync::SubscriptionStore> get_subscription_store_base() REQUIRES(!m_state_mutex);
 
     mutable util::CheckedMutex m_state_mutex;
     mutable util::CheckedMutex m_connection_state_mutex;
