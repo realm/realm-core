@@ -86,11 +86,20 @@ struct GeoPoint {
     }
 };
 
+// Construct a rectangle from minimum and maximum latitudes and longitudes.
+// If lo.lng() > hi.lng(), the rectangle spans the 180 degree longitude
+// line. Both points must be normalized, with lo.lat() <= hi.lat().
+// The rectangle contains all the points p such that 'lo' <= p <= 'hi',
+// where '<=' is defined in the obvious way.
 struct GeoBox {
-    GeoPoint p1;
-    GeoPoint p2;
+    GeoPoint lo;
+    GeoPoint hi;
 };
 
+// A simple spherical polygon. It consists of a single
+// chain of vertices where the first vertex is implicitly connected to the
+// last. Chain of vertices is defined to have a CCW orientation, i.e. the interior
+// of the polygon is on the left side of the edges.
 struct GeoPolygon {
     GeoPolygon(std::initializer_list<GeoPoint>&& l)
         : points(std::move(l))
@@ -108,8 +117,16 @@ struct GeoPolygon {
 };
 
 struct GeoCenterSphere {
-    double radius_km = 0.0;
+    double radius_radians = 0.0;
     GeoPoint center;
+
+    // Equatorial radius of earth.
+    static const double c_radius_meters;
+
+    static GeoCenterSphere from_kms(double km, GeoPoint&& p)
+    {
+        return GeoCenterSphere{km * 1000 / c_radius_meters, p};
+    }
 };
 
 class Geospatial {
@@ -128,7 +145,7 @@ public:
     }
     Geospatial(GeoBox box)
         : m_type(Type::Box)
-        , m_points({box.p1, box.p2})
+        , m_points({box.lo, box.hi})
     {
     }
     Geospatial(GeoPolygon polygon)
@@ -139,7 +156,7 @@ public:
     Geospatial(GeoCenterSphere centerSphere)
         : m_type(Type::CenterSphere)
         , m_points({centerSphere.center})
-        , m_radius_radians(centerSphere.radius_km / c_radius_km)
+        , m_radius_radians(centerSphere.radius_radians)
     {
     }
 
@@ -186,7 +203,8 @@ public:
 
     bool operator==(const Geospatial& other) const
     {
-        return m_type == other.m_type && m_points == other.m_points && m_radius_radians == other.m_radius_radians;
+        return m_type == other.m_type && m_points == other.m_points &&
+               ((!is_radius_valid() && !other.is_radius_valid()) || (m_radius_radians == other.m_radius_radians));
     }
     bool operator!=(const Geospatial& other) const
     {
@@ -201,12 +219,21 @@ public:
     constexpr static std::string_view c_geo_point_coords_col_name = "coordinates";
     constexpr static std::string_view c_types[] = {"Point", "Box", "Polygon", "CenterSphere"};
 
-    static const double c_radius_km;
-
 private:
     Type m_type;
     std::vector<GeoPoint> m_points;
-    std::optional<double> m_radius_radians;
+
+    double m_radius_radians = get_nan();
+
+    constexpr static double get_nan()
+    {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+
+    bool is_radius_valid() const
+    {
+        return !std::isnan(m_radius_radians);
+    }
 
     mutable std::shared_ptr<S2Region> m_region;
     S2Region& get_region() const;
@@ -218,9 +245,9 @@ template <>
 inline GeoCenterSphere Geospatial::get<GeoCenterSphere>() const noexcept
 {
     REALM_ASSERT_EX(m_type == Type::CenterSphere, get_type_string());
-    REALM_ASSERT(m_radius_radians);
+    REALM_ASSERT(is_radius_valid());
     REALM_ASSERT(m_points.size() >= 1);
-    return GeoCenterSphere{*m_radius_radians, m_points[0]};
+    return GeoCenterSphere{m_radius_radians, m_points[0]};
 }
 
 template <>
@@ -235,7 +262,7 @@ class GeospatialRef {
 public:
     GeospatialRef(const GeoPoint* data, const Geospatial& geo)
         : m_data(data)
-        , m_sphere_radius(geo.m_radius_radians ? *geo.m_radius_radians : 0)
+        , m_sphere_radius(geo.m_radius_radians)
         , m_size(unsigned(geo.m_points.size()))
         , m_type(geo.m_type)
     {
@@ -268,7 +295,7 @@ public:
             }
             case Geospatial::Type::CenterSphere:
                 REALM_ASSERT_EX(m_size == 1, m_size);
-                return Geospatial(GeoCenterSphere{m_sphere_radius * Geospatial::c_radius_km, m_data[0]});
+                return Geospatial(GeoCenterSphere{m_sphere_radius, m_data[0]});
         }
         return Geospatial();
     }

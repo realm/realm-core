@@ -241,7 +241,7 @@ std::string print_value<>(realm::Geospatial geo)
         case Geospatial::Type::CenterSphere: {
             GeoCenterSphere sphere = geo.get<GeoCenterSphere>();
             return util::format("GeoSphere(%1, %2)", point_str(sphere.center),
-                                sphere.radius_km * Geospatial::c_radius_km);
+                                sphere.radius_radians);
         }
         case Geospatial::Type::Invalid:
             return "NULL";
