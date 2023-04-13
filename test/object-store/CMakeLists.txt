@@ -61,6 +61,7 @@ if(REALM_ENABLE_SYNC)
         sync/flx_migration.cpp
         sync/flx_sync.cpp
         sync/metadata.cpp
+        sync/migration_store_test.cpp
         sync/remote_mongo_tests.cpp
         sync/session/connection_change_notifications.cpp
         sync/session/progress_notifications.cpp
