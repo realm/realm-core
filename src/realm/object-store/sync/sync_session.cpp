@@ -226,7 +226,7 @@ void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status 
     {
         util::CheckedUniqueLock lock(m_state_mutex);
         // Logged out, also free any pending subscription waiters
-        cancel_pending_waits(std::move(lock), error_code, error_code);
+        cancel_pending_waits(std::move(lock), error_code);
     }
     if (user) {
         user->log_out();
@@ -272,7 +272,7 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool re
         if (!session_user) {
             util::CheckedUniqueLock lock(session->m_state_mutex);
             auto refresh_error = error ? error->to_status() : Status::OK();
-            session->cancel_pending_waits(std::move(lock), refresh_error, refresh_error);
+            session->cancel_pending_waits(std::move(lock), refresh_error);
         }
         else if (error) {
             if (error->code() == ErrorCodes::ClientAppDeallocated) {
@@ -805,7 +805,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
         }
         case NextStateAfterError::error: {
             auto error = sync_error.to_status();
-            cancel_pending_waits(std::move(lock), error, error);
+            cancel_pending_waits(std::move(lock), error);
             break;
         }
     }
@@ -821,16 +821,20 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
 }
 
 void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, Status error,
-                                       std::optional<Status> sub_notify_error)
+                                       std::optional<Status> subs_notify_error)
 {
     CompletionCallbacks callbacks;
     std::swap(callbacks, m_completion_callbacks);
 
     // Inform any waiters on pending subscription states that they were cancelled
-    if (sub_notify_error && m_flx_subscription_store) {
-        m_flx_subscription_store->notify_all_state_change_notifications(*sub_notify_error);
+    if (subs_notify_error && m_flx_subscription_store) {
+        auto subscription_store = m_flx_subscription_store;
+        m_state_mutex.unlock(lock);
+        subscription_store->notify_all_state_change_notifications(*subs_notify_error);
     }
-    m_state_mutex.unlock(lock);
+    else {
+        m_state_mutex.unlock(lock);
+    }
 
     // Inform any queued-up completion handlers that they were cancelled.
     for (auto& [id, callback] : callbacks)
