@@ -77,7 +77,7 @@ public:
     /*
      * State diagram:
      *
-     *              ──────┬───────────┬─────────►Error──────────────────────────┐
+     *                    ┌───────────┬─────────►Error──────────────────────────┐
      *                    │           │                                         │
      *                    │           │                                         ▼
      *   Uncommitted──►Pending──►Bootstrapping──►AwaitingMark──►Complete───►Superseded
@@ -97,8 +97,6 @@ public:
         // This subscription set is the active subscription set that is currently being synchronized with the server.
         Complete,
         // An error occurred while processing this subscription set on the server. Check error_str() for details.
-        // This is also used if the subscription store is not available, such as when rolling back a FLX migrated
-        // client.
         Error,
         // The server responded to a later subscription set to this one and this one has been trimmed from the
         // local storage of subscription sets.
@@ -145,7 +143,7 @@ public:
     // This will make a copy of this subscription set with the next available version number and return it as
     // a mutable SubscriptionSet to be updated. The new SubscriptionSet's state will be Uncommitted. This
     // subscription set will be unchanged.
-    MutableSubscriptionSet make_mutable_copy();
+    MutableSubscriptionSet make_mutable_copy() const;
 
     // Returns a future that will resolve either with an error status if this subscription set encounters an
     // error, or resolves when the subscription set reaches at least that state. It's possible for a subscription
@@ -166,9 +164,6 @@ public:
 
     // The error string for this subscription set if any.
     StringData error_str() const;
-
-    // The error code and string for this subscription set if any.
-    std::optional<Status> get_error() const;
 
     // Returns the number of subscriptions in the set.
     size_t size() const;
@@ -200,28 +195,18 @@ protected:
     explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, int64_t version, SupersededTag);
     explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj,
                              MakingMutableCopy making_mutable_copy = MakingMutableCopy(false));
-    // Used to create a SubscriptionSet response when an error occurs during processing
-    // (e.g. SubscriptionStore was destroyed or the operation was aborted/returned an error)
-    explicit SubscriptionSet(const Status&, std::optional<int64_t> = std::nullopt);
 
     void load_from_database(Obj obj);
 
     // Get a reference to the SubscriptionStore. It may briefly extend the lifetime of the store.
-    std::shared_ptr<const SubscriptionStore> get_flx_subscription_store();
-
-    // If an error occurs while getting a SubscriptionSet, return a SubscriptionSet whose state is
-    // Error and the error_str() is set.
-    static SubscriptionSet make_error_subset(const Status& error, std::optional<int64_t> version = std::nullopt);
-
-    // Set the error state in the subscription set if the subscription store is no longer valid
-    void set_error(const Status& error);
+    std::shared_ptr<const SubscriptionStore> get_flx_subscription_store() const;
 
     std::weak_ptr<const SubscriptionStore> m_mgr;
 
     DB::version_type m_cur_version = 0;
     int64_t m_version = 0;
     State m_state = State::Uncommitted;
-    std::optional<Status> m_error;
+    std::string m_error_str;
     DB::version_type m_snapshot_version = -1;
     std::vector<Subscription> m_subs;
 };
@@ -285,7 +270,6 @@ protected:
 
     MutableSubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj,
                            MakingMutableCopy making_mutable_copy = MakingMutableCopy{false});
-    explicit MutableSubscriptionSet(const Status& error, TransactionRef tr, std::optional<int64_t> = std::nullopt);
 
     void insert_sub(const Subscription& sub);
 
@@ -353,13 +337,6 @@ public:
     // Returns true if there have been commits to the DB since the given version
     bool would_refresh(DB::version_type version) const noexcept;
 
-    // Notify all subscription waiters on this subscription store with the provided status
-    void notify_all_pending(Status status);
-
-    // Clear out and disable the subscription store - once it has been cleared, the subscription store will be
-    // inactive and a new subscription store will need to be createdßß
-    void terminate();
-
     using TableSet = std::set<std::string, std::less<>>;
     TableSet get_tables_for_latest(const Transaction& tr) const;
 
@@ -371,6 +348,15 @@ public:
     util::Optional<PendingSubscription> get_next_pending_version(int64_t last_query_version,
                                                                  DB::version_type after_client_version) const;
     std::vector<SubscriptionSet> get_pending_subscriptions() const;
+
+    // Notify all subscription state change notification handlers on this subscription store with the
+    // provided Status - this does not change the state of any pending subscriptions.
+    // Must be called from the event loop thread.
+    void notify_all_state_change_notifications(Status error);
+
+    // Reset SubscriptionStore and erase all current subscriptions and supersede any pending
+    // subscriptions. Must be called from the event loop thread.
+    void terminate();
 
 private:
     using std::enable_shared_from_this<SubscriptionStore>::weak_from_this;
@@ -398,15 +384,6 @@ protected:
     SubscriptionSet get_by_version_impl(int64_t flx_version, util::Optional<DB::VersionID> version) const;
     MutableSubscriptionSet make_mutable_copy(const SubscriptionSet& set) const;
 
-    // If an error occurs while getting a Mutable SubscriptionSet, return a MutableSubscriptionSet whose state is
-    // Error and the error_str() is set.
-    static MutableSubscriptionSet make_error_mutsubset(const Status& error, TransactionRef tr,
-                                                       std::optional<int64_t> = std::nullopt);
-
-    void do_notify_all_pending(Status, std::unique_lock<std::mutex> notify_lock);
-
-    bool is_active() const;
-
     friend class MutableSubscriptionSet;
     friend class Subscription;
     friend class SubscriptionSet;
@@ -433,7 +410,6 @@ protected:
     mutable int64_t m_outstanding_requests = 0;
     mutable int64_t m_min_outstanding_version = 0;
     mutable std::list<NotificationRequest> m_pending_notifications;
-    mutable bool m_active = true;
 };
 
 } // namespace realm::sync

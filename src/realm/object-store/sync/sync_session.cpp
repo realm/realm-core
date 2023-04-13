@@ -225,7 +225,8 @@ void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status 
     // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
     {
         util::CheckedUniqueLock lock(m_state_mutex);
-        cancel_pending_waits(std::move(lock), error_code);
+        // Logged out, also free any pending subscription waiters
+        cancel_pending_waits(std::move(lock), error_code, error_code);
     }
     if (user) {
         user->log_out();
@@ -270,7 +271,8 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool re
         auto session_user = session->user();
         if (!session_user) {
             util::CheckedUniqueLock lock(session->m_state_mutex);
-            session->cancel_pending_waits(std::move(lock), error ? error->to_status() : Status::OK());
+            auto refresh_error = error ? error->to_status() : Status::OK();
+            session->cancel_pending_waits(std::move(lock), refresh_error, refresh_error);
         }
         else if (error) {
             if (error->code() == ErrorCodes::ClientAppDeallocated) {
@@ -335,6 +337,18 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const Realm
                          SyncManager* sync_manager)
     : m_config{config}
     , m_db{std::move(db)}
+    , m_subscription_store_base{sync::SubscriptionStore::create(
+          m_db,
+          [this](int64_t new_version) {
+              util::CheckedLockGuard lk(m_state_mutex);
+              if (m_state != State::Active && m_state != State::WaitingForAccessToken) {
+                  return;
+              }
+              // There may be no session yet (i.e., waiting to refresh the access token).
+              if (m_session) {
+                  m_session->on_new_flx_sync_subscription(new_version);
+              }
+          })}
     , m_original_sync_config{m_config.sync_config}
     , m_migration_store{sync::MigrationStore::create(m_db)}
     , m_client(client)
@@ -780,6 +794,8 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     switch (next_state) {
         case NextStateAfterError::none:
             if (config(&SyncConfig::cancel_waits_on_nonfatal_error)) {
+                // The connection will be re-established at some point, so
+                // keep the pending subscription waiters active
                 cancel_pending_waits(std::move(lock), sync_error.to_status()); // unlocks the mutex
             }
             break;
@@ -788,7 +804,8 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
             break;
         }
         case NextStateAfterError::error: {
-            cancel_pending_waits(std::move(lock), sync_error.to_status());
+            auto error = sync_error.to_status();
+            cancel_pending_waits(std::move(lock), error, error);
             break;
         }
     }
@@ -803,10 +820,16 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     }
 }
 
-void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, Status error)
+void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, Status error,
+                                       std::optional<Status> sub_notify_error)
 {
     CompletionCallbacks callbacks;
     std::swap(callbacks, m_completion_callbacks);
+
+    // Inform any waiters on pending subscription states that they were cancelled
+    if (sub_notify_error && m_flx_subscription_store) {
+        m_flx_subscription_store->notify_all_state_change_notifications(*sub_notify_error);
+    }
     m_state_mutex.unlock(lock);
 
     // Inform any queued-up completion handlers that they were cancelled.
@@ -1363,16 +1386,9 @@ void SyncSession::update_subscription_store(bool flx_sync_requested)
 void SyncSession::create_subscription_store()
 {
     REALM_ASSERT(!m_flx_subscription_store);
-    m_flx_subscription_store = sync::SubscriptionStore::create(m_db, [this](int64_t new_version) {
-        util::CheckedLockGuard lk(m_state_mutex);
-        if (m_state != State::Active && m_state != State::WaitingForAccessToken) {
-            return;
-        }
-        // There may be no session yet (i.e., waiting to refresh the access token).
-        if (m_session) {
-            m_session->on_new_flx_sync_subscription(new_version);
-        }
-    });
+    // m_subscription_store_base is always around for the life of SyncSession, but the
+    // m_flx_subscription_store is set when using FLX.
+    m_flx_subscription_store = m_subscription_store_base;
 }
 
 void SyncSession::set_write_validator_factory(std::weak_ptr<sync::SubscriptionStore> weak_sub_mgr)
