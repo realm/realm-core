@@ -60,7 +60,8 @@ static bool type_is_valid(std::string str_type)
 
 namespace realm {
 
-const double Geospatial::c_radius_km = 6371.01;
+// src/mongo/db/geo/geoconstants.h
+const double GeoCenterSphere::c_radius_meters = 6378100.0;
 
 Geospatial Geospatial::from_obj(const Obj& obj, ColKey type_col, ColKey coords_col)
 {
@@ -198,7 +199,7 @@ S2Region& Geospatial::get_region() const
             REALM_ASSERT(m_radius_radians && m_radius_radians > 0.0);
             auto&& p = m_points.front();
             auto center = S2LatLng::FromDegrees(p.latitude, p.longitude).ToPoint();
-            auto radius = S1Angle::Radians(*m_radius_radians);
+            auto radius = S1Angle::Radians(m_radius_radians);
             m_region.reset(S2Cap::FromAxisAngle(center, radius).Clone()); // FIXME without extra copy
         } break;
         default:

@@ -67,8 +67,8 @@ TEST(Query_GeoWithin)
     p = {GeoPoint{-3.0, -1.0}, GeoPoint{-2.0, -2.0}, GeoPoint{-1.0, -1.0}, GeoPoint{1.5, -1.0}, GeoPoint{-1.0, 1.5}};
     CHECK_EQUAL(location.geo_within(p).count(), 2);
 
-    CHECK_EQUAL(location.geo_within(GeoCenterSphere{150.0, GeoPoint{1.0, 0.5}}).count(), 3);
-    CHECK_EQUAL(location.geo_within(GeoCenterSphere{90.0, GeoPoint{-1.5, -1.5}}).count(), 2);
+    CHECK_EQUAL(location.geo_within(GeoCenterSphere::from_kms(150.0, GeoPoint{1.0, 0.5})).count(), 3);
+    CHECK_EQUAL(location.geo_within(GeoCenterSphere::from_kms(90.0, GeoPoint{-1.5, -1.5})).count(), 2);
 }
 
 #endif
