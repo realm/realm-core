@@ -1969,7 +1969,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             REQUIRE(pending_batch.query_version == 1);
             REQUIRE(static_cast<bool>(pending_batch.progress));
             REQUIRE(pending_batch.remaining_changesets == 0);
-            REQUIRE(pending_batch.changesets.size() == 3);
+            REQUIRE(pending_batch.changesets.size() == 6);
 
             check_interrupted_state(realm);
         }
