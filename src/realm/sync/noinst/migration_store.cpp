@@ -116,7 +116,8 @@ bool MigrationStore::is_migrated()
 void MigrationStore::complete_migration()
 {
     // Ensure the migration table has been initialized
-    REALM_ASSERT(load_data());
+    bool loaded = load_data();
+    REALM_ASSERT(loaded);
 
     std::unique_lock lock{m_mutex};
     if (m_state != MigrationState::InProgress) {
@@ -179,7 +180,8 @@ void MigrationStore::migrate_to_flx(std::string_view rql_query_string, std::stri
     REALM_ASSERT(!rql_query_string.empty());
 
     // Ensure the migration table has been initialized
-    REALM_ASSERT(load_data());
+    bool loaded = load_data();
+    REALM_ASSERT(loaded);
 
     {
         std::unique_lock lock{m_mutex};
@@ -216,7 +218,8 @@ void MigrationStore::migrate_to_flx(std::string_view rql_query_string, std::stri
 void MigrationStore::cancel_migration()
 {
     // Ensure the migration table has been initialized
-    REALM_ASSERT(load_data());
+    bool loaded = load_data();
+    REALM_ASSERT(loaded);
 
     // Clear the migration state
     std::unique_lock lock{m_mutex};

@@ -196,7 +196,7 @@ TEST_CASE("Migration store", "[flx][migration]") {
         check_not_migrated(migration_store);
     }
 
-    SECTION("Migration store complete and cancel", "[flx][migration]") {
+    SECTION("Migration store complete without in progress", "[flx][migration]") {
         check_not_migrated(migration_store);
 
         // Complete the migration and check the state - should be not migrated
