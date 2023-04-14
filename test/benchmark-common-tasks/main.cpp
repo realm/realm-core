@@ -248,6 +248,60 @@ struct BenchmarkWithStringsManyDup : BenchmarkWithStringsTable {
     }
 };
 
+struct BenchmarkLongStringsManyDup : BenchmarkWithStringsTable {
+    void before_all(DBRef group)
+    {
+        const char* strings[] = {
+            "An object database (also object-oriented database management system) is a database management system in "
+            "which information is represented in the form of objects as used in object-oriented programming. Object "
+            "databases are different from relational databases which are table-oriented. Object-relational databases "
+            "are a hybrid of both approaches.",
+            "Object database management systems grew out of research during the early to mid-1970s into having "
+            "intrinsic database management support for graph-structured objects. The term 'object-oriented database "
+            "system' first appeared around 1985.[4] Notable research projects included Encore-Ob/Server (Brown "
+            "University), EXODUS (University of Wisconsin–Madison), IRIS (Hewlett-Packard), ODE (Bell Labs), ORION "
+            "(Microelectronics and Computer Technology Corporation or MCC), Vodak (GMD-IPSI), and Zeitgeist (Texas "
+            "Instruments). The ORION project had more published papers than any of the other efforts. Won Kim of MCC "
+            "compiled the best of those papers in a book published by The MIT Press.",
+            "Early commercial products included Gemstone (Servio Logic, name changed to GemStone Systems), Gbase "
+            "(Graphael), and Vbase (Ontologic). The early to mid-1990s saw additional commercial products enter the "
+            "market. These included ITASCA (Itasca Systems), Jasmine (Fujitsu, marketed by Computer Associates), "
+            "Matisse (Matisse Software), Objectivity/DB (Objectivity, Inc.), ObjectStore (Progress Software, "
+            "acquired from eXcelon which was originally Object Design), ONTOS (Ontos, Inc., name changed from "
+            "Ontologic), O2[6] (O2 Technology, merged with several companies, acquired by Informix, which was in "
+            "turn acquired by IBM), POET (now FastObjects from Versant which acquired Poet Software), Versant Object "
+            "Database (Versant Corporation), VOSS (Logic Arts) and JADE (Jade Software Corporation). Some of these "
+            "products remain on the market and have been joined by new open source and commercial products such as "
+            "InterSystems Caché.",
+            "As the usage of web-based technology increases with the implementation of Intranets and extranets, "
+            "companies have a vested interest in OODBMSs to display their complex data. Using a DBMS that has been "
+            "specifically designed to store data as objects gives an advantage to those companies that are geared "
+            "towards multimedia presentation or organizations that utilize computer-aided design (CAD).[3]",
+            "Object database management systems added the concept of persistence to object programming languages. "
+            "The early commercial products were integrated with various languages: GemStone (Smalltalk), Gbase "
+            "(LISP), Vbase (COP) and VOSS (Virtual Object Storage System for Smalltalk). For much of the 1990s, C++ "
+            "dominated the commercial object database management market. Vendors added Java in the late 1990s and "
+            "more recently, C#.",
+            "L’archive ouverte pluridisciplinaire HAL, est destinée au dépôt et à la diffusion de documents "
+            "scientifiques de niveau recherche, publiés ou non, émanant des établissements d’enseignement et de "
+            "recherche français ou étrangers, des laboratoires publics ou privés.",
+            "object object object object object duplicates",
+        };
+
+        BenchmarkWithStringsTable::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table(name());
+        Random r;
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
+            Obj obj = t->create_object();
+            obj.set<StringData>(m_col, strings[i % 7]);
+            m_keys.push_back(obj.get_key());
+        }
+        t->add_fulltext_index(m_col);
+        tr.commit();
+    }
+};
+
 struct BenchmarkFindAllStringFewDupes : BenchmarkWithStringsFewDup {
     const char* name() const
     {
@@ -271,6 +325,19 @@ struct BenchmarkFindAllStringManyDupes : BenchmarkWithStringsManyDup {
     {
         ConstTableRef table = m_table;
         TableView view = table->where().equal(m_col, StringData("10", 2)).find_all();
+    }
+};
+
+struct BenchmarkFindAllFulltextStringManyDupes : BenchmarkLongStringsManyDup {
+    const char* name() const
+    {
+        return "FindAllFulltextStringManyDupes";
+    }
+
+    void operator()(DBRef)
+    {
+        ConstTableRef table = m_table;
+        TableView view = table->where().fulltext(m_col, "object gemstone").find_all();
     }
 };
 
@@ -2023,6 +2090,7 @@ int benchmark_common_tasks_main()
     // queries / searching
     BENCH(BenchmarkFindAllStringFewDupes);
     BENCH(BenchmarkFindAllStringManyDupes);
+    BENCH(BenchmarkFindAllFulltextStringManyDupes);
     BENCH(BenchmarkFindFirstStringFewDupes);
     BENCH(BenchmarkFindFirstStringManyDupes);
     BENCH(BenchmarkCountStringManyDupes<false>);
