@@ -40,6 +40,8 @@ using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
+static std::set<std::string> g_bench_filter;
+
 namespace {
 // not smaller than 100.000 or the UID based benchmarks has to be modified!
 #define BASE_SIZE 200000
@@ -1909,7 +1911,11 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
     for (auto it = configs.begin(); it != configs.end(); ++it) {
         DBOptions::Durability level = it->first;
         const char* key = it->second;
+
         B benchmark;
+        if (!g_bench_filter.empty() && g_bench_filter.find(benchmark.name()) == g_bench_filter.end())
+            return;
+
         benchmark.m_durability = level;
         benchmark.m_encryption_key = key;
 
@@ -2081,7 +2087,7 @@ int main(int argc, const char** argv)
     if (argc > 1) {
         std::string arg_path = argv[1];
         if (arg_path == "-h" || arg_path == "--help") {
-            std::cout << "Usage: " << argv[0] << " [-h|--help] [PATH]" << std::endl
+            std::cout << "Usage: " << argv[0] << " [-h|--help] [PATH] [NAMES]" << std::endl
                       << "Run the common tasks benchmark test application." << std::endl
                       << "Results are placed in the executable directory by default." << std::endl
                       << std::endl
@@ -2089,6 +2095,7 @@ int main(int argc, const char** argv)
                       << "  -h, --help      display this help" << std::endl
                       << "  PATH            alternate path to store the results files;" << std::endl
                       << "                  this path should end with a slash." << std::endl
+                      << "  NAMES           benchmark names to run (',' separated)" << std::endl
                       << std::endl;
             return 1;
         }
@@ -2096,5 +2103,17 @@ int main(int argc, const char** argv)
 
     if (!initialize_test_path(argc, argv))
         return 1;
+
+    if (argc > 2) {
+        std::string filter = argv[2];
+        for (size_t i = 0, j = 0, len = filter.size(); i <= len; ++i) {
+            if (i == len || filter[i] == ',') {
+                if (j < i)
+                    g_bench_filter.insert(filter.substr(j, i - j));
+                j = i + 1;
+            }
+        }
+    }
+
     return benchmark_common_tasks_main();
 }
