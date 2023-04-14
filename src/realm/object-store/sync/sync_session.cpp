@@ -93,7 +93,7 @@ void SyncSession::become_active()
         m_flx_subscription_store->get_by_version(*m_migration_sentinel_query_version)
             .get_state_change_notification(sync::SubscriptionSet::State::Complete)
             .get_async([=, weak_self = weak_from_this()](StatusWith<sync::SubscriptionSet::State> s) {
-                if (s.is_ok()) {
+                if (!s.is_ok()) {
                     return;
                 }
                 REALM_ASSERT(s.get_value() == sync::SubscriptionSet::State::Complete);
