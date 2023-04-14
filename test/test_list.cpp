@@ -818,6 +818,57 @@ TEST(List_NestedList_Links)
     t.remove();
     tr->commit_and_continue_as_read();
     CHECK_EQUAL(ll->size(), 0);
+    tr->promote_to_write();
+    t = target->create_object();
+    ll->add(t.get_key());
+    CHECK_EQUAL(t.get_backlink_count(), 1);
+    list->remove(1);
+    CHECK_EQUAL(t.get_backlink_count(), 0);
+}
+
+TEST(List_NestedList_Embedded)
+{
+    Group g;
+    auto target = g.add_table("target", Table::Type::Embedded);
+    auto origin = g.add_table("origin");
+    auto list_col = origin->add_column(*target, "embedded", {CollectionType::List, CollectionType::List});
+
+    Obj o = origin->create_object();
+
+    {
+        // Remove entry in parent list
+        auto list = o.get_collection_list(list_col);
+        CHECK(list->is_empty());
+        auto collection = list->insert_collection(0);
+        auto ll = dynamic_cast<LnkLst*>(collection.get());
+        ll->create_and_insert_linked_object(0);
+        CHECK_EQUAL(target->size(), 1);
+        list->remove(0);
+        CHECK_EQUAL(target->size(), 0);
+    }
+    {
+        // Remove object
+        auto list = o.get_collection_list(list_col);
+        CHECK(list->is_empty());
+        auto collection = list->insert_collection(0);
+        auto ll = dynamic_cast<LnkLst*>(collection.get());
+        ll->create_and_insert_linked_object(0);
+        CHECK_EQUAL(target->size(), 1);
+        o.remove();
+        CHECK_EQUAL(target->size(), 0);
+    }
+    o = origin->create_object();
+    {
+        // Clear table
+        auto list = o.get_collection_list(list_col);
+        CHECK(list->is_empty());
+        auto collection = list->insert_collection(0);
+        auto ll = dynamic_cast<LnkLst*>(collection.get());
+        ll->create_and_insert_linked_object(0);
+        CHECK_EQUAL(target->size(), 1);
+        origin->clear();
+        CHECK_EQUAL(target->size(), 0);
+    }
 }
 
 TEST(List_NestedSet_Links)
@@ -844,6 +895,12 @@ TEST(List_NestedSet_Links)
     t.remove();
     tr->commit_and_continue_as_read();
     CHECK_EQUAL(ll->size(), 0);
+    tr->promote_to_write();
+    t = target->create_object();
+    ll->insert(t.get_key());
+    CHECK_EQUAL(t.get_backlink_count(), 1);
+    list->remove(1);
+    CHECK_EQUAL(t.get_backlink_count(), 0);
 }
 
 TEST(List_NestedDict_Links)
@@ -870,6 +927,12 @@ TEST(List_NestedDict_Links)
     t.remove();
     tr->commit_and_continue_as_read();
     CHECK_EQUAL(dict->get("Hello"), Mixed());
+    tr->promote_to_write();
+    t = target->create_object();
+    dict->insert("Hello", t.get_key());
+    CHECK_EQUAL(t.get_backlink_count(), 1);
+    list->remove(1);
+    CHECK_EQUAL(t.get_backlink_count(), 0);
 }
 
 TEST(List_NestedDictList_Links)

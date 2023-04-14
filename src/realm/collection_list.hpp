@@ -43,6 +43,10 @@ public:
     {
         return std::shared_ptr<CollectionList>(new CollectionList(parent, col_key, index, coll_type));
     }
+    [[nodiscard]] static CollectionListPtr create(CollectionParent& parent, ColKey col_key)
+    {
+        return std::shared_ptr<CollectionList>(new CollectionList(&parent, col_key));
+    }
     CollectionList(const CollectionList&) = delete;
 
     ~CollectionList() override;
@@ -96,9 +100,13 @@ public:
     void update_child_ref(size_t child_ndx, ref_type new_ref) final;
 
 private:
-    std::shared_ptr<CollectionParent> m_parent;
+    friend class Cluster;
+    friend class ClusterTree;
+
+    std::shared_ptr<CollectionParent> m_owned_parent;
+    CollectionParent* m_parent;
     CollectionParent::Index m_index;
-    size_t m_level;
+    size_t m_level = 0;
     Allocator* m_alloc;
     ColKey m_col_key;
     mutable Array m_top;
@@ -109,6 +117,7 @@ private:
 
 
     CollectionList(std::shared_ptr<CollectionParent> parent, ColKey col_key, Index index, CollectionType coll_type);
+    CollectionList(CollectionParent*, ColKey col_key);
 
     UpdateStatus ensure_created()
     {
@@ -133,6 +142,7 @@ private:
 
         REALM_UNREACHABLE();
     }
+    void get_all_keys(size_t levels, std::vector<ObjKey>&) const;
 };
 
 } // namespace realm

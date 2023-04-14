@@ -28,6 +28,7 @@
 #include "realm/array_string.hpp"
 #include "realm/array_mixed.hpp"
 #include "realm/array_fixed_bytes.hpp"
+#include "realm/collection_list.hpp"
 
 #include <iostream>
 
@@ -1126,99 +1127,93 @@ bool ClusterTree::is_string_enum_type(ColKey::Idx col_ndx) const
 void ClusterTree::remove_all_links(CascadeState& state)
 {
     Allocator& alloc = get_alloc();
+    auto origin_table = get_owning_table();
     // This function will add objects that should be deleted to 'state'
-    auto func = [this, &state, &alloc](const Cluster* cluster) {
+    auto func = [&](const Cluster* cluster) {
         auto remove_link_from_column = [&](ColKey col_key) {
             // Prevent making changes to table that is going to be removed anyway
             // Furthermore it is a prerequisite for using 'traverse' that the tree
             // is not modified
-            if (get_owning_table()->links_to_self(col_key)) {
+            if (origin_table->links_to_self(col_key)) {
                 return IteratorControl::AdvanceToNext;
             }
             auto col_type = col_key.get_type();
-            if (col_key.is_list() || col_key.is_set()) {
-                if (col_type == col_type_LinkList)
-                    col_type = col_type_Link;
-                if (col_type == col_type_Link) {
-                    ArrayInteger values(alloc);
-                    cluster->init_leaf(col_key, &values);
-                    size_t sz = values.size();
-                    BPlusTree<ObjKey> links(alloc);
-                    for (size_t i = 0; i < sz; i++) {
-                        if (ref_type ref = values.get_as_ref(i)) {
-                            links.init_from_ref(ref);
-                            if (links.size() > 0) {
-                                cluster->remove_backlinks(cluster->get_real_key(i), col_key, links.get_all(), state);
-                            }
-                        }
-                    }
-                }
-                else if (col_type == col_type_TypedLink) {
-                    ArrayInteger values(alloc);
-                    cluster->init_leaf(col_key, &values);
-                    size_t sz = values.size();
-                    BPlusTree<ObjLink> links(alloc);
-                    for (size_t i = 0; i < sz; i++) {
-                        if (ref_type ref = values.get_as_ref(i)) {
-                            links.init_from_ref(ref);
-                            if (links.size() > 0) {
-                                cluster->remove_backlinks(cluster->get_real_key(i), col_key, links.get_all(), state);
-                            }
-                        }
-                    }
-                }
-                else if (col_type == col_type_Mixed) {
-                    ArrayInteger values(alloc);
-                    cluster->init_leaf(col_key, &values);
-                    size_t sz = values.size();
-                    BPlusTree<Mixed> mix_arr(alloc);
-                    for (size_t i = 0; i < sz; i++) {
-                        if (ref_type ref = values.get_as_ref(i)) {
-                            mix_arr.init_from_ref(ref);
-                            auto sz = mix_arr.size();
-                            std::vector<ObjLink> links;
-                            for (size_t j = 0; j < sz; j++) {
-                                auto mix = mix_arr.get(j);
-                                if (mix.is_type(type_TypedLink)) {
-                                    links.push_back(mix.get<ObjLink>());
-                                }
-                            }
-                            if (links.size())
-                                cluster->remove_backlinks(cluster->get_real_key(i), col_key, links, state);
-                        }
-                    }
-                }
-            }
-            else if (col_key.is_dictionary()) {
+            if (col_type == col_type_LinkList)
+                col_type = col_type_Link;
+            auto nesting_levels = origin_table->get_nesting_levels(col_key);
+            if (col_key.is_collection()) {
                 ArrayInteger values(alloc);
                 cluster->init_leaf(col_key, &values);
                 size_t sz = values.size();
+
                 for (size_t i = 0; i < sz; i++) {
-                    if (values.get_as_ref(i)) {
-                        std::vector<ObjLink> links;
-
-                        Array top(alloc);
-                        top.set_parent(&values, i);
-                        top.init_from_parent();
-                        BPlusTree<Mixed> values(alloc);
-                        values.set_parent(&top, 1);
-                        values.init_from_parent();
-
-                        // Iterate through values and insert all link values
-                        values.traverse([&](BPlusTreeNode* node, size_t) {
-                            auto bplustree_leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
-                            auto sz = bplustree_leaf->size();
-                            for (size_t i = 0; i < sz; i++) {
-                                auto mix = bplustree_leaf->get(i);
-                                if (mix.is_type(type_TypedLink)) {
-                                    links.push_back(mix.get<ObjLink>());
+                    if (ref_type ref = values.get_as_ref(i)) {
+                        ObjKey origin_key = cluster->get_real_key(i);
+                        if (nesting_levels > 0) {
+                            if (col_type == col_type_Link) {
+                                DummyParent parent(origin_table->m_own_ref, ref);
+                                auto list = CollectionList::create(parent, col_key);
+                                std::vector<ObjKey> keys;
+                                list->get_all_keys(nesting_levels - 1, keys);
+                                cluster->do_remove_backlinks(origin_key, col_key, keys, state);
+                            }
+                        }
+                        else if (col_key.is_list() || col_key.is_set()) {
+                            if (col_type == col_type_Link) {
+                                BPlusTree<ObjKey> links(alloc);
+                                links.init_from_ref(ref);
+                                if (links.size() > 0) {
+                                    cluster->do_remove_backlinks(origin_key, col_key, links.get_all(), state);
                                 }
                             }
-                            return IteratorControl::AdvanceToNext;
-                        });
+                            else if (col_type == col_type_TypedLink) {
+                                BPlusTree<ObjLink> links(alloc);
+                                links.init_from_ref(ref);
+                                if (links.size() > 0) {
+                                    cluster->do_remove_backlinks(origin_key, col_key, links.get_all(), state);
+                                }
+                            }
+                            else if (col_type == col_type_Mixed) {
+                                BPlusTree<Mixed> mix_arr(alloc);
+                                mix_arr.init_from_ref(ref);
+                                auto sz = mix_arr.size();
+                                std::vector<ObjLink> links;
+                                for (size_t j = 0; j < sz; j++) {
+                                    auto mix = mix_arr.get(j);
+                                    if (mix.is_type(type_TypedLink)) {
+                                        links.push_back(mix.get<ObjLink>());
+                                    }
+                                }
+                                if (links.size())
+                                    cluster->do_remove_backlinks(origin_key, col_key, links, state);
+                            }
+                        }
+                        else if (col_key.is_dictionary()) {
+                            std::vector<ObjLink> links;
 
-                        if (links.size() > 0) {
-                            cluster->remove_backlinks(cluster->get_real_key(i), col_key, links, state);
+                            Array top(alloc);
+                            top.set_parent(&values, i);
+                            top.init_from_parent();
+                            BPlusTree<Mixed> values(alloc);
+                            values.set_parent(&top, 1);
+                            values.init_from_parent();
+
+                            // Iterate through values and insert all link values
+                            values.traverse([&](BPlusTreeNode* node, size_t) {
+                                auto bplustree_leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
+                                auto sz = bplustree_leaf->size();
+                                for (size_t i = 0; i < sz; i++) {
+                                    auto mix = bplustree_leaf->get(i);
+                                    if (mix.is_type(type_TypedLink)) {
+                                        links.push_back(mix.get<ObjLink>());
+                                    }
+                                }
+                                return IteratorControl::AdvanceToNext;
+                            });
+
+                            if (links.size() > 0) {
+                                cluster->do_remove_backlinks(origin_key, col_key, links, state);
+                            }
                         }
                     }
                 }
@@ -1230,8 +1225,8 @@ void ClusterTree::remove_all_links(CascadeState& state)
                     size_t sz = values.size();
                     for (size_t i = 0; i < sz; i++) {
                         if (ObjKey key = values.get(i)) {
-                            cluster->remove_backlinks(cluster->get_real_key(i), col_key, std::vector<ObjKey>{key},
-                                                      state);
+                            cluster->do_remove_backlinks(cluster->get_real_key(i), col_key, std::vector<ObjKey>{key},
+                                                         state);
                         }
                     }
                 }
@@ -1241,8 +1236,8 @@ void ClusterTree::remove_all_links(CascadeState& state)
                     size_t sz = values.size();
                     for (size_t i = 0; i < sz; i++) {
                         if (ObjLink link = values.get(i)) {
-                            cluster->remove_backlinks(cluster->get_real_key(i), col_key, std::vector<ObjLink>{link},
-                                                      state);
+                            cluster->do_remove_backlinks(cluster->get_real_key(i), col_key,
+                                                         std::vector<ObjLink>{link}, state);
                         }
                     }
                 }
@@ -1253,8 +1248,8 @@ void ClusterTree::remove_all_links(CascadeState& state)
                     for (size_t i = 0; i < sz; i++) {
                         Mixed mix = values.get(i);
                         if (mix.is_type(type_TypedLink)) {
-                            cluster->remove_backlinks(cluster->get_real_key(i), col_key,
-                                                      std::vector<ObjLink>{mix.get<ObjLink>()}, state);
+                            cluster->do_remove_backlinks(cluster->get_real_key(i), col_key,
+                                                         std::vector<ObjLink>{mix.get<ObjLink>()}, state);
                         }
                     }
                 }

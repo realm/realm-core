@@ -260,4 +260,11 @@ CollectionBasePtr CollectionParent::get_collection_ptr(ColKey col_key) const
     return {};
 }
 
+static Obj dummy_obj;
+
+const Obj& DummyParent::get_object() const noexcept
+{
+    return dummy_obj;
+}
+
 } // namespace realm
