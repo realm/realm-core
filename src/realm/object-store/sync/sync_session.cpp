@@ -87,6 +87,24 @@ void SyncSession::become_active()
     REALM_ASSERT(m_state != State::Active);
     m_state = State::Active;
 
+    // First time the session becomes active, register a notification on the sentinel subscription set to restart the
+    // session and update to native FLX.
+    if (m_migration_sentinel_query_version) {
+        m_flx_subscription_store->get_by_version(*m_migration_sentinel_query_version)
+            .get_state_change_notification(sync::SubscriptionSet::State::Complete)
+            .get_async([=, weak_self = weak_from_this()](StatusWith<sync::SubscriptionSet::State> s) {
+                if (s.is_ok()) {
+                    return;
+                }
+                REALM_ASSERT(s.get_value() == sync::SubscriptionSet::State::Complete);
+                if (auto strong_self = weak_self.lock()) {
+                    strong_self->m_migration_store->cancel_migration();
+                    strong_self->restart_session();
+                }
+            });
+        m_migration_sentinel_query_version.reset();
+    }
+
     // when entering from the Dying state the session will still be bound
     if (!m_session) {
         create_sync_session();
@@ -363,16 +381,8 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const Realm
     // Note: Currently, a sentinel subscription set is always created even if there is nothing to upload.
     if (m_migration_store->is_migrated() && m_original_sync_config->flx_sync_requested) {
         m_migration_store->create_sentinel_subscription_set(*m_flx_subscription_store);
-        auto sentinel_query_version = m_migration_store->get_sentinel_subscription_set_version();
-        REALM_ASSERT(sentinel_query_version);
-        m_flx_subscription_store->get_by_version(*sentinel_query_version)
-            .get_state_change_notification(sync::SubscriptionSet::State::Complete)
-            .get_async([=](StatusWith<sync::SubscriptionSet::State> s) {
-                if (s.is_ok()) {
-                    m_migration_store->cancel_migration();
-                    restart_session();
-                }
-            });
+        m_migration_sentinel_query_version = m_migration_store->get_sentinel_subscription_set_version();
+        REALM_ASSERT(m_migration_sentinel_query_version);
     }
 }
 
