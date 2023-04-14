@@ -39,9 +39,8 @@ using namespace realm;
 
 class CaptureHelper {
 public:
-    CaptureHelper(TransactionRef group, SharedRealm const& r, LnkLst& lv, TableKey table_key)
+    CaptureHelper(SharedRealm const& r, LnkLst& lv, TableKey table_key)
         : m_realm(r)
-        , m_group(group)
         , m_list(lv)
         , m_table_key(table_key)
     {
@@ -60,7 +59,8 @@ public:
         _impl::TransactionChangeInfo info{};
         info.tables[m_table_key];
         info.collections.push_back({m_table_key, m_list.get_owner_key(), m_list.get_col_key(), &c});
-        _impl::transaction::advance(*m_group, info);
+        auto tr = m_realm->duplicate();
+        _impl::parse(*tr, info, tr->get_version() - 1, tr->get_version());
 
         if (info.collections.empty()) {
             REQUIRE(!m_list.is_attached());
@@ -117,9 +117,6 @@ private:
         REQUIRE(m_list.is_attached());
 
         // and make sure we end up with the same end result
-        if (m_initial.size() != m_list.size()) {
-            std::cout << "Error " << m_list.size() << std::endl;
-        }
         REQUIRE(m_initial.size() == m_list.size());
         for (size_t i = 0; i < m_initial.size(); ++i)
             CHECK(m_initial[i] == m_list.get_key(i));
@@ -304,10 +301,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             table.get_object(objects[i]).set_all(i, i);
         r->commit_transaction();
 
-        auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
         auto track_changes = [&](std::vector<TableKey> tables_needed, auto&& f) {
-            auto sg = coordinator->begin_read();
-
             r->begin_transaction();
             f();
             r->commit_transaction();
@@ -315,7 +309,9 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             _impl::TransactionChangeInfo info{};
             for (auto table : tables_needed)
                 info.tables[table];
-            _impl::transaction::advance(static_cast<Transaction&>(*sg), info);
+
+            auto tr = r->duplicate();
+            _impl::parse(*tr, info, tr->get_version() - 1, tr->get_version());
             return info;
         };
 
@@ -412,11 +408,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
 
         r->commit_transaction();
 
-        auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
-#define VALIDATE_CHANGES(out)                                                                                        \
-    for (CaptureHelper helper(std::static_pointer_cast<Transaction>(coordinator->begin_read()), r, lv,               \
-                              origin->get_key());                                                                    \
-         helper; out = helper.finish())
+#define VALIDATE_CHANGES(out) for (CaptureHelper helper(r, lv, origin->get_key()); helper; out = helper.finish())
 
         CollectionChangeSet changes;
         SECTION("single change type") {
@@ -1607,16 +1599,15 @@ TEMPLATE_TEST_CASE("DeepChangeChecker collections", "[notifications]", cf::ListO
     r->commit_transaction();
 
     auto track_changes = [&](auto&& f) {
-        auto tr = r->duplicate();
-
         r->begin_transaction();
         f();
         r->commit_transaction();
 
         _impl::TransactionChangeInfo info{};
+        auto tr = r->duplicate();
         for (auto key : tr->get_table_keys())
             info.tables[key];
-        _impl::transaction::advance(*tr, info);
+        _impl::parse(*tr, info, tr->get_version() - 1, tr->get_version());
         return info;
     };
 
@@ -1851,16 +1842,15 @@ TEST_CASE("DeepChangeChecker singular links", "[notifications]") {
     r->commit_transaction();
 
     auto track_changes = [&](auto&& f) {
-        auto tr = r->duplicate();
-
         r->begin_transaction();
         f();
         r->commit_transaction();
 
         _impl::TransactionChangeInfo info{};
+        auto tr = r->duplicate();
         for (auto key : tr->get_table_keys())
             info.tables[key];
-        _impl::transaction::advance(*tr, info);
+        _impl::parse(*tr, info, tr->get_version() - 1, tr->get_version());
         return info;
     };
 

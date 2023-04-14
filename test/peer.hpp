@@ -194,9 +194,9 @@ public:
         return 0;
     }
 
-    void do_initiate_transact(Group& group, version_type current_version, bool history_updated) override
+    void do_initiate_transact(Group& group) override
     {
-        SyncReplication::do_initiate_transact(group, current_version, history_updated);
+        SyncReplication::do_initiate_transact(group);
         using gf = _impl::GroupFriend;
         Array arr(gf::get_alloc(group));
         group.set_sync_file_id(m_local_file_ident);
@@ -254,7 +254,6 @@ private:
         ShortCircuitHistory& m_impl;
 
         void update_from_ref_and_version(ref_type, version_type) override final {}
-        void update_from_parent(version_type) final {}
         void set_oldest_bound_version(version_type) override final {}
         void verify() const override final {}
 

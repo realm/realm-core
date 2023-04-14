@@ -359,12 +359,9 @@ public:
     std::map<uint_fast64_t, ChangeSet> m_changesets;
     MyHistory* m_write_history = nullptr;
 
-    void update_from_ref_and_version(ref_type, version_type version) override
+    void update_from_ref_and_version(ref_type ref, version_type version) override
     {
-        update_from_parent(version);
-    }
-    void update_from_parent(version_type) override
-    {
+        History::update_from_ref_and_version(ref, version);
         if (m_write_history)
             m_changesets = m_write_history->m_changesets;
     }
@@ -2091,11 +2088,40 @@ public:
     }
 };
 
+template <typename Handler>
+class LogParseObserver : public Transaction::Observer {
+public:
+    LogParseObserver(Handler& handler)
+        : m_handler(handler)
+    {
+    }
+
+    void will_advance(Transaction& tr, DB::version_type old_version, DB::version_type new_version) override
+    {
+        tr.parse_history(m_handler, old_version, new_version);
+    }
+
+private:
+    Handler& m_handler;
+};
+
+template <typename T>
+LogParseObserver(T&) -> LogParseObserver<T>;
+
+
+struct TestContextObserver : Transaction::Observer {
+    TestContext& test_context;
+    TestContextObserver(TestContext& test_context)
+        : test_context(test_context)
+    {
+    }
+};
+
 struct AdvanceReadTransact {
     template <typename Func>
     static void call(TransactionRef tr, Func* func)
     {
-        tr->advance_read(func);
+        tr->advance_read(VersionID(), func);
     }
 };
 
@@ -2126,38 +2152,51 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
     auto tr = sg->start_read();
 
     {
-        // With no changes, the handler should not be called at all
-        struct : NoOpTransactionLogParser {
-            using NoOpTransactionLogParser::NoOpTransactionLogParser;
-            void parse_complete()
+        // With no changes, the handler should be called indicating that the
+        // version did not change
+        struct : public TestContextObserver {
+            using TestContextObserver::TestContextObserver;
+            void will_advance(Transaction&, DB::version_type old_version, DB::version_type new_version) override
             {
-                CHECK(false);
+                CHECK_EQUAL(old_version, new_version);
             }
-        } parser(test_context);
+            void did_advance(Transaction&, DB::version_type old_version, DB::version_type new_version) override
+            {
+                CHECK_EQUAL(old_version, new_version);
+            }
+        } parser{test_context};
         TEST_TYPE::call(tr, &parser);
     }
 
     {
-        // With an empty change, parse_complete() and nothing else should be called
+        // With an empty change, will_advance() should be called with an empty changeset
         auto wt = sg->start_write();
         wt->commit();
 
-        struct foo : NoOpTransactionLogParser {
-            using NoOpTransactionLogParser::NoOpTransactionLogParser;
-
-            bool called = false;
-            void parse_complete()
+        struct : TestContextObserver {
+            using TestContextObserver::TestContextObserver;
+            int calls = 0;
+            void will_advance(Transaction& tr, DB::version_type old_version, DB::version_type new_version) override
             {
-                called = true;
+                CHECK_EQUAL(old_version + 1, new_version);
+                auto hist = tr.get_history();
+                _impl::ChangesetInputStream in(*hist, old_version, new_version);
+                CHECK_EQUAL(in.next_block().size(), 0);
+                ++calls;
             }
-        } parser(test_context);
+            void did_advance(Transaction&, DB::version_type, DB::version_type) override
+            {
+                ++calls;
+            }
+        } parser{test_context};
+
         TEST_TYPE::call(tr, &parser);
-        CHECK(parser.called);
+        CHECK_EQUAL(parser.calls, 2);
     }
     ObjKey o0, o1;
     {
         // Make a simple modification and verify that the appropriate handler is called
-        struct foo : NoOpTransactionLogParser {
+        struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
             size_t expected_table = 0;
@@ -2172,6 +2211,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 return true;
             }
         } parser(test_context);
+        LogParseObserver observer(parser);
 
         WriteTransaction wt(sg);
         parser.t1 = wt.get_table("table 1")->get_key();
@@ -2180,7 +2220,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         o1 = wt.get_table("table 2")->create_object().get_key();
         wt.commit();
 
-        TEST_TYPE::call(tr, &parser);
+        TEST_TYPE::call(tr, &observer);
         CHECK_EQUAL(2, parser.expected_table);
     }
     ColKey c2, c3;
@@ -2239,7 +2279,8 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         parser.okey = okey;
         parser.link_col = c2;
         parser.link_list_col = c3;
-        TEST_TYPE::call(tr, &parser);
+        LogParseObserver observer(parser);
+        TEST_TYPE::call(tr, &observer);
     }
     {
         // Verify that clear() logs the correct rows
@@ -2268,7 +2309,8 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 return true;
             }
         } parser(test_context);
-        TEST_TYPE::call(tr, &parser);
+        LogParseObserver observer(parser);
+        TEST_TYPE::call(tr, &observer);
     }
 }
 
@@ -2302,15 +2344,13 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
     struct ObserverError {
     };
     try {
-        struct : NoOpTransactionLogParser {
-            using NoOpTransactionLogParser::NoOpTransactionLogParser;
-
-            bool modify_object(ColKey, ObjKey) const
+        struct : Transaction::Observer {
+            void will_advance(Transaction&, DB::version_type, DB::version_type) override
             {
                 throw ObserverError();
             }
-        } parser(test_context);
-        g->advance_read(&parser);
+        } parser;
+        g->advance_read(VersionID(), &parser);
         CHECK(false); // Should not be reached
     }
     catch (ObserverError) {
@@ -6001,39 +6041,6 @@ TEST(LangBindHelper_ArrayXoverMapping)
                 REALM_ASSERT(str[j] == 'a');
         }
     }
-}
-
-TEST(LangBindHelper_SchemaChangeNotification)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    auto hist = make_in_realm_history();
-    DBRef db = DB::create(*hist, path);
-
-    auto rt = db->start_read();
-    bool handler_called;
-    rt->set_schema_change_notification_handler([&handler_called]() {
-        handler_called = true;
-    });
-    CHECK(rt->has_schema_change_notification_handler());
-
-    {
-        auto tr = db->start_write();
-        tr->add_table("my_table");
-        tr->commit();
-    }
-    handler_called = false;
-    rt->advance_read();
-    CHECK(handler_called);
-
-    {
-        auto tr = db->start_write();
-        auto table = tr->get_table("my_table");
-        table->add_column(type_Int, "integer");
-        tr->commit();
-    }
-    handler_called = false;
-    rt->advance_read();
-    CHECK(handler_called);
 }
 
 TEST(LangBindHelper_InMemoryDB)

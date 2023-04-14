@@ -1272,56 +1272,6 @@ size_t Group::get_used_space() const noexcept
 }
 
 
-namespace {
-class TransactAdvancer : public _impl::NullInstructionObserver {
-public:
-    TransactAdvancer(Group&, bool& schema_changed)
-        : m_schema_changed(schema_changed)
-    {
-    }
-
-    bool insert_group_level_table(TableKey) noexcept
-    {
-        m_schema_changed = true;
-        return true;
-    }
-
-    bool erase_class(TableKey) noexcept
-    {
-        m_schema_changed = true;
-        return true;
-    }
-
-    bool rename_class(TableKey) noexcept
-    {
-        m_schema_changed = true;
-        return true;
-    }
-
-    bool insert_column(ColKey)
-    {
-        m_schema_changed = true;
-        return true;
-    }
-
-    bool erase_column(ColKey)
-    {
-        m_schema_changed = true;
-        return true;
-    }
-
-    bool rename_column(ColKey) noexcept
-    {
-        m_schema_changed = true;
-        return true; // No-op
-    }
-
-private:
-    bool& m_schema_changed;
-};
-} // anonymous namespace
-
-
 void Group::update_allocator_wrappers(bool writable)
 {
     m_is_writable = writable;
@@ -1382,7 +1332,7 @@ void Group::refresh_dirty_accessors()
 }
 
 
-void Group::advance_transact(ref_type new_top_ref, util::InputStream* in, bool writable)
+void Group::advance_transact(ref_type new_top_ref, bool writable)
 {
     REALM_ASSERT(is_attached());
     // Exception safety: If this function throws, the group accessor and all of
@@ -1400,38 +1350,11 @@ void Group::advance_transact(ref_type new_top_ref, util::InputStream* in, bool w
     // the underlying node structure has undergone arbitrary change, such as
     // when a read transaction has been advanced to a later snapshot of the
     // database.
-    //
-    // Initially, when this function is invoked, we cannot assume any
-    // correspondence between the accessor state and the underlying node
-    // structure. We can assume that the hierarchy is in a state of minimal
-    // consistency, and that it can be brought to a state of structural
-    // correspondence using information in the transaction logs. When structural
-    // correspondence is achieved, we can reliably refresh the accessor hierarchy
-    // (Table::refresh_accessor_tree()) to bring it back to a fully consistent
-    // state. See AccessorConsistencyLevels.
-    //
-    // Much of the information in the transaction logs is not used in this
-    // process, because the changes have already been applied to the underlying
-    // node structure. All we need to do here is to bring the accessors back
-    // into a state where they correctly reflect the underlying structure (or
-    // detach them if the underlying object has been removed.)
-    //
-    // This is no longer needed in Core, but we need to compute "schema_changed",
-    // for the benefit of ObjectStore.
-    bool schema_changed = false;
-    if (in && has_schema_change_notification_handler()) {
-        TransactAdvancer advancer(*this, schema_changed);
-        _impl::TransactLogParser parser; // Throws
-        parser.parse(*in, advancer);     // Throws
-    }
 
     m_top.detach();                                           // Soft detach
     bool create_group_when_missing = false;                   // See Group::attach_shared().
     attach(new_top_ref, writable, create_group_when_missing); // Throws
     refresh_dirty_accessors();                                // Throws
-
-    if (schema_changed)
-        send_schema_change_notification();
 }
 
 void Group::prepare_top_for_history(int history_type, int history_schema_version, uint64_t file_ident)
@@ -1607,7 +1530,7 @@ void Group::verify() const
     // Verify history if present
     if (Replication* repl = *get_repl()) {
         if (auto hist = repl->_create_history_read()) {
-            hist->set_group(const_cast<Group*>(this), false);
+            hist->set_group(const_cast<Group*>(this));
             _impl::History::version_type version = 0;
             int history_type = 0;
             int history_schema_version = 0;

@@ -144,11 +144,10 @@ void in_place_set_difference(Container& a, const Container& b)
     a.erase(a_out, a_end);
 }
 
-class TransactLogHandler {
+class TransactLogHandler : public Transaction::Observer {
 public:
-    TransactLogHandler(Group const& g, AuditObjectSerializer& serializer)
-        : m_group(g)
-        , m_serializer(serializer)
+    TransactLogHandler(AuditObjectSerializer& serializer)
+        : m_serializer(serializer)
         , m_data(nlohmann::json::object())
     {
     }
@@ -163,8 +162,10 @@ public:
         return m_str;
     }
 
-    void parse_complete()
+    void will_advance(Transaction& tr, DB::version_type old_version, DB::version_type new_version) override
     {
+        tr.parse_history(*this, old_version, new_version);
+
         for (auto& [table_key, changes] : m_tables) {
             sort_and_unique(changes.insertions);
             sort_and_unique(changes.deletions);
@@ -180,7 +181,7 @@ public:
             in_place_set_difference(changes.modifications, changes.deletions);
             in_place_set_difference(changes.modifications, changes.insertions);
 
-            auto table = m_group.get_table(table_key);
+            auto table = tr.get_table(table_key);
             if (table->is_embedded()) {
                 // Embedded objects don't generate insertion instructions, and
                 // instead we just see the modifications on an object that doesn't
@@ -220,13 +221,13 @@ public:
         }
     }
 
-    void after_advance()
+    void did_advance(Transaction& tr, DB::version_type, DB::version_type) override
     {
         for (auto& [table_key, changes] : m_tables) {
             if (changes.insertions.empty() && changes.deletions.empty() && changes.modifications.empty()) {
                 continue;
             }
-            auto table = m_group.get_table(table_key);
+            auto table = tr.get_table(table_key);
             auto& data = m_data[ObjectStore::object_type_for_table_name(table->get_name())];
             if (!changes.modifications.empty()) {
                 auto& objects = data["modifications"];
@@ -254,6 +255,8 @@ public:
         }
         m_str = m_data.dump();
     }
+
+    void parse_complete() {}
 
     bool select_table(TableKey tk) noexcept
     {
@@ -324,7 +327,6 @@ private:
         std::vector<ObjKey> modifications;
     };
 
-    Group const& m_group;
     AuditObjectSerializer& m_serializer;
     std::unordered_map<TableKey, TableChanges> m_tables;
     TableChanges* m_active_table = nullptr;
@@ -507,10 +509,8 @@ public:
 
     bool operator()(audit_event::Write const& write)
     {
-        auto& g = read(write.prev_version);
-        TransactLogHandler changes(g, m_serializer);
-        g.advance_read(&changes, write.version);
-        changes.after_advance();
+        TransactLogHandler changes(m_serializer);
+        read(write.prev_version).advance_read(write.version, &changes);
 
         if (changes.has_any_changes())
             return write_event(write.timestamp, m_activity, "write", changes.data());

@@ -116,97 +116,6 @@ private:
 };
 
 
-// LCOV_EXCL_START (because the NullInstructionObserver is trivial)
-class NullInstructionObserver {
-public:
-    /// The following methods are also those that TransactLogParser expects
-    /// to find on the `InstructionHandler`.
-
-    // No selection needed:
-    bool select_table(TableKey)
-    {
-        return true;
-    }
-    bool select_collection(ColKey, ObjKey)
-    {
-        return true;
-    }
-    bool insert_group_level_table(TableKey)
-    {
-        return true;
-    }
-    bool erase_class(TableKey)
-    {
-        return true;
-    }
-    bool rename_class(TableKey)
-    {
-        return true;
-    }
-    bool typed_link_change(ColKey, TableKey)
-    {
-        return true;
-    }
-
-    // Must have table selected:
-    bool create_object(ObjKey)
-    {
-        return true;
-    }
-    bool remove_object(ObjKey)
-    {
-        return true;
-    }
-    bool modify_object(ColKey, ObjKey)
-    {
-        return true;
-    }
-
-    // Must have descriptor selected:
-    bool insert_column(ColKey)
-    {
-        return true;
-    }
-    bool erase_column(ColKey)
-    {
-        return true;
-    }
-    bool rename_column(ColKey)
-    {
-        return true;
-    }
-    bool set_link_type(ColKey)
-    {
-        return true;
-    }
-
-    // Must have collection selected:
-    bool collection_set(size_t)
-    {
-        return true;
-    }
-    bool collection_insert(size_t)
-    {
-        return true;
-    }
-    bool collection_move(size_t, size_t)
-    {
-        return true;
-    }
-    bool collection_erase(size_t)
-    {
-        return true;
-    }
-    bool collection_clear(size_t)
-    {
-        return true;
-    }
-
-    void parse_complete() {}
-};
-// LCOV_EXCL_STOP (NullInstructionObserver)
-
-
 /// See Replication for information about the meaning of the
 /// arguments of each of the functions in this class.
 class TransactLogEncoder {
@@ -334,7 +243,7 @@ public:
 private:
     util::Buffer<char> m_input_buffer{1024};
 
-    // The input stream is assumed to consist of chunks of memory organised such that
+    // The input stream is assumed to consist of chunks of memory organized such that
     // every instruction resides in a single chunk only.
     util::InputStream* m_input;
     // pointer into transaction log, each instruction is parsed from m_input_begin and onwards.

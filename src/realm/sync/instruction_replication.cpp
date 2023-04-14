@@ -18,9 +18,9 @@ void SyncReplication::reset()
     m_last_field_name = InternString::npos;
 }
 
-void SyncReplication::do_initiate_transact(Group& group, version_type current_version, bool history_updated)
+void SyncReplication::do_initiate_transact(Group& group)
 {
-    Replication::do_initiate_transact(group, current_version, history_updated);
+    Replication::do_initiate_transact(group);
     m_transaction = dynamic_cast<Transaction*>(&group); // FIXME: Is this safe?
     m_write_validator = make_write_validator(*m_transaction);
     reset();

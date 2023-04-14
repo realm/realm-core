@@ -467,11 +467,10 @@ public:
 
     // Overriding member functions in _impl::History
     void update_from_ref_and_version(ref_type ref, version_type) override;
-    void update_from_parent(version_type) override;
 
-    void set_group(Group* group, bool updated = false) override
+    void set_group(Group* group, version_type version = 0) override
     {
-        _impl::History::set_group(group, updated);
+        _impl::History::set_group(group, version);
         if (REALM_LIKELY(m_acc)) {
             _impl::GroupFriend::set_history_parent(*m_group, m_acc->root);
         }

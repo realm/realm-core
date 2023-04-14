@@ -95,7 +95,6 @@ public:
     // Be sure to keep this type aligned with what is actually used in DB.
     using version_type = _impl::History::version_type;
     using InputStream = util::InputStream;
-    class TransactLogApplier;
     class Interrupted; // Exception
     class SimpleIndexTranslator;
 
@@ -175,18 +174,16 @@ public:
     /// Note that finalize_commit() and abort_transact() are not allowed to
     /// throw.
     ///
-    /// \param current_version The version of the snapshot that the current
-    /// transaction is based on.
-    ///
-    /// \param history_updated Pass true only when the history has already been
-    /// updated to reflect the currently bound snapshot, such as when
+    /// \param history_updated_version The version which the history has
+    /// already been updated to if it does not match the current read
+    /// transaction version, such as when
     /// _impl::History::update_early_from_top_ref() was called during the
     /// transition from a read transaction to the current write transaction.
     ///
     /// \throw Interrupted Thrown by initiate_transact() and prepare_commit() if
     /// a blocking operation was interrupted.
 
-    void initiate_transact(Group& group, version_type current_version, bool history_updated);
+    void initiate_transact(Group& group, version_type history_updated_version = 0);
     /// \param current_version The version of the snapshot that the current
     /// transaction is based on.
     /// \return prepare_commit() returns the version of the new snapshot
@@ -203,10 +200,10 @@ public:
     /// not handed over to the caller.
     ///
     /// This function may be called only during a write transaction (prior to
-    /// initiation of commit operation). In that case, the caller may assume that the
-    /// returned memory reference stays valid for the remainder of the transaction (up
-    /// until initiation of the commit operation).
-    BinaryData get_uncommitted_changes() const noexcept;
+    /// initiation of commit operation). In that case, the caller may assume
+    /// that the returned memory reference stays valid until either another
+    /// modification is made or the transaction is ended.
+    util::Span<const char> get_uncommitted_changes() const noexcept;
 
     /// CAUTION: These values are stored in Realm files, so value reassignment
     /// is not allowed.
@@ -376,11 +373,11 @@ protected:
     /// actual acceptance to finalize_commit(), which requires that the final
     /// acceptance can be done without any risk of failure. Alternatively, the
     /// Replication implementation can fully accept the changeset in
-    /// do_prepapre_commit() (allowing for failure), and then discard that
+    /// do_prepare_commit() (allowing for failure), and then discard that
     /// changeset during the next invocation of do_initiate_transact() if
     /// `current_version` indicates that the previous transaction failed.
 
-    virtual void do_initiate_transact(Group& group, version_type current_version, bool history_updated);
+    virtual void do_initiate_transact(Group& group);
 
     //@}
 
@@ -446,12 +443,12 @@ public:
 
 // Implementation:
 
-inline void Replication::initiate_transact(Group& group, version_type current_version, bool history_updated)
+inline void Replication::initiate_transact(Group& group, version_type history_updated_version)
 {
     if (auto hist = _get_history_write()) {
-        hist->set_group(&group, history_updated);
+        hist->set_group(&group, history_updated_version);
     }
-    do_initiate_transact(group, current_version, history_updated);
+    do_initiate_transact(group);
     unselect_all();
 }
 
@@ -460,11 +457,11 @@ inline void Replication::finalize_commit() noexcept
     finalize_changeset();
 }
 
-inline BinaryData Replication::get_uncommitted_changes() const noexcept
+inline util::Span<const char> Replication::get_uncommitted_changes() const noexcept
 {
     const char* data = m_stream.get_data();
     size_t size = m_encoder.write_position() - data;
-    return BinaryData(data, size);
+    return {data, size};
 }
 
 inline size_t Replication::transact_log_size()

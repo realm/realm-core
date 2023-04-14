@@ -302,13 +302,176 @@ VersionID Transaction::commit_and_continue_writing()
     db->release_read_lock(m_read_lock);
     m_read_lock = lock_after_commit;
     if (Replication* repl = db->get_replication()) {
-        bool history_updated = false;
-        repl->initiate_transact(*this, lock_after_commit.m_version, history_updated); // Throws
+        repl->initiate_transact(*this); // Throws
     }
 
     bool writable = true;
     remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable); // Throws
     return VersionID{version, lock_after_commit.m_reader_idx};
+}
+
+void Transaction::advance_read(VersionID version_id, Observer* observer)
+{
+    if (m_transact_stage != DB::transact_Reading)
+        throw WrongTransactionState("Not a read transaction");
+
+    // It is an error if the new version precedes the currently bound one.
+    if (version_id.version < m_read_lock.m_version)
+        throw IllegalOperation("Requesting an older version when advancing");
+
+    auto hist = get_history(); // Throws
+    if (!hist)
+        throw IllegalOperation("No transaction log when advancing");
+
+    auto old_version = m_read_lock.m_version;
+    internal_advance_read(observer, version_id, *hist, false); // Throws
+    if (db->m_logger) {
+        db->m_logger->log(util::Logger::Level::trace, "Advance read: %1 -> %2", old_version, m_read_lock.m_version);
+    }
+    if (observer) {
+        observer->did_advance(*this, old_version, m_read_lock.m_version);
+    }
+}
+
+bool Transaction::promote_to_write(Observer* observer, bool nonblocking)
+{
+    if (m_transact_stage != DB::transact_Reading)
+        throw WrongTransactionState("Not a read transaction");
+
+    if (!holds_write_mutex()) {
+        if (nonblocking) {
+            bool success = db->do_try_begin_write();
+            if (!success) {
+                return false;
+            }
+        }
+        else {
+            auto t1 = std::chrono::steady_clock::now();
+            acquire_write_lock(); // Throws
+            if (db->m_logger) {
+                auto t2 = std::chrono::steady_clock::now();
+                db->m_logger->log(util::Logger::Level::trace, "Acquired write lock in %1 us",
+                                  std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+            }
+        }
+    }
+    auto old_version = m_read_lock.m_version;
+    try {
+        Replication* repl = db->get_replication();
+        if (!repl)
+            throw IllegalOperation("No transaction log when promoting to write");
+
+        VersionID version = VersionID(); // Latest
+        m_history = repl->_get_history_write();
+        bool history_updated = internal_advance_read(observer, version, *m_history, true); // Throws
+
+        REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
+        DB::version_type current_version = m_read_lock.m_version;
+        m_alloc.init_mapping_management(current_version);
+        repl->initiate_transact(*this, history_updated ? current_version : 0); // Throws
+
+        // If the group has no top array (top_ref == 0), create a new node
+        // structure for an empty group now, to be ready for modifications. See
+        // also Group::attach_shared().
+        if (!m_top.is_attached())
+            create_empty_group(); // Throws
+    }
+    catch (...) {
+        if (!holds_write_mutex())
+            db->end_write_on_correct_thread();
+        m_history = nullptr;
+        throw;
+    }
+
+    if (db->m_logger) {
+        db->m_logger->log(util::Logger::Level::trace, "Promote to write: %1 -> %2", old_version,
+                          m_read_lock.m_version);
+    }
+
+    set_transact_stage(DB::transact_Writing);
+    if (observer) {
+        observer->did_advance(*this, old_version, m_read_lock.m_version);
+    }
+    return true;
+}
+
+void Transaction::rollback_and_continue_as_read(Observer* observer)
+{
+    if (m_transact_stage != DB::transact_Writing)
+        throw WrongTransactionState("Not a write transaction");
+
+    Replication* repl = db->get_replication();
+    if (!repl)
+        throw IllegalOperation("No transaction log when rolling back");
+
+    auto uncommitted_changes = repl->get_uncommitted_changes();
+    if (observer && uncommitted_changes.size()) {
+        observer->will_reverse(*this, uncommitted_changes);
+    }
+
+    // Mark all managed space (beyond the attached file) as free.
+    db->reset_free_space_tracking(); // Throws
+
+    m_read_lock.check();
+    ref_type top_ref = m_read_lock.m_top_ref;
+    size_t file_size = m_read_lock.m_file_size;
+
+    // since we had the write lock, we already have the latest encrypted pages in memory
+    m_alloc.update_reader_view(file_size); // Throws
+    update_allocator_wrappers(false);
+    advance_transact(top_ref, false); // Throws
+
+    if (!holds_write_mutex())
+        db->end_write_on_correct_thread();
+
+    if (db->m_logger) {
+        db->m_logger->log(util::Logger::Level::trace, "Rollback");
+    }
+
+    m_history = nullptr;
+    set_transact_stage(DB::transact_Reading);
+}
+
+bool Transaction::internal_advance_read(Observer* observer, VersionID version_id, _impl::History& hist, bool writable)
+{
+    DB::ReadLockInfo new_read_lock = db->grab_read_lock(DB::ReadLockInfo::Live, version_id); // Throws
+    DB::ReadLockGuard g(*db, new_read_lock);
+    DB::version_type old_version = m_read_lock.m_version;
+    DB::version_type new_version = new_read_lock.m_version;
+    REALM_ASSERT(new_version >= old_version);
+
+    if (old_version == new_version) {
+        // update allocator wrappers merely to update write protection
+        update_allocator_wrappers(writable);
+        if (observer) {
+            observer->will_advance(*this, old_version, old_version);
+        }
+        return false; // _impl::History::update_early_from_top_ref() was not called
+    }
+
+    size_t new_file_size = new_read_lock.m_file_size;
+    ref_type new_top_ref = new_read_lock.m_top_ref;
+
+    // Synchronize readers view of the file
+    SlabAlloc& alloc = m_alloc;
+    alloc.update_reader_view(new_file_size);
+    update_allocator_wrappers(writable);
+    using gf = _impl::GroupFriend;
+    ref_type hist_ref = gf::get_history_ref(alloc, new_top_ref);
+    hist.update_from_ref_and_version(hist_ref, new_version);
+
+    if (observer) {
+        // This has to happen in the context of the originally bound snapshot
+        // and while the read transaction is still in a fully functional state.
+        observer->will_advance(*this, old_version, new_version);
+    }
+
+    advance_transact(new_top_ref, writable); // Throws
+    db->release_read_lock(m_read_lock);
+    m_read_lock = new_read_lock;
+    g.release();
+
+    return true; // _impl::History::update_early_from_top_ref() was called
 }
 
 TransactionRef Transaction::freeze()
@@ -346,7 +509,7 @@ _impl::History* Transaction::get_history() const
                     if (!m_history_read)
                         m_history_read = repl->_create_history_read();
                     m_history = m_history_read.get();
-                    m_history->set_group(const_cast<Transaction*>(this), false);
+                    m_history->set_group(const_cast<Transaction*>(this));
                     break;
                 case DB::transact_Writing:
                     m_history = repl->_get_history_write();
@@ -897,9 +1060,7 @@ void Transaction::initialize_replication()
 {
     if (m_transact_stage == DB::transact_Writing) {
         if (Replication* repl = get_replication()) {
-            auto current_version = m_read_lock.m_version;
-            bool history_updated = false;
-            repl->initiate_transact(*this, current_version, history_updated); // Throws
+            repl->initiate_transact(*this); // Throws
         }
     }
 }

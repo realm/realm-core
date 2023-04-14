@@ -150,7 +150,6 @@ void Realm::begin_read(VersionID version_id)
 {
     REALM_ASSERT(!m_transaction);
     m_transaction = m_coordinator->begin_read(version_id, bool(m_frozen_version));
-    add_schema_change_handler();
     read_schema_from_group_if_needed();
 }
 
@@ -386,7 +385,7 @@ void Realm::set_schema_subset(Schema schema)
 }
 
 void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction migration_function,
-                          DataInitializationFunction initialization_function, bool in_transaction)
+                          DataInitializationFunction initialization_function)
 {
     uint64_t validation_mode = SchemaValidationMode::Basic;
 #if REALM_ENABLE_SYNC
@@ -402,6 +401,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     schema.validate(static_cast<SchemaValidationMode>(validation_mode));
 
     bool was_in_read_transaction = is_in_read_transaction();
+    bool was_in_write_transaction = is_in_transaction();
     Schema actual_schema = get_full_schema();
 
     // Frozen Realms never modify the schema on disk and we just need to verify
@@ -424,14 +424,15 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     // Cancel the write transaction if we exit this function before committing it
     auto cleanup = util::make_scope_exit([&]() noexcept {
         // When in_transaction is true, caller is responsible to cancel the transaction.
-        if (!in_transaction && is_in_transaction())
+        if (!was_in_write_transaction && is_in_transaction())
             cancel_transaction();
         if (!was_in_read_transaction)
             m_transaction = nullptr;
     });
 
-    if (!in_transaction) {
-        transaction().promote_to_write();
+    if (!was_in_write_transaction) {
+        _impl::RealmTransactionObserver obs(*this);
+        transaction().promote_to_write(&obs);
 
         // Beginning the write transaction may have advanced the version and left
         // us with nothing to do if someone else initialized the schema on disk
@@ -506,7 +507,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     m_dynamic_schema = false;
     m_coordinator->clear_schema_cache_and_set_schema_version(version);
 
-    if (!in_transaction) {
+    if (!was_in_write_transaction) {
         m_coordinator->commit_write(*this);
         cache_new_schema();
     }
@@ -519,21 +520,17 @@ void Realm::rename_property(Schema schema, StringData object_type, StringData ol
     ObjectStore::rename_property(read_group(), schema, object_type, old_name, new_name);
 }
 
-void Realm::add_schema_change_handler()
+void Realm::schema_changed()
 {
-    if (m_config.immutable())
-        return;
-    m_transaction->set_schema_change_notification_handler([&] {
-        m_new_schema = ObjectStore::schema_from_group(read_group());
-        m_schema_version = ObjectStore::get_schema_version(read_group());
-        if (m_dynamic_schema) {
-            m_schema = *m_new_schema;
-        }
-        else {
-            m_schema.copy_keys_from(*m_new_schema, m_config.schema_subset_mode);
-        }
-        notify_schema_changed();
-    });
+    m_new_schema = ObjectStore::schema_from_group(read_group());
+    m_schema_version = ObjectStore::get_schema_version(read_group());
+    if (m_dynamic_schema) {
+        m_schema = *m_new_schema;
+    }
+    else {
+        m_schema.copy_keys_from(*m_new_schema, m_config.schema_subset_mode);
+    }
+    notify_schema_changed();
 }
 
 void Realm::cache_new_schema()
@@ -808,7 +805,8 @@ void Realm::run_writes()
         }
         catch (const std::exception&) {
             if (m_transaction) {
-                transaction::cancel(*m_transaction, m_binding_context.get());
+                _impl::RealmTransactionObserver observer(*this);
+                m_transaction->rollback_and_continue_as_read(&observer);
             }
             m_notify_only = false;
 
@@ -843,7 +841,8 @@ void Realm::run_writes()
         else {
             if (m_transaction->get_transact_stage() == DB::transact_Writing) {
                 // Still in writing stage - we make a rollback
-                transaction::cancel(transaction(), m_binding_context.get());
+                _impl::RealmTransactionObserver observer(*this);
+                m_transaction->rollback_and_continue_as_read(&observer);
             }
         }
         if (m_async_commit_barrier_requested)
@@ -1036,7 +1035,8 @@ void Realm::cancel_transaction()
         throw WrongTransactionState("Can't cancel a non-existing write transaction");
     }
 
-    transaction::cancel(transaction(), m_binding_context.get());
+    _impl::RealmTransactionObserver observer(*this);
+    m_transaction->rollback_and_continue_as_read(&observer);
 
     if (m_transaction && !m_is_running_async_writes) {
         if (m_async_write_q.empty()) {

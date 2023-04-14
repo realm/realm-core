@@ -612,7 +612,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                                  partition_prop,
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        0);
                 })
                 ->make_local_changes([&](SharedRealm local) {
                     local->update_schema(
@@ -640,7 +640,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                                  remotely_added_property,
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        0);
 
                     create_object(*local, new_table_name, {pk1}, partition);
                     create_object(*local, existing_table_name, {pk1}, partition);
@@ -673,7 +673,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                                  shared_added_property,
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        0);
 
                     create_object(*remote, new_table_name, {pk2}, partition);
                     create_object(*remote, existing_table_name, {pk2}, partition);
@@ -712,7 +712,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                                  {prop_name, PropertyType::Float},
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        0);
                 })
                 ->make_remote_changes([&](SharedRealm remote) {
                     remote->update_schema(
@@ -724,7 +724,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                                  {prop_name, PropertyType::Int},
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        0);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
                     util::EventLoop::main().run_until([&] {
@@ -1188,7 +1188,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        0);
                     create_object(*local, "object2", ObjectId::gen(), partition);
                     create_object(*local, "object2", ObjectId::gen(), partition);
                 })
@@ -1223,7 +1223,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        0);
                     auto table = ObjectStore::table_for_object_type(local->read_group(), "object");
                     table->begin()->set(table->get_column_key("value2"), 123);
                 })
@@ -1259,7 +1259,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        0);
                 })
                 ->make_remote_changes([](SharedRealm remote) {
                     remote->update_schema(
@@ -1277,7 +1277,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        0);
                 })
                 ->on_post_reset([](SharedRealm realm) {
                     REQUIRE_NOTHROW(realm->refresh());
@@ -1304,7 +1304,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        0);
                 })
                 ->make_remote_changes([](SharedRealm remote) {
                     remote->update_schema(
@@ -1316,7 +1316,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        0);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
                     util::EventLoop::main().run_until([&] {
@@ -1345,7 +1345,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        0);
                 })
                 ->make_remote_changes([](SharedRealm remote) {
                     remote->update_schema(
@@ -1356,7 +1356,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
                         },
-                        0, nullptr, nullptr, true);
+                        0);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
                     util::EventLoop::main().run_until([&] {

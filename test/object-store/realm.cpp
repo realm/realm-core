@@ -2742,6 +2742,8 @@ TEST_CASE("SharedRealm: notifications") {
         REQUIRE(change_count == 4);
         REQUIRE_FALSE(realm->refresh());
     }
+
+    // FIXME: here's where to test the thing
 }
 
 TEST_CASE("SharedRealm: schema updating from external changes") {
@@ -3215,27 +3217,17 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
          }},
     };
 
-    class ExternalWriter {
-    private:
-        std::shared_ptr<Realm> m_realm;
-
-    public:
-        WriteTransaction wt;
-        ExternalWriter(Realm::Config const& config)
-            : m_realm([&] {
-                auto c = config;
-                c.scheduler = util::Scheduler::make_frozen(VersionID());
-                return _impl::RealmCoordinator::get_coordinator(c.path)->get_realm(c, util::none);
-            }())
-            , wt(TestHelper::get_db(m_realm))
-        {
-        }
+    auto open_db = [](RealmConfig const& config) {
+        DBOptions options;
+        if (!config.encryption_key.empty())
+            options.encryption_key = config.encryption_key.data();
+        return DB::create(make_in_realm_history(), config.path, options);
     };
 
     auto external_write = [&](Realm::Config const& config, auto&& fn) {
-        ExternalWriter wt(config);
-        fn(wt.wt);
-        wt.wt.commit();
+        WriteTransaction wt(open_db(config));
+        fn(wt);
+        wt.commit();
     };
 
     SECTION("is initially empty for uninitialized file") {
@@ -3376,38 +3368,25 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
     SECTION("update_schema() to version populated on disk while waiting for the write lock updates cache") {
         r->read_group();
 
-        // We want to commit the write while we're waiting on the write lock on
-        // this thread, which can't really be done in a properly synchronized manner
-        std::chrono::microseconds wait_time{5000};
-#if REALM_ANDROID
-        // When running on device or in an emulator we need to wait longer due
-        // to them being slow
-        wait_time *= 10;
-#endif
-
-        bool did_run = false;
+        test_util::BowlOfStonesSemaphore bowl;
         JoiningThread thread([&] {
-            ExternalWriter writer(config);
-            if (writer.wt.get_table("class_object 2"))
-                return;
-            did_run = true;
+            auto db = open_db(config);
+            WriteTransaction wt(db);
+            bowl.add_stone();
 
-            auto table = writer.wt.add_table("class_object 2");
+            auto table = wt.add_table("class_object 2");
             table->add_column(type_Int, "value");
-            std::this_thread::sleep_for(wait_time * 2);
-            writer.wt.commit();
+            while (!db->other_writers_waiting_for_lock())
+                std::this_thread::sleep_for(std::chrono::microseconds{5});
+            wt.commit();
         });
-        std::this_thread::sleep_for(wait_time);
+        bowl.get_stone(); // wait for BG thread to have write lock
 
         auto tv = cache_tv;
         r->update_schema(Schema{
             {"object", {{"value", PropertyType::Int}}},
             {"object 2", {{"value", PropertyType::Int}}},
         });
-
-        // just skip the test if the timing was wrong to avoid spurious failures
-        if (!did_run)
-            return;
 
         REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
         REQUIRE(cache_tv == tv + 1); // only +1 because update_schema()'s write was rolled back

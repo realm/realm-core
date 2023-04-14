@@ -452,28 +452,6 @@ public:
 
     //@}
 
-    //@{
-    /// During sync operation, schema changes may happen at runtime as connected
-    /// clients update their schema as part of an app update. Since this is a
-    /// relatively rare event, no attempt is made at limiting the amount of work
-    /// the handler is required to do to update its information about table and
-    /// column indices (i.e., all table and column indices must be recalculated).
-    ///
-    /// At the time of writing, only additive schema changes may occur in that
-    /// scenario.
-    ///
-    /// has_schema_change_notification_handler() returns true iff there is currently
-    /// a non-null notification handler registered.
-    ///
-    /// set_schema_change_notification_handler() replaces the current handler (if any)
-    /// with the passed in handler. Pass in nullptr to remove the current handler
-    /// without registering a new one.
-
-    bool has_schema_change_notification_handler() const noexcept;
-    void set_schema_change_notification_handler(util::UniqueFunction<void()> new_handler) noexcept;
-
-    //@}
-
     // Conversion
     void schema_to_json(std::ostream& out, std::map<std::string, std::string>* renames = nullptr) const;
     void to_json(std::ostream& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr,
@@ -613,7 +591,6 @@ private:
     static std::optional<int> fake_target_file_format;
 
     util::UniqueFunction<void(const CascadeNotification&)> m_notify_handler;
-    util::UniqueFunction<void()> m_schema_change_handler;
     std::shared_ptr<metrics::Metrics> m_metrics;
     std::vector<ToDeleteRef> m_objects_to_delete;
     size_t m_total_rows;
@@ -694,7 +671,7 @@ private:
     void update_num_objects();
     /// Memory mappings must have been updated to reflect any growth in filesize before
     /// calling advance_transact()
-    void advance_transact(ref_type new_top_ref, util::InputStream*, bool writable);
+    void advance_transact(ref_type new_top_ref, bool writable);
     void refresh_dirty_accessors();
     void flush_accessors_for_commit();
 
@@ -792,7 +769,6 @@ private:
     static int get_target_file_format_version_for_session(int current_file_format_version, int history_type) noexcept;
 
     void send_cascade_notification(const CascadeNotification& notification) const;
-    void send_schema_change_notification() const;
 
     static void get_version_and_history_info(const Array& top, _impl::History::version_type& version,
                                              int& history_type, int& history_schema_version) noexcept;
@@ -1052,22 +1028,6 @@ inline void Group::send_cascade_notification(const CascadeNotification& notifica
 {
     REALM_ASSERT_DEBUG(m_notify_handler);
     m_notify_handler(notification);
-}
-
-inline bool Group::has_schema_change_notification_handler() const noexcept
-{
-    return !!m_schema_change_handler;
-}
-
-inline void Group::set_schema_change_notification_handler(util::UniqueFunction<void()> new_handler) noexcept
-{
-    m_schema_change_handler = std::move(new_handler);
-}
-
-inline void Group::send_schema_change_notification() const
-{
-    if (m_schema_change_handler)
-        m_schema_change_handler();
 }
 
 inline ref_type Group::get_history_ref(const Array& top) noexcept

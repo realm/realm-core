@@ -2674,8 +2674,7 @@ TransactionRef DB::start_write(bool nonblocking)
         version_type current_version = read_lock.m_version;
         m_alloc.init_mapping_management(current_version);
         if (Replication* repl = get_replication()) {
-            bool history_updated = false;
-            repl->initiate_transact(*tr, current_version, history_updated); // Throws
+            repl->initiate_transact(*tr); // Throws
         }
         g.release();
     }

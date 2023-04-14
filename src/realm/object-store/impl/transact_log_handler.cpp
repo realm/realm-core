@@ -18,12 +18,7 @@
 
 #include <realm/object-store/impl/transact_log_handler.hpp>
 
-#include <realm/object-store/binding_context.hpp>
-#include <realm/object-store/impl/collection_notifier.hpp>
-#include <realm/object-store/index_set.hpp>
 #include <realm/object-store/shared_realm.hpp>
-
-#include <realm/db.hpp>
 
 #include <algorithm>
 #include <numeric>
@@ -31,81 +26,54 @@
 using namespace realm;
 
 namespace {
-
-class KVOAdapter : public _impl::TransactionChangeInfo {
-public:
-    KVOAdapter(std::vector<BindingContext::ObserverState>& observers, BindingContext* context, bool is_rollback);
-
-    void before(Transaction& sg);
-    void after(Transaction& sg);
-
-private:
-    BindingContext* m_context;
-    std::vector<BindingContext::ObserverState>& m_observers;
-    std::vector<void*> m_invalidated;
-
-    struct ListInfo {
-        BindingContext::ObserverState* observer;
-        _impl::CollectionChangeBuilder builder;
-        ColKey col;
-    };
-    std::vector<ListInfo> m_lists;
-    VersionID m_version;
-    bool m_rollback;
+struct ListInfo {
+    BindingContext::ObserverState* observer;
+    _impl::CollectionChangeBuilder builder;
+    ColKey col;
 };
 
-KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, BindingContext* context,
-                       bool is_rollback)
-    : _impl::TransactionChangeInfo{}
-    , m_context(context)
-    , m_observers(observers)
-    , m_rollback(is_rollback)
+std::vector<ListInfo> prepare_kvo(_impl::TransactionChangeInfo& info,
+                                  std::vector<BindingContext::ObserverState>& observers, Group& group)
 {
-    if (m_observers.empty())
-        return;
-
     std::vector<TableKey> tables_needed;
-    for (auto& observer : observers) {
+    for (auto& observer : observers)
         tables_needed.push_back(observer.table_key);
-    }
     std::sort(begin(tables_needed), end(tables_needed));
     tables_needed.erase(std::unique(begin(tables_needed), end(tables_needed)), end(tables_needed));
 
-    auto realm = context->realm.lock();
-    auto& group = realm->read_group();
+    std::vector<ListInfo> lists;
     for (auto& observer : observers) {
         auto table = group.get_table(TableKey(observer.table_key));
         for (auto key : table->get_column_keys()) {
             if (table->get_column_attr(key).test(col_attr_List))
-                m_lists.push_back({&observer, {}, key});
+                lists.push_back({&observer, {}, key});
         }
     }
 
-    tables.reserve(tables_needed.size());
+    info.tables.reserve(tables_needed.size());
     for (auto& tbl : tables_needed)
-        tables[tbl] = {};
-    for (auto& list : m_lists)
-        collections.push_back({list.observer->table_key, list.observer->obj_key, list.col, &list.builder});
+        info.tables[tbl];
+    for (auto& list : lists)
+        info.collections.push_back({list.observer->table_key, list.observer->obj_key, list.col, &list.builder});
+
+    return lists;
 }
 
-void KVOAdapter::before(Transaction& sg)
+void complete_kvo(_impl::TransactionChangeInfo& info, std::vector<BindingContext::ObserverState>& observers,
+                  std::vector<void*>& invalidated, std::vector<ListInfo>& lists, bool is_rollback)
 {
-    if (!m_context)
+    if (observers.empty() || info.tables.empty())
         return;
 
-    m_version = sg.get_version_of_current_transaction();
-    if (tables.empty())
-        return;
-
-    for (auto& observer : m_observers) {
-        auto it = tables.find(observer.table_key);
-        if (it == tables.end())
+    for (auto& observer : observers) {
+        auto it = info.tables.find(observer.table_key);
+        if (it == info.tables.end())
             continue;
 
         auto const& table = it->second;
         auto key = observer.obj_key;
-        if (m_rollback ? table.insertions_contains(key) : table.deletions_contains(key)) {
-            m_invalidated.push_back(observer.info);
+        if (is_rollback ? table.insertions_contains(key) : table.deletions_contains(key)) {
+            invalidated.push_back(observer.info);
             continue;
         }
         auto column_modifications = table.get_columns_modified(key);
@@ -116,7 +84,7 @@ void KVOAdapter::before(Transaction& sg)
         }
     }
 
-    for (auto& list : m_lists) {
+    for (auto& list : lists) {
         if (list.builder.empty()) {
             // We may have pre-emptively marked the column as modified if the
             // LinkList was selected but the actual changes made ended up being
@@ -126,7 +94,7 @@ void KVOAdapter::before(Transaction& sg)
         }
         // If the containing row was deleted then changes will be empty
         if (list.observer->changes.empty()) {
-            REALM_ASSERT_DEBUG(tables[list.observer->table_key].deletions_contains(list.observer->obj_key));
+            REALM_ASSERT_DEBUG(info.tables[list.observer->table_key].deletions_contains(list.observer->obj_key));
             continue;
         }
         // otherwise the column should have been marked as modified
@@ -192,7 +160,7 @@ void KVOAdapter::before(Transaction& sg)
         // If we're rolling back a write transaction, insertions are actually
         // deletions and vice-versa. More complicated scenarios which would
         // require logic beyond this fortunately just aren't supported by KVO.
-        if (m_rollback) {
+        if (is_rollback) {
             switch (changes.kind) {
                 case BindingContext::ColumnInfo::Kind::Insert:
                     changes.kind = BindingContext::ColumnInfo::Kind::Remove;
@@ -205,15 +173,6 @@ void KVOAdapter::before(Transaction& sg)
             }
         }
     }
-    m_context->will_change(m_observers, m_invalidated);
-}
-
-void KVOAdapter::after(Transaction& sg)
-{
-    if (!m_context)
-        return;
-    m_context->did_change(m_observers, m_invalidated,
-                          m_version != VersionID{} && m_version != sg.get_version_of_current_transaction());
 }
 
 class TransactLogValidationMixin {
@@ -258,7 +217,7 @@ public:
         schema_error();
     }
 
-    // Additive changes and reorderings are supported
+    // Additive changes are supported
     bool insert_group_level_table(TableKey)
     {
         return true;
@@ -273,7 +232,6 @@ public:
     }
 
     // Non-schema changes are all allowed
-    void parse_complete() {}
     bool create_object(ObjKey)
     {
         return true;
@@ -316,6 +274,7 @@ public:
 // A transaction log handler that just validates that all operations made are
 // ones supported by the object store
 struct TransactLogValidator : public TransactLogValidationMixin {
+    bool schema_changed = false;
     bool modify_object(ColKey, ObjKey)
     {
         return true;
@@ -324,9 +283,25 @@ struct TransactLogValidator : public TransactLogValidationMixin {
     {
         return true;
     }
+    bool insert_group_level_table(TableKey)
+    {
+        schema_changed = true;
+        return true;
+    }
+    bool insert_column(ColKey)
+    {
+        schema_changed = true;
+        return true;
+    }
+    bool set_link_type(ColKey)
+    {
+        schema_changed = true;
+        return true;
+    }
+    void parse_complete() {}
 };
 
-// Extends TransactLogValidator to track changes made to LinkViews
+// Extends TransactLogValidator to track changes made to collections
 class TransactLogObserver : public TransactLogValidationMixin {
     _impl::TransactionChangeInfo& m_info;
     _impl::CollectionChangeBuilder* m_active_collection = nullptr;
@@ -479,148 +454,89 @@ public:
     }
 };
 
-class KVOTransactLogObserver : public TransactLogObserver {
-    KVOAdapter m_adapter;
-    _impl::NotifierPackage& m_notifiers;
-    Transaction& m_sg;
+} // anonymous namespace
 
-public:
-    KVOTransactLogObserver(std::vector<BindingContext::ObserverState>& observers, BindingContext* context,
-                           _impl::NotifierPackage& notifiers, Transaction& sg, bool is_rollback = false)
-        : TransactLogObserver(m_adapter)
-        , m_adapter(observers, context, is_rollback)
-        , m_notifiers(notifiers)
-        , m_sg(sg)
-    {
-    }
+namespace realm::_impl {
 
-    ~KVOTransactLogObserver()
-    {
-        m_adapter.after(m_sg);
-    }
-
-    void parse_complete()
-    {
-        TransactLogObserver::parse_complete();
-        m_adapter.before(m_sg);
-
-        m_notifiers.package_and_wait(m_sg.get_version_of_latest_snapshot());
-        m_notifiers.before_advance();
-    }
-};
-
-template <typename Func>
-void advance_with_notifications(BindingContext* context, const std::shared_ptr<Transaction>& sg, Func&& func,
-                                _impl::NotifierPackage& notifiers)
+RealmTransactionObserver::RealmTransactionObserver(Realm& realm, _impl::NotifierPackage* notifiers)
+    : m_realm(realm)
+    , m_notifiers(notifiers)
+    , m_context(realm.m_binding_context.get())
 {
-    auto old_version = sg->get_version_of_current_transaction();
-    std::vector<BindingContext::ObserverState> observers;
-    if (context) {
-        observers = context->get_observed_rows();
-    }
+    if (m_context)
+        m_observers = m_context->get_observed_rows();
+}
 
-    // Advancing to the latest version with notifiers requires using the full
-    // transaction log observer so that we have a point where we know what
-    // version we're going to before we actually advance to that version
-    if (observers.empty() && (!notifiers || notifiers.version())) {
-        notifiers.before_advance();
-        TransactLogValidator validator;
-        func(&validator);
-        auto new_version = sg->get_version_of_current_transaction();
-        if (context && old_version != new_version)
-            context->did_change({}, {});
-        // Each of these places where we call back to the user could close the
-        // Realm. Just return early if that happens.
-        if (sg->get_transact_stage() == DB::transact_Ready)
-            return;
-        if (context)
-            context->will_send_notifications();
-        if (sg->get_transact_stage() == DB::transact_Ready)
-            return;
-        notifiers.after_advance();
-        if (sg->get_transact_stage() == DB::transact_Ready)
-            return;
-        if (context)
-            context->did_send_notifications();
+void RealmTransactionObserver::will_reverse(Transaction&, util::Span<const char> transact_log)
+{
+    if (m_observers.empty())
+        return;
+
+    auto lists = prepare_kvo(m_info, m_observers, Realm::Internal::get_transaction(m_realm));
+    TransactLogObserver obs{m_info};
+    util::SimpleInputStream in(transact_log);
+    _impl::parse_transact_log(in, obs);
+    complete_kvo(m_info, m_observers, m_invalidated, lists, true);
+    m_context->did_change(m_observers, m_invalidated, false);
+}
+
+void RealmTransactionObserver::will_advance(Transaction& tr, DB::version_type old_version, DB::version_type new_version)
+{
+    if (old_version == new_version) {
+        if (m_notifiers)
+            m_notifiers->package_and_wait(new_version);
         return;
     }
 
-    if (context)
-        context->will_send_notifications();
-    {
-        KVOTransactLogObserver observer(observers, context, notifiers, *sg);
-        func(&observer);
+    if (!m_observers.empty()) {
+        auto lists = prepare_kvo(m_info, m_observers, tr);
+        TransactLogObserver obs{m_info};
+        tr.parse_history(obs, old_version, new_version);
+        complete_kvo(m_info, m_observers, m_invalidated, lists, false);
     }
-    notifiers.package_and_wait(
-        sg->get_version_of_current_transaction().version); // is a no-op if parse_complete() was called
-    notifiers.after_advance();
-    if (context)
-        context->did_send_notifications();
+    else {
+        TransactLogValidator validator;
+        tr.parse_history(validator, old_version, new_version);
+        m_info.schema_changed = validator.schema_changed;
+    }
+    if (m_notifiers) {
+        m_notifiers->package_and_wait(new_version);
+        m_notifiers->before_advance();
+    }
+    if (m_context) {
+        m_context->will_change(m_observers, m_invalidated);
+    }
 }
 
-} // anonymous namespace
-
-namespace realm {
-namespace _impl {
+void RealmTransactionObserver::did_advance(Transaction&, DB::version_type old_version, DB::version_type new_version)
+{
+    if (m_info.schema_changed) {
+        Realm::Internal::schema_changed(m_realm);
+    }
+    // Each of these places where we call back to the user could close the
+    // Realm, so we have to keep checking if it's still open. If it's been
+    // closed we don't make any more calls.
+    bool version_changed = old_version != new_version;
+    if (m_context && (version_changed || !m_observers.empty() || !m_invalidated.empty()))
+        m_context->did_change(m_observers, m_invalidated, version_changed);
+    if (m_realm.is_closed())
+        return;
+    if (m_context)
+        m_context->will_send_notifications();
+    if (m_realm.is_closed())
+        return;
+    if (m_notifiers)
+        m_notifiers->after_advance();
+    if (m_realm.is_closed())
+        return;
+    if (m_context)
+        m_context->did_send_notifications();
+}
 
 UnsupportedSchemaChange::UnsupportedSchemaChange()
     : std::logic_error(
           "Schema mismatch detected: another process has modified the Realm file's schema in an incompatible way")
 {
-}
-
-namespace transaction {
-void advance(Transaction& tr, BindingContext*, VersionID version)
-{
-    TransactLogValidator validator;
-    tr.advance_read(&validator, version);
-}
-
-void advance(const std::shared_ptr<Transaction>& tr, BindingContext* context, NotifierPackage&& notifiers)
-{
-    advance_with_notifications(
-        context, tr,
-        [&](auto&&... args) {
-            tr->advance_read(std::move(args)..., notifiers.version().value_or(VersionID{}));
-        },
-        notifiers);
-}
-
-void begin(const std::shared_ptr<Transaction>& tr, BindingContext* context, NotifierPackage&& notifiers)
-{
-    advance_with_notifications(
-        context, tr,
-        [&](auto&&... args) {
-            tr->promote_to_write(std::move(args)...);
-        },
-        notifiers);
-}
-
-void cancel(Transaction& tr, BindingContext* context)
-{
-    std::vector<BindingContext::ObserverState> observers;
-    if (context) {
-        observers = context->get_observed_rows();
-    }
-    if (observers.empty()) {
-        tr.rollback_and_continue_as_read();
-        return;
-    }
-
-    _impl::NotifierPackage notifiers;
-    KVOTransactLogObserver o(observers, context, notifiers, tr, true);
-    tr.rollback_and_continue_as_read(o);
-}
-
-void advance(Transaction& tr, TransactionChangeInfo& info, VersionID version)
-{
-    if (info.tables.empty() && info.collections.empty()) {
-        tr.advance_read(version);
-    }
-    else {
-        TransactLogObserver o(info);
-        tr.advance_read(&o, version);
-    }
 }
 
 void parse(Transaction& tr, TransactionChangeInfo& info, VersionID::version_type initial_version,
@@ -632,6 +548,4 @@ void parse(Transaction& tr, TransactionChangeInfo& info, VersionID::version_type
     }
 }
 
-} // namespace transaction
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl

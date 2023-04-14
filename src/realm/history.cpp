@@ -55,9 +55,9 @@ public:
         return m_alloc;
     }
 
-    void set_group(Group* group, bool updated) override
+    void set_group(Group* group, version_type version) override
     {
-        _impl::History::set_group(group, updated);
+        _impl::History::set_group(group, version);
         if (m_changesets)
             _impl::GroupFriend::set_history_parent(*m_group, *m_changesets);
     }
@@ -76,7 +76,6 @@ public:
     /// produced by the added changeset.
     version_type add_changeset(BinaryData);
 
-    void update_from_parent(version_type) override;
     void update_from_ref_and_version(ref_type, version_type) override;
     // void update_early_from_top_ref(version_type, size_t, ref_type) override;
     // void update_from_parent(version_type) override;
@@ -177,15 +176,9 @@ void InRealmHistory::verify() const
 #endif
 }
 
-void InRealmHistory::update_from_parent(version_type version)
-{
-    using gf = _impl::GroupFriend;
-    ref_type ref = gf::get_history_ref(*m_group);
-    update_from_ref_and_version(ref, version); // Throws
-}
-
 void InRealmHistory::update_from_ref_and_version(ref_type ref, version_type version)
 {
+    History::update_from_ref_and_version(ref, version);
     if (ref == 0) {
         // No history
         m_base_version = version;
@@ -276,5 +269,14 @@ std::unique_ptr<Replication> make_in_realm_history()
 {
     return std::unique_ptr<InRealmHistoryImpl>(new InRealmHistoryImpl()); // Throws
 }
+
+namespace _impl {
+void History::update_from_parent(version_type current_version)
+{
+    using gf = _impl::GroupFriend;
+    ref_type ref = gf::get_history_ref(*m_group);
+    update_from_ref_and_version(ref, current_version); // Throws
+}
+} // namespace _impl
 
 } // namespace realm

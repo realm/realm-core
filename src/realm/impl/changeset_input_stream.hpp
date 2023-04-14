@@ -28,55 +28,49 @@ namespace realm::_impl {
 class ChangesetInputStream : public util::InputStream {
 public:
     using version_type = History::version_type;
-    static constexpr unsigned NB_BUFFERS = 8;
 
     ChangesetInputStream(History& hist, version_type begin_version, version_type end_version)
         : m_history(hist)
         , m_begin_version(begin_version)
         , m_end_version(end_version)
     {
-        get_changeset();
     }
 
     util::Span<const char> next_block() override
     {
-        while (m_valid) {
+        while (get_changeset()) {
             if (BinaryData actual = m_changesets_begin->get_next(); actual.size() > 0) {
                 return actual;
             }
-
             m_changesets_begin++;
-
-            if (REALM_UNLIKELY(m_changesets_begin == m_changesets_end)) {
-                get_changeset();
-            }
         }
         return {nullptr, nullptr}; // End of input
     }
 
 private:
+    static constexpr version_type NB_BUFFERS = 8;
     History& m_history;
     version_type m_begin_version, m_end_version;
     BinaryIterator m_changesets[NB_BUFFERS]; // Buffer
     BinaryIterator* m_changesets_begin = nullptr;
     BinaryIterator* m_changesets_end = nullptr;
-    bool m_valid;
 
-    void get_changeset()
+    bool get_changeset() noexcept
     {
-        auto versions_to_get = m_end_version - m_begin_version;
-        m_valid = versions_to_get > 0;
-        if (!m_valid) {
-            return;
+        if (m_changesets_begin != m_changesets_end) {
+            return true;
+        }
+        auto versions_to_get = std::min(m_end_version - m_begin_version, NB_BUFFERS);
+        if (versions_to_get == 0) {
+            return false;
         }
 
-        if (versions_to_get > NB_BUFFERS)
-            versions_to_get = NB_BUFFERS;
         version_type end_version = m_begin_version + versions_to_get;
         m_history.get_changesets(m_begin_version, end_version, m_changesets);
         m_begin_version = end_version;
         m_changesets_begin = m_changesets;
         m_changesets_end = m_changesets_begin + versions_to_get;
+        return true;
     }
 };
 

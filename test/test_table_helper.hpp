@@ -65,9 +65,9 @@ public:
         return {};
     }
 
-    void do_initiate_transact(Group& group, version_type version, bool hist_updated) override
+    void do_initiate_transact(Group& group) override
     {
-        Replication::do_initiate_transact(group, version, hist_updated);
+        Replication::do_initiate_transact(group);
         m_group = &group;
     }
 

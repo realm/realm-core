@@ -46,7 +46,7 @@ void Replication::initialize(DB&)
     // Nothing needs to be done here
 }
 
-void Replication::do_initiate_transact(Group&, version_type, bool)
+void Replication::do_initiate_transact(Group&)
 {
     char* data = m_stream.get_data();
     size_t size = m_stream.get_size();

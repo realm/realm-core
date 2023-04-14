@@ -3312,7 +3312,7 @@ TEST_CASE("C API", "[c_api]") {
                         checked(realm_list_insert(strings.get(), 2, null));
                     });
                     CHECK(!state.error);
-                    CHECK(state.changes);
+                    REQUIRE(state.changes);
 
                     size_t num_deletion_ranges, num_insertion_ranges, num_modification_ranges, num_moves;
                     realm_collection_changes_get_num_ranges(state.changes.get(), &num_deletion_ranges,
@@ -3353,7 +3353,7 @@ TEST_CASE("C API", "[c_api]") {
                     });
                     REQUIRE(state.called);
                     CHECK(!state.error);
-                    CHECK(state.changes);
+                    REQUIRE(state.changes);
 
                     state.called = false;
                     write([&]() {
@@ -3382,7 +3382,7 @@ TEST_CASE("C API", "[c_api]") {
                         checked(realm_list_set(strings.get(), 2, str1));
                     });
                     CHECK(!state.error);
-                    CHECK(state.changes);
+                    REQUIRE(state.changes);
 
                     size_t num_deletion_ranges, num_insertion_ranges, num_modification_ranges, num_moves;
                     realm_collection_changes_get_num_ranges(state.changes.get(), &num_deletion_ranges,
@@ -3845,7 +3845,7 @@ TEST_CASE("C API", "[c_api]") {
                         checked(realm_set_insert(strings.get(), null, nullptr, nullptr));
                     });
                     CHECK(!state.error);
-                    CHECK(state.changes);
+                    REQUIRE(state.changes);
 
                     size_t num_deletion_ranges, num_insertion_ranges, num_modification_ranges, num_moves;
                     realm_collection_changes_get_num_ranges(state.changes.get(), &num_deletion_ranges,
@@ -4371,7 +4371,7 @@ TEST_CASE("C API", "[c_api]") {
                         checked(realm_dictionary_insert(strings.get(), rlm_str_val("c"), null, nullptr, nullptr));
                     });
                     CHECK(!state.error);
-                    CHECK(state.dictionary_changes);
+                    REQUIRE(state.dictionary_changes);
 
                     size_t num_deletions, num_insertions, num_modifications;
                     realm_dictionary_get_changes(state.dictionary_changes.get(), &num_deletions, &num_insertions,
@@ -4472,7 +4472,7 @@ TEST_CASE("C API", "[c_api]") {
                     checked(realm_object_delete(obj1.get()));
                 });
                 CHECK(!state.error);
-                CHECK(state.changes);
+                REQUIRE(state.changes);
                 bool deleted = realm_object_changes_is_deleted(state.changes.get());
                 CHECK(deleted);
             }
@@ -4484,7 +4484,7 @@ TEST_CASE("C API", "[c_api]") {
                     checked(realm_set_value(obj1.get(), foo_str_key, rlm_str_val("aaa"), false));
                 });
                 CHECK(!state.error);
-                CHECK(state.changes);
+                REQUIRE(state.changes);
                 bool deleted = realm_object_changes_is_deleted(state.changes.get());
                 CHECK(!deleted);
                 size_t num_modified = realm_object_changes_get_num_modified_properties(state.changes.get());
@@ -4514,7 +4514,7 @@ TEST_CASE("C API", "[c_api]") {
                 });
                 REQUIRE(state.called);
                 CHECK(!state.error);
-                CHECK(state.changes);
+                REQUIRE(state.changes);
                 realm_property_key_t modified_keys[2];
                 size_t n = realm_object_changes_get_modified_properties(state.changes.get(), modified_keys, 2);
                 CHECK(n == 1);

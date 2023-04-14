@@ -454,6 +454,7 @@ void NotifierPackage::package_and_wait(VersionID::version_type target_version)
     if (!m_coordinator || !*this)
         return;
 
+    REALM_ASSERT(target_version != VersionID{}.version);
     m_pin_tr = m_coordinator->package_notifiers(m_notifiers, target_version);
     if (m_pin_tr && m_pin_tr->get_version_of_current_transaction().version < target_version)
         m_pin_tr.reset();

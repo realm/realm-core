@@ -19,51 +19,38 @@
 #ifndef REALM_TRANSACT_LOG_HANDLER_HPP
 #define REALM_TRANSACT_LOG_HANDLER_HPP
 
-#include <cstdint>
-#include <stdexcept>
-#include <memory>
+#include <realm/object-store/binding_context.hpp>
+#include <realm/object-store/impl/collection_notifier.hpp>
+#include <realm/object-store/index_set.hpp>
 
-#include <realm/version_id.hpp>
+#include <realm/transaction.hpp>
 
-namespace realm {
-class BindingContext;
-class Transaction;
-
-namespace _impl {
+namespace realm::_impl {
 class NotifierPackage;
-struct TransactionChangeInfo;
 
 struct UnsupportedSchemaChange : std::logic_error {
     UnsupportedSchemaChange();
 };
 
-namespace transaction {
-// Advance the read transaction version, with change notifications sent to delegate
-// Must not be called from within a write transaction.
-void advance(const std::shared_ptr<Transaction>& sg, BindingContext* binding_context, NotifierPackage&&);
-void advance(Transaction& sg, BindingContext* binding_context, VersionID);
+class RealmTransactionObserver : public Transaction::Observer {
+public:
+    RealmTransactionObserver(Realm& realm, NotifierPackage* notifiers = nullptr);
 
-// Begin a write transaction
-// If the read transaction version is not up to date, will first advance to the
-// most recent read transaction and sent notifications to delegate
-void begin(const std::shared_ptr<Transaction>& sg, BindingContext* binding_context, NotifierPackage&&);
+    void will_advance(Transaction&, DB::version_type old_version, DB::version_type new_version) override;
+    void did_advance(Transaction&, DB::version_type old_version, DB::version_type new_version) override;
+    void will_reverse(Transaction&, util::Span<const char>) override;
 
-// Cancel a write transaction and roll back all changes, with change notifications
-// for reverting to the old values sent to delegate
-void cancel(Transaction& sg, BindingContext* binding_context);
+private:
+    Realm& m_realm;
+    _impl::TransactionChangeInfo m_info;
+    std::vector<BindingContext::ObserverState> m_observers;
+    std::vector<void*> m_invalidated;
+    _impl::NotifierPackage* m_notifiers;
+    BindingContext* m_context;
+};
 
-// Advance the read transaction version, with change information gathered in info
-void advance(Transaction& sg, TransactionChangeInfo& info, VersionID version = VersionID{});
-
-// Parse the transaction logs between initial_version and end_version,
-// populating `info` with the results. initial_version must be a version that
-// has not been pruned (i.e. greater than or equal to the oldest pinned live
-// version) and end_version must be less than or equal to the transaction's
-// version.
 void parse(Transaction& tr, TransactionChangeInfo& info, VersionID::version_type initial_version,
            VersionID::version_type end_version);
-} // namespace transaction
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif /* REALM_TRANSACT_LOG_HANDLER_HPP */

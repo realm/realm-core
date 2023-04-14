@@ -91,7 +91,7 @@ public:
 
 protected:
     // Replication interface:
-    void do_initiate_transact(Group& group, version_type current_version, bool history_updated) override;
+    void do_initiate_transact(Group& group) override;
 
     virtual util::UniqueFunction<WriteValidator> make_write_validator(Transaction&)
     {

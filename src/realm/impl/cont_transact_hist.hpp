@@ -38,7 +38,7 @@ class History {
 public:
     using version_type = VersionID::version_type;
 
-    virtual ~History() noexcept {}
+    virtual ~History() = default;
 
     /// May be called during any transaction
     ///
@@ -46,8 +46,12 @@ public:
     /// updated - that is, the mapping is updated to provide full visibility to
     /// the file.
     ///
-    virtual void update_from_ref_and_version(ref_type, version_type) = 0;
-    virtual void update_from_parent(version_type version) = 0;
+    virtual void update_from_ref_and_version(ref_type, version_type version)
+    {
+        m_updated_version = version;
+    }
+
+    void update_from_parent(version_type version);
 
     /// Get all changesets between the specified versions. References to those
     /// changesets will be made available in successive entries of `buffer`. The
@@ -120,17 +124,17 @@ public:
         return true;
     }
 
-    virtual void set_group(Group* group, bool updated = false)
+    virtual void set_group(Group* group, version_type version = 0)
     {
         m_group = group;
-        m_updated = updated;
+        m_updated_version = version;
     }
 
     void ensure_updated(version_type version) const
     {
-        if (!m_updated) {
+        if (version > m_updated_version) {
             const_cast<History*>(this)->update_from_parent(version);
-            m_updated = true;
+            m_updated_version = version;
         }
     }
 
@@ -138,7 +142,7 @@ protected:
     Group* m_group = nullptr;
 
 private:
-    mutable bool m_updated = false;
+    mutable version_type m_updated_version = 0;
 };
 
 } // namespace _impl

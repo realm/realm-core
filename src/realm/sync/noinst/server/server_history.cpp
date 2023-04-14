@@ -1367,15 +1367,6 @@ auto ServerHistory::prepare_changeset(const char* data, std::size_t size, versio
 
 
 // Overriding member in _impl::History
-void ServerHistory::update_from_parent(version_type realm_version)
-{
-    using gf = _impl::GroupFriend;
-    ref_type ref = gf::get_history_ref(*m_group);
-    update_from_ref_and_version(ref, realm_version); // Throws
-}
-
-
-// Overriding member in _impl::History
 void ServerHistory::get_changesets(version_type begin_version, version_type end_version,
                                    BinaryIterator* iterators) const noexcept
 {
@@ -1669,6 +1660,7 @@ private:
 // Overriding member in _impl::History
 void ServerHistory::update_from_ref_and_version(ref_type ref, version_type realm_version)
 {
+    History::update_from_ref_and_version(ref, realm_version);
     if (ref == 0) {
         // No history schema yet
         m_local_file_ident = g_root_node_file_ident;

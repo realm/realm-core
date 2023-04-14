@@ -1406,7 +1406,7 @@ TEST_CASE("notifications: sync") {
          }},
     };
 
-    SECTION("sync progress commits do not distrupt notifications") {
+    SECTION("sync progress commits do not disrupt notifications") {
         auto r = Realm::get_shared_realm(config);
         auto wait_realm = Realm::get_shared_realm(config);
 

@@ -62,6 +62,7 @@ class AnyHandover;
 class CollectionNotifier;
 class RealmCoordinator;
 class RealmFriend;
+class RealmTransactionObserver;
 } // namespace _impl
 
 // A callback function to be called during a migration for Automatic and
@@ -216,7 +217,7 @@ public:
 
     // Updates a Realm to a given schema, using the Realm's pre-set schema mode.
     void update_schema(Schema schema, uint64_t version = 0, MigrationFunction migration_function = nullptr,
-                       DataInitializationFunction initialization_function = nullptr, bool in_transaction = false);
+                       DataInitializationFunction initialization_function = nullptr);
 
     void rename_property(Schema schema, StringData object_type, StringData old_name, StringData new_name);
 
@@ -455,6 +456,7 @@ public:
     class Internal {
         friend class _impl::CollectionNotifier;
         friend class _impl::RealmCoordinator;
+        friend class _impl::RealmTransactionObserver;
         friend class TestHelper;
         friend class ThreadSafeReference;
 
@@ -475,6 +477,11 @@ public:
         static void copy_schema(Realm& target_realm, const Realm& source_realm)
         {
             target_realm.copy_schema_from(source_realm);
+        }
+
+        static void schema_changed(Realm& realm)
+        {
+            realm.schema_changed();
         }
 
         // CollectionNotifier needs to be able to access the owning
@@ -552,7 +559,7 @@ private:
     // version of the file
     void read_schema_from_group_if_needed();
 
-    void add_schema_change_handler();
+    void schema_changed();
     void cache_new_schema();
     void translate_schema_error();
     void notify_schema_changed();

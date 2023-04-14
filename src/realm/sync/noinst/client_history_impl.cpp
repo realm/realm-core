@@ -1094,9 +1094,9 @@ void ClientHistory::fix_up_client_file_ident_in_stored_changesets(Transaction& g
     root.set(s_progress_uploadable_bytes_iip, RefOrTagged::make_tagged(uploadable_bytes));
 }
 
-void ClientHistory::set_group(Group* group, bool updated)
+void ClientHistory::set_group(Group* group, version_type version)
 {
-    _impl::History::set_group(group, updated);
+    _impl::History::set_group(group, version);
     if (m_arrays)
         _impl::GroupFriend::set_history_parent(*m_group, m_arrays->root);
 }
@@ -1165,6 +1165,7 @@ void ClientHistory::record_current_schema_version(Array& schema_versions, versio
 // Overriding member function in realm::_impl::History
 void ClientHistory::update_from_ref_and_version(ref_type ref, version_type version)
 {
+    History::update_from_ref_and_version(ref, version);
     if (ref == 0) {
         // No history
         m_ct_history_base_version = version;
@@ -1193,15 +1194,6 @@ void ClientHistory::update_from_ref_and_version(ref_type ref, version_type versi
         version_type(root.get_as_ref_or_tagged(s_progress_download_server_version_iip).get_as_int());
     m_progress_download.last_integrated_client_version =
         version_type(root.get_as_ref_or_tagged(s_progress_download_client_version_iip).get_as_int());
-}
-
-
-// Overriding member function in realm::_impl::History
-void ClientHistory::update_from_parent(version_type current_version)
-{
-    using gf = _impl::GroupFriend;
-    ref_type ref = gf::get_history_ref(*m_group);
-    update_from_ref_and_version(ref, current_version); // Throws
 }
 
 

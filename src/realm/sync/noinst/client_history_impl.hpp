@@ -448,9 +448,8 @@ private:
     }
 
     // Overriding member functions in realm::_impl::History
-    void set_group(Group* group, bool updated = false) override;
+    void set_group(Group* group, version_type version) override;
     void update_from_ref_and_version(ref_type ref, version_type version) override;
-    void update_from_parent(version_type current_version) override;
     void get_changesets(version_type, version_type, BinaryIterator*) const noexcept override;
     void set_oldest_bound_version(version_type) override;
     void verify() const override;
