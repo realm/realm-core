@@ -225,7 +225,6 @@ void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status 
     // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
     {
         util::CheckedUniqueLock lock(m_state_mutex);
-        // Logged out, also free any pending subscription waiters
         cancel_pending_waits(std::move(lock), error_code);
     }
     if (user) {
@@ -782,8 +781,6 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     switch (next_state) {
         case NextStateAfterError::none:
             if (config(&SyncConfig::cancel_waits_on_nonfatal_error)) {
-                // The connection will be re-established at some point, so
-                // keep the pending subscription waiters active
                 cancel_pending_waits(std::move(lock), sync_error.to_status()); // unlocks the mutex
             }
             break;
