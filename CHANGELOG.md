@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Clear out SubscriptionStore and cancel pending notifications upon rollback to PBS after client migration to FLX. ([#6389](https://github.com/realm/realm-core/issues/6389))
 
 ----------------------------------------------
 
@@ -44,7 +44,6 @@
 * The following unused util headers have been deleted: call_with_tuple.hpp, get_file_size.hpp, inspect.hpp, substitute.hpp, type_list.hpp, and utf8.hpp.
 * Add migrated state information to flexible sync client BIND message for backfilling PBS partition value in objects once client has migrated to FLX. ([PR #6464](https://github.com/realm/realm-core/pull/6464))
 * Add unit test for MigrationStore ([PR #6495](https://github.com/realm/realm-core/pull/6495))
-* Clear out SubscriptionStore and cancel pending notifications upon rollback to PBS after client migration to FLX. ([#6389](https://github.com/realm/realm-core/issues/6389))
 
 ----------------------------------------------
 
