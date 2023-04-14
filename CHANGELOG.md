@@ -1,7 +1,6 @@
-# NEXT RELEASE
+# 13.9.1 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * None.
 
 ### Fixed
