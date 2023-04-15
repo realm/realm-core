@@ -736,11 +736,13 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
         // is disabled. In this scenario we attempt an automatic token refresh and if that succeeds continue as
         // normal. If the refresh request also fails with 401 then we need to stop retrying and pass along the error;
         // see handle_refresh().
-        bool restart_session = error_code == sync::websocket::WebSocketError::websocket_moved_permanently;
-        if (restart_session || error_code == sync::websocket::WebSocketError::websocket_unauthorized ||
+        bool redirect_occurred = error_code == sync::websocket::WebSocketError::websocket_moved_permanently;
+        if (redirect_occurred || error_code == sync::websocket::WebSocketError::websocket_unauthorized ||
             error_code == sync::websocket::WebSocketError::websocket_abnormal_closure) {
             if (auto u = user()) {
-                u->refresh_custom_data(handle_refresh(shared_from_this(), restart_session));
+                // If a redirection occurred, the location metadata will be updated before refreshing the access
+                // token.
+                u->refresh_custom_data(handle_refresh(shared_from_this(), redirect_occurred), redirect_occurred);
                 return;
             }
         }

@@ -285,8 +285,9 @@ public:
     void register_session(std::shared_ptr<SyncSession>) REQUIRES(!m_mutex);
 
     /// Refreshes the custom data for this user
-    void refresh_custom_data(util::UniqueFunction<void(util::Optional<app::AppError>)> completion_block)
-        REQUIRES(!m_mutex);
+    /// If refresh_location is true, the location metadata will be queried before the request
+    void refresh_custom_data(util::UniqueFunction<void(util::Optional<app::AppError>)> completion_block,
+                             bool refresh_location = false) REQUIRES(!m_mutex);
 
     /// Checks the expiry on the access token against the local time and if it is invalid or expires soon, returns
     /// true.

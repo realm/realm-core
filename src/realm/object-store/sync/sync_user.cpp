@@ -480,7 +480,8 @@ void SyncUser::set_binding_context_factory(SyncUserContextFactory factory)
     s_binding_context_factory = std::move(factory);
 }
 
-void SyncUser::refresh_custom_data(util::UniqueFunction<void(util::Optional<app::AppError>)> completion_block)
+void SyncUser::refresh_custom_data(util::UniqueFunction<void(util::Optional<app::AppError>)> completion_block,
+                                   bool refresh_location)
 {
     std::shared_ptr<app::App> app;
     std::shared_ptr<SyncUser> user;
@@ -505,12 +506,15 @@ void SyncUser::refresh_custom_data(util::UniqueFunction<void(util::Optional<app:
     }
     else {
         std::weak_ptr<SyncUser> weak_user = user->weak_from_this();
-        app->refresh_custom_data(user, [completion_block = std::move(completion_block), weak_user](auto error) {
-            if (auto strong = weak_user.lock()) {
-                strong->emit_change_to_subscribers(*strong);
-            }
-            completion_block(error);
-        });
+        app->refresh_custom_data(
+            user,
+            [completion_block = std::move(completion_block), weak_user](auto error) {
+                if (auto strong = weak_user.lock()) {
+                    strong->emit_change_to_subscribers(*strong);
+                }
+                completion_block(error);
+            },
+            refresh_location);
     }
 }
 

@@ -266,8 +266,9 @@ public:
 
     /// Refreshes the custom data for a specified user
     /// @param user The user you want to refresh
+    /// @param refresh_location If true, the location metadata will be updated before refresh
     void refresh_custom_data(const std::shared_ptr<SyncUser>& user,
-                             util::UniqueFunction<void(util::Optional<AppError>)>&&);
+                             util::UniqueFunction<void(util::Optional<AppError>)>&&, bool refresh_location = false);
 
     /// Log out the given user if they are not already logged out.
     void log_out(const std::shared_ptr<SyncUser>& user,
@@ -404,8 +405,10 @@ private:
 
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion Passes an error should one occur.
+    /// @param refresh_location If true, the location metadata will be updated before refresh
     void refresh_access_token(const std::shared_ptr<SyncUser>& user,
-                              util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
+                              util::UniqueFunction<void(util::Optional<AppError>)>&& completion,
+                              bool refresh_location = false);
 
     /// Checks if an auth failure has taken place and if so it will attempt to refresh the
     /// access token and then perform the orginal request again with the new access token

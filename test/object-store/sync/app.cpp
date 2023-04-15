@@ -2209,7 +2209,10 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             std::string redirect_host = "127.0.0.1:9090";
             std::string redirect_url = "http://127.0.0.1:9090";
             redir_transport->request_hook = [&](const Request& request) {
+                logger->trace("Received request[%1]: %2", request_count, request.url);
                 if (request_count == 0) {
+                    // First request should be to location
+                    REQUIRE(request.url.find_first_of("/location") != std::string::npos);
                     if (request.url.find("https://") != std::string::npos) {
                         redirect_scheme = "https://";
                     }
@@ -2357,8 +2360,10 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         std::string websocket_url = "ws://some-websocket:9090";
         std::string original_url;
         redir_transport->request_hook = [&](const Request& request) {
+            logger->trace("Received request[%1]: %2", request_count, request.url);
             if (request_count == 0) {
-                logger->trace("request.url (%1): %2", request_count, request.url);
+                // First request should be to location
+                REQUIRE(request.url.find_first_of("/location") != std::string::npos);
                 if (request.url.find("https://") != std::string::npos) {
                     original_scheme = "https://";
                 }
@@ -2435,6 +2440,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
         auto redir_transport = std::make_shared<HookedTransport>();
         auto redir_provider = std::make_shared<HookedSocketProvider>(logger, "");
+        std::mutex logout_mutex;
+        std::condition_variable logout_cv;
+        bool logged_out = false;
 
         // Use the transport to grab the current url so it can be converted
         redir_transport->request_hook = [&](const Request& request) {
@@ -2465,9 +2473,12 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         auto user1 = test_session.app()->current_user();
         SyncTestFile r_config(user1, partition, schema);
         // Overrride the default
-        r_config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
+        r_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
             if (error.get_system_error() == sync::make_error_code(realm::sync::ProtocolError::bad_authentication)) {
                 util::format(std::cerr, "Websocket redirect test: User logged out\n");
+                std::unique_lock lk(logout_mutex);
+                logged_out = true;
+                logout_cv.notify_one();
                 return;
             }
             util::format(std::cerr, "An unexpected sync error was caught by the default SyncTestFile handler: '%1'\n",
@@ -2497,7 +2508,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             redir_transport->request_hook = [&](const Request& request) {
                 if (request_count++ == 0) {
                     logger->trace("request.url (%1): %2", request_count, request.url);
-                    REQUIRE(!request.redirect_count);
+                    // First request should be to location
+                    REQUIRE(request.url.find_first_of("/location") != std::string::npos);
+                    REQUIRE(request.redirect_count == 0);
                     redir_transport->simulated_response = {
                         static_cast<int>(sync::HTTPStatus::PermanentRedirect),
                         0,
@@ -2523,6 +2536,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
             sync_session->resume();
             REQUIRE(!wait_for_download(*r));
+            REQUIRE(user1->is_logged_in());
 
             // Verify session is using the updated server url from the redirect
             auto server_url = sync_session->full_realm_url();
@@ -2547,7 +2561,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             redir_transport->request_hook = [&](const Request& request) {
                 if (request_count++ == 0) {
                     logger->trace("request.url (%1): %2", request_count, request.url);
-                    REQUIRE(!request.redirect_count);
+                    // First request should be to location
+                    REQUIRE(request.url.find_first_of("/location") != std::string::npos);
+                    REQUIRE(request.redirect_count == 0);
                     redir_transport->simulated_response = {
                         static_cast<int>(sync::HTTPStatus::MovedPermanently),
                         0,
@@ -2580,6 +2596,10 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
             sync_session->resume();
             REQUIRE(wait_for_download(*r));
+            std::unique_lock lk(logout_mutex);
+            REQUIRE(logout_cv.wait_for(lk, std::chrono::seconds(15), [&]() {
+                return logged_out;
+            }));
             REQUIRE(!user1->is_logged_in());
         }
     }
