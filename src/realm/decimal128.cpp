@@ -122,20 +122,20 @@ static const BID_UINT128 bid_roundbound_128[] = {
     {{0ull, (1ull << 63)}},      // BID_ROUNDING_TO_NEAREST | negative | even
     {{~0ull, (1ull << 63) - 1}}, // BID_ROUNDING_TO_NEAREST | negative | odd
 
-    {{~0ull, ~0ull}}, // BID_ROUNDING_DOWN       | positive | even
-    {{~0ull, ~0ull}}, // BID_ROUNDING_DOWN       | positive | odd
-    {{0ull, 0ull}},   // BID_ROUNDING_DOWN       | negative | even
-    {{0ull, 0ull}},   // BID_ROUNDING_DOWN       | negative | odd
+    {{~0ull, ~0ull}},            // BID_ROUNDING_DOWN       | positive | even
+    {{~0ull, ~0ull}},            // BID_ROUNDING_DOWN       | positive | odd
+    {{0ull, 0ull}},              // BID_ROUNDING_DOWN       | negative | even
+    {{0ull, 0ull}},              // BID_ROUNDING_DOWN       | negative | odd
 
-    {{0ull, 0ull}},   // BID_ROUNDING_UP         | positive | even
-    {{0ull, 0ull}},   // BID_ROUNDING_UP         | positive | odd
-    {{~0ull, ~0ull}}, // BID_ROUNDING_UP         | negative | even
-    {{~0ull, ~0ull}}, // BID_ROUNDING_UP         | negative | odd
+    {{0ull, 0ull}},              // BID_ROUNDING_UP         | positive | even
+    {{0ull, 0ull}},              // BID_ROUNDING_UP         | positive | odd
+    {{~0ull, ~0ull}},            // BID_ROUNDING_UP         | negative | even
+    {{~0ull, ~0ull}},            // BID_ROUNDING_UP         | negative | odd
 
-    {{~0ull, ~0ull}}, // BID_ROUNDING_TO_ZERO    | positive | even
-    {{~0ull, ~0ull}}, // BID_ROUNDING_TO_ZERO    | positive | odd
-    {{~0ull, ~0ull}}, // BID_ROUNDING_TO_ZERO    | negative | even
-    {{~0ull, ~0ull}}, // BID_ROUNDING_TO_ZERO    | negative | odd
+    {{~0ull, ~0ull}},            // BID_ROUNDING_TO_ZERO    | positive | even
+    {{~0ull, ~0ull}},            // BID_ROUNDING_TO_ZERO    | positive | odd
+    {{~0ull, ~0ull}},            // BID_ROUNDING_TO_ZERO    | negative | even
+    {{~0ull, ~0ull}},            // BID_ROUNDING_TO_ZERO    | negative | odd
 
     {{~0ull, (1ull << 63) - 1}}, // BID_ROUNDING_TIES_AWAY  | positive | even
     {{~0ull, (1ull << 63) - 1}}, // BID_ROUNDING_TIES_AWAY  | positive | odd
@@ -1559,6 +1559,20 @@ int Decimal128::compare(const Decimal128& rhs) const noexcept
     return lhs_is_nan ? -1 : 1;
 }
 
+int Decimal128::compareTotalOrdering(const Decimal128& rhs) const noexcept
+{
+    int lr;
+    int rl;
+    BID_UINT128 l = to_BID_UINT128(*this);
+    BID_UINT128 r = to_BID_UINT128(rhs);
+    bid128_totalOrder(&lr, &l, &r);
+    bid128_totalOrder(&rl, &r, &l);
+    if (lr && rl) return 0;
+    if (lr) return -1;
+    if (rl) return 1;
+    return 0;
+}
+
 bool Decimal128::operator<(const Decimal128& rhs) const noexcept
 {
     return compare(rhs) < 0;
@@ -1672,6 +1686,15 @@ Decimal128& Decimal128::operator-=(Decimal128 rhs) noexcept
     memcpy(this, &res, sizeof(Decimal128));
     return *this;
 }
+
+Decimal128 Decimal128::operator-() const noexcept 
+{
+    BID_UINT128 x = to_BID_UINT128(*this);
+    BID_UINT128 res;
+    bid128_negate(&res, &x);
+    return to_decimal128(res);
+}
+
 
 bool Decimal128::is_valid_str(StringData str) noexcept
 {

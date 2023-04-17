@@ -78,6 +78,7 @@ public:
     bool operator>=(const Decimal128& rhs) const noexcept;
 
     int compare(const Decimal128& rhs) const noexcept;
+    int compareTotalOrdering(const Decimal128& rhs) const noexcept;
 
     Decimal128 operator*(int64_t mul) const noexcept;
     Decimal128 operator*(size_t mul) const noexcept;
@@ -109,6 +110,7 @@ public:
         ret -= rhs;
         return ret;
     }
+    Decimal128 operator-() const noexcept;
 
     std::string to_string() const noexcept;
     Bid64 to_bid64() const;
