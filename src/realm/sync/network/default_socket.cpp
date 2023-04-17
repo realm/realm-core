@@ -1,10 +1,10 @@
 #include <realm/sync/network/default_socket.hpp>
 
 #include <realm/sync/binding_callback_thread_observer.hpp>
-
 #include <realm/sync/network/network.hpp>
 #include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/network/websocket.hpp>
+#include <realm/util/random.hpp>
 #include <realm/util/scope_exit.hpp>
 
 namespace realm::sync::websocket {
