@@ -4718,15 +4718,16 @@ TEST(Parser_Mixed)
     verify_query(test_context, table, "mixed like bin(\"Strin*\")", 1); // 28
     verify_query(test_context, table, "mixed endswith \"4\"", 5); // 4, 24, 44, 64, 84
     verify_query(test_context, table, "mixed endswith bin(\"4\")", 0);
+    verify_query(test_context, table, "mixed endswith bin(\"Binary\")", 1);
     verify_query(test_context, table, "mixed == oid(" + id.to_string() + ")", 1);
 
-    char bin[1] = {'4'};
-    std::any args[] = {BinaryData(bin),
+    std::string str_value = "4";
+    std::any args[] = {BinaryData(str_value),
                        ObjLink(table->get_key(), table->begin()->get_key()),
                        ObjLink(origin->get_key(), origin->begin()->get_key()),
                        ObjLink(TableKey(), ObjKey()), // null link
                        realm::null{},
-                       StringData(bin)};
+                       StringData(str_value)};
     size_t num_args = 6;
     verify_query_sub(test_context, table, "mixed endswith $0", args, num_args, 0);
     verify_query_sub(test_context, table, "mixed endswith $5", args, num_args, 5); // 4, 24, 44, 64, 84
