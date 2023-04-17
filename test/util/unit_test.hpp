@@ -34,7 +34,6 @@
 #include <realm/util/features.h>
 #include <realm/util/logger.hpp>
 #include <realm/util/safe_int_ops.hpp>
-#include <realm/util/type_traits.hpp>
 
 
 #define TEST(name) TEST_IF(name, true)
@@ -195,6 +194,13 @@ static const bool running_with_tsan = false;
 static const bool running_with_asan = true;
 #else
 static const bool running_with_asan = false;
+#endif
+
+#if REALM_ANDROID || REALM_IOS
+// android doesn't implement posix_spawn(), iOS doesn't permit starting another process
+constexpr bool testing_supports_spawn_process = false;
+#else
+constexpr bool testing_supports_spawn_process = !running_with_valgrind && !running_with_tsan && !running_with_asan;
 #endif
 
 //@{

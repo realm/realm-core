@@ -264,6 +264,9 @@ public:
 
 protected:
     friend class SubscriptionStore;
+    // Allow the MigrationStore access to insert_sub because it cannot use insert_or_assign due to having the query as
+    // a string and not a Query object.
+    friend class MigrationStore;
 
     MutableSubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj,
                            MakingMutableCopy making_mutable_copy = MakingMutableCopy{false});

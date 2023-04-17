@@ -151,6 +151,15 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
         property.is_fulltext_indexed = table->search_index_type(col_key) == IndexType::Fulltext;
         property.column_key = col_key;
 
+        // account for nesting collections
+        const auto nesting_levels = table->get_nesting_levels(col_key);
+        if (nesting_levels > 0) {
+            property.nested_types.reserve(nesting_levels);
+            for (size_t i = 0; i < nesting_levels; ++i) {
+                property.nested_types.push_back(table->get_nested_column_type(col_key, i));
+            }
+        }
+
         if (property.type == PropertyType::Object) {
             // set link type for objects and arrays
             ConstTableRef linkTable = table->get_link_target(col_key);

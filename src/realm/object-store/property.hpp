@@ -27,7 +27,6 @@
 #include <realm/util/tagged_bool.hpp>
 
 #include <string>
-
 namespace realm {
 class BinaryData;
 class Decimal128;
@@ -59,6 +58,7 @@ enum class PropertyType : unsigned short {
     Required = 0,
     Nullable = 64,
     Array = 128,
+
     Set = 256,
     Dictionary = 512,
 
@@ -96,6 +96,8 @@ struct Property {
     IsPrimary is_primary = false;
     IsIndexed is_indexed = false;
     IsFulltextIndexed is_fulltext_indexed = false;
+    using NestedTypes = std::vector<CollectionType>;
+    NestedTypes nested_types;
 
     ColKey column_key;
 
@@ -107,7 +109,12 @@ struct Property {
     // Text property with fulltext index
     Property(std::string name, IsFulltextIndexed indexed, std::string public_name = "");
 
+    // Link to another object
     Property(std::string name, PropertyType type, std::string object_type, std::string link_origin_property_name = "",
+             std::string public_name = "");
+
+    // Nested collections
+    Property(std::string name, PropertyType type, const NestedTypes& nested_types, std::string object_type = "",
              std::string public_name = "");
 
     Property(Property const&) = default;
@@ -127,6 +134,7 @@ struct Property {
 
     bool type_is_indexable() const noexcept;
     bool type_is_nullable() const noexcept;
+    size_t type_nesting_levels() const noexcept;
 
     std::string type_string() const;
 };
@@ -336,6 +344,18 @@ inline Property::Property(std::string name, PropertyType type, std::string objec
 {
 }
 
+inline Property::Property(std::string name, PropertyType type, const NestedTypes& nested_types,
+                          std::string target_type, std::string public_name)
+    : name(std::move(name))
+    , public_name(std::move(public_name))
+    , type(type)
+    , object_type(std::move(target_type))
+    , nested_types(nested_types)
+{
+    REALM_ASSERT(is_collection(type));
+    REALM_ASSERT((type == PropertyType::Object) == (object_type.size() != 0));
+}
+
 inline bool Property::type_is_indexable() const noexcept
 {
     return !is_collection(type) &&
@@ -350,26 +370,52 @@ inline bool Property::type_is_nullable() const noexcept
            type != PropertyType::LinkingObjects;
 }
 
+inline size_t Property::type_nesting_levels() const noexcept
+{
+    return nested_types.size();
+}
+
 inline std::string Property::type_string() const
 {
+    std::string nested;
+    std::string closing_brackets;
+    for (auto& type : nested_types) {
+        switch (type) {
+            case CollectionType::List:
+                nested += "array<";
+                break;
+            case CollectionType::Dictionary:
+                nested += "dictionary<string,";
+                break;
+            case CollectionType::Set:
+                REALM_UNREACHABLE();
+                break;
+        }
+        closing_brackets += ">";
+    }
+
     if (is_array(type)) {
         if (type == PropertyType::Object)
             return "array<" + object_type + ">";
         if (type == PropertyType::LinkingObjects)
             return "linking objects<" + object_type + ">";
-        return std::string("array<") + string_for_property_type(type & ~PropertyType::Flags) + ">";
+        const auto str = std::string("array<") + string_for_property_type(type & ~PropertyType::Flags) + ">";
+        return nested + str + closing_brackets;
     }
     if (is_set(type)) {
         REALM_ASSERT(type != PropertyType::LinkingObjects);
         if (type == PropertyType::Object)
             return "set<" + object_type + ">";
-        return std::string("set<") + string_for_property_type(type & ~PropertyType::Flags) + ">";
+        const auto str = std::string("set<") + string_for_property_type(type & ~PropertyType::Flags) + ">";
+        return nested + str + closing_brackets;
     }
     if (is_dictionary(type)) {
         REALM_ASSERT(type != PropertyType::LinkingObjects);
         if (type == PropertyType::Object)
             return "dictionary<string, " + object_type + ">";
-        return std::string("dictionary<string, ") + string_for_property_type(type & ~PropertyType::Flags) + ">";
+        const auto str =
+            std::string("dictionary<string, ") + string_for_property_type(type & ~PropertyType::Flags) + ">";
+        return nested + str + closing_brackets;
     }
     switch (auto base_type = (type & ~PropertyType::Flags)) {
         case PropertyType::Object:
@@ -388,7 +434,8 @@ inline bool operator==(Property const& lft, Property const& rgt)
     return to_underlying(lft.type) == to_underlying(rgt.type) && lft.is_primary == rgt.is_primary &&
            lft.requires_index() == rgt.requires_index() &&
            lft.requires_fulltext_index() == rgt.requires_fulltext_index() && lft.name == rgt.name &&
-           lft.object_type == rgt.object_type && lft.link_origin_property_name == rgt.link_origin_property_name;
+           lft.object_type == rgt.object_type && lft.link_origin_property_name == rgt.link_origin_property_name &&
+           lft.nested_types == rgt.nested_types;
 }
 } // namespace realm
 

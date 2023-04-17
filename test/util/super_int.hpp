@@ -24,7 +24,6 @@
 #include <ostream>
 
 #include <realm/util/features.h>
-#include <realm/util/type_traits.hpp>
 #include <realm/util/safe_int_ops.hpp>
 
 namespace realm {

@@ -18,7 +18,6 @@
 
 #include "misc.hpp"
 
-
 namespace realm {
 namespace test_util {
 

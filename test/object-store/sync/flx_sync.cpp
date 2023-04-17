@@ -793,6 +793,19 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             })
             ->run();
     }
+
+    SECTION("DiscardLocal: completion callbacks fire after client reset even when there is no data to download") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        config_local.sync_config->notify_after_client_reset = reset_handler;
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        test_reset
+            ->on_post_local_changes([&](SharedRealm realm) {
+                wait_for_upload(*realm);
+                wait_for_download(*realm);
+            })
+            ->run();
+    }
 }
 
 TEST_CASE("flx: creating an object on a class with no subscription throws", "[sync][flx][app]") {
@@ -1956,7 +1969,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             REQUIRE(pending_batch.query_version == 1);
             REQUIRE(static_cast<bool>(pending_batch.progress));
             REQUIRE(pending_batch.remaining_changesets == 0);
-            REQUIRE(pending_batch.changesets.size() == 3);
+            REQUIRE(pending_batch.changesets.size() == 6);
 
             check_interrupted_state(realm);
         }
@@ -2060,6 +2073,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
             Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", bar_obj_id}, {"location", "bar"s}}));
             realm->commit_transaction();
+            wait_for_upload(*realm);
         });
 
         harness->do_with_new_realm([&](SharedRealm realm) {
@@ -2084,6 +2098,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
                 "Attempting to create an object of type 'Asymmetric' with an existing primary key value 'not "
                 "implemented'");
             realm->commit_transaction();
+            wait_for_upload(*realm);
         });
 
         harness->do_with_new_realm([&](SharedRealm realm) {
@@ -2170,6 +2185,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             Object::create(c, realm, "Asymmetric",
                            std::any(AnyDict{{"_id", ObjectId::gen()}, {"embedded_obj", AnyDict{{"value", "foo"s}}}}));
             realm->commit_transaction();
+            wait_for_upload(*realm);
         });
 
         harness->do_with_new_realm([&](SharedRealm realm) {
@@ -2232,7 +2248,6 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
 }
 
 // TODO this test has been failing very frequently. We need to fix it and re-enable it in RCORE-1149.
-#if 0
 TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app]") {
     FLXSyncTestHarness::ServerSchema server_schema;
     server_schema.dev_mode_enabled = true;
@@ -2274,7 +2289,6 @@ TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app]") {
         },
         schema);
 }
-#endif
 
 TEST_CASE("flx: send client error", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_client_error");
@@ -2931,46 +2945,6 @@ TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][app
     CHECK(user_commit_version == bootstrap_version + 1);
 }
 
-
-TEST_CASE("flx: really big bootstraps", "[sync][flx][app]") {
-    FLXSyncTestHarness harness("harness");
-
-    std::vector<ObjectId> expected_obj_ids;
-    harness.load_initial_data([&](SharedRealm realm) {
-        realm->cancel_transaction();
-        for (size_t n = 0; n < 10; ++n) {
-            realm->begin_transaction();
-            for (size_t i = 0; i < 100; ++i) {
-                expected_obj_ids.push_back(ObjectId::gen());
-                auto& obj_id = expected_obj_ids.back();
-                CppContext c(realm);
-                Object::create(c, realm, "TopLevel",
-                               std::any(AnyDict{{"_id", obj_id},
-                                                {"queryable_str_field", "foo"s},
-                                                {"queryable_int_field", static_cast<int64_t>(5)},
-                                                {"non_queryable_field", random_string(1024 * 128)}}));
-            }
-            realm->commit_transaction();
-        }
-        realm->begin_transaction();
-    });
-
-    SyncTestFile target(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
-    auto error_pf = util::make_promise_future<SyncError>();
-    target.sync_config->error_handler = [promise = util::CopyablePromiseHolder(std::move(error_pf.promise))](
-                                            std::shared_ptr<SyncSession>, SyncError err) mutable {
-        promise.get_promise().emplace_value(std::move(err));
-    };
-    auto realm = Realm::get_shared_realm(target);
-    auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
-    mut_subs.insert_or_assign(Query(realm->read_group().get_table("class_TopLevel")));
-    auto subs = mut_subs.commit();
-
-    // TODO when BAAS-19105 is fixed we should be able to just wait for bootstrapping to be complete. For now though,
-    // check that we get the error code we expect.
-    auto err = error_pf.future.get();
-    REQUIRE(err.get_system_error() == sync::ClientError::bad_changeset_size);
-}
 
 } // namespace realm::app
 

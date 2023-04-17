@@ -460,7 +460,6 @@ Group::~Group() noexcept
         m_local_alloc->detach();
 }
 
-
 void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable)
 {
     m_alloc.update_reader_view(new_file_size); // Throws
@@ -474,7 +473,8 @@ void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bo
     update_refs(new_top_ref);
 }
 
-void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
+void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc, std::optional<size_t> read_lock_file_size,
+                               std::optional<uint_fast64_t> read_lock_version)
 {
     size_t top_size = arr.size();
     ref_type top_ref = arr.get_ref();
@@ -495,8 +495,9 @@ void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
             // Logical file size must never exceed actual file size.
             auto file_size = alloc.get_baseline();
             if (logical_file_size > file_size) {
-                std::string err = "Invalid logical file size: " + util::to_string(logical_file_size) +
-                                  ", actual file size: " + util::to_string(file_size);
+                std::string err = util::format("Invalid logical file size: %1, actual file size: %2, read lock file "
+                                               "size: %3, read lock version: %4",
+                                               logical_file_size, file_size, read_lock_file_size, read_lock_version);
                 throw InvalidDatabase(err, "");
             }
             // First two entries must be valid refs pointing inside the file
@@ -504,22 +505,27 @@ void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
                 return ref == 0 || (ref & 7) || ref > logical_file_size;
             };
             if (invalid_ref(table_names_ref) || invalid_ref(tables_ref)) {
-                std::string err = "Invalid top array (top_ref, [0], [1]): " + util::to_string(top_ref) + ", " +
-                                  util::to_string(table_names_ref) + ", " + util::to_string(tables_ref);
+                std::string err = util::format(
+                    "Invalid top array (top_ref, [0], [1]): %1, %2, %3, read lock size: %4, read lock version: %5",
+                    top_ref, table_names_ref, tables_ref, read_lock_file_size, read_lock_version);
                 throw InvalidDatabase(err, "");
             }
             break;
         }
         default: {
-            std::string err = "Invalid top array size (ref: " + util::to_string(top_ref) +
-                              ", size: " + util::to_string(top_size) + ")";
+            auto logical_file_size = arr.get_as_ref_or_tagged(s_file_size_ndx).get_as_int();
+            std::string err =
+                util::format("Invalid top array size (ref: %1, array size: %2) file size: %3, read "
+                             "lock size: %4, read lock version: %5",
+                             top_ref, top_size, logical_file_size, read_lock_file_size, read_lock_version);
             throw InvalidDatabase(err, "");
             break;
         }
     }
 }
 
-void Group::attach(ref_type top_ref, bool writable, bool create_group_when_missing)
+void Group::attach(ref_type top_ref, bool writable, bool create_group_when_missing, size_t file_size,
+                   uint_fast64_t version)
 {
     REALM_ASSERT(!m_top.is_attached());
     if (create_group_when_missing)
@@ -534,7 +540,7 @@ void Group::attach(ref_type top_ref, bool writable, bool create_group_when_missi
 
     if (top_ref != 0) {
         m_top.init_from_ref(top_ref);
-        validate_top_array(m_top, m_alloc);
+        validate_top_array(m_top, m_alloc, file_size, version);
         m_table_names.init_from_parent();
         m_tables.init_from_parent();
     }
@@ -590,8 +596,7 @@ void Group::update_num_objects()
 #endif // REALM_METRICS
 }
 
-
-void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable)
+void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, VersionID version)
 {
     REALM_ASSERT_3(new_top_ref, <, new_file_size);
     REALM_ASSERT(!is_attached());
@@ -608,7 +613,7 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writa
     // nodes to attached them to. In the case of write transactions, the nodes
     // have to be created, as they have to be ready for being modified.
     bool create_group_when_missing = writable;
-    attach(new_top_ref, writable, create_group_when_missing); // Throws
+    attach(new_top_ref, writable, create_group_when_missing, new_file_size, version.version); // Throws
 }
 
 
