@@ -17,15 +17,17 @@
 #include <realm/util/logger.hpp>
 #include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/network/default_socket.hpp>
-#include "realm/util/span.hpp"
+#include <realm/util/span.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
+#include <realm/sync/noinst/migration_store.hpp>
+#include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/subscriptions.hpp>
 #include <realm/sync/trigger.hpp>
+#include <realm/sync/noinst/migration_store.hpp>
 
 
 namespace realm {
@@ -741,12 +743,15 @@ public:
     /// or after initiation of deactivation.
     void request_download_completion_notification();
 
-    /// \brief Gets or creates the subscription store associated with this Session.
+    /// \brief Gets the subscription store associated with this Session.
     SubscriptionStore* get_flx_subscription_store();
+
+    /// \brief Gets the migration store associated with this Session.
+    MigrationStore* get_migration_store();
 
     /// Update internal client state when a flx subscription becomes complete outside
     /// of the normal sync process. This can happen during client reset.
-    void non_sync_flx_completion(int64_t version);
+    void on_flx_sync_version_complete(int64_t version);
 
     /// \brief Callback for when a new subscription set has been created for FLX sync.
     void on_new_flx_subscription_set(int64_t new_version);

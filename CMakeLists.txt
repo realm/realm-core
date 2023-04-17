@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
+message(STATUS "CMake version: ${CMAKE_VERSION}")
 
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
 project(RealmCore)
@@ -43,7 +44,9 @@ elseif(APPLE)
     set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 endif()
 
-function(add_cxx_flag_if_supported flag)
+# Sets/clears the {FLAG} variable if the compiler flag is supported or not
+# The compiler flag check is only performed once and the value is cached as the out variable name
+function(check_if_cxx_compiler_flag_supported flag out_var)
     if(flag MATCHES "^-Wno-")
         # Compilers ignore unknown -Wno-foo flags, so look for -Wfoo instead.
         string(REPLACE "-Wno-" "-W" check_flag ${flag})
@@ -51,10 +54,41 @@ function(add_cxx_flag_if_supported flag)
         set(check_flag ${flag})
     endif()
 
-    check_cxx_compiler_flag(${check_flag} HAVE${check_flag})
-    if(HAVE${check_flag})
+    check_cxx_compiler_flag(${check_flag} ${out_var})
+endfunction()
+
+function(add_cxx_flag_if_supported flag)
+    check_if_cxx_compiler_flag_supported(${flag} HAVE${flag})
+    if(HAVE${flag})
         add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${flag}>)
     endif()
+endfunction()
+
+# Usage: append_source_file_compile_options(FILES <file1>[ <file2>...] FLAGS <flag1>[ <flag2>...])
+function(append_source_file_compile_options)
+    set(options)
+    set(args)
+    set(list_args FILES FLAGS)
+    cmake_parse_arguments(append_options "${options}" "${args}" "${list_args}" ${ARGN})
+    if (NOT append_options_FILES)
+        message(FATAL_ERROR "Missing FILES argument for append_source_file_compile_options")
+    endif()
+    if (NOT append_options_FLAGS)
+        message(FATAL_ERROR "Missing FLAGS argument for append_source_file_compile_options")
+    endif()
+    foreach(FLAG_ IN LISTS append_options_FLAGS)
+        check_if_cxx_compiler_flag_supported(${FLAG_} HAVE${FLAG_})
+        if (HAVE${FLAG_})
+            foreach(SRC_ IN LISTS append_options_FILES)
+                get_source_file_property(OLD_OPTS ${SRC_} COMPILE_OPTIONS)
+                if (NOT OLD_OPTS)
+                    set_source_files_properties(${SRC_} PROPERTIES COMPILE_OPTIONS "${FLAG_}")
+                elseif(NOT "${FLAG_}" IN_LIST OLD_OPTS)
+                    set_source_files_properties(${SRC_} PROPERTIES COMPILE_OPTIONS "${OLD_OPTS};${FLAG_}")
+                endif()
+            endforeach()
+        endif()
+    endforeach()
 endfunction()
 
 function(use_faster_linker)
@@ -300,7 +334,7 @@ elseif(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 endif()
 set(CATCH_CONFIG_ENABLE_ALL_STRINGMAKERS ON CACHE BOOL "Enable Catch2's optional standard library stringmakers")
 
-add_subdirectory(external/catch EXCLUDE_FROM_ALL)
+add_subdirectory(external EXCLUDE_FROM_ALL)
 
 # Cmake does not let us easily set the deployment target per-target, but Catch2
 # can use modern features because we only run tests on recent OS versions.

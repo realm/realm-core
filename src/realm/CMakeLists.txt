@@ -102,7 +102,6 @@ set(UTIL_SOURCES
     util/misc_ext_errors.cpp
     util/random.cpp
     util/resource_limits.cpp
-    util/substitute.cpp
     util/uri.cpp
 )
 
@@ -215,7 +214,6 @@ set(REALM_INSTALL_HEADERS
     util/bind_ptr.hpp
     util/buffer.hpp
     util/buffer_stream.hpp
-    util/call_with_tuple.hpp
     util/cf_ptr.hpp
     util/checked_mutex.hpp
     util/compression.hpp
@@ -232,7 +230,6 @@ set(REALM_INSTALL_HEADERS
     util/future.hpp
     util/hex_dump.hpp
     util/input_stream.hpp
-    util/inspect.hpp
     util/interprocess_condvar.hpp
     util/interprocess_mutex.hpp
     util/logger.hpp
@@ -242,7 +239,9 @@ set(REALM_INSTALL_HEADERS
     util/miscellaneous.hpp
     util/optional.hpp
     util/overload.hpp
+    util/platform_info.hpp
     util/priority_queue.hpp
+    util/random.hpp
     util/safe_int_ops.hpp
     util/scope_exit.hpp
     util/serializer.hpp
@@ -252,10 +251,8 @@ set(REALM_INSTALL_HEADERS
     util/terminate.hpp
     util/thread.hpp
     util/to_string.hpp
-    util/type_list.hpp
     util/type_traits.hpp
     util/uri.hpp
-    util/utf8.hpp
 
     metrics/metrics.hpp
     metrics/metric_timer.hpp
@@ -273,16 +270,12 @@ set(REALM_NOINST_HEADERS
     util/demangle.hpp
     util/enum.hpp
     util/from_chars.hpp
-    util/get_file_size.hpp
     util/json_parser.hpp
     util/load_file.hpp
-    util/platform_info.hpp
     util/quote.hpp
-    util/random.hpp
     util/resource_limits.hpp
     util/scratch_allocator.hpp
     util/signal_blocker.hpp
-    util/substitute.hpp
     util/thread_exec_guard.hpp
     util/time.hpp
     util/timestamp_formatter.hpp

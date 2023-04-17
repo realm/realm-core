@@ -55,21 +55,38 @@ public:
     }
     void canonicalize() override
     {
-        std::vector<QueryNode*> newChildren;
+        std::vector<LogicalNode*> todo;
+        do_canonicalize(todo);
+        while (todo.size()) {
+            LogicalNode* cur = todo.back();
+            todo.pop_back();
+            cur->do_canonicalize(todo);
+        }
+    }
+
+    void do_canonicalize(std::vector<LogicalNode*>& todo)
+    {
         auto& my_type = typeid(*this);
-        for (auto& child : children) {
-            child->canonicalize();
-            if (typeid(*child) == my_type) {
+        size_t index = 0;
+        while (index < children.size()) {
+            QueryNode* child = *(children.begin() + index);
+            auto& child_type = typeid(*child);
+            if (child_type == my_type) {
                 auto logical_node = static_cast<LogicalNode*>(child);
-                for (auto c : logical_node->children) {
-                    newChildren.push_back(c);
-                }
+                REALM_ASSERT_EX(logical_node->children.size() == 2, logical_node->children.size());
+                children.push_back(logical_node->children[0]);
+                children.push_back(logical_node->children[1]);
+                children.erase(children.begin() + index);
+                continue; // do not ++index because of the delete
+            }
+            else if (auto ln = dynamic_cast<LogicalNode*>(child)) {
+                todo.push_back(ln);
             }
             else {
-                newChildren.push_back(child);
+                child->canonicalize();
             }
+            ++index;
         }
-        children = newChildren;
     }
 
 private:

@@ -164,9 +164,13 @@ public:
 
     /// Messages sent by the client.
 
-    void make_bind_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
-                           const std::string& server_path, const std::string& signed_user_token,
-                           bool need_client_file_ident, bool is_subserver);
+    void make_pbs_bind_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
+                               const std::string& server_path, const std::string& signed_user_token,
+                               bool need_client_file_ident, bool is_subserver);
+
+    void make_flx_bind_message(int protocol_version, OutputBuffer& out, session_ident_type session_ident,
+                               const nlohmann::json& json_data, const std::string& signed_user_token,
+                               bool need_client_file_ident, bool is_subserver);
 
     void make_pbs_ident_message(OutputBuffer&, session_ident_type session_ident, SaltedFileIdent client_file_ident,
                                 const SyncProgress& progress);
