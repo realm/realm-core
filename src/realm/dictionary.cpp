@@ -673,8 +673,8 @@ void Dictionary::nullify(size_t ndx)
     REALM_ASSERT(m_dictionary_top);
     REALM_ASSERT(ndx != realm::npos);
 
-    auto key = do_get_key(ndx);
     if (Replication* repl = get_replication()) {
+        auto key = do_get_key(ndx);
         repl->dictionary_set(*this, ndx, key, Mixed());
     }
 

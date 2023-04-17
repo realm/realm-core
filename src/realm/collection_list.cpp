@@ -336,33 +336,34 @@ auto CollectionList::get_index(size_t ndx) const noexcept -> Index
 
 void CollectionList::get_all_keys(size_t levels, std::vector<ObjKey>& keys) const
 {
-    if (update_if_needed()) {
-        for (size_t i = 0; i < size(); i++) {
-            if (levels > 0) {
-                get_collection_list(i)->get_all_keys(levels - 1, keys);
-            }
-            else {
-                auto ref = m_refs.get(i);
-                if (m_col_key.is_dictionary()) {
-                    Array top(*m_alloc);
-                    top.init_from_ref(ref);
-                    BPlusTree<Mixed> values(*m_alloc);
-                    values.set_parent(&top, 1);
-                    values.init_from_parent();
-                    for (size_t n = 0; n < values.size(); n++) {
-                        Mixed value = values.get(n);
-                        if (value.is_type(type_TypedLink)) {
-                            keys.push_back(value.get<ObjKey>());
-                        }
+    if (!update_if_needed()) {
+        return;
+    }
+    for (size_t i = 0; i < size(); i++) {
+        if (levels > 0) {
+            get_collection_list(i)->get_all_keys(levels - 1, keys);
+        }
+        else {
+            auto ref = m_refs.get(i);
+            if (m_col_key.is_dictionary()) {
+                Array top(*m_alloc);
+                top.init_from_ref(ref);
+                BPlusTree<Mixed> values(*m_alloc);
+                values.set_parent(&top, 1);
+                values.init_from_parent();
+                for (size_t n = 0; n < values.size(); n++) {
+                    Mixed value = values.get(n);
+                    if (value.is_type(type_TypedLink)) {
+                        keys.push_back(value.get<ObjKey>());
                     }
                 }
-                else {
-                    BPlusTree<ObjKey> links(*m_alloc);
-                    links.init_from_ref(ref);
-                    if (links.size() > 0) {
-                        auto vec = links.get_all();
-                        std::move(vec.begin(), vec.end(), std::back_inserter(keys));
-                    }
+            }
+            else {
+                BPlusTree<ObjKey> links(*m_alloc);
+                links.init_from_ref(ref);
+                if (links.size() > 0) {
+                    auto vec = links.get_all();
+                    std::move(vec.begin(), vec.end(), std::back_inserter(keys));
                 }
             }
         }

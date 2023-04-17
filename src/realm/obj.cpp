@@ -46,8 +46,8 @@
 namespace realm {
 namespace {
 
-struct Helper {
-    Helper(CollectionListPtr l)
+struct NestedCollectionInfo {
+    NestedCollectionInfo(CollectionListPtr l)
         : list(std::move(l))
         , index(0)
         , sz(list->size())
@@ -58,9 +58,9 @@ struct Helper {
     size_t sz;
 };
 
-std::vector<Helper> init_levels(Obj& obj, ColKey origin_col_key, size_t nesting_levels)
+std::vector<NestedCollectionInfo> init_levels(Obj& obj, ColKey origin_col_key, size_t nesting_levels)
 {
-    std::vector<Helper> levels;
+    std::vector<NestedCollectionInfo> levels;
     levels.reserve(nesting_levels);
 
     levels.emplace_back(obj.get_collection_list(origin_col_key));
@@ -71,7 +71,7 @@ std::vector<Helper> init_levels(Obj& obj, ColKey origin_col_key, size_t nesting_
     return levels;
 }
 
-bool advance(std::vector<Helper>& levels)
+bool advance(std::vector<NestedCollectionInfo>& levels)
 {
     levels.pop_back();
 
@@ -79,7 +79,7 @@ bool advance(std::vector<Helper>& levels)
         return false;
     }
 
-    Helper& current = levels.back();
+    NestedCollectionInfo& current = levels.back();
     current.index++;
     if (current.index == current.sz) {
         if (!advance(levels)) {
@@ -101,11 +101,11 @@ size_t find_link_value_in_collection(T& coll, Obj& obj, ColKey origin_col_key, U
     }
 
     // Iterate through all leaf arrays until link is found
-    std::vector<Helper> levels = init_levels(obj, origin_col_key, nesting_levels);
+    std::vector<NestedCollectionInfo> levels = init_levels(obj, origin_col_key, nesting_levels);
 
     bool give_up = false;
     while (!give_up) {
-        Helper& current = levels.back();
+        NestedCollectionInfo& current = levels.back();
         for (size_t i = 0; i < current.sz; i++) {
             coll.set_owner(current.list, current.list->get_index(i));
             size_t ndx = coll.find_first(link);
