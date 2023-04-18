@@ -134,10 +134,11 @@ REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
         termination_notification_callback(ss.str().c_str());
     }
     else {
-        std::cerr << ss.rdbuf() << '\n';
+        std::cerr << ss.rdbuf();
         std::string thread_name;
         if (Thread::get_name(thread_name))
-            std::cerr << "Thread name: " << thread_name << "\n";
+            std::cerr << "\nThread name: " << thread_name;
+        std::cerr << std::endl;
     }
 
     REALM_TERMINATE_AUTO_VERSIONED();
