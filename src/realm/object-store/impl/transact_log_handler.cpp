@@ -34,7 +34,7 @@ namespace {
 
 class KVOAdapter : public _impl::TransactionChangeInfo {
 public:
-    KVOAdapter(std::vector<BindingContext::ObserverState>& observers, BindingContext* context);
+    KVOAdapter(std::vector<BindingContext::ObserverState>& observers, BindingContext* context, bool is_rollback);
 
     void before(Transaction& sg);
     void after(Transaction& sg);
@@ -51,12 +51,15 @@ private:
     };
     std::vector<ListInfo> m_lists;
     VersionID m_version;
+    bool m_rollback;
 };
 
-KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, BindingContext* context)
+KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, BindingContext* context,
+                       bool is_rollback)
     : _impl::TransactionChangeInfo{}
     , m_context(context)
     , m_observers(observers)
+    , m_rollback(is_rollback)
 {
     if (m_observers.empty())
         return;
@@ -101,7 +104,7 @@ void KVOAdapter::before(Transaction& sg)
 
         auto const& table = it->second;
         auto key = observer.obj_key;
-        if (table.deletions_contains(key)) {
+        if (m_rollback ? table.insertions_contains(key) : table.deletions_contains(key)) {
             m_invalidated.push_back(observer.info);
             continue;
         }
@@ -134,7 +137,7 @@ void KVOAdapter::before(Transaction& sg)
 
         builder.modifications.remove(builder.insertions);
 
-        // KVO can't express moves (becaue NSArray doesn't have them), so
+        // KVO can't express moves (because NSArray doesn't have them), so
         // transform them into a series of sets on each affected index when possible
         if (!builder.moves.empty() && builder.insertions.count() == builder.moves.size() &&
             builder.deletions.count() == builder.moves.size()) {
@@ -184,6 +187,22 @@ void KVOAdapter::before(Transaction& sg)
             REALM_ASSERT(!builder.deletions.empty());
             changes.kind = BindingContext::ColumnInfo::Kind::Remove;
             changes.indices = builder.deletions;
+        }
+
+        // If we're rolling back a write transaction, insertions are actually
+        // deletions and vice-versa. More complicated scenarios which would
+        // require logic beyond this fortunately just aren't supported by KVO.
+        if (m_rollback) {
+            switch (changes.kind) {
+                case BindingContext::ColumnInfo::Kind::Insert:
+                    changes.kind = BindingContext::ColumnInfo::Kind::Remove;
+                    break;
+                case BindingContext::ColumnInfo::Kind::Remove:
+                    changes.kind = BindingContext::ColumnInfo::Kind::Insert;
+                    break;
+                default:
+                    break;
+            }
         }
     }
     m_context->will_change(m_observers, m_invalidated);
@@ -467,9 +486,9 @@ class KVOTransactLogObserver : public TransactLogObserver {
 
 public:
     KVOTransactLogObserver(std::vector<BindingContext::ObserverState>& observers, BindingContext* context,
-                           _impl::NotifierPackage& notifiers, Transaction& sg)
+                           _impl::NotifierPackage& notifiers, Transaction& sg, bool is_rollback = false)
         : TransactLogObserver(m_adapter)
-        , m_adapter(observers, context)
+        , m_adapter(observers, context, is_rollback)
         , m_notifiers(notifiers)
         , m_sg(sg)
     {
@@ -589,8 +608,8 @@ void cancel(Transaction& tr, BindingContext* context)
     }
 
     _impl::NotifierPackage notifiers;
-    KVOTransactLogObserver o(observers, context, notifiers, tr);
-    tr.rollback_and_continue_as_read(&o);
+    KVOTransactLogObserver o(observers, context, notifiers, tr, true);
+    tr.rollback_and_continue_as_read(o);
 }
 
 void advance(Transaction& tr, TransactionChangeInfo& info, VersionID version)

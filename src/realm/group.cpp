@@ -1451,7 +1451,7 @@ void Group::refresh_dirty_accessors()
 }
 
 
-void Group::advance_transact(ref_type new_top_ref, util::NoCopyInputStream& in, bool writable)
+void Group::advance_transact(ref_type new_top_ref, util::NoCopyInputStream* in, bool writable)
 {
     REALM_ASSERT(is_attached());
     // Exception safety: If this function throws, the group accessor and all of
@@ -1488,10 +1488,10 @@ void Group::advance_transact(ref_type new_top_ref, util::NoCopyInputStream& in, 
     // This is no longer needed in Core, but we need to compute "schema_changed",
     // for the benefit of ObjectStore.
     bool schema_changed = false;
-    if (has_schema_change_notification_handler()) {
-        _impl::TransactLogParser parser; // Throws
+    if (in && has_schema_change_notification_handler()) {
         TransactAdvancer advancer(*this, schema_changed);
-        parser.parse(in, advancer); // Throws
+        _impl::TransactLogParser parser; // Throws
+        parser.parse(*in, advancer);     // Throws
     }
 
     m_top.detach();                                           // Soft detach

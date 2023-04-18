@@ -2,7 +2,7 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Improve performance of rolling back write transactions after making changes. If no KVO observers are used this is now constant time rather than taking time proportional to the number of changes to be rolled back. Rollbacks with KVO observers are 10-20% faster. ([PR #6513](https://github.com/realm/realm-core/pull/6513))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -18,6 +18,8 @@
 
 ### Internals
 * Clear out SubscriptionStore and cancel pending notifications upon rollback to PBS after client migration to FLX. ([#6389](https://github.com/realm/realm-core/issues/6389))
+* Simplify the non-sync replication log by emitting the same instruction type for all three types of collections rather than different instructions per collection type. This has no functional effect but eliminates some duplicated code. ([PR #6513](https://github.com/realm/realm-core/pull/6513))
+* Remove TransactionChangeInfo::track_all, which was only ever used by the global notifier. ([PR #6513](https://github.com/realm/realm-core/pull/6513))
 
 ----------------------------------------------
 
@@ -53,8 +55,6 @@
 
 ### Internals
 * Allow to run multiprocess encryption tests outside building folder.
-* Simplify the non-sync replication log by emitting the same instruction type for all three types of collections rather than different instructions per collection type. This has no functional effect but eliminates some duplicated code. ([PR #6513](https://github.com/realm/realm-core/pull/6513))
-* Remove TransactionChangeInfo::track_all, which was only ever used by the global notifier. ([PR #6513](https://github.com/realm/realm-core/pull/6513))
 
 ----------------------------------------------
 
