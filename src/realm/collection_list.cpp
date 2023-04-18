@@ -19,6 +19,9 @@
 #include <realm/collection_list.hpp>
 #include <realm/obj.hpp>
 #include <realm/table.hpp>
+#include <realm/group.hpp>
+#include <realm/cluster.hpp>
+#include <realm/list.hpp>
 #include "realm/array_string.hpp"
 #include "realm/array_integer.hpp"
 
@@ -28,14 +31,27 @@ namespace realm {
 
 CollectionList::CollectionList(std::shared_ptr<CollectionParent> parent, ColKey col_key, Index index,
                                CollectionType coll_type)
-    : m_parent(parent)
+    : m_owned_parent(parent)
+    , m_parent(m_owned_parent.get())
     , m_index(index)
     , m_level(parent->get_level() + 1)
-    , m_alloc(&m_parent->get_object().get_alloc())
+    , m_alloc(&get_table()->get_alloc())
     , m_col_key(col_key)
     , m_top(*m_alloc)
     , m_refs(*m_alloc)
     , m_key_type(coll_type == CollectionType::List ? type_Int : type_String)
+{
+    m_top.set_parent(this, 0);
+    m_refs.set_parent(&m_top, 1);
+}
+
+CollectionList::CollectionList(CollectionParent* obj, ColKey col_key)
+    : m_parent(obj)
+    , m_alloc(&get_table()->get_alloc())
+    , m_col_key(col_key)
+    , m_top(*m_alloc)
+    , m_refs(*m_alloc)
+    , m_key_type(get_table()->get_nested_column_type(col_key, 0) == CollectionType::List ? type_Int : type_String)
 {
     m_top.set_parent(this, 0);
     m_refs.set_parent(&m_top, 1);
@@ -241,6 +257,18 @@ void CollectionList::remove(size_t ndx)
     if (ndx >= sz) {
         throw OutOfBounds("CollectionList::remove", ndx, sz);
     }
+
+    if (m_col_key.get_type() == col_type_LinkList || m_col_key.get_type() == col_type_Link) {
+        std::vector<ObjKey> keys;
+        auto origin_table = m_parent->get_table().unchecked_ptr();
+        auto origin_key = m_parent->get_object().get_key();
+        CascadeState state(CascadeState::Mode::Strong, origin_table->get_parent_group());
+
+        get_all_keys(origin_table->get_nesting_levels(m_col_key) - m_level, keys);
+        Cluster::remove_backlinks(origin_table, origin_key, m_col_key, keys, state);
+        origin_table->remove_recursive(state);
+    }
+
     int_keys->erase(ndx);
     auto ref = m_refs.get(ndx);
     Array::destroy_deep(ref, *m_alloc);
@@ -290,6 +318,55 @@ void CollectionList::set_collection_ref(Index index, ref_type ref)
         auto ndx = string_keys->find_first(StringData(mpark::get<std::string>(index)));
         REALM_ASSERT(ndx != realm::not_found);
         return m_refs.set(ndx, ref);
+    }
+}
+
+auto CollectionList::get_index(size_t ndx) const noexcept -> Index
+{
+    if (m_key_type == type_Int) {
+        auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
+        return int_keys->get(ndx);
+    }
+    else {
+        auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
+        return string_keys->get(ndx);
+    }
+    return {};
+}
+
+void CollectionList::get_all_keys(size_t levels, std::vector<ObjKey>& keys) const
+{
+    if (!update_if_needed()) {
+        return;
+    }
+    for (size_t i = 0; i < size(); i++) {
+        if (levels > 0) {
+            get_collection_list(i)->get_all_keys(levels - 1, keys);
+        }
+        else {
+            auto ref = m_refs.get(i);
+            if (m_col_key.is_dictionary()) {
+                Array top(*m_alloc);
+                top.init_from_ref(ref);
+                BPlusTree<Mixed> values(*m_alloc);
+                values.set_parent(&top, 1);
+                values.init_from_parent();
+                for (size_t n = 0; n < values.size(); n++) {
+                    Mixed value = values.get(n);
+                    if (value.is_type(type_TypedLink)) {
+                        keys.push_back(value.get<ObjKey>());
+                    }
+                }
+            }
+            else {
+                BPlusTree<ObjKey> links(*m_alloc);
+                links.init_from_ref(ref);
+                if (links.size() > 0) {
+                    auto vec = links.get_all();
+                    std::move(vec.begin(), vec.end(), std::back_inserter(keys));
+                }
+            }
+        }
     }
 }
 

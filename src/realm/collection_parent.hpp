@@ -104,6 +104,42 @@ protected:
     CollectionBasePtr get_collection_ptr(ColKey col_key) const;
 };
 
+// Used in Cluster when removing owning object
+class DummyParent : public CollectionParent {
+public:
+    DummyParent(TableRef t, ref_type ref)
+        : m_table(t)
+        , m_ref(ref)
+    {
+    }
+    size_t get_level() const noexcept final
+    {
+        return 0;
+    }
+    TableRef get_table() const noexcept final
+    {
+        return m_table;
+    }
+
+protected:
+    TableRef m_table;
+    ref_type m_ref;
+    UpdateStatus update_if_needed_with_status() const final
+    {
+        return UpdateStatus::Updated;
+    }
+    bool update_if_needed() const final
+    {
+        return true;
+    }
+    const Obj& get_object() const noexcept final;
+    ref_type get_collection_ref(Index) const noexcept final
+    {
+        return m_ref;
+    }
+    void set_collection_ref(Index, ref_type) {}
+};
+
 } // namespace realm
 
 #endif

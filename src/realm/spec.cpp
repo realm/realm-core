@@ -421,13 +421,15 @@ CollectionType Spec::get_nested_column_type(size_t column_ndx, size_t level) con
 
 size_t Spec::get_nesting_levels(size_t column_ndx) const
 {
-    if (auto ref = m_top.get_as_ref(s_nested_types_ndx)) {
-        Array coll_types(m_top.get_alloc());
-        coll_types.init_from_ref(ref);
-        if (auto ref = coll_types.get_as_ref(column_ndx)) {
-            Array arr(m_top.get_alloc());
-            arr.init_from_ref(ref);
-            return arr.size();
+    if (column_ndx < m_num_public_columns) {
+        if (auto ref = m_top.get_as_ref(s_nested_types_ndx)) {
+            Array coll_types(m_top.get_alloc());
+            coll_types.init_from_ref(ref);
+            if (auto ref = coll_types.get_as_ref(column_ndx)) {
+                Array arr(m_top.get_alloc());
+                arr.init_from_ref(ref);
+                return arr.size();
+            }
         }
     }
 

@@ -271,6 +271,7 @@ protected:
         }
 
         if (!allow_create) {
+            m_tree->detach();
             return false;
         }
 

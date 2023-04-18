@@ -215,7 +215,6 @@ public:
     size_t get_nesting_levels(ColKey col_key) const
     {
         auto spec_ndx = colkey2spec_ndx(col_key);
-        REALM_ASSERT_3(spec_ndx, <, get_column_count());
         return m_spec.get_nesting_levels(spec_ndx);
     }
 
@@ -907,6 +906,7 @@ private:
     friend class ColKeyIterator;
     friend class Obj;
     friend class CollectionParent;
+    friend class CollectionList;
     friend class LnkLst;
     friend class Dictionary;
     friend class IncludeDescriptor;

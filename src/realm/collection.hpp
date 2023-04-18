@@ -370,6 +370,29 @@ public:
         return false;
     }
 
+    void set_owner(const Obj& obj, ColKey ck) override
+    {
+        m_obj_mem = obj;
+        m_parent = &m_obj_mem;
+        m_index = ck;
+        if (obj) {
+            m_alloc = &obj.get_alloc();
+        }
+    }
+
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        m_obj_mem = parent->get_object();
+        m_col_parent = std::move(parent);
+        m_parent = m_col_parent.get();
+        m_index = index;
+        if (m_obj_mem) {
+            m_alloc = &m_obj_mem.get_alloc();
+        }
+        // Force update on next access
+        m_content_version = 0;
+    }
+
     using Interface::get_owner_key;
     using Interface::get_table;
     using Interface::get_target_table;
@@ -441,30 +464,6 @@ protected:
     {
         return !(*this == other);
     }
-
-    void set_owner(const Obj& obj, ColKey ck) override
-    {
-        m_obj_mem = obj;
-        m_parent = &m_obj_mem;
-        m_index = ck;
-        if (obj) {
-            m_alloc = &obj.get_alloc();
-        }
-    }
-
-    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
-    {
-        m_obj_mem = parent->get_object();
-        m_col_parent = std::move(parent);
-        m_parent = m_col_parent.get();
-        m_index = index;
-        if (m_obj_mem) {
-            m_alloc = &m_obj_mem.get_alloc();
-        }
-        // Force update on next access
-        m_content_version = 0;
-    }
-
 
     ref_type get_collection_ref() const noexcept
     {
