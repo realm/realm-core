@@ -260,10 +260,10 @@ CollectionBasePtr CollectionParent::get_collection_ptr(ColKey col_key) const
     return {};
 }
 
-static Obj dummy_obj;
 
 const Obj& DummyParent::get_object() const noexcept
 {
+    static Obj dummy_obj;
     return dummy_obj;
 }
 
