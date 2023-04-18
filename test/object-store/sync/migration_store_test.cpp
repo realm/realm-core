@@ -1,11 +1,10 @@
+#include <realm/transaction.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/migration_store.hpp>
 
 #include <catch2/catch_all.hpp>
 
-
-#if REALM_ENABLE_SYNC
-#if REALM_ENABLE_AUTH_TESTS
+#if REALM_ENABLE_SYNC && REALM_ENABLE_AUTH_TESTS
 
 using namespace realm;
 
@@ -208,5 +207,4 @@ TEST_CASE("Migration store", "[flx][migration]") {
     }
 }
 
-#endif // REALM_ENABLE_AUTH_TESTS
-#endif // REALM_ENABLE_SYNC
+#endif // REALM_ENABLE_SYNC && REALM_ENABLE_AUTH_TESTS

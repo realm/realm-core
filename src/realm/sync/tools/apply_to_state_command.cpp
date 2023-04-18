@@ -1,4 +1,5 @@
 #include "realm/db.hpp"
+#include "realm/transaction.hpp"
 #include "realm/sync/history.hpp"
 #include "realm/sync/instruction_applier.hpp"
 #include "realm/sync/impl/clamped_hex_dump.hpp"
