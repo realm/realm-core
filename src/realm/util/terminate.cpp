@@ -128,7 +128,8 @@ REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
 {
     util::Backtrace::capture().print(ss);
 
-    ss << "!!! IMPORTANT: Please report this at https://github.com/realm/realm-core/issues/new/choose";
+    ss << "\n!!! IMPORTANT: Please report this at https://github.com/realm/realm-core/issues/new/choose";
+
     if (termination_notification_callback) {
         termination_notification_callback(ss.str().c_str());
     }
