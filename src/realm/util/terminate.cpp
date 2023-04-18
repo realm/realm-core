@@ -147,11 +147,7 @@ REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
 REALM_NORETURN void terminate(const char* message, const char* file, long line,
                               std::initializer_list<Printable>&& values) noexcept
 {
-    std::stringstream ss;
-    ss << file << ':' << line << ": " REALM_VER_CHUNK " " << message;
-    Printable::print_all(ss, values, false);
-    ss << '\n';
-    terminate_internal(ss);
+    terminate_with_info(message, file, line, nullptr, std::move(values));
 }
 
 REALM_NORETURN void terminate_with_info(const char* message, const char* file, long line,
@@ -159,8 +155,10 @@ REALM_NORETURN void terminate_with_info(const char* message, const char* file, l
                                         std::initializer_list<Printable>&& values) noexcept
 {
     std::stringstream ss;
-    ss << file << ':' << line << ": " REALM_VER_CHUNK " " << message << " with " << interesting_names << " = ";
-    Printable::print_all(ss, values, true);
+    ss << file << ':' << line << ": " REALM_VER_CHUNK " " << message;
+    if (interesting_names)
+        ss << " with " << interesting_names << " = ";
+    Printable::print_all(ss, values, bool(interesting_names));
     ss << '\n';
     terminate_internal(ss);
 }
