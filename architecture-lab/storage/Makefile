@@ -1,4 +1,4 @@
-CXXFLAGS = -pthread -Wall -pedantic -std=c++14 -Og -ggdb -MMD
+CXXFLAGS = -pthread -Wall -pedantic -std=c++14 -O3 -ggdb -MMD
 
 ifeq ($(DEBUG),1)
 CXXFLAGS += -O0

@@ -121,11 +121,14 @@ int hash(uint16_t a, uint16_t b)
     tmp *= b + 7;
     return (tmp ^ (tmp >> 16)) & 0xFFFF;
 }
+#define COMPRESS_BEFORE_INTERNING 1
 
 class string_compressor {
 public:
     std::vector<std::vector<uint16_t>> symbols;
+    std::vector<std::string> strings;
     std::unordered_map<std::vector<uint16_t>, int> symbol_map;
+    std::unordered_map<std::string, int> string_map;
     std::vector<encoding_entry> encoding_table;
     std::vector<encoding_entry> decoding_table;
     bool separators[256];
@@ -245,7 +248,6 @@ public:
     {
         // expand into 16 bit symbols:
         int size = past - first;
-        total_chars += size;
         assert(size < 8180);
         uint16_t* to = symbols;
         int out_size = 0;
@@ -270,7 +272,10 @@ public:
     }
     int handle(const char* _first, const char* _past)
     {
-        auto size = compress(symbol_buffer, _first, _past);
+#if COMPRESS_BEFORE_INTERNING
+        int size = _past - _first;
+        total_chars += size;
+        size = compress(symbol_buffer, _first, _past);
         // decompress_and_verify(symbol_buffer, size, _first, _past);
 
         std::vector<uint16_t> symbol(size);
@@ -287,6 +292,27 @@ public:
         else {
             return it->second;
         }
+#else // INTERN BEFORE COMPRESSING:
+        int size = _past - _first;
+        total_chars += size;
+        std::string s(_first, _past);
+        auto it = string_map.find(s);
+        if (it == string_map.end()) {
+            auto id = strings.size();
+            strings.push_back(s);
+            string_map[s] = id;
+            auto size = compress(symbol_buffer, _first, _past);
+            std::vector<uint16_t> symbol(size);
+            for (int j = 0; j < size; ++j)
+                symbol[j] = symbol_buffer[j];
+            symbols.push_back(symbol);
+            unique_symbol_size += size;
+            return id;
+        }
+        else {
+            return it->second;
+        }
+#endif
     }
     int symbol_table_size()
     {
@@ -300,11 +326,11 @@ public:
 };
 
 // controls
-#define USE_UNALIGNED 1
+#define USE_UNALIGNED 0
 #define USE_INTERPOLATION 0
 #define USE_LOCAL_DIR 1
 #define USE_SPARSE 1
-#define USE_BASE_OFFSET 0
+#define USE_BASE_OFFSET 0 // defunct
 #define USE_EMPTY_IMPROVEMENT 1
 
 int unsigned_bits_needed(uint64_t val)
@@ -380,7 +406,7 @@ enum EncType { Array = 0, Empty = 1, Sprse = 2, Indir = 3, Linear = 4, Offst = 5
 std::string EncName[] = {"array", "empty", "sparse", "indir", "lnreg", "offst"};
 
 struct leaf_compression_analyzer {
-    constexpr static int leaf_size = 100;
+    constexpr static int leaf_size = 256;
     int64_t values[leaf_size];
     std::unordered_map<int64_t, int> unique_values;
     int entry_count = 0;
@@ -447,7 +473,8 @@ struct leaf_compression_analyzer {
 #if USE_SPARSE
         // next evaluate a sparse encoding with actual entries marked in a bit mask
         {
-            int alt_leaf_cost = 8 + 16 + (bits_per_value * (non_default_values + (default_value ? 1 : 0) + 7) / 8);
+            int alt_leaf_cost = 8 + 16 + (entry_count + 7) / 8 +
+                                (bits_per_value * (non_default_values + (default_value ? 1 : 0) + 7) / 8);
             // std::cout << "Sparse     " << leaf_cost << " bytes" << std::endl;
             alt_leaf_cost = align(8, alt_leaf_cost);
             if (alt_leaf_cost < leaf_cost) {
@@ -685,7 +712,7 @@ int main(int argc, char* argv[])
     void* file_start = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
     assert(file_start != (void*)-1);
     long step_size = 5000000;
-    int num_work_packages = 12;
+    int num_work_packages = 8;
     concurrent_queue<results*> to_reader;
     for (int i = 0; i < num_work_packages; ++i)
         to_reader.put(new results(step_size, max_fields));
