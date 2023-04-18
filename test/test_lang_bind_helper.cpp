@@ -2134,30 +2134,6 @@ public:
     {
         return false;
     }
-    bool dictionary_insert(size_t, Mixed)
-    {
-        return false;
-    }
-    bool dictionary_set(size_t, Mixed)
-    {
-        return false;
-    }
-    bool dictionary_erase(size_t, Mixed)
-    {
-        return false;
-    }
-    bool set_insert(size_t)
-    {
-        return false;
-    }
-    bool set_erase(size_t)
-    {
-        return false;
-    }
-    bool set_clear(size_t)
-    {
-        return false;
-    }
     bool modify_object(ColKey, ObjKey)
     {
         return false;

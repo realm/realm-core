@@ -53,6 +53,7 @@
 
 ### Internals
 * Allow to run multiprocess encryption tests outside building folder.
+* Simplify the non-sync replication log by emitting the same instruction type for all three types of collections rather than different instructions per collection type. This has no functional effect but eliminates some duplicated code.
 
 ----------------------------------------------
 

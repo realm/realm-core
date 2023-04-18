@@ -974,31 +974,13 @@ public:
 
     bool list_set(size_t ndx)
     {
-        std::cout << "List set at " << ndx << std::endl;
+        std::cout << "Collection set at " << ndx << std::endl;
         return true;
     }
 
     bool list_insert(size_t ndx)
     {
-        std::cout << "List insert at " << ndx << std::endl;
-        return true;
-    }
-
-    bool dictionary_insert(size_t, realm::Mixed key)
-    {
-        std::cout << "Dictionary insert at " << key << std::endl;
-        return true;
-    }
-
-    bool dictionary_set(size_t, realm::Mixed key)
-    {
-        std::cout << "Dictionary set at " << key << std::endl;
-        return true;
-    }
-
-    bool dictionary_erase(size_t, realm::Mixed key)
-    {
-        std::cout << "Dictionary erase at " << key << std::endl;
+        std::cout << "Collection insert at " << ndx << std::endl;
         return true;
     }
 
@@ -1037,31 +1019,13 @@ public:
 
     bool list_erase(size_t ndx)
     {
-        std::cout << "List erase at " << ndx << std::endl;
+        std::cout << "Collection erase at " << ndx << std::endl;
         return true;
     }
 
     bool list_clear(size_t old_list_size)
     {
-        std::cout << "List clear. Old size: " << old_list_size << std::endl;
-        return true;
-    }
-
-    bool set_insert(size_t ndx)
-    {
-        std::cout << "Set insert at " << ndx << std::endl;
-        return true;
-    }
-
-    bool set_erase(size_t ndx)
-    {
-        std::cout << "Set erase at " << ndx << std::endl;
-        return true;
-    }
-
-    bool set_clear(size_t old_set_size)
-    {
-        std::cout << "Set clear. Old size: " << old_set_size << std::endl;
+        std::cout << "Collection clear. Old size: " << old_list_size << std::endl;
         return true;
     }
 

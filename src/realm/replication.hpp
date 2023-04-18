@@ -566,19 +566,19 @@ inline void Replication::list_insert(const CollectionBase& list, size_t list_ndx
 inline void Replication::set_insert(const CollectionBase& set, size_t set_ndx, Mixed)
 {
     select_collection(set);        // Throws
-    m_encoder.set_insert(set_ndx); // Throws
+    m_encoder.list_insert(set_ndx); // Throws
 }
 
 inline void Replication::set_erase(const CollectionBase& set, size_t set_ndx, Mixed)
 {
     select_collection(set);       // Throws
-    m_encoder.set_erase(set_ndx); // Throws
+    m_encoder.list_erase(set_ndx); // Throws
 }
 
 inline void Replication::set_clear(const CollectionBase& set)
 {
     select_collection(set);          // Throws
-    m_encoder.set_clear(set.size()); // Throws
+    m_encoder.list_clear(set.size()); // Throws
 }
 
 inline void Replication::remove_object(const Table* t, ObjKey key)

@@ -297,12 +297,6 @@ public:
     bool list_move(size_t, size_t) { return true; }
     bool list_erase(size_t) { return true; }
     bool list_clear(size_t) { return true; }
-    bool dictionary_insert(size_t, Mixed const&) { return true; }
-    bool dictionary_set(size_t, Mixed const&) { return true; }
-    bool dictionary_erase(size_t, Mixed const&) { return true; }
-    bool set_insert(size_t) { return true; }
-    bool set_erase(size_t) { return true; }
-    bool set_clear(size_t) { return true; }
 
     // We don't run this code on arbitrary transactions that could perform schema changes
     bool insert_group_level_table(TableKey) { unexpected_instruction(); }

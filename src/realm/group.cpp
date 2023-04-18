@@ -1381,31 +1381,6 @@ public:
         return true; // No-op
     }
 
-    bool dictionary_insert(size_t, Mixed)
-    {
-        return true; // No-op
-    }
-    bool dictionary_set(size_t, Mixed)
-    {
-        return true; // No-op
-    }
-    bool dictionary_erase(size_t, Mixed)
-    {
-        return true; // No-op
-    }
-
-    bool set_insert(size_t)
-    {
-        return true; // No-op
-    }
-    bool set_erase(size_t)
-    {
-        return true; // No-op
-    }
-    bool set_clear(size_t)
-    {
-        return true; // No-op
-    }
     bool typed_link_change(ColKey, TableKey)
     {
         return true; // No-op

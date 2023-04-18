@@ -63,15 +63,16 @@ enum Instruction {
     instr_ListErase = 35, // Remove an entry from a list
     instr_ListClear = 36, // Remove all entries from a list
 
+    // No longer emitted, but supported for a file shared with an older version.
+    // Treated identically to the List versions.
     instr_DictionaryInsert = 37,
     instr_DictionarySet = 38,
     instr_DictionaryErase = 39,
+    instr_SetInsert = 40,
+    instr_SetErase = 41,
+    instr_SetClear = 42,
 
-    instr_SetInsert = 40, // Insert value into set
-    instr_SetErase = 41,  // Erase value from set
-    instr_SetClear = 42,  // Remove all values in a set
-
-    // An action involving TypedLinks has occured which caused
+    // An action involving TypedLinks has occurred which caused
     // the number of backlink columns to change. This can happen
     // when a TypedLink is created for the first time to a Table.
     instr_TypedLinkChange = 43,
@@ -149,6 +150,10 @@ public:
     {
         return true;
     }
+    bool typed_link_change(ColKey, TableKey)
+    {
+        return true;
+    }
 
     // Must have table selected:
     bool create_object(ObjKey)
@@ -160,27 +165,6 @@ public:
         return true;
     }
     bool modify_object(ColKey, ObjKey)
-    {
-        return true;
-    }
-    bool list_set(size_t)
-    {
-        return true;
-    }
-    bool list_insert(size_t)
-    {
-        return true;
-    }
-
-    bool dictionary_insert(size_t, Mixed)
-    {
-        return true;
-    }
-    bool dictionary_set(size_t, Mixed)
-    {
-        return true;
-    }
-    bool dictionary_erase(size_t, Mixed)
     {
         return true;
     }
@@ -203,7 +187,15 @@ public:
         return true;
     }
 
-    // Must have linklist selected:
+    // Must have collection selected:
+    bool list_set(size_t)
+    {
+        return true;
+    }
+    bool list_insert(size_t)
+    {
+        return true;
+    }
     bool list_move(size_t, size_t)
     {
         return true;
@@ -213,24 +205,6 @@ public:
         return true;
     }
     bool list_clear(size_t)
-    {
-        return true;
-    }
-
-    bool set_insert(size_t)
-    {
-        return true;
-    }
-    bool set_erase(size_t)
-    {
-        return true;
-    }
-    bool set_clear(size_t)
-    {
-        return true;
-    }
-
-    bool typed_link_change(ColKey, TableKey)
     {
         return true;
     }
@@ -280,15 +254,6 @@ public:
     bool list_move(size_t from_link_ndx, size_t to_link_ndx);
     bool list_erase(size_t list_ndx);
     bool list_clear(size_t old_list_size);
-
-    // Must have set selected:
-    bool set_insert(size_t set_ndx);
-    bool set_erase(size_t set_ndx);
-    bool set_clear(size_t set_ndx);
-
-    bool dictionary_insert(size_t dict_ndx, Mixed key);
-    bool dictionary_set(size_t dict_ndx, Mixed key);
-    bool dictionary_erase(size_t dict_ndx, Mixed key);
 
     bool typed_link_change(ColKey col, TableKey dest);
 
@@ -682,29 +647,6 @@ inline bool TransactLogEncoder::list_insert(size_t list_ndx)
 }
 
 
-/************************************ Set ************************************/
-
-inline bool TransactLogEncoder::set_insert(size_t set_ndx)
-{
-    append_simple_instr(instr_SetInsert, set_ndx); // Throws
-    return true;
-}
-
-
-inline bool TransactLogEncoder::set_erase(size_t set_ndx)
-{
-    append_simple_instr(instr_SetErase, set_ndx); // Throws
-    return true;
-}
-
-
-inline bool TransactLogEncoder::set_clear(size_t set_size)
-{
-    append_simple_instr(instr_SetClear, set_size); // Throws
-    return true;
-}
-
-
 inline bool TransactLogEncoder::list_move(size_t from_link_ndx, size_t to_link_ndx)
 {
     // This test is to prevent some fuzzy testing on the server to crash
@@ -809,6 +751,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
+        case instr_SetInsert:
         case instr_ListInsert: {
             size_t list_ndx = read_int<size_t>();
             if (!handler.list_insert(list_ndx)) // Throws
@@ -822,12 +765,14 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
+        case instr_SetErase:
         case instr_ListErase: {
             size_t link_ndx = read_int<size_t>(); // Throws
             if (!handler.list_erase(link_ndx))    // Throws
                 parser_error();
             return;
         }
+        case instr_SetClear:
         case instr_ListClear: {
             size_t old_list_size = read_int<size_t>(); // Throws
             if (!handler.list_clear(old_list_size))    // Throws
@@ -837,45 +782,27 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_DictionaryInsert: {
             int type = read_int<int>(); // Throws
             REALM_ASSERT(type == int(type_String));
-            Mixed key = Mixed(read_string(m_string_buffer));
-            size_t dict_ndx = read_int<size_t>();          // Throws
-            if (!handler.dictionary_insert(dict_ndx, key)) // Throws
+            read_string(m_string_buffer);         // skip key
+            size_t dict_ndx = read_int<size_t>(); // Throws
+            if (!handler.list_insert(dict_ndx))   // Throws
                 parser_error();
             return;
         }
         case instr_DictionarySet: {
             int type = read_int<int>(); // Throws
             REALM_ASSERT(type == int(type_String));
-            Mixed key = Mixed(read_string(m_string_buffer));
+            read_string(m_string_buffer);               // skip key
             size_t dict_ndx = read_int<size_t>();       // Throws
-            if (!handler.dictionary_set(dict_ndx, key)) // Throws
+            if (!handler.list_set(dict_ndx))            // Throws
                 parser_error();
             return;
         }
         case instr_DictionaryErase: {
             int type = read_int<int>(); // Throws
             REALM_ASSERT(type == int(type_String));
-            Mixed key = Mixed(read_string(m_string_buffer));
+            read_string(m_string_buffer);                 // skip key
             size_t dict_ndx = read_int<size_t>();         // Throws
-            if (!handler.dictionary_erase(dict_ndx, key)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_SetInsert: {
-            size_t set_ndx = read_int<size_t>(); // Throws
-            if (!handler.set_insert(set_ndx))    // Throws
-                parser_error();
-            return;
-        }
-        case instr_SetErase: {
-            size_t set_ndx = read_int<size_t>(); // Throws
-            if (!handler.set_erase(set_ndx))     // Throws
-                parser_error();
-            return;
-        }
-        case instr_SetClear: {
-            size_t set_size = read_int<size_t>(); // Throws
-            if (!handler.set_clear(set_size))     // Throws
+            if (!handler.list_erase(dict_ndx))            // Throws
                 parser_error();
             return;
         }
@@ -1101,24 +1028,6 @@ public:
         return true;
     }
 
-    bool dictionary_insert(size_t dict_ndx, Mixed key)
-    {
-        m_encoder.dictionary_erase(dict_ndx, key);
-        return true;
-    }
-
-    bool dictionary_set(size_t dict_ndx, Mixed key)
-    {
-        m_encoder.dictionary_set(dict_ndx, key);
-        return true;
-    }
-
-    bool dictionary_erase(size_t dict_ndx, Mixed key)
-    {
-        m_encoder.dictionary_insert(dict_ndx, key);
-        return true;
-    }
-
     bool set_link_type(ColKey key)
     {
         m_encoder.set_link_type(key);
@@ -1174,29 +1083,6 @@ public:
         // all front-insertions
         for (size_t i = old_list_size; i > 0; --i) {
             m_encoder.list_insert(i - 1);
-            append_instruction();
-        }
-        return true;
-    }
-
-    bool set_insert(size_t ndx)
-    {
-        m_encoder.set_erase(ndx);
-        append_instruction();
-        return true;
-    }
-
-    bool set_erase(size_t ndx)
-    {
-        m_encoder.set_insert(ndx);
-        append_instruction();
-        return true;
-    }
-
-    bool set_clear(size_t old_set_size)
-    {
-        for (size_t i = old_set_size; i > 0; --i) {
-            m_encoder.set_insert(i - 1);
             append_instruction();
         }
         return true;
