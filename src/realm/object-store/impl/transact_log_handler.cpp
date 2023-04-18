@@ -336,15 +336,10 @@ public:
         TransactLogValidationMixin::select_table(key);
 
         TableKey table_key = current_table();
-        if (m_info.track_all)
-            m_active_table = &m_info.tables[table_key];
-        else {
-            auto it = m_info.tables.find(table_key);
-            if (it == m_info.tables.end())
-                m_active_table = nullptr;
-            else
-                m_active_table = &it->second;
-        }
+        if (auto it = m_info.tables.find(table_key); it != m_info.tables.end())
+            m_active_table = &it->second;
+        else
+            m_active_table = nullptr;
         return true;
     }
 
@@ -600,7 +595,7 @@ void cancel(Transaction& tr, BindingContext* context)
 
 void advance(Transaction& tr, TransactionChangeInfo& info, VersionID version)
 {
-    if (!info.track_all && info.tables.empty() && info.collections.empty()) {
+    if (info.tables.empty() && info.collections.empty()) {
         tr.advance_read(version);
     }
     else {
