@@ -279,7 +279,8 @@ bool ListResultsNotifier::do_add_required_change_info(TransactionChangeInfo& inf
     if (!m_list->is_attached())
         return false; // origin row was deleted after the notification was added
 
-    info.lists.push_back({m_list->get_table()->get_key(), m_list->get_owner_key(), m_list->get_col_key(), &m_change});
+    info.collections.push_back(
+        {m_list->get_table()->get_key(), m_list->get_owner_key(), m_list->get_col_key(), &m_change});
 
     m_info = &info;
     return true;
@@ -322,7 +323,7 @@ void ListResultsNotifier::calculate_changes()
 
 void ListResultsNotifier::run()
 {
-    if (!m_list->is_attached()) {
+    if (!m_list || !m_list->is_attached()) {
         // List was deleted, so report all of the rows being removed
         m_change = {};
         m_change.deletions.set(m_previous_indices.size());

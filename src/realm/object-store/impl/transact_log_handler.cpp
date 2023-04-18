@@ -82,7 +82,7 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
     for (auto& tbl : tables_needed)
         tables[tbl] = {};
     for (auto& list : m_lists)
-        lists.push_back({list.observer->table_key, list.observer->obj_key, list.col, &list.builder});
+        collections.push_back({list.observer->table_key, list.observer->obj_key, list.col, &list.builder});
 }
 
 void KVOAdapter::before(Transaction& sg)
@@ -313,19 +313,6 @@ class TransactLogObserver : public TransactLogValidationMixin {
     _impl::CollectionChangeBuilder* m_active_collection = nullptr;
     ObjectChangeSet* m_active_table = nullptr;
 
-    _impl::CollectionChangeBuilder* find_list(ObjKey obj, ColKey col)
-    {
-        // When there are multiple source versions there could be multiple
-        // change objects for a single LinkView, in which case we need to use
-        // the last one
-        auto table = current_table();
-        for (auto it = m_info.lists.rbegin(), end = m_info.lists.rend(); it != end; ++it) {
-            if (it->table_key == table && it->obj_key == obj && it->col_key == col)
-                return it->changes;
-        }
-        return nullptr;
-    }
-
 public:
     TransactLogObserver(_impl::TransactionChangeInfo& info)
         : m_info(info)
@@ -334,8 +321,8 @@ public:
 
     void parse_complete()
     {
-        for (auto& list : m_info.lists)
-            list.changes->clean_up_stale_moves();
+        for (auto& collection : m_info.collections)
+            collection.changes->clean_up_stale_moves();
         for (auto it = m_info.tables.begin(); it != m_info.tables.end();) {
             if (it->second.empty())
                 it = m_info.tables.erase(it);
@@ -364,7 +351,14 @@ public:
     bool select_collection(ColKey col, ObjKey obj)
     {
         modify_object(col, obj);
-        m_active_collection = find_list(obj, col);
+        auto table = current_table();
+        for (auto& c : m_info.collections) {
+            if (c.table_key == table && c.obj_key == obj && c.col_key == col) {
+                m_active_collection = c.changes;
+                return true;
+            }
+        }
+        m_active_collection = nullptr;
         return true;
     }
 
@@ -430,14 +424,14 @@ public:
             m_active_table->deletions_add(key);
         m_active_table->modifications_remove(key);
 
-        for (size_t i = 0; i < m_info.lists.size(); ++i) {
-            auto& list = m_info.lists[i];
+        for (size_t i = 0; i < m_info.collections.size(); ++i) {
+            auto& list = m_info.collections[i];
             if (list.table_key != current_table())
                 continue;
             if (list.obj_key == key) {
-                if (i + 1 < m_info.lists.size())
-                    m_info.lists[i] = std::move(m_info.lists.back());
-                m_info.lists.pop_back();
+                if (i + 1 < m_info.collections.size())
+                    m_info.collections[i] = std::move(m_info.collections.back());
+                m_info.collections.pop_back();
                 continue;
             }
         }
@@ -606,7 +600,7 @@ void cancel(Transaction& tr, BindingContext* context)
 
 void advance(Transaction& tr, TransactionChangeInfo& info, VersionID version)
 {
-    if (!info.track_all && info.tables.empty() && info.lists.empty()) {
+    if (!info.track_all && info.tables.empty() && info.collections.empty()) {
         tr.advance_read(version);
     }
     else {
