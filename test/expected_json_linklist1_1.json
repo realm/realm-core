@@ -1,0 +1,1 @@
+[{"_key":0,"col1":100,"str1":"foo","linkA":{"table": "table2", "keys": [1]},"linkB":{"table": "table3", "keys": [0,2]}},{"_key":1,"col1":200,"str1":"!","linkA":{"table": "table2", "keys": [1,2]},"linkB":{"table": "table3", "keys": []}},{"_key":2,"col1":300,"str1":"bar","linkA":{"table": "table2", "keys": []},"linkB":{"table": "table3", "keys": []}}]

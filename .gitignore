@@ -1,0 +1,99 @@
+*.ncb
+*.suo
+*.swp
+*~
+cscope.*
+tags
+GPATH
+GRTAGS
+GTAGS
+
+/gcovr.xml
+/tmp
+doc/html
+
+# CMake artifacts
+CMakeFiles
+CMakeCache.txt
+Testing
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+Realm.xcodeproj
+CMakeScripts
+
+# Ignore build artifacts
+/build*
+/debug*
+
+# Ignore all user files except one which includes execution path for test
+*.user
+!Realm.vcxproj.user
+
+# Ignore user folder attributes created by Apple
+.DS_Store
+
+# Ignore thumbnails created by windows
+Thumbs.db
+
+# Ignore files build by Visual Studio
+/.vs
+/Visual\ Studio
+
+# Ignore user-local configuration for Visual Studio Code
+/.vscode
+/.cache
+compile_commands.json
+
+# Ignore Eclipse settings
+/.settings
+.cproject
+
+*.dSYM
+
+# Ignore KDevelop4 user files
+.kdev4/*
+
+# ref doc
+/doc/ref_cpp/html/*
+
+# cpack artifacts
+/_CPack_Packages*
+/realm-*.tar.gz
+
+# sh build.sh build-cocoa
+/core-*.zip
+/macosx-lib/
+/ios-lib/
+/ios-no-bitcode-lib/
+/watchos-lib/
+/tvos-lib/
+
+# sh build.sh build-dotnet-cocoa
+/realm-core-dotnet-cocoa*.zip
+
+# sh build.sh build-android
+/android-lib/
+/openssl/
+/realm-core-android-*.tar.gz
+
+# debian/ubuntu builds
+/debian/realm/*
+/debian/librealm/*
+/debian/librealm-dev/*
+/debian/librealm-dev.substvars
+/debian/librealm.substvars
+/debian/realm.substvars
+/debian/files
+/debian/changelog
+/debian/debhelper.log
+/debian/librealm.debhelper.lo
+/debian/librealm-dev.debhelper.log
+
+# Ignore python compiled files
+*.pyc
+/test/android/jni/#Android.mk#
+
+# Swift package manager
+/.swiftpm
+/.build

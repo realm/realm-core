@@ -1,0 +1,11 @@
+replicaCount: 20
+config:
+  receivePropagationTimeRequests: true
+  downloadFirst: true
+  numPeers: "100"
+  numGrowths: "100"
+  timeBetweenGrowths: "3000" # 3 seconds per growth
+  startDelay: "10000" # 10 seconds
+  maxStartDelay: "13000" # 13 seconds
+  metricsPrefix: "realm.fan_out_recv" # See ../grafana-dashboards/fanout.json
+  reportRoundtripTimes: true

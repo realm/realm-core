@@ -1,0 +1,90 @@
+{
+   <CFString buildProtocolList init>
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc_zone_malloc
+   fun:_ZL17buildProtocolListP13category_listPK15protocol_list_tPS3_
+   fun:_ZL12realizeClassP10objc_class
+   ...
+   fun:CFStringCreateWithCString
+}
+{
+   <CoreFoundation initializeMainExecutable malloc_zone_malloc>
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc_zone_malloc
+   ...
+   fun:_ZN4dyld24initializeMainExecutableEv
+   ...
+}
+{
+   <CoreFoundation initializeMainExecutable malloc_zone_calloc>
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc_zone_calloc
+   ...
+   fun:_ZN4dyld24initializeMainExecutableEv
+   ...
+}
+{
+   <CoreFoundation initializeMainExecutable malloc>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   ...
+   fun:_ZN4dyld24initializeMainExecutableEv
+   ...
+}
+{
+   <CoreFoundation CFBundleGetTypeID>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:calloc
+   fun:class_createInstance
+   ...
+   fun:CFBundleGetTypeID
+}
+{
+   <ImageLoader malloc_zone_calloc>
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc_zone_calloc
+   ...
+   fun:_ZN11ImageLoader19processInitializersERKNS_11LinkContextEjRNS_21InitializerTimingListERNS_15UninitedUpwardsE
+}
+{
+   <Objective-C realizeClass malloc_zone_calloc>
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc_zone_calloc
+   ...
+   fun:_ZL12realizeClassP10objc_class
+   ...
+}
+{
+   <CFString buildPropertyList init>
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc_zone_malloc
+   fun:_ZL17buildPropertyListPK15property_list_tP13category_lista
+   fun:_ZL12realizeClassP10objc_class
+   ...
+   fun:CFStringCreateWithCString
+}
+{
+   <ImageLoader malloc_zone_malloc>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc_zone_malloc
+   ...
+   fun:_ZN11ImageLoader23recursiveInitializationERKNS_11LinkContextEjRNS_21InitializerTimingListERNS_15UninitedUpwardsE
+}
+{
+   <Objective-C realizeClass malloc_zone_malloc>
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc_zone_malloc
+   ...
+   fun:_ZL12realizeClassP10objc_class
+   ...
+}

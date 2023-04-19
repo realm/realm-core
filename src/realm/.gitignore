@@ -1,0 +1,73 @@
+/*.d
+/*.o
+/util/*.d
+/util/*.o
+/impl/*.d
+/impl/*.o
+/*.libdeps
+
+# Coverage data
+/*.gcno
+/*.gcda
+/util/*.gcno
+/util/*.gcda
+/impl/*.gcno
+/impl/*.gcda
+
+# ASAN
+/*-asan
+/*-asan-noinst
+/*-asan-dbg
+/*-asan-dbg-noinst
+/*-asan-cov
+/*-asan-cov-noinst
+
+# TSAN
+/*-tsan
+/*-tsan-noinst
+/*-tsan-dbg
+/*-tsan-dbg-noinst
+/*-tsan-cov
+/*-tsan-cov-noinst
+
+/librealm*.a
+/librealm*.so
+/librealm*.so.*
+/librealm*.dylib
+
+/realm-import
+/realm-import-noinst
+/realm-import-dbg
+/realm-import-dbg-noinst
+/realm-import-cov
+/realm-import-cov-noinst
+
+/realmd
+/realmd-noinst
+/realmd-dbg
+/realmd-dbg-noinst
+/realmd-cov
+/realmd-cov-noinst
+
+/realm-config
+/realm-config-dbg
+
+/realm-config-macosx
+/realm-config-macosx-dbg
+
+# iPhone
+/realm-config-ios
+/realm-config-ios-dbg
+
+# Watch
+/realm-config-watchos
+/realm-config-watchos-dbg
+
+# TV
+/realm-config-tvos
+/realm-config-tvos-dbg
+
+/util/config.h
+
+/realm-schema-dump*
+/realm-schema-dump-dbg*

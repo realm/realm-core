@@ -1,0 +1,88 @@
+name: SDK Integration
+on:
+  pull_request:
+    types:
+    - opened
+    - labeled
+    - synchronize
+    - closed
+jobs:
+  update-sdk-prs:
+    runs-on: ubuntu-latest
+    name: Update SDK PRs
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'public-api') && (github.event.pull_request.state == 'open' || (github.event.action == 'closed' && github.event.pull_request.merged)) }}
+    strategy:
+      matrix:
+        repo:
+          - name: realm-dotnet
+            submodule-path: wrappers/realm-core
+          - name: realm-js
+            submodule-path: vendor/realm-core
+          - name: realm-cocoa
+    outputs:
+      pr-url-dotnet: ${{ steps.set-pr-url.outputs.realm-dotnet-url }}
+      pr-url-js: ${{ steps.set-pr-url.outputs.realm-js-url }}
+      pr-url-cocoa: ${{ steps.set-pr-url.outputs.realm-cocoa-url }}
+    steps:
+    - name: Checkout ${{ matrix.repo.name }}
+      uses: actions/checkout@v2
+      with:
+        repository: realm/${{ matrix.repo.name }}
+        path: integration/${{ matrix.repo.name }}
+        submodules: recursive
+        token: ${{ secrets.REALM_CI_PAT }}
+        fetch-depth: 0
+    - name: Checkout existing branch
+      id: checkout-existing
+      run: |
+        cd integration/${{ matrix.repo.name }}
+        branch_exists=$(git ls-remote --heads https://github.com/realm/${{ matrix.repo.name }}.git ${{ github.event.pull_request.head.ref }} | wc -l)
+        if [ $branch_exists -eq 1 ];then
+          git checkout -t origin/${{ github.event.pull_request.head.ref }}
+          echo "::set-output name=pr-exists::true"
+        elif ${{ github.event.pull_request.merged }}; then
+          echo "Existing SDK branch not found for a merge PR. Bailing out"
+          exit 1
+        fi
+    - name: Update submodule
+      if: ${{ matrix.repo.submodule-path }}
+      run: |
+        cd integration/${{ matrix.repo.name }}/${{ matrix.repo.submodule-path }}
+        git checkout ${{ (github.event.pull_request.merged && 'master') || format('-t origin/{0}', github.event.pull_request.head.ref) }}
+    - name: Update Package.swift
+      if: ${{ !matrix.repo.submodule-path }}
+      uses: jacobtomlinson/gha-find-replace@3eaedee5ed6204139f1edb18af1ee349763feac2
+      with:
+        include: integration\/${{ matrix.repo.name }}\/Package\.swift
+        find: 'url: "https:\/\/github\.com\/realm\/realm-core", (.*)\)'
+        replace: 'url: "https://github.com/realm/realm-core", .revision("${{ (github.event.pull_request.merged && github.event.pull_request.merge_commit_sha) || github.event.pull_request.head.sha }}"))'
+    - name: Push to existing branch
+      if: ${{ steps.checkout-existing.outputs.pr-exists == 'true' }}
+      run: |
+        cd integration/${{ matrix.repo.name }}
+        if [ -n "$(git status --porcelain)" ]; then
+          git config --global user.name 'Realm CI bot'
+          git config --global user.email 'realm-ci@users.noreply.github.com'
+          git commit -am "Update Core to ${{ (github.event.pull_request.merged && format('master@{0}', github.event.pull_request.merge_commit_sha)) || github.event.pull_request.head.sha }}"
+          git push https://realm-ci:${{ secrets.REALM_CI_PAT }}@github.com/realm/${{ matrix.repo.name }}.git
+        else
+          echo "SDK repo is already up to date with these changes. Nothing to commit/push."
+        fi
+    - name: Create PR
+      uses: peter-evans/create-pull-request@7380612b49221684fefa025244f2ef4008ae50ad
+      if: ${{ steps.checkout-existing.outputs.pr-exists != 'true' }}
+      id: create-pr
+      with:
+        token: ${{ secrets.REALM_CI_PAT }}
+        branch: ${{ github.event.pull_request.head.ref }}
+        title: ${{ github.event.pull_request.title }}
+        body: Pick up https://github.com/realm/realm-core/pull/${{ github.event.pull_request.number }}
+        delete-branch: true
+        path: integration/${{ matrix.repo.name }}
+        base: master
+        labels: public-api
+        commit-message: Update Core to ${{ github.event.pull_request.head.sha }}
+        draft: true
+    - name: Set PR Url Output
+      id: set-pr-url
+      run: echo "set-output name=${{matrix.repo.name}}-url::${{ steps.create-pr.outputs.pull-request-url }}"

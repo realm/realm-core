@@ -1,0 +1,1 @@
+[{"_key":0,"col1":100,"str1":"foo","linkA":[{"_key":1,"col1":500,"str2":"world"}],"linkB":[{"_key":0,"col1":700,"str2":"baz"},{"_key":2,"col1":900,"str2":"hi"}]},{"_key":1,"col1":200,"str1":"!","linkA":[{"_key":1,"col1":500,"str2":"world"},{"_key":2,"col1":600,"str2":"!"}],"linkB":[]},{"_key":2,"col1":300,"str1":"bar","linkA":[],"linkB":[]}]

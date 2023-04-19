@@ -1,0 +1,1 @@
+[{"_key":0,"primaryKey":"t1o1","int1":100,"LINKA":{"key1":{"_key":1,"primaryKey":"t2o2","int2":500}}},{"_key":1,"primaryKey":"t1o3","int1":300,"LINKA":{}},{"_key":2,"primaryKey":"t1o2","int1":200,"LINKA":{"key2":{"_key":1,"primaryKey":"t2o2","int2":500},"key4":null,"key5":null,"key3":{"_key":2,"primaryKey":"t2o3","int2":600}}}]

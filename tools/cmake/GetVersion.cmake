@@ -1,0 +1,27 @@
+file(STRINGS "${RealmCore_SOURCE_DIR}/dependencies.list" DEPENDENCIES)
+message("Dependencies: ${DEPENDENCIES}")
+foreach(LINE IN LISTS DEPENDENCIES)
+    string(REGEX MATCHALL "([^=]+)" KEY_VALUE ${LINE})
+    list(GET KEY_VALUE 0 KEY)
+    list(GET KEY_VALUE 1 VALUE)
+    set(DEP_${KEY} ${VALUE})
+endforeach()
+
+#check version format
+string(REGEX MATCH "^[0-9]+\.[0-9]+\.[0-9]+$" CONFIG_VERSION ${DEP_VERSION})
+if (NOT CONFIG_VERSION)
+    string(REGEX MATCH "^[0-9]+\.[0-9]+\.[0-9]+-.+$" CONFIG_VERSION ${DEP_VERSION})
+    if (NOT CONFIG_VERSION)
+        message(FATAL_ERROR "Wrong version number format: ${DEP_VERSION}.")
+    endif()
+    set(extended_version 1)
+endif()
+
+# Split "x.y.z-t" into a list x;y;z;t
+string(REGEX MATCHALL "[^.-]+" VERSION_LIST ${CONFIG_VERSION})
+list(GET VERSION_LIST 0 CONFIG_VERSION_MAJOR)
+list(GET VERSION_LIST 1 CONFIG_VERSION_MINOR)
+list(GET VERSION_LIST 2 CONFIG_VERSION_PATCH)
+if (extended_version)
+    list(GET VERSION_LIST 3 CONFIG_VERSION_TWEAK)
+endif()

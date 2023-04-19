@@ -1,0 +1,242 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
+#include "testsettings.hpp"
+
+#include <realm/util/optional.hpp>
+
+#include "test.hpp"
+
+using namespace realm::util;
+
+TEST(Optional_DefaultConstructor)
+{
+    Optional<int> x{};
+    CHECK(!bool(x));
+}
+
+TEST(Optional_NoneConstructor)
+{
+    Optional<int> x{realm::none};
+    CHECK(!bool(x));
+}
+
+TEST(Optional_ValueConstructor)
+{
+    Optional<std::string> a{"foo"};
+    CHECK(bool(a));
+}
+
+TEST(Optional_MoveConstructor)
+{
+    Optional<std::string> a{"foo"};
+    Optional<std::string> b{std::move(a)};
+    CHECK(bool(a));
+    CHECK(bool(b));
+    CHECK_EQUAL(*a, "");
+    CHECK_EQUAL(*b, "foo");
+}
+
+TEST(Optional_CopyConstructor)
+{
+    Optional<std::string> a{"foo"};
+    Optional<std::string> b{a};
+    CHECK(bool(a));
+    CHECK(bool(b));
+    CHECK_EQUAL(*a, "foo");
+    CHECK_EQUAL(*b, "foo");
+}
+
+TEST(Optional_MoveValueConstructor)
+{
+    std::string a = "foo";
+    Optional<std::string> b{std::move(a)};
+    CHECK(bool(b));
+    CHECK_EQUAL(*b, "foo");
+    CHECK_EQUAL(a, "");
+}
+
+TEST(Optional_CopyAssignment)
+{
+    Optional<std::string> a{"foo"};
+    Optional<std::string> b;
+    b = a;
+    CHECK(bool(a));
+    CHECK(bool(b));
+    CHECK_EQUAL(*a, "foo");
+    CHECK_EQUAL(*b, "foo");
+
+    Optional<std::string> c{"foo"};
+    Optional<std::string> d{"bar"};
+    d = c;
+    CHECK(bool(c));
+    CHECK(bool(d));
+    CHECK_EQUAL(*c, "foo");
+    CHECK_EQUAL(*d, "foo");
+
+    Optional<std::string> e;
+    Optional<std::string> f{"foo"};
+    f = e;
+    CHECK(!bool(e));
+    CHECK(!bool(f));
+}
+
+TEST(Optional_MoveAssignment)
+{
+    Optional<std::string> a{"foo"};
+    Optional<std::string> b;
+    b = std::move(a);
+    CHECK(bool(a));
+    CHECK(bool(b));
+    CHECK_EQUAL(*b, "foo");
+
+    Optional<std::string> c{"foo"};
+    Optional<std::string> d{"bar"};
+    d = std::move(c);
+    CHECK(bool(c));
+    CHECK(bool(d));
+    CHECK_EQUAL(*d, "foo");
+
+    Optional<std::string> e;
+    Optional<std::string> f{"foo"};
+    f = std::move(e);
+    CHECK(!bool(e));
+    CHECK(!bool(f));
+}
+
+TEST(Optional_ValueAssignment)
+{
+    Optional<std::string> o;
+    o = std::string{"foo"};
+    CHECK(bool(o));
+    CHECK_EQUAL(*o, "foo");
+
+    o = std::string{"bar"};
+    CHECK(bool(o));
+    CHECK_EQUAL(*o, "bar");
+}
+
+namespace {
+
+struct SetBooleanOnDestroy {
+    bool& m_b;
+    explicit SetBooleanOnDestroy(bool& b)
+        : m_b(b)
+    {
+    }
+    ~SetBooleanOnDestroy()
+    {
+        m_b = true;
+    }
+};
+
+} // unnamed namespace
+
+TEST(Optional_Destructor)
+{
+    bool b = false;
+    {
+        Optional<SetBooleanOnDestroy> x{SetBooleanOnDestroy(b)};
+    }
+    CHECK(b);
+}
+
+TEST(Optional_DestroyOnAssignNone)
+{
+    bool b = false;
+    {
+        Optional<SetBooleanOnDestroy> x{SetBooleanOnDestroy(b)};
+        x = realm::none;
+        CHECK(b);
+    }
+    CHECK(b);
+}
+
+namespace {
+
+/// See:
+/// http://www.boost.org/doc/libs/1_57_0/libs/optional/doc/html/boost_optional/dependencies_and_portability/optional_reference_binding.html
+
+const int global_i = 0;
+
+struct TestingReferenceBinding {
+    TestingReferenceBinding(const int& ii)
+    {
+        static_cast<void>(ii);
+        REALM_ASSERT(&ii == &global_i);
+    }
+
+    void operator=(const int& ii)
+    {
+        static_cast<void>(ii);
+        REALM_ASSERT(&ii == &global_i);
+    }
+
+    void operator=(int&&)
+    {
+        REALM_ASSERT(false);
+    }
+};
+
+} // unnamed namespace
+
+TEST(Optional_ReferenceBinding)
+{
+    const int& iref = global_i;
+    CHECK_EQUAL(&iref, &global_i);
+    TestingReferenceBinding ttt = global_i;
+    ttt = global_i;
+    TestingReferenceBinding ttt2 = iref;
+    ttt2 = iref;
+}
+
+TEST(Optional_ValueDoesntGenerateWarning)
+{
+    // Shouldn't generate any warnings:
+    const Optional<int> i{1};
+    CHECK(*i);
+}
+
+TEST(Optional_ConstExpr)
+{
+    // Should compile:
+    constexpr Optional<int> a;
+    constexpr Optional<int> b{none};
+    constexpr Optional<int> c{1};
+    CHECK_EQUAL(bool(a), false);
+    CHECK_EQUAL(bool(c), true);
+    constexpr int d = *c;
+    CHECK_EQUAL(1, d);
+    constexpr bool e = bool(Optional<int>{1});
+    CHECK_EQUAL(true, e);
+    constexpr bool f = bool(Optional<int>{none});
+    CHECK_EQUAL(false, f);
+    constexpr int g = b.value_or(1234);
+    CHECK_EQUAL(1234, g);
+}
+
+// Disabled for compliance with std::optional
+// TEST(Optional_VoidIsEquivalentToBool)
+// {
+//     auto a = some<void>();
+//     CHECK_EQUAL(sizeof(a), sizeof(bool));
+//     CHECK(a);
+//     Optional<void> b = none;
+//     CHECK_EQUAL(sizeof(b), sizeof(bool));
+//     CHECK(!b);
+// }

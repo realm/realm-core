@@ -1,0 +1,1 @@
+[{"_key":0,"str1":"hello","linkA":{"_key":0,"str2":"foo","linkB":{"_key":0,"str1":"hello","linkA":{"table": "table2", "key": 0}}}},{"_key":1,"str1":"world","linkA":null}]

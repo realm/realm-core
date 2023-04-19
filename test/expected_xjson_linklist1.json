@@ -1,0 +1,1 @@
+[{"int1":{"$numberLong":"100"},"linkA":["t2o2"],"linkB":"t2o1","primaryKey":"t1o1"},{"int1":{"$numberLong":"300"},"linkA":[],"linkB":null,"primaryKey":"t1o3"},{"int1":{"$numberLong":"200"},"linkA":["t2o2","t2o3"],"linkB":null,"primaryKey":"t1o2"}]

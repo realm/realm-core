@@ -1,0 +1,10 @@
+/*.d
+/*.o
+
+# Coverage data
+/*.gcno
+/*.gcda
+
+/benchmark-prealloc
+/benchmark-prealloc-dbg
+/benchmark-prealloc-cov

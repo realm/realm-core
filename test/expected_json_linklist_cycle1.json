@@ -1,0 +1,20 @@
+[
+  {
+    "_key": 0,
+    "str1": "hello",
+    "linkA": {
+      "table": "table2",
+      "keys": [
+        1
+      ]
+    }
+  },
+  {
+    "_key": 1,
+    "str1": "world",
+    "linkA": {
+      "table": "table2",
+      "keys": []
+    }
+  }
+]

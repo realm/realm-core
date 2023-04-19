@@ -1,0 +1,10 @@
+/*.d
+/*.o
+
+# Coverage data
+/*.gcno
+/*.gcda
+
+/test-client
+/test-client-dbg
+/test-client-cov

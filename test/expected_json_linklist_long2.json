@@ -1,0 +1,46 @@
+[
+  {
+    "_key": 0,
+    "link": {
+      "_key": 9,
+      "str1": "String_9",
+      "sub": {
+        "_key": 8,
+        "str1": "String_8",
+        "sub": {
+          "_key": 7,
+          "str1": "String_7",
+          "sub": {
+            "_key": 6,
+            "str1": "String_6",
+            "sub": {
+              "_key": 5,
+              "str1": "String_5",
+              "sub": {
+                "_key": 4,
+                "str1": "String_4",
+                "sub": {
+                  "_key": 3,
+                  "str1": "String_3",
+                  "sub": {
+                    "_key": 2,
+                    "str1": "String_2",
+                    "sub": {
+                      "_key": 1,
+                      "str1": "String_1",
+                      "sub": {
+                        "_key": 0,
+                        "str1": "String_0",
+                        "sub": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,10 @@
+/*.d
+/*.o
+
+# Coverage data
+/*.gcno
+/*.gcda
+
+/add_insert
+/add_insert-dbg
+/add_insert-cov

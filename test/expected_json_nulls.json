@@ -1,0 +1,1 @@
+[{"_key":0,"str_col":"Hello","bool_col":false,"int_col":1,"timestamp_col":"1970-01-01 00:00:01"},{"_key":1,"str_col":null,"bool_col":null,"int_col":null,"timestamp_col":null}]

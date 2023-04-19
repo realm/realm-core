@@ -1,0 +1,9 @@
+/*.d
+/*.o
+/*.libdeps
+
+# Coverage data
+/*.gcno
+/*.gcda
+
+/test-util*.a
