@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Allow to run multiprocess encryption tests outside building folder.
 
 ----------------------------------------------
 
