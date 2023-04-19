@@ -101,7 +101,7 @@ bool ResultsNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     // when key path filters are set hence we need to recalculate every time the callbacks are changed.
     util::CheckedLockGuard lock(m_callback_mutex);
     if (m_did_modify_callbacks) {
-        update_related_tables(*(m_query->get_table()));
+        update_related_tables(*m_query->get_table());
     }
 
     return m_query->get_table() && has_run() && have_callbacks();
@@ -141,7 +141,7 @@ void ResultsNotifier::calculate_changes()
 
 void ResultsNotifier::run()
 {
-    REALM_ASSERT(m_info);
+    REALM_ASSERT(m_info || !has_run());
 
     // Table's been deleted, so report all objects as deleted
     if (!m_query->get_table()) {
@@ -288,7 +288,7 @@ bool ListResultsNotifier::do_add_required_change_info(TransactionChangeInfo& inf
 
 bool ListResultsNotifier::need_to_run()
 {
-    REALM_ASSERT(m_info);
+    REALM_ASSERT(m_info || !has_run());
 
     // Don't run the query if the results aren't actually going to be used
     if (!is_alive() || (!have_callbacks() && !m_results_were_used))

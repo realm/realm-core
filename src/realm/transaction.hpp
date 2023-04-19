@@ -58,6 +58,9 @@ public:
     void rollback() REQUIRES(!m_async_mutex);
     void end_read() REQUIRES(!m_async_mutex);
 
+    template <class O>
+    void parse_history(O& observer, DB::version_type begin, DB::version_type end);
+
     // Live transactions state changes, often taking an observer functor:
     VersionID commit_and_continue_as_read(bool commit_to_disk = true) REQUIRES(!m_async_mutex);
     VersionID commit_and_continue_writing();
@@ -422,9 +425,7 @@ inline void Transaction::rollback_and_continue_as_read(O& observer)
     BinaryData uncommitted_changes = repl->get_uncommitted_changes();
     if (uncommitted_changes.size()) {
         util::SimpleInputStream in(uncommitted_changes);
-        _impl::TransactLogParser parser; // Throws
-        parser.parse(in, observer);      // Throws
-        observer.parse_complete();       // Throws
+        _impl::parse_transact_log(in, observer); // Throws
     }
 
     rollback_and_continue_as_read();
@@ -492,10 +493,8 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
     if (observer) {
         // This has to happen in the context of the originally bound snapshot
         // and while the read transaction is still in a fully functional state.
-        _impl::TransactLogParser parser;
         _impl::ChangesetInputStream in(hist, old_version, new_version);
-        parser.parse(in, *observer); // Throws
-        observer->parse_complete();  // Throws
+        _impl::parse_transact_log(in, *observer); // Throws
     }
 
     // The old read lock must be retained for as long as the change history is
@@ -514,6 +513,18 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
     m_read_lock = new_read_lock;
 
     return true; // _impl::History::update_early_from_top_ref() was called
+}
+
+template <class O>
+void Transaction::parse_history(O& observer, DB::version_type begin, DB::version_type end)
+{
+    REALM_ASSERT(m_transact_stage != DB::transact_Ready);
+    REALM_ASSERT(end <= m_read_lock.m_version);
+    auto hist = get_history(); // Throws
+    REALM_ASSERT(hist);
+    hist->ensure_updated(m_read_lock.m_version);
+    _impl::ChangesetInputStream in(*hist, begin, end);
+    _impl::parse_transact_log(in, observer); // Throws
 }
 
 } // namespace realm

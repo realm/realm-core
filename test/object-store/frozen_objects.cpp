@@ -410,9 +410,6 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
     }
     realm->commit_transaction();
     int notifications = 0;
-    // SharedRealm captured = realm->freeze(); // Realm::get_shared_realm(config);
-    // force readlock allocation NOW!
-    // captured->read_group();
     for (int j = 0; j < num_iterations; ++j) {
 
         // pick a random earlier transaction

@@ -95,7 +95,7 @@ void ListNotifier::run()
 
     m_prev_size = m_list->size();
 
-    if (m_type == PropertyType::Object) {
+    if (m_info && m_type == PropertyType::Object) {
         auto object_did_change = get_modification_checker(*m_info, m_list->get_target_table());
         for (size_t i = 0; i < m_prev_size; ++i) {
             if (m_change.modifications.contains(i))
