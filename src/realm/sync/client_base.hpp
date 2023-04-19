@@ -1,15 +1,15 @@
 #ifndef REALM_SYNC_CLIENT_BASE_HPP
 #define REALM_SYNC_CLIENT_BASE_HPP
 
-#include <realm/transaction.hpp>
+#include <realm/db.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/protocol.hpp>
-#include <realm/sync/socket_provider.hpp>
 #include <realm/util/functional.hpp>
 
 namespace realm::sync {
 class ClientImpl;
 class SessionWrapper;
+class SyncSocketProvider;
 
 /// The presence of the ClientReset config indicates an ongoing or requested client
 /// reset operation. If client_reset is util::none or if the local Realm does not
