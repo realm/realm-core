@@ -51,7 +51,7 @@ bool MigrationStore::load_data(bool read_only)
          c_flx_migration_table,
          {
              {&m_migration_started_at, c_flx_migration_started_at, type_Timestamp},
-             {&m_migration_completed_at, c_flx_migration_completed_at, type_Timestamp},
+             {&m_migration_completed_at, c_flx_migration_completed_at, type_Timestamp, true},
              {&m_migration_state, c_flx_migration_state, type_Int},
              {&m_migration_query_str, c_flx_migration_query_string, type_String},
              {&m_migration_partition, c_flx_migration_original_partition, type_String},
