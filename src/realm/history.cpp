@@ -29,7 +29,9 @@ using namespace realm;
 namespace {
 
 // As new schema versions come into existence, describe them here.
-constexpr int g_history_schema_version = 0;
+// 0: legacy version
+// 1: nested collections
+constexpr int g_history_schema_version = 1;
 
 
 /// This class is a basis for implementing the Replication API for the purpose
@@ -238,17 +240,14 @@ public:
 
     bool is_upgradable_history_schema(int stored_schema_version) const noexcept override
     {
-        // Never called because only one schema version exists so far.
         static_cast<void>(stored_schema_version);
-        REALM_ASSERT(false);
-        return false;
+        return true;
     }
 
     void upgrade_history_schema(int stored_schema_version) override
     {
-        // Never called because only one schema version exists so far.
+        // No need to upgrade, because the old entries will not be used
         static_cast<void>(stored_schema_version);
-        REALM_ASSERT(false);
     }
 
     _impl::History* _get_history_write() override

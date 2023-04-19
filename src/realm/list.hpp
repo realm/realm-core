@@ -481,7 +481,15 @@ public:
     }
 
     // Overriding members in CollectionParent
-    FullPath get_path() const final;
+    FullPath get_path() const override
+    {
+        return Base::get_path();
+    }
+
+    Path get_short_path() const override
+    {
+        return Base::get_short_path();
+    }
     void add_index(Path& path, Index ndx) const final;
     TableRef get_table() const noexcept override
     {
@@ -715,6 +723,16 @@ public:
     CollectionType get_collection_type() const noexcept override
     {
         return CollectionType::List;
+    }
+
+    FullPath get_path() const noexcept final
+    {
+        return m_list.get_path();
+    }
+
+    Path get_short_path() const noexcept final
+    {
+        return m_list.get_short_path();
     }
 
     // Overriding members of LstBase:

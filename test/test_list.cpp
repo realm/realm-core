@@ -1317,3 +1317,53 @@ TEST(List_NestedList_Path)
         CHECK_EQUAL(path.path_from_top[2], 1);
     }
 }
+
+TEST(List_Nested_Replication)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(make_in_realm_history(), path);
+    auto tr = db->start_write();
+    auto table = tr->add_table("table");
+    auto col_any = table->add_column(type_Mixed, "something");
+
+    Obj obj = table->create_object();
+
+    obj.set_collection(col_any, CollectionType::Dictionary);
+    auto dict = obj.get_dictionary_ptr(col_any);
+    dict->insert_collection("level1", CollectionType::Dictionary);
+    auto dict2 = dict->get_dictionary("level1");
+    dict2->insert("Paul", "McCartney");
+    tr->commit_and_continue_as_read();
+
+    {
+        auto wt = db->start_write();
+        auto t = wt->get_table("table");
+        auto o = *t->begin();
+        auto d = o.get_collection_ptr({"something", "level1"});
+
+        dynamic_cast<Dictionary*>(d.get())->insert("John", "Lennon");
+        wt->commit();
+    }
+
+    struct Parser : _impl::NoOpTransactionLogParser {
+        TestContext& test_context;
+        Parser(TestContext& context)
+            : test_context(context)
+        {
+        }
+
+        bool collection_insert(size_t ndx)
+        {
+            auto collection_path = get_path();
+            CHECK(collection_path[1] == expected_path[1]);
+            CHECK(ndx == 0);
+            return true;
+        }
+
+        Path expected_path;
+    } parser(test_context);
+
+    parser.expected_path.push_back("");
+    parser.expected_path.push_back("level1");
+    tr->advance_read(&parser);
+}

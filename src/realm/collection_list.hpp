@@ -60,6 +60,7 @@ public:
     bool update_if_needed() const final;
 
     FullPath get_path() const noexcept final;
+    Path get_short_path() const noexcept final;
     void add_index(Path& path, Index ndx) const noexcept final;
 
     TableRef get_table() const noexcept final

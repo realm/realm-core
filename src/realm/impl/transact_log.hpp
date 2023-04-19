@@ -73,6 +73,13 @@ enum Instruction {
     // the number of backlink columns to change. This can happen
     // when a TypedLink is created for the first time to a Table.
     instr_TypedLinkChange = 43,
+
+    // dictionary clear should be moved up with the other instructions once we
+    // release the next file format breaking change
+    instr_DictionaryClear = 44,
+
+    // This instruction includes a path to the collection
+    instr_SelectCollectionByPath = 45,
 };
 
 class TransactLogStream {
@@ -127,7 +134,7 @@ public:
     {
         return true;
     }
-    bool select_collection(ColKey, ObjKey)
+    bool select_collection(ColKey, ObjKey, const std::vector<PathElement>&)
     {
         return true;
     }
@@ -241,7 +248,7 @@ public:
     bool set_link_type(ColKey col_key);
 
     // Must have collection selected:
-    bool select_collection(ColKey col_key, ObjKey key);
+    bool select_collection(ColKey col_key, ObjKey key, const std::vector<PathElement>& path);
     bool collection_set(size_t collection_ndx);
     bool collection_insert(size_t ndx);
     bool collection_move(size_t from_ndx, size_t to_ndx);
@@ -321,6 +328,9 @@ private:
 
     template <class T>
     static char* encode_int(char*, T value);
+
+    void encode_string(StringData string);
+
     friend class TransactLogParser;
 };
 
@@ -743,6 +753,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_SetClear:
+        case instr_DictionaryClear:
         case instr_CollectionClear: {
             size_t old_size = read_int<size_t>();    // Throws
             if (!handler.collection_clear(old_size)) // Throws
@@ -776,10 +787,24 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
-        case instr_SelectCollection: {
+        case instr_SelectCollection:
+        case instr_SelectCollectionByPath: {
             ColKey col_key = ColKey(read_int<int64_t>()); // Throws
             ObjKey key = ObjKey(read_int<int64_t>());     // Throws
-            if (!handler.select_collection(col_key, key)) // Throws
+            size_t nesting_level = instr == instr_SelectCollectionByPath ? read_int<uint32_t>() : 0;
+            std::vector<PathElement> path;
+            path.push_back(size_t(col_key.value));
+            for (size_t l = 0; l < nesting_level; l++) {
+                auto ndx = read_int<int64_t>();
+                if (ndx < 0) {
+                    auto key = read_string(m_string_buffer);
+                    path.emplace_back(key);
+                }
+                else {
+                    path.emplace_back(size_t(ndx));
+                }
+            }
+            if (!handler.select_collection(col_key, key, path)) // Throws
                 parser_error();
             return;
         }
@@ -953,10 +978,16 @@ public:
         return {m_current_linkview_col, m_current_linkview_obj};
     }
 
+    const std::vector<PathElement>& get_path() const
+    {
+        return m_path;
+    }
+
 private:
     TableKey m_current_table;
     ColKey m_current_linkview_col;
     ObjKey m_current_linkview_obj;
+    std::vector<PathElement> m_path;
 
 public:
     void parse_complete() {}
@@ -967,10 +998,11 @@ public:
         return true;
     }
 
-    bool select_collection(ColKey col_key, ObjKey obj_key)
+    bool select_collection(ColKey col_key, ObjKey obj_key, const std::vector<PathElement>& path)
     {
         m_current_linkview_col = col_key;
         m_current_linkview_obj = obj_key;
+        m_path = path;
         return true;
     }
 

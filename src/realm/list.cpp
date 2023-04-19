@@ -665,11 +665,6 @@ void Lst<Mixed>::set_collection_ref(Index index, ref_type ref, CollectionType ty
     m_tree->set(ndx, Mixed(ref, type));
 }
 
-FullPath Lst<Mixed>::get_path() const
-{
-    return Base::get_path();
-}
-
 void Lst<Mixed>::add_index(Path& path, Index index) const
 {
     auto ndx = m_tree->find_key(mpark::get<int64_t>(index));

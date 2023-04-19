@@ -87,6 +87,16 @@ public:
         return m_dictionary->has_changed();
     }
 
+    FullPath get_path() const noexcept final
+    {
+        return m_dictionary->get_path();
+    }
+
+    Path get_short_path() const noexcept final
+    {
+        return m_dictionary->get_short_path();
+    }
+
     // -------------------------------------------------------------------------
     // Things not applicable to the adapter
 

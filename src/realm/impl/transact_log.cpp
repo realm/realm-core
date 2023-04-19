@@ -28,12 +28,35 @@ bool TransactLogEncoder::select_table(TableKey key)
     return true;
 }
 
-bool TransactLogEncoder::select_collection(ColKey col_key, ObjKey key)
+bool TransactLogEncoder::select_collection(ColKey col_key, ObjKey key, const std::vector<PathElement>& path)
 {
-    append_simple_instr(instr_SelectCollection, col_key, key.value); // Throws
+    auto path_size = path.size();
+    if (path_size > 1) {
+        append_simple_instr(instr_SelectCollectionByPath, col_key, key.value, path_size - 1);
+        for (size_t n = 1; n < path_size; n++) {
+            if (path[n].is_ndx()) {
+                append_simple_instr(path[n].get_ndx());
+            }
+            else if (path[n].is_key()) {
+                append_simple_instr(-1);
+                encode_string(StringData(path[n].get_key().c_str()));
+            }
+        }
+    }
+    else {
+        append_simple_instr(instr_SelectCollection, col_key, key.value); // Throws
+    }
     return true;
 }
 
+void TransactLogEncoder::encode_string(StringData string)
+{
+    size_t max_required_bytes = max_enc_bytes_per_int + string.size();
+    char* ptr = reserve(max_required_bytes); // Throws
+    ptr = encode(ptr, size_t(string.size()));
+    ptr = std::copy(string.data(), string.data() + string.size(), ptr);
+    advance(ptr);
+}
 
 REALM_NORETURN
 void TransactLogParser::parser_error() const
