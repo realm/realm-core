@@ -175,6 +175,13 @@ auto CollectionList::get_path() const noexcept -> FullPath
     return path;
 }
 
+auto CollectionList::get_short_path() const noexcept -> Path
+{
+    auto path = m_parent->get_short_path();
+    m_parent->add_index(path, m_index);
+    return path;
+}
+
 void CollectionList::add_index(Path& path, Index index) const noexcept
 {
     if (m_coll_type == CollectionType::List) {

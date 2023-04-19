@@ -26,6 +26,10 @@ public:
     {
         return {};
     }
+    Path get_short_path() const noexcept final
+    {
+        return {};
+    }
     void add_index(Path&, Index) const noexcept final {}
 
     TableRef get_table() const noexcept final
@@ -79,6 +83,8 @@ public:
     {
         throw IllegalOperation("set_collection is not legal on this collection type");
     }
+    virtual FullPath get_path() const = 0;
+    virtual Path get_short_path() const = 0;
 };
 
 using CollectionPtr = std::shared_ptr<Collection>;
@@ -406,11 +412,18 @@ class CollectionBaseImpl : public Interface, protected ArrayParent {
 public:
     static_assert(std::is_base_of_v<CollectionBase, Interface>);
 
-    FullPath get_path() const
+    FullPath get_path() const override
     {
         auto path = m_parent->get_path();
         m_parent->add_index(path.path_from_top, m_index);
         return path;
+    }
+
+    Path get_short_path() const override
+    {
+        Path ret = m_parent->get_short_path();
+        m_parent->add_index(ret, m_index);
+        return ret;
     }
 
     // Overriding members of CollectionBase:
@@ -423,6 +436,7 @@ public:
     {
         return m_obj_mem;
     }
+
 
     /// Returns true if the accessor has changed since the last time
     /// `has_changed()` was called.

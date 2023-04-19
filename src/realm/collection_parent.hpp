@@ -71,7 +71,6 @@ enum class UpdateStatus {
     /// current state.
     NoChange,
 };
-
 struct PathElement {
     union {
         std::string string_val;
@@ -200,12 +199,15 @@ public:
     // Return the path to this object. The path is calculated from
     // the topmost Obj - which must be an Obj with a primary key.
     virtual FullPath get_path() const = 0;
+    // Return path from owning object
+    virtual Path get_short_path() const = 0;
     // Add a translation of Index to PathElement
     virtual void add_index(Path& path, Index ndx) const = 0;
     /// Get table of owning object
     virtual TableRef get_table() const noexcept = 0;
 
 protected:
+    friend class Collection;
     template <class>
     friend class CollectionBaseImpl;
     friend class CollectionList;
