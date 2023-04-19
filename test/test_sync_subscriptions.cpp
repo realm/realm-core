@@ -1,8 +1,9 @@
 #include <realm/exceptions.hpp>
 #include <realm/object_id.hpp>
+#include <realm/transaction.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/sync_metadata_schema.hpp>
 #include <realm/sync/subscriptions.hpp>
-#include <realm/sync/noinst/client_history_impl.hpp>
 
 #include "test.hpp"
 #include "util/test_path.hpp"

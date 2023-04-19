@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix a build error due to an installed header depending on a non-installed on (since v13.9.1).
 
 ### Breaking changes
 * None.
