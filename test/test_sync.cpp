@@ -6337,7 +6337,7 @@ TEST(Sync_DanglingLinksCountInPriorSize)
         CHECK_EQUAL(changesets_to_upload.size(), static_cast<size_t>(1));
         realm::sync::Changeset parsed_changeset;
         auto unparsed_changeset = changesets_to_upload[0].changeset.get_first_chunk();
-        realm::util::SimpleNoCopyInputStream changeset_stream(unparsed_changeset);
+        realm::util::SimpleInputStream changeset_stream(unparsed_changeset);
         realm::sync::parse_changeset(changeset_stream, parsed_changeset);
         test_context.logger->info("changeset at version %1: %2", last_version, parsed_changeset);
         last_version_observed = last_version;

@@ -94,7 +94,7 @@ public:
 
     // Be sure to keep this type aligned with what is actually used in DB.
     using version_type = _impl::History::version_type;
-    using InputStream = util::NoCopyInputStream;
+    using InputStream = util::InputStream;
     class TransactLogApplier;
     class Interrupted; // Exception
     class SimpleIndexTranslator;
