@@ -6063,6 +6063,8 @@ TEST(Query_FullTextMulti)
         ll.add(o.get_key());
     }
 
+    CHECK_THROW_ANY(table->where().fulltext(col, "").find_all());
+
     // search with multiple terms
     auto tv = table->where().fulltext(col, "object gemstone").find_all();
     CHECK_EQUAL(2, tv.size());
@@ -6087,6 +6089,15 @@ TEST(Query_FullTextMulti)
     // search for combination that is not present
     tv = table->where().fulltext(col, "object data").find_all();
     CHECK_EQUAL(0, tv.size());
+
+    // exclude words
+    tv = table->where().fulltext(col, "object -databases").find_all();
+    CHECK_EQUAL(4, tv.size());
+    tv = table->where().fulltext(col, "-databases object -duplicates").find_all();
+    CHECK_EQUAL(3, tv.size());
+    tv = table->where().fulltext(col, "object -objects").find_all();
+    CHECK_EQUAL(3, tv.size());
+    CHECK_THROW_ANY(table->where().fulltext(col, "-databases").find_all());
 
     // many terms
     tv = table->where().fulltext(col, "object database management brown").find_all();
