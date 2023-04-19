@@ -833,29 +833,23 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     // columns of other tables, however, to do that, we would have to
     // automatically remove the "offending" link columns from those other
     // tables. Such a behaviour is deemed too obscure, and we shall therefore
-    // require that a removed table does not contain foreigh origin backlink
+    // require that a removed table does not contain foreign origin backlink
     // columns.
     if (table->is_cross_table_link_target())
         throw CrossTableLinkTarget(table->get_name());
 
-    // There is no easy way for Group::TransactAdvancer to handle removal of
-    // tables that contain foreign target table link columns, because that
-    // involves removal of the corresponding backlink columns. For that reason,
-    // we start by removing all columns, which will generate individual
-    // replication instructions for each column removal with sufficient
-    // information for Group::TransactAdvancer to handle them.
-    size_t n = table->get_column_count();
-    Replication* repl = *get_repl();
-    if (repl) {
-        // This will prevent sync instructions for column removals to be generated
-        repl->prepare_erase_class(key);
-    }
-    for (size_t i = n; i > 0; --i) {
-        ColKey col_key = table->spec_ndx2colkey(i - 1);
-        table->remove_column(col_key);
+    {
+        // We don't want to replicate the individual column removals along the
+        // way as they're covered by the table removal
+        Table::DisableReplication dr(*table);
+        for (size_t i = table->get_column_count(); i > 0; --i) {
+            ColKey col_key = table->spec_ndx2colkey(i - 1);
+            table->remove_column(col_key);
+        }
     }
 
     size_t prior_num_tables = m_tables.size();
+    Replication* repl = *get_repl();
     if (repl)
         repl->erase_class(key, prior_num_tables); // Throws
 

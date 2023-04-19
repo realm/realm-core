@@ -49,7 +49,6 @@ public:
     virtual void add_class(TableKey table_key, StringData table_name, Table::Type table_type);
     virtual void add_class_with_primary_key(TableKey, StringData table_name, DataType pk_type, StringData pk_field,
                                             bool nullable, Table::Type table_type);
-    virtual void prepare_erase_class(TableKey table_key);
     virtual void erase_class(TableKey table_key, size_t num_tables);
     virtual void rename_class(TableKey table_key, StringData new_name);
     virtual void insert_column(const Table*, ColKey col_key, DataType type, StringData name, Table* target_table);
@@ -493,8 +492,6 @@ inline void Replication::select_collection(const CollectionBase& list)
         do_select_collection(list); // Throws
     }
 }
-
-inline void Replication::prepare_erase_class(TableKey) {}
 
 inline void Replication::erase_class(TableKey table_key, size_t)
 {
