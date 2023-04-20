@@ -104,6 +104,7 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
         return from_capi(m_args[i].arg[0].link);
     }
 
+#if REALM_ENABLE_GEOSPATIAL
     Geospatial geospatial_for_argument(size_t i) final
     {
         verify_ndx(i);
@@ -112,6 +113,7 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
             ErrorCodes::RuntimeError,
             util::format("geospatial in the C-API is not yet implemented (for argument %1)", i)}; // LCOV_EXCL_LINE
     }
+#endif
 
     bool is_argument_null(size_t i) final
     {
