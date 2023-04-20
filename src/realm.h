@@ -194,7 +194,6 @@ typedef struct realm_value {
         realm_decimal128_t decimal128;
         realm_object_id_t object_id;
         realm_uuid_t uuid;
-
         realm_link_t link;
 
         char data[16];

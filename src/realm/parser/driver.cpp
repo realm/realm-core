@@ -245,6 +245,10 @@ public:
     {
         return mixed_for_argument(n).get<ObjLink>();
     }
+    Geospatial geospatial_for_argument(size_t n) final
+    {
+        return mixed_for_argument(n).get<Geospatial>();
+    }
     std::vector<Mixed> list_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
@@ -737,6 +741,41 @@ Query StringOpsNode::visit(ParserDriver* drv)
         }
     }
     return {};
+}
+
+Query GeoWithinNode::visit(ParserDriver* drv)
+{
+    auto left = prop->visit(drv);
+    auto left_type = left->get_type();
+    if (left_type != type_Link) {
+        throw InvalidQueryError(util::format("The left hand side of 'geoWithin' must be a link to geoJSON formatted "
+                                             "data. But the provided type is '%1'",
+                                             get_data_type_name(left_type)));
+    }
+    auto link_column = dynamic_cast<const Columns<Link>*>(left.get());
+
+    if (geo) {
+        auto right = geo->visit(drv, type_Int);
+        auto geo_value = dynamic_cast<const ConstantGeospatialValue*>(right.get());
+        return link_column->geo_within(geo_value->get_mixed().get<Geospatial>());
+    }
+    else {
+        size_t arg_no = size_t(strtol(argument.substr(1).c_str(), nullptr, 10));
+        auto right_type = drv->m_args.is_argument_null(arg_no) ? DataType(-1) : drv->m_args.type_for_argument(arg_no);
+        if (right_type != type_Geospatial) {
+            throw InvalidQueryError(util::format("The right hand side of 'geoWithin' must be a geospatial constant "
+                                                 "value. But the provided type is '%1'",
+                                                 get_data_type_name(right_type)));
+        }
+        Geospatial geo = drv->m_args.geospatial_for_argument(arg_no);
+        if (!geo.is_valid()) {
+            throw InvalidQueryError(
+                util::format("The right hand side of 'geoWithin' must be a valid Geospatial value, got '%1'", geo));
+        }
+        return link_column->geo_within(geo);
+    }
+
+    REALM_UNREACHABLE();
 }
 
 Query TrueOrFalseNode::visit(ParserDriver* drv)
@@ -1303,6 +1342,33 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             util::format("Unsupported comparison between property of type '%1' and constant value: %2",
                          get_data_type_name(hint), explain_value_message));
     }
+    return ret;
+}
+
+GeospatialNode::GeospatialNode(GeospatialNode::Box, GeoPoint& p1, GeoPoint& p2)
+    : m_geo{Geospatial{GeoBox{p1, p2}}}
+{
+}
+
+GeospatialNode::GeospatialNode(Sphere, GeoPoint& p, double radius)
+    : m_geo{Geospatial{GeoCenterSphere{radius, p}}}
+{
+}
+
+GeospatialNode::GeospatialNode(Polygon, GeoPoint& p)
+    : m_geo(Geospatial{GeoPolygon{p}})
+{
+}
+
+void GeospatialNode::add_point_to_polygon(GeoPoint& p)
+{
+    m_geo.add_point_to_polygon(p);
+}
+
+std::unique_ptr<Subexpr> GeospatialNode::visit(ParserDriver*, DataType)
+{
+    std::unique_ptr<Subexpr> ret;
+    ret = std::make_unique<ConstantGeospatialValue>(m_geo); // FIXME: Mixed value type
     return ret;
 }
 

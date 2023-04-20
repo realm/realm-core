@@ -1219,6 +1219,107 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
     }
 }
 
+TEST_CASE("flx: geospatial", "[sync][flx][app]") {
+    static std::optional<FLXSyncTestHarness> harness;
+    if (!harness) {
+        Schema schema{
+            {"restaurant",
+             {
+                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                 {"queryable_str_field", PropertyType::String},
+                 {"location", PropertyType::Object | PropertyType::Nullable, "geoPointType"},
+                 {"array", PropertyType::Object | PropertyType::Array, "geoPointType"},
+             }},
+            {"geoPointType",
+             ObjectSchema::ObjectType::Embedded,
+             {
+                 {"type", PropertyType::String},
+                 {"coordinates", PropertyType::Double | PropertyType::Array},
+             }},
+        };
+        FLXSyncTestHarness::ServerSchema server_schema{schema, {"queryable_str_field"}};
+        harness.emplace("flx_geospatial", server_schema);
+    }
+
+    auto create_subscription = [](SharedRealm realm, StringData table_name, StringData column_name, auto make_query) {
+        auto table = realm->read_group().get_table(table_name);
+        auto queryable_field = table->get_column_key(column_name);
+        auto new_query = realm->get_active_subscription_set().make_mutable_copy();
+        new_query.insert_or_assign(make_query(Query(table), queryable_field));
+        return new_query.commit();
+    };
+
+    // TODO: when this test starts failing because the server implements the new
+    // syntax, then we should implement an actual geospatial FLX query test here
+    /*
+    auto check_failed_status = [](auto status) {
+        CHECK(!status.is_ok());
+        if (status.get_status().reason().find("Client provided query with bad syntax:") == std::string::npos ||
+            status.get_status().reason().find("\"restaurant\": syntax error") == std::string::npos) {
+            FAIL(status.get_status().reason());
+        }
+    };
+
+    SECTION("Server doesn't support GEOWITHIN yet") {
+        harness->do_with_new_realm([&](SharedRealm realm) {
+            auto subs = create_subscription(realm, "class_restaurant", "location", [](Query q, ColKey c) {
+                GeoBox area{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}};
+                return q.get_table()->column<Link>(c).geo_within(area);
+            });
+            auto sub_res = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
+            check_failed_status(sub_res);
+            CHECK(realm->get_active_subscription_set().version() == 0);
+            CHECK(realm->get_latest_subscription_set().version() == 1);
+        });
+    }
+     */
+
+    SECTION("non-geospatial FLX query syncs data which can be queried locally") {
+        harness->do_with_new_realm([&](SharedRealm realm) {
+            auto subs = create_subscription(realm, "class_restaurant", "queryable_str_field", [](Query q, ColKey c) {
+                return q.equal(c, "synced");
+            });
+            auto sub_res = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
+            CHECK(sub_res.is_ok());
+            CHECK(realm->get_active_subscription_set().version() == 1);
+            CHECK(realm->get_latest_subscription_set().version() == 1);
+
+            realm->begin_transaction();
+            CppContext c(realm);
+            Object::create(
+                c, realm, "restaurant",
+                std::any(AnyDict{{"_id", INT64_C(1)},
+                                 {"queryable_str_field", "synced"s},
+                                 {"location", AnyDict{{"type", "Point"s},
+                                                      {"coordinates", std::vector<std::any>{1.1, 2.2, 3.3}}}}}));
+            realm->commit_transaction();
+            wait_for_upload(*realm);
+
+            {
+                auto table = realm->read_group().get_table("class_restaurant");
+                CHECK(table->size() == 1);
+                Obj obj = table->get_object_with_primary_key(Mixed{1});
+                REQUIRE(obj);
+                Geospatial geo = obj.get<Geospatial>("location");
+                REQUIRE(geo.get_type_string() == "Point");
+                REQUIRE(geo.get_type() == Geospatial::Type::Point);
+                auto points = geo.get_points();
+                REQUIRE(points.size() == 1);
+                REQUIRE(points[0].longitude == 1.1);
+                REQUIRE(points[0].latitude == 2.2);
+                REQUIRE(points[0].get_altitude());
+                REQUIRE(*points[0].get_altitude() == 3.3);
+            }
+        });
+    }
+
+    // Add new sections before this
+    SECTION("teardown") {
+        harness->app()->sync_manager()->wait_for_sessions_to_terminate();
+        harness.reset();
+    }
+}
+
 TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bootstrap_batching", {g_large_array_schema, {"queryable_int_field"}});
 

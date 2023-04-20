@@ -130,8 +130,13 @@ TEST_CASE("geospatial") {
         auto obj = create(AnyDict{
             {"_id", INT64_C(1)},
             {"location", AnyDict{{"type", "Point"s}, {"coordinates", AnyVec{1.1, 2.2, 3.3}}}},
-//            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(30)}}}},
         });
+
+        {
+            TableRef table = obj.obj().get_table();
+            REQUIRE(!Geospatial::is_geospatial(table, table->get_column_key("_id")));
+            REQUIRE(Geospatial::is_geospatial(table, table->get_column_key("location")));
+        }
 
         REQUIRE(obj.obj().get<int64_t>("_id") == 1);
         auto linked_obj = util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "location")).obj();
@@ -145,13 +150,14 @@ TEST_CASE("geospatial") {
 
         {
             Geospatial geo = obj.obj().get<Geospatial>("location");
-            REQUIRE(geo.get_type() == "Point");
+            REQUIRE(geo.get_type_string() == "Point");
+            REQUIRE(geo.get_type() == Geospatial::Type::Point);
             auto points = geo.get_points();
             REQUIRE(points.size() == 1);
             REQUIRE(points[0].longitude == 1.1);
             REQUIRE(points[0].latitude == 2.2);
-            REQUIRE(points[0].altitude);
-            REQUIRE(*points[0].altitude == 3.3);
+            REQUIRE(points[0].get_altitude());
+            REQUIRE(*points[0].get_altitude() == 3.3);
         }
 
         {

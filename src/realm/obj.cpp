@@ -1710,9 +1710,13 @@ Obj& Obj::set(ColKey col_key, Geospatial value, bool)
 
     if (type != ColumnTypeTraits<Link>::column_id)
         throw InvalidArgument(ErrorCodes::TypeMismatch,
-                              util::format("Property not a %1", ColumnTypeTraits<int64_t>::column_id));
+                              util::format("Property '%1' must be a link to set a Geospatial value",
+                                           get_table()->get_column_name(col_key)));
 
-    Obj geo = create_and_set_linked_object(col_key);
+    Obj geo = get_linked_object(col_key);
+    if (!geo) {
+        geo = create_and_set_linked_object(col_key);
+    }
     value.assign_to(geo);
     return *this;
 }
@@ -1728,7 +1732,8 @@ Obj& Obj::set(ColKey col_key, std::optional<Geospatial> value, bool)
 
     if (type != ColumnTypeTraits<Link>::column_id)
         throw InvalidArgument(ErrorCodes::TypeMismatch,
-                              util::format("Property not a %1", ColumnTypeTraits<int64_t>::column_id));
+                              util::format("Property '%1' must be a link to set a Geospatial value",
+                                           get_table()->get_column_name(col_key)));
     if (!value && !attrs.test(col_attr_Nullable))
         throw NotNullable(Group::table_name_to_class_name(table->get_name()), table->get_column_name(col_key));
 
@@ -1736,7 +1741,10 @@ Obj& Obj::set(ColKey col_key, std::optional<Geospatial> value, bool)
         set_null(col_key);
     }
     else {
-        Obj geo = create_and_set_linked_object(col_key);
+        Obj geo = get_linked_object(col_key);
+        if (!geo) {
+            geo = create_and_set_linked_object(col_key);
+        }
         value->assign_to(geo);
     }
     return *this;

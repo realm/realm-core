@@ -33,14 +33,56 @@ class S2Region;
 namespace realm {
 
 class Obj;
+class TableRef;
 
 struct GeoPoint {
-    double longitude = 0;
-    double latitude = 0;
-    std::optional<double> altitude;
+    GeoPoint() = delete;
+    GeoPoint(double lon, double lat)
+        : longitude(lon)
+        , latitude(lat)
+    {
+    }
+    GeoPoint(double lon, double lat, double alt)
+        : longitude(lon)
+        , latitude(lat)
+        , altitude(alt)
+    {
+    }
+
+    double longitude = get_nan();
+    double latitude = get_nan();
+    double altitude = get_nan();
+
     bool operator==(const GeoPoint& other) const
     {
-        return longitude == other.longitude && latitude == other.latitude && altitude == other.altitude;
+        return (longitude == other.longitude || (std::isnan(longitude) && std::isnan(other.longitude))) &&
+               (latitude == other.latitude || (std::isnan(latitude) && std::isnan(other.latitude))) &&
+               ((!has_altitude() && !other.has_altitude()) || altitude == other.altitude);
+    }
+
+    bool is_valid() const
+    {
+        return !std::isnan(longitude) && !std::isnan(latitude);
+    }
+
+    bool has_altitude() const
+    {
+        return !std::isnan(altitude);
+    }
+
+    std::optional<double> get_altitude() const noexcept
+    {
+        return std::isnan(altitude) ? std::optional<double>{} : altitude;
+    }
+
+    void set_altitude(std::optional<double> val) noexcept
+    {
+        altitude = val.value_or(get_nan());
+    }
+
+    constexpr static double get_nan()
+    {
+        return std::numeric_limits<double>::quiet_NaN();
     }
 };
 
@@ -60,7 +102,15 @@ struct GeoBox {
 // of the polygon is on the left side of the edges.
 struct GeoPolygon {
     GeoPolygon(std::initializer_list<GeoPoint>&& l)
-        : points(l)
+        : points(std::move(l))
+    {
+    }
+    GeoPolygon(std::vector<GeoPoint>&& p)
+        : points(std::move(p))
+    {
+    }
+    GeoPolygon(std::vector<GeoPoint> p)
+        : points(std::move(p))
     {
     }
     std::vector<GeoPoint> points;
@@ -81,8 +131,13 @@ struct GeoCenterSphere {
 
 class Geospatial {
 public:
-    enum class Type { Point, Box, Polygon, CenterSphere, Invalid };
+    // keep this type small so it doesn't bloat the size of a Mixed
+    enum class Type : uint8_t { Point, Box, Polygon, CenterSphere, Invalid };
 
+    Geospatial()
+        : m_type(Type::Invalid)
+    {
+    }
     Geospatial(GeoPoint point)
         : m_type(Type::Point)
         , m_points({point})
@@ -105,12 +160,6 @@ public:
     {
     }
 
-    Geospatial(StringData invalid_type) // FIXME remove or use for error outside of the type?
-        : m_type(Type::Invalid)
-        , m_invalid_type(invalid_type)
-    {
-    }
-
     Geospatial(const Geospatial&) = default;
     Geospatial& operator=(const Geospatial&) = default;
 
@@ -119,12 +168,20 @@ public:
 
     static Geospatial from_obj(const Obj& obj, ColKey type_col = {}, ColKey coords_col = {});
     static Geospatial from_link(const Obj& obj);
+    static bool is_geospatial(const TableRef table, ColKey link_col);
     void assign_to(Obj& link) const;
 
-    std::string get_type() const noexcept
+    std::string get_type_string() const noexcept
     {
-        return is_valid() ? std::string(c_types[static_cast<size_t>(m_type)]) : *m_invalid_type;
+        return is_valid() ? std::string(c_types[static_cast<size_t>(m_type)]) : "Invalid";
     }
+    Type get_type() const noexcept
+    {
+        return m_type;
+    }
+
+    template <class T>
+    T get() const noexcept;
 
     bool is_valid() const noexcept
     {
@@ -136,6 +193,12 @@ public:
     const std::vector<GeoPoint>& get_points() const
     {
         return m_points;
+    }
+
+    void add_point_to_polygon(const GeoPoint& p)
+    {
+        REALM_ASSERT_EX(m_type == Type::Polygon, get_type_string());
+        m_points.push_back(p);
     }
 
     bool operator==(const Geospatial& other) const
@@ -158,8 +221,6 @@ public:
 
 private:
     Type m_type;
-    std::optional<std::string> m_invalid_type;
-
     std::vector<GeoPoint> m_points;
 
     double m_radius_radians = get_nan();
@@ -177,6 +238,23 @@ private:
     mutable std::shared_ptr<S2Region> m_region;
     S2Region& get_region() const;
 };
+
+template <>
+inline GeoCenterSphere Geospatial::get<GeoCenterSphere>() const noexcept
+{
+    REALM_ASSERT_EX(m_type == Type::CenterSphere, get_type_string());
+    REALM_ASSERT(is_radius_valid());
+    REALM_ASSERT(m_points.size() >= 1);
+    return GeoCenterSphere{m_radius_radians, m_points[0]};
+}
+
+template <>
+inline GeoPolygon Geospatial::get<GeoPolygon>() const noexcept
+{
+    REALM_ASSERT_EX(m_type == Type::Polygon, get_type_string());
+    REALM_ASSERT(m_points.size() >= 1);
+    return GeoPolygon(m_points);
+}
 
 std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo);
 

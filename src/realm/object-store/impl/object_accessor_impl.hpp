@@ -68,7 +68,7 @@ public:
     {
         if (auto geo = std::any_cast<Geospatial>(&dict)) {
             if (prop.name == Geospatial::c_geo_point_type_col_name) {
-                return geo->get_type();
+                return geo->get_type_string();
             }
             else if (prop.name == Geospatial::c_geo_point_coords_col_name) {
                 std::vector<std::any> coords;
@@ -76,8 +76,8 @@ public:
                 if (points.size()) {
                     coords.push_back(points[0].longitude);
                     coords.push_back(points[0].latitude);
-                    if (points[0].altitude) {
-                        coords.push_back(*points[0].altitude);
+                    if (points[0].get_altitude()) {
+                        coords.push_back(*points[0].get_altitude());
                     }
                 }
                 return coords;

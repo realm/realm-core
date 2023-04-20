@@ -313,6 +313,10 @@ const char* get_data_type_name(DataType type) noexcept
         default:
             if (type == type_TypeOfValue)
                 return "@type";
+            else if (type == type_Geospatial)
+                return "geospatial";
+            else if (type == ColumnTypeTraits<null>::id)
+                return "null";
     }
     return "unknown";
 }

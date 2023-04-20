@@ -104,6 +104,15 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
         return from_capi(m_args[i].arg[0].link);
     }
 
+    Geospatial geospatial_for_argument(size_t i) final
+    {
+        verify_ndx(i);
+        // FIXME: implement this
+        throw LogicError{
+            ErrorCodes::RuntimeError,
+            util::format("geospatial in the C-API is not yet implemented (for argument %1)", i)}; // LCOV_EXCL_LINE
+    }
+
     bool is_argument_null(size_t i) final
     {
         verify_ndx(i);

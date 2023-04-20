@@ -53,6 +53,7 @@ blank   [ \t\r]
 (?i:text)                   return yy::parser::make_TEXT(yytext);
 (?i:like)                   return yy::parser::make_LIKE(yytext);
 (?i:between)                return yy::parser::make_BETWEEN(yytext);
+(?i:geowithin)              return yy::parser::make_GEOWITHIN(yytext);
 (?i:truepredicate)          return yy::parser::make_TRUEPREDICATE (); 
 (?i:falsepredicate)         return yy::parser::make_FALSEPREDICATE (); 
 (?i:sort)                   return yy::parser::make_SORT(yytext);
@@ -62,6 +63,9 @@ blank   [ \t\r]
 (?i:ascending)|(?i:asc)     return yy::parser::make_ASCENDING(yytext);
 (?i:descending)|(?i:desc)   return yy::parser::make_DESCENDING(yytext);
 (?i:subquery)               return yy::parser::make_SUBQUERY();
+(?i:geobox)                 return yy::parser::make_GEOBOX();
+(?i:geopolygon)             return yy::parser::make_GEOPOLYGON();
+(?i:geosphere)              return yy::parser::make_GEOSPHERE();
 ("@size"|"@count")          return yy::parser::make_SIZE(yytext);
 "@max"                      return yy::parser::make_MAX    ();
 "@min"                      return yy::parser::make_MIN    ();

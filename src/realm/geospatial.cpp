@@ -47,6 +47,7 @@
 #include <realm/list.hpp>
 #include <realm/obj.hpp>
 #include <realm/table.hpp>
+#include <realm/table_ref.hpp>
 
 namespace {
 
@@ -62,6 +63,29 @@ namespace realm {
 
 // src/mongo/db/geo/geoconstants.h
 const double GeoCenterSphere::c_radius_meters = 6378100.0;
+
+bool Geospatial::is_geospatial(const TableRef table, ColKey link_col)
+{
+    if (!table || !link_col) {
+        return false;
+    }
+    if (!table->is_link_type(link_col.get_type())) {
+        return false;
+    }
+    TableRef target = table->get_link_target(link_col);
+    if (!target || !target->is_embedded()) {
+        return false;
+    }
+    ColKey type_col = target->get_column_key(StringData(c_geo_point_type_col_name));
+    if (!type_col || type_col.is_collection() || type_col.get_type() != col_type_String) {
+        return false;
+    }
+    ColKey coords_col = target->get_column_key(StringData(c_geo_point_coords_col_name));
+    if (!coords_col || !coords_col.is_list() || coords_col.get_type() != col_type_Double) {
+        return false;
+    }
+    return true;
+}
 
 Geospatial Geospatial::from_obj(const Obj& obj, ColKey type_col, ColKey coords_col)
 {
@@ -86,43 +110,37 @@ Geospatial Geospatial::from_obj(const Obj& obj, ColKey type_col, ColKey coords_c
     }
 
     Lst<double> coords = obj.get_list<double>(coords_col);
-    GeoPoint geo;
-    if (coords.size() >= 1) {
-        geo.longitude = coords[0];
+    if (coords.size() < 2) {
+        return Geospatial(); // invalid
     }
-    if (coords.size() >= 2) {
-        geo.latitude = coords[1];
+    if (coords.size() > 2) {
+        return GeoPoint{coords[0], coords[1], coords[2]};
     }
-    if (coords.size() >= 3) {
-        geo.altitude = coords[2];
-    }
-    return geo;
+    return GeoPoint{coords[0], coords[1]};
 }
 
 Geospatial Geospatial::from_link(const Obj& link)
 {
-    GeoPoint point;
     if (!link) {
-        return Geospatial{point};
+        return Geospatial{};
     }
     ColKey type_col = link.get_table()->get_column_key(StringData(c_geo_point_type_col_name));
     ColKey coords_col = link.get_table()->get_column_key(StringData(c_geo_point_coords_col_name));
     if (!type_col || !coords_col) {
-        return Geospatial{point};
+        return Geospatial{};
     }
     if (!type_is_valid(link.get<String>(type_col))) {
-        return Geospatial(link.get<String>(type_col));
+        return Geospatial();
     }
     Lst<double> geo_data = link.get_list<double>(coords_col);
     const size_t num_entries = geo_data.size();
-    if (num_entries >= 2) {
-        point.longitude = geo_data.get(0);
-        point.latitude = geo_data.get(1);
+    if (num_entries < 2) {
+        return Geospatial(); // invalid
     }
-    if (num_entries >= 3) {
-        point.altitude = geo_data.get(2);
+    if (num_entries > 2) {
+        return GeoPoint{geo_data[0], geo_data[1], geo_data[2]};
     }
-    return Geospatial{point};
+    return GeoPoint{geo_data[0], geo_data[1]};
 }
 
 void Geospatial::assign_to(Obj& link) const
@@ -138,8 +156,12 @@ void Geospatial::assign_to(Obj& link) const
         throw InvalidArgument(ErrorCodes::TypeMismatch,
                               util::format("Property %1 doesn't exist", c_geo_point_coords_col_name));
     }
-    if (!type_is_valid(get_type())) {
-        throw IllegalOperation("The only Geospatial type currently supported is 'point'");
+    if (m_type == Type::Invalid) {
+        link.remove();
+        return;
+    }
+    if (m_type != Type::Point) {
+        throw IllegalOperation("The only Geospatial type currently supported for storage is 'point'");
     }
     if (m_points.size() > 1) {
         throw IllegalOperation("Only one Geospatial point is currently supported");
@@ -147,7 +169,7 @@ void Geospatial::assign_to(Obj& link) const
     if (m_points.size() == 0) {
         throw InvalidArgument("Geospatial value must have one point");
     }
-    link.set(type_col, get_type());
+    link.set(type_col, get_type_string());
     Lst<double> coords = link.get_list<double>(coords_col);
     if (coords.size() >= 1) {
         coords.set(0, m_points[0].longitude);
@@ -161,13 +183,17 @@ void Geospatial::assign_to(Obj& link) const
     else {
         coords.add(m_points[0].latitude);
     }
-    if (m_points[0].altitude) {
+    std::optional<double> altitude = m_points[0].get_altitude();
+    if (altitude) {
         if (coords.size() >= 3) {
-            coords.set(2, *m_points[0].altitude);
+            coords.set(2, *altitude);
         }
         else {
-            coords.add(*m_points[0].altitude);
+            coords.add(*altitude);
         }
+    }
+    else if (coords.size() >= 3) {
+        coords.remove(2, coords.size());
     }
 }
 
