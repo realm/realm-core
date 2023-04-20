@@ -107,11 +107,10 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
     Geospatial geospatial_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].arg[0].type == RLM_TYPE_GEOSPATIAL) {
-            return from_capi(m_args[i].arg[0].geospatial).get();
-        }
-        throw LogicError{ErrorCodes::TypeMismatch,
-                         util::format("query argument %1 must be a geospatial type", i)}; // LCOV_EXCL_LINE
+        // FIXME: implement this
+        throw LogicError{
+            ErrorCodes::RuntimeError,
+            util::format("geospatial in the C-API is not yet implemented (for argument %1)", i)}; // LCOV_EXCL_LINE
     }
 
     bool is_argument_null(size_t i) final
@@ -165,8 +164,6 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
                 return type_Decimal;
             case RLM_TYPE_UUID:
                 return type_UUID;
-            case RLM_TYPE_GEOSPATIAL:
-                return type_Geospatial;
         }
         throw LogicError{ErrorCodes::TypeMismatch, "Unsupported type"}; // LCOV_EXCL_LINE
         return type_Int;
