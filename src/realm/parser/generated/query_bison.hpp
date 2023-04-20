@@ -2775,7 +2775,7 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 554,     ///< Last index in yytable_.
+      yylast_ = 553,     ///< Last index in yytable_.
       yynnts_ = 35,  ///< Number of nonterminal symbols.
       yyfinal_ = 66 ///< Termination state number.
     };

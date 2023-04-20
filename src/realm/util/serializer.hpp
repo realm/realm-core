@@ -78,7 +78,7 @@ std::string print_value<>(realm::UUID);
 template <>
 std::string print_value<>(realm::TypeOfValue);
 template <>
-std::string print_value<>(realm::Geospatial);
+std::string print_value<>(const realm::Geospatial&);
 
 // General implementation for most types
 template <typename T>

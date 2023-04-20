@@ -214,7 +214,7 @@ public:
         return true;
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
-    Geospatial m_geo;
+    std::vector<std::vector<GeoPoint>> m_points;
 #else
     template <typename... Ts>
     GeospatialNode(Ts&&...)

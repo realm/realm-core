@@ -263,7 +263,7 @@ geopoly_content
 geospatial
     : GEOBOX '(' geopoint ',' geopoint ')'  { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Box{}, *$3, *$5); }
     | GEOSPHERE '(' geopoint ',' coordinate ')' { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Sphere{}, *$3, $5); }
-    | GEOPOLYGON '(' geopoly_content ')'    { $$ = $3; }
+    | GEOPOLYGON '(' '{' geopoly_content '}' ')'    { $$ = $4; }
 
 post_query
     : %empty                    { $$ = drv.m_parse_nodes.create<DescriptorOrderingNode>();}

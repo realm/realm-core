@@ -1361,19 +1361,24 @@ GeospatialNode::GeospatialNode(Sphere, GeoPoint& p, double radius)
 }
 
 GeospatialNode::GeospatialNode(Polygon, GeoPoint& p)
-    : m_geo(Geospatial{GeoPolygon{p}})
+    : m_points({{p}})
 {
 }
 
 void GeospatialNode::add_point_to_polygon(GeoPoint& p)
 {
-    m_geo.add_point_to_polygon(p);
+    m_points[0].push_back(p);
 }
 
 std::unique_ptr<Subexpr> GeospatialNode::visit(ParserDriver*, DataType)
 {
     std::unique_ptr<Subexpr> ret;
-    ret = std::make_unique<ConstantGeospatialValue>(m_geo); // FIXME: Mixed value type
+    if (m_geo.is_valid()) {
+        ret = std::make_unique<ConstantGeospatialValue>(m_geo);
+    }
+    else {
+        ret = std::make_unique<ConstantGeospatialValue>(GeoPolygon{m_points});
+    }
     return ret;
 }
 #endif
