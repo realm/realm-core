@@ -3,20 +3,21 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <memory>
-#include <utility>
-#include <functional>
 #include <exception>
+#include <functional>
+#include <memory>
 #include <string>
+#include <utility>
 
 #include <realm/util/buffer.hpp>
 #include <realm/util/functional.hpp>
+#include <realm/util/future.hpp>
 #include <realm/sync/client_base.hpp>
-#include <realm/sync/socket_provider.hpp>
-#include <realm/sync/subscriptions.hpp>
-#include <realm/sync/noinst/migration_store.hpp>
 
 namespace realm::sync {
+
+class MigrationStore;
+class SubscriptionStore;
 
 class Client {
 public:

@@ -2,6 +2,28 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* Improve performance of equality queries on a non-indexed mixed property by about 30%. ([#6506](https://github.com/realm/realm-core/issues/6506))
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fix a build error due to an installed header depending on a non-installed on (since v13.9.1).
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Allow to run multiprocess encryption tests outside building folder.
+
+----------------------------------------------
+
+# 13.9.1 Release notes
+
+### Enhancements
 * None.
 
 ### Fixed
@@ -19,6 +41,9 @@
 ### Internals
 * Fix compiler warnings with MacOS Clang 14.0.3 ([PR #6467](https://github.com/realm/realm-core/pull/6467))
 * Perform a client reset to migrate a sync'd realm from PBS to FLX and vice versa ([#6393](https://github.com/realm/realm-core/issues/6393))
+* The following unused util headers have been deleted: call_with_tuple.hpp, get_file_size.hpp, inspect.hpp, substitute.hpp, type_list.hpp, and utf8.hpp.
+* Add migrated state information to flexible sync client BIND message for backfilling PBS partition value in objects once client has migrated to FLX. ([PR #6464](https://github.com/realm/realm-core/pull/6464))
+* Add unit test for MigrationStore ([PR #6495](https://github.com/realm/realm-core/pull/6495))
 
 ----------------------------------------------
 
@@ -36,6 +61,7 @@
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+* Lock file format: New format introduced for multiprocess encryption. All processes accessing the file must be upgraded to the new format.
 
 -----------
 

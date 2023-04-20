@@ -1926,6 +1926,29 @@ void Session::send_message()
     if (m_target_download_mark > m_last_download_mark_sent)
         return send_mark_message(); // Throws
 
+    auto is_upload_allowed = [&]() -> bool {
+        if (!m_is_flx_sync_session) {
+            return true;
+        }
+
+        auto migration_store = get_migration_store();
+        if (!migration_store) {
+            return true;
+        }
+
+        auto sentinel_query_version = migration_store->get_sentinel_subscription_set_version();
+        if (!sentinel_query_version) {
+            return true;
+        }
+
+        // Do not allow upload if the last query sent is the sentinel one used by the migration store.
+        return m_last_sent_flx_query_version != *sentinel_query_version;
+    };
+
+    if (!is_upload_allowed()) {
+        return;
+    }
+
     auto check_pending_flx_version = [&]() -> bool {
         if (!m_is_flx_sync_session) {
             return false;
@@ -1962,7 +1985,6 @@ void Session::send_bind_message()
     REALM_ASSERT(m_state == Active);
 
     session_ident_type session_ident = m_ident;
-    const std::string& path = get_virt_path();
     bool need_client_file_ident = !have_client_file_ident();
     const bool is_subserver = false;
 
@@ -1971,9 +1993,31 @@ void Session::send_bind_message()
     int protocol_version = m_conn.get_negotiated_protocol_version();
     OutputBuffer& out = m_conn.get_output_buffer();
     // Discard the token since it's ignored by the server.
-    std::string empty_access_token{};
-    protocol.make_bind_message(protocol_version, out, session_ident, path, empty_access_token, need_client_file_ident,
-                               is_subserver); // Throws
+    std::string empty_access_token;
+    if (m_is_flx_sync_session) {
+        nlohmann::json bind_json_data;
+        if (auto migrated_partition = get_migration_store()->get_migrated_partition()) {
+            bind_json_data["migratedPartition"] = *migrated_partition;
+        }
+        if (logger.would_log(util::Logger::Level::debug)) {
+            std::string json_data_dump;
+            if (!bind_json_data.empty()) {
+                json_data_dump = bind_json_data.dump();
+            }
+            logger.debug(
+                "Sending: BIND(session_ident=%1, need_client_file_ident=%2 is_subserver=%3 json_data=\"%4\")",
+                session_ident, need_client_file_ident, is_subserver, json_data_dump);
+        }
+        protocol.make_flx_bind_message(protocol_version, out, session_ident, bind_json_data, empty_access_token,
+                                       need_client_file_ident, is_subserver); // Throws
+    }
+    else {
+        std::string server_path = get_virt_path();
+        logger.debug("Sending: BIND(session_ident=%1, need_client_file_ident=%2 is_subserver=%3 server_path=%4)",
+                     session_ident, need_client_file_ident, is_subserver, server_path);
+        protocol.make_pbs_bind_message(protocol_version, out, session_ident, server_path, empty_access_token,
+                                       need_client_file_ident, is_subserver); // Throws
+    }
     m_conn.initiate_write_message(out, this); // Throws
 
     m_bind_message_sent = true;
@@ -2043,8 +2087,8 @@ void Session::send_query_change_message()
     auto sub_store = get_flx_subscription_store();
     auto latest_sub_set = sub_store->get_by_version(m_pending_flx_sub_set->query_version);
     auto latest_queries = latest_sub_set.to_ext_json();
-    logger.debug("Sending: QUERY(query_version=%1, query_size=%2, query=\"%3\"", latest_sub_set.version(),
-                 latest_queries.size(), latest_queries);
+    logger.debug("Sending: QUERY(query_version=%1, query_size=%2, query=\"%3\", snapshot_version=%4)",
+                 latest_sub_set.version(), latest_queries.size(), latest_queries, latest_sub_set.snapshot_version());
 
     OutputBuffer& out = m_conn.get_output_buffer();
     session_ident_type session_ident = get_ident();
@@ -2327,7 +2371,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         // this point forward.
         auto client_reset_operation = std::move(m_client_reset_operation);
         util::UniqueFunction<void(int64_t)> on_flx_subscription_complete = [this](int64_t version) {
-            this->non_sync_flx_completion(version);
+            this->on_flx_sync_version_complete(version);
         };
         if (!client_reset_operation->finalize(client_file_ident, get_flx_subscription_store(),
                                               std::move(on_flx_subscription_complete))) {
@@ -2391,9 +2435,9 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
     }
     if (!did_client_reset) {
         repl.get_history().set_client_file_ident(client_file_ident, m_fix_up_object_ids); // Throws
-        this->m_progress.download.last_integrated_client_version = 0;
-        this->m_progress.upload.client_version = 0;
-        this->m_last_version_selected_for_upload = 0;
+        m_progress.download.last_integrated_client_version = 0;
+        m_progress.upload.client_version = 0;
+        m_last_version_selected_for_upload = 0;
     }
 
     // Ready to send the IDENT message

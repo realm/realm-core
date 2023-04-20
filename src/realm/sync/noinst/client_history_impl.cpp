@@ -27,6 +27,7 @@
 #include <realm/sync/instruction_applier.hpp>
 #include <realm/sync/instruction_replication.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
+#include <realm/transaction.hpp>
 #include <realm/version.hpp>
 
 #include <algorithm>
