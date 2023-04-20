@@ -49,12 +49,13 @@ public:
     }
     CollectionList(const CollectionList&) = delete;
 
-    ~CollectionList() override;
-    size_t size() const override
+    ~CollectionList() final;
+    size_t size() const final
     {
         return update_if_needed() ? m_refs.size() : 0;
     }
 
+    Mixed get_any(size_t ndx) const final;
 
     bool init_from_parent(bool allow_create) const;
 

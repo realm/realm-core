@@ -37,6 +37,7 @@
 
 namespace realm {
 
+using ref_type = size_t;
 
 /// This class represents a polymorphic Realm value.
 ///
@@ -159,6 +160,25 @@ public:
     }
     Mixed(const std::string& s) noexcept
         : Mixed(StringData(s))
+    {
+    }
+
+    struct ListTag {};
+    Mixed(ref_type ref, ListTag) noexcept
+        : m_type(int(type_List) + 1)
+        , int_val(int64_t(ref))
+    {
+    }
+    struct SetTag {};
+    Mixed(ref_type ref, SetTag) noexcept
+        : m_type(int(type_Set) + 1)
+        , int_val(int64_t(ref))
+    {
+    }
+    struct DictionaryTag {};
+    Mixed(ref_type ref, DictionaryTag) noexcept
+        : m_type(int(type_Dictionary) + 1)
+        , int_val(int64_t(ref))
     {
     }
 

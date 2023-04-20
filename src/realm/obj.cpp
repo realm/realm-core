@@ -550,6 +550,18 @@ Mixed Obj::get_any(ColKey col_key) const
 {
     m_table->check_column(col_key);
     auto col_ndx = col_key.get_index();
+    if (col_key.is_collection()) {
+        ref_type ref = to_ref(_get<int64_t>(col_ndx));
+        switch (get_table()->get_collection_type(col_key, 0)) {
+            case CollectionType::List:
+                return Mixed(ref, Mixed::ListTag());
+            case CollectionType::Set:
+                return Mixed(ref, Mixed::SetTag());
+            case CollectionType::Dictionary:
+                return Mixed(ref, Mixed::DictionaryTag());
+        }
+        return {};
+    }
     switch (col_key.get_type()) {
         case col_type_Int:
             if (col_key.get_attrs().test(col_attr_Nullable)) {
