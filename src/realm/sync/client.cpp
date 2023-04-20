@@ -1487,7 +1487,7 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
             m_flx_pending_bootstrap_store = std::make_unique<PendingBootstrapStore>(m_db, sess->logger);
         }
 
-        sess->logger.detail("Binding '%1' to '%2'", m_db->get_path(), m_virt_path); // Throws
+        sess->logger.info("Binding '%1' to '%2'", m_db->get_path(), m_virt_path); // Throws
         m_sess = sess.get();
         conn.activate_session(std::move(sess)); // Throws
 
