@@ -210,10 +210,6 @@ bool rlm_val_eq(realm_value_t lhs, realm_value_t rhs)
             return lhs.link.target_table == rhs.link.target_table && lhs.link.target == rhs.link.target;
         case RLM_TYPE_UUID:
             return memcmp(lhs.uuid.bytes, rhs.uuid.bytes, 16) == 0;
-        case RLM_TYPE_GEOSPATIAL:
-            return lhs.geospatial.type == rhs.geospatial.type && lhs.geospatial.size == rhs.geospatial.size &&
-                   lhs.geospatial.sphere_radius == rhs.geospatial.sphere_radius &&
-                   memcmp(lhs.geospatial.points, rhs.geospatial.points, sizeof(double) * lhs.geospatial.size) == 0;
     }
     REALM_TERMINATE("");
 }

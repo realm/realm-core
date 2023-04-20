@@ -1450,11 +1450,10 @@ class ConstantGeospatialValue : public Value<Geospatial> {
 public:
     ConstantGeospatialValue(const Geospatial& geo)
         : Value()
-        , m_points(geo.get_points())
-        , m_geostore(m_points.data(), geo)
+        , m_geospatial(geo)
     {
         if (geo.is_valid()) {
-            set(0, Mixed{m_geostore});
+            set(0, Mixed{&m_geospatial});
         }
     }
 
@@ -1466,17 +1465,13 @@ public:
 private:
     ConstantGeospatialValue(const ConstantGeospatialValue& other)
         : Value()
-        , m_points(other.m_points)
-        , m_geostore(other.m_geostore)
+        , m_geospatial(other.m_geospatial)
     {
-        Geospatial geo = other.m_geostore.get();
-        m_geostore = GeospatialRef{m_points.data(), geo};
-        if (geo.is_valid()) {
-            set(0, Mixed{m_geostore});
+        if (m_geospatial.is_valid()) {
+            set(0, Mixed{&m_geospatial});
         }
     }
-    std::vector<GeoPoint> m_points;
-    GeospatialRef m_geostore;
+    Geospatial m_geospatial;
 };
 
 

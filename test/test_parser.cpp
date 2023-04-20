@@ -5674,14 +5674,13 @@ TEST(Parser_Geospatial)
     verify_query(test_context, table, "link geoWithin geoPolygon([0.0, 0.0], [1.0, 0.0], [1, 1], [0, 1])", 1);
     verify_query(test_context, table, "link == NULL", 1);
 
-    GeoBox box{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}};
-    GeoCenterSphere sphere{1000, GeoPoint{0.3, 0.3}};
-    GeoPolygon polygon{{GeoPoint{0, 0}, GeoPoint{1, 0}, GeoPoint{1, 1}, GeoPoint{0, 1}}};
+    Geospatial box{GeoBox{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}}};
+    Geospatial sphere{GeoCenterSphere{1000, GeoPoint{0.3, 0.3}}};
+    Geospatial polygon{GeoPolygon{{GeoPoint{0, 0}, GeoPoint{1, 0}, GeoPoint{1, 1}, GeoPoint{0, 1}}}};
     Geospatial invalid;
     Geospatial point{GeoPoint{0, 0}};
-    GeospatialStorage store{box, sphere, polygon, invalid};
-    std::vector<Mixed> args = {store.get(0),         store.get(1), store.get(2), store.get(3),
-                               Mixed{realm::null()}, Mixed{1.2},   Mixed{1000},  Mixed{"string value"}};
+    std::vector<Mixed> args = {Mixed{&box},          Mixed{&sphere}, Mixed{&polygon}, Mixed{&invalid},
+                               Mixed{realm::null()}, Mixed{1.2},     Mixed{1000},     Mixed{"string value"}};
     verify_query_sub(test_context, table, "link GEOWITHIN $0", args, 1);
     verify_query_sub(test_context, table, "link GEOWITHIN $1", args, 4);
     verify_query_sub(test_context, table, "link GEOWITHIN $2", args, 1);

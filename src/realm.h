@@ -128,7 +128,6 @@ typedef enum realm_value_type {
     RLM_TYPE_OBJECT_ID,
     RLM_TYPE_LINK,
     RLM_TYPE_UUID,
-    RLM_TYPE_GEOSPATIAL,
 } realm_value_type_e;
 
 typedef enum realm_schema_validation_mode {
@@ -138,13 +137,6 @@ typedef enum realm_schema_validation_mode {
     RLM_SCHEMA_VALIDATION_SYNC_FLX = 4
 } realm_schema_validation_mode_e;
 
-typedef enum realm_geospatial_type {
-    RLM_GEOSPATIAL_POINT,
-    RLM_GEOSPATIAL_BOX,
-    RLM_GEOSPATIAL_POLYGON,
-    RLM_GEOSPATIAL_CENTER_SPHERE,
-    RLM_GEOSPATIAL_INVALID,
-} realm_geospatial_type_e;
 /**
  * Represents a view over a UTF-8 string buffer. The buffer is unowned by this struct.
  *
@@ -190,19 +182,6 @@ typedef struct realm_uuid {
     uint8_t bytes[16];
 } realm_uuid_t;
 
-typedef struct realm_geopoint {
-    double longitude;
-    double latitude;
-    double altitude;
-} realm_geopoint_t;
-
-typedef struct realm_geospatial {
-    const realm_geopoint_t* points;
-    size_t size;
-    realm_geospatial_type_e type;
-    double sphere_radius;
-} realm_geospatial_t;
-
 typedef struct realm_value {
     union {
         int64_t integer;
@@ -216,7 +195,6 @@ typedef struct realm_value {
         realm_object_id_t object_id;
         realm_uuid_t uuid;
         realm_link_t link;
-        realm_geospatial_t geospatial;
 
         char data[16];
     } RLM_ANON_UNION_MEMBER(values);
