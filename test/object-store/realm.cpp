@@ -32,6 +32,7 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/class.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/util/scheduler.hpp>
 #include <realm/object-store/util/event_loop_dispatcher.hpp>
@@ -339,12 +340,12 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         auto realm = Realm::get_shared_realm(config);
         REQUIRE(realm->schema().size() == 1);
         auto it = realm->schema().find("object");
-        auto table = realm->read_group().get_table("class_object");
+        Class cls(realm, "object");
         REQUIRE(it != realm->schema().end());
-        REQUIRE(it->table_key == table->get_key());
+        REQUIRE(it->table_key == cls.get_key());
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
-        REQUIRE(it->persisted_properties[0].column_key == table->get_column_key("value"));
+        REQUIRE(it->persisted_properties[0].column_key == cls.get_column_key("value"));
     }
 
     SECTION("should read the proper schema from the file if a custom version is supplied") {
@@ -410,12 +411,12 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         config.schema_mode = SchemaMode::Immutable;
         auto realm = Realm::get_shared_realm(config);
         auto it = realm->schema().find("object");
-        auto table = realm->read_group().get_table("class_object");
+        Class cls(realm, "object");
         REQUIRE(it != realm->schema().end());
-        REQUIRE(it->table_key == table->get_key());
+        REQUIRE(it->table_key == cls.get_key());
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
-        REQUIRE(it->persisted_properties[0].column_key == table->get_column_key("value"));
+        REQUIRE(it->persisted_properties[0].column_key == cls.get_column_key("value"));
 
         SECTION("refreshing an immutable Realm throws") {
             REQUIRE_THROWS_WITH(realm->refresh(), "Can't refresh an immutable Realm.");
@@ -580,9 +581,8 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(frozen1 != realm);
         REQUIRE(realm->read_transaction_version() == frozen1->read_transaction_version());
 
-        auto table = realm->read_group().get_table("class_object");
         realm->begin_transaction();
-        table->create_object();
+        Class(realm, "object").create_object();
         realm->commit_transaction();
 
         REQUIRE(realm->read_transaction_version() > frozen1->read_transaction_version());
@@ -920,7 +920,8 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         // Create some content
         auto origin = Realm::get_shared_realm(config);
         origin->begin_transaction();
-        origin->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        Class cls(origin, "object");
+        cls.create_object(0);
         origin->commit_transaction();
         wait_for_upload(*origin);
 
@@ -932,7 +933,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             // Write some data
             SharedRealm realm = Realm::get_shared_realm(std::move(ref));
             realm->begin_transaction();
-            realm->read_group().get_table("class_object")->create_object_with_primary_key(2);
+            Class(realm, "object").create_object(2);
             realm->commit_transaction();
             wait_for_upload(*realm);
             wait_for_download(*realm);
@@ -943,29 +944,30 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 
         // Create some more content on the server
         origin->begin_transaction();
-        origin->read_group().get_table("class_object")->create_object_with_primary_key(7);
+        cls.create_object(7);
         origin->commit_transaction();
         wait_for_upload(*origin);
 
         // Now open a realm based on the realm file created above
         auto realm = Realm::get_shared_realm(config3);
+        Class cls2(realm, "object");
         wait_for_download(*realm);
         wait_for_upload(*realm);
 
         // Make sure we have got a new client file id
         REQUIRE(realm->read_group().get_sync_file_id() != client_file_id);
-        REQUIRE(realm->read_group().get_table("class_object")->size() == 3);
+        REQUIRE(cls.size() == 3);
 
         // Check that we can continue committing to this realm
         realm->begin_transaction();
-        realm->read_group().get_table("class_object")->create_object_with_primary_key(5);
+        cls2.create_object(5);
         realm->commit_transaction();
         wait_for_upload(*realm);
 
         // Check that this change is now in the original realm
         wait_for_download(*origin);
         origin->refresh();
-        REQUIRE(origin->read_group().get_table("class_object")->size() == 4);
+        REQUIRE(cls.size() == 4);
     }
 
     SECTION("downloads Realms which exist on the server") {

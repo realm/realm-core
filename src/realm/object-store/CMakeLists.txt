@@ -6,6 +6,7 @@ set(SOURCES
     dictionary.cpp
     index_set.cpp
     list.cpp
+    class.cpp
     object.cpp
     object_changeset.cpp
     object_schema.cpp
@@ -45,6 +46,7 @@ set(HEADERS
     index_set.hpp
     keypath_helpers.hpp
     list.hpp
+    class.hpp
     object.hpp
     object_accessor.hpp
     object_changeset.hpp

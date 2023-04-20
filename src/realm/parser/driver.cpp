@@ -24,6 +24,7 @@
 #include "realm/uuid.hpp"
 #include "realm/util/base64.hpp"
 #include "realm/util/overload.hpp"
+#include "realm/object-store/class.hpp"
 
 #define YY_NO_UNISTD_H 1
 #define YY_NO_INPUT 1
@@ -1657,6 +1658,12 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
     driver.parse(query_string);
     driver.result->canonicalize();
     return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
+}
+
+Query Class::get_query(const std::string& query_string, query_parser::Arguments& args,
+                       const query_parser::KeyPathMapping& mapping) const
+{
+    return m_table->query(query_string, args, mapping);
 }
 
 std::unique_ptr<Subexpr> LinkChain::column(const std::string& col)
