@@ -1323,12 +1323,12 @@ public:
         return true; // No-op
     }
 
-    bool list_set(size_t)
+    bool collection_set(size_t)
     {
         return true;
     }
 
-    bool list_insert(size_t)
+    bool collection_insert(size_t)
     {
         return true;
     }
@@ -1366,17 +1366,17 @@ public:
         return true; // No-op
     }
 
-    bool list_move(size_t, size_t) noexcept
+    bool collection_move(size_t, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool list_erase(size_t) noexcept
+    bool collection_erase(size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool list_clear(size_t) noexcept
+    bool collection_clear(size_t) noexcept
     {
         return true; // No-op
     }

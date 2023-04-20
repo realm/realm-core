@@ -2017,13 +2017,6 @@ public:
         return true;
     }
 
-    bool select_link_list(ColKey col_key, ObjKey obj_key, size_t)
-    {
-        m_current_linkview_col = col_key;
-        m_current_linkview_row = obj_key;
-        return true;
-    }
-
     bool select_collection(ColKey col_key, ObjKey obj_key)
     {
         m_current_linkview_col = col_key;
@@ -2031,13 +2024,7 @@ public:
         return true;
     }
 
-    // subtables not supported
-    bool select_descriptor(int, const size_t*)
-    {
-        return false;
-    }
-
-    // Default no-op implmentations of all of the mutation instructions
+    // Default no-op implementations of all of the mutation instructions
     bool insert_group_level_table(TableKey)
     {
         return false;
@@ -2054,35 +2041,11 @@ public:
     {
         return false;
     }
-    bool insert_link_column(ColKey, DataType, StringData, size_t, size_t)
-    {
-        return false;
-    }
     bool erase_column(ColKey)
     {
         return false;
     }
-    bool erase_link_column(size_t, size_t, size_t)
-    {
-        return false;
-    }
     bool rename_column(ColKey)
-    {
-        return false;
-    }
-    bool add_search_index(size_t)
-    {
-        return false;
-    }
-    bool remove_search_index(size_t)
-    {
-        return false;
-    }
-    bool add_primary_key(size_t)
-    {
-        return false;
-    }
-    bool remove_primary_key()
     {
         return false;
     }
@@ -2094,107 +2057,31 @@ public:
     {
         return false;
     }
-    bool add_row_with_key(size_t, size_t, size_t, int64_t)
-    {
-        return false;
-    }
     bool remove_object(ObjKey)
     {
         return false;
     }
-    bool swap_rows(size_t, size_t)
+    bool collection_set(size_t)
     {
         return false;
     }
-    bool move_row(size_t, size_t)
+    bool collection_clear(size_t)
     {
         return false;
     }
-    bool list_set(size_t)
+    bool collection_erase(size_t)
     {
         return false;
     }
-    bool list_clear(size_t)
+    bool collection_insert(size_t)
     {
         return false;
     }
-    bool list_erase(size_t)
-    {
-        return false;
-    }
-    bool link_list_nullify(size_t, size_t)
-    {
-        return false;
-    }
-    bool list_insert(size_t)
-    {
-        return false;
-    }
-    bool list_move(size_t, size_t)
+    bool collection_move(size_t, size_t)
     {
         return false;
     }
     bool modify_object(ColKey, ObjKey)
-    {
-        return false;
-    }
-    bool add_int(size_t, size_t, int_fast64_t)
-    {
-        return false;
-    }
-    bool set_bool(size_t, size_t, bool, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_float(size_t, size_t, float, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_double(size_t, size_t, double, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_string(size_t, size_t, StringData, _impl::Instruction, size_t)
-    {
-        return false;
-    }
-    bool set_binary(size_t, size_t, BinaryData, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_timestamp(size_t, size_t, Timestamp, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_table(size_t, size_t, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_mixed(size_t, size_t, const Mixed&, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_link(size_t, size_t, size_t, size_t, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_null(size_t, size_t, _impl::Instruction, size_t)
-    {
-        return false;
-    }
-    bool nullify_link(size_t, size_t, size_t)
-    {
-        return false;
-    }
-    bool insert_substring(size_t, size_t, size_t, StringData)
-    {
-        return false;
-    }
-    bool erase_substring(size_t, size_t, size_t, size_t)
-    {
-        return false;
-    }
-    bool optimize_table()
     {
         return false;
     }
@@ -2327,13 +2214,13 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 CHECK(o == o1 || o == o0);
                 return true;
             }
-            bool select_link_list(ColKey col, ObjKey o)
+            bool select_collection(ColKey col, ObjKey o)
             {
                 CHECK(col == link_list_col);
                 CHECK(o == okey);
                 return true;
             }
-            bool list_erase(size_t ndx)
+            bool collection_erase(size_t ndx)
             {
                 CHECK(ndx == 0);
                 return true;
@@ -2375,7 +2262,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            bool list_clear(size_t old_size) const
+            bool collection_clear(size_t old_size) const
             {
                 CHECK_EQUAL(3, old_size);
                 return true;

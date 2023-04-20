@@ -52,16 +52,16 @@ enum Instruction {
     instr_RenameColumn = 22, // Rename column in selected descriptor
     // instr_SetLinkType = 23,  Strong/weak (unused from file format 11)
 
-    instr_SelectList = 30,
-    instr_ListInsert = 31, // Insert list entry
-    instr_ListSet = 32,    // Assign to list entry
-    instr_ListMove = 33,   // Move an entry within a link list
+    instr_SelectCollection = 30,
+    instr_CollectionInsert = 31, // Insert collection entry
+    instr_CollectionSet = 32,    // Assign to collection entry
+    instr_CollectionMove = 33,   // Move an entry within an ordered collection
     // instr_ListSwap = 34,   Swap two entries within a list (unused from file format 11)
-    instr_ListErase = 35, // Remove an entry from a list
-    instr_ListClear = 36, // Remove all entries from a list
+    instr_CollectionErase = 35, // Remove an entry from a collection
+    instr_CollectionClear = 36, // Remove all entries from a collection
 
     // No longer emitted, but supported for a file shared with an older version.
-    // Treated identically to the List versions.
+    // Treated identically to the Collection versions.
     instr_DictionaryInsert = 37,
     instr_DictionarySet = 38,
     instr_DictionaryErase = 39,
@@ -131,10 +131,6 @@ public:
     {
         return true;
     }
-    bool select_link_list(ColKey, ObjKey)
-    {
-        return true;
-    }
     bool insert_group_level_table(TableKey)
     {
         return true;
@@ -185,23 +181,23 @@ public:
     }
 
     // Must have collection selected:
-    bool list_set(size_t)
+    bool collection_set(size_t)
     {
         return true;
     }
-    bool list_insert(size_t)
+    bool collection_insert(size_t)
     {
         return true;
     }
-    bool list_move(size_t, size_t)
+    bool collection_move(size_t, size_t)
     {
         return true;
     }
-    bool list_erase(size_t)
+    bool collection_erase(size_t)
     {
         return true;
     }
-    bool list_clear(size_t)
+    bool collection_clear(size_t)
     {
         return true;
     }
@@ -246,11 +242,11 @@ public:
 
     // Must have collection selected:
     bool select_collection(ColKey col_key, ObjKey key);
-    bool list_set(size_t list_ndx);
-    bool list_insert(size_t ndx);
-    bool list_move(size_t from_link_ndx, size_t to_link_ndx);
-    bool list_erase(size_t list_ndx);
-    bool list_clear(size_t old_list_size);
+    bool collection_set(size_t collection_ndx);
+    bool collection_insert(size_t ndx);
+    bool collection_move(size_t from_ndx, size_t to_ndx);
+    bool collection_erase(size_t collection_ndx);
+    bool collection_clear(size_t old_size);
 
     bool typed_link_change(ColKey col, TableKey dest);
 
@@ -628,41 +624,40 @@ inline bool TransactLogEncoder::modify_object(ColKey col_key, ObjKey key)
 }
 
 
+/************************************ Collections ***********************************/
 
-/************************************ List ***********************************/
-
-inline bool TransactLogEncoder::list_set(size_t list_ndx)
+inline bool TransactLogEncoder::collection_set(size_t ndx)
 {
-    append_simple_instr(instr_ListSet, list_ndx); // Throws
+    append_simple_instr(instr_CollectionSet, ndx); // Throws
     return true;
 }
 
-inline bool TransactLogEncoder::list_insert(size_t list_ndx)
+inline bool TransactLogEncoder::collection_insert(size_t ndx)
 {
-    append_simple_instr(instr_ListInsert, list_ndx); // Throws
+    append_simple_instr(instr_CollectionInsert, ndx); // Throws
     return true;
 }
 
 
-inline bool TransactLogEncoder::list_move(size_t from_link_ndx, size_t to_link_ndx)
+inline bool TransactLogEncoder::collection_move(size_t from_ndx, size_t to_ndx)
 {
     // This test is to prevent some fuzzy testing on the server to crash
-    if (from_link_ndx != to_link_ndx) {
-        append_simple_instr(instr_ListMove, from_link_ndx, to_link_ndx); // Throws
+    if (from_ndx != to_ndx) {
+        append_simple_instr(instr_CollectionMove, from_ndx, to_ndx); // Throws
     }
     return true;
 }
 
-inline bool TransactLogEncoder::list_erase(size_t list_ndx)
+inline bool TransactLogEncoder::collection_erase(size_t ndx)
 {
-    append_simple_instr(instr_ListErase, list_ndx); // Throws
+    append_simple_instr(instr_CollectionErase, ndx); // Throws
     return true;
 }
 
 
-inline bool TransactLogEncoder::list_clear(size_t old_list_size)
+inline bool TransactLogEncoder::collection_clear(size_t old_size)
 {
-    append_simple_instr(instr_ListClear, old_list_size); // Throws
+    append_simple_instr(instr_CollectionClear, old_size); // Throws
     return true;
 }
 
@@ -722,12 +717,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_SetDefault:
             // Should not appear in the transaction log
             parser_error();
-        case instr_ListSet: {
-            size_t list_ndx = read_int<size_t>();
-            if (!handler.list_set(list_ndx)) // Throws
-                parser_error();
-            return;
-        }
         case instr_CreateObject: {
             ObjKey key(read_int<int64_t>()); // Throws
             if (!handler.create_object(key)) // Throws
@@ -748,40 +737,46 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
-        case instr_SetInsert:
-        case instr_ListInsert: {
-            size_t list_ndx = read_int<size_t>();
-            if (!handler.list_insert(list_ndx)) // Throws
+        case instr_CollectionSet: {
+            size_t ndx = read_int<size_t>();
+            if (!handler.collection_set(ndx)) // Throws
                 parser_error();
             return;
         }
-        case instr_ListMove: {
-            size_t from_link_ndx = read_int<size_t>();          // Throws
-            size_t to_link_ndx = read_int<size_t>();            // Throws
-            if (!handler.list_move(from_link_ndx, to_link_ndx)) // Throws
+        case instr_SetInsert:
+        case instr_CollectionInsert: {
+            size_t ndx = read_int<size_t>();
+            if (!handler.collection_insert(ndx)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_CollectionMove: {
+            size_t from_ndx = read_int<size_t>();           // Throws
+            size_t to_ndx = read_int<size_t>();             // Throws
+            if (!handler.collection_move(from_ndx, to_ndx)) // Throws
                 parser_error();
             return;
         }
         case instr_SetErase:
-        case instr_ListErase: {
-            size_t link_ndx = read_int<size_t>(); // Throws
-            if (!handler.list_erase(link_ndx))    // Throws
+        case instr_CollectionErase: {
+            size_t ndx = read_int<size_t>();    // Throws
+            if (!handler.collection_erase(ndx)) // Throws
                 parser_error();
             return;
         }
         case instr_SetClear:
-        case instr_ListClear: {
-            size_t old_list_size = read_int<size_t>(); // Throws
-            if (!handler.list_clear(old_list_size))    // Throws
+        case instr_CollectionClear: {
+            size_t old_size = read_int<size_t>();    // Throws
+            if (!handler.collection_clear(old_size)) // Throws
                 parser_error();
             return;
         }
         case instr_DictionaryInsert: {
             int type = read_int<int>(); // Throws
             REALM_ASSERT(type == int(type_String));
-            read_string(m_string_buffer);         // skip key
-            size_t dict_ndx = read_int<size_t>(); // Throws
-            if (!handler.list_insert(dict_ndx))   // Throws
+            read_string(m_string_buffer);             // skip key
+            size_t dict_ndx = read_int<size_t>();     // Throws
+            if (!handler.collection_insert(dict_ndx)) // Throws
                 parser_error();
             return;
         }
@@ -790,7 +785,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             REALM_ASSERT(type == int(type_String));
             read_string(m_string_buffer);               // skip key
             size_t dict_ndx = read_int<size_t>();       // Throws
-            if (!handler.list_set(dict_ndx))            // Throws
+            if (!handler.collection_set(dict_ndx))      // Throws
                 parser_error();
             return;
         }
@@ -799,11 +794,11 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             REALM_ASSERT(type == int(type_String));
             read_string(m_string_buffer);                 // skip key
             size_t dict_ndx = read_int<size_t>();         // Throws
-            if (!handler.list_erase(dict_ndx))            // Throws
+            if (!handler.collection_erase(dict_ndx))      // Throws
                 parser_error();
             return;
         }
-        case instr_SelectList: {
+        case instr_SelectCollection: {
             ColKey col_key = ColKey(read_int<int64_t>()); // Throws
             ObjKey key = ObjKey(read_int<int64_t>());     // Throws
             if (!handler.select_collection(col_key, key)) // Throws

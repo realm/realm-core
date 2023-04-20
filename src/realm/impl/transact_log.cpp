@@ -30,7 +30,7 @@ bool TransactLogEncoder::select_table(TableKey key)
 
 bool TransactLogEncoder::select_collection(ColKey col_key, ObjKey key)
 {
-    append_simple_instr(instr_SelectList, col_key, key.value); // Throws
+    append_simple_instr(instr_SelectCollection, col_key, key.value); // Throws
     return true;
 }
 

@@ -106,29 +106,29 @@ void Replication::do_select_collection(const CollectionBase& list)
 void Replication::list_clear(const CollectionBase& list)
 {
     select_collection(list);           // Throws
-    m_encoder.list_clear(list.size()); // Throws
+    m_encoder.collection_clear(list.size()); // Throws
 }
 
 void Replication::link_list_nullify(const Lst<ObjKey>& list, size_t link_ndx)
 {
     select_collection(list);
-    m_encoder.list_erase(link_ndx);
+    m_encoder.collection_erase(link_ndx);
 }
 
 void Replication::dictionary_insert(const CollectionBase& dict, size_t ndx, Mixed, Mixed)
 {
     select_collection(dict);
-    m_encoder.list_insert(ndx);
+    m_encoder.collection_insert(ndx);
 }
 
 void Replication::dictionary_set(const CollectionBase& dict, size_t ndx, Mixed, Mixed)
 {
     select_collection(dict);
-    m_encoder.list_set(ndx);
+    m_encoder.collection_set(ndx);
 }
 
 void Replication::dictionary_erase(const CollectionBase& dict, size_t ndx, Mixed)
 {
     select_collection(dict);
-    m_encoder.list_erase(ndx);
+    m_encoder.collection_erase(ndx);
 }

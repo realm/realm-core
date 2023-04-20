@@ -292,11 +292,11 @@ public:
     // clang-format off
     // We don't care about fine-grained changes to collections and just do
     // object-level change tracking, which is covered by select_collection()
-    bool list_set(size_t) { return true; }
-    bool list_insert(size_t) { return true; }
-    bool list_move(size_t, size_t) { return true; }
-    bool list_erase(size_t) { return true; }
-    bool list_clear(size_t) { return true; }
+    bool collection_set(size_t) { return true; }
+    bool collection_insert(size_t) { return true; }
+    bool collection_move(size_t, size_t) { return true; }
+    bool collection_erase(size_t) { return true; }
+    bool collection_clear(size_t) { return true; }
 
     // We don't run this code on arbitrary transactions that could perform schema changes
     bool insert_group_level_table(TableKey) { unexpected_instruction(); }

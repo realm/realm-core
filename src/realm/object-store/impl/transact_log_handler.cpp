@@ -282,27 +282,27 @@ public:
     {
         return true;
     }
-    bool list_set(size_t)
+    bool collection_set(size_t)
     {
         return true;
     }
-    bool list_insert(size_t)
+    bool collection_insert(size_t)
     {
         return true;
     }
-    bool list_erase(size_t)
+    bool collection_erase(size_t)
     {
         return true;
     }
-    bool list_clear(size_t)
+    bool collection_clear(size_t)
     {
         return true;
     }
-    bool list_move(size_t, size_t)
+    bool collection_move(size_t, size_t)
     {
         return true;
     }
-    bool list_swap(size_t, size_t)
+    bool collection_swap(size_t, size_t)
     {
         return true;
     }
@@ -376,28 +376,28 @@ public:
         return true;
     }
 
-    bool list_set(size_t index)
+    bool collection_set(size_t index)
     {
         if (m_active_collection)
             m_active_collection->modify(index);
         return true;
     }
 
-    bool list_insert(size_t index)
+    bool collection_insert(size_t index)
     {
         if (m_active_collection)
             m_active_collection->insert(index);
         return true;
     }
 
-    bool list_erase(size_t index)
+    bool collection_erase(size_t index)
     {
         if (m_active_collection)
             m_active_collection->erase(index);
         return true;
     }
 
-    bool list_swap(size_t index1, size_t index2)
+    bool collection_swap(size_t index1, size_t index2)
     {
         if (m_active_collection) {
             if (index1 > index2)
@@ -409,14 +409,14 @@ public:
         return true;
     }
 
-    bool list_clear(size_t old_size)
+    bool collection_clear(size_t old_size)
     {
         if (m_active_collection)
             m_active_collection->clear(old_size);
         return true;
     }
 
-    bool list_move(size_t from, size_t to)
+    bool collection_move(size_t from, size_t to)
     {
         if (m_active_collection)
             m_active_collection->move(from, to);

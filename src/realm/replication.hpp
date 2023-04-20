@@ -554,31 +554,31 @@ inline void Replication::nullify_link(const Table* t, ColKey col_key, ObjKey key
 inline void Replication::list_set(const CollectionBase& list, size_t list_ndx, Mixed)
 {
     select_collection(list);                            // Throws
-    m_encoder.list_set(list.translate_index(list_ndx)); // Throws
+    m_encoder.collection_set(list.translate_index(list_ndx)); // Throws
 }
 
 inline void Replication::list_insert(const CollectionBase& list, size_t list_ndx, Mixed, size_t)
 {
     select_collection(list);                               // Throws
-    m_encoder.list_insert(list.translate_index(list_ndx)); // Throws
+    m_encoder.collection_insert(list.translate_index(list_ndx)); // Throws
 }
 
 inline void Replication::set_insert(const CollectionBase& set, size_t set_ndx, Mixed)
 {
     select_collection(set);        // Throws
-    m_encoder.list_insert(set_ndx); // Throws
+    m_encoder.collection_insert(set_ndx); // Throws
 }
 
 inline void Replication::set_erase(const CollectionBase& set, size_t set_ndx, Mixed)
 {
     select_collection(set);       // Throws
-    m_encoder.list_erase(set_ndx); // Throws
+    m_encoder.collection_erase(set_ndx); // Throws
 }
 
 inline void Replication::set_clear(const CollectionBase& set)
 {
     select_collection(set);          // Throws
-    m_encoder.list_clear(set.size()); // Throws
+    m_encoder.collection_clear(set.size()); // Throws
 }
 
 inline void Replication::remove_object(const Table* t, ObjKey key)
@@ -590,13 +590,13 @@ inline void Replication::remove_object(const Table* t, ObjKey key)
 inline void Replication::list_move(const CollectionBase& list, size_t from_link_ndx, size_t to_link_ndx)
 {
     select_collection(list);                                                                     // Throws
-    m_encoder.list_move(list.translate_index(from_link_ndx), list.translate_index(to_link_ndx)); // Throws
+    m_encoder.collection_move(list.translate_index(from_link_ndx), list.translate_index(to_link_ndx)); // Throws
 }
 
 inline void Replication::list_erase(const CollectionBase& list, size_t link_ndx)
 {
     select_collection(list);                              // Throws
-    m_encoder.list_erase(list.translate_index(link_ndx)); // Throws
+    m_encoder.collection_erase(list.translate_index(link_ndx)); // Throws
 }
 
 inline void Replication::typed_link_change(const Table* source_table, ColKey col, TableKey dest_table)

@@ -972,13 +972,13 @@ public:
         return true;
     }
 
-    bool list_set(size_t ndx)
+    bool collection_set(size_t ndx)
     {
         std::cout << "Collection set at " << ndx << std::endl;
         return true;
     }
 
-    bool list_insert(size_t ndx)
+    bool collection_insert(size_t ndx)
     {
         std::cout << "Collection insert at " << ndx << std::endl;
         return true;
@@ -1011,19 +1011,19 @@ public:
         return true;
     }
 
-    bool list_move(size_t from_link_ndx, size_t to_link_ndx)
+    bool collection_move(size_t from_link_ndx, size_t to_link_ndx)
     {
         std::cout << "List move from " << from_link_ndx << " to " << to_link_ndx << std::endl;
         return true;
     }
 
-    bool list_erase(size_t ndx)
+    bool collection_erase(size_t ndx)
     {
         std::cout << "Collection erase at " << ndx << std::endl;
         return true;
     }
 
-    bool list_clear(size_t old_list_size)
+    bool collection_clear(size_t old_list_size)
     {
         std::cout << "Collection clear. Old size: " << old_list_size << std::endl;
         return true;
