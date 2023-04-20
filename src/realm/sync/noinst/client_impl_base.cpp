@@ -637,12 +637,6 @@ void Connection::initiate_reconnect_wait()
         m_nonzero_reconnect_delay = true;
     }
     else {
-        // Make a randomized deduction of up to 25% to prevent a large
-        // number of clients from trying to reconnect in synchronicity.
-        auto distr = std::uniform_int_distribution<std::chrono::milliseconds::rep>(0, delay.count() / 4);
-        std::chrono::milliseconds randomized_deduction(distr(m_client.get_random()));
-        delay -= randomized_deduction;
-
         if (delay > std::chrono::milliseconds::zero()) {
             logger.detail("Allowing reconnection in %1 milliseconds", delay.count()); // Throws
         }
