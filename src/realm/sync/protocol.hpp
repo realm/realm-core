@@ -225,6 +225,7 @@ struct ResumptionDelayInfo {
     std::chrono::milliseconds max_resumption_delay_interval = std::chrono::minutes{5};
     std::chrono::milliseconds resumption_delay_interval = std::chrono::seconds{1};
     int resumption_delay_backoff_multiplier = 2;
+    int delay_jitter_divisor = 4;
 };
 
 struct ProtocolErrorInfo {

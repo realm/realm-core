@@ -236,6 +236,11 @@ struct ClientConfig {
     /// will be delayed unconditionally.
     milliseconds_type fast_reconnect_limit = default_fast_reconnect_limit;
 
+    /// If a connection is disconnected because of an error that isn't a
+    /// sync protocol ERROR message, this parameter will be used to decide how
+    /// long to wait between each re-connect attempt.
+    ResumptionDelayInfo reconnect_backoff_info;
+
     /// Set to true to completely disable delaying of the upload process. In
     /// this mode, the upload process will be activated immediately, and the
     /// value of `fast_reconnect_limit` is ignored.

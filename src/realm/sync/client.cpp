@@ -624,7 +624,9 @@ ClientImpl::get_connection(ServerEndpoint endpoint, const std::string& authoriza
                            std::function<SyncConfig::SSLVerifyCallback> ssl_verify_callback,
                            Optional<ProxyConfig> proxy_config, SyncServerMode sync_mode, bool& was_created)
 {
-    ServerSlot& server_slot = m_server_slots[endpoint]; // Throws
+    auto&& [server_slot_it, inserted] =
+        m_server_slots.try_emplace(endpoint, ReconnectInfo(m_reconnect_mode, m_reconnect_backoff_info, get_random()));
+    ServerSlot& server_slot = server_slot_it->second; // Throws
 
     // TODO: enable multiplexing with proxies
     if (server_slot.connection && !m_one_connection_per_session && !proxy_config) {
