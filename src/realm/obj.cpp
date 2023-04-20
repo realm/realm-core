@@ -1177,6 +1177,7 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
 
     auto col_keys = m_table->get_column_keys();
     for (auto ck : col_keys) {
+        auto nesting_levels = m_table->get_nesting_levels(ck);
         name = m_table->get_column_name(ck);
         auto type = ck.get_type();
         if (type == col_type_LinkList)
@@ -1289,6 +1290,11 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
             out << open_str;
             out << "[";
             for (size_t i = 0; i < sz; i++) {
+                if (nesting_levels > 0) { // this can only be true for lists
+                    auto collection = get_collection_list(ck)->get_collection(0);
+                    for (size_t j = 0; j < collection->size(); ++j)
+                        print_value(Mixed{}, collection->get_any(j));
+                }
                 if (i > 0)
                     out << ",";
                 print_value(Mixed{}, list->get_any(i));
@@ -1304,6 +1310,14 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
 
             bool first = true;
             for (auto it : dict) {
+
+                if (nesting_levels > 0) {
+                    // this is incomplete.
+                    auto collection = get_collection_list(ck)->get_collection(0);
+                    for (size_t j = 0; j < collection->size(); ++j)
+                        print_value(Mixed{}, collection->get_any(j));
+                }
+
                 if (!first)
                     out << ",";
                 first = false;

@@ -1913,12 +1913,14 @@ void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::s
         }
         if (col_key.is_list()) {
             out << ",\"isArray\":true";
+            out << ",\"isNested\":" << (get_nesting_levels(col_key) > 0 ? "true" : "false");
         }
         else if (col_key.is_set()) {
             out << ",\"isSet\":true";
         }
         else if (col_key.is_dictionary()) {
             out << ",\"isMap\":true";
+            out << ",\"isNested\":" << (get_nesting_levels(col_key) > 0 ? "true" : "false");
             auto key_type = get_dictionary_key_type(col_key);
             out << ",\"keyType\":\"" << get_data_type_name(key_type) << "\"";
         }

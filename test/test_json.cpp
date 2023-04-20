@@ -840,6 +840,9 @@ TEST(Json_Schema)
     persons->add_column(type_Int, "age", is_nullable);
     persons->add_column_list(type_Timestamp, "dates");
     persons->add_column_list(*dogs, "pet");
+    persons->add_column_dictionary(type_Mixed, "dictionary_pet");
+    persons->add_column(type_Int, "nested_list", false, {CollectionType::List, CollectionType::List});
+    persons->add_column(type_Int, "nested_dict", false, {CollectionType::List, CollectionType::Dictionary});
     dogs->add_column(type_String, "name");
 
     std::stringstream ss;
@@ -851,8 +854,12 @@ TEST(Json_Schema)
         "{\"name\":\"name\",\"type\":\"string\"},"
         "{\"name\":\"isMarried\",\"type\":\"bool\"},"
         "{\"name\":\"age\",\"type\":\"int\",\"isOptional\":true},"
-        "{\"name\":\"dates\",\"type\":\"timestamp\",\"isArray\":true},"
-        "{\"name\":\"pet\",\"type\":\"object\",\"objectType\":\"dog\",\"isArray\":true}"
+        "{\"name\":\"dates\",\"type\":\"timestamp\",\"isArray\":true,\"isNested\":false},"
+        "{\"name\":\"pet\",\"type\":\"object\",\"objectType\":\"dog\",\"isArray\":true,\"isNested\":false},"
+        "{\"name\":\"dictionary_pet\",\"type\":\"mixed\",\"isMap\":true,\"isNested\":false,\"keyType\":\"string\","
+        "\"isOptional\":true},"
+        "{\"name\":\"nested_list\",\"type\":\"int\",\"isArray\":true,\"isNested\":true},"
+        "{\"name\":\"nested_dict\",\"type\":\"int\",\"isMap\":true,\"isNested\":true,\"keyType\":\"string\"}"
         "]},\n"
         "{\"name\":\"dog\",\"tableType\":\"Embedded\",\"properties\":[{\"name\":\"name\",\"type\":\"string\"}]}\n"
         "]\n";
