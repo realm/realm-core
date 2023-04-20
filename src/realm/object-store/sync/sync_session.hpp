@@ -355,7 +355,7 @@ private:
     std::shared_ptr<SyncManager> sync_manager() const REQUIRES(!m_state_mutex);
 
     static util::UniqueFunction<void(util::Optional<app::AppError>)>
-    handle_refresh(const std::shared_ptr<SyncSession>&, bool = false);
+    handle_refresh(const std::shared_ptr<SyncSession>&, bool);
 
     SyncSession(_impl::SyncClient&, std::shared_ptr<DB>, const RealmConfig&, SyncManager* sync_manager);
 

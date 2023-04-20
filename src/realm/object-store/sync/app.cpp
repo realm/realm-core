@@ -793,9 +793,15 @@ void App::link_user(const std::shared_ptr<SyncUser>& user, const AppCredentials&
 }
 
 void App::refresh_custom_data(const std::shared_ptr<SyncUser>& user,
-                              UniqueFunction<void(Optional<AppError>)>&& completion, bool refresh_location)
+                              UniqueFunction<void(Optional<AppError>)>&& completion)
 {
-    refresh_access_token(user, std::move(completion), refresh_location);
+    refresh_access_token(user, false, std::move(completion));
+}
+
+void App::refresh_custom_data(const std::shared_ptr<SyncUser>& user, bool refresh_location,
+                              UniqueFunction<void(Optional<AppError>)>&& completion)
+{
+    refresh_access_token(user, refresh_location, std::move(completion));
 }
 
 std::string App::url_for_path(const std::string& path = "") const
@@ -1015,24 +1021,25 @@ void App::handle_auth_failure(const AppError& error, const Response& response, R
         return;
     }
 
-    App::refresh_access_token(sync_user, [self = shared_from_this(), request = std::move(request),
-                                          completion = std::move(completion), response = std::move(response),
-                                          sync_user](Optional<AppError>&& error) mutable {
-        if (!error) {
-            // assign the new access_token to the auth header
-            request.headers = get_request_headers(sync_user, RequestTokenType::AccessToken);
-            self->do_request(std::move(request), std::move(completion));
-        }
-        else {
-            // pass the error back up the chain
-            completion(std::move(response));
-        }
-    });
+    App::refresh_access_token(sync_user, false,
+                              [self = shared_from_this(), request = std::move(request),
+                               completion = std::move(completion), response = std::move(response),
+                               sync_user](Optional<AppError>&& error) mutable {
+                                  if (!error) {
+                                      // assign the new access_token to the auth header
+                                      request.headers = get_request_headers(sync_user, RequestTokenType::AccessToken);
+                                      self->do_request(std::move(request), std::move(completion));
+                                  }
+                                  else {
+                                      // pass the error back up the chain
+                                      completion(std::move(response));
+                                  }
+                              });
 }
 
 /// MARK: - refresh access token
-void App::refresh_access_token(const std::shared_ptr<SyncUser>& sync_user,
-                               util::UniqueFunction<void(Optional<AppError>)>&& completion, bool refresh_location)
+void App::refresh_access_token(const std::shared_ptr<SyncUser>& sync_user, bool refresh_location,
+                               util::UniqueFunction<void(Optional<AppError>)>&& completion)
 {
     if (!sync_user) {
         completion(AppError(ErrorCodes::ClientUserNotFound, "No current user exists"));

@@ -742,7 +742,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
             if (auto u = user()) {
                 // If a redirection occurred, the location metadata will be updated before refreshing the access
                 // token.
-                u->refresh_custom_data(handle_refresh(shared_from_this(), redirect_occurred), redirect_occurred);
+                u->refresh_custom_data(redirect_occurred, handle_refresh(shared_from_this(), redirect_occurred));
                 return;
             }
         }
@@ -1175,7 +1175,7 @@ void SyncSession::update_access_token(const std::string& signed_token)
 void SyncSession::initiate_access_token_refresh()
 {
     if (auto session_user = user()) {
-        session_user->refresh_custom_data(handle_refresh(shared_from_this()));
+        session_user->refresh_custom_data(handle_refresh(shared_from_this(), false));
     }
 }
 
