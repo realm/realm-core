@@ -1,11 +1,9 @@
-# NEXT RELEASE
+# 13.9.2 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Improve performance of equality queries on a non-indexed mixed property by about 30%. ([#6506](https://github.com/realm/realm-core/issues/6506))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix a build error due to an installed header depending on a non-installed on (since v13.9.1).
 
 ### Breaking changes
