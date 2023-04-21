@@ -33,10 +33,10 @@ using CollectionListPtr = std::shared_ptr<CollectionList>;
  * by either an integer index or a string key.
  */
 
-class CollectionList : public Collection,
-                       public CollectionParent,
-                       protected ArrayParent,
-                       public std::enable_shared_from_this<CollectionList> {
+class CollectionList final : public Collection,
+                             public CollectionParent,
+                             protected ArrayParent,
+                             public std::enable_shared_from_this<CollectionList> {
 public:
     [[nodiscard]] static CollectionListPtr create(std::shared_ptr<CollectionParent> parent, ColKey col_key,
                                                   Index index, CollectionType coll_type)

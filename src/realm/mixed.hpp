@@ -163,19 +163,22 @@ public:
     {
     }
 
-    struct ListTag {};
+    struct ListTag {
+    };
     Mixed(ref_type ref, ListTag) noexcept
         : m_type(int(type_List) + 1)
         , int_val(int64_t(ref))
     {
     }
-    struct SetTag {};
+    struct SetTag {
+    };
     Mixed(ref_type ref, SetTag) noexcept
         : m_type(int(type_Set) + 1)
         , int_val(int64_t(ref))
     {
     }
-    struct DictionaryTag {};
+    struct DictionaryTag {
+    };
     Mixed(ref_type ref, DictionaryTag) noexcept
         : m_type(int(type_Dictionary) + 1)
         , int_val(int64_t(ref))
