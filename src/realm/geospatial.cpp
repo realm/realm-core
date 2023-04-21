@@ -236,12 +236,18 @@ S2Region& Geospatial::get_region() const
                      [&](const GeoPolygon& polygon) {
                          REALM_ASSERT(polygon.points.size() >= 1);
                          // FIXME: should be really S2Polygon
-                         std::vector<S2Point> points;
-                         points.reserve(polygon.points[0].size());
-                         for (auto&& p : polygon.points[0])
-                             // FIXME rewrite without copying
-                             points.emplace_back(S2LatLng::FromDegrees(p.latitude, p.longitude).ToPoint());
-                         m_region = std::make_unique<S2Loop>(points);
+                         std::vector<S2Loop*> loops;
+                         for (size_t i = 0; i < polygon.points.size(); ++i) {
+                             std::vector<S2Point> points;
+                             points.reserve(polygon.points[i].size());
+                             for (auto&& p : polygon.points[i]) {
+                                 // FIXME rewrite without copying
+                                 points.emplace_back(S2LatLng::FromDegrees(p.latitude, p.longitude).ToPoint());
+                             }
+                             loops.push_back(new S2Loop(points));
+                         }
+                         // S2Polygon takes ownership of all the S2Loop pointers
+                         m_region = std::make_unique<S2Polygon>(&loops);
                      },
                      [&](const GeoCenterSphere& sphere) {
                          auto center =
@@ -272,7 +278,7 @@ bool Geospatial::is_within(const Geospatial& geometry) const noexcept
                                            return static_cast<S2LatLngRect&>(region).Contains(point);
                                        },
                                        [&](const GeoPolygon&) {
-                                           return static_cast<S2Loop&>(region).Contains(point);
+                                           return static_cast<S2Polygon&>(region).Contains(point);
                                        },
                                        [&](const GeoCenterSphere&) {
                                            return static_cast<S2Cap&>(region).Contains(point);

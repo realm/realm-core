@@ -5690,6 +5690,10 @@ TEST(Parser_Geospatial)
     verify_query(test_context, table, "link geoWithin geoSphere([0.3, 0.3], 1000.0)", 4);
     verify_query(test_context, table, "link geoWithin geoSphere([0.3, 0.3, 0.3], 1000.0)", 4);
     verify_query(test_context, table, "link geoWithin geoPolygon({[0.0, 0.0], [1.0, 0.0], [1, 1], [0, 1]})", 1);
+    verify_query(test_context, table,
+                 "link geoWithin geoPolygon({[0.0, 0.0], [1.0, 0.0], [1, 1], [0, 1]}, "
+                 "{[0.25, 0.25], [0.75, 0.25], [0.75, 0.75], [0.25, 0.75]})",
+                 0); // polygon with hole
     verify_query(test_context, table, "link == NULL", 1);
 
     Geospatial box{GeoBox{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}}};

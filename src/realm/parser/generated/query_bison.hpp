@@ -464,6 +464,8 @@ namespace yy {
       // expr
       char dummy5[sizeof (ExpressionNode*)];
 
+      // geoloop_content
+      // geoloop
       // geopoly_content
       // geospatial
       char dummy6[sizeof (GeospatialNode*)];
@@ -754,29 +756,31 @@ namespace yy {
         SYM_subquery = 82,                       // subquery
         SYM_coordinate = 83,                     // coordinate
         SYM_geopoint = 84,                       // geopoint
-        SYM_geopoly_content = 85,                // geopoly_content
-        SYM_geospatial = 86,                     // geospatial
-        SYM_post_query = 87,                     // post_query
-        SYM_distinct = 88,                       // distinct
-        SYM_distinct_param = 89,                 // distinct_param
-        SYM_sort = 90,                           // sort
-        SYM_sort_param = 91,                     // sort_param
-        SYM_limit = 92,                          // limit
-        SYM_direction = 93,                      // direction
-        SYM_list = 94,                           // list
-        SYM_list_content = 95,                   // list_content
-        SYM_constant = 96,                       // constant
-        SYM_primary_key = 97,                    // primary_key
-        SYM_boolexpr = 98,                       // boolexpr
-        SYM_comp_type = 99,                      // comp_type
-        SYM_post_op = 100,                       // post_op
-        SYM_aggr_op = 101,                       // aggr_op
-        SYM_equality = 102,                      // equality
-        SYM_relational = 103,                    // relational
-        SYM_stringop = 104,                      // stringop
-        SYM_path = 105,                          // path
-        SYM_path_elem = 106,                     // path_elem
-        SYM_id = 107                             // id
+        SYM_geoloop_content = 85,                // geoloop_content
+        SYM_geoloop = 86,                        // geoloop
+        SYM_geopoly_content = 87,                // geopoly_content
+        SYM_geospatial = 88,                     // geospatial
+        SYM_post_query = 89,                     // post_query
+        SYM_distinct = 90,                       // distinct
+        SYM_distinct_param = 91,                 // distinct_param
+        SYM_sort = 92,                           // sort
+        SYM_sort_param = 93,                     // sort_param
+        SYM_limit = 94,                          // limit
+        SYM_direction = 95,                      // direction
+        SYM_list = 96,                           // list
+        SYM_list_content = 97,                   // list_content
+        SYM_constant = 98,                       // constant
+        SYM_primary_key = 99,                    // primary_key
+        SYM_boolexpr = 100,                      // boolexpr
+        SYM_comp_type = 101,                     // comp_type
+        SYM_post_op = 102,                       // post_op
+        SYM_aggr_op = 103,                       // aggr_op
+        SYM_equality = 104,                      // equality
+        SYM_relational = 105,                    // relational
+        SYM_stringop = 106,                      // stringop
+        SYM_path = 107,                          // path
+        SYM_path_elem = 108,                     // path_elem
+        SYM_id = 109                             // id
       };
     };
 
@@ -836,6 +840,8 @@ namespace yy {
         value.move< ExpressionNode* > (std::move (that.value));
         break;
 
+      case symbol_kind::SYM_geoloop_content: // geoloop_content
+      case symbol_kind::SYM_geoloop: // geoloop
       case symbol_kind::SYM_geopoly_content: // geopoly_content
       case symbol_kind::SYM_geospatial: // geospatial
         value.move< GeospatialNode* > (std::move (that.value));
@@ -1265,6 +1271,8 @@ switch (yykind)
         value.template destroy< ExpressionNode* > ();
         break;
 
+      case symbol_kind::SYM_geoloop_content: // geoloop_content
+      case symbol_kind::SYM_geoloop: // geoloop
       case symbol_kind::SYM_geopoly_content: // geopoly_content
       case symbol_kind::SYM_geospatial: // geospatial
         value.template destroy< GeospatialNode* > ();
@@ -2775,8 +2783,8 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 553,     ///< Last index in yytable_.
-      yynnts_ = 35,  ///< Number of nonterminal symbols.
+      yylast_ = 555,     ///< Last index in yytable_.
+      yynnts_ = 37,  ///< Number of nonterminal symbols.
       yyfinal_ = 66 ///< Termination state number.
     };
 
@@ -2874,6 +2882,8 @@ switch (yykind)
         value.copy< ExpressionNode* > (YY_MOVE (that.value));
         break;
 
+      case symbol_kind::SYM_geoloop_content: // geoloop_content
+      case symbol_kind::SYM_geoloop: // geoloop
       case symbol_kind::SYM_geopoly_content: // geopoly_content
       case symbol_kind::SYM_geospatial: // geospatial
         value.copy< GeospatialNode* > (YY_MOVE (that.value));
@@ -3029,6 +3039,8 @@ switch (yykind)
         value.move< ExpressionNode* > (YY_MOVE (s.value));
         break;
 
+      case symbol_kind::SYM_geoloop_content: // geoloop_content
+      case symbol_kind::SYM_geoloop: // geoloop
       case symbol_kind::SYM_geopoly_content: // geopoly_content
       case symbol_kind::SYM_geospatial: // geospatial
         value.move< GeospatialNode* > (YY_MOVE (s.value));

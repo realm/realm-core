@@ -1365,9 +1365,19 @@ GeospatialNode::GeospatialNode(Polygon, GeoPoint& p)
 {
 }
 
-void GeospatialNode::add_point_to_polygon(GeoPoint& p)
+GeospatialNode::GeospatialNode(Loop, GeoPoint& p)
+    : m_points({{p}})
 {
-    m_points[0].push_back(p);
+}
+
+void GeospatialNode::add_point_to_loop(GeoPoint& p)
+{
+    m_points.back().push_back(p);
+}
+
+void GeospatialNode::add_loop_to_polygon(GeospatialNode* node)
+{
+    m_points.push_back(node->m_points.back());
 }
 
 std::unique_ptr<Subexpr> GeospatialNode::visit(ParserDriver*, DataType)
