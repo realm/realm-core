@@ -2,6 +2,7 @@
 #ifndef REALM_UTIL_TIME_HPP
 #define REALM_UTIL_TIME_HPP
 
+#include <chrono>
 #include <cstring>
 #include <ctime>
 #include <iterator>
