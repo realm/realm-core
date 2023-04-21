@@ -115,6 +115,9 @@ struct ErrorBackoffState {
 private:
     std::chrono::milliseconds jitter_value(std::chrono::milliseconds value)
     {
+        if (delay_info.delay_jitter_divisor == 0) {
+            return value;
+        }
         const auto max_jitter = value.count() / delay_info.delay_jitter_divisor;
         auto distr = std::uniform_int_distribution<std::chrono::milliseconds::rep>(0, max_jitter);
         std::chrono::milliseconds randomized_deduction(distr(m_random_engine.get()));
