@@ -352,6 +352,17 @@ Schema Realm::get_full_schema()
     return actual_schema;
 }
 
+std::vector<Class> Realm::get_classes()
+{
+    std::vector<Class> ret;
+    ret.reserve(m_schema.size());
+    auto r = shared_from_this();
+    for (auto& os : m_schema) {
+        ret.emplace_back(r, &os);
+    }
+    return ret;
+}
+
 void Realm::set_schema_subset(Schema schema)
 {
     verify_thread();

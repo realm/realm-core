@@ -340,12 +340,12 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         auto realm = Realm::get_shared_realm(config);
         REQUIRE(realm->schema().size() == 1);
         auto it = realm->schema().find("object");
-        Class cls(realm, "object");
+        auto table = realm->read_group().get_table("class_object");
         REQUIRE(it != realm->schema().end());
-        REQUIRE(it->table_key == cls.get_key());
+        REQUIRE(it->table_key == table->get_key());
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
-        REQUIRE(it->persisted_properties[0].column_key == cls.get_column_key("value"));
+        REQUIRE(it->persisted_properties[0].column_key == table->get_column_key("value"));
     }
 
     SECTION("should read the proper schema from the file if a custom version is supplied") {
@@ -411,12 +411,12 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         config.schema_mode = SchemaMode::Immutable;
         auto realm = Realm::get_shared_realm(config);
         auto it = realm->schema().find("object");
-        Class cls(realm, "object");
+        auto table = realm->read_group().get_table("class_object");
         REQUIRE(it != realm->schema().end());
-        REQUIRE(it->table_key == cls.get_key());
+        REQUIRE(it->table_key == table->get_key());
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
-        REQUIRE(it->persisted_properties[0].column_key == cls.get_column_key("value"));
+        REQUIRE(it->persisted_properties[0].column_key == table->get_column_key("value"));
 
         SECTION("refreshing an immutable Realm throws") {
             REQUIRE_THROWS_WITH(realm->refresh(), "Can't refresh an immutable Realm.");
@@ -581,8 +581,9 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(frozen1 != realm);
         REQUIRE(realm->read_transaction_version() == frozen1->read_transaction_version());
 
+        auto table = realm->read_group().get_table("class_object");
         realm->begin_transaction();
-        Class(realm, "object").create_object();
+        table->create_object();
         realm->commit_transaction();
 
         REQUIRE(realm->read_transaction_version() > frozen1->read_transaction_version());

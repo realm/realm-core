@@ -57,11 +57,7 @@ Results::Results(SharedRealm r, Query q, DescriptorOrdering o)
 }
 
 Results::Results(const Class& cls)
-    : m_realm(cls.m_realm)
-    , m_table(cls.m_table)
-    , m_table_view(m_table)
-    , m_mode(Mode::Table)
-    , m_mutex(m_realm && m_realm->is_frozen())
+    : Results(cls.m_realm, cls.m_table)
 {
 }
 

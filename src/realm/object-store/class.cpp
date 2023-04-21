@@ -22,36 +22,29 @@
 
 namespace realm {
 
-Class::Class(const std::shared_ptr<Realm>& r, StringData object_type)
-    : m_realm(r)
-    , m_object_schema(&*r->schema().find(object_type))
-    , m_table(r->read_group().get_table(m_object_schema->table_key))
+Class::Class(std::shared_ptr<Realm> r, StringData object_type)
+    : m_realm(std::move(r))
+    , m_object_schema(&*m_realm->schema().find(object_type))
+    , m_table(m_realm->read_group().get_table(m_object_schema->table_key))
 {
 }
 
-size_t Class::size() const
+Class::Class(std::shared_ptr<Realm> r, const ObjectSchema* object_schema)
+    : m_realm(std::move(r))
+    , m_object_schema(object_schema)
+    , m_table(m_realm->read_group().get_table(m_object_schema->table_key))
 {
-    return m_table->size();
 }
 
-TableKey Class::get_key() const
+std::pair<Obj, bool> Class::create_object(Mixed pk)
 {
-    return m_table->get_key();
+    bool did_create;
+    auto obj = m_table->create_object_with_primary_key(pk, &did_create);
+    return {obj, did_create};
 }
 
-ColKey Class::get_column_key(StringData name) const
+Obj Class::create_object()
 {
-    return m_table->get_column_key(name);
-}
-
-Obj Class::create_object(Mixed pk)
-{
-    if (!pk.is_null()) {
-        bool did_create;
-        auto obj = m_table->create_object_with_primary_key(pk, &did_create);
-        REALM_ASSERT(did_create);
-        return obj;
-    }
     return m_table->create_object();
 }
 

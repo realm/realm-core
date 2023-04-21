@@ -32,15 +32,30 @@ class Query;
 
 class Class {
 public:
-    Class(const std::shared_ptr<Realm>& r, StringData object_type);
+    Class(std::shared_ptr<Realm> r, StringData object_type);
+    Class(std::shared_ptr<Realm> r, const ObjectSchema* object_schema);
 
-    size_t size() const;
-    TableKey get_key() const;
-    ColKey get_column_key(StringData) const;
+    size_t size() const
+    {
+        return m_table->size();
+    }
+    bool is_embedded()
+    {
+        return m_table->is_embedded();
+    }
+    TableKey get_key() const
+    {
+        return m_table->get_key();
+    }
+    ColKey get_column_key(StringData name) const
+    {
+        return m_table->get_column_key(name);
+    }
     Query get_query(const std::string& query_string, query_parser::Arguments& args,
                     const query_parser::KeyPathMapping& mapping) const;
 
-    Obj create_object(Mixed primary_value = {});
+    std::pair<Obj, bool> create_object(Mixed primary_value);
+    Obj create_object();
     Obj get_object(Mixed primary_value);
 
 private:

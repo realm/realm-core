@@ -23,10 +23,10 @@
 using namespace realm;
 using namespace realm::_impl;
 
-ObjectNotifier::ObjectNotifier(std::shared_ptr<Realm> realm, TableKey table_key, ObjKey obj_key)
+ObjectNotifier::ObjectNotifier(std::shared_ptr<Realm> realm, const Obj& obj)
     : CollectionNotifier(std::move(realm))
-    , m_table(transaction().get_table(table_key))
-    , m_obj_key(obj_key)
+    , m_table(obj.get_table())
+    , m_obj_key(obj.get_key())
 {
 }
 
