@@ -193,7 +193,8 @@ public:
 
     enum {
         flag_Trunc = 1, ///< Truncate the file if it already exists.
-        flag_Append = 2 ///< Move to end of file before each write.
+        flag_Append = 2, ///< Move to end of file before each write.
+        flag_Direct = 3 ///< Use direct/unbuffered access.
     };
 
     /// See open(const std::string&, Mode).

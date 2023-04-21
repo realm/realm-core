@@ -167,6 +167,9 @@ target_include_directories(CoreTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 add_bundled_test(CoreTests)
 
+add_executable(flush-benchmark flush-benchmark.cpp)
+target_link_libraries(flush-benchmark Storage TestUtil)
+
 if(REALM_ENABLE_SYNC)
     set(SYNC_TESTS
         test_all.cpp
