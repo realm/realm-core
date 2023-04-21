@@ -44,7 +44,7 @@ std::set<std::string> Tokenizer::get_all_tokens()
 TokenInfoMap Tokenizer::get_token_info()
 {
     TokenInfoMap info;
-    size_t num_tokens = 0;
+    unsigned num_tokens = 0;
     while (next()) {
         auto it = info.find(std::string(get_token()));
         if (it == info.end()) {
@@ -139,13 +139,13 @@ bool DefaultTokenizer::next()
 
         if (is_alnum) {
             if (state == searching) {
-                m_start = m_cur_pos - m_start_pos;
+                m_start = unsigned(m_cur_pos - m_start_pos);
             }
             state = building;
         }
         else {
             if (state == building) {
-                m_end = m_cur_pos - m_start_pos;
+                m_end = unsigned(m_cur_pos - m_start_pos);
                 state = finished;
             }
         }
