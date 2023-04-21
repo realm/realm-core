@@ -246,7 +246,7 @@ option(REALM_ENABLE_MEMDEBUG "Add additional memory checks" OFF)
 option(REALM_VALGRIND "Tell the test suite we are running with valgrind" OFF)
 option(REALM_METRICS "Enable various metric tracking" ON)
 option(REALM_INCLUDE_CERTS "Include a list of trust certificates in the build for SSL certificate verification" ${REALM_INCLUDE_CERTS_DEFAULT})
-option(REALM_ENABLE_SYNC_MULTPLEXING "Enables sync session multi-plexing by default" ON)
+option(REALM_ENABLE_SYNC_MULTIPLEXING "Enables sync session multi-plexing by default")
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 
 # Find dependencies
