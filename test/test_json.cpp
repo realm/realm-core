@@ -554,6 +554,108 @@ TEST(Xjson_LinkList1)
     CHECK(json_test(ss.str(), "expected_xjson_plus_linklist2", generate_all));
 }
 
+ONLY(Xjson_NestedLinkList)
+{
+    // Basic non-cyclic LinkList test that also tests column and table renaming
+    Group group;
+
+    TableRef table1 = group.add_table_with_primary_key("table1", type_String, "primaryKey");
+    // TableRef table2 = group.add_table_with_primary_key("table2", type_String, "primaryKey");
+
+    // add some more columns to table1 and table2
+    ColKey table1Coll =
+        table1->add_column(type_Int, "list_list_int", false, {{CollectionType::List, CollectionType::List}});
+    // ColKey table2Coll = table2->add_column(type_Int, "list_list_int2", false, {{CollectionType::List,
+    // CollectionType::List}} );
+
+    // add some rows
+
+    // Obj obj = table->create_object();
+    // auto int_lst = obj.get_list_ptr<Int>({list_col2, "Foo", 0});
+    // int_lst->add(7);
+    // int_lst = obj.get_list_ptr<Int>({list_col2, "Bar", 0});
+    // int_lst->add(5);
+
+    auto obj1 = table1->create_object_with_primary_key("t1o1");
+    // auto obj2 = table1->create_object_with_primary_key("t1o2");
+    // auto obj3 = table1->create_object_with_primary_key("t1o3");
+
+    CollectionListPtr list1 = obj1.get_collection_list(table1Coll);
+    CHECK(list1->is_empty());
+    auto collection1 = list1->insert_collection(0);
+    auto collection2 = list1->insert_collection(1);
+    auto collection3 = list1->insert_collection(2);
+    auto collection4 = list1->insert_collection(2);
+    dynamic_cast<Lst<Int>*>(collection1.get())->add(1);
+    dynamic_cast<Lst<Int>*>(collection1.get())->add(2);
+
+    dynamic_cast<Lst<Int>*>(collection2.get())->add(3);
+    dynamic_cast<Lst<Int>*>(collection2.get())->add(4);
+
+    dynamic_cast<Lst<Int>*>(collection3.get())->add(5);
+    dynamic_cast<Lst<Int>*>(collection3.get())->add(6);
+
+    dynamic_cast<Lst<Int>*>(collection4.get())->add(7);
+    dynamic_cast<Lst<Int>*>(collection4.get())->add(8);
+
+    // CollectionListPtr list2 = obj2.get_collection_list(table1Coll);
+    // CHECK(list2->is_empty());
+    // auto collection2 = list2->insert_collection(0);
+    // dynamic_cast<Lst<Int>*>(collection2.get())->add(1);
+    // dynamic_cast<Lst<Int>*>(collection2.get())->add(2);
+
+    // CollectionListPtr list3 = obj3.get_collection_list(table1Coll);
+    // CHECK(list3->is_empty());
+    // auto collection3 = list2->insert_collection(0);
+    // dynamic_cast<Lst<Int>*>(collection3.get())->add(1);
+    // dynamic_cast<Lst<Int>*>(collection3.get())->add(2);
+
+
+    // auto k20 = table2->create_object_with_primary_key("t2o1");
+    // .set(table2Coll, 400).get_key();
+    // auto k21 = table2->create_object_with_primary_key("t2o2");
+    // .set(table2Coll, 500).get_key();
+    // auto k22 = table2->create_object_with_primary_key("t2o3");
+    // .set(table2Coll, 600).get_key();
+
+    // ColKey col_link2 = table1->add_column_list(*table2, "linkA");
+    // ColKey col_link3 = table1->add_column(*table2, "linkB");
+
+    // // set some links
+    // obj0.set(col_link3, k20);
+    // auto ll0 = obj0.get_linklist(col_link2); // Links to table 2
+    // ll0.add(k21);
+
+    // auto ll1 = obj1.get_linklist(col_link2); // Links to table 2
+    // ll1.add(k21);
+    // ll1.add(k22);
+
+    std::stringstream ss;
+
+    // Now try different link_depth arguments
+    table1->to_json(ss, 0, no_renames, output_mode_xjson);
+    std::cout << "Data: " << ss.str() << std::endl;
+    std::cout << "New line: " << std::endl;
+    // CHECK(json_test(ss.str(), "expected_xjson_linklist1", generate_all));
+
+    // ss.str("");
+    // table1->to_json(ss, 0, no_renames, output_mode_xjson_plus);
+    // CHECK(json_test(ss.str(), "expected_xjson_plus_linklist1", generate_all));
+
+    // Column and table renaming
+    // std::map<std::string, std::string> m;
+    // m["str1"] = "STR1";
+    // m["linkA"] = "LINKA";
+    // m["table1"] = "TABLE1";
+    // ss.str("");
+    // table1->to_json(ss, 2, m, output_mode_xjson);
+    // CHECK(json_test(ss.str(), "expected_xjson_linklist2", generate_all));
+
+    // ss.str("");
+    // table1->to_json(ss, 2, m, output_mode_xjson_plus);
+    // CHECK(json_test(ss.str(), "expected_xjson_plus_linklist2", generate_all));
+}
+
 TEST(Xjson_LinkSet1)
 {
     // Basic non-cyclic LinkList test that also tests column and table renaming

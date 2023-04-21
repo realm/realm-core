@@ -160,6 +160,10 @@ public:
     template <class T>
     bool evaluate(T func) const;
 
+    // TODO: both must become private
+    //  std::string print_value(Mixed key, Mixed val);
+    //  std::string nested_collection_to_json(ColKey colkey, size_t index, size_t current, size_t levels) const;
+
     void to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
                  std::vector<ObjLink>& followed, JSONOutputMode output_mode) const;
     void to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,

@@ -1160,6 +1160,43 @@ void out_mixed(std::ostream& out, const Mixed& val, JSONOutputMode output_mode)
 }
 
 } // anonymous namespace
+
+
+template <typename Func>
+std::string nested_collection_to_json(Obj obj, TableRef table, ColKey colkey, size_t index, size_t current,
+                                      size_t levels, Func& func)
+{
+    std::stringstream out;
+    if (current < levels) {
+        auto type = table->get_nested_column_type(colkey, current);
+        auto open_symbol = " [ ";
+        auto close_symbol = " ] ";
+        if (type == CollectionType::Dictionary) {
+            open_symbol = " { ";
+            close_symbol = " } ";
+        }
+        out << open_symbol << nested_collection_to_json(obj, table, colkey, index, current + 1, levels, func)
+            << close_symbol;
+        return out.str();
+    }
+
+
+    if (colkey.is_list() || colkey.is_set()) {
+        auto collection_list = obj.get_collection_list(colkey);
+        auto list = collection_list->get_collection(current - 1);
+        auto sz = list->size();
+        for (size_t i = 0; i < sz; i++) {
+            if (i > 0)
+                out << ",";
+            out << func(Mixed{}, list->get_any(i));
+        }
+    }
+    else if (colkey.is_dictionary()) {
+    }
+    auto str = out.str();
+    return out.str();
+}
+
 void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
                   std::vector<ObjLink>& followed, JSONOutputMode output_mode) const
 {
@@ -1229,7 +1266,8 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
             }
         }
 
-        auto print_value = [&](Mixed key, Mixed val) {
+        auto print_value = [&](Mixed key, Mixed val) -> std::string {
+            std::stringstream out;
             if (!key.is_null()) {
                 out_mixed(out, key, output_mode);
                 out << ":";
@@ -1260,18 +1298,18 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                     ObjLink link(tt->get_key(), obj_key);
                     if (obj_key.is_unresolved()) {
                         out << "null";
-                        return;
+                        return out.str();
                     }
                     if (!tt->is_embedded()) {
                         if (link_depth == 0) {
                             out << table_info << obj_key.value << table_info_close;
-                            return;
+                            return out.str();
                         }
                         if ((link_depth == realm::npos &&
                              std::find(followed.begin(), followed.end(), link) != followed.end())) {
                             // We have detected a cycle in links
                             out << "{ \"table\": \"" << tt->get_name() << "\", \"key\": " << obj_key.value << " }";
-                            return;
+                            return out.str();
                         }
                     }
 
@@ -1281,47 +1319,58 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
             else {
                 out_mixed(out, val, output_mode);
             }
+            return out.str();
         };
 
         if (ck.is_list() || ck.is_set()) {
-            auto list = get_collection_ptr(ck);
-            auto sz = list->size();
 
             out << open_str;
             out << "[";
-            for (size_t i = 0; i < sz; i++) {
-                if (nesting_levels > 0) { // this can only be true for lists
-                    auto collection = get_collection_list(ck)->get_collection(0);
-                    for (size_t j = 0; j < collection->size(); ++j)
-                        print_value(Mixed{}, collection->get_any(j));
+            if (nesting_levels > 0) {
+                auto collection_list = get_collection_list(ck);
+                auto sz = collection_list->size();
+                // std::cout << "nested levels: " << nesting_levels << std::endl;
+                // std::cout << "list size: " << sz << std::endl;
+                for (size_t i = 0; i < sz; i++) {
+                    if (i > 0)
+                        out << ",";
+                    out << nested_collection_to_json(*this, m_table, ck, i, 0, nesting_levels, print_value);
                 }
-                if (i > 0)
-                    out << ",";
-                print_value(Mixed{}, list->get_any(i));
+            }
+            else {
+                auto list = get_collection_ptr(ck);
+                auto sz = list->size();
+                for (size_t i = 0; i < sz; i++) {
+                    if (i > 0)
+                        out << ",";
+                    out << print_value(Mixed{}, list->get_any(i));
+                }
             }
             out << "]";
             out << close_str;
         }
         else if (ck.get_attrs().test(col_attr_Dictionary)) {
             auto dict = get_dictionary(ck);
-
             out << open_str;
             out << "{";
-
-            bool first = true;
-            for (auto it : dict) {
-
-                if (nesting_levels > 0) {
-                    // this is incomplete.
-                    auto collection = get_collection_list(ck)->get_collection(0);
-                    for (size_t j = 0; j < collection->size(); ++j)
-                        print_value(Mixed{}, collection->get_any(j));
+            if (nesting_levels > 0) {
+                // this is a nested collection
+                const auto sz = dict.size();
+                // tmp.
+                for (size_t i = 0; i < sz; i++) {
+                    if (i > 0)
+                        out << ",";
+                    out << nested_collection_to_json(*this, m_table, ck, i, 0, nesting_levels, print_value);
                 }
-
-                if (!first)
-                    out << ",";
-                first = false;
-                print_value(it.first, it.second);
+            }
+            else {
+                bool first = true;
+                for (auto it : dict) {
+                    if (!first)
+                        out << ",";
+                    first = false;
+                    out << print_value(it.first, it.second);
+                }
             }
             out << "}";
             out << close_str;
