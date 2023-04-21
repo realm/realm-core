@@ -72,13 +72,11 @@ public:
             }
             else if (prop.name == Geospatial::c_geo_point_coords_col_name) {
                 std::vector<std::any> coords;
-                const std::vector<GeoPoint>& points = geo->get_points();
-                if (points.size()) {
-                    coords.push_back(points[0].longitude);
-                    coords.push_back(points[0].latitude);
-                    if (points[0].get_altitude()) {
-                        coords.push_back(*points[0].get_altitude());
-                    }
+                GeoPoint point = geo->get<GeoPoint>(); // throws
+                coords.push_back(point.longitude);
+                coords.push_back(point.latitude);
+                if (point.has_altitude()) {
+                    coords.push_back(*point.get_altitude());
                 }
                 return coords;
             }

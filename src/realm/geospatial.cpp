@@ -67,7 +67,22 @@ const double GeoCenterSphere::c_radius_meters = 6378100.0;
 
 std::string Geospatial::get_type_string() const noexcept
 {
-    return is_valid() ? std::string(c_types[static_cast<size_t>(get_type())]) : "Invalid";
+    return mpark::visit(util::overload{[&](const GeoPoint&) {
+                                           return "Point";
+                                       },
+                                       [&](const GeoBox&) {
+                                           return "Box";
+                                       },
+                                       [&](const GeoPolygon&) {
+                                           return "Polygon";
+                                       },
+                                       [&](const GeoCenterSphere&) {
+                                           return "CenterSphere";
+                                       },
+                                       [&](const mpark::monostate&) {
+                                           return "Invalid";
+                                       }},
+                        m_value);
 }
 
 Geospatial::Type Geospatial::get_type() const noexcept
@@ -235,7 +250,6 @@ S2Region& Geospatial::get_region() const
                      },
                      [&](const GeoPolygon& polygon) {
                          REALM_ASSERT(polygon.points.size() >= 1);
-                         // FIXME: should be really S2Polygon
                          std::vector<S2Loop*> loops;
                          for (size_t i = 0; i < polygon.points.size(); ++i) {
                              std::vector<S2Point> points;
