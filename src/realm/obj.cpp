@@ -32,7 +32,9 @@
 #include "realm/cluster_tree.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/dictionary.hpp"
+#if REALM_ENABLE_GEOSPATIAL
 #include "realm/geospatial.hpp"
+#endif
 #include "realm/link_translator.hpp"
 #include "realm/index_string.hpp"
 #include "realm/object_converter.hpp"
@@ -279,6 +281,8 @@ T Obj::get(ColKey col_key) const
     return _get<T>(col_key.get_index());
 }
 
+#if REALM_ENABLE_GEOSPATIAL
+
 template <>
 Geospatial Obj::get(ColKey col_key) const
 {
@@ -301,6 +305,8 @@ std::optional<Geospatial> Obj::get(ColKey col_key) const
     }
     return Geospatial::from_link(geo);
 }
+
+#endif
 
 template <class T>
 T Obj::_get(ColKey::Idx col_ndx) const
@@ -1701,6 +1707,8 @@ inline void Obj::set_spec<ArrayString>(ArrayString& values, ColKey col_key)
     values.set_spec(spec, spec_ndx);
 }
 
+#if REALM_ENABLE_GEOSPATIAL
+
 template <>
 Obj& Obj::set(ColKey col_key, Geospatial value, bool)
 {
@@ -1749,6 +1757,8 @@ Obj& Obj::set(ColKey col_key, std::optional<Geospatial> value, bool)
     }
     return *this;
 }
+
+#endif
 
 template <class T>
 Obj& Obj::set(ColKey col_key, T value, bool is_default)

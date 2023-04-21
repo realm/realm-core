@@ -139,7 +139,9 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/column_integer.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/dictionary.hpp>
+#if REALM_ENABLE_GEOSPATIAL
 #include <realm/geospatial.hpp>
+#endif
 #include <realm/table.hpp>
 #include <realm/index_string.hpp>
 #include <realm/query.hpp>
@@ -1166,6 +1168,7 @@ public:
     }
 };
 
+#if REALM_ENABLE_GEOSPATIAL
 template <>
 class Subexpr2<Geospatial> : public Subexpr, public Overloads<Geospatial, Geospatial> {
 public:
@@ -1175,6 +1178,7 @@ public:
         return type_Geospatial;
     }
 };
+#endif
 
 struct TrueExpression : Expression {
     size_t find_first(size_t start, size_t end) const override
@@ -1446,6 +1450,7 @@ private:
     OwnedBinaryData m_buffer;
 };
 
+#if REALM_ENABLE_GEOSPATIAL
 class ConstantGeospatialValue : public Value<Geospatial> {
 public:
     ConstantGeospatialValue(const Geospatial& geo)
@@ -1473,7 +1478,7 @@ private:
     }
     Geospatial m_geospatial;
 };
-
+#endif
 
 // Classes used for LinkMap (see below).
 struct LinkMapFunction {
@@ -2411,6 +2416,7 @@ private:
     LinkMap m_link_map;
 };
 
+#if REALM_ENABLE_GEOSPATIAL
 class GeoWithinCompare : public Expression {
 public:
     GeoWithinCompare(const LinkMap& lm, Geospatial bounds)
@@ -2506,6 +2512,7 @@ private:
     mutable ColKey m_type_col;
     mutable ColKey m_coords_col;
 };
+#endif
 
 template <class T, class TExpr>
 class SizeOperator : public Subexpr2<Int> {
@@ -2727,10 +2734,12 @@ public:
         return make_expression<UnaryLinkCompare<true>>(m_link_map);
     }
 
+#if REALM_ENABLE_GEOSPATIAL
     Query geo_within(Geospatial bounds) const
     {
         return make_expression<GeoWithinCompare>(m_link_map, bounds);
     }
+#endif
 
     LinkCount count() const
     {

@@ -14,7 +14,6 @@ set(SOURCES
     collection_change_indices.cpp
     dictionary.cpp
     frozen_objects.cpp
-    geospatial.cpp
     index_set.cpp
     list.cpp
     main.cpp
@@ -40,6 +39,10 @@ set(SOURCES
     util/test_file.cpp
     util/test_utils.cpp
 )
+
+if (REALM_ENABLE_GEOSPATIAL)
+    list(APPEND SOURCES geospatial.cpp)
+endif()
 
 file(GLOB RESOURCES RELATIVE ${CMAKE_CURRENT_BINARY_DIR}
      "*.realm")

@@ -204,6 +204,7 @@ public:
     };
     struct Sphere {
     };
+#if REALM_ENABLE_GEOSPATIAL
     GeospatialNode(Box, GeoPoint& p1, GeoPoint& p2);
     GeospatialNode(Sphere, GeoPoint& p, double radius);
     GeospatialNode(Polygon, GeoPoint& p);
@@ -214,6 +215,21 @@ public:
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
     Geospatial m_geo;
+#else
+    template <typename... Ts>
+    GeospatialNode(Ts&&...)
+    {
+        throw realm::LogicError(ErrorCodes::NotSupported, "Support for Geospatial queries is not enabled");
+    }
+    template <typename Point>
+    void add_point_to_polygon(Point&&)
+    {
+    }
+    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override
+    {
+        return {};
+    }
+#endif
 };
 
 class ListNode : public ValueNode {
@@ -461,6 +477,7 @@ public:
 
 class GeoWithinNode : public CompareNode {
 public:
+#if REALM_ENABLE_GEOSPATIAL
     PropertyNode* prop;
     GeospatialNode* geo = nullptr;
     std::string argument;
@@ -475,6 +492,17 @@ public:
         argument = arg;
     }
     Query visit(ParserDriver*) override;
+#else
+    template <typename... Ts>
+    GeoWithinNode(Ts&&...)
+    {
+        throw realm::LogicError(ErrorCodes::NotSupported, "Support for Geospatial queries is not enabled");
+    }
+    virtual Query visit(ParserDriver*) override
+    {
+        return {};
+    }
+#endif
 };
 
 /******************************** Other Nodes ********************************/

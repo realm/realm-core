@@ -31,7 +31,6 @@ set(REALM_SOURCES
     dictionary.cpp
     disable_sync_to_disk.cpp
     exceptions.cpp
-    geospatial.cpp
     group.cpp
     db.cpp
     group_writer.cpp
@@ -152,7 +151,6 @@ set(REALM_INSTALL_HEADERS
     error_codes.h
     error_codes.hpp
     exceptions.hpp
-    geospatial.hpp
     global_key.hpp
     group.hpp
     group_writer.hpp
@@ -291,6 +289,19 @@ if(NOT MSVC)
     list(APPEND REALM_SOURCES util/interprocess_mutex.cpp)
 endif()
 
+if (REALM_ENABLE_GEOSPATIAL)
+    list(APPEND REALM_SOURCES geospatial.cpp)
+    list(APPEND REALM_INSTALL_HEADERS geospatial.hpp)
+
+    set_source_files_properties(geospatial.cpp PROPERTIES
+        INCLUDE_DIRECTORIES "${RealmCore_SOURCE_DIR}/src/external"
+        # the only flag not supported with pragma diagnostic disable in src file by gcc until 13.
+        COMPILE_FLAGS "$<$<CXX_COMPILER_ID:GNU>: -Wno-unknown-pragmas>"
+    )
+
+    list(APPEND REALM_OBJECT_FILES $<TARGET_OBJECTS:s2geometry>)
+endif()
+
 add_library(Storage STATIC
     ${REALM_SOURCES}
     ${UTIL_SOURCES}
@@ -298,8 +309,12 @@ add_library(Storage STATIC
     ${REALM_NOINST_HEADERS}
     ${REALM_OBJECT_FILES}
     $<TARGET_OBJECTS:Bid>
-    $<TARGET_OBJECTS:s2geometry>
 )
+
+if (REALM_ENABLE_GEOSPATIAL)
+    target_compile_definitions(Storage PUBLIC REALM_ENABLE_GEOSPATIAL=1)
+endif()
+
 add_library(Realm::Storage ALIAS Storage)
 
 set_target_properties(Storage PROPERTIES
@@ -324,12 +339,6 @@ target_include_directories(Storage INTERFACE
     $<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/src>
     $<BUILD_INTERFACE:${RealmCore_BINARY_DIR}/src>
     $<INSTALL_INTERFACE:include>
-)
-
-set_source_files_properties(geospatial.cpp PROPERTIES
-    INCLUDE_DIRECTORIES "${RealmCore_SOURCE_DIR}/src/external"
-    # the only flag not supported with pragma diagnostic disable in src file by gcc until 13.
-    COMPILE_FLAGS "$<$<CXX_COMPILER_ID:GNU>: -Wno-unknown-pragmas>"
 )
 
 # On systems without a built-in SHA-1 implementation (or one provided by a dependency)

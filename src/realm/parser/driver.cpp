@@ -245,10 +245,12 @@ public:
     {
         return mixed_for_argument(n).get<ObjLink>();
     }
+#if REALM_ENABLE_GEOSPATIAL
     Geospatial geospatial_for_argument(size_t n) final
     {
         return mixed_for_argument(n).get<Geospatial>();
     }
+#endif
     std::vector<Mixed> list_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
@@ -743,6 +745,7 @@ Query StringOpsNode::visit(ParserDriver* drv)
     return {};
 }
 
+#if REALM_ENABLE_GEOSPATIAL
 Query GeoWithinNode::visit(ParserDriver* drv)
 {
     auto left = prop->visit(drv);
@@ -777,6 +780,7 @@ Query GeoWithinNode::visit(ParserDriver* drv)
 
     REALM_UNREACHABLE();
 }
+#endif
 
 Query TrueOrFalseNode::visit(ParserDriver* drv)
 {
@@ -1345,6 +1349,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
     return ret;
 }
 
+#if REALM_ENABLE_GEOSPATIAL
 GeospatialNode::GeospatialNode(GeospatialNode::Box, GeoPoint& p1, GeoPoint& p2)
     : m_geo{Geospatial{GeoBox{p1, p2}}}
 {
@@ -1371,6 +1376,7 @@ std::unique_ptr<Subexpr> GeospatialNode::visit(ParserDriver*, DataType)
     ret = std::make_unique<ConstantGeospatialValue>(m_geo); // FIXME: Mixed value type
     return ret;
 }
+#endif
 
 std::unique_ptr<Subexpr> ListNode::visit(ParserDriver* drv, DataType hint)
 {
