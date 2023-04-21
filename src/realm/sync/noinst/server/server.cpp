@@ -2,6 +2,7 @@
 
 #include <realm/binary_data.hpp>
 #include <realm/impl/simulated_failure.hpp>
+#include <realm/object_id.hpp>
 #include <realm/string_data.hpp>
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/trigger.hpp>
@@ -1578,6 +1579,7 @@ public:
 private:
     ServerImpl& m_server;
     const int_fast64_t m_id;
+    const ObjectId m_appservices_request_id = ObjectId::gen();
     std::unique_ptr<network::Socket> m_socket;
     std::unique_ptr<network::ssl::Stream> m_ssl_stream;
     std::unique_ptr<network::ReadAheadBuffer> m_read_ahead_buffer;
@@ -1920,6 +1922,8 @@ private:
     void add_common_http_response_headers(HTTPResponse& response)
     {
         response.headers["Server"] = "RealmSync/" REALM_VERSION_STRING; // Throws
+        // This isn't a real X-Appservices-Request-Id, but it should be enough to test with
+        response.headers["X-Appservices-Request-Id"] = m_appservices_request_id.to_string();
     }
 
     void read_error(std::error_code ec)

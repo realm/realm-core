@@ -166,6 +166,10 @@ else()
     target_sources(ObjectStore PRIVATE impl/generic/external_commit_helper.cpp)
 endif()
 
+if(REALM_ENABLE_SYNC AND REALM_ENABLE_SYNC_MULTIPLEXING)
+    target_compile_definitions(ObjectStore PUBLIC REALM_ENABLE_SYNC_MULTIPLEXING=1)
+endif()
+
 if(REALM_ENABLE_SYNC OR REALM_ENABLE_SERVER)
     # needed to disable assertions in external/json
     target_compile_definitions(ObjectStore PUBLIC
