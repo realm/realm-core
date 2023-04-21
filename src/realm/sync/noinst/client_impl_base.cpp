@@ -150,10 +150,10 @@ ClientImpl::ClientImpl(ClientConfig config)
     // FIXME: Would be better if seeding was up to the application.
     util::seed_prng_nondeterministically(m_random); // Throws
 
-    logger.debug("Realm sync client (%1)", REALM_VER_CHUNK); // Throws
+    logger.info("Realm sync client (%1)", REALM_VER_CHUNK); // Throws
     logger.debug("Supported protocol versions: %1-%2", get_oldest_supported_protocol_version(),
                  get_current_protocol_version()); // Throws
-    logger.debug("Platform: %1", util::get_platform_info());
+    logger.info("Platform: %1", util::get_platform_info());
     const char* build_mode;
 #if REALM_DEBUG
     build_mode = "Debug";
