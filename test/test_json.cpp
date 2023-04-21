@@ -554,7 +554,7 @@ TEST(Xjson_LinkList1)
     CHECK(json_test(ss.str(), "expected_xjson_plus_linklist2", generate_all));
 }
 
-ONLY(Xjson_NestedLinkList)
+ONLY(Xjson_NestedJsonTest)
 {
     // Basic non-cyclic LinkList test that also tests column and table renaming
     Group group;
@@ -635,7 +635,6 @@ ONLY(Xjson_NestedLinkList)
     // Now try different link_depth arguments
     table1->to_json(ss, 0, no_renames, output_mode_xjson);
     std::cout << "Data: " << ss.str() << std::endl;
-    std::cout << "New line: " << std::endl;
     // CHECK(json_test(ss.str(), "expected_xjson_linklist1", generate_all));
 
     // ss.str("");

@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+#include <iostream>
 
 #include "realm/obj.hpp"
 #include "realm/array_basic.hpp"
@@ -1161,40 +1162,76 @@ void out_mixed(std::ostream& out, const Mixed& val, JSONOutputMode output_mode)
 
 } // anonymous namespace
 
-
-template <typename Func>
-std::string nested_collection_to_json(Obj obj, TableRef table, ColKey colkey, size_t index, size_t current,
-                                      size_t levels, Func& func)
+template <typename F>
+std::string collection_to_json(Collection* collection, ColKey colkey, size_t level, size_t nested_levels, F& f)
 {
     std::stringstream out;
-    if (current < levels) {
-        auto type = table->get_nested_column_type(colkey, current);
-        auto open_symbol = " [ ";
-        auto close_symbol = " ] ";
-        if (type == CollectionType::Dictionary) {
-            open_symbol = " { ";
-            close_symbol = " } ";
-        }
-        out << open_symbol << nested_collection_to_json(obj, table, colkey, index, current + 1, levels, func)
-            << close_symbol;
-        return out.str();
-    }
-
-
-    if (colkey.is_list() || colkey.is_set()) {
-        auto collection_list = obj.get_collection_list(colkey);
-        auto list = collection_list->get_collection(current - 1);
+    if (level == nested_levels) {
+        out << "[ ";
+        auto list = (CollectionBase*)collection;
         auto sz = list->size();
         for (size_t i = 0; i < sz; i++) {
             if (i > 0)
                 out << ",";
-            out << func(Mixed{}, list->get_any(i));
+            out << f(Mixed{}, list->get_any(i));
+        }
+        out << " ]";
+        return out.str();
+    }
+
+    // keep looking for the level to print
+    out << "[ ";
+    auto sz = collection->size();
+    for (size_t i = 0; i < sz; ++i) {
+        if (i > 0)
+            out << ", ";
+
+        auto coll_list = (CollectionList*)collection;
+        if (level + 1 == nested_levels) {
+            auto coll = coll_list->get_collection(i);
+            out << collection_to_json(coll.get(), colkey, level + 1, nested_levels, f);
+        }
+        else {
+            out << "[ ";
+            auto coll = coll_list->get_collection_list(i);
+            out << collection_to_json(coll.get(), colkey, level + 1, nested_levels, f);
+            out << "] ";
         }
     }
-    else if (colkey.is_dictionary()) {
-    }
-    auto str = out.str();
+    out << "] ";
     return out.str();
+}
+
+template <typename F>
+std::string dictionary_to_json(Obj, ColKey, size_t, size_t, F&)
+{
+    // std::stringstream out;
+    // if( level < nested_levels) {
+    //     //keep looking for the level to print
+
+    //     auto coll_list = obj.get_collection_list(colkey);
+    //     auto sz = coll_list->size();
+    //     out << "{ ";
+    //     for(size_t i = 0; i<sz; ++i) {
+    //         if(i > 0)
+    //             out << ", ";
+    //         out << collection_to_json(obj, colkey, level+1, nested_levels, f);
+    //     }
+    //     out << " }";
+    //     return out.str();
+    // }
+
+    // out << "{ ";
+    // auto dict = obj.get_dictionary(ck);
+    // bool first = true;
+    // for (auto it : dict) {
+    //     if (!first)
+    //         out << ",";
+    //     first = false;
+    //     out << print_value(it.first, it.second);
+    // }
+    // out << " }";
+    // return out.str();
 }
 
 void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
@@ -1325,54 +1362,19 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
         if (ck.is_list() || ck.is_set()) {
 
             out << open_str;
-            out << "[";
             if (nesting_levels > 0) {
-                auto collection_list = get_collection_list(ck);
-                auto sz = collection_list->size();
-                // std::cout << "nested levels: " << nesting_levels << std::endl;
-                // std::cout << "list size: " << sz << std::endl;
-                for (size_t i = 0; i < sz; i++) {
-                    if (i > 0)
-                        out << ",";
-                    out << nested_collection_to_json(*this, m_table, ck, i, 0, nesting_levels, print_value);
-                }
+                auto nested_coll = get_collection_list(ck);
+                out << collection_to_json(nested_coll.get(), ck, 0, nesting_levels, print_value);
             }
             else {
-                auto list = get_collection_ptr(ck);
-                auto sz = list->size();
-                for (size_t i = 0; i < sz; i++) {
-                    if (i > 0)
-                        out << ",";
-                    out << print_value(Mixed{}, list->get_any(i));
-                }
+                auto base_collection = get_collection_ptr(ck);
+                out << collection_to_json(base_collection.get(), ck, 0, nesting_levels, print_value);
             }
-            out << "]";
             out << close_str;
         }
         else if (ck.get_attrs().test(col_attr_Dictionary)) {
-            auto dict = get_dictionary(ck);
             out << open_str;
-            out << "{";
-            if (nesting_levels > 0) {
-                // this is a nested collection
-                const auto sz = dict.size();
-                // tmp.
-                for (size_t i = 0; i < sz; i++) {
-                    if (i > 0)
-                        out << ",";
-                    out << nested_collection_to_json(*this, m_table, ck, i, 0, nesting_levels, print_value);
-                }
-            }
-            else {
-                bool first = true;
-                for (auto it : dict) {
-                    if (!first)
-                        out << ",";
-                    first = false;
-                    out << print_value(it.first, it.second);
-                }
-            }
-            out << "}";
+            // out << dictionary_to_json(*this, ck, 0, nesting_levels, print_value);
             out << close_str;
         }
         else {
