@@ -4792,7 +4792,8 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
         config.sync_config->error_handler = [](std::shared_ptr<SyncSession> session, SyncError error) mutable {
             // Ignore websocket errors, since there's not really an app out there...
             if (error.reason().find("Bad WebSocket") != std::string::npos ||
-                error.reason().find("Connection Failed") != std::string::npos) {
+                error.reason().find("Connection Failed") != std::string::npos ||
+                error.reason().find("user has been removed") != std::string::npos) {
                 util::format(std::cerr,
                              "An expected possible WebSocket error was caught during test: 'app destroyed during "
                              "token refresh': '%1' for '%2'",
