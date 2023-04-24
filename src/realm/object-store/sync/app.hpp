@@ -266,8 +266,8 @@ public:
 
     /// Refreshes the custom data for a specified user
     /// @param user The user you want to refresh
-    /// @param refresh_location If true, the location metadata will be updated before refresh
-    void refresh_custom_data(const std::shared_ptr<SyncUser>& user, bool refresh_location,
+    /// @param update_location If true, the location metadata will be updated before refresh
+    void refresh_custom_data(const std::shared_ptr<SyncUser>& user, bool update_location,
                              util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
     void refresh_custom_data(const std::shared_ptr<SyncUser>& user,
                              util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
@@ -407,8 +407,8 @@ private:
 
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion Passes an error should one occur.
-    /// @param refresh_location If true, the location metadata will be updated before refresh
-    void refresh_access_token(const std::shared_ptr<SyncUser>& user, bool refresh_location,
+    /// @param update_location If true, the location metadata will be updated before refresh
+    void refresh_access_token(const std::shared_ptr<SyncUser>& user, bool update_location,
                               util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
     /// Checks if an auth failure has taken place and if so it will attempt to refresh the

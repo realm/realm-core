@@ -486,7 +486,7 @@ void SyncUser::refresh_custom_data(util::UniqueFunction<void(util::Optional<app:
     refresh_custom_data(false, std::move(completion_block));
 }
 
-void SyncUser::refresh_custom_data(bool refresh_location,
+void SyncUser::refresh_custom_data(bool update_location,
                                    util::UniqueFunction<void(util::Optional<app::AppError>)> completion_block)
 {
     std::shared_ptr<app::App> app;
@@ -512,7 +512,7 @@ void SyncUser::refresh_custom_data(bool refresh_location,
     }
     else {
         std::weak_ptr<SyncUser> weak_user = user->weak_from_this();
-        app->refresh_custom_data(user, refresh_location,
+        app->refresh_custom_data(user, update_location,
                                  [completion_block = std::move(completion_block), weak_user](auto error) {
                                      if (auto strong = weak_user.lock()) {
                                          strong->emit_change_to_subscribers(*strong);

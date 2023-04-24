@@ -798,10 +798,10 @@ void App::refresh_custom_data(const std::shared_ptr<SyncUser>& user,
     refresh_access_token(user, false, std::move(completion));
 }
 
-void App::refresh_custom_data(const std::shared_ptr<SyncUser>& user, bool refresh_location,
+void App::refresh_custom_data(const std::shared_ptr<SyncUser>& user, bool update_location,
                               UniqueFunction<void(Optional<AppError>)>&& completion)
 {
-    refresh_access_token(user, refresh_location, std::move(completion));
+    refresh_access_token(user, update_location, std::move(completion));
 }
 
 std::string App::url_for_path(const std::string& path = "") const
@@ -1038,7 +1038,7 @@ void App::handle_auth_failure(const AppError& error, const Response& response, R
 }
 
 /// MARK: - refresh access token
-void App::refresh_access_token(const std::shared_ptr<SyncUser>& sync_user, bool refresh_location,
+void App::refresh_access_token(const std::shared_ptr<SyncUser>& sync_user, bool update_location,
                                util::UniqueFunction<void(Optional<AppError>)>&& completion)
 {
     if (!sync_user) {
@@ -1077,8 +1077,8 @@ void App::refresh_access_token(const std::shared_ptr<SyncUser>& sync_user, bool 
         return completion(util::none);
     };
 
-    if (refresh_location) {
-        // If refresh_location, update the location metadata before sending the request
+    if (update_location) {
+        // If update_location, update the location metadata before sending the request
         update_metadata_and_resend(std::move(request), std::move(handler));
     }
     else {
