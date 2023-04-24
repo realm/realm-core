@@ -86,13 +86,11 @@ set(CORE_TEST_SOURCES
     test_util_from_chars.cpp
     test_util_functional.cpp
     test_util_future.cpp
-    test_util_inspect.cpp
     test_util_logger.cpp
     test_util_memory_stream.cpp
     test_util_overload.cpp
     test_util_scope_exit.cpp
     test_util_to_string.cpp
-    test_util_type_list.cpp
     test_uuid.cpp
     )
 
@@ -185,6 +183,7 @@ if(REALM_ENABLE_SYNC)
         test_sync.cpp
         test_sync_auth.cpp
         test_sync_history_migration.cpp
+        test_sync_protocol_codec.cpp
         test_sync_subscriptions.cpp
         test_sync_pending_bootstraps.cpp
         test_transform.cpp

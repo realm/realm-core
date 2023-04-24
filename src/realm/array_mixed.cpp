@@ -218,7 +218,7 @@ size_t ArrayMixed::find_first(Mixed value, size_t begin, size_t end) const noexc
     if (end == realm::npos)
         end = size();
     for (size_t i = begin; i < end; i++) {
-        if (this->get_type(i) == type && get(i) == value) {
+        if (Mixed::data_types_are_comparable(this->get_type(i), type) && get(i) == value) {
             return i;
         }
     }

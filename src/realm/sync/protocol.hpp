@@ -34,6 +34,11 @@ namespace sync {
 //   7 Client takes the 'action' specified in the 'json_error' messages received
 //     from server. Client sends 'json_error' messages to the server.
 //
+//   8 Support for PBS->FLX client migration
+//     Websocket http errors are now sent as websocket close codes
+//     FLX sync BIND message can include JSON data in place of server path string
+//     Updated format for Sec-Websocket-Protocol strings
+//
 //  XX Changes:
 //     - TBD
 //

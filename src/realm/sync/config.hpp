@@ -20,15 +20,13 @@
 #define REALM_SYNC_CONFIG_HPP
 
 #include <realm/exceptions.hpp>
-#include <realm/db.hpp>
-#include <realm/util/assert.hpp>
-#include <realm/util/optional.hpp>
 #include <realm/sync/protocol.hpp>
 
 #include <functional>
-#include <memory>
-#include <string>
 #include <map>
+#include <memory>
+#include <optional>
+#include <string>
 #include <unordered_map>
 
 namespace realm {
@@ -141,6 +139,7 @@ enum class SyncClientHookAction {
     NoAction,
     EarlyReturn,
     SuspendWithRetryableError,
+    TriggerReconnect,
 };
 
 struct SyncClientHookData {
