@@ -642,6 +642,7 @@ void Connection::initiate_reconnect_wait()
         }
         m_reconnect_disconnect_timer = m_client.create_timer(delay, std::move(cb));   // Throws
         m_reconnect_delay_in_progress = true;
+        m_nonzero_reconnect_delay = true;
     }
 }
 
@@ -801,7 +802,6 @@ void Connection::handle_connection_established()
     milliseconds_type now = monotonic_clock_now();
     m_pong_wait_started_at = now; // Initially, no time was spent waiting for a PONG message
     initiate_ping_delay(now);     // Throws
-    m_reconnect_info.reset();
 
     bool fast_reconnect = false;
     if (m_disconnect_has_occurred) {
@@ -1041,6 +1041,7 @@ void Connection::handle_write_ping()
 
 void Connection::handle_message_received(util::Span<const char> data)
 {
+    m_reconnect_info.reset();
     // parse_message_received() parses the message and calls the proper handler
     // on the Connection object (this).
     get_client_protocol().parse_message_received<Connection>(*this, std::string_view(data.data(), data.size()));
