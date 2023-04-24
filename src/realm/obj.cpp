@@ -1165,9 +1165,12 @@ void out_mixed(std::ostream& out, const Mixed& val, JSONOutputMode output_mode)
 template <typename F>
 std::string collection_to_json(Collection* collection, ColKey colkey, size_t level, size_t nested_levels, F& f)
 {
+    // return "[]";
+
+    // TODO: Transform this in some iterative function.
     std::stringstream out;
     if (level == nested_levels) {
-        out << "[ ";
+        out << "[";
         auto list = (CollectionBase*)collection;
         auto sz = list->size();
         for (size_t i = 0; i < sz; i++) {
@@ -1175,12 +1178,12 @@ std::string collection_to_json(Collection* collection, ColKey colkey, size_t lev
                 out << ",";
             out << f(Mixed{}, list->get_any(i));
         }
-        out << " ]";
+        out << "]";
         return out.str();
     }
 
-    // keep looking for the level to print
-    out << "[ ";
+    // keep looking for the leaf level to print
+    out << "[";
     auto sz = collection->size();
     for (size_t i = 0; i < sz; ++i) {
         if (i > 0)
@@ -1192,13 +1195,13 @@ std::string collection_to_json(Collection* collection, ColKey colkey, size_t lev
             out << collection_to_json(coll.get(), colkey, level + 1, nested_levels, f);
         }
         else {
-            out << "[ ";
+            out << "[";
             auto coll = coll_list->get_collection_list(i);
             out << collection_to_json(coll.get(), colkey, level + 1, nested_levels, f);
-            out << "] ";
+            out << "]";
         }
     }
-    out << "] ";
+    out << "]";
     return out.str();
 }
 
@@ -1360,7 +1363,6 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
         };
 
         if (ck.is_list() || ck.is_set()) {
-
             out << open_str;
             if (nesting_levels > 0) {
                 auto nested_coll = get_collection_list(ck);
@@ -1381,7 +1383,7 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
             auto val = get_any(ck);
             if (!val.is_null()) {
                 out << open_str;
-                print_value(Mixed{}, val);
+                out << print_value(Mixed{}, val);
                 out << close_str;
             }
             else {
