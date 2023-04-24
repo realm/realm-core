@@ -151,7 +151,12 @@ static constexpr DataType type_OldTable = DataType{5};
 static constexpr DataType type_OldDateTime = DataType{7};
 static_assert(!type_OldTable.is_valid());
 static_assert(!type_OldDateTime.is_valid());
+
+// Non primitive types
 static constexpr DataType type_TypeOfValue = DataType{18};
+static constexpr DataType type_List = DataType{19};
+static constexpr DataType type_Set = DataType{20};
+static constexpr DataType type_Dictionary = DataType{21};
 
 constexpr inline DataType::operator util::Printable() const noexcept
 {
@@ -193,6 +198,15 @@ constexpr inline DataType::operator util::Printable() const noexcept
     }
     if (*this == type_TypeOfValue) {
         return "type_TypeOfValue";
+    }
+    if (*this == type_List) {
+        return "type_List";
+    }
+    if (*this == type_Set) {
+        return "type_Set";
+    }
+    if (*this == type_Dictionary) {
+        return "type_Dictionary";
     }
     return "type_UNKNOWN";
 }

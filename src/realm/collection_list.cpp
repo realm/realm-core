@@ -98,6 +98,25 @@ bool CollectionList::init_from_parent(bool allow_create) const
     return true;
 }
 
+Mixed CollectionList::get_any(size_t ndx) const
+{
+    auto sz = size();
+    if (ndx >= sz) {
+        throw OutOfBounds("CollectionList::get_collection_ptr()", ndx, sz);
+    }
+
+    ref_type ref = m_refs.get(ndx);
+    switch (get_table()->get_collection_type(m_col_key, m_level)) {
+        case CollectionType::List:
+            return Mixed(ref, Mixed::ListTag());
+        case CollectionType::Set:
+            return Mixed(ref, Mixed::SetTag());
+        case CollectionType::Dictionary:
+            return Mixed(ref, Mixed::DictionaryTag());
+    }
+    return {};
+}
+
 UpdateStatus CollectionList::update_if_needed_with_status() const
 {
     auto status = m_parent->update_if_needed_with_status();

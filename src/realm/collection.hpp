@@ -24,6 +24,8 @@ public:
     {
         return size() == 0;
     }
+    /// Get element at @a ndx as a `Mixed`.
+    virtual Mixed get_any(size_t ndx) const = 0;
 };
 
 using CollectionPtr = std::shared_ptr<Collection>;
@@ -39,9 +41,6 @@ class CollectionBase : public Collection {
 public:
     /// True if the element at @a ndx is NULL.
     virtual bool is_null(size_t ndx) const = 0;
-
-    /// Get element at @a ndx as a `Mixed`.
-    virtual Mixed get_any(size_t ndx) const = 0;
 
     /// Clear the collection.
     virtual void clear() = 0;
