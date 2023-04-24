@@ -4523,7 +4523,7 @@ TEST(Sync_ServerDiscardDeadConnections)
 
     BowlOfStonesSemaphore bowl;
     auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        bool valid_error = ec == sync::websocket::WebSocketError::websocket_read_error;
+        bool valid_error = (ec == sync::websocket::WebSocketError::websocket_read_error);
         CHECK(valid_error);
         bowl.add_stone();
     };
@@ -6688,6 +6688,49 @@ TEST(Sync_InvalidChangesetFromServer)
                                                        DownloadBatchState::SteadyState, logger, transact),
                    sync::IntegrationException,
                    StringData(e.what()).contains("Failed to parse received changeset: Invalid interned string"));
+}
+
+TEST(Sync_DifferentUsersMultiplexing)
+{
+    ClientServerFixture::Config fixture_config;
+    fixture_config.one_connection_per_session = false;
+
+    TEST_DIR(server_dir);
+    ClientServerFixture fixture(server_dir, test_context, std::move(fixture_config));
+
+    struct SessionBundle {
+        test_util::DBTestPathGuard path_guard;
+        DBRef db;
+        Session sess;
+
+        SessionBundle(unit_test::TestContext& ctx, ClientServerFixture& fixture, std::string name,
+                      std::string signed_token, std::string user_id)
+            : path_guard(realm::test_util::get_test_path(ctx.get_test_name(), "." + name + ".realm"))
+            , db(DB::create(make_client_replication(), path_guard))
+        {
+            Session::Config config;
+            config.signed_user_token = signed_token;
+            config.user_id = user_id;
+            sess = fixture.make_bound_session(db, "/test", std::move(config));
+            sess.wait_for_download_complete_or_client_stopped();
+        }
+    };
+
+    fixture.start();
+
+    SessionBundle user_1_sess_1(test_context, fixture, "user_1_db_1", g_user_0_token, "user_0");
+    SessionBundle user_2_sess_1(test_context, fixture, "user_2_db_1", g_user_1_token, "user_1");
+    SessionBundle user_1_sess_2(test_context, fixture, "user_1_db_2", g_user_0_token, "user_0");
+    SessionBundle user_2_sess_2(test_context, fixture, "user_2_db_2", g_user_1_token, "user_1");
+
+    CHECK_EQUAL(user_1_sess_1.sess.get_appservices_connection_id(),
+                user_1_sess_2.sess.get_appservices_connection_id());
+    CHECK_EQUAL(user_2_sess_1.sess.get_appservices_connection_id(),
+                user_2_sess_2.sess.get_appservices_connection_id());
+    CHECK_NOT_EQUAL(user_1_sess_1.sess.get_appservices_connection_id(),
+                    user_2_sess_1.sess.get_appservices_connection_id());
+    CHECK_NOT_EQUAL(user_1_sess_2.sess.get_appservices_connection_id(),
+                    user_2_sess_2.sess.get_appservices_connection_id());
 }
 
 // Tests that an empty reciprocal changesets is set and retrieved correctly.

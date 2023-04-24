@@ -87,6 +87,24 @@ void SyncSession::become_active()
     REALM_ASSERT(m_state != State::Active);
     m_state = State::Active;
 
+    // First time the session becomes active, register a notification on the sentinel subscription set to restart the
+    // session and update to native FLX.
+    if (m_migration_sentinel_query_version) {
+        m_flx_subscription_store->get_by_version(*m_migration_sentinel_query_version)
+            .get_state_change_notification(sync::SubscriptionSet::State::Complete)
+            .get_async([=, weak_self = weak_from_this()](StatusWith<sync::SubscriptionSet::State> s) {
+                if (!s.is_ok()) {
+                    return;
+                }
+                REALM_ASSERT(s.get_value() == sync::SubscriptionSet::State::Complete);
+                if (auto strong_self = weak_self.lock()) {
+                    strong_self->m_migration_store->cancel_migration();
+                    strong_self->restart_session();
+                }
+            });
+        m_migration_sentinel_query_version.reset();
+    }
+
     // when entering from the Dying state the session will still be bound
     if (!m_session) {
         create_sync_session();
@@ -357,6 +375,16 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const Realm
         std::weak_ptr<sync::SubscriptionStore> weak_sub_mgr(m_flx_subscription_store);
         set_write_validator_factory(weak_sub_mgr);
     }
+
+    // After a migration to FLX, if the user opens the realm with a flexible sync configuration, we need to first
+    // upload any unsynced changes before updating to native FLX.
+    // A subscription set is used as sentinel so we know when to stop uploading.
+    // Note: Currently, a sentinel subscription set is always created even if there is nothing to upload.
+    if (m_migration_store->is_migrated() && m_original_sync_config->flx_sync_requested) {
+        m_migration_store->create_sentinel_subscription_set(*m_flx_subscription_store);
+        m_migration_sentinel_query_version = m_migration_store->get_sentinel_subscription_set_version();
+        REALM_ASSERT(m_migration_sentinel_query_version);
+    }
 }
 
 std::shared_ptr<SyncManager> SyncSession::sync_manager() const
@@ -480,26 +508,28 @@ void SyncSession::download_fresh_realm(sync::ProtocolErrorInfo::Action server_re
             fresh_sub = fresh_mut_sub.commit();
         }
         fresh_sub.get_state_change_notification(sync::SubscriptionSet::State::Complete)
-            .then([=](sync::SubscriptionSet::State state) {
-                // Create subscriptions in the fresh realm based on the schema instructions received in the bootstrap
-                // message.
-                if (server_requests_action != sync::ProtocolErrorInfo::Action::MigrateToFLX ||
-                    !m_migration_store->is_migration_in_progress()) {
+            .then([=, weak_self = weak_from_this()](sync::SubscriptionSet::State state) {
+                if (server_requests_action != sync::ProtocolErrorInfo::Action::MigrateToFLX) {
+                    return util::Future<sync::SubscriptionSet::State>::make_ready(state);
+                }
+                auto strong_self = weak_self.lock();
+                if (!strong_self || !strong_self->m_migration_store->is_migration_in_progress()) {
                     return util::Future<sync::SubscriptionSet::State>::make_ready(state);
                 }
 
                 // fresh_sync_session is using a new realm file that doesn't have the migration_store info
                 // so the query string from the local migration store will need to be provided
-                auto query_string = m_migration_store->get_query_string();
+                auto query_string = strong_self->m_migration_store->get_query_string();
                 REALM_ASSERT(query_string);
+                // Create subscriptions in the fresh realm based on the schema instructions received in the bootstrap
+                // message.
                 fresh_sync_session->m_migration_store->create_subscriptions(*fresh_sub_store, *query_string);
-
                 auto latest_subs = fresh_sub_store->get_latest();
                 {
-                    util::CheckedLockGuard lock(m_state_mutex);
+                    util::CheckedLockGuard lock(strong_self->m_state_mutex);
                     // Save a copy of the subscriptions so we add them to the local realm once the
                     // subscription store is created.
-                    m_active_subscriptions_after_migration = latest_subs;
+                    strong_self->m_active_subscriptions_after_migration = latest_subs;
                 }
 
                 return latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete);
@@ -746,6 +776,13 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
             }
         }
 
+        // If the websocket was closed cleanly or if the socket disappeared, don't notify the user as an error
+        // since the sync client will retry.
+        if (error_code == sync::websocket::WebSocketError::websocket_read_error ||
+            error_code == sync::websocket::WebSocketError::websocket_write_error) {
+            return;
+        }
+
         // Surface a simplified websocket error to the user.
         auto simplified_error = sync::websocket::get_simplified_websocket_error(
             static_cast<sync::websocket::WebSocketError>(error_code.value()));
@@ -878,6 +915,7 @@ void SyncSession::create_sync_session()
 
     sync::Session::Config session_config;
     session_config.signed_user_token = sync_config.user->access_token();
+    session_config.user_id = sync_config.user->identity();
     session_config.realm_identifier = sync_config.partition_value;
     session_config.verify_servers_ssl_certificate = sync_config.client_validate_ssl;
     session_config.ssl_trust_certificate_path = sync_config.ssl_trust_certificate_path;
