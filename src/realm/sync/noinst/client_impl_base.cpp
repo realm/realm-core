@@ -640,7 +640,7 @@ void Connection::initiate_reconnect_wait()
         if (delay > std::chrono::milliseconds::zero()) {
             logger.detail("Allowing reconnection in %1 milliseconds", delay.count()); // Throws
         }
-        m_reconnect_disconnect_timer = m_client.create_timer(delay, std::move(cb));   // Throws
+        m_reconnect_disconnect_timer = m_client.create_timer(delay, std::move(cb)); // Throws
         m_reconnect_delay_in_progress = true;
         m_nonzero_reconnect_delay = true;
     }
