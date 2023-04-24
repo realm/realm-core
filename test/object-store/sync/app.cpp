@@ -5205,7 +5205,7 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     // should all point to same underlying app
     auto app1_1 = App::get_shared_app(config1, sync_config);
     auto app1_2 = App::get_shared_app(config1, sync_config);
-    auto app1_3 = App::get_cached_app(config1.app_id, &config1.base_url);
+    auto app1_3 = App::get_cached_app(config1.app_id, config1.base_url);
     auto app1_4 = App::get_shared_app(config2, sync_config);
     auto app1_5 = App::get_cached_app(config1.app_id);
 
@@ -5216,7 +5216,7 @@ TEST_CASE("app: shared instances", "[sync][app]") {
 
     // config3 and config4 should point to different apps
     auto app2_1 = App::get_shared_app(config3, sync_config);
-    auto app2_2 = App::get_cached_app(config3.app_id, &config3.base_url);
+    auto app2_2 = App::get_cached_app(config3.app_id, config3.base_url);
     auto app2_3 = App::get_shared_app(config4, sync_config);
     auto app2_4 = App::get_cached_app(config3.app_id);
 
