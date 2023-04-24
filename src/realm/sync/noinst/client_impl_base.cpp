@@ -2413,9 +2413,9 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
             handle_pending_client_reset_acknowledgement();
         }
 
-        // If a migration is in progress, mark it complete when client reset is completed.
+        // If a migration or rollback is in progress, mark it complete when client reset is completed.
         if (auto migration_store = get_migration_store()) {
-            migration_store->complete_migration();
+            migration_store->complete_migration_or_rollback();
         }
 
         return true;

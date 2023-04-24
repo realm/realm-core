@@ -363,9 +363,9 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const Realm
     m_config.scheduler = nullptr;
     m_config.audit_config = nullptr;
 
-    // Adjust the sync_config if using PBS sync and already in the migrated state
-    if (m_migration_store->is_migrated()) {
-        m_config.sync_config = m_migration_store->convert_sync_config(m_original_sync_config);
+    // Adjust the sync_config if using PBS sync and already in the migrated or rollback state
+    if (m_migration_store->is_migrated() || m_migration_store->is_rollback_in_progress()) {
+        m_config.sync_config = sync::MigrationStore::convert_sync_config_to_flx(m_original_sync_config);
     }
 
     // If using FLX, set up m_flx_subscription_store and the history_write_validator
@@ -712,8 +712,8 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                                      "Received 'RevertToPBS' from server after rollback while client is natively "
                                      "using FLX - expected 'SwitchToPBS'");
                 }
-                // Original config was PBS, cancel the migration
-                m_migration_store->cancel_migration();
+                // Original config was PBS, rollback the migration
+                m_migration_store->rollback_to_pbs();
                 save_sync_config_after_migration();
                 download_fresh_realm(error.server_requests_action);
                 return;
@@ -1346,7 +1346,9 @@ void SyncSession::apply_sync_config_after_migration()
     // Migration state changed - Update the configuration to
     // match the new sync mode.
     util::CheckedLockGuard cfg_lock(m_config_mutex);
-    REALM_ASSERT(m_migrated_sync_config);
+    if (!m_migrated_sync_config)
+        return;
+
     m_config.sync_config = m_migrated_sync_config;
     m_migrated_sync_config.reset();
 }
