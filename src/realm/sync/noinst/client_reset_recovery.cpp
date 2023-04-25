@@ -16,16 +16,18 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include <realm/sync/noinst/client_reset_recovery.hpp>
+
 #include <realm/db.hpp>
 #include <realm/dictionary.hpp>
 #include <realm/object_converter.hpp>
 #include <realm/set.hpp>
+#include <realm/transaction.hpp>
 
 #include <realm/sync/history.hpp>
 #include <realm/sync/changeset_parser.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
-#include <realm/sync/noinst/client_reset_recovery.hpp>
 #include <realm/sync/subscriptions.hpp>
 
 #include <realm/util/compression.hpp>

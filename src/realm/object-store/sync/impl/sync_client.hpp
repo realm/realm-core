@@ -107,11 +107,18 @@ struct SyncClient {
         m_client.shutdown();
     }
 
+    void voluntary_disconnect_all_connections()
+    {
+        m_client.voluntary_disconnect_all_connections();
+    }
+
     std::unique_ptr<sync::Session> make_session(std::shared_ptr<DB> db,
                                                 std::shared_ptr<sync::SubscriptionStore> flx_sub_store,
+                                                std::shared_ptr<sync::MigrationStore> migration_store,
                                                 sync::Session::Config config)
     {
-        return std::make_unique<sync::Session>(m_client, std::move(db), std::move(flx_sub_store), std::move(config));
+        return std::make_unique<sync::Session>(m_client, std::move(db), std::move(flx_sub_store),
+                                               std::move(migration_store), std::move(config));
     }
 
     bool decompose_server_url(const std::string& url, sync::ProtocolEnvelope& protocol, std::string& address,

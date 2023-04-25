@@ -1183,6 +1183,11 @@ Query& Query::Or()
 
 ObjKey Query::find() const
 {
+    ObjKey ret;
+
+    if (!m_table)
+        return ret;
+
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Find);
 #endif
@@ -1197,7 +1202,6 @@ ObjKey Query::find() const
         do_log = true;
     }
 
-    ObjKey ret;
     init();
 
     // ordering could change the way in which objects are returned, in this case we need to run find_all()
@@ -1495,6 +1499,8 @@ size_t Query::count() const
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
 #endif
+    if (!m_table)
+        return 0;
     return do_count();
 }
 
@@ -1536,6 +1542,8 @@ size_t Query::count(const DescriptorOrdering& descriptor) const
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
 #endif
+    if (!m_table)
+        return 0;
     realm::util::Optional<size_t> min_limit = descriptor.get_min_limit();
 
     if (bool(min_limit) && *min_limit == 0)

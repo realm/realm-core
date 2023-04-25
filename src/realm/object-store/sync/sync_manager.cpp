@@ -178,8 +178,7 @@ bool SyncManager::run_file_action(SyncFileActionMetadata& md)
     switch (md.action()) {
         case SyncFileActionMetadata::Action::DeleteRealm:
             // Delete all the files for the given Realm.
-            m_file_manager->remove_realm(md.original_name());
-            return true;
+            return m_file_manager->remove_realm(md.original_name());
         case SyncFileActionMetadata::Action::BackUpThenDeleteRealm:
             // Copy the primary Realm file to the recovery dir, and then delete the Realm.
             auto new_name = md.new_name();
@@ -801,4 +800,9 @@ void SyncManager::close_all_sessions()
     }
 
     get_sync_client().wait_for_session_terminations();
+}
+
+void SyncManager::OnlyForTesting::voluntary_disconnect_all_connections(SyncManager& mgr)
+{
+    mgr.get_sync_client().voluntary_disconnect_all_connections();
 }

@@ -3,19 +3,21 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <memory>
-#include <utility>
-#include <functional>
 #include <exception>
+#include <functional>
+#include <memory>
 #include <string>
+#include <utility>
 
 #include <realm/util/buffer.hpp>
 #include <realm/util/functional.hpp>
+#include <realm/util/future.hpp>
 #include <realm/sync/client_base.hpp>
-#include <realm/sync/socket_provider.hpp>
-#include <realm/sync/subscriptions.hpp>
 
 namespace realm::sync {
+
+class MigrationStore;
+class SubscriptionStore;
 
 class Client {
 public:
@@ -60,6 +62,9 @@ public:
     ///
     /// Thread-safe.
     void cancel_reconnect_delay();
+
+    /// Forces all open connections to disconnect/reconnect. To be used in testing.
+    void voluntary_disconnect_all_connections();
 
     /// \brief Wait for session termination to complete.
     ///
@@ -201,6 +206,11 @@ public:
         /// On the MongoDB Realm-based Sync server, virtual paths are not coupled
         /// to file system paths, and thus, these restrictions do not apply.
         std::string realm_identifier = "";
+
+        /// The user id of the logged in user for this sync session. This will be used
+        /// along with the server_address/server_port/protocol_envelope to determine
+        /// which connection to the server this session will use.
+        std::string user_id;
 
         /// The protocol used for communicating with the server. See
         /// ProtocolEnvelope.
@@ -347,7 +357,8 @@ public:
     /// Note that the session is not fully activated until you call bind().
     /// Also note that if you call set_sync_transact_callback(), it must be
     /// done before calling bind().
-    Session(Client&, std::shared_ptr<DB>, std::shared_ptr<SubscriptionStore>, Config&& = {});
+    Session(Client&, std::shared_ptr<DB>, std::shared_ptr<SubscriptionStore>, std::shared_ptr<MigrationStore>,
+            Config&& = {});
 
     /// This leaves the right-hand side session object detached. See "Thread
     /// safety" section under detach().
@@ -722,6 +733,12 @@ public:
     void on_new_flx_sync_subscription(int64_t new_version);
 
     util::Future<std::string> send_test_command(std::string command_body);
+
+    /// Returns the app services connection id if the session is connected, otherwise
+    /// returns an empty string. This function blocks until the value is set from
+    /// the event loop thread. If an error occurs, this will throw an ExceptionForStatus
+    /// with the error.
+    std::string get_appservices_connection_id();
 
 private:
     SessionWrapper* m_impl = nullptr;

@@ -72,7 +72,8 @@ private:
 // Class controlling a memory mapped window into a file
 class GroupWriter::MapWindow {
 public:
-    MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t initial_size);
+    MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t initial_size,
+              util::WriteMarker* write_marker = nullptr);
     ~MapWindow();
 
     // translate a ref to a pointer
@@ -157,12 +158,19 @@ bool GroupWriter::MapWindow::extends_to_match(util::File& f, ref_type start_ref,
     return true;
 }
 
-GroupWriter::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t size)
+GroupWriter::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t size,
+                                  util::WriteMarker* write_marker)
     : m_alignment(alignment)
 {
     m_base_ref = aligned_to_mmap_block(start_ref);
     size_t window_size = get_window_size(f, start_ref, size);
     m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
+#if REALM_ENABLE_ENCRYPTION
+    if (auto p = m_map.get_encrypted_mapping())
+        p->set_marker(write_marker);
+#else
+    static_cast<void>(write_marker);
+#endif
 }
 
 GroupWriter::MapWindow::~MapWindow()
@@ -198,13 +206,14 @@ void GroupWriter::MapWindow::encryption_write_barrier(void* start_addr, size_t s
 }
 
 
-GroupWriter::GroupWriter(Group& group, Durability dura)
+GroupWriter::GroupWriter(Group& group, Durability dura, WriteMarker* write_marker)
     : m_group(group)
     , m_alloc(group.m_alloc)
     , m_free_positions(m_alloc)
     , m_free_lengths(m_alloc)
     , m_free_versions(m_alloc)
     , m_durability(dura)
+    , m_write_marker(write_marker)
 {
     m_map_windows.reserve(num_map_windows);
 #if REALM_PLATFORM_APPLE && REALM_MOBILE
@@ -358,7 +367,8 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
         m_map_windows.back()->flush();
         m_map_windows.pop_back();
     }
-    auto new_window = std::make_unique<MapWindow>(m_window_alignment, m_alloc.get_file(), start_ref, size);
+    auto new_window =
+        std::make_unique<MapWindow>(m_window_alignment, m_alloc.get_file(), start_ref, size, m_write_marker);
     m_map_windows.insert(m_map_windows.begin(), std::move(new_window));
     return m_map_windows[0].get();
 }
@@ -885,6 +895,15 @@ ref_type GroupWriter::write_group()
         write_array_at(window, free_positions_ref, m_free_positions.get_header(), free_positions_size); // Throws
         write_array_at(window, free_sizes_ref, m_free_lengths.get_header(), free_sizes_size);           // Throws
         write_array_at(window, free_versions_ref, m_free_versions.get_header(), free_versions_size);    // Throws
+        REALM_ASSERT_EX(
+            free_positions_ref >= reserve_ref && free_positions_ref + free_positions_size <= reserve_ref + used,
+            reserve_ref, reserve_ref + used, free_positions_ref, free_positions_ref + free_positions_size, top_ref);
+        REALM_ASSERT_EX(free_sizes_ref >= reserve_ref && free_sizes_ref + free_sizes_size <= reserve_ref + used,
+                        reserve_ref, reserve_ref + used, free_sizes_ref, free_sizes_ref + free_sizes_size, top_ref);
+        REALM_ASSERT_EX(
+            free_versions_ref >= reserve_ref && free_versions_ref + free_versions_size <= reserve_ref + used,
+            reserve_ref, reserve_ref + used, free_versions_ref, free_versions_ref + free_versions_size, top_ref);
+
 
         // Write top
         write_array_at(window, top_ref, top.get_header(), top_byte_size); // Throws
@@ -1339,9 +1358,8 @@ void GroupWriter::commit(ref_type new_top_ref)
     REALM_ASSERT(!util::int_cast_has_overflow<type_1>(file_format_version));
     // only write the file format field if necessary (optimization)
     if (type_1(file_format_version) != file_header.m_file_format[slot_selector]) {
+        // write barrier on the entire `file_header` happens below
         file_header.m_file_format[slot_selector] = type_1(file_format_version);
-        window->encryption_write_barrier(&file_header.m_file_format[slot_selector],
-                                         sizeof(file_header.m_file_format[slot_selector]));
     }
 
     // When running the test suite, device synchronization is disabled
@@ -1354,14 +1372,15 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // Make sure that that all data relating to the new snapshot is written to
     // stable storage before flipping the slot selector
-    window->encryption_write_barrier(&file_header.m_top_ref[slot_selector],
-                                     sizeof(file_header.m_top_ref[slot_selector]));
+    window->encryption_write_barrier(&file_header, sizeof file_header);
     flush_all_mappings();
     if (!disable_sync) {
         sync_all_mappings();
         m_alloc.get_file().barrier();
     }
+
     // Flip the slot selector bit.
+    window->encryption_read_barrier(&file_header, sizeof file_header);
     using type_2 = std::remove_reference<decltype(file_header.m_flags)>::type;
     file_header.m_flags = type_2(new_flags);
 

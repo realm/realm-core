@@ -86,7 +86,7 @@ struct TimedFutureState : public util::AtomicRefCountBase {
 };
 
 template <typename T>
-util::Future<T> wait_for_future(util::Future<T>&& input, std::chrono::milliseconds max_ms)
+util::Future<T> wait_for_future(util::Future<T>&& input, std::chrono::milliseconds max_ms = std::chrono::seconds(60))
 {
     auto pf = util::make_promise_future<T>();
     auto shared_state = util::make_bind<TimedFutureState<T>>(std::move(pf.promise));
