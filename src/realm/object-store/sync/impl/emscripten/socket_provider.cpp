@@ -23,10 +23,7 @@ using namespace realm;
 using namespace realm::sync;
 
 namespace realm::_impl {
-static inline void check_result(EMSCRIPTEN_RESULT result)
-{
-    REALM_ASSERT(result == EMSCRIPTEN_RESULT_SUCCESS);
-}
+#define check_result(expr)  do { [[maybe_unused]] auto result = expr; REALM_ASSERT_3(result, ==, EMSCRIPTEN_RESULT_SUCCESS); } while(0)
 
 struct EmscriptenTimer final : SyncSocketProvider::Timer {
     using DoubleMiliseconds = std::chrono::duration<double, std::chrono::milliseconds::period>;
@@ -102,8 +99,8 @@ public:
         if (buffered_amount < blocking_send_threshold) {
             handler(Status::OK());
         }
-        // Otherwise we start polling the buffer in a recursive timeout (see sending_poll_check below).
         else {
+            // Otherwise we start polling the buffer in a recursive timeout (see sending_poll_check below).
             emscripten_set_timeout(
                 sending_poll_check, 0,
                 new PollCheckState{
@@ -207,7 +204,7 @@ std::unique_ptr<WebSocketInterface> EmscriptenSocketProvider::connect(std::uniqu
     std::string protocols;
     for (size_t i = 0; i < endpoint.protocols.size(); i++) {
         if (i > 0)
-            protocols += ",";
+            protocols += ',';
         protocols += endpoint.protocols[i];
     }
 
