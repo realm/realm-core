@@ -351,11 +351,12 @@ public:
 
     // Notify all subscription state change notification handlers on this subscription store with the
     // provided Status - this does not change the state of any pending subscriptions.
-    // Must be called from the event loop thread.
-    void notify_all_state_change_notifications(Status error);
+    // Does not necessarily need to be called from the event loop thread.
+    void notify_all_state_change_notifications(Status status);
 
     // Reset SubscriptionStore and erase all current subscriptions and supersede any pending
-    // subscriptions. Must be called from the event loop thread.
+    // subscriptions. Must be called from the event loop thread to prevent data race issues
+    // with the subscription store.
     void terminate();
 
 private:
@@ -383,6 +384,10 @@ protected:
 
     SubscriptionSet get_by_version_impl(int64_t flx_version, util::Optional<DB::VersionID> version) const;
     MutableSubscriptionSet make_mutable_copy(const SubscriptionSet& set) const;
+
+    // Ensure the subscriptions table is properly initialized
+    // If clear_table is true, the subscriptions table will be cleared before initialization
+    void initialize_subscriptions_table(TransactionRef&& tr, bool clear_table);
 
     friend class MutableSubscriptionSet;
     friend class Subscription;

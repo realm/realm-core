@@ -674,10 +674,20 @@ SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t
         load_sync_metadata_schema(tr, &internal_tables);
     }
 
-    // There should always be at least one subscription set so that the user can always wait for synchronizationon
-    // on the result of get_latest().
-    if (auto sub_sets = tr->get_table(m_sub_set_table); sub_sets->is_empty()) {
+    // Make sure the subscription set table is properly initialized
+    initialize_subscriptions_table(std::move(tr), false);
+}
+
+void SubscriptionStore::initialize_subscriptions_table(TransactionRef&& tr, bool clear_table)
+{
+    if (auto sub_sets = tr->get_table(m_sub_set_table); clear_table || sub_sets->is_empty()) {
         tr->promote_to_write();
+        // If erase_table is true, clear out the sub_sets table
+        if (clear_table) {
+            sub_sets->clear();
+        }
+        // There should always be at least one subscription set so that the user can always wait
+        // for synchronizationon on the result of get_latest().
         auto zero_sub = sub_sets->create_object_with_primary_key(Mixed{int64_t(0)});
         zero_sub.set(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Pending));
         zero_sub.set(m_sub_set_snapshot_version, tr->get_version());
@@ -798,7 +808,7 @@ std::vector<SubscriptionSet> SubscriptionStore::get_pending_subscriptions() cons
     return subscriptions_to_recover;
 }
 
-void SubscriptionStore::notify_all_state_change_notifications(Status error)
+void SubscriptionStore::notify_all_state_change_notifications(Status status)
 {
     std::unique_lock<std::mutex> lk(m_pending_notifications_mutex);
     m_pending_notifications_cv.wait(lk, [&] {
@@ -811,19 +821,14 @@ void SubscriptionStore::notify_all_state_change_notifications(Status error)
     // Just complete/cancel the pending notifications - this function does not alter the
     // state of any pending subscriptions
     for (auto& req : to_finish) {
-        req.promise.set_error(error);
+        req.promise.set_error(status);
     }
 }
 
 void SubscriptionStore::terminate()
 {
-    auto tr = m_db->start_write();
-    auto sub_sets = tr->get_table(m_sub_set_table);
-    sub_sets->clear();
-    auto zero_sub = sub_sets->create_object_with_primary_key(Mixed{int64_t(0)});
-    zero_sub.set(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Pending));
-    zero_sub.set(m_sub_set_snapshot_version, tr->get_version());
-    tr->commit();
+    // Clear out and initialize the subscription store
+    initialize_subscriptions_table(m_db->start_read(), true);
 
     std::unique_lock<std::mutex> lk(m_pending_notifications_mutex);
     m_pending_notifications_cv.wait(lk, [&] {
