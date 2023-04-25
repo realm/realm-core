@@ -8,6 +8,8 @@
 * If session multiplexing was enabled in the sync client and multiple realms for multiple users were being synchronized, a connection authenticated for the wrong user could have been used, reuslting in a UserMismatch error from the server. ([PR #6320](https://github.com/realm/realm-core/pull/6320), since v10.0.0).
 * If session multiplexing was enabled and an automatic client reset failed, it could cause all sessions to fail with a fatal ProtocolError rather than just the session that failed to client reset. This would mean that no other sync session would be able to be opened for up to an hour without restarting the app. ([PR #6320](https://github.com/realm/realm-core/pull/6320), since v11.5.0)
 * If a DOWNLOAD message was received after a sync session was de-activated but before the UNBOUND message was received by the client, a use-after-free error may have occurred when the sync session tried to process the download messaage. So far this has only been reproducible if session multiplexing was enabled. ([PR #6320](https://github.com/realm/realm-core/pull/6320), since v12.9.0)
+* HTTP and Websocket redirections are not properly updating URL locations if the network transport implementation handles redirect responses internally ([#6485](https://github.com/realm/realm-core/issues/6485), since v12.9.0)
+* Don't report non ssl related errors during ssl handshake as fatal in default socket provider. ([#6434](https://github.com/realm/realm-core/issues/6434), since v13.3.0)
 
 ### Breaking changes
 * None.
