@@ -23,7 +23,11 @@ using namespace realm;
 using namespace realm::sync;
 
 namespace realm::_impl {
-#define check_result(expr)  do { [[maybe_unused]] auto result = expr; REALM_ASSERT_3(result, ==, EMSCRIPTEN_RESULT_SUCCESS); } while(0)
+#define check_result(expr)                                                                                           \
+    do {                                                                                                             \
+        [[maybe_unused]] auto result = expr;                                                                         \
+        REALM_ASSERT_3(result, ==, EMSCRIPTEN_RESULT_SUCCESS);                                                       \
+    } while (0)
 
 struct EmscriptenTimer final : SyncSocketProvider::Timer {
     using DoubleMiliseconds = std::chrono::duration<double, std::chrono::milliseconds::period>;
