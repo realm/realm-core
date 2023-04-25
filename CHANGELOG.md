@@ -19,7 +19,7 @@
 -----------
 
 ### Internals
-* None.
+* Add initial support for targeting WebAssembly with Emscripten ([PR #6263](https://github.com/realm/realm-core/pull/6263)).
 
 ----------------------------------------------
 
