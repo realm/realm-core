@@ -580,9 +580,9 @@ private:
     void handle_disconnect_wait(Status status);
     void read_or_write_error(std::error_code ec, std::string_view msg);
     void close_due_to_protocol_error(std::error_code, std::optional<std::string_view> msg = std::nullopt);
-    void close_due_to_client_side_error(std::error_code, std::optional<std::string_view> msg, bool is_fatal);
+    void close_due_to_client_side_error(std::error_code, std::optional<std::string_view> msg, bool is_fatal, ConnectionTerminationReason reason);
     void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
-    void involuntary_disconnect(const SessionErrorInfo& info);
+    void involuntary_disconnect(const SessionErrorInfo& info, ConnectionTerminationReason reason);
     void disconnect(const SessionErrorInfo& info);
     void change_state_to_disconnected() noexcept;
     // These are only called from ClientProtocol class.
@@ -1318,14 +1318,16 @@ void ClientImpl::Connection::for_each_active_session(H handler)
 
 inline void ClientImpl::Connection::voluntary_disconnect()
 {
-    REALM_ASSERT(!m_reconnect_info.reason() || was_voluntary(*m_reconnect_info.reason()));
+    m_reconnect_info.update(ConnectionTerminationReason::closed_voluntarily, std::nullopt);
     constexpr bool try_again = true;
     disconnect(SessionErrorInfo{ClientError::connection_closed, try_again}); // Throws
 }
 
-inline void ClientImpl::Connection::involuntary_disconnect(const SessionErrorInfo& info)
+inline void ClientImpl::Connection::involuntary_disconnect(const SessionErrorInfo& info,
+                                                           ConnectionTerminationReason reason)
 {
-    REALM_ASSERT(m_reconnect_info.reason() && !was_voluntary(*m_reconnect_info.reason()));
+    REALM_ASSERT(!was_voluntary(reason));
+    m_reconnect_info.update(reason, info.resumption_delay_interval);
     disconnect(info); // Throws
 }
 

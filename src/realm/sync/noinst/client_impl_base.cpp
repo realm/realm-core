@@ -463,9 +463,9 @@ void Connection::websocket_connected_handler(const std::string& protocol)
     else {
         logger.error("Missing protocol info from server"); // Throws
     }
-    m_reconnect_info.update(ConnectionTerminationReason::bad_headers_in_http_response, std::nullopt);
     bool is_fatal = true;
-    close_due_to_client_side_error(ClientError::bad_protocol_from_server, std::nullopt, is_fatal); // Throws
+    close_due_to_client_side_error(ClientError::bad_protocol_from_server, std::nullopt, is_fatal,
+                                   ConnectionTerminationReason::bad_headers_in_http_response); // Throws
 }
 
 
@@ -507,9 +507,9 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         case WebSocketError::websocket_resolve_failed:
             [[fallthrough]];
         case WebSocketError::websocket_connection_failed: {
-            m_reconnect_info.update(ConnectionTerminationReason::connect_operation_failed, std::nullopt);
             constexpr bool try_again = true;
-            involuntary_disconnect(SessionErrorInfo{error_code, try_again}); // Throws
+            involuntary_disconnect(SessionErrorInfo{error_code, try_again},
+                                   ConnectionTerminationReason::connect_operation_failed); // Throws
             break;
         }
         case WebSocketError::websocket_read_error:
@@ -533,14 +533,13 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         case WebSocketError::websocket_no_status_received:
             [[fallthrough]];
         case WebSocketError::websocket_invalid_extension: {
-            m_reconnect_info.update(ConnectionTerminationReason::websocket_protocol_violation, std::nullopt);
             constexpr bool try_again = true;
             SessionErrorInfo error_info{error_code, status.reason(), try_again};
-            involuntary_disconnect(std::move(error_info)); // Throws
+            involuntary_disconnect(std::move(error_info),
+                                   ConnectionTerminationReason::websocket_protocol_violation); // Throws
             break;
         }
         case WebSocketError::websocket_message_too_big: {
-            m_reconnect_info.update(ConnectionTerminationReason::websocket_protocol_violation, std::nullopt);
             constexpr bool try_again = true;
             auto ec = make_error_code(ProtocolError::limits_exceeded);
             auto message =
@@ -548,43 +547,44 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
                              status.reason());
             SessionErrorInfo error_info(ec, message, try_again);
             error_info.server_requests_action = ProtocolErrorInfo::Action::ClientReset;
-            involuntary_disconnect(std::move(error_info)); // Throws
+            involuntary_disconnect(std::move(error_info),
+                                   ConnectionTerminationReason::websocket_protocol_violation); // Throws
             break;
         }
         case WebSocketError::websocket_tls_handshake_failed: {
             error_code = ClientError::ssl_server_cert_rejected;
             constexpr bool is_fatal = false;
-            m_reconnect_info.update(ConnectionTerminationReason::ssl_certificate_rejected, std::nullopt);
-            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            close_due_to_client_side_error(error_code, status.reason(), is_fatal,
+                                           ConnectionTerminationReason::ssl_certificate_rejected); // Throws
             break;
         }
         case WebSocketError::websocket_client_too_old: {
             error_code = ClientError::client_too_old_for_server;
             constexpr bool is_fatal = true;
-            m_reconnect_info.update(ConnectionTerminationReason::http_response_says_fatal_error, std::nullopt);
-            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            close_due_to_client_side_error(error_code, status.reason(), is_fatal,
+                                           ConnectionTerminationReason::http_response_says_fatal_error); // Throws
             break;
         }
         case WebSocketError::websocket_client_too_new: {
             error_code = ClientError::client_too_new_for_server;
             constexpr bool is_fatal = true;
-            m_reconnect_info.update(ConnectionTerminationReason::http_response_says_fatal_error, std::nullopt);
-            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            close_due_to_client_side_error(error_code, status.reason(), is_fatal,
+                                           ConnectionTerminationReason::http_response_says_fatal_error); // Throws
             break;
         }
         case WebSocketError::websocket_protocol_mismatch: {
             error_code = ClientError::protocol_mismatch;
             constexpr bool is_fatal = true;
-            m_reconnect_info.update(ConnectionTerminationReason::http_response_says_fatal_error, std::nullopt);
-            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            close_due_to_client_side_error(error_code, status.reason(), is_fatal,
+                                           ConnectionTerminationReason::http_response_says_fatal_error); // Throws
             break;
         }
         case WebSocketError::websocket_fatal_error:
             [[fallthrough]];
         case WebSocketError::websocket_forbidden: {
             constexpr bool is_fatal = true;
-            m_reconnect_info.update(ConnectionTerminationReason::http_response_says_fatal_error, std::nullopt);
-            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            close_due_to_client_side_error(error_code, status.reason(), is_fatal,
+                                           ConnectionTerminationReason::http_response_says_fatal_error); // Throws
             break;
         }
         case WebSocketError::websocket_unauthorized:
@@ -597,8 +597,8 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
             [[fallthrough]];
         case WebSocketError::websocket_retry_error: {
             constexpr bool is_fatal = false;
-            m_reconnect_info.update(ConnectionTerminationReason::http_response_says_nonfatal_error, std::nullopt);
-            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            close_due_to_client_side_error(error_code, status.reason(), is_fatal,
+                                           ConnectionTerminationReason::http_response_says_nonfatal_error); // Throws
             break;
         }
     }
@@ -780,10 +780,10 @@ void Connection::handle_connect_wait(Status status)
     }
 
     REALM_ASSERT(m_state == ConnectionState::connecting);
-    m_reconnect_info.update(ConnectionTerminationReason::sync_connect_timeout, std::nullopt);
     logger.info("Connect timeout"); // Throws
     constexpr bool try_again = true;
-    involuntary_disconnect(SessionErrorInfo{ClientError::connect_timeout, try_again}); // Throws
+    involuntary_disconnect(SessionErrorInfo{ClientError::connect_timeout, try_again},
+                           ConnectionTerminationReason::sync_connect_timeout); // Throws
 }
 
 
@@ -921,8 +921,8 @@ void Connection::handle_pong_timeout()
 {
     REALM_ASSERT(m_waiting_for_pong);
     logger.debug("Timeout on reception of PONG message"); // Throws
-    m_reconnect_info.update(ConnectionTerminationReason::pong_timeout, std::nullopt);
-    close_due_to_client_side_error(ClientError::pong_timeout, std::nullopt, false);
+    close_due_to_client_side_error(ClientError::pong_timeout, std::nullopt, false,
+                                   ConnectionTerminationReason::pong_timeout);
 }
 
 
@@ -1090,23 +1090,21 @@ void Connection::handle_disconnect_wait(Status status)
 
 void Connection::read_or_write_error(std::error_code ec, std::string_view msg)
 {
-    m_reconnect_info.update(ConnectionTerminationReason::read_or_write_error, std::nullopt);
     bool is_fatal = false;
-    close_due_to_client_side_error(ec, msg, is_fatal); // Throws
+    close_due_to_client_side_error(ec, msg, is_fatal, ConnectionTerminationReason::read_or_write_error); // Throws
 }
 
 
 void Connection::close_due_to_protocol_error(std::error_code ec, std::optional<std::string_view> msg)
 {
-    m_reconnect_info.update(ConnectionTerminationReason::sync_protocol_violation, std::nullopt);
-    bool is_fatal = true;                              // A sync protocol violation is a fatal error
-    close_due_to_client_side_error(ec, msg, is_fatal); // Throws
+    bool is_fatal = true; // A sync protocol violation is a fatal error
+    close_due_to_client_side_error(ec, msg, is_fatal, ConnectionTerminationReason::sync_protocol_violation); // Throws
 }
 
 
 // Close connection due to error discovered on the client-side.
 void Connection::close_due_to_client_side_error(std::error_code ec, std::optional<std::string_view> msg,
-                                                bool is_fatal)
+                                                bool is_fatal, ConnectionTerminationReason reason)
 {
     logger.info("Connection closed due to error"); // Throws
     const bool try_again = !is_fatal;
@@ -1115,7 +1113,7 @@ void Connection::close_due_to_client_side_error(std::error_code ec, std::optiona
         message += ": ";
         message += *msg;
     }
-    involuntary_disconnect(SessionErrorInfo{ec, message, try_again}); // Throws
+    involuntary_disconnect(SessionErrorInfo{ec, message, try_again}, reason); // Throws
 }
 
 
@@ -1123,20 +1121,13 @@ void Connection::close_due_to_client_side_error(std::error_code ec, std::optiona
 // reported to the client by way of a connection-level ERROR message.
 void Connection::close_due_to_server_side_error(ProtocolError error_code, const ProtocolErrorInfo& info)
 {
-    if (info.try_again) {
-        m_reconnect_info.update(ConnectionTerminationReason::server_said_try_again_later,
-                                info.resumption_delay_interval);
-    }
-    else {
-        m_reconnect_info.update(ConnectionTerminationReason::server_said_do_not_reconnect,
-                                info.resumption_delay_interval);
-    }
-
     logger.info("Connection closed due to error reported by server: %1 (%2)", info.message,
                 int(error_code)); // Throws
 
     std::error_code ec = make_error_code(error_code);
-    involuntary_disconnect(SessionErrorInfo{info, ec}); // Throws
+    const auto reason = info.try_again ? ConnectionTerminationReason::server_said_try_again_later
+                                       : ConnectionTerminationReason::server_said_do_not_reconnect;
+    involuntary_disconnect(SessionErrorInfo{info, ec}, reason); // Throws
 }
 
 
@@ -2549,8 +2540,8 @@ void Session::suspend(const SessionErrorInfo& info)
     // Notify the application of the suspension of the session if the session is
     // still in the Active state
     if (m_state == Active) {
-        m_conn.one_less_active_unsuspended_session();                      // Throws
-        on_suspended(info);                                                // Throws
+        m_conn.one_less_active_unsuspended_session(); // Throws
+        on_suspended(info);                           // Throws
     }
 
     if (info.try_again) {
