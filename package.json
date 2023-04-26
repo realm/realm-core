@@ -13,22 +13,12 @@
   "scripts": {
     "start": "./bindgen/realm-bindgen.ts",
     "test": "wireit",
-    "generate:spec-schema": "wireit"
   },
   "wireit": {
     "test": {
       "command": "mocha",
       "dependencies": [
         "../../../../realm:build:node"
-      ]
-    },
-    "generate:spec-schema": {
-      "command": "typescript-json-schema tsconfig.json RelaxedSpec --include bindgen/src/spec/relaxed-model.ts --out bindgen/generated/spec.schema.json --required",
-      "files": [
-        "bindgen/src/spec/relaxed-model.ts"
-      ],
-      "output": [
-        "bindgen/generated/spec.schema.json"
       ]
     }
   },
