@@ -288,7 +288,8 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool re
         auto session_user = session->user();
         if (!session_user) {
             util::CheckedUniqueLock lock(session->m_state_mutex);
-            session->cancel_pending_waits(std::move(lock), error ? error->to_status() : Status::OK());
+            auto refresh_error = error ? error->to_status() : Status::OK();
+            session->cancel_pending_waits(std::move(lock), refresh_error);
         }
         else if (error) {
             if (error->code() == ErrorCodes::ClientAppDeallocated) {
@@ -766,13 +767,22 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
         // is disabled. In this scenario we attempt an automatic token refresh and if that succeeds continue as
         // normal. If the refresh request also fails with 401 then we need to stop retrying and pass along the error;
         // see handle_refresh().
-        bool restart_session = error_code == sync::websocket::WebSocketError::websocket_moved_permanently;
-        if (restart_session || error_code == sync::websocket::WebSocketError::websocket_unauthorized ||
+        bool redirect_occurred = error_code == sync::websocket::WebSocketError::websocket_moved_permanently;
+        if (redirect_occurred || error_code == sync::websocket::WebSocketError::websocket_unauthorized ||
             error_code == sync::websocket::WebSocketError::websocket_abnormal_closure) {
             if (auto u = user()) {
-                u->refresh_custom_data(handle_refresh(shared_from_this(), restart_session));
+                // If a redirection occurred, the location metadata will be updated before refreshing the access
+                // token.
+                u->refresh_custom_data(redirect_occurred, handle_refresh(shared_from_this(), redirect_occurred));
                 return;
             }
+        }
+
+        // If the websocket was closed cleanly or if the socket disappeared, don't notify the user as an error
+        // since the sync client will retry.
+        if (error_code == sync::websocket::WebSocketError::websocket_read_error ||
+            error_code == sync::websocket::WebSocketError::websocket_write_error) {
+            return;
         }
 
         // Surface a simplified websocket error to the user.
@@ -818,7 +828,8 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
             break;
         }
         case NextStateAfterError::error: {
-            cancel_pending_waits(std::move(lock), sync_error.to_status());
+            auto error = sync_error.to_status();
+            cancel_pending_waits(std::move(lock), error);
             break;
         }
     }
@@ -833,11 +844,21 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     }
 }
 
-void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, Status error)
+void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, Status error,
+                                       std::optional<Status> subs_notify_error)
 {
     CompletionCallbacks callbacks;
     std::swap(callbacks, m_completion_callbacks);
-    m_state_mutex.unlock(lock);
+
+    // Inform any waiters on pending subscription states that they were cancelled
+    if (subs_notify_error && m_flx_subscription_store) {
+        auto subscription_store = m_flx_subscription_store;
+        m_state_mutex.unlock(lock);
+        subscription_store->notify_all_state_change_notifications(*subs_notify_error);
+    }
+    else {
+        m_state_mutex.unlock(lock);
+    }
 
     // Inform any queued-up completion handlers that they were cancelled.
     for (auto& [id, callback] : callbacks)
@@ -896,6 +917,7 @@ void SyncSession::create_sync_session()
 
     sync::Session::Config session_config;
     session_config.signed_user_token = sync_config.user->access_token();
+    session_config.user_id = sync_config.user->identity();
     session_config.realm_identifier = sync_config.partition_value;
     session_config.verify_servers_ssl_certificate = sync_config.client_validate_ssl;
     session_config.ssl_trust_certificate_path = sync_config.ssl_trust_certificate_path;
@@ -1203,7 +1225,7 @@ void SyncSession::update_access_token(const std::string& signed_token)
 void SyncSession::initiate_access_token_refresh()
 {
     if (auto session_user = user()) {
-        session_user->refresh_custom_data(handle_refresh(shared_from_this()));
+        session_user->refresh_custom_data(handle_refresh(shared_from_this(), false));
     }
 }
 
@@ -1295,6 +1317,12 @@ std::shared_ptr<sync::SubscriptionStore> SyncSession::get_flx_subscription_store
     return m_flx_subscription_store;
 }
 
+std::shared_ptr<sync::SubscriptionStore> SyncSession::get_subscription_store_base()
+{
+    util::CheckedLockGuard lock(m_state_mutex);
+    return m_subscription_store_base;
+}
+
 sync::SaltedFileIdent SyncSession::get_file_ident() const
 {
     auto repl = m_db->get_replication();
@@ -1361,9 +1389,10 @@ void SyncSession::update_subscription_store(bool flx_sync_requested)
     if (!flx_sync_requested) {
         if (m_flx_subscription_store) {
             // Empty the subscription store and cancel any pending subscription notification
-            // waiters - will be done in a separate PR
-            m_flx_subscription_store.reset();
+            // waiters
+            auto subscription_store = std::move(m_flx_subscription_store);
             lock.unlock();
+            subscription_store->terminate();
             auto tr = m_db->start_write();
             history.set_write_validator_factory(nullptr);
             tr->rollback();
@@ -1392,16 +1421,26 @@ void SyncSession::update_subscription_store(bool flx_sync_requested)
 void SyncSession::create_subscription_store()
 {
     REALM_ASSERT(!m_flx_subscription_store);
-    m_flx_subscription_store = sync::SubscriptionStore::create(m_db, [this](int64_t new_version) {
-        util::CheckedLockGuard lk(m_state_mutex);
-        if (m_state != State::Active && m_state != State::WaitingForAccessToken) {
-            return;
-        }
-        // There may be no session yet (i.e., waiting to refresh the access token).
-        if (m_session) {
-            m_session->on_new_flx_sync_subscription(new_version);
-        }
-    });
+
+    // Create the main subscription store instance when this is first called - this will
+    // remain valid afterwards for the life of the SyncSession, but m_flx_subscription_store
+    // will be reset when rolling back to PBS after a client FLX migration
+    if (!m_subscription_store_base) {
+        m_subscription_store_base = sync::SubscriptionStore::create(m_db, [this](int64_t new_version) {
+            util::CheckedLockGuard lk(m_state_mutex);
+            if (m_state != State::Active && m_state != State::WaitingForAccessToken) {
+                return;
+            }
+            // There may be no session yet (i.e., waiting to refresh the access token).
+            if (m_session) {
+                m_session->on_new_flx_sync_subscription(new_version);
+            }
+        });
+    }
+
+    // m_subscription_store_base is always around for the life of SyncSession, but the
+    // m_flx_subscription_store is set when using FLX.
+    m_flx_subscription_store = m_subscription_store_base;
 }
 
 void SyncSession::set_write_validator_factory(std::weak_ptr<sync::SubscriptionStore> weak_sub_mgr)
