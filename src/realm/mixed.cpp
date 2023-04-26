@@ -642,6 +642,14 @@ size_t Mixed::hash() const
     return hash;
 }
 
+inline void copy_big_endian(char* dest, uint64_t value)
+{
+    uint32_t msw = uint32_t(value >> 32);
+    uint32_t lsw = uint32_t(value & 0x00000000FFFFFFFF);
+    realm::safe_copy_n(reinterpret_cast<const char*>(&msw), sizeof(uint32_t), dest);
+    realm::safe_copy_n(reinterpret_cast<const char*>(&lsw), sizeof(uint32_t), dest + sizeof(uint32_t));
+}
+
 StringData Mixed::get_index_data(std::array<char, 16>& buffer) const noexcept
 {
     if (is_null()) {
@@ -650,8 +658,7 @@ StringData Mixed::get_index_data(std::array<char, 16>& buffer) const noexcept
     switch (get_type()) {
         case type_Int: {
             int64_t i = get_int();
-            const char* c = reinterpret_cast<const char*>(&i);
-            realm::safe_copy_n(c, sizeof(int64_t), buffer.data());
+            copy_big_endian(buffer.data(), uint64_t(i));
             return StringData{buffer.data(), sizeof(int64_t)};
         }
         case type_Bool: {
@@ -689,9 +696,8 @@ StringData Mixed::get_index_data(std::array<char, 16>& buffer) const noexcept
             int64_t s = dt.get_seconds();
             int32_t ns = dt.get_nanoseconds();
             constexpr size_t index_size = sizeof(s) + sizeof(ns);
-            const char* s_buf = reinterpret_cast<const char*>(&s);
+            copy_big_endian(buffer.data(), uint64_t(s));
             const char* ns_buf = reinterpret_cast<const char*>(&ns);
-            realm::safe_copy_n(s_buf, sizeof(s), buffer.data());
             realm::safe_copy_n(ns_buf, sizeof(ns), buffer.data() + sizeof(s));
             return StringData{buffer.data(), index_size};
         }

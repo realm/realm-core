@@ -508,18 +508,17 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     }
     if (current_file_format_version < 24) {
         // rewrite the string indexes with the comparison order
+        // and rewrite int/timestamp indexes with the new key hash
         for (auto k : table_keys) {
             auto t = get_table(k);
             t->migrate_string_sets(); // rewrite sets to use the new string order
             t->for_each_public_column([&](ColKey col) {
-                if (col.get_type() != col_type_String) {
+                if (col.get_type() != col_type_String && col.get_type() != col_type_Int &&
+                    col.get_type() != col_type_Timestamp) {
                     return IteratorControl::AdvanceToNext;
                 }
                 switch (t->search_index_type(col)) {
                     case IndexType::General: {
-                        if (current_file_format_version < 22 && t->get_primary_key_column() == col) {
-                            break; // this index was just added by a previous upgrade step above
-                        }
                         t->remove_search_index(col);
                         t->add_search_index(col, IndexType::General);
                         break;
