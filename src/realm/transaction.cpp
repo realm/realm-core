@@ -557,6 +557,30 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             t->migrate_sets_and_dictionaries();
         }
     }
+    if (current_file_format_version < 24) {
+        // rewrite int indexes with the new key hash
+        for (auto k : table_keys) {
+            auto t = get_table(k);
+            t->for_each_public_column([&](ColKey col) {
+                if (col.get_type() != col_type_Int) {
+                    return IteratorControl::AdvanceToNext;
+                }
+                switch (t->search_index_type(col)) {
+                    case IndexType::General: {
+                        t->remove_search_index(col);
+                        t->add_search_index(col, IndexType::General);
+                        break;
+                    }
+                    case IndexType::Fulltext:
+                        REALM_UNREACHABLE();  // int columns cannot have a fulltext index
+                        break;
+                    case IndexType::None:
+                        break;
+                }
+                return IteratorControl::AdvanceToNext;
+            });
+        }
+    }
     // NOTE: Additional future upgrade steps go here.
 }
 
