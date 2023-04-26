@@ -12,7 +12,8 @@
   "type": "module",
   "scripts": {
     "start": "./bindgen/realm-bindgen.ts",
-    "test": "cd bindgen && mocha"
+    "test": "cd bindgen && mocha",
+    "lint": "eslint bindgen/src"
   },
   "dependencies": {
     "@commander-js/extra-typings": "^10.0.2",
@@ -29,10 +30,15 @@
     "@types/chai": "^4.3.3",
     "@types/debug": "^4.1.7",
     "@types/mocha": "^10.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.42.0",
+    "@typescript-eslint/parser": "^5.42.0",
     "chai": "4.3.6",
     "cmake-js": "6.3.2",
     "mocha": "^10.1.0",
-    "tsx": "^3.12.3"
+    "tsx": "^3.12.3",
+    "eslint": "^8.26.0",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-prettier": "^4.2.1"
   },
   "binary": {
     "napi_versions": [
