@@ -15,6 +15,7 @@ set(NPX ${NODE_FORCE_COLOR} npx --prefix .) # without a prefix, npx changes the 
 set(SCHEMA_FILE ${CMAKE_CURRENT_SOURCE_DIR}/generated/spec.schema.json)
 add_custom_command(
     OUTPUT ${SCHEMA_FILE}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMAND ${NPX} typescript-json-schema ${CMAKE_CURRENT_SOURCE_DIR}/tsconfig.json RelaxedSpec --include ${CMAKE_CURRENT_SOURCE_DIR}/src/spec/relaxed-model.ts --out ${SCHEMA_FILE} --required --noExtraProps --aliasRefs
     VERBATIM
     MAIN_DEPENDENCY src/spec/relaxed-model.ts
@@ -60,6 +61,7 @@ function(bindgen)
 
     add_custom_command(
         OUTPUT ${BINDGEN_OUTPUTS}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_FUNCTION_LIST_DIR}
         COMMAND ${NPX} tsx -- "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/realm-bindgen.ts"
             --spec "$<JOIN:${CORE_SPEC_FILE};${BINDGEN_SPECS},;--spec;>"
             --template "${BINDGEN_TEMPLATE}"
