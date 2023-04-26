@@ -12,7 +12,7 @@
   "type": "module",
   "scripts": {
     "start": "./bindgen/realm-bindgen.ts",
-    "test": "cd bindgen && mocha",
+    "test": "cd bindgen && tsc --incremental && mocha",
     "lint": "eslint bindgen/src"
   },
   "dependencies": {
