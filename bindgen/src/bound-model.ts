@@ -17,7 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 import { strict as assert } from "assert";
 
-import { Spec, TypeSpec, ClassSpec, MethodSpec } from "./spec";
+import { Spec, TypeSpec, MethodSpec } from "./spec";
 
 abstract class TypeBase {
   abstract readonly kind: TypeKind;
