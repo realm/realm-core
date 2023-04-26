@@ -387,7 +387,7 @@ TEST_CASE("Test client migration and rollback with recovery", "[flx][migration]"
     //  Roll back to PBS
     trigger_server_migration(session.app_session(), RollbackToPBS, logger_ptr);
 
-    // Open up the realm without the sync client attached and make a change. This will be recovered by the rollback.
+    // Add a local object while the session is paused. This will be recovered when connecting after the rollback.
     {
         outer_realm->begin_transaction();
         outer_realm->read_group()
@@ -420,7 +420,7 @@ TEST_CASE("Test client migration and rollback with recovery", "[flx][migration]"
         REALM_ASSERT(result.get_value() == sync::SubscriptionSet::State::Superseded);
     }
 
-    outer_realm = nullptr;
+    outer_realm.reset();
 
     //  Migrate back to FLX
     trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
