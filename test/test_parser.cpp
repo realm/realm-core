@@ -4035,6 +4035,7 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "ALL {8, 10} / 2 >= ANY items.price", 1);
     verify_query(test_context, t, "NONE {1, 2, 3} * 20 <= ANY items.price", 3);
     verify_query(test_context, t, "ANY {1, 2, 3, 4, 5, 6} + 2 == ANY items.price", 1);
+    verify_query(test_context, t, "ANY {0, 1, 2, 3, 5, 6, 7, 8, 9} == ANY items.price", 0); // No hit and all smaller
 
     // list property vs list property
     verify_query(test_context, t, "items.price IN items.price", 3);
