@@ -6056,6 +6056,19 @@ TEST(Query_FullTextMulti)
              "scientifiques de niveau recherche, publiés ou non, émanant des établissements d’enseignement et de "
              "recherche français ou étrangers, des laboratoires publics ou privés.");
     table->create_object().set(col, "object object object object object duplicates");
+    table->create_object().set(col, "one two three");
+    table->create_object().set(col, "three two one");
+    table->create_object().set(col, "two one");
+
+    // object:      0, 1, 2, 4, 6
+    // objects:     0, 1, 3
+    // gemstone:    2, 4
+    // data:        3
+    // depot:       5
+    // emanant:     5
+    // database:    0, 1, 2, 4
+    // databases:   0
+    // duplicates:  6
 
     int64_t id = 1000;
     for (auto& o : *table) {
@@ -6063,48 +6076,75 @@ TEST(Query_FullTextMulti)
         ll.add(o.get_key());
     }
 
-    CHECK_THROW_ANY(table->where().fulltext(col, "").find_all());
+    typedef std::vector<int64_t> Keys;
+    auto get_keys = [&](const TableView& tv) -> Keys {
+        std::vector<int64_t> keys(tv.size());
+        for (size_t i = 0; i < tv.size(); ++i)
+            keys[i] = tv.get_key(i).value;
+        return keys;
+    };
+    auto do_fulltext_find = [&](StringData term) -> Keys {
+        return get_keys(table->where().fulltext(col, term).find_all());
+    };
+    auto do_query_find = [&](const TableRef& table, StringData query) -> Keys {
+        return get_keys(table->query(query).find_all());
+    };
+
+    CHECK_THROW_ANY(do_fulltext_find(""));
 
     // search with multiple terms
-    auto tv = table->where().fulltext(col, "object gemstone").find_all();
-    CHECK_EQUAL(2, tv.size());
+    CHECK_EQUAL(do_fulltext_find("one three"), Keys({7, 8}));
+    CHECK_EQUAL(do_fulltext_find("three one"), Keys({7, 8}));
+    CHECK_EQUAL(do_fulltext_find("C# c++"), Keys({4}));
+    CHECK_EQUAL(do_fulltext_find("1990s"), Keys({2, 4}));
+    CHECK_EQUAL(do_fulltext_find("1990s c++"), Keys({4}));
+    CHECK_EQUAL(do_fulltext_find("object gemstone"), Keys({2, 4}));
 
     // over links
-    tv = origin->link(col_link).column<String>(col).fulltext("object gemstone").find_all();
-    CHECK_EQUAL(2, tv.size());
-
-    tv = origin->query("link.text TEXT 'object gemstone'").find_all();
-    CHECK_EQUAL(2, tv.size());
+    CHECK_EQUAL(do_query_find(origin, "link.text TEXT 'object gemstone'"), Keys({2, 4}));
+    auto tv = origin->link(col_link).column<String>(col).fulltext("object gemstone").find_all();
+    CHECK_EQUAL(get_keys(tv), Keys({2, 4}));
 
     // through LnkLst
     auto obj = tv.get_object(0);
     auto ll = obj.get_linklist(col_link);
     tv = table->where(ll).fulltext(col, "object gemstone").find_all();
-    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(get_keys(tv), Keys({2}));
 
     // Diacritics ignorant
-    tv = table->where().fulltext(col, "depot emanant").find_all();
-    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(do_fulltext_find("depot emanant archive"), Keys({5}));
 
     // search for combination that is not present
-    tv = table->where().fulltext(col, "object data").find_all();
-    CHECK_EQUAL(0, tv.size());
+    CHECK_EQUAL(do_fulltext_find("object data"), Keys());
 
     // exclude words
-    tv = table->where().fulltext(col, "object -databases").find_all();
-    CHECK_EQUAL(4, tv.size());
-    tv = table->where().fulltext(col, "-databases object -duplicates").find_all();
-    CHECK_EQUAL(3, tv.size());
-    tv = table->where().fulltext(col, "object -objects").find_all();
-    CHECK_EQUAL(3, tv.size());
-    CHECK_THROW_ANY(table->where().fulltext(col, "-databases").find_all());
+    CHECK_EQUAL(do_fulltext_find("-three one"), Keys({9}));
+    CHECK_EQUAL(do_fulltext_find("one -three"), Keys({9}));
+    CHECK_EQUAL(do_fulltext_find("object -databases"), Keys({1, 2, 4, 6}));
+    CHECK_EQUAL(do_fulltext_find("-databases object -duplicates"), Keys({1, 2, 4}));
+    CHECK_EQUAL(do_fulltext_find("object -objects"), Keys({2, 4, 6}));
+    CHECK_EQUAL(do_fulltext_find("-object objects"), Keys({3}));
+    CHECK_EQUAL(do_fulltext_find("databases -database"), Keys({}));
+    CHECK_EQUAL(do_fulltext_find("-database databases"), Keys({}));
+    CHECK_EQUAL(do_fulltext_find("database -databases"), Keys({1, 2, 4}));
+    CHECK_EQUAL(do_fulltext_find("-databases database"), Keys({1, 2, 4}));
+
+    // invalid exclude searches
+    // FIXME shouldn't this simply return all excluding term?
+    CHECK_THROW_ANY(do_fulltext_find("-databases"));
+
+    // wouldn't be better to not force user to verify that search is empty set?
+    CHECK_THROW_ANY(do_fulltext_find("-object object"));
+    CHECK_NOTHROW(do_fulltext_find("object -object")); // FIXME ???
+
+    // FIXME that can't be right
+    CHECK_NOTHROW(do_fulltext_find("objects -object object"));
+    CHECK_NOTHROW(do_fulltext_find("object -object object"));
+    CHECK_NOTHROW(do_fulltext_find("database -database"));
 
     // many terms
-    tv = table->where().fulltext(col, "object database management brown").find_all();
-    CHECK_EQUAL(1, tv.size());
-
-    tv = table->query("text TEXT 'object database management brown'").find_all();
-    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(do_fulltext_find("object database management brown"), Keys({1}));
+    CHECK_EQUAL(do_query_find(table, "text TEXT 'object database management brown'"), Keys({1}));
 
     while (table->size() > 0) {
         table->begin()->remove();
