@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Clear out SubscriptionStore and cancel pending notifications upon rollback to PBS after client migration to FLX. ([#6389](https://github.com/realm/realm-core/issues/6389))
 
 ----------------------------------------------
 
