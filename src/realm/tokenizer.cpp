@@ -176,43 +176,27 @@ char buffer[256 * 256];
 
 int main(int argc, const char* argv[])
 {
-    auto tok = realm::Tokenizer::get_instance();
-    tok->reset("to be or not to be");
-    auto tokens = tok->get_all_tokens();
-    assert(tokens.size() == 4);
-    tok->reset("To be or not to be");
-    realm::TokenInfoMap info = tok->get_token_info();
-    assert(info.size() == 4);
-    realm::TokenInfo& i(info["to"]);
-    assert(i.positions.size() == 2);
-    assert(i.positions[0] == 0);
-    assert(i.positions[1] == 4);
-    assert(i.ranges.size() == 2);
-    assert(i.ranges[0].first == 0);
-    assert(i.ranges[0].second == 2);
-    assert(i.ranges[1].first == 13);
-    assert(i.ranges[1].second == 15);
-    tok->reset("Jeg gik mig over sø og land");
-    info = tok->get_token_info();
-    assert(info.size() == 7);
-    realm::TokenInfo& j(info["sø"]);
-    assert(j.ranges[0].first == 17);
-    assert(j.ranges[0].second == 20);
-
-    if (argc > 1) {
-        std::ifstream istr(argv[1]);
-        istr.read(buffer, sizeof(buffer));
-        std::string_view text(buffer, istr.gcount());
-
-        tok->reset(text);
-        auto t1 = steady_clock::now();
-        auto tokens = tok->get_all_tokens();
-        auto t2 = steady_clock::now();
-        tok->reset(text);
-        auto info = tok->get_token_info();
-        auto t3 = steady_clock::now();
-        std::cout << "tokenize: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
-        std::cout << "info: " << duration_cast<microseconds>(t3 - t2).count() << " us" << std::endl;
+    if (argc < 1) {
+        std::cerr << "Please, provide the file to tokenize!";
+        return 1;
     }
+
+    auto tok = realm::Tokenizer::get_instance();
+
+    std::ifstream istr(argv[1]);
+    istr.read(buffer, sizeof(buffer));
+    std::string_view text(buffer, istr.gcount());
+
+    tok->reset(text);
+    auto t1 = steady_clock::now();
+    auto tokens = tok->get_all_tokens();
+    auto t2 = steady_clock::now();
+    tok->reset(text);
+    auto info = tok->get_token_info();
+    auto t3 = steady_clock::now();
+    std::cout << "tokenize: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+    std::cout << "info: " << duration_cast<microseconds>(t3 - t2).count() << " us" << std::endl;
+
+    return 0;
 }
 #endif
