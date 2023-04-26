@@ -176,8 +176,8 @@ char buffer[256 * 256];
 
 int main(int argc, const char* argv[])
 {
-    if (argc < 1) {
-        std::cerr << "Please, provide the file to tokenize!";
+    if (argc < 2) {
+        std::cerr << "Please, provide the file to tokenize!\n";
         return 1;
     }
 
