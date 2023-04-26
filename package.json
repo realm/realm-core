@@ -12,15 +12,7 @@
   "type": "module",
   "scripts": {
     "start": "./bindgen/realm-bindgen.ts",
-    "test": "wireit",
-  },
-  "wireit": {
-    "test": {
-      "command": "mocha",
-      "dependencies": [
-        "../../../../realm:build:node"
-      ]
-    }
+    "test": "cd bindgen && mocha"
   },
   "dependencies": {
     "@commander-js/extra-typings": "^10.0.2",
@@ -39,7 +31,8 @@
     "@types/mocha": "^10.0.0",
     "chai": "4.3.6",
     "cmake-js": "6.3.2",
-    "mocha": "^10.1.0"
+    "mocha": "^10.1.0",
+    "tsx": "^3.12.3"
   },
   "binary": {
     "napi_versions": [
