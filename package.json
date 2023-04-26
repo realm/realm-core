@@ -4,14 +4,14 @@
   "private": true,
   "description": "Binding generator exposing Realm Core to the SDK",
   "bin": {
-    "realm-bindgen": "./realm-bindgen.ts"
+    "realm-bindgen": "./bindgen/realm-bindgen.ts"
   },
   "exports": {
-    "./*": "./src/*"
+    "./*": "./bindgen/src/*"
   },
   "type": "module",
   "scripts": {
-    "start": "./realm-bindgen.ts",
+    "start": "./bindgen/realm-bindgen.ts",
     "test": "wireit",
     "generate:spec-schema": "wireit"
   },
@@ -23,12 +23,12 @@
       ]
     },
     "generate:spec-schema": {
-      "command": "typescript-json-schema tsconfig.json RelaxedSpec --include src/spec/relaxed-model.ts --out generated/spec.schema.json --required",
+      "command": "typescript-json-schema tsconfig.json RelaxedSpec --include bindgen/src/spec/relaxed-model.ts --out bindgen/generated/spec.schema.json --required",
       "files": [
-        "src/spec/relaxed-model.ts"
+        "bindgen/src/spec/relaxed-model.ts"
       ],
       "output": [
-        "generated/spec.schema.json"
+        "bindgen/generated/spec.schema.json"
       ]
     }
   },
