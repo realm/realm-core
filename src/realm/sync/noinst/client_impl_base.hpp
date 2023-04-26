@@ -15,6 +15,7 @@
 #include <realm/util/optional.hpp>
 #include <realm/util/buffer_stream.hpp>
 #include <realm/util/logger.hpp>
+#include <realm/util/tagged_bool.hpp>
 #include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/network/default_socket.hpp>
 #include <realm/util/span.hpp>
@@ -530,6 +531,9 @@ private:
     };
     struct WebSocketObserverShim;
 
+    class IsFatalTag {};
+    using IsFatal = util::TaggedBool<class IsFatalTag>;
+
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
 
     template <class H>
@@ -580,7 +584,9 @@ private:
     void handle_disconnect_wait(Status status);
     void read_or_write_error(std::error_code ec, std::string_view msg);
     void close_due_to_protocol_error(std::error_code, std::optional<std::string_view> msg = std::nullopt);
-    void close_due_to_client_side_error(std::error_code, std::optional<std::string_view> msg, bool is_fatal, ConnectionTerminationReason reason);
+
+    void close_due_to_client_side_error(std::error_code, std::optional<std::string_view> msg, IsFatal is_fatal,
+                                        ConnectionTerminationReason reason);
     void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
     void involuntary_disconnect(const SessionErrorInfo& info, ConnectionTerminationReason reason);
     void disconnect(const SessionErrorInfo& info);
