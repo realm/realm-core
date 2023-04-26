@@ -52,7 +52,7 @@ public:
     ~CollectionList() final;
     size_t size() const final
     {
-        return update_if_needed() ? m_refs.size() : 0;
+        return update() ? m_refs.size() : 0;
     }
 
     Mixed get_any(size_t ndx) const final;
@@ -63,11 +63,8 @@ public:
     {
         return m_level;
     }
-    UpdateStatus update_if_needed_with_status() const final;
-    bool update_if_needed() const final
-    {
-        return update_if_needed_with_status() != UpdateStatus::Detached;
-    }
+    UpdateStatus update_if_needed_with_status() const noexcept final;
+    bool update_if_needed() const final;
     TableRef get_table() const noexcept final
     {
         return m_parent->get_table();
@@ -122,28 +119,14 @@ private:
     CollectionList(std::shared_ptr<CollectionParent> parent, ColKey col_key, Index index, CollectionType coll_type);
     CollectionList(CollectionParent*, ColKey col_key);
 
-    UpdateStatus ensure_created()
+    void bump_content_version()
     {
-        auto status = m_parent->update_if_needed_with_status();
-        switch (status) {
-            case UpdateStatus::Detached:
-                break; // Not possible (would have thrown earlier).
-            case UpdateStatus::NoChange: {
-                if (m_top.is_attached()) {
-                    return UpdateStatus::NoChange;
-                }
-                // The tree has not been initialized yet for this accessor, so
-                // perform lazy initialization by treating it as an update.
-                [[fallthrough]];
-            }
-            case UpdateStatus::Updated: {
-                bool attached = init_from_parent(true);
-                REALM_ASSERT(attached);
-                return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
-            }
-        }
-
-        REALM_UNREACHABLE();
+        m_content_version = m_alloc->bump_content_version();
+    }
+    void ensure_created();
+    bool update() const
+    {
+        return update_if_needed_with_status() != UpdateStatus::Detached;
     }
     void get_all_keys(size_t levels, std::vector<ObjKey>&) const;
 };

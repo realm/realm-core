@@ -82,7 +82,7 @@ public:
     {
         return m_dictionary->get_obj();
     }
-    bool has_changed() const override
+    bool has_changed() const noexcept override
     {
         return m_dictionary->has_changed();
     }

@@ -787,6 +787,7 @@ TEST(List_NestedList_Remove)
     list->remove(0);
     CHECK_THROW_ANY(dict->remove("Bar"));
     dict->remove("Foo");
+    CHECK_THROW_ANY(list2->insert_collection(1));
     tr->verify();
     tr->commit_and_continue_as_read();
 

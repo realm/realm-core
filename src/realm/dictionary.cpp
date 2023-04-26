@@ -585,9 +585,9 @@ Dictionary::Iterator Dictionary::find(Mixed key) const noexcept
     return end();
 }
 
-UpdateStatus Dictionary::update_if_needed() const
+UpdateStatus Dictionary::update_if_needed_with_status() const noexcept
 {
-    auto status = Base::update_if_needed();
+    auto status = Base::get_update_status();
     switch (status) {
         case UpdateStatus::Detached: {
             m_dictionary_top.reset();
@@ -603,34 +603,19 @@ UpdateStatus Dictionary::update_if_needed() const
         }
         case UpdateStatus::Updated: {
             bool attached = init_from_parent(false);
+            Base::update_content_version();
             return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
         }
     }
     REALM_UNREACHABLE();
 }
 
-UpdateStatus Dictionary::ensure_created()
+void Dictionary::ensure_created()
 {
-    auto status = Base::ensure_created();
-    switch (status) {
-        case UpdateStatus::Detached:
-            break; // Not possible (would have thrown earlier).
-        case UpdateStatus::NoChange: {
-            if (m_dictionary_top && m_dictionary_top->is_attached()) {
-                return UpdateStatus::NoChange;
-            }
-            // The tree has not been initialized yet for this accessor, so
-            // perform lazy initialization by treating it as an update.
-            [[fallthrough]];
-        }
-        case UpdateStatus::Updated: {
-            bool attached = init_from_parent(true);
-            REALM_ASSERT(attached);
-            return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
-        }
+    if (Base::should_update() || !(m_dictionary_top && m_dictionary_top->is_attached())) {
+        bool attached = init_from_parent(true);
+        REALM_ASSERT(attached);
     }
-
-    REALM_UNREACHABLE();
 }
 
 bool Dictionary::try_erase(Mixed key)

@@ -93,7 +93,13 @@ bool CollectionList::init_from_parent(bool allow_create) const
     m_top.create(Array::type_HasRefs, false, 2, 0);
     m_keys->create();
     m_refs.create();
-    m_top.update_parent();
+    try {
+        m_top.update_parent();
+    }
+    catch (const StaleAccessor& e) {
+        m_top.destroy_deep();
+        throw e;
+    }
 
     return true;
 }
@@ -117,9 +123,29 @@ Mixed CollectionList::get_any(size_t ndx) const
     return {};
 }
 
-UpdateStatus CollectionList::update_if_needed_with_status() const
+void CollectionList::ensure_created()
 {
-    auto status = m_parent->update_if_needed_with_status();
+    bool changed = m_parent->update_if_needed(); // Throws if the object does not exist.
+    auto content_version = m_alloc->get_content_version();
+
+    if (changed || content_version != m_content_version || !m_top.is_attached()) {
+        bool attached = init_from_parent(true);
+        m_content_version = m_alloc->get_content_version();
+        REALM_ASSERT(attached);
+    }
+}
+
+UpdateStatus CollectionList::update_if_needed_with_status() const noexcept
+{
+    UpdateStatus status = m_parent ? m_parent->update_if_needed_with_status() : UpdateStatus::Detached;
+
+    if (status != UpdateStatus::Detached) {
+        auto content_version = m_alloc->get_content_version();
+        if (content_version != m_content_version) {
+            m_content_version = content_version;
+            status = UpdateStatus::Updated;
+        }
+    }
     switch (status) {
         case UpdateStatus::Detached: {
             m_top.detach();
@@ -127,23 +153,28 @@ UpdateStatus CollectionList::update_if_needed_with_status() const
         }
         case UpdateStatus::NoChange:
             if (m_top.is_attached()) {
-                auto content_version = m_alloc->get_content_version();
-                if (content_version == m_content_version) {
-                    return UpdateStatus::NoChange;
-                }
-                m_content_version = content_version;
+                return UpdateStatus::NoChange;
             }
             // The tree has not been initialized yet for this accessor, so
             // perform lazy initialization by treating it as an update.
             [[fallthrough]];
         case UpdateStatus::Updated: {
             bool attached = init_from_parent(false);
+            m_content_version = m_alloc->get_content_version();
             return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
         }
     }
     REALM_UNREACHABLE();
 }
 
+bool CollectionList::update_if_needed() const
+{
+    auto status = update_if_needed_with_status();
+    if (status == UpdateStatus::Detached) {
+        throw StaleAccessor("CollectionList no longer exists");
+    }
+    return status == UpdateStatus::Updated;
+}
 
 ref_type CollectionList::get_child_ref(size_t) const noexcept
 {
@@ -169,6 +200,9 @@ CollectionBasePtr CollectionList::insert_collection(size_t ndx)
     m_refs.insert(ndx, 0);
     CollectionBasePtr coll = CollectionParent::get_collection_ptr(m_col_key);
     coll->set_owner(shared_from_this(), key);
+
+    bump_content_version();
+
     return coll;
 }
 
@@ -190,6 +224,8 @@ CollectionBasePtr CollectionList::insert_collection(StringData key)
     }
     CollectionBasePtr coll = CollectionParent::get_collection_ptr(m_col_key);
     coll->set_owner(shared_from_this(), key);
+
+    bump_content_version();
 
     return coll;
 }
@@ -227,6 +263,8 @@ CollectionListPtr CollectionList::insert_collection_list(size_t ndx)
     int_keys->insert(ndx, key);
     m_refs.insert(ndx, 0);
 
+    bump_content_version();
+
     return get_collection_list(ndx);
 }
 
@@ -245,6 +283,9 @@ CollectionListPtr CollectionList::insert_collection_list(StringData key)
         string_keys->insert(it.index(), key);
         m_refs.insert(it.index(), 0);
     }
+
+    bump_content_version();
+
     return get_collection_list(it.index());
 }
 
@@ -292,6 +333,8 @@ void CollectionList::remove(size_t ndx)
     auto ref = m_refs.get(ndx);
     Array::destroy_deep(ref, *m_alloc);
     m_refs.erase(ndx);
+
+    bump_content_version();
 }
 
 void CollectionList::remove(StringData key)
@@ -308,6 +351,8 @@ void CollectionList::remove(StringData key)
     auto ref = m_refs.get(index);
     Array::destroy_deep(ref, *m_alloc);
     m_refs.erase(index);
+
+    bump_content_version();
 }
 
 ref_type CollectionList::get_collection_ref(Index index) const noexcept
@@ -326,18 +371,19 @@ ref_type CollectionList::get_collection_ref(Index index) const noexcept
 
 void CollectionList::set_collection_ref(Index index, ref_type ref)
 {
+    size_t ndx;
     if (m_key_type == type_Int) {
         auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
-        auto ndx = int_keys->find_first(mpark::get<int64_t>(index));
-        REALM_ASSERT(ndx != realm::not_found);
-        return m_refs.set(ndx, ref);
+        ndx = int_keys->find_first(mpark::get<int64_t>(index));
     }
     else {
         auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
-        auto ndx = string_keys->find_first(StringData(mpark::get<std::string>(index)));
-        REALM_ASSERT(ndx != realm::not_found);
-        return m_refs.set(ndx, ref);
+        ndx = string_keys->find_first(StringData(mpark::get<std::string>(index)));
     }
+    if (ndx == realm::not_found) {
+        throw StaleAccessor("Collection has been deleted");
+    }
+    m_refs.set(ndx, ref);
 }
 
 auto CollectionList::get_index(size_t ndx) const noexcept -> Index
@@ -355,7 +401,7 @@ auto CollectionList::get_index(size_t ndx) const noexcept -> Index
 
 void CollectionList::get_all_keys(size_t levels, std::vector<ObjKey>& keys) const
 {
-    if (!update_if_needed()) {
+    if (!update()) {
         return;
     }
     for (size_t i = 0; i < size(); i++) {

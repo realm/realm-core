@@ -80,7 +80,7 @@ protected:
     virtual ~CollectionParent();
     /// Update the accessor (and return `UpdateStatus::Detached` if the parent
     /// is no longer valid, rather than throwing an exception).
-    virtual UpdateStatus update_if_needed_with_status() const = 0;
+    virtual UpdateStatus update_if_needed_with_status() const noexcept = 0;
     /// Check if the storage version has changed and update if it has
     /// Return true if the object was updated
     virtual bool update_if_needed() const = 0;
@@ -124,7 +124,7 @@ public:
 protected:
     TableRef m_table;
     ref_type m_ref;
-    UpdateStatus update_if_needed_with_status() const final
+    UpdateStatus update_if_needed_with_status() const noexcept final
     {
         return UpdateStatus::Updated;
     }

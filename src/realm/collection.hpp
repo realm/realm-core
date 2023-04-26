@@ -88,7 +88,7 @@ public:
     /// Return true if the collection has changed since the last call to
     /// `has_changed()`. Note that this function is not idempotent and updates
     /// the internal state of the accessor if it has changed.
-    virtual bool has_changed() const = 0;
+    virtual bool has_changed() const noexcept = 0;
 
     /// Returns true if the accessor is in the attached state. By default, this
     /// checks if the owning object is still valid.
@@ -371,10 +371,10 @@ public:
     /// Note: This function does not return true for an accessor that became
     /// detached since the last call, even though it may look to the caller as
     /// if the size of the collection suddenly became zero.
-    bool has_changed() const final
+    bool has_changed() const noexcept final
     {
         // `has_changed()` sneakily modifies internal state.
-        update_if_needed();
+        update_if_needed_with_status();
         if (m_last_content_version != m_content_version) {
             m_last_content_version = m_content_version;
             return true;
@@ -483,22 +483,7 @@ protected:
         m_parent->set_collection_ref(m_index, ref);
     }
 
-    /// Refresh the associated `Obj` (if needed), and update the internal
-    /// content version number. This is meant to be called from a derived class
-    /// before accessing its data.
-    ///
-    /// If the `Obj` changed since the last call, or the content version was
-    /// bumped, this returns `UpdateStatus::Updated`. In response, the caller
-    /// must invoke `init_from_parent()` or similar on its internal state
-    /// accessors to refresh its view of the data.
-    ///
-    /// If the owning object (or parent container) was deleted, this returns
-    /// `UpdateStatus::Detached`, and the caller is allowed to enter a
-    /// degenerate state.
-    ///
-    /// If no change has happened to the data, this function returns
-    /// `UpdateStatus::NoChange`, and the caller is allowed to not do anything.
-    virtual UpdateStatus update_if_needed() const
+    UpdateStatus get_update_status() const noexcept
     {
         UpdateStatus status = m_parent ? m_parent->update_if_needed_with_status() : UpdateStatus::Detached;
 
@@ -513,17 +498,10 @@ protected:
         return status;
     }
 
-    /// Refresh the associated `Obj` (if needed) and ensure that the
-    /// collection is created. Must be used in places where you
-    /// modify a potentially detached collection.
-    ///
-    /// The caller must react to the `UpdateStatus` in the same way as with
-    /// `update_if_needed()`, i.e., eventually end up calling
-    /// `init_from_parent()` or similar.
-    ///
-    /// Throws if the owning object no longer exists. Note: This means that this
-    /// method will never return `UpdateStatus::Detached`.
-    virtual UpdateStatus ensure_created()
+    /// Refresh the parent object (if needed) and compare version numbers.
+    /// Return true if the collection should initialize from parent
+    /// Throws if the owning object no longer exists.
+    bool should_update()
     {
         check_parent();
         bool changed = m_parent->update_if_needed(); // Throws if the object does not exist.
@@ -531,15 +509,21 @@ protected:
 
         if (changed || content_version != m_content_version) {
             m_content_version = content_version;
-            return UpdateStatus::Updated;
+            return true;
         }
-        return UpdateStatus::NoChange;
+        return false;
     }
 
     void bump_content_version()
     {
         REALM_ASSERT(m_alloc);
         m_content_version = m_alloc->bump_content_version();
+    }
+
+    void update_content_version() const
+    {
+        REALM_ASSERT(m_alloc);
+        m_content_version = m_alloc->get_content_version();
     }
 
     void bump_both_versions()
@@ -631,6 +615,22 @@ private:
             throw StaleAccessor("Allocator not set");
         }
     }
+    /// Refresh the associated `Obj` (if needed), and update the internal
+    /// content version number. This is meant to be called from a derived class
+    /// before accessing its data.
+    ///
+    /// If the `Obj` changed since the last call, or the content version was
+    /// bumped, this returns `UpdateStatus::Updated`. In response, the caller
+    /// must invoke `init_from_parent()` or similar on its internal state
+    /// accessors to refresh its view of the data.
+    ///
+    /// If the owning object (or parent container) was deleted, this returns
+    /// `UpdateStatus::Detached`, and the caller is allowed to enter a
+    /// degenerate state.
+    ///
+    /// If no change has happened to the data, this function returns
+    /// `UpdateStatus::NoChange`, and the caller is allowed to not do anything.
+    virtual UpdateStatus update_if_needed_with_status() const noexcept = 0;
 };
 
 namespace _impl {

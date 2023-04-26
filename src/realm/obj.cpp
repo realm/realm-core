@@ -370,7 +370,7 @@ inline bool Obj::_update_if_needed() const
     return false;
 }
 
-UpdateStatus Obj::update_if_needed_with_status() const
+UpdateStatus Obj::update_if_needed_with_status() const noexcept
 {
     if (!m_table) {
         // Table deleted

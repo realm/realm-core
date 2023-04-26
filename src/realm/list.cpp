@@ -64,7 +64,7 @@ void do_sort(std::vector<size_t>& indices, size_t size, util::FunctionRef<bool(s
 template <class T>
 void Lst<T>::sort(std::vector<size_t>& indices, bool ascending) const
 {
-    update_if_needed();
+    update();
 
     auto tree = m_tree.get();
     if (ascending) {
