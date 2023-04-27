@@ -19,7 +19,6 @@
 #include "testsettings.hpp"
 #ifdef TEST_GEO
 
-#if REALM_ENABLE_GEOSPATIAL
 #include "test.hpp"
 
 #include <realm/geospatial.hpp>
@@ -183,5 +182,4 @@ TEST(Geospatial_GeoWithinShapes)
     }
 }
 
-#endif // REALM_ENABLE_GEOSPATIAL
 #endif
