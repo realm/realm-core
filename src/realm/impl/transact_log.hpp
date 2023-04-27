@@ -327,22 +327,16 @@ private:
 
 class TransactLogParser {
 public:
-    TransactLogParser();
-    ~TransactLogParser() noexcept;
-
     /// See `TransactLogEncoder` for a list of methods that the `InstructionHandler` must define.
     template <class InstructionHandler>
     void parse(util::InputStream&, InstructionHandler&);
 
-    template <class InstructionHandler>
-    void parse(util::NoCopyInputStream&, InstructionHandler&);
-
 private:
-    util::Buffer<char> m_input_buffer;
+    util::Buffer<char> m_input_buffer{1024};
 
     // The input stream is assumed to consist of chunks of memory organised such that
     // every instruction resides in a single chunk only.
-    util::NoCopyInputStream* m_input;
+    util::InputStream* m_input;
     // pointer into transaction log, each instruction is parsed from m_input_begin and onwards.
     // Each instruction are assumed to be contiguous in memory.
     const char* m_input_begin;
@@ -668,30 +662,14 @@ inline bool TransactLogEncoder::typed_link_change(ColKey col, TableKey dest)
 }
 
 
-inline TransactLogParser::TransactLogParser()
-    : m_input_buffer(1024) // Throws
-{
-}
-
-
-inline TransactLogParser::~TransactLogParser() noexcept {}
-
-
 template <class InstructionHandler>
-void TransactLogParser::parse(util::NoCopyInputStream& in, InstructionHandler& handler)
+void TransactLogParser::parse(util::InputStream& in, InstructionHandler& handler)
 {
     m_input = &in;
     m_input_begin = m_input_end = nullptr;
 
     while (has_next())
         parse_one(handler); // Throws
-}
-
-template <class InstructionHandler>
-void TransactLogParser::parse(util::InputStream& in, InstructionHandler& handler)
-{
-    util::NoCopyInputStreamAdaptor in_2(in, m_input_buffer);
-    parse(in_2, handler); // Throws
 }
 
 inline bool TransactLogParser::has_next() noexcept
@@ -950,6 +928,14 @@ inline bool TransactLogParser::read_char(char& c)
         return false;
     c = *m_input_begin++;
     return true;
+}
+
+template <typename Handler>
+void parse_transact_log(util::InputStream& is, Handler& handler)
+{
+    TransactLogParser parser;
+    parser.parse(is, handler);
+    handler.parse_complete();
 }
 
 } // namespace _impl

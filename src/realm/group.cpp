@@ -1272,7 +1272,8 @@ size_t Group::get_used_space() const noexcept
 }
 
 
-class Group::TransactAdvancer {
+namespace {
+class TransactAdvancer : public _impl::NullInstructionObserver {
 public:
     TransactAdvancer(Group&, bool& schema_changed)
         : m_schema_changed(schema_changed)
@@ -1297,41 +1298,6 @@ public:
         return true;
     }
 
-    bool select_table(TableKey) noexcept
-    {
-        return true;
-    }
-
-    bool create_object(ObjKey) noexcept
-    {
-        return true;
-    }
-
-    bool remove_object(ObjKey) noexcept
-    {
-        return true;
-    }
-
-    bool modify_object(ColKey, ObjKey) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool collection_set(size_t)
-    {
-        return true;
-    }
-
-    bool collection_insert(size_t)
-    {
-        return true;
-    }
-
-    bool enumerate_string_column(ColKey)
-    {
-        return true; // No-op
-    }
-
     bool insert_column(ColKey)
     {
         m_schema_changed = true;
@@ -1350,39 +1316,10 @@ public:
         return true; // No-op
     }
 
-    bool set_link_type(ColKey) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool select_collection(ColKey, ObjKey) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool collection_move(size_t, size_t) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool collection_erase(size_t) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool collection_clear(size_t) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool typed_link_change(ColKey, TableKey)
-    {
-        return true; // No-op
-    }
-
 private:
     bool& m_schema_changed;
 };
+} // anonymous namespace
 
 
 void Group::update_allocator_wrappers(bool writable)
@@ -1445,7 +1382,7 @@ void Group::refresh_dirty_accessors()
 }
 
 
-void Group::advance_transact(ref_type new_top_ref, util::NoCopyInputStream* in, bool writable)
+void Group::advance_transact(ref_type new_top_ref, util::InputStream* in, bool writable)
 {
     REALM_ASSERT(is_attached());
     // Exception safety: If this function throws, the group accessor and all of

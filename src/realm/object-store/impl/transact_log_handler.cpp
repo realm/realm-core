@@ -623,6 +623,15 @@ void advance(Transaction& tr, TransactionChangeInfo& info, VersionID version)
     }
 }
 
+void parse(Transaction& tr, TransactionChangeInfo& info, VersionID::version_type initial_version,
+           VersionID::version_type end_version)
+{
+    if (!info.tables.empty() || !info.collections.empty()) {
+        TransactLogObserver o(info);
+        tr.parse_history(o, initial_version, end_version);
+    }
+}
+
 } // namespace transaction
 } // namespace _impl
 } // namespace realm

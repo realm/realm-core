@@ -790,6 +790,7 @@ void RealmCoordinator::register_notifier(std::shared_ptr<CollectionNotifier> not
     auto& self = Realm::Internal::get_coordinator(*notifier->get_realm());
     {
         util::CheckedLockGuard lock(self.m_notifier_mutex);
+        notifier->set_initial_transaction(self.m_new_notifiers);
         self.m_new_notifiers.push_back(std::move(notifier));
     }
 }
@@ -908,9 +909,12 @@ void RealmCoordinator::run_async_notifiers()
     if (!new_notifiers.empty()) {
         new_notifier_change_info.reserve(new_notifiers.size());
         for (auto& notifier : new_notifiers) {
+            if (notifier->version() == version)
+                continue;
             new_notifier_change_info.emplace_back();
             notifier->add_required_change_info(new_notifier_change_info.back());
-            transaction::advance(notifier->transaction(), new_notifier_change_info.back(), version);
+            transaction::parse(*newest_transaction, new_notifier_change_info.back(), notifier->version().version,
+                               version.version);
         }
     }
 
@@ -967,8 +971,6 @@ void RealmCoordinator::run_async_notifiers()
     // Now that they're at the same version, switch the new notifiers over to
     // the main Transaction used for background work rather than the temporary one
     for (auto& notifier : new_notifiers) {
-        REALM_ASSERT(m_notifier_transaction->get_version_of_current_transaction() ==
-                     notifier->transaction().get_version_of_current_transaction());
         notifier->attach_to(m_notifier_transaction);
         notifier->run();
     }

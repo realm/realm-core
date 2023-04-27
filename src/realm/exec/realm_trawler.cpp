@@ -1047,7 +1047,7 @@ void RealmFile::changes() const
     auto changesets = m_group->get_changesets();
 
     for (auto c : changesets) {
-        realm::util::SimpleNoCopyInputStream stream(c);
+        realm::util::SimpleInputStream stream(c);
         parser.parse(stream, logger);
         std::cout << "--------------------------------------------" << std::endl;
     }
