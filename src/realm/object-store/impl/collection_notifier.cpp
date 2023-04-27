@@ -127,7 +127,7 @@ bool CollectionNotifier::all_callbacks_filtered() const noexcept
 
 CollectionNotifier::CollectionNotifier(std::shared_ptr<Realm> realm)
     : m_realm(std::move(realm))
-    , m_transaction(m_realm->duplicate())
+    , m_transaction(Realm::Internal::get_transaction_ref(*m_realm))
 {
 }
 
@@ -373,6 +373,19 @@ void CollectionNotifier::for_each_callback(Fn&& fn)
 
     m_callback_index = npos;
 }
+
+void CollectionNotifier::set_initial_transaction(
+    const std::vector<std::shared_ptr<CollectionNotifier>>& other_notifiers)
+{
+    for (auto& other : other_notifiers) {
+        if (version() == other->version()) {
+            attach_to(other->m_transaction);
+            return;
+        }
+    }
+    attach_to(m_transaction->duplicate());
+}
+
 
 void CollectionNotifier::attach_to(std::shared_ptr<Transaction> tr)
 {

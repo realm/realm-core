@@ -1,4 +1,5 @@
 #include "realm/db.hpp"
+#include "realm/transaction.hpp"
 #include "realm/sync/history.hpp"
 #include "realm/sync/instruction_applier.hpp"
 #include "realm/sync/impl/clamped_hex_dump.hpp"
@@ -144,7 +145,7 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger, bo
 
         realm::sync::Changeset parsed_changeset;
         auto changeset_data = body.read_sized_data<BinaryData>(changeset_size);
-        auto changeset_stream = realm::util::SimpleNoCopyInputStream(changeset_data);
+        auto changeset_stream = realm::util::SimpleInputStream(changeset_data);
         realm::sync::parse_changeset(changeset_stream, parsed_changeset);
         logger.trace("found download changeset: serverVersion: %1, clientVersion: %2, origin: %3 %4",
                      cur_changeset.remote_version, cur_changeset.last_integrated_local_version,
@@ -199,7 +200,7 @@ UploadMessage UploadMessage::parse(HeaderLineParser& msg, Logger& logger)
         logger.trace("found upload changeset: %1 %2 %3 %4 %5", cur_changeset.last_integrated_remote_version,
                      cur_changeset.version, cur_changeset.origin_timestamp, cur_changeset.origin_file_ident,
                      changeset_size);
-        realm::util::SimpleNoCopyInputStream changeset_stream(changeset_buffer);
+        realm::util::SimpleInputStream changeset_stream(changeset_buffer);
         try {
             realm::sync::parse_changeset(changeset_stream, cur_changeset);
         }

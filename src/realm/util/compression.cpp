@@ -126,7 +126,7 @@ void grow_arena(compression::CompressMemoryArena& compress_memory_arena)
     compress_memory_arena.resize(n); // Throws
 }
 
-uint8_t read_byte(NoCopyInputStream& is, Span<const char>& buf)
+uint8_t read_byte(InputStream& is, Span<const char>& buf)
 {
     if (!buf.size())
         buf = is.next_block();
@@ -143,7 +143,7 @@ struct Header {
     size_t size;
 };
 
-Header read_header(NoCopyInputStream& is, Span<const char>& buf)
+Header read_header(InputStream& is, Span<const char>& buf)
 {
     Header ret = {};
     auto first_byte = read_byte(is, buf);
@@ -194,15 +194,15 @@ void inflate_zlib_header(z_stream& strm)
     REALM_ASSERT(strm.avail_in == 0);
 }
 
-struct DecompressInputStreamNone final : public NoCopyInputStream {
-    DecompressInputStreamNone(NoCopyInputStream& s, Span<const char> b)
+struct DecompressInputStreamNone final : public InputStream {
+    DecompressInputStreamNone(InputStream& s, Span<const char> b)
         : source(s)
         , current_block(b)
     {
         if (current_block.empty())
             current_block = source.next_block();
     }
-    NoCopyInputStream& source;
+    InputStream& source;
     Span<const char> current_block;
 
     Span<const char> next_block() override
@@ -214,9 +214,9 @@ struct DecompressInputStreamNone final : public NoCopyInputStream {
     }
 };
 
-class DecompressInputStreamZlib final : public NoCopyInputStream {
+class DecompressInputStreamZlib final : public InputStream {
 public:
-    DecompressInputStreamZlib(NoCopyInputStream& s, Span<const char> b, size_t total_size)
+    DecompressInputStreamZlib(InputStream& s, Span<const char> b, size_t total_size)
         : m_source(s)
     {
         // Arbitrary upper limit to reduce peak memory usage
@@ -281,7 +281,7 @@ public:
     }
 
 private:
-    NoCopyInputStream& m_source;
+    InputStream& m_source;
     Span<const char> m_current_block;
     z_stream m_strm = {};
     AppendBuffer<char> m_buffer;
@@ -303,9 +303,9 @@ compression_algorithm algorithm_to_compression_algorithm(Algorithm a)
 
 API_AVAILABLE_BEGIN(macos(10.11))
 
-class DecompressInputStreamLibCompression final : public NoCopyInputStream {
+class DecompressInputStreamLibCompression final : public InputStream {
 public:
-    DecompressInputStreamLibCompression(NoCopyInputStream& s, Span<const char> b, Header h)
+    DecompressInputStreamLibCompression(InputStream& s, Span<const char> b, Header h)
         : m_source(s)
     {
         // Arbitrary upper limit to reduce peak memory usage
@@ -373,7 +373,7 @@ public:
     }
 
 private:
-    NoCopyInputStream& m_source;
+    InputStream& m_source;
     compression_stream m_strm = {};
     AppendBuffer<char> m_buffer;
 };
@@ -381,8 +381,7 @@ private:
 API_AVAILABLE_END
 #endif
 
-std::error_code decompress_none(NoCopyInputStream& compressed, Span<const char> compressed_buf,
-                                Span<char> decompressed_buf)
+std::error_code decompress_none(InputStream& compressed, Span<const char> compressed_buf, Span<char> decompressed_buf)
 {
     do {
         auto count = std::min(decompressed_buf.size(), compressed_buf.size());
@@ -397,8 +396,8 @@ std::error_code decompress_none(NoCopyInputStream& compressed, Span<const char> 
     return std::error_code{};
 }
 
-std::error_code decompress_zlib(NoCopyInputStream& compressed, Span<const char> compressed_buf,
-                                Span<char> decompressed_buf, bool has_header)
+std::error_code decompress_zlib(InputStream& compressed, Span<const char> compressed_buf, Span<char> decompressed_buf,
+                                bool has_header)
 {
     using namespace compression;
 
@@ -487,7 +486,7 @@ std::error_code decompress_zlib(NoCopyInputStream& compressed, Span<const char> 
 
 #if REALM_USE_LIBCOMPRESSION
 API_AVAILABLE_BEGIN(macos(10.11))
-std::error_code decompress_libcompression(NoCopyInputStream& compressed, Span<const char> compressed_buf,
+std::error_code decompress_libcompression(InputStream& compressed, Span<const char> compressed_buf,
                                           Span<char> decompressed_buf, Algorithm algorithm, bool has_header)
 {
     using namespace compression;
@@ -581,8 +580,8 @@ std::error_code decompress_libcompression(NoCopyInputStream& compressed, Span<co
 API_AVAILABLE_END
 #endif
 
-std::error_code decompress(NoCopyInputStream& compressed, Span<const char> compressed_buf,
-                           Span<char> decompressed_buf, Algorithm algorithm, bool has_header)
+std::error_code decompress(InputStream& compressed, Span<const char> compressed_buf, Span<char> decompressed_buf,
+                           Algorithm algorithm, bool has_header)
 {
     using namespace compression;
 
@@ -812,18 +811,18 @@ std::error_code compression::compress(Span<const char> uncompressed_buf, Span<ch
     return std::error_code{};
 }
 
-std::error_code compression::decompress(NoCopyInputStream& compressed, Span<char> decompressed_buf)
+std::error_code compression::decompress(InputStream& compressed, Span<char> decompressed_buf)
 {
     return ::decompress(compressed, compressed.next_block(), decompressed_buf, Algorithm::Deflate, true);
 }
 
 std::error_code compression::decompress(Span<const char> compressed_buf, Span<char> decompressed_buf)
 {
-    SimpleNoCopyInputStream adapter(compressed_buf);
+    SimpleInputStream adapter(compressed_buf);
     return ::decompress(adapter, adapter.next_block(), decompressed_buf, Algorithm::Deflate, true);
 }
 
-std::error_code compression::decompress_nonportable(NoCopyInputStream& compressed, AppendBuffer<char>& decompressed)
+std::error_code compression::decompress_nonportable(InputStream& compressed, AppendBuffer<char>& decompressed)
 {
     auto compressed_buf = compressed.next_block();
     auto header = read_header(compressed, compressed_buf);
@@ -926,8 +925,7 @@ util::AppendBuffer<char> compression::allocate_and_compress_nonportable(Span<con
     return compressed;
 }
 
-std::unique_ptr<NoCopyInputStream> compression::decompress_nonportable_input_stream(NoCopyInputStream& source,
-                                                                                    size_t& total_size)
+std::unique_ptr<InputStream> compression::decompress_nonportable_input_stream(InputStream& source, size_t& total_size)
 {
     auto first_block = source.next_block();
     auto header = read_header(source, first_block);
@@ -948,7 +946,7 @@ std::unique_ptr<NoCopyInputStream> compression::decompress_nonportable_input_str
     return nullptr;
 }
 
-size_t compression::get_uncompressed_size_from_header(NoCopyInputStream& source)
+size_t compression::get_uncompressed_size_from_header(InputStream& source)
 {
     auto first_block = source.next_block();
     return read_header(source, first_block).size;

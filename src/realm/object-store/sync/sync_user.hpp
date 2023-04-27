@@ -285,6 +285,10 @@ public:
     void register_session(std::shared_ptr<SyncSession>) REQUIRES(!m_mutex);
 
     /// Refreshes the custom data for this user
+    /// If update_location is true, the location metadata will be queried before the request
+    void refresh_custom_data(bool update_location,
+                             util::UniqueFunction<void(util::Optional<app::AppError>)> completion_block)
+        REQUIRES(!m_mutex);
     void refresh_custom_data(util::UniqueFunction<void(util::Optional<app::AppError>)> completion_block)
         REQUIRES(!m_mutex);
 
