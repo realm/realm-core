@@ -202,9 +202,9 @@ public:
     };
     struct Polygon {
     };
-    struct Sphere {
-    };
     struct Loop {
+    };
+    struct Sphere {
     };
 #if REALM_ENABLE_GEOSPATIAL
     GeospatialNode(Box, GeoPoint& p1, GeoPoint& p2);
