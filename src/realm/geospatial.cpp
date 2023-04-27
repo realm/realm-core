@@ -205,7 +205,7 @@ void Geospatial::assign_to(Obj& link) const
     if (type != Type::Point) {
         throw IllegalOperation("The only Geospatial type currently supported for storage is 'point'");
     }
-    GeoPoint point = get<GeoPoint>();
+    auto&& point = get<GeoPoint>();
     link.set(type_col, get_type_string());
     Lst<double> coords = link.get_list<double>(coords_col);
     if (coords.size() >= 1) {
@@ -281,7 +281,7 @@ bool Geospatial::is_within(const Geospatial& geometry) const noexcept
 {
     REALM_ASSERT(get_type() == Geospatial::Type::Point);
 
-    GeoPoint geo_point = mpark::get<GeoPoint>(m_value);
+    auto&& geo_point = mpark::get<GeoPoint>(m_value);
     auto point = S2LatLng::FromDegrees(geo_point.latitude, geo_point.longitude).ToPoint();
 
     auto& region = geometry.get_region();

@@ -75,7 +75,7 @@ public:
             }
             else if (prop.name == Geospatial::c_geo_point_coords_col_name) {
                 std::vector<std::any> coords;
-                GeoPoint point = geo->get<GeoPoint>(); // throws
+                auto&& point = geo->get<GeoPoint>(); // throws
                 coords.push_back(point.longitude);
                 coords.push_back(point.latitude);
                 if (point.has_altitude()) {

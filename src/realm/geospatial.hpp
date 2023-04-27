@@ -185,7 +185,7 @@ public:
     Type get_type() const noexcept;
 
     template <class T>
-    T get() const noexcept;
+    const T& get() const noexcept;
 
     bool is_valid() const noexcept
     {
@@ -218,25 +218,25 @@ private:
 };
 
 template <>
-inline GeoCenterSphere Geospatial::get<GeoCenterSphere>() const noexcept
+inline const GeoCenterSphere& Geospatial::get<GeoCenterSphere>() const noexcept
 {
     return mpark::get<GeoCenterSphere>(m_value);
 }
 
 template <>
-inline GeoBox Geospatial::get<GeoBox>() const noexcept
+inline const GeoBox& Geospatial::get<GeoBox>() const noexcept
 {
     return mpark::get<GeoBox>(m_value);
 }
 
 template <>
-inline GeoPoint Geospatial::get<GeoPoint>() const noexcept
+inline const GeoPoint& Geospatial::get<GeoPoint>() const noexcept
 {
     return mpark::get<GeoPoint>(m_value);
 }
 
 template <>
-inline GeoPolygon Geospatial::get<GeoPolygon>() const noexcept
+inline const GeoPolygon& Geospatial::get<GeoPolygon>() const noexcept
 {
     return mpark::get<GeoPolygon>(m_value);
 }
