@@ -476,43 +476,82 @@ TEST_CASE("An interrupted migration or rollback can recover on the next session"
     // Migrate to FLX
     trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
 
+    auto error_event_hook = [&config](sync::ProtocolError error, int& error_count) {
+        return [&config, &error_count, error](std::weak_ptr<SyncSession> weak_session,
+                                              const SyncClientHookData& data) mutable {
+            if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
+                return SyncClientHookAction::NoAction;
+            }
+            auto session = weak_session.lock();
+            REQUIRE(session);
+
+            if (session->path() != config.path) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
+
+            if (error_code == sync::ProtocolError::initial_sync_not_completed) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            REQUIRE(error_code == error);
+            ++error_count;
+            return SyncClientHookAction::NoAction;
+        };
+    };
+
     // Session is interrupted before the migration is completed.
     {
+        auto error_count = 0;
+        config.sync_config->on_sync_client_event_hook =
+            error_event_hook(sync::ProtocolError::migrate_to_flx, error_count);
         auto realm = Realm::get_shared_realm(config);
 
         timed_wait_for([&] {
             return util::File::exists(_impl::ClientResetOperation::get_fresh_path_for(config.path));
         });
 
-        // Restart the session to continue the client reset.
-        realm->sync_session()->restart_session();
+        // Pause then resume the session. This triggers the server to send a new client reset request.
+        realm->sync_session()->pause();
+        realm->sync_session()->resume();
 
         REQUIRE(!wait_for_upload(*realm));
         REQUIRE(!wait_for_download(*realm));
 
         auto table = realm->read_group().get_table("class_Object");
         CHECK(table->size() == 5);
+
+        // Client reset is requested twice.
+        REQUIRE(error_count == 2);
     }
 
     //  Roll back to PBS
-    trigger_server_migration(session.app_session(), false, logger_ptr);
+    trigger_server_migration(session.app_session(), RollbackToPBS, logger_ptr);
 
     // Session is interrupted before the rollback is completed.
     {
+        auto error_count = 0;
+        config.sync_config->on_sync_client_event_hook =
+            error_event_hook(sync::ProtocolError::revert_to_pbs, error_count);
         auto realm = Realm::get_shared_realm(config);
 
         timed_wait_for([&] {
             return util::File::exists(_impl::ClientResetOperation::get_fresh_path_for(config.path));
         });
 
-        // Restart the session to continue the client reset.
-        realm->sync_session()->restart_session();
+        // Pause then resume the session. This triggers the server to send a new client reset request.
+        realm->sync_session()->pause();
+        realm->sync_session()->resume();
 
         REQUIRE(!wait_for_upload(*realm));
         REQUIRE(!wait_for_download(*realm));
 
         auto table = realm->read_group().get_table("class_Object");
         CHECK(table->size() == 5);
+
+        // Client reset is requested twice.
+        REQUIRE(error_count == 2);
     }
 }
 
@@ -644,7 +683,7 @@ TEST_CASE("New table is synced after migration", "[flx][migration]") {
     }
 
     // Migrate to FLX
-    trigger_server_migration(session.app_session(), true, logger_ptr);
+    trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
 
     {
         auto realm = Realm::get_shared_realm(config);
@@ -701,6 +740,13 @@ TEST_CASE("New table is synced after migration", "[flx][migration]") {
         CHECK(table->size() == 5);
         auto table2 = realm->read_group().get_table("class_Object2");
         CHECK(table2->size() == 1);
+        auto sync_session = realm->sync_session();
+        REQUIRE(sync_session);
+        auto sub_store = sync_session->get_flx_subscription_store();
+        REQUIRE(sub_store);
+        auto active_subs = sub_store->get_active();
+        REQUIRE(active_subs.size() == 2);
+        REQUIRE(active_subs.find("flx_migrated_Object2"));
     }
 }
 
