@@ -44,29 +44,17 @@ namespace sync {
 //
 constexpr int get_current_protocol_version() noexcept
 {
-#ifdef REALM_SYNC_PROTOCOL_V8
     return 8;
-#else
-    return 7;
-#endif // REALM_SYNC_PROTOCOL_V8
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
 {
-#ifdef REALM_SYNC_PROTOCOL_V8
     return "com.mongodb.realm-sync#";
-#else
-    return "com.mongodb.realm-sync/";
-#endif // REALM_SYNC_PROTOCOL_V8
 }
 
 constexpr std::string_view get_flx_websocket_protocol_prefix() noexcept
 {
-#ifdef REALM_SYNC_PROTOCOL_V8
     return "com.mongodb.realm-query-sync#";
-#else
-    return "com.mongodb.realm-query-sync/";
-#endif // REALM_SYNC_PROTOCOL_V8
 }
 
 enum class SyncServerMode { PBS, FLX };

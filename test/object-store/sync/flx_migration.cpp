@@ -40,7 +40,7 @@ static void trigger_server_migration(const AppSession& app_session, MigrationMod
         else
             return "FLX->PBS Server rollback";
     }();
-    const int duration = 300; // 5 minutes, for now, since it sometimes takes longet than 90 seconds
+    const int duration = 300; // 5 minutes, for now, since it sometimes takes longer than 90 seconds
     try {
         timed_sleeping_wait_for(
             [&] {
@@ -239,8 +239,6 @@ TEST_CASE("Test server migration and rollback", "[flx][migration]") {
         check_data(pbs_realm, false, true);
     }
 }
-
-#ifdef REALM_SYNC_PROTOCOL_V8
 
 TEST_CASE("Test client migration and rollback", "[flx][migration]") {
     std::shared_ptr<util::Logger> logger_ptr =
@@ -600,14 +598,6 @@ TEST_CASE("Update to native FLX after migration", "[flx][migration]") {
         CHECK(table->size() == 7);
     }
 }
-
-TEST_CASE("Validate protocol v8 features", "[flx][migration]") {
-    REQUIRE(sync::get_current_protocol_version() >= 8);
-    REQUIRE("com.mongodb.realm-sync#" == sync::get_pbs_websocket_protocol_prefix());
-    REQUIRE("com.mongodb.realm-query-sync#" == sync::get_flx_websocket_protocol_prefix());
-}
-
-#endif // REALM_SYNC_PROTOCOL_V8
 
 #endif // REALM_ENABLE_AUTH_TESTS
 #endif // REALM_ENABLE_SYNC
