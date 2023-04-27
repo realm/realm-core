@@ -6095,7 +6095,6 @@ TEST(Query_FullTextMulti)
     // search with multiple terms
     CHECK_EQUAL(do_fulltext_find("one three"), Keys({7, 8}));
     CHECK_EQUAL(do_fulltext_find("three one"), Keys({7, 8}));
-    CHECK_EQUAL(do_fulltext_find("C# c++"), Keys({4}));
     CHECK_EQUAL(do_fulltext_find("1990s"), Keys({2, 4}));
     CHECK_EQUAL(do_fulltext_find("1990s c++"), Keys({4}));
     CHECK_EQUAL(do_fulltext_find("object gemstone"), Keys({2, 4}));
@@ -6130,17 +6129,16 @@ TEST(Query_FullTextMulti)
     CHECK_EQUAL(do_fulltext_find("-databases database"), Keys({1, 2, 4}));
 
     // invalid exclude searches
-    // FIXME shouldn't this simply return all excluding term?
+    // There should always be at least one mandatory term
     CHECK_THROW_ANY(do_fulltext_find("-databases"));
 
-    // wouldn't be better to not force user to verify that search is empty set?
+    // Token should only appear once
+    CHECK_THROW_ANY(do_fulltext_find("C# c++"));
     CHECK_THROW_ANY(do_fulltext_find("-object object"));
-    CHECK_NOTHROW(do_fulltext_find("object -object")); // FIXME ???
-
-    // FIXME that can't be right
-    CHECK_NOTHROW(do_fulltext_find("objects -object object"));
-    CHECK_NOTHROW(do_fulltext_find("object -object object"));
-    CHECK_NOTHROW(do_fulltext_find("database -database"));
+    CHECK_THROW_ANY(do_fulltext_find("object -object"));
+    CHECK_THROW_ANY(do_fulltext_find("objects -object object"));
+    CHECK_THROW_ANY(do_fulltext_find("object -object object"));
+    CHECK_THROW_ANY(do_fulltext_find("database -database"));
 
     // many terms
     CHECK_EQUAL(do_fulltext_find("object database management brown"), Keys({1}));
