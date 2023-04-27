@@ -201,9 +201,6 @@ functions:
               export ASAN_SYMBOLIZER_PATH="$(./evergreen/abspath.sh ${llvm_symbolizer})"
           fi
           if [[ -n "${enable_llvm_coverage}" ]]; then
-              LLVM_RUNNER="${llvm_runner|}"
-              LLVM_PROFDATA="${llvm_profdata|llvm-profdata}"
-              LLVM_COV="${llvm_cov|llvm-cov}"
               export LLVM_PROFILE_FILE="${task_name}-%p.profraw"
           fi
 
@@ -221,19 +218,55 @@ functions:
           cd build
           $CTEST -C ${cmake_build_type|Debug} $TEST_FLAGS
 
+    - command: shell.exec
+      params:
+        working_dir: realm-core
+        shell: bash
+        env:
+          COVERALLS_TOKEN: "${coveralls_token}"
+        script: |-
+          set -o errexit
+          set -o verbose
+
+          if [ -n "${xcode_developer_dir}" ]; then
+              export DEVELOPER_DIR="${xcode_developer_dir}"
+          fi
+
           if [[ "${enable_llvm_coverage}" && -n "${test_executable_name|}" ]]; then
-              find . -name ${task_name}-\*.profraw -exec "$LLVM_RUNNER" "$LLVM_PROFDATA" merge -sparse -o ${task_name}.profdata {} +
-              if [[ ! -f ${task_name}.profdata ]]; then
-                echo "No coverage data found"
-                exit 0
-              fi
-              TEST_EXECUTABLE_NAME="$(find . -name "${test_executable_name}" -type f)"
-              "$LLVM_RUNNER" "$LLVM_COV" show \
-                  --instr-profile=${task_name}.profdata \
-                  --format=html \
-                  --object="$TEST_EXECUTABLE_NAME" \
-                  --ignore-filename-regex='(src/)?external/' \
-                  --output-dir=coverage_report_${task_name}
+            export LLVM_PROFILE_FILE=$(find . -name "${task_name}-*.profraw")
+            if [[ ! -f "$LLVM_PROFILE_FILE" ]]; then
+              echo "No coverage data found"
+              exit 1
+            fi
+
+            curl -LsS "${grcov_url}" | tar -xj
+            chmod +x grcov
+
+            if [[ "$(umame -s)" == "Darwin" ]]; then
+              TEST_EXECUTABLE_NAME="$(find build -name "${test_executable_name}.app" -type d)"
+            else
+              TEST_EXECUTABLE_NAME="$(find build -name "${test_executable_name}" -type f)"
+            fi
+
+            TEST_DIR_NAME="$(dirname $TEST_EXECUTABLE_NAME)"
+            LLVM_PROFDATA_PATH="$(xcrun -f llvm-profdata)"
+            LLVM_PROFDATA_DIR="$(dirname $LLVM_PROFDATA_PATH)"
+
+           ./grcov . --source-dir . \
+                --binary-path ./build/test/Debug \
+                --llvm \
+                -t coveralls+ \
+                --branch \
+                --ignore-not-existing \
+                --llvm-path="$LLVM_PROFDATA_DIR" \
+                --token="$COVERALLS_TOKEN" \
+                --service-name="Evergreen" \
+                --service-job-id="${build_id}" \
+                --service-pull-request="${github_pr_number}" \
+                --commit-sha="${github_commit}" \
+                --vcs-branch="${branch_name}" \
+                --output-path=coveralls_${task_name}.json
+            curl -X POST https://coveralls.io/api/v1/jobs -F 'json_file=@coveralls_${task_name}.json'
           fi
 
   "upload test results":
@@ -262,42 +295,6 @@ functions:
       content_type: text/text
       display_name: install baas output
       optional: true
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      shell: bash
-      env:
-        AWS_ACCESS_KEY_ID: '${realm_artifacts_aws_access_key}'
-        AWS_SECRET_ACCESS_KEY: '${realm_artifacts_aws_secret_key}'
-        AWS_DEFAULT_REGION: us-east-1
-      script: |-
-        set -o errexit
-        set -o verbose
-
-        if [[ ! -d ./build/coverage_report_${task_name} ]]; then
-          echo "No coverage data found!"
-          echo "[]" > coverage_artifacts.json
-          exit 0
-        fi
-
-        cd build/coverage_report_${task_name}
-        aws s3 sync . \
-          "s3://realm-evergreen-artifacts/${project}/${branch_name}/${task_id}/${execution}/coverage_report/"
-
-        cat > ../../coverage_artifacts.json <<EOF
-        [
-          {
-            "name": "Coverage report",
-            "link": "https://s3.amazonaws.com/realm-evergreen-artifacts/${project}/${branch_name}/${task_id}/${execution}/coverage_report/index.html",
-            "visibility": "public"
-          }
-        ]
-        EOF
-
-  - command: attach.artifacts
-    params:
-      files:
-        - realm-core/coverage_artifacts.json
 
   "upload fuzzer results":
   - command: shell.exec
@@ -1192,12 +1189,11 @@ buildvariants:
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    cmake_build_type: Release
     run_tests_against_baas: On
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
-    llvm_runner: "xcrun"
     enable_llvm_coverage: On
+    grcov_url: "https://github.com/mozilla/grcov/releases/download/v0.8.18/grcov-aarch64-apple-darwin.tar.bz2"
   tasks:
   - name: compile_test
 
