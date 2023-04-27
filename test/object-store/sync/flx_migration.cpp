@@ -441,6 +441,19 @@ TEST_CASE("Test client migration and rollback with recovery", "[flx][migration]"
         REQUIRE(active_subs.size() == 1);
         REQUIRE(active_subs.find("flx_migrated_Object"));
     }
+
+    // Roll back to PBS once again
+    trigger_server_migration(session.app_session(), RollbackToPBS, logger_ptr);
+
+    {
+        auto realm = Realm::get_shared_realm(config);
+
+        REQUIRE(!wait_for_upload(*realm));
+        REQUIRE(!wait_for_download(*realm));
+
+        auto table = realm->read_group().get_table("class_Object");
+        REQUIRE(table->size() == 7);
+    }
 }
 
 TEST_CASE("An interrupted migration or rollback can recover on the next session", "[flx][migration]") {
@@ -649,6 +662,29 @@ TEST_CASE("Update to native FLX after migration", "[flx][migration]") {
         flx_realm->refresh();
         auto table = flx_realm->read_group().get_table("class_Object");
         CHECK(table->size() == 7);
+    }
+
+    //  Roll back to PBS
+    trigger_server_migration(session.app_session(), RollbackToPBS, logger_ptr);
+
+    // Connect again as native FLX: server replies with SwitchToPBS
+    {
+        SyncTestFile flx_config(session.app()->current_user(), server_app_config.schema,
+                                SyncConfig::FLXSyncEnabled{});
+        flx_config.path = config.path;
+
+        auto [err_promise, err_future] = util::make_promise_future<SyncError>();
+        util::CopyablePromiseHolder promise(std::move(err_promise));
+        flx_config.sync_config->error_handler =
+            [&logger_ptr, error_promise = std::move(promise)](std::shared_ptr<SyncSession>, SyncError err) mutable {
+                // This situation should return the switch_to_pbs error
+                logger_ptr->error("Server rolled back - connect as FLX received error: %1", err.reason());
+                error_promise.get_promise().emplace_value(std::move(err));
+            };
+        auto flx_realm = Realm::get_shared_realm(flx_config);
+        auto err = wait_for_future(std::move(err_future), std::chrono::seconds(30)).get();
+        REQUIRE(err.get_system_error() == make_error_code(sync::ProtocolError::switch_to_pbs));
+        REQUIRE(err.server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
     }
 }
 
