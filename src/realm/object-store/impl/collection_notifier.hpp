@@ -171,6 +171,11 @@ public:
         return m_have_callbacks;
     }
 
+    Transaction& transaction() const noexcept
+    {
+        return *m_transaction;
+    }
+
 protected:
     void add_changes(CollectionChangeBuilder change) REQUIRES(!m_callback_mutex);
     std::unique_lock<std::mutex> lock_target();
@@ -199,11 +204,6 @@ protected:
     bool all_callbacks_filtered() const noexcept;
 
     void update_related_tables(Table const& table) REQUIRES(m_callback_mutex);
-
-    Transaction& transaction() const noexcept
-    {
-        return *m_transaction;
-    }
 
     // The actual change, calculated in run() and delivered in prepare_handover()
     CollectionChangeBuilder m_change;

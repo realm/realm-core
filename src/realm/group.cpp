@@ -833,29 +833,23 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     // columns of other tables, however, to do that, we would have to
     // automatically remove the "offending" link columns from those other
     // tables. Such a behaviour is deemed too obscure, and we shall therefore
-    // require that a removed table does not contain foreigh origin backlink
+    // require that a removed table does not contain foreign origin backlink
     // columns.
     if (table->is_cross_table_link_target())
         throw CrossTableLinkTarget(table->get_name());
 
-    // There is no easy way for Group::TransactAdvancer to handle removal of
-    // tables that contain foreign target table link columns, because that
-    // involves removal of the corresponding backlink columns. For that reason,
-    // we start by removing all columns, which will generate individual
-    // replication instructions for each column removal with sufficient
-    // information for Group::TransactAdvancer to handle them.
-    size_t n = table->get_column_count();
-    Replication* repl = *get_repl();
-    if (repl) {
-        // This will prevent sync instructions for column removals to be generated
-        repl->prepare_erase_class(key);
-    }
-    for (size_t i = n; i > 0; --i) {
-        ColKey col_key = table->spec_ndx2colkey(i - 1);
-        table->remove_column(col_key);
+    {
+        // We don't want to replicate the individual column removals along the
+        // way as they're covered by the table removal
+        Table::DisableReplication dr(*table);
+        for (size_t i = table->get_column_count(); i > 0; --i) {
+            ColKey col_key = table->spec_ndx2colkey(i - 1);
+            table->remove_column(col_key);
+        }
     }
 
     size_t prior_num_tables = m_tables.size();
+    Replication* repl = *get_repl();
     if (repl)
         repl->erase_class(key, prior_num_tables); // Throws
 
@@ -1323,12 +1317,12 @@ public:
         return true; // No-op
     }
 
-    bool list_set(size_t)
+    bool collection_set(size_t)
     {
         return true;
     }
 
-    bool list_insert(size_t)
+    bool collection_insert(size_t)
     {
         return true;
     }
@@ -1366,46 +1360,21 @@ public:
         return true; // No-op
     }
 
-    bool list_move(size_t, size_t) noexcept
+    bool collection_move(size_t, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool list_erase(size_t) noexcept
+    bool collection_erase(size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool list_clear(size_t) noexcept
+    bool collection_clear(size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool dictionary_insert(size_t, Mixed)
-    {
-        return true; // No-op
-    }
-    bool dictionary_set(size_t, Mixed)
-    {
-        return true; // No-op
-    }
-    bool dictionary_erase(size_t, Mixed)
-    {
-        return true; // No-op
-    }
-
-    bool set_insert(size_t)
-    {
-        return true; // No-op
-    }
-    bool set_erase(size_t)
-    {
-        return true; // No-op
-    }
-    bool set_clear(size_t)
-    {
-        return true; // No-op
-    }
     bool typed_link_change(ColKey, TableKey)
     {
         return true; // No-op
@@ -1476,7 +1445,7 @@ void Group::refresh_dirty_accessors()
 }
 
 
-void Group::advance_transact(ref_type new_top_ref, util::NoCopyInputStream& in, bool writable)
+void Group::advance_transact(ref_type new_top_ref, util::NoCopyInputStream* in, bool writable)
 {
     REALM_ASSERT(is_attached());
     // Exception safety: If this function throws, the group accessor and all of
@@ -1513,10 +1482,10 @@ void Group::advance_transact(ref_type new_top_ref, util::NoCopyInputStream& in, 
     // This is no longer needed in Core, but we need to compute "schema_changed",
     // for the benefit of ObjectStore.
     bool schema_changed = false;
-    if (has_schema_change_notification_handler()) {
-        _impl::TransactLogParser parser; // Throws
+    if (in && has_schema_change_notification_handler()) {
         TransactAdvancer advancer(*this, schema_changed);
-        parser.parse(in, advancer); // Throws
+        _impl::TransactLogParser parser; // Throws
+        parser.parse(*in, advancer);     // Throws
     }
 
     m_top.detach();                                           // Soft detach
