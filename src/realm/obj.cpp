@@ -1163,78 +1163,94 @@ void out_mixed(std::ostream& out, const Mixed& val, JSONOutputMode output_mode)
 } // anonymous namespace
 
 template <typename F>
-std::string collection_to_json(Collection* collection, ColKey colkey, size_t level, size_t nested_levels, F& f)
+void Obj::print_leaf_collection(std::ostream& out, Collection* collection, ColKey col_key, F f) const
 {
-    // return "[]";
-
-    // TODO: Transform this in some iterative function.
-    std::stringstream out;
-    if (level == nested_levels) {
+    auto print_list = [&](CollectionBase* collection) {
+        auto sz = collection->size();
         out << "[";
-        auto list = (CollectionBase*)collection;
-        auto sz = list->size();
         for (size_t i = 0; i < sz; i++) {
             if (i > 0)
                 out << ",";
-            out << f(Mixed{}, list->get_any(i));
+            f(Mixed{}, collection->get_any(i));
         }
         out << "]";
-        return out.str();
+    };
+
+    auto print_dict = [&](const Dictionary& dict) {
+        out << "{";
+        bool first = true;
+        for (auto it : dict) {
+            if (!first)
+                out << ",";
+            first = false;
+            f(it.first, it.second);
+        }
+        out << "}";
+    };
+
+    if (col_key.is_list() || col_key.is_set()) {
+        auto list = dynamic_cast<CollectionBase*>(collection);
+        print_list(list);
+    }
+    else {
+        auto dict = dynamic_cast<Dictionary*>(collection);
+        print_dict(*dict);
+    }
+}
+
+void Obj::handle_nested_dictionary(std::ostream& out, CollectionList* collection_list, size_t ndx)
+{
+    auto index = collection_list->get_index(ndx);
+    auto on_col_key_index = [](ColKey) {
+        // not used
+    };
+    auto on_integer_index = [&](Int) {
+        // not used;
+    };
+    auto on_string_index = [&](StringData key) {
+        out << "\"" << key << "\":";
+    };
+    mpark::visit(util::overload{on_col_key_index, on_integer_index, on_string_index}, index);
+}
+
+template <typename F>
+void Obj::collection_to_json(std::ostream& out, const ColKey& col_key, Collection* collection, size_t level,
+                             size_t nested_levels, F& f) const
+{
+    if (level == nested_levels) {
+        print_leaf_collection(out, collection, col_key, f);
+        return;
+    }
+    // keep walking the tree up until we hit the leaf collection
+    auto type = m_table->get_nested_column_type(col_key, level);
+    auto sz = collection->size();
+    auto open = "[";
+    auto close = "]";
+    if (type == CollectionType::Dictionary) {
+        open = "{";
+        close = "}";
     }
 
-    // keep looking for the leaf level to print
-    out << "[";
-    auto sz = collection->size();
+    out << open;
     for (size_t i = 0; i < sz; ++i) {
         if (i > 0)
             out << ", ";
 
-        auto coll_list = (CollectionList*)collection;
-        if (level + 1 == nested_levels) {
+        auto coll_list = static_cast<CollectionList*>(collection);
+        if (type == CollectionType::Dictionary)
+            handle_nested_dictionary(out, coll_list, i);
+
+        const auto is_leaf_collection = (level + 1) == nested_levels;
+        if (is_leaf_collection) {
             auto coll = coll_list->get_collection(i);
-            out << collection_to_json(coll.get(), colkey, level + 1, nested_levels, f);
+            collection_to_json(out, col_key, coll.get(), level + 1, nested_levels, f);
         }
         else {
-            out << "[";
             auto coll = coll_list->get_collection_list(i);
-            out << collection_to_json(coll.get(), colkey, level + 1, nested_levels, f);
-            out << "]";
+            collection_to_json(out, col_key, coll.get(), level + 1, nested_levels, f);
         }
     }
-    out << "]";
-    return out.str();
-}
-
-template <typename F>
-std::string dictionary_to_json(Obj, ColKey, size_t, size_t, F&)
-{
-    // std::stringstream out;
-    // if( level < nested_levels) {
-    //     //keep looking for the level to print
-
-    //     auto coll_list = obj.get_collection_list(colkey);
-    //     auto sz = coll_list->size();
-    //     out << "{ ";
-    //     for(size_t i = 0; i<sz; ++i) {
-    //         if(i > 0)
-    //             out << ", ";
-    //         out << collection_to_json(obj, colkey, level+1, nested_levels, f);
-    //     }
-    //     out << " }";
-    //     return out.str();
-    // }
-
-    // out << "{ ";
-    // auto dict = obj.get_dictionary(ck);
-    // bool first = true;
-    // for (auto it : dict) {
-    //     if (!first)
-    //         out << ",";
-    //     first = false;
-    //     out << print_value(it.first, it.second);
-    // }
-    // out << " }";
-    // return out.str();
+    out << close;
 }
 
 void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
@@ -1306,8 +1322,7 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
             }
         }
 
-        auto print_value = [&](Mixed key, Mixed val) -> std::string {
-            std::stringstream out;
+        auto print_value = [&](Mixed key, Mixed val) {
             if (!key.is_null()) {
                 out_mixed(out, key, output_mode);
                 out << ":";
@@ -1338,18 +1353,18 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                     ObjLink link(tt->get_key(), obj_key);
                     if (obj_key.is_unresolved()) {
                         out << "null";
-                        return out.str();
+                        return;
                     }
                     if (!tt->is_embedded()) {
                         if (link_depth == 0) {
                             out << table_info << obj_key.value << table_info_close;
-                            return out.str();
+                            return;
                         }
                         if ((link_depth == realm::npos &&
                              std::find(followed.begin(), followed.end(), link) != followed.end())) {
                             // We have detected a cycle in links
                             out << "{ \"table\": \"" << tt->get_name() << "\", \"key\": " << obj_key.value << " }";
-                            return out.str();
+                            return;
                         }
                     }
 
@@ -1359,31 +1374,27 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
             else {
                 out_mixed(out, val, output_mode);
             }
-            return out.str();
         };
 
-        if (ck.is_list() || ck.is_set()) {
+        if (ck.is_list() || ck.is_set() || ck.get_attrs().test(col_attr_Dictionary)) {
             out << open_str;
             if (nesting_levels > 0) {
+                // explore all the nested levels
                 auto nested_coll = get_collection_list(ck);
-                out << collection_to_json(nested_coll.get(), ck, 0, nesting_levels, print_value);
+                collection_to_json(out, ck, nested_coll.get(), 0, nesting_levels, print_value);
             }
             else {
+                // straight into leaf level
                 auto base_collection = get_collection_ptr(ck);
-                out << collection_to_json(base_collection.get(), ck, 0, nesting_levels, print_value);
+                collection_to_json(out, ck, base_collection.get(), 0, nesting_levels, print_value);
             }
-            out << close_str;
-        }
-        else if (ck.get_attrs().test(col_attr_Dictionary)) {
-            out << open_str;
-            // out << dictionary_to_json(*this, ck, 0, nesting_levels, print_value);
             out << close_str;
         }
         else {
             auto val = get_any(ck);
             if (!val.is_null()) {
                 out << open_str;
-                out << print_value(Mixed{}, val);
+                print_value(Mixed{}, val);
                 out << close_str;
             }
             else {
