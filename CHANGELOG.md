@@ -2,7 +2,7 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Enable PBS to FLX Migration feature that will migrate the local realm to use FLX if the server has been migrated to FLX. ([#6342](https://github.com/realm/realm-core/issues/6342))
+* PBS to FLX Migration for migrating a client app that uses partition based sync to use flexible sync under the hood if the server has been migrated to flexible sync. ([#6554](https://github.com/realm/realm-core/issues/6342))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

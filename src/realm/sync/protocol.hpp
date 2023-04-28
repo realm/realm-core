@@ -44,6 +44,8 @@ namespace sync {
 //
 constexpr int get_current_protocol_version() noexcept
 {
+    // Also update the current protocol version test in flx_sync.cpp when
+    // updating this value
     return 8;
 }
 

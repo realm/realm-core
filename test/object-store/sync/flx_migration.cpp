@@ -13,7 +13,6 @@
 #include <catch2/catch_all.hpp>
 #include <chrono>
 
-
 #if REALM_ENABLE_SYNC
 #if REALM_ENABLE_AUTH_TESTS
 
@@ -40,7 +39,7 @@ static void trigger_server_migration(const AppSession& app_session, MigrationMod
         else
             return "FLX->PBS Server rollback";
     }();
-    const int duration = 300; // 5 minutes, for now, since it sometimes takes longer than 90 seconds
+    const int duration = 480; // 8 minutes, for now, since it sometimes takes longer than 300 seconds
     try {
         timed_sleeping_wait_for(
             [&] {
