@@ -12,11 +12,11 @@ using realm::sync::Changeset;
 namespace {
 Changeset encode_then_parse(const Changeset& changeset)
 {
-    using realm::util::SimpleNoCopyInputStream;
+    using realm::util::SimpleInputStream;
 
     sync::ChangesetEncoder::Buffer buffer;
     encode_changeset(changeset, buffer);
-    SimpleNoCopyInputStream stream{buffer};
+    SimpleInputStream stream{buffer};
     Changeset parsed;
     parse_changeset(stream, parsed);
     return parsed;
@@ -288,8 +288,8 @@ TEST(ChangesetEncoding_AccentWords)
     encoder.intern_string("Program");
     auto& buffer = encoder.buffer();
 
-    using realm::util::SimpleNoCopyInputStream;
-    SimpleNoCopyInputStream stream{buffer};
+    using realm::util::SimpleInputStream;
+    SimpleInputStream stream{buffer};
     Changeset parsed;
     // This will throw if a string is interned twice.
     CHECK_NOTHROW(parse_changeset(stream, parsed));
@@ -317,7 +317,7 @@ void encode_string(util::AppendBuffer<char>& buffer, uint32_t index, std::string
 
 #define CHECK_BADCHANGESET(buffer, msg)                                                                              \
     do {                                                                                                             \
-        util::SimpleNoCopyInputStream stream{buffer};                                                                \
+        util::SimpleInputStream stream{buffer};                                                                      \
         Changeset parsed;                                                                                            \
         CHECK_THROW_EX(parse_changeset(stream, parsed), sync::BadChangesetError,                                     \
                        StringData(e.what()).contains(msg));                                                          \
@@ -336,7 +336,7 @@ TEST(ChangesetParser_GoodInternString)
     encode_string(buffer, 0, "a");
     encode_string(buffer, 1, "b");
 
-    util::SimpleNoCopyInputStream stream{buffer};
+    util::SimpleInputStream stream{buffer};
     Changeset parsed;
     CHECK_NOTHROW(parse_changeset(stream, parsed));
 }

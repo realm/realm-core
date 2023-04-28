@@ -16,12 +16,9 @@
  *
  **************************************************************************/
 
-#include <realm/global_key.hpp>
 #include <realm/impl/transact_log.hpp>
-#include <realm/list.hpp>
 
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 
 bool TransactLogEncoder::select_table(TableKey key)
@@ -33,39 +30,7 @@ bool TransactLogEncoder::select_table(TableKey key)
 
 bool TransactLogEncoder::select_collection(ColKey col_key, ObjKey key)
 {
-    append_simple_instr(instr_SelectList, col_key, key.value); // Throws
-    return true;
-}
-
-/******************************** Dictionary *********************************/
-
-bool TransactLogEncoder::dictionary_insert(size_t dict_ndx, Mixed key)
-{
-    REALM_ASSERT(key.get_type() == type_String);
-    append_string_instr(instr_DictionaryInsert, key.get_string()); // Throws
-    append_simple_instr(dict_ndx);
-    return true;
-}
-
-bool TransactLogEncoder::dictionary_set(size_t dict_ndx, Mixed key)
-{
-    REALM_ASSERT(key.get_type() == type_String);
-    append_string_instr(instr_DictionarySet, key.get_string()); // Throws
-    append_simple_instr(dict_ndx);
-    return true;
-}
-
-bool TransactLogEncoder::dictionary_erase(size_t ndx, Mixed key)
-{
-    REALM_ASSERT(key.get_type() == type_String);
-    append_string_instr(instr_DictionaryErase, key.get_string()); // Throws
-    append_simple_instr(ndx);
-    return true;
-}
-
-bool TransactLogEncoder::dictionary_clear(size_t dict_size)
-{
-    append_simple_instr(instr_DictionaryClear, dict_size); // Throws
+    append_simple_instr(instr_SelectCollection, col_key, key.value); // Throws
     return true;
 }
 
@@ -76,5 +41,4 @@ void TransactLogParser::parser_error() const
     throw Exception(ErrorCodes::BadChangeset, "Bad transaction log");
 }
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl

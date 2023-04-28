@@ -17,10 +17,10 @@ using namespace realm::sync;
 namespace {
 
 struct State {
-    util::NoCopyInputStream& m_input;
+    util::InputStream& m_input;
     InstructionHandler& m_handler;
 
-    explicit State(util::NoCopyInputStream& input, InstructionHandler& handler)
+    explicit State(util::InputStream& input, InstructionHandler& handler)
         : m_input(input)
         , m_handler(handler)
     {
@@ -670,17 +670,9 @@ void State::parser_error(const char* complaints)
 
 } // anonymous namespace
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 void parse_changeset(util::InputStream& input, Changeset& out_log)
-{
-    util::Buffer<char> input_buffer{1024};
-    util::NoCopyInputStreamAdaptor in_2{input, input_buffer};
-    return parse_changeset(in_2, out_log);
-}
-
-void parse_changeset(util::NoCopyInputStream& input, Changeset& out_log)
 {
     InstructionBuilder builder{out_log};
     State state{input, builder};
@@ -695,7 +687,7 @@ OwnedMixed parse_base64_encoded_primary_key(std::string_view str)
     if (!bin_encoded) {
         throw BadChangesetError("invalid base64 in base64-encoded primary key");
     }
-    util::SimpleNoCopyInputStream stream(*bin_encoded);
+    util::SimpleInputStream stream(*bin_encoded);
     UnreachableInstructionHandler fake_encoder;
     State state{stream, fake_encoder};
     using Type = Instruction::Payload::Type;
@@ -722,5 +714,4 @@ OwnedMixed parse_base64_encoded_primary_key(std::string_view str)
     }
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
