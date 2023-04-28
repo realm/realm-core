@@ -788,7 +788,7 @@ tasks:
                   "status": "done"
                   }
                 }' \
-            'https://coveralls.io/webhook?repo_token=$COVERALLS_TOKEN&carryforward=macos-arm64,ubuntu-x86_64'
+            "https://coveralls.io/webhook?repo_token=$COVERALLS_TOKEN&carryforward=macos-arm64,ubuntu-x86_64"
 
 - name: lint
   tags: [ "for_pull_requests" ]
