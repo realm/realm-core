@@ -710,7 +710,7 @@ tasks:
         set -o errexit
         set -o verbose
 
-        if [ -n "${xcode_developer_dir}" ]; then
+        if [[ -n "${xcode_developer_dir}" ]]; then
             export DEVELOPER_DIR="${xcode_developer_dir}"
         fi
 
@@ -730,8 +730,15 @@ tasks:
         curl -LsS "${grcov_url}" | tar -xj
         chmod +x grcov
 
-        LLVM_PROFDATA_PATH="$(xcrun -f llvm-profdata)"
-        LLVM_PROFDATA_DIR="$(dirname $LLVM_PROFDATA_PATH)"
+        if [[ -d ./clang_binaries/bin ]]; then
+          LLVM_PROFDATA_DIR="$(evergreen/abspath.sh ./clang_binaries/bin)"
+        elif [[ "$(uname -s)" == "Darwin" ]]; then
+          LLVM_PROFDATA_PATH="$(xcrun -f llvm-profdata)"
+          LLVM_PROFDATA_DIR="$(dirname $LLVM_PROFDATA_PATH)"
+        else
+          echo "Missing path to clang binaries."
+          exit 1
+        fi
 
         ./grcov ./coverage_data --source-dir . \
             --binary-path ./coverage_binaries \
@@ -743,11 +750,45 @@ tasks:
             --token="$COVERALLS_TOKEN" \
             --service-name="Evergreen" \
             --service-job-id="${task_id}" \
+            --service-number="${revision_order_id}" \
             --service-pull-request="${github_pr_number}" \
+            --service-flag-name="${coveralls_flag_name}" \
             --commit-sha="${github_commit}" \
             --vcs-branch="${branch_name}" \
+            --parallel \
             --output-path=coveralls_${task_name}.json
+
         curl -X POST https://coveralls.io/api/v1/jobs -F 'json_file=@coveralls_${task_name}.json'
+
+- name: finalize_coverage_data
+  display_name: Finalize Coverage Data
+  tags: [ "for_pull_requests" ]
+  depends_on:
+    - name: "process_coverage_data"
+      variant: "*"
+      status: "*"
+  commands:
+    - command: shell.exec
+      params:
+        shell: bash
+        env:
+          COVERALLS_TOKEN: "${coveralls_token}"
+        script: |-
+          set -o errexit
+
+          if [[ -z "${enable_llvm_coverage}" ]]; then
+            exit 0
+          fi
+
+          curl -X POST \
+            -H 'Content-Type: application/json' \
+            -d '{
+                  "payload": {
+                  "build_num": "${revision_order_id}",
+                  "status": "done"
+                  }
+                }' \
+            'https://coveralls.io/webhook?repo_token=$COVERALLS_TOKEN&carryforward=macos-arm64,ubuntu-x86_64'
 
 - name: lint
   tags: [ "for_pull_requests" ]
@@ -1243,9 +1284,28 @@ buildvariants:
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     enable_llvm_coverage: On
+    coveralls_flag_name: "macos-arm64"
     grcov_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/grcov-aarch64-apple-darwin.tar.bz2"
   tasks:
   - name: compile_test_coverage
+
+- name: ubuntu-coverage
+  display_name: "Ubuntu (Code Coverage)"
+  run_on: ubuntu2004-large
+  expansions:
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    run_tests_against_baas: On
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+    enable_llvm_coverage: On
+    coveralls_flag_name: "ubuntu-x86_64"
+    grcov_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/grcov-x86_64-unknown-linux-gnu.tar.bz2"
+  tasks:
+  - name: compile_test_coverage
+  - name: finalize_coverage_data
 
 - name: windows-64-vs2019
   display_name: "Windows x86_64 (VS 2019)"
