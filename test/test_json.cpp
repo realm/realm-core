@@ -556,7 +556,7 @@ TEST(Xjson_LinkList1)
     CHECK(json_test(ss.str(), "expected_xjson_plus_linklist2", generate_all));
 }
 
-ONLY(Xjson_NestedJsonTest)
+TEST(Xjson_NestedJsonTest)
 {
     Group group;
 
@@ -577,7 +577,7 @@ ONLY(Xjson_NestedJsonTest)
     ColKey table5NestedCollDict = table5->add_column(type_Int, "dict_dict_int", false,
                                                      {{CollectionType::Dictionary, CollectionType::Dictionary}});
 
-    //add some rows
+    // add some rows
     auto obj1 = table1->create_object_with_primary_key("t1o1");
     auto obj2 = table2->create_object_with_primary_key("t2o1");
     auto obj3 = table3->create_object_with_primary_key("t3o1");
