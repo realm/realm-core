@@ -104,10 +104,9 @@ TEST(Query_GeoWithinBasics)
     CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}}).count(), 1);
     CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{-2, -1.5}, GeoPoint{0.7, 0.5}}).count(), 3);
 
-    GeoPolygon p{{{GeoPoint{-0.5, -0.5}, GeoPoint{1.0, 2.5}, GeoPoint{2.5, -0.5}}}};
+    GeoPolygon p{{GeoPoint{-0.5, -0.5}, GeoPoint{1.0, 2.5}, GeoPoint{2.5, -0.5}}};
     CHECK_EQUAL(location.geo_within(p).count(), 3);
-    p = {{{GeoPoint{-3.0, -1.0}, GeoPoint{-2.0, -2.0}, GeoPoint{-1.0, -1.0}, GeoPoint{1.5, -1.0},
-           GeoPoint{-1.0, 1.5}}}};
+    p = {{{-3.0, -1.0}, {-2.0, -2.0}, {-1.0, -1.0}, {1.5, -1.0}, {-1.0, 1.5}}};
     CHECK_EQUAL(location.geo_within(p).count(), 2);
 
     CHECK_EQUAL(location.geo_within(GeoCenterSphere::from_kms(150.0, GeoPoint{1.0, 0.5})).count(), 3);
@@ -124,7 +123,7 @@ TEST(Geospatial_MeridianQuery)
     TableRef table = setup_with_points(g, points);
     ColKey location_column_key = table->get_column_key("location");
     Geospatial meridianCrossingPoly{
-        GeoPolygon{{{{-178.0, 10.0}, {178.0, 10.0}, {178.0, -10.0}, {-178.0, -10.0}, {-178.0, 10.0}}}}};
+        GeoPolygon{{{-178.0, 10.0}, {178.0, 10.0}, {178.0, -10.0}, {-178.0, -10.0}, {-178.0, 10.0}}}};
     size_t num_results = table->column<Link>(location_column_key).geo_within(meridianCrossingPoly).count();
     CHECK_EQUAL(num_results, 3);
 }
@@ -137,7 +136,7 @@ TEST(Geospatial_EquatorQuery)
                                       GeoPoint{179.0, 1.0}};
     TableRef table = setup_with_points(g, points);
     ColKey location_column_key = table->get_column_key("location");
-    Geospatial horizontalPoly{GeoPolygon{{{{30.0, 1.0}, {-30.0, 1.0}, {-30.0, -1.0}, {30.0, -1.0}, {30.0, 1.0}}}}};
+    Geospatial horizontalPoly{GeoPolygon{{{30.0, 1.0}, {-30.0, 1.0}, {-30.0, -1.0}, {30.0, -1.0}, {30.0, 1.0}}}};
     size_t num_results = table->column<Link>(location_column_key).geo_within(horizontalPoly).count();
     CHECK_EQUAL(num_results, 1);
 }
@@ -169,8 +168,7 @@ TEST(Geospatial_GeoWithinShapes)
     std::vector<Geospatial> shapes = {
         Geospatial{GeoCenterSphere{1, GeoPoint{0, 0}}},
         Geospatial{GeoBox{GeoPoint{-5, -5}, GeoPoint{5, 5}}},
-        Geospatial{
-            GeoPolygon{{{{GeoPoint{-5, -5}, GeoPoint{5, -5}, GeoPoint{5, 5}, GeoPoint{-5, 5}, GeoPoint{-5, -5}}}}}},
+        Geospatial{GeoPolygon{{{-5, -5}, {5, -5}, {5, 5}, {-5, 5}, {-5, -5}}}},
     };
     for (auto& shape : shapes) {
         Query query = table->column<Link>(location_column_key).geo_within(shape);
