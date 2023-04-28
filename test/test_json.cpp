@@ -577,13 +577,13 @@ TEST(Xjson_NestedJsonTest)
     ColKey table5NestedCollDict = table5->add_column(type_Int, "dict_dict_int", false,
                                                      {{CollectionType::Dictionary, CollectionType::Dictionary}});
 
-    // add some rows
+    // add some rows to test basic nested collections
     auto obj1 = table1->create_object_with_primary_key("t1o1");
     auto obj2 = table2->create_object_with_primary_key("t2o1");
     auto obj3 = table3->create_object_with_primary_key("t3o1");
     auto obj4 = table4->create_object_with_primary_key("t4o1");
     auto obj5 = table5->create_object_with_primary_key("t5o1");
-
+    //[[1,2,3],[4,5],[6,7,8]]
     CollectionListPtr list1 = obj1.get_collection_list(table1NestedListColl);
     CHECK(list1->is_empty());
     auto collection1_1 = list1->insert_collection(0);
@@ -598,13 +598,14 @@ TEST(Xjson_NestedJsonTest)
     dynamic_cast<Lst<Int>*>(collection1_3.get())->add(6);
     dynamic_cast<Lst<Int>*>(collection1_4.get())->add(7);
     dynamic_cast<Lst<Int>*>(collection1_4.get())->add(8);
-
+    //[[1],[2]]
     CollectionListPtr list2 = obj2.get_collection_list(table2NestedListColl);
     CHECK(list2->is_empty());
     auto collection2_1 = list2->insert_collection(0);
     auto collection2_2 = list2->insert_collection(1);
     dynamic_cast<Lst<Int>*>(collection2_1.get())->add(1);
     dynamic_cast<Lst<Int>*>(collection2_2.get())->add(2);
+    //{"Foo":[1,2,3], "Foo1":[4,5], "Foo2":[6,7,8]}
     auto dict = obj3.get_collection_list(table3NestedCollDict);
     auto inner_list1 = dict->insert_collection("Foo");
     dynamic_cast<Lst<Int>*>(inner_list1.get())->add(1);
@@ -617,7 +618,7 @@ TEST(Xjson_NestedJsonTest)
     dynamic_cast<Lst<Int>*>(inner_list3.get())->add(6);
     dynamic_cast<Lst<Int>*>(inner_list3.get())->add(7);
     dynamic_cast<Lst<Int>*>(inner_list3.get())->add(8);
-
+    //[{"Key1":10,"Key2":10,"Key3":10}, {"Key1":20,"Key2":20,"Key3":20}]
     CollectionListPtr list4 = obj4.get_collection_list(table4NestedCollDict);
     CHECK(list4->is_empty());
     auto coll_ptr1 = list4->insert_collection(0);
@@ -630,7 +631,7 @@ TEST(Xjson_NestedJsonTest)
     dict4_2->insert("Key1", 20);
     dict4_2->insert("Key2", 20);
     dict4_2->insert("Key3", 20);
-
+    //{"Foo":{"Key1":10,"Key2":10,"Key3":10}, "Foo1":{"Key1":20,"Key2":20,"Key3":20}}
     CollectionListPtr list5 = obj5.get_collection_list(table5NestedCollDict);
     CHECK(list5->is_empty());
     auto coll_ptr3 = list5->insert_collection("Foo");
@@ -646,7 +647,6 @@ TEST(Xjson_NestedJsonTest)
 
     std::stringstream ss;
 
-    // Now try different link_depth arguments
     table1->to_json(ss, 0, no_renames, output_mode_xjson);
     CHECK(json_test(ss.str(), "expected_xjson_nested_linklist1", generate_all));
 
@@ -665,6 +665,42 @@ TEST(Xjson_NestedJsonTest)
     ss.str("");
     table5->to_json(ss, 0, no_renames, output_mode_json);
     CHECK(json_test(ss.str(), "expected_xjson_nested_dictionary3", generate_all));
+
+    // test links
+
+    // List<Dictionary<Link>>
+    auto link_col1 = table1->add_column(*table2, "obj_list_dict", {CollectionType::List, CollectionType::Dictionary});
+    table1->create_object_with_primary_key("to1_list_dict_link");
+    auto list_link1 = obj1.get_collection_list(link_col1);
+    CHECK(list_link1->is_empty());
+    dynamic_cast<Dictionary*>(list_link1->insert_collection(0).get())->insert("Link_Key", obj2.get_key());
+
+    // List<List<Link>>
+    auto link_col2 = table1->add_column(*table2, "obj_list_list", {CollectionType::List, CollectionType::List});
+    table1->create_object_with_primary_key("to1_list_list_link");
+    auto list_link2 = obj1.get_collection_list(link_col2);
+    CHECK(list_link2->is_empty());
+    dynamic_cast<LnkLst*>(list_link2->insert_collection(0).get())->add(obj3.get_key());
+
+    // Dictionary<List<Link>>
+    auto link_col3 = table1->add_column(*table2, "obj_dict_list", {CollectionType::Dictionary, CollectionType::List});
+    table1->create_object_with_primary_key("to1_dict_list_link");
+    auto list_link3 = obj1.get_collection_list(link_col3);
+    CHECK(list_link3->is_empty());
+    dynamic_cast<LnkLst*>(list_link3->insert_collection("Link_Key").get())->add(obj4.get_key());
+
+    // Dictionary<Dictionary<Link>>
+    auto link_col4 =
+        table1->add_column(*table2, "obj_dict_dict", {CollectionType::Dictionary, CollectionType::Dictionary});
+    table1->create_object_with_primary_key("to1_dict_dict_link");
+    auto list_link4 = obj1.get_collection_list(link_col4);
+    CHECK(list_link4->is_empty());
+    dynamic_cast<Dictionary*>(list_link4->insert_collection("Link_Key").get())
+        ->insert("Link_Key_Nested", obj5.get_key());
+
+    ss.str("");
+    table1->to_json(ss, 0, no_renames, output_mode_xjson_plus);
+    CHECK(json_test(ss.str(), "expected_xjson_nested_links", generate_all));
 }
 
 TEST(Xjson_LinkSet1)
