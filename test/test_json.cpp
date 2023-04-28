@@ -556,7 +556,7 @@ TEST(Xjson_LinkList1)
     CHECK(json_test(ss.str(), "expected_xjson_plus_linklist2", generate_all));
 }
 
-TEST(Xjson_NestedJsonTest)
+ONLY(Xjson_NestedJsonTest)
 {
     Group group;
 
@@ -577,7 +577,7 @@ TEST(Xjson_NestedJsonTest)
     ColKey table5NestedCollDict = table5->add_column(type_Int, "dict_dict_int", false,
                                                      {{CollectionType::Dictionary, CollectionType::Dictionary}});
 
-    // // add some rows
+    //add some rows
     auto obj1 = table1->create_object_with_primary_key("t1o1");
     auto obj2 = table2->create_object_with_primary_key("t2o1");
     auto obj3 = table3->create_object_with_primary_key("t3o1");
@@ -648,23 +648,23 @@ TEST(Xjson_NestedJsonTest)
 
     // Now try different link_depth arguments
     table1->to_json(ss, 0, no_renames, output_mode_xjson);
-    CHECK(json_test(ss.str(), "expected_xjson_nestedlinklist1", true));
+    CHECK(json_test(ss.str(), "expected_xjson_nested_linklist1", generate_all));
 
     ss.str("");
     table2->to_json(ss, 0, no_renames, output_mode_xjson);
-    CHECK(json_test(ss.str(), "expected_xjson_nestedlinklist2", true));
+    CHECK(json_test(ss.str(), "expected_xjson_nested_linklist2", generate_all));
 
     ss.str("");
     table3->to_json(ss, 0, no_renames, output_mode_json);
-    CHECK(json_test(ss.str(), "expected_xjson_nested_dictionary1", true));
+    CHECK(json_test(ss.str(), "expected_xjson_nested_dictionary1", generate_all));
 
     ss.str("");
     table4->to_json(ss, 0, no_renames, output_mode_json);
-    CHECK(json_test(ss.str(), "expected_xjson_nested_dictionary2", true));
+    CHECK(json_test(ss.str(), "expected_xjson_nested_dictionary2", generate_all));
 
     ss.str("");
     table5->to_json(ss, 0, no_renames, output_mode_json);
-    CHECK(json_test(ss.str(), "expected_xjson_nested_dictionary3", true));
+    CHECK(json_test(ss.str(), "expected_xjson_nested_dictionary3", generate_all));
 }
 
 TEST(Xjson_LinkSet1)
