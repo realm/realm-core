@@ -42,16 +42,22 @@ public:
         NotMigrated,
         InProgress,
         Migrated,
+        RollbackInProgress,
     };
 
     static MigrationStoreRef create(DBRef db);
 
-    // Converts the configuration from PBS to FLX if a migration is in progress or completed, otherwise returns the
-    // passed in config object.
+    // Converts the configuration from PBS to FLX if a migration or rollback is in progress or completed, otherwise
+    // returns the passed in config object.
     std::shared_ptr<realm::SyncConfig> convert_sync_config(std::shared_ptr<realm::SyncConfig> config);
+    // Convert a configuration from PBS to FLX. No-op if already an FLX configuration.
+    static std::shared_ptr<realm::SyncConfig> convert_sync_config_to_flx(std::shared_ptr<realm::SyncConfig> config);
 
     // Called when the server responds with migrate to FLX and stores the FLX subscription RQL query string.
     void migrate_to_flx(std::string_view rql_query_string, std::string_view partition_value);
+
+    // Called when the server responds with rollback to PBS.
+    void rollback_to_pbs();
 
     // Clear the migrated state
     void cancel_migration();
@@ -60,9 +66,12 @@ public:
     bool is_migration_in_progress();
     // Has the client migration to FLX completed?
     bool is_migrated();
+    // Is a client rollback to PBS in progress?
+    bool is_rollback_in_progress();
 
-    // Mark the migration complete and update the state. No-op if not in 'InProgress' state.
-    void complete_migration();
+    // Mark the migration or rollback complete and update the state. No-op if not in 'InProgress' or
+    // 'RollbackInProgress' state.
+    void complete_migration_or_rollback();
 
     std::optional<std::string> get_migrated_partition();
     std::optional<std::string> get_query_string();

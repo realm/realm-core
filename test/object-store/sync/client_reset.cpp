@@ -956,6 +956,40 @@ TEST_CASE("sync: client reset", "[client reset]") {
             }
         }
 
+        SECTION("an interrupted reset can recover on the next session restart") {
+            test_reset->disable_wait_for_reset_completion();
+            SharedRealm realm;
+            test_reset
+                ->on_post_local_changes([&](SharedRealm local) {
+                    // retain a reference of the realm.
+                    realm = local;
+                })
+                ->run();
+
+            timed_wait_for([&] {
+                return util::File::exists(_impl::ClientResetOperation::get_fresh_path_for(local_config.path));
+            });
+
+            // Restart the session before the client reset finishes.
+            realm->sync_session()->restart_session();
+
+            REQUIRE(!wait_for_upload(*realm));
+            REQUIRE(!wait_for_download(*realm));
+            realm->refresh();
+
+            auto table = realm->read_group().get_table("class_object");
+            REQUIRE(table->size() == 1);
+            auto col = table->get_column_key("value");
+            int64_t value = table->begin()->get<Int>(col);
+            REQUIRE(value == 6);
+
+            {
+                std::lock_guard<std::mutex> lock(mtx);
+                REQUIRE(before_callback_invoctions == 1);
+                REQUIRE(after_callback_invocations == 1);
+            }
+        }
+
         SECTION("invalid files at the fresh copy path are cleaned up") {
             ThreadSafeSyncError err;
             local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
