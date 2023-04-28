@@ -1198,6 +1198,9 @@ void StringIndex::find_all_fulltext(std::vector<ObjKey>& result, StringData valu
     // Order the tokens so that we handle words to match first
     for (auto& info : token_info) {
         auto start = std::get<0>(info.second.ranges[0]);
+        if (info.second.ranges.size() > 1) {
+            throw InvalidArgument("Search token should only appear once");
+        }
         bool exclude = start == 0 ? false : value[start - 1] == '-';
         auto it = tokens.insert(exclude_start, {info.first, exclude});
         if (exclude) {
