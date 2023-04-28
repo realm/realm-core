@@ -205,7 +205,20 @@ functions:
               export ASAN_SYMBOLIZER_PATH="$(./evergreen/abspath.sh ${llvm_symbolizer})"
           fi
           if [[ -n "${enable_llvm_coverage}" ]]; then
-              export LLVM_PROFILE_FILE="${task_name}-%p.profraw"
+              if [[ -z "${test_executable_name}" ]]; then
+                echo "Missing executable name"
+                exit 1
+              fi
+              [[ -d coverage_data ]] || mkdir coverage_data
+              [[ -d coverage_binaries ]] || mkdir coverage_binaries
+              export LLVM_PROFILE_FILE="$(pwd)/coverage_data/${task_name}-%p.profraw"
+              EXECUTABLE_PATH=$(find build -name ${test_executable_name} -type f)
+              EXECUTABLE_PATH=$(./evergreen/abspath.sh $EXECUTABLE_PATH)
+              if [[ -z "$EXECUTABLE_PATH" || ! -f "$EXECUTABLE_PATH" ]]; then
+                echo "Invalid executable path $EXECUTABLE_PATH"
+                exit 1
+              fi
+              ln -s $EXECUTABLE_PATH coverage_binaries/${test_executable_name}
           fi
 
           export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
@@ -221,57 +234,6 @@ functions:
 
           cd build
           $CTEST -C ${cmake_build_type|Debug} $TEST_FLAGS
-
-    - command: shell.exec
-      params:
-        working_dir: realm-core
-        shell: bash
-        env:
-          COVERALLS_TOKEN: "${coveralls_token}"
-        script: |-
-          set -o errexit
-          set -o verbose
-
-          if [ -n "${xcode_developer_dir}" ]; then
-              export DEVELOPER_DIR="${xcode_developer_dir}"
-          fi
-
-          if [[ "${enable_llvm_coverage}" && -n "${test_executable_name|}" ]]; then
-            export LLVM_PROFILE_FILE=$(find . -name "${task_name}-*.profraw")
-            if [[ ! -f "$LLVM_PROFILE_FILE" ]]; then
-              echo "No coverage data found"
-              exit 1
-            fi
-
-            curl -LsS "${grcov_url}" | tar -xj
-            chmod +x grcov
-
-            if [[ "$(umame -s)" == "Darwin" ]]; then
-              TEST_EXECUTABLE_NAME="$(find build -name "${test_executable_name}.app" -type d)"
-            else
-              TEST_EXECUTABLE_NAME="$(find build -name "${test_executable_name}" -type f)"
-            fi
-
-            TEST_DIR_NAME="$(dirname $TEST_EXECUTABLE_NAME)"
-            LLVM_PROFDATA_PATH="$(xcrun -f llvm-profdata)"
-            LLVM_PROFDATA_DIR="$(dirname $LLVM_PROFDATA_PATH)"
-
-           ./grcov . --source-dir . \
-                --binary-path ./build/test/Debug \
-                --llvm \
-                -t coveralls+ \
-                --branch \
-                --ignore-not-existing \
-                --llvm-path="$LLVM_PROFDATA_DIR" \
-                --token="$COVERALLS_TOKEN" \
-                --service-name="Evergreen" \
-                --service-job-id="${build_id}" \
-                --service-pull-request="${github_pr_number}" \
-                --commit-sha="${github_commit}" \
-                --vcs-branch="${branch_name}" \
-                --output-path=coveralls_${task_name}.json
-            curl -X POST https://coveralls.io/api/v1/jobs -F 'json_file=@coveralls_${task_name}.json'
-          fi
 
   "upload test results":
   - command: attach.results
@@ -733,6 +695,60 @@ tasks:
       test_filter: ObjectStoreTests
       verbose_test_output: true
 
+- name: process_coverage_data
+  display_name: Process Coverage Data
+  tags: [ "for_pull_requests" ]
+  exec_timeout_secs: 1800
+  commands:
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: bash
+      env:
+        COVERALLS_TOKEN: "${coveralls_token}"
+      script: |-
+        set -o errexit
+        set -o verbose
+
+        if [ -n "${xcode_developer_dir}" ]; then
+            export DEVELOPER_DIR="${xcode_developer_dir}"
+        fi
+
+        if [[ -z "${enable_llvm_coverage}" ]]; then
+          exit 0
+        fi
+
+        export LLVM_PROFILE_FILE="$(find ./coverage_data -name "*.profraw")"
+        if [[ -z "$LLVM_PROFILE_FILE" ]]; then
+          echo "No coverage data found"
+          exit 1
+        fi
+
+        echo "Found coverage files: "
+        find ./coverage_data -name "*.profraw"
+
+        curl -LsS "${grcov_url}" | tar -xj
+        chmod +x grcov
+
+        LLVM_PROFDATA_PATH="$(xcrun -f llvm-profdata)"
+        LLVM_PROFDATA_DIR="$(dirname $LLVM_PROFDATA_PATH)"
+
+        ./grcov ./coverage_data --source-dir . \
+            --binary-path ./coverage_binaries \
+            --llvm \
+            -t coveralls+ \
+            --branch \
+            --ignore-not-existing \
+            --llvm-path="$LLVM_PROFDATA_DIR" \
+            --token="$COVERALLS_TOKEN" \
+            --service-name="Evergreen" \
+            --service-job-id="${task_id}" \
+            --service-pull-request="${github_pr_number}" \
+            --commit-sha="${github_commit}" \
+            --vcs-branch="${branch_name}" \
+            --output-path=coveralls_${task_name}.json
+        curl -X POST https://coveralls.io/api/v1/jobs -F 'json_file=@coveralls_${task_name}.json'
+
 - name: lint
   tags: [ "for_pull_requests" ]
   exec_timeout_secs: 1800
@@ -806,6 +822,21 @@ task_groups:
   tasks:
   - compile
   - .test_suite
+
+- name: compile_test_coverage
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
+  tasks:
+  - compile
+  - .test_suite
+  - process_coverage_data
 
 - name: core_tests_group
   setup_group_can_fail_task: true
@@ -1212,9 +1243,9 @@ buildvariants:
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     enable_llvm_coverage: On
-    grcov_url: "https://github.com/mozilla/grcov/releases/download/v0.8.18/grcov-aarch64-apple-darwin.tar.bz2"
+    grcov_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/grcov-aarch64-apple-darwin.tar.bz2"
   tasks:
-  - name: compile_test
+  - name: compile_test_coverage
 
 - name: windows-64-vs2019
   display_name: "Windows x86_64 (VS 2019)"
