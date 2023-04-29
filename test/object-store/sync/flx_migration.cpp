@@ -39,7 +39,7 @@ static void trigger_server_migration(const AppSession& app_session, MigrationMod
         else
             return "FLX->PBS Server rollback";
     }();
-    const int duration = 480; // 8 minutes, for now, since it sometimes takes longer than 300 seconds
+    const int duration = 600; // 10 minutes, for now, since it sometimes takes longer than 300 seconds
     try {
         timed_sleeping_wait_for(
             [&] {
