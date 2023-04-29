@@ -2,7 +2,7 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* PBS to FLX Migration for migrating a client app that uses partition based sync to use flexible sync under the hood if the server has been migrated to flexible sync. ([#6554](https://github.com/realm/realm-core/issues/6554))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Bump the sync protocol version to v8 ([PR #6549](https://github.com/realm/realm-core/pull/6549))
 
 ----------------------------------------------
 
