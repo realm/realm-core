@@ -49,7 +49,6 @@ public:
     virtual void add_class(TableKey table_key, StringData table_name, Table::Type table_type);
     virtual void add_class_with_primary_key(TableKey, StringData table_name, DataType pk_type, StringData pk_field,
                                             bool nullable, Table::Type table_type);
-    virtual void prepare_erase_class(TableKey table_key);
     virtual void erase_class(TableKey table_key, size_t num_tables);
     virtual void rename_class(TableKey table_key, StringData new_name);
     virtual void insert_column(const Table*, ColKey col_key, DataType type, StringData name, Table* target_table);
@@ -95,7 +94,7 @@ public:
 
     // Be sure to keep this type aligned with what is actually used in DB.
     using version_type = _impl::History::version_type;
-    using InputStream = util::NoCopyInputStream;
+    using InputStream = util::InputStream;
     class TransactLogApplier;
     class Interrupted; // Exception
     class SimpleIndexTranslator;
@@ -494,8 +493,6 @@ inline void Replication::select_collection(const CollectionBase& list)
     }
 }
 
-inline void Replication::prepare_erase_class(TableKey) {}
-
 inline void Replication::erase_class(TableKey table_key, size_t)
 {
     unselect_all();
@@ -554,31 +551,31 @@ inline void Replication::nullify_link(const Table* t, ColKey col_key, ObjKey key
 inline void Replication::list_set(const CollectionBase& list, size_t list_ndx, Mixed)
 {
     select_collection(list);                            // Throws
-    m_encoder.list_set(list.translate_index(list_ndx)); // Throws
+    m_encoder.collection_set(list.translate_index(list_ndx)); // Throws
 }
 
 inline void Replication::list_insert(const CollectionBase& list, size_t list_ndx, Mixed, size_t)
 {
     select_collection(list);                               // Throws
-    m_encoder.list_insert(list.translate_index(list_ndx)); // Throws
+    m_encoder.collection_insert(list.translate_index(list_ndx)); // Throws
 }
 
 inline void Replication::set_insert(const CollectionBase& set, size_t set_ndx, Mixed)
 {
     select_collection(set);        // Throws
-    m_encoder.set_insert(set_ndx); // Throws
+    m_encoder.collection_insert(set_ndx); // Throws
 }
 
 inline void Replication::set_erase(const CollectionBase& set, size_t set_ndx, Mixed)
 {
     select_collection(set);       // Throws
-    m_encoder.set_erase(set_ndx); // Throws
+    m_encoder.collection_erase(set_ndx); // Throws
 }
 
 inline void Replication::set_clear(const CollectionBase& set)
 {
     select_collection(set);          // Throws
-    m_encoder.set_clear(set.size()); // Throws
+    m_encoder.collection_clear(set.size()); // Throws
 }
 
 inline void Replication::remove_object(const Table* t, ObjKey key)
@@ -590,13 +587,13 @@ inline void Replication::remove_object(const Table* t, ObjKey key)
 inline void Replication::list_move(const CollectionBase& list, size_t from_link_ndx, size_t to_link_ndx)
 {
     select_collection(list);                                                                     // Throws
-    m_encoder.list_move(list.translate_index(from_link_ndx), list.translate_index(to_link_ndx)); // Throws
+    m_encoder.collection_move(list.translate_index(from_link_ndx), list.translate_index(to_link_ndx)); // Throws
 }
 
 inline void Replication::list_erase(const CollectionBase& list, size_t link_ndx)
 {
     select_collection(list);                              // Throws
-    m_encoder.list_erase(list.translate_index(link_ndx)); // Throws
+    m_encoder.collection_erase(list.translate_index(link_ndx)); // Throws
 }
 
 inline void Replication::typed_link_change(const Table* source_table, ColKey col, TableKey dest_table)

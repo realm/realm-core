@@ -43,7 +43,6 @@ class TableKeys;
 
 namespace _impl {
 class GroupFriend;
-class TransactLogParser;
 } // namespace _impl
 
 
@@ -693,10 +692,9 @@ private:
     std::shared_ptr<metrics::Metrics> get_metrics() const noexcept;
     void set_metrics(std::shared_ptr<metrics::Metrics> other) noexcept;
     void update_num_objects();
-    class TransactAdvancer;
     /// Memory mappings must have been updated to reflect any growth in filesize before
     /// calling advance_transact()
-    void advance_transact(ref_type new_top_ref, util::NoCopyInputStream&, bool writable);
+    void advance_transact(ref_type new_top_ref, util::InputStream*, bool writable);
     void refresh_dirty_accessors();
     void flush_accessors_for_commit();
 
@@ -837,7 +835,6 @@ private:
     friend class GroupWriter;
     friend class DB;
     friend class _impl::GroupFriend;
-    friend class _impl::TransactLogParser;
     friend class metrics::QueryInfo;
     friend class metrics::Metrics;
     friend class Transaction;

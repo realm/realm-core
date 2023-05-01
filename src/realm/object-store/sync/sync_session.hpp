@@ -369,8 +369,8 @@ private:
     void create_subscription_store() REQUIRES(m_state_mutex);
     void set_write_validator_factory(std::weak_ptr<sync::SubscriptionStore> weak_sub_mgr);
     // Update the sync config after a PBS->FLX migration or FLX->PBS rollback occurs
-    void apply_sync_config_after_migration() REQUIRES(!m_config_mutex, !m_state_mutex);
-    void save_sync_config_after_migration() REQUIRES(!m_config_mutex);
+    void apply_sync_config_after_migration_or_rollback() REQUIRES(!m_config_mutex, !m_state_mutex);
+    void save_sync_config_after_migration_or_rollback() REQUIRES(!m_config_mutex);
 
     void download_fresh_realm(sync::ProtocolErrorInfo::Action server_requests_action)
         REQUIRES(!m_config_mutex, !m_state_mutex, !m_connection_state_mutex);

@@ -7,7 +7,7 @@ BUILD_DIR="build.afl"
 if [ "$#" -ne 2 ]; then
     echo "Usage: ${SCRIPT} <num_fuzzers> <fuzz_test>"
     echo "          num_fuzzers: the number of fuzzers to run in parallel"
-    echo "          fuzz_test  : fuzz-group or fuzz-transact-log"
+    echo "          fuzz_test  : fuzz-group"
     exit 1
 fi
 num_fuzzers="$1"
