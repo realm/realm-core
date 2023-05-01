@@ -61,7 +61,7 @@ uint8_t value_of_hex_digit(char hex_digit)
         return 10 + hex_digit - 'a';
     }
     else {
-        throw std::invalid_argument("Cannot get the value of a character that isn't a hex digit.");
+        throw LogicError(ErrorCodes::InvalidArgument, "Cannot get the value of a character that isn't a hex digit.");
     }
 }
 
@@ -82,7 +82,8 @@ bool character_is_unreserved(char character)
 char decoded_char_for(const std::string& percent_encoding, size_t index)
 {
     if (index + 2 >= percent_encoding.length()) {
-        throw std::invalid_argument("Malformed string: not enough characters after '%' before end of string.");
+        throw LogicError(ErrorCodes::InvalidArgument,
+                         "Malformed string: not enough characters after '%' before end of string.");
     }
     REALM_ASSERT(percent_encoding[index] == '%');
     return (16 * value_of_hex_digit(percent_encoding[index + 1])) + value_of_hex_digit(percent_encoding[index + 2]);
@@ -126,7 +127,8 @@ std::string make_raw_string(const std::string& percent_encoded_string)
         else {
             // No need to decode. +1.
             if (!character_is_unreserved(current)) {
-                throw std::invalid_argument("Input string is invalid: contains reserved characters.");
+                throw LogicError(ErrorCodes::InvalidArgument,
+                                 "Input string is invalid: contains reserved characters.");
             }
             buffer.push_back(current);
             idx++;
@@ -207,7 +209,9 @@ std::string reserve_unique_file_name(const std::string& path, const std::string&
     int fd = mkstemp(&path_buffer[0]);
     if (fd < 0) {
         int err = errno;
-        throw std::system_error(err, std::system_category());
+        throw RuntimeError(ErrorCodes::FileOperationFailed,
+                           util::format("Failed to make temporary path: %1 (%2)",
+                                        std::system_error(err, std::system_category()).what(), err));
     }
     // Remove the file so we can use the name for our own file.
 #ifdef _WIN32
@@ -225,7 +229,8 @@ static std::string validate_and_clean_path(const std::string& path)
     REALM_ASSERT(path.length() > 0);
     std::string escaped_path = util::make_percent_encoded_string(path);
     if (filename_is_reserved(escaped_path))
-        throw std::invalid_argument(
+        throw LogicError(
+            ErrorCodes::InvalidArgument,
             util::format("A path can't have an identifier reserved by the filesystem: '%1'", escaped_path));
     return escaped_path;
 }
@@ -418,10 +423,10 @@ std::string SyncFileManager::realm_file_path(const std::string& user_identity, c
         }
         catch (const FileAccessError& e_hashed) {
             // hashed test path also failed, give up and report error to user.
-            throw std::logic_error(util::format("A valid realm path cannot be created for the "
-                                                "Realm identity '%1' at neither '%2' nor '%3'. %4",
-                                                realm_file_name, preferred_name_with_suffix, hashed_path,
-                                                e_hashed.what()));
+            throw LogicError(ErrorCodes::InvalidArgument,
+                             util::format("A valid realm path cannot be created for the "
+                                          "Realm identity '%1' at neither '%2' nor '%3'. %4",
+                                          realm_file_name, preferred_name_with_suffix, hashed_path, e_hashed.what()));
         }
     }
 
