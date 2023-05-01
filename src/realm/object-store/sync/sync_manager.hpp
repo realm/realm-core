@@ -79,10 +79,10 @@ struct SyncClientConfig {
     LoggerFactory logger_factory;
     util::Logger::Level log_level = util::Logger::Level::info;
     ReconnectMode reconnect_mode = ReconnectMode::normal; // For internal sync-client testing only!
-#if REALM_ENABLE_SYNC_MULTIPLEXING
-    bool multiplex_sessions = true;
-#else
+#if REALM_DISABLE_SYNC_MULTIPLEXING
     bool multiplex_sessions = false;
+#else
+    bool multiplex_sessions = true;
 #endif
 
     // The SyncSocket instance used by the Sync Client for event synchronization
