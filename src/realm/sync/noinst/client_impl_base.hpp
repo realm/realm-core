@@ -531,7 +531,8 @@ private:
     };
     struct WebSocketObserverShim;
 
-    class IsFatalTag {};
+    class IsFatalTag {
+    };
     using IsFatal = util::TaggedBool<class IsFatalTag>;
 
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
