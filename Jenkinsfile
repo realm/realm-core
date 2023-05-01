@@ -98,7 +98,7 @@ jobWrapper {
             rlmNode('docker') {
                 getArchive()
 
-                buildDockerEnv('testing.Dockerfile').inside {
+                buildDockerEnv('linux.Dockerfile').inside {
                     echo "Checking code formatting"
                     modifications = sh(returnStdout: true, script: "git clang-format --diff ${targetSHA1}").trim()
                     try {
@@ -132,9 +132,9 @@ jobWrapper {
 
         parallelExecutors = [
             buildLinuxRelease       : doBuildLinux('Release'),
-            checkLinuxDebug         : doCheckInDocker(buildOptions),
+            checkLinuxDebug         : doCheckInDocker(buildOptions + [useToolchain : true]),
             checkLinuxDebugEncrypt  : doCheckInDocker(buildOptions + [useEncryption : true]),
-            checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: 4, buildType : 'Release']),
+            checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: 4, buildType : 'Release', useToolchain : true]),
             checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync: true, dumpChangesetTransform: true]),
             checkLinuxDebugNoEncryp : doCheckInDocker(buildOptions + [enableEncryption: false]),
             checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType: 'Release', enableSync: true]),
@@ -277,13 +277,17 @@ def doCheckInDocker(Map options = [:]) {
         rlmNode('docker') {
             getArchive()
 
-            def buildEnv = buildDockerEnv('testing.Dockerfile')
+            def buildEnv = buildDockerEnv('linux.Dockerfile')
 
             def environment = environment()
             environment << 'UNITTEST_XML=unit-test-report.xml'
             environment << "UNITTEST_SUITE_NAME=Linux-${options.buildType}"
             if (options.useEncryption) {
                 environment << 'UNITTEST_ENCRYPT_ALL=1'
+            }
+
+            if (options.useToolchain) {
+                cmakeDefinitions += " -DCMAKE_TOOLCHAIN_FILE=\"${env.WORKSPACE}/tools/cmake/x86_64.toolchain.cmake\""
             }
 
             def buildSteps = { String dockerArgs = "" ->
@@ -377,7 +381,7 @@ def doCheckSanity(Map options = [:]) {
               "UNITTEST_SUITE_NAME=Linux-${options.buildType}",
               "TSAN_OPTIONS=\"suppressions=${WORKSPACE}/test/tsan.suppress\""
             ]
-            buildDockerEnv('testing.Dockerfile').inside(privileged) {
+            buildDockerEnv('linux.Dockerfile').inside(privileged) {
                 withEnv(environment) {
                     try {
                         dir('build-dir') {
@@ -405,12 +409,12 @@ def doBuildLinux(String buildType) {
         rlmNode('docker') {
             getSourceArchive()
 
-            buildDockerEnv('packaging.Dockerfile').inside {
+            buildDockerEnv('linux.Dockerfile').inside {
                 sh """
                    rm -rf build-dir
                    mkdir build-dir
                    cd build-dir
-                   cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -DREALM_VERSION="${gitDescribeVersion}" -G Ninja ..
+                   cmake -DCMAKE_BUILD_TYPE=${buildType} -DCMAKE_TOOLCHAIN_FILE=../tools/cmake/x86_64.toolchain.cmake -DREALM_NO_TESTS=1 -DREALM_VERSION="${gitDescribeVersion}" -G Ninja ..
                    ninja
                    cpack -G TGZ
                 """
@@ -436,7 +440,7 @@ def doBuildLinuxClang(String buildType) {
               'CXX=clang++'
             ]
 
-            buildDockerEnv('testing.Dockerfile').inside {
+            buildDockerEnv('linux.Dockerfile').inside {
                 withEnv(environment) {
                     dir('build-dir') {
                         sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -DREALM_VERSION=\"${gitDescribeVersion}\" -G Ninja .."
@@ -783,7 +787,7 @@ def doBuildCoverage() {
     rlmNode('docker') {
       getArchive()
 
-      buildDockerEnv('testing.Dockerfile').inside {
+      buildDockerEnv('linux.Dockerfile').inside {
         sh '''
           mkdir build
           cd build

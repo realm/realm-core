@@ -1,16 +1,18 @@
-set(CMAKE_SYSTEM_NAME Linux)
-set(CMAKE_SYSTEM_PROCESSOR arm)
-set(CMAKE_LIBRARY_ARCHITECTURE aarch64-linux-gnu)
+if(NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" OR NOT CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    message(FATAL_ERROR "This toolchain can only be used on x86_64 Linux.")
+endif()
 
-set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
-set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
+set(_TRIPLET "aarch64-unknown-linux-gnu")
+file(DOWNLOAD https://static.realm.io/toolchains/v3/${_TRIPLET}.tar.zst ${CMAKE_BINARY_DIR}/${_TRIPLET}.tar.zst
+     EXPECTED_HASH MD5=a3a14d87f98904c2558b43bbd310f337 STATUS _DOWNLOAD_STATUS)
+list(GET _DOWNLOAD_STATUS 0 _DOWNLOAD_STATUS_CODE)
+if(NOT ${_DOWNLOAD_STATUS_CODE} EQUAL 0)
+    message(FATAL_ERROR "Error downloading ${_TRIPLET}.tar.zst: ${_DOWNLOAD_STATUS}")
+endif()
 
-set(CMAKE_CXX_FLAGS_INIT "-Wno-psabi")
+file(ARCHIVE_EXTRACT INPUT ${CMAKE_BINARY_DIR}/${_TRIPLET}.tar.zst DESTINATION ${CMAKE_BINARY_DIR})
+include("${CMAKE_BINARY_DIR}/${_TRIPLET}/toolchain.cmake")
 
-set(CMAKE_FIND_ROOT_PATH "/usr/${CMAKE_LIBRARY_ARCHITECTURE}")
-
-set(ENV{PKG_CONFIG_SYSROOT_DIR} "/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}")
-
-set(THREADS_PTHREAD_ARG -pthread)
-
-set(REALM_USE_SYSTEM_OPENSSL ON)
+set(CMAKE_EXE_LINKER_FLAGS_INIT "-Xlinker --exclude-libs=libgcc.a,libstdc++.a -static-libgcc -static-libstdc++")
+set(CMAKE_SHARED_LINKER_FLAGS_INIT "-Xlinker --exclude-libs=libgcc.a,libstdc++.a -static-libgcc -static-libstdc++")
+set(CMAKE_MODULE_LINKER_FLAGS_INIT "-Xlinker --exclude-libs=libgcc.a,libstdc++.a -static-libgcc -static-libstdc++")
