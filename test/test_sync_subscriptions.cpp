@@ -412,7 +412,7 @@ TEST(Sync_SubscriptionStoreRefreshSubscriptionSetInvalid)
     store.reset();
 
     // Throws since the SubscriptionStore is gone.
-    CHECK_THROW(latest->refresh(), std::logic_error);
+    CHECK_THROW(latest->refresh(), RuntimeError);
 }
 
 TEST(Sync_SubscriptionStoreInternalSchemaMigration)
