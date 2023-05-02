@@ -198,14 +198,10 @@ public:
 
 class GeospatialNode : public ValueNode {
 public:
-    struct Box {
-    };
-    struct Polygon {
-    };
-    struct Loop {
-    };
-    struct Sphere {
-    };
+    struct Box {};
+    struct Polygon {};
+    struct Loop {};
+    struct Sphere {};
 #if REALM_ENABLE_GEOSPATIAL
     GeospatialNode(Box, GeoPoint& p1, GeoPoint& p2);
     GeospatialNode(Sphere, GeoPoint& p, double radius);

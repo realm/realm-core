@@ -228,6 +228,7 @@ public:
 
     constexpr static std::string_view c_geo_point_type_col_name = "type";
     constexpr static std::string_view c_geo_point_coords_col_name = "coordinates";
+
 private:
     mpark::variant<mpark::monostate, GeoPoint, GeoBox, GeoPolygon, GeoCenterSphere> m_value;
 
