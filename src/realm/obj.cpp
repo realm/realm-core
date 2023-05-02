@@ -963,215 +963,6 @@ Obj::Path Obj::get_path() const
 }
 
 
-namespace {
-const char to_be_escaped[] = "\"\n\r\t\f\\\b";
-const char encoding[] = "\"nrtf\\b";
-
-template <class T>
-inline void out_floats(std::ostream& out, T value)
-{
-    std::streamsize old = out.precision();
-    out.precision(std::numeric_limits<T>::digits10 + 1);
-    out << std::scientific << value;
-    out.precision(old);
-}
-
-void out_string(std::ostream& out, std::string str)
-{
-    size_t p = str.find_first_of(to_be_escaped);
-    while (p != std::string::npos) {
-        char c = str[p];
-        auto found = strchr(to_be_escaped, c);
-        REALM_ASSERT(found);
-        out << str.substr(0, p) << '\\' << encoding[found - to_be_escaped];
-        str = str.substr(p + 1);
-        p = str.find_first_of(to_be_escaped);
-    }
-    out << str;
-}
-
-void out_binary(std::ostream& out, BinaryData bin)
-{
-    const char* start = bin.data();
-    const size_t len = bin.size();
-    std::string encode_buffer;
-    encode_buffer.resize(util::base64_encoded_size(len));
-    util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
-    out << encode_buffer;
-}
-
-void out_mixed_json(std::ostream& out, const Mixed& val)
-{
-    if (val.is_null()) {
-        out << "null";
-        return;
-    }
-    switch (val.get_type()) {
-        case type_Int:
-            out << val.get<Int>();
-            break;
-        case type_Bool:
-            out << (val.get<bool>() ? "true" : "false");
-            break;
-        case type_Float:
-            out_floats<float>(out, val.get<float>());
-            break;
-        case type_Double:
-            out_floats<double>(out, val.get<double>());
-            break;
-        case type_String: {
-            out << "\"";
-            out_string(out, val.get<String>());
-            out << "\"";
-            break;
-        }
-        case type_Binary: {
-            out << "\"";
-            out_binary(out, val.get<Binary>());
-            out << "\"";
-            break;
-        }
-        case type_Timestamp:
-            out << "\"";
-            out << val.get<Timestamp>();
-            out << "\"";
-            break;
-        case type_Decimal:
-            out << "\"";
-            out << val.get<Decimal128>();
-            out << "\"";
-            break;
-        case type_ObjectId:
-            out << "\"";
-            out << val.get<ObjectId>();
-            out << "\"";
-            break;
-        case type_UUID:
-            out << "\"";
-            out << val.get<UUID>();
-            out << "\"";
-            break;
-        case type_TypedLink:
-            out << "\"";
-            out << val.get<ObjLink>();
-            out << "\"";
-            break;
-        case type_Link:
-        case type_LinkList:
-        case type_Mixed:
-            break;
-    }
-}
-
-void out_mixed_xjson(std::ostream& out, const Mixed& val)
-{
-    if (val.is_null()) {
-        out << "null";
-        return;
-    }
-    switch (val.get_type()) {
-        case type_Int:
-            out << "{\"$numberLong\": \"";
-            out << val.get<Int>();
-            out << "\"}";
-            break;
-        case type_Bool:
-            out << (val.get<bool>() ? "true" : "false");
-            break;
-        case type_Float:
-            out << "{\"$numberDouble\": \"";
-            out_floats<float>(out, val.get<float>());
-            out << "\"}";
-            break;
-        case type_Double:
-            out << "{\"$numberDouble\": \"";
-            out_floats<double>(out, val.get<double>());
-            out << "\"}";
-            break;
-        case type_String: {
-            out << "\"";
-            out_string(out, val.get<String>());
-            out << "\"";
-            break;
-        }
-        case type_Binary: {
-            out << "{\"$binary\": {\"base64\": \"";
-            out_binary(out, val.get<Binary>());
-            out << "\", \"subType\": \"00\"}}";
-            break;
-        }
-        case type_Timestamp: {
-            out << "{\"$date\": {\"$numberLong\": \"";
-            auto ts = val.get<Timestamp>();
-            int64_t timeMillis = ts.get_seconds() * 1000 + ts.get_nanoseconds() / 1000000;
-            out << timeMillis;
-            out << "\"}}";
-            break;
-        }
-        case type_Decimal:
-            out << "{\"$numberDecimal\": \"";
-            out << val.get<Decimal128>();
-            out << "\"}";
-            break;
-        case type_ObjectId:
-            out << "{\"$oid\": \"";
-            out << val.get<ObjectId>();
-            out << "\"}";
-            break;
-        case type_UUID:
-            out << "{\"$binary\": {\"base64\": \"";
-            out << val.get<UUID>().to_base64();
-            out << "\", \"subType\": \"04\"}}";
-            break;
-
-        case type_TypedLink: {
-            out_mixed_xjson(out, val.get<ObjLink>().get_obj_key());
-            break;
-        }
-        case type_Link:
-        case type_LinkList:
-        case type_Mixed:
-            break;
-    }
-}
-
-void out_mixed_xjson_plus(std::ostream& out, const Mixed& val)
-{
-    if (val.is_null()) {
-        out << "null";
-        return;
-    }
-
-    // Special case for outputing a typedLink, otherwise just us out_mixed_xjson
-    if (val.is_type(type_TypedLink)) {
-        auto link = val.get<ObjLink>();
-        out << "{ \"$link\": { \"table\": \"" << link.get_table_key() << "\", \"key\": ";
-        out_mixed_xjson(out, link.get_obj_key());
-        out << "}}";
-        return;
-    }
-
-    out_mixed_xjson(out, val);
-}
-
-void out_mixed(std::ostream& out, const Mixed& val, JSONOutputMode output_mode)
-{
-    switch (output_mode) {
-        case output_mode_xjson: {
-            out_mixed_xjson(out, val);
-            return;
-        }
-        case output_mode_xjson_plus: {
-            out_mixed_xjson_plus(out, val);
-            return;
-        }
-        case output_mode_json: {
-            out_mixed_json(out, val);
-        }
-    }
-}
-
-} // anonymous namespace
 void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
                   std::vector<ObjLink>& followed, JSONOutputMode output_mode) const
 {
@@ -1202,134 +993,96 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
         prefixComma = true;
 
         TableRef target_table;
-        std::string open_str;
-        std::string close_str;
         ColKey pk_col_key;
         if (type == col_type_Link) {
             target_table = get_target_table(ck);
             pk_col_key = target_table->get_primary_key_column();
-            bool is_embedded = target_table->is_embedded();
-            bool link_depth_reached = !is_embedded && (link_depth == 0);
-
-            if (output_mode == output_mode_xjson_plus) {
-                open_str = std::string("{ ") + (is_embedded ? "\"$embedded" : "\"$link");
-                open_str += collection_type_name(ck, true);
-                open_str += "\": ";
-                close_str += " }";
-            }
-
-            if ((link_depth_reached && output_mode != output_mode_xjson) || output_mode == output_mode_xjson_plus) {
-                open_str += "{ \"table\": \"" + std::string(get_target_table(ck)->get_name()) + "\", ";
-                open_str += ((is_embedded || ck.is_dictionary()) ? "\"value" : "\"key");
-                if (ck.is_collection())
-                    open_str += "s";
-                open_str += "\": ";
-                close_str += "}";
-            }
-        }
-        else {
-            if (output_mode == output_mode_xjson_plus) {
-                if (ck.is_set()) {
-                    open_str = "{ \"$set\": ";
-                    close_str = " }";
-                }
-                else if (ck.is_dictionary()) {
-                    open_str = "{ \"$dictionary\": ";
-                    close_str = " }";
-                }
-            }
         }
 
-        auto print_value = [&](Mixed key, Mixed val) {
-            if (!key.is_null()) {
-                out_mixed(out, key, output_mode);
-                out << ":";
+        auto print_link = [&](const Mixed& val) {
+            REALM_ASSERT(val.is_type(type_Link, type_TypedLink));
+            TableRef tt = target_table;
+            auto obj_key = val.get<ObjKey>();
+            std::string table_info;
+            std::string table_info_close;
+            if (!tt) {
+                // It must be a typed link
+                tt = m_table->get_parent_group()->get_table(val.get_link().get_table_key());
+                pk_col_key = tt->get_primary_key_column();
+                if (output_mode == output_mode_xjson_plus) {
+                    table_info = std::string("{ \"$link\": ");
+                    table_info_close = " }";
+                }
+
+                table_info += std::string("{ \"table\": \"") + std::string(tt->get_name()) + "\", \"key\": ";
+                table_info_close += " }";
             }
-            if (val.is_type(type_Link, type_TypedLink)) {
-                TableRef tt = target_table;
-                auto obj_key = val.get<ObjKey>();
-                std::string table_info;
-                std::string table_info_close;
-                if (!tt) {
-                    // It must be a typed link
-                    tt = m_table->get_parent_group()->get_table(val.get_link().get_table_key());
-                    pk_col_key = tt->get_primary_key_column();
-                    if (output_mode == output_mode_xjson_plus) {
-                        table_info = std::string("{ \"$link\": ");
-                        table_info_close = " }";
-                    }
-
-                    table_info += std::string("{ \"table\": \"") + std::string(tt->get_name()) + "\", \"key\": ";
-                    table_info_close += " }";
-                }
-                if (pk_col_key && output_mode != output_mode_json) {
-                    out << table_info;
-                    out_mixed_xjson(out, tt->get_primary_key(obj_key));
-                    out << table_info_close;
-                }
-                else {
-                    ObjLink link(tt->get_key(), obj_key);
-                    if (obj_key.is_unresolved()) {
-                        out << "null";
-                        return;
-                    }
-                    if (!tt->is_embedded()) {
-                        if (link_depth == 0) {
-                            out << table_info << obj_key.value << table_info_close;
-                            return;
-                        }
-                        if ((link_depth == realm::npos &&
-                             std::find(followed.begin(), followed.end(), link) != followed.end())) {
-                            // We have detected a cycle in links
-                            out << "{ \"table\": \"" << tt->get_name() << "\", \"key\": " << obj_key.value << " }";
-                            return;
-                        }
-                    }
-
-                    tt->get_object(obj_key).to_json(out, new_depth, renames, followed, output_mode);
-                }
+            if (pk_col_key && output_mode != output_mode_json) {
+                out << table_info;
+                tt->get_primary_key(obj_key).to_json(out, output_mode_xjson);
+                out << table_info_close;
             }
             else {
-                out_mixed(out, val, output_mode);
+                ObjLink link(tt->get_key(), obj_key);
+                if (obj_key.is_unresolved()) {
+                    out << "null";
+                    return;
+                }
+                if (!tt->is_embedded()) {
+                    if (link_depth == 0) {
+                        out << table_info << obj_key.value << table_info_close;
+                        return;
+                    }
+                    if ((link_depth == realm::npos &&
+                         std::find(followed.begin(), followed.end(), link) != followed.end())) {
+                        // We have detected a cycle in links
+                        out << "{ \"table\": \"" << tt->get_name() << "\", \"key\": " << obj_key.value << " }";
+                        return;
+                    }
+                }
+
+                tt->get_object(obj_key).to_json(out, new_depth, renames, followed, output_mode);
             }
         };
 
-        if (ck.is_list() || ck.is_set()) {
-            auto list = get_collection_ptr(ck);
-            auto sz = list->size();
-
-            out << open_str;
-            out << "[";
-            for (size_t i = 0; i < sz; i++) {
-                if (i > 0)
-                    out << ",";
-                print_value(Mixed{}, list->get_any(i));
+        if (ck.is_collection()) {
+            if (m_table->get_nesting_levels(ck)) {
+                auto collection_list = get_collection_list(ck);
+                collection_list->to_json(out, link_depth, output_mode, print_link);
             }
-            out << "]";
-            out << close_str;
-        }
-        else if (ck.get_attrs().test(col_attr_Dictionary)) {
-            auto dict = get_dictionary(ck);
-
-            out << open_str;
-            out << "{";
-
-            bool first = true;
-            for (auto it : dict) {
-                if (!first)
-                    out << ",";
-                first = false;
-                print_value(it.first, it.second);
+            else {
+                auto collection = get_collection_ptr(ck);
+                collection->to_json(out, link_depth, output_mode, print_link);
             }
-            out << "}";
-            out << close_str;
         }
         else {
             auto val = get_any(ck);
             if (!val.is_null()) {
-                out << open_str;
-                print_value(Mixed{}, val);
-                out << close_str;
+                if (type == col_type_Link) {
+                    std::string close_string;
+                    bool is_embedded = target_table->is_embedded();
+                    bool link_depth_reached = !is_embedded && (link_depth == 0);
+
+                    if (output_mode == output_mode_xjson_plus) {
+                        out << "{ " << (is_embedded ? "\"$embedded" : "\"$link") << "\": ";
+                        close_string += "}";
+                    }
+                    if ((link_depth_reached && output_mode == output_mode_json) ||
+                        output_mode == output_mode_xjson_plus) {
+                        out << "{ \"table\": \"" << target_table->get_name() << "\", "
+                            << (is_embedded ? "\"value" : "\"key") << "\": ";
+                        close_string += "}";
+                    }
+
+                    print_link(val);
+                    out << close_string;
+                }
+                else if (val.is_type(type_TypedLink)) {
+                    print_link(val);
+                }
+                else {
+                    val.to_json(out, output_mode);
+                }
             }
             else {
                 out << "null";

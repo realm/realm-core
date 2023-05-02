@@ -1,0 +1,18 @@
+[
+    {
+        "_key": 0,
+        "list_dict_int": [
+            {
+                "Key1": 10,
+                "Key2": 10,
+                "Key3": 10
+            },
+            {
+                "Key1": 20,
+                "Key2": 20,
+                "Key3": 20
+            }
+        ],
+        "primaryKey": "t4o1"
+    }
+]

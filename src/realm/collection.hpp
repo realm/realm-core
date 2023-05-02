@@ -19,13 +19,14 @@ public:
     virtual ~Collection();
     /// The size of the collection.
     virtual size_t size() const = 0;
+    /// Get element at @a ndx as a `Mixed`.
+    virtual Mixed get_any(size_t ndx) const = 0;
     /// True if `size()` returns 0.
     bool is_empty() const
     {
         return size() == 0;
     }
-    /// Get element at @a ndx as a `Mixed`.
-    virtual Mixed get_any(size_t ndx) const = 0;
+    virtual void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const {}
 };
 
 using CollectionPtr = std::shared_ptr<Collection>;
@@ -130,6 +131,17 @@ public:
         return get_table()->get_column_name(get_col_key());
     }
 
+    bool operator==(const CollectionBase& other) const noexcept
+    {
+        return get_table() == other.get_table() && get_owner_key() == other.get_owner_key() &&
+               get_col_key() == other.get_col_key();
+    }
+
+    bool operator!=(const CollectionBase& other) const noexcept
+    {
+        return !(*this == other);
+    }
+
 protected:
     friend class Transaction;
     CollectionBase() noexcept = default;
@@ -139,6 +151,7 @@ protected:
     CollectionBase& operator=(CollectionBase&&) noexcept = default;
 
     void validate_index(const char* msg, size_t index, size_t size) const;
+    std::pair<std::string, std::string> get_open_close_strings(size_t link_depth, JSONOutputMode output_mode) const;
 };
 
 inline std::string_view collection_type_name(ColKey col, bool uppercase = false)
@@ -332,7 +345,7 @@ struct AverageHelper<T, std::void_t<ColumnSumType<T>>> {
 /// Convenience base class for collections, which implements most of the
 /// relevant interfaces for a collection that is bound to an object accessor and
 /// representable as a BPlusTree<T>.
-template <class Interface, class Derived>
+template <class Interface>
 class CollectionBaseImpl : public Interface, protected ArrayParent {
 public:
     static_assert(std::is_base_of_v<CollectionBase, Interface>);
@@ -391,6 +404,8 @@ public:
         // Force update on next access
         m_content_version = 0;
     }
+
+    void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
     using Interface::get_owner_key;
     using Interface::get_table;
@@ -451,17 +466,6 @@ protected:
         }
 
         return *this;
-    }
-
-    bool operator==(const Derived& other) const noexcept
-    {
-        return get_table() == other.get_table() && get_owner_key() == other.get_owner_key() &&
-               get_col_key() == other.get_col_key();
-    }
-
-    bool operator!=(const Derived& other) const noexcept
-    {
-        return !(*this == other);
     }
 
     ref_type get_collection_ref() const noexcept

@@ -24,6 +24,7 @@
 #include <realm/table.hpp>
 #include <realm/query_value.hpp>
 #include <realm/util/serializer.hpp>
+#include "realm/util/base64.hpp"
 
 namespace realm {
 namespace {
@@ -793,5 +794,202 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
 }
 // LCOV_EXCL_STOP
 
+namespace {
+const char to_be_escaped[] = "\"\n\r\t\f\\\b";
+const char encoding[] = "\"nrtf\\b";
+
+template <class T>
+inline void out_floats(std::ostream& out, T value)
+{
+    std::streamsize old = out.precision();
+    out.precision(std::numeric_limits<T>::digits10 + 1);
+    out << std::scientific << value;
+    out.precision(old);
+}
+
+void out_string(std::ostream& out, std::string str)
+{
+    size_t p = str.find_first_of(to_be_escaped);
+    while (p != std::string::npos) {
+        char c = str[p];
+        auto found = strchr(to_be_escaped, c);
+        REALM_ASSERT(found);
+        out << str.substr(0, p) << '\\' << encoding[found - to_be_escaped];
+        str = str.substr(p + 1);
+        p = str.find_first_of(to_be_escaped);
+    }
+    out << str;
+}
+
+void out_binary(std::ostream& out, BinaryData bin)
+{
+    const char* start = bin.data();
+    const size_t len = bin.size();
+    std::string encode_buffer;
+    encode_buffer.resize(util::base64_encoded_size(len));
+    util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
+    out << encode_buffer;
+}
+} // anonymous namespace
+
+
+void Mixed::to_xjson(std::ostream& out) const noexcept
+{
+    switch (get_type()) {
+        case type_Int:
+            out << "{\"$numberLong\": \"";
+            out << int_val;
+            out << "\"}";
+            break;
+        case type_Bool:
+            out << (bool_val ? "true" : "false");
+            break;
+        case type_Float:
+            out << "{\"$numberDouble\": \"";
+            out_floats<float>(out, float_val);
+            out << "\"}";
+            break;
+        case type_Double:
+            out << "{\"$numberDouble\": \"";
+            out_floats<double>(out, double_val);
+            out << "\"}";
+            break;
+        case type_String: {
+            out << "\"";
+            out_string(out, string_val);
+            out << "\"";
+            break;
+        }
+        case type_Binary: {
+            out << "{\"$binary\": {\"base64\": \"";
+            out_binary(out, binary_val);
+            out << "\", \"subType\": \"00\"}}";
+            break;
+        }
+        case type_Timestamp: {
+            out << "{\"$date\": {\"$numberLong\": \"";
+            int64_t timeMillis = date_val.get_seconds() * 1000 + date_val.get_nanoseconds() / 1000000;
+            out << timeMillis;
+            out << "\"}}";
+            break;
+        }
+        case type_Decimal:
+            out << "{\"$numberDecimal\": \"";
+            out << decimal_val;
+            out << "\"}";
+            break;
+        case type_ObjectId:
+            out << "{\"$oid\": \"";
+            out << id_val;
+            out << "\"}";
+            break;
+        case type_UUID:
+            out << "{\"$binary\": {\"base64\": \"";
+            out << uuid_val.to_base64();
+            out << "\", \"subType\": \"04\"}}";
+            break;
+
+        case type_TypedLink: {
+            Mixed val(get<ObjLink>().get_obj_key());
+            val.to_xjson(out);
+            break;
+        }
+        case type_Link:
+        case type_LinkList:
+        case type_Mixed:
+            break;
+    }
+}
+
+void Mixed::to_xjson_plus(std::ostream& out) const noexcept
+{
+
+    // Special case for outputing a typedLink, otherwise just us out_mixed_xjson
+    if (is_type(type_TypedLink)) {
+        auto link = get<ObjLink>();
+        out << "{ \"$link\": { \"table\": \"" << link.get_table_key() << "\", \"key\": ";
+        Mixed val(link.get_obj_key());
+        val.to_xjson(out);
+        out << "}}";
+        return;
+    }
+
+    to_xjson(out);
+}
+
+void Mixed::to_json(std::ostream& out, JSONOutputMode output_mode) const noexcept
+{
+    if (is_null()) {
+        out << "null";
+        return;
+    }
+    switch (output_mode) {
+        case output_mode_xjson: {
+            to_xjson(out);
+            return;
+        }
+        case output_mode_xjson_plus: {
+            to_xjson_plus(out);
+            return;
+        }
+        case output_mode_json: {
+            switch (get_type()) {
+                case type_Int:
+                    out << int_val;
+                    break;
+                case type_Bool:
+                    out << (bool_val ? "true" : "false");
+                    break;
+                case type_Float:
+                    out_floats<float>(out, float_val);
+                    break;
+                case type_Double:
+                    out_floats<double>(out, double_val);
+                    break;
+                case type_String: {
+                    out << "\"";
+                    out_string(out, string_val);
+                    out << "\"";
+                    break;
+                }
+                case type_Binary: {
+                    out << "\"";
+                    out_binary(out, binary_val);
+                    out << "\"";
+                    break;
+                }
+                case type_Timestamp:
+                    out << "\"";
+                    out << date_val;
+                    out << "\"";
+                    break;
+                case type_Decimal:
+                    out << "\"";
+                    out << decimal_val;
+                    out << "\"";
+                    break;
+                case type_ObjectId:
+                    out << "\"";
+                    out << id_val;
+                    out << "\"";
+                    break;
+                case type_UUID:
+                    out << "\"";
+                    out << uuid_val;
+                    out << "\"";
+                    break;
+                case type_TypedLink:
+                    out << "\"";
+                    out << link_val;
+                    out << "\"";
+                    break;
+                case type_Link:
+                case type_LinkList:
+                case type_Mixed:
+                    break;
+            }
+        }
+    }
+}
 
 } // namespace realm

@@ -46,9 +46,9 @@ protected:
 };
 
 template <class T>
-class Set final : public CollectionBaseImpl<SetBase, Set<T>> {
+class Set final : public CollectionBaseImpl<SetBase> {
 public:
-    using Base = CollectionBaseImpl<SetBase, Set>;
+    using Base = CollectionBaseImpl<SetBase>;
     using value_type = T;
     using iterator = CollectionIterator<Set<T>>;
 
@@ -72,8 +72,6 @@ public:
     Set(Set&& other) noexcept;
     Set& operator=(const Set& other);
     Set& operator=(Set&& other) noexcept;
-    using Base::operator==;
-    using Base::operator!=;
 
     SetBasePtr clone() const final
     {
@@ -414,6 +412,8 @@ public:
     {
         m_set.set_owner(std::move(parent), index);
     }
+
+    void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
 private:
     Set<ObjKey> m_set;

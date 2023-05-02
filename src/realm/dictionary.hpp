@@ -26,9 +26,17 @@
 
 namespace realm {
 
-class Dictionary final : public CollectionBaseImpl<CollectionBase, Dictionary> {
+class DictionaryBase : public CollectionBase {
 public:
-    using Base = CollectionBaseImpl<CollectionBase, Dictionary>;
+    using CollectionBase::CollectionBase;
+
+protected:
+    static constexpr CollectionType s_collection_type = CollectionType::Dictionary;
+};
+
+class Dictionary final : public CollectionBaseImpl<DictionaryBase> {
+public:
+    using Base = CollectionBaseImpl<DictionaryBase>;
     class Iterator;
 
     Dictionary() {}
@@ -47,8 +55,6 @@ public:
         *this = other;
     }
     Dictionary& operator=(const Dictionary& other);
-
-    using Base::operator==;
 
     DataType get_key_data_type() const;
     DataType get_value_data_type() const;
@@ -158,6 +164,8 @@ public:
         Base::set_owner(std::move(parent), index);
         get_key_type();
     }
+
+    void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
 private:
     template <typename T, typename Op>

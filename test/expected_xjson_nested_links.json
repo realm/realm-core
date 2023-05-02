@@ -1,0 +1,131 @@
+[
+    {
+        "primaryKey": "t1o1",
+        "list_list_int": [
+            [
+                {
+                    "$numberLong": "1"
+                },
+                {
+                    "$numberLong": "2"
+                }
+            ],
+            [
+                {
+                    "$numberLong": "3"
+                },
+                {
+                    "$numberLong": "4"
+                }
+            ],
+            [
+                {
+                    "$numberLong": "5"
+                },
+                {
+                    "$numberLong": "6"
+                }
+            ],
+            [
+                {
+                    "$numberLong": "7"
+                },
+                {
+                    "$numberLong": "8"
+                }
+            ]
+        ],
+        "obj_list_dict": [
+            {
+                "$linkDictionary": {
+                    "table": "table2",
+                    "values": {
+                        "Link_Key": "t2o1"
+                    }
+                }
+            }
+        ],
+        "obj_list_list": [
+            {
+                "$linkList": {
+                    "table": "table2",
+                    "keys": [
+                        "t2o1"
+                    ]
+                }
+            }
+        ],
+        "obj_dict_list": {
+            "$dictionary": {
+                "Link_Key": {
+                    "$linkList": {
+                        "table": "table2",
+                        "keys": [
+                            "t2o1"
+                        ]
+                    }
+                }
+            }
+        },
+        "obj_dict_dict": {
+            "$dictionary": {
+                "Link_Key": {
+                    "$linkDictionary": {
+                        "table": "table2",
+                        "values": {
+                            "Link_Key_Nested": "t2o1"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    {
+        "primaryKey": "to1_list_dict_link",
+        "list_list_int": [],
+        "obj_list_dict": [],
+        "obj_list_list": [],
+        "obj_dict_list": {
+            "$dictionary": {}
+        },
+        "obj_dict_dict": {
+            "$dictionary": {}
+        }
+    },
+    {
+        "primaryKey": "to1_list_list_link",
+        "list_list_int": [],
+        "obj_list_dict": [],
+        "obj_list_list": [],
+        "obj_dict_list": {
+            "$dictionary": {}
+        },
+        "obj_dict_dict": {
+            "$dictionary": {}
+        }
+    },
+    {
+        "primaryKey": "to1_dict_list_link",
+        "list_list_int": [],
+        "obj_list_dict": [],
+        "obj_list_list": [],
+        "obj_dict_list": {
+            "$dictionary": {}
+        },
+        "obj_dict_dict": {
+            "$dictionary": {}
+        }
+    },
+    {
+        "primaryKey": "to1_dict_dict_link",
+        "list_list_int": [],
+        "obj_list_dict": [],
+        "obj_list_list": [],
+        "obj_dict_list": {
+            "$dictionary": {}
+        },
+        "obj_dict_dict": {
+            "$dictionary": {}
+        }
+    }
+]

@@ -72,9 +72,9 @@ protected:
 };
 
 template <class T>
-class Lst final : public CollectionBaseImpl<LstBase, Lst<T>> {
+class Lst final : public CollectionBaseImpl<LstBase> {
 public:
-    using Base = CollectionBaseImpl<LstBase, Lst<T>>;
+    using Base = CollectionBaseImpl<LstBase>;
     using iterator = LstIterator<T>;
     using value_type = T;
 
@@ -97,8 +97,6 @@ public:
     Lst(Lst&&) noexcept;
     Lst& operator=(const Lst& other);
     Lst& operator=(Lst&& other) noexcept;
-
-    using Base::operator==;
 
     iterator begin() const noexcept
     {
@@ -508,6 +506,8 @@ public:
     {
         m_list.set_owner(std::move(parent), index);
     }
+
+    void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
 private:
     friend class TableView;
