@@ -1,10 +1,10 @@
 #include <realm/sync/network/default_socket.hpp>
 
 #include <realm/sync/binding_callback_thread_observer.hpp>
-
 #include <realm/sync/network/network.hpp>
 #include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/network/websocket.hpp>
+#include <realm/util/random.hpp>
 #include <realm/util/scope_exit.hpp>
 
 namespace realm::sync::websocket {
@@ -431,9 +431,15 @@ void DefaultWebSocketImpl::handle_ssl_handshake(std::error_code ec)
     if (ec) {
         REALM_ASSERT(ec != util::error::operation_aborted);
         constexpr bool was_clean = false;
-        websocket_error_and_close_handler(
-            was_clean,
-            Status{make_error_code(WebSocketError::websocket_tls_handshake_failed), ec.message()}); // Throws
+        std::error_code ec2;
+        if (ec == network::ssl::Errors::certificate_rejected) {
+            ec2 = make_error_code(WebSocketError::websocket_tls_handshake_failed);
+        }
+        else {
+            ec2 = make_error_code(WebSocketError::websocket_connection_failed);
+        }
+
+        websocket_error_and_close_handler(was_clean, Status{ec2, ec.message()}); // Throws
         return;
     }
 

@@ -56,7 +56,7 @@ bool ObjectNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 
 void ObjectNotifier::run()
 {
-    if (!m_table)
+    if (!m_table || !m_info)
         return;
 
     auto it = m_info->tables.find(m_table->get_key());

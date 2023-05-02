@@ -35,6 +35,7 @@
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 
 #include <realm/group.hpp>
+#include <realm/sync/subscriptions.hpp>
 #include <realm/util/any.hpp>
 
 #include <cstdint>

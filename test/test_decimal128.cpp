@@ -110,6 +110,9 @@ TEST(Decimal_Basics)
     CHECK_EQUAL(exp, 6111);
     Decimal128 decimal3(bid, exp, sign);
     CHECK_EQUAL(decimal, decimal3);
+
+    decimal = Decimal128::nan("123");
+    CHECK_EQUAL(decimal.compare(decimal), 0);
 }
 
 TEST(Decimal_Int64_Conversions)
