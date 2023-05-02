@@ -21,6 +21,7 @@
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/sync/binding_callback_thread_observer.hpp>
+#include <realm/sync/subscriptions.hpp>
 #endif
 
 #include <stdexcept>
@@ -822,7 +823,12 @@ public:
         : m_create_callback_func{on_thread_create}
         , m_destroy_callback_func{on_thread_destroy}
         , m_error_callback_func{on_error}
-        , m_user_data{realm::c_api::UserdataPtr(userdata, free_userdata)}
+        , m_user_data{userdata, [&free_userdata] {
+                          if (free_userdata)
+                              return free_userdata;
+                          else
+                              return CBindingThreadObserver::m_default_free_userdata;
+                      }()}
     {
     }
 
@@ -848,6 +854,11 @@ public:
         return m_error_callback_func(m_user_data.get(), e.what());
     }
 
+    bool has_handle_error() override
+    {
+        return bool(m_error_callback_func);
+    }
+
     /// {@
     /// For testing: Return the values in this CBindingThreadObserver for comparing if two objects
     /// have the same callback functions and userdata ptr values.
@@ -871,6 +882,8 @@ public:
 
 protected:
     CBindingThreadObserver() = default;
+
+    static constexpr realm_free_userdata_func_t m_default_free_userdata = [](realm_userdata_t) {};
 
     realm_on_object_store_thread_callback_t m_create_callback_func = nullptr;
     realm_on_object_store_thread_callback_t m_destroy_callback_func = nullptr;

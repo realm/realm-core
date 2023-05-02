@@ -2480,6 +2480,12 @@ RLM_API realm_results_t* realm_get_backlinks(realm_object_t* object, realm_class
 RLM_API bool realm_query_delete_all(const realm_query_t*);
 
 /**
+ * Set the boolean passed as argument to true or false whether the realm_results passed is valid or not
+ * @return true/false if no exception has occured.
+ */
+RLM_API bool realm_results_is_valid(const realm_results_t*, bool*);
+
+/**
  * Count the number of results.
  *
  * If the result is "live" (not a snapshot), this may rerun the query if things
@@ -3371,6 +3377,8 @@ typedef enum realm_sync_error_action {
     RLM_SYNC_ERROR_ACTION_DELETE_REALM,
     RLM_SYNC_ERROR_ACTION_CLIENT_RESET,
     RLM_SYNC_ERROR_ACTION_CLIENT_RESET_NO_RECOVERY,
+    RLM_SYNC_ERROR_ACTION_MIGRATE_TO_FLX,
+    RLM_SYNC_ERROR_ACTION_REVERT_TO_PBS,
 } realm_sync_error_action_e;
 
 typedef struct realm_sync_session realm_sync_session_t;

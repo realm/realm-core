@@ -4035,6 +4035,7 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "ALL {8, 10} / 2 >= ANY items.price", 1);
     verify_query(test_context, t, "NONE {1, 2, 3} * 20 <= ANY items.price", 3);
     verify_query(test_context, t, "ANY {1, 2, 3, 4, 5, 6} + 2 == ANY items.price", 1);
+    verify_query(test_context, t, "ANY {0, 1, 2, 3, 5, 6, 7, 8, 9} == ANY items.price", 0); // No hit and all smaller
 
     // list property vs list property
     verify_query(test_context, t, "items.price IN items.price", 3);
@@ -5646,6 +5647,66 @@ TEST(Parser_PrimaryKey)
     q = linking->query(query_string);
     CHECK_EQUAL(q.count(), 1);
     CHECK_EQUAL(q.get_description(), query_string);
+}
+
+TEST(Parser_RecursiveLogial)
+{
+    using util::serializer::print_value;
+    Group g;
+    auto table = g.add_table_with_primary_key("table", type_ObjectId, "id");
+    table->create_object_with_primary_key(ObjectId());
+
+    {
+        std::vector<Mixed> args = {ObjectId(), ObjectId::gen(), ObjectId::gen()};
+        verify_query_sub(test_context, table,
+                         "TRUEPREDICATE AND (id == $1 OR id == $2 OR id == $0) AND TRUEPREDICATE", args, 1);
+        verify_query_sub(
+            test_context, table,
+            "(id == $1 OR id == $2 OR id == $0) AND (TRUEPREDICATE AND id == $0 AND id == $0) AND TRUEPREDICATE",
+            args, 1);
+        verify_query_sub(
+            test_context, table,
+            "(id == $1 OR id == $2 OR id == $0) AND (FALSEPREDICATE AND id == $0 AND id == $0) AND TRUEPREDICATE",
+            args, 0);
+        verify_query_sub(test_context, table,
+                         "(id == $1 OR id == $2 OR FALSEPREDICATE) AND (TRUEPREDICATE AND id == $0 AND id == $0) AND "
+                         "TRUEPREDICATE",
+                         args, 0);
+        verify_query_sub(
+            test_context, table,
+            "(id == $1 OR id == $2 OR id == $0) AND (TRUEPREDICATE AND id == $0 AND id == $0) AND FALSEPREDICATE",
+            args, 0);
+    }
+
+    constexpr size_t num_args = 1000;
+    std::vector<Mixed> args;
+    args.reserve(num_args);
+    for (size_t i = 0; i < num_args; ++i) {
+        args.push_back(ObjectId::gen());
+    }
+
+    std::string base_query;
+    for (size_t i = 0; i < 1000; ++i) {
+        base_query += util::format("%1id = $%2", i == 0 ? "" : " OR ", i);
+    }
+    // minimum size to trigger a stack overflow on "my" machine in debug mode
+    constexpr size_t num_repeats = 53;
+    std::string query = "FALSEPREDICATE";
+    query.reserve(query.size() + ((4 + base_query.size()) * num_repeats));
+    for (size_t i = 0; i < num_repeats; ++i) {
+        query.append(" OR ");
+        query.append(base_query);
+    }
+    Query q = table->query(query, args, {});
+    size_t q_count = q.count();
+    CHECK_EQUAL(q_count, 0);
+
+    query.append(util::format(" OR id = oid(%1)", ObjectId()));
+    query.append(" OR ");
+    query.append(base_query);
+    q = table->query(query, args, {});
+    q_count = q.count();
+    CHECK_EQUAL(q_count, 1);
 }
 
 #endif // TEST_PARSER

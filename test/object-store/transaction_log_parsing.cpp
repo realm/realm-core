@@ -59,10 +59,10 @@ public:
         _impl::CollectionChangeBuilder c;
         _impl::TransactionChangeInfo info{};
         info.tables[m_table_key];
-        info.lists.push_back({m_table_key, m_list.get_owner_key(), m_list.get_col_key(), &c});
+        info.collections.push_back({m_table_key, m_list.get_owner_key(), m_list.get_col_key(), &c});
         _impl::transaction::advance(*m_group, info);
 
-        if (info.lists.empty()) {
+        if (info.collections.empty()) {
             REQUIRE(!m_list.is_attached());
             return {};
         }

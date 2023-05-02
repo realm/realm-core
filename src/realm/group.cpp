@@ -459,7 +459,6 @@ Group::~Group() noexcept
         m_local_alloc->detach();
 }
 
-
 void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable)
 {
     m_alloc.update_reader_view(new_file_size); // Throws
@@ -473,7 +472,8 @@ void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bo
     update_refs(new_top_ref);
 }
 
-void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
+void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc, std::optional<size_t> read_lock_file_size,
+                               std::optional<uint_fast64_t> read_lock_version)
 {
     size_t top_size = arr.size();
     ref_type top_ref = arr.get_ref();
@@ -494,8 +494,9 @@ void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
             // Logical file size must never exceed actual file size.
             auto file_size = alloc.get_baseline();
             if (logical_file_size > file_size) {
-                std::string err = "Invalid logical file size: " + util::to_string(logical_file_size) +
-                                  ", actual file size: " + util::to_string(file_size);
+                std::string err = util::format("Invalid logical file size: %1, actual file size: %2, read lock file "
+                                               "size: %3, read lock version: %4",
+                                               logical_file_size, file_size, read_lock_file_size, read_lock_version);
                 throw InvalidDatabase(err, "");
             }
             // First two entries must be valid refs pointing inside the file
@@ -503,22 +504,27 @@ void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
                 return ref == 0 || (ref & 7) || ref > logical_file_size;
             };
             if (invalid_ref(table_names_ref) || invalid_ref(tables_ref)) {
-                std::string err = "Invalid top array (top_ref, [0], [1]): " + util::to_string(top_ref) + ", " +
-                                  util::to_string(table_names_ref) + ", " + util::to_string(tables_ref);
+                std::string err = util::format(
+                    "Invalid top array (top_ref, [0], [1]): %1, %2, %3, read lock size: %4, read lock version: %5",
+                    top_ref, table_names_ref, tables_ref, read_lock_file_size, read_lock_version);
                 throw InvalidDatabase(err, "");
             }
             break;
         }
         default: {
-            std::string err = "Invalid top array size (ref: " + util::to_string(top_ref) +
-                              ", size: " + util::to_string(top_size) + ")";
+            auto logical_file_size = arr.get_as_ref_or_tagged(s_file_size_ndx).get_as_int();
+            std::string err =
+                util::format("Invalid top array size (ref: %1, array size: %2) file size: %3, read "
+                             "lock size: %4, read lock version: %5",
+                             top_ref, top_size, logical_file_size, read_lock_file_size, read_lock_version);
             throw InvalidDatabase(err, "");
             break;
         }
     }
 }
 
-void Group::attach(ref_type top_ref, bool writable, bool create_group_when_missing)
+void Group::attach(ref_type top_ref, bool writable, bool create_group_when_missing, size_t file_size,
+                   uint_fast64_t version)
 {
     REALM_ASSERT(!m_top.is_attached());
     if (create_group_when_missing)
@@ -533,7 +539,7 @@ void Group::attach(ref_type top_ref, bool writable, bool create_group_when_missi
 
     if (top_ref != 0) {
         m_top.init_from_ref(top_ref);
-        validate_top_array(m_top, m_alloc);
+        validate_top_array(m_top, m_alloc, file_size, version);
         m_table_names.init_from_parent();
         m_tables.init_from_parent();
     }
@@ -589,8 +595,7 @@ void Group::update_num_objects()
 #endif // REALM_METRICS
 }
 
-
-void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable)
+void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, VersionID version)
 {
     REALM_ASSERT_3(new_top_ref, <, new_file_size);
     REALM_ASSERT(!is_attached());
@@ -607,7 +612,7 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writa
     // nodes to attached them to. In the case of write transactions, the nodes
     // have to be created, as they have to be ready for being modified.
     bool create_group_when_missing = writable;
-    attach(new_top_ref, writable, create_group_when_missing); // Throws
+    attach(new_top_ref, writable, create_group_when_missing, new_file_size, version.version); // Throws
 }
 
 
@@ -828,29 +833,23 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     // columns of other tables, however, to do that, we would have to
     // automatically remove the "offending" link columns from those other
     // tables. Such a behaviour is deemed too obscure, and we shall therefore
-    // require that a removed table does not contain foreigh origin backlink
+    // require that a removed table does not contain foreign origin backlink
     // columns.
     if (table->is_cross_table_link_target())
         throw CrossTableLinkTarget(table->get_name());
 
-    // There is no easy way for Group::TransactAdvancer to handle removal of
-    // tables that contain foreign target table link columns, because that
-    // involves removal of the corresponding backlink columns. For that reason,
-    // we start by removing all columns, which will generate individual
-    // replication instructions for each column removal with sufficient
-    // information for Group::TransactAdvancer to handle them.
-    size_t n = table->get_column_count();
-    Replication* repl = *get_repl();
-    if (repl) {
-        // This will prevent sync instructions for column removals to be generated
-        repl->prepare_erase_class(key);
-    }
-    for (size_t i = n; i > 0; --i) {
-        ColKey col_key = table->spec_ndx2colkey(i - 1);
-        table->remove_column(col_key);
+    {
+        // We don't want to replicate the individual column removals along the
+        // way as they're covered by the table removal
+        Table::DisableReplication dr(*table);
+        for (size_t i = table->get_column_count(); i > 0; --i) {
+            ColKey col_key = table->spec_ndx2colkey(i - 1);
+            table->remove_column(col_key);
+        }
     }
 
     size_t prior_num_tables = m_tables.size();
+    Replication* repl = *get_repl();
     if (repl)
         repl->erase_class(key, prior_num_tables); // Throws
 
@@ -1273,7 +1272,8 @@ size_t Group::get_used_space() const noexcept
 }
 
 
-class Group::TransactAdvancer {
+namespace {
+class TransactAdvancer : public _impl::NullInstructionObserver {
 public:
     TransactAdvancer(Group&, bool& schema_changed)
         : m_schema_changed(schema_changed)
@@ -1298,41 +1298,6 @@ public:
         return true;
     }
 
-    bool select_table(TableKey) noexcept
-    {
-        return true;
-    }
-
-    bool create_object(ObjKey) noexcept
-    {
-        return true;
-    }
-
-    bool remove_object(ObjKey) noexcept
-    {
-        return true;
-    }
-
-    bool modify_object(ColKey, ObjKey) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool list_set(size_t)
-    {
-        return true;
-    }
-
-    bool list_insert(size_t)
-    {
-        return true;
-    }
-
-    bool enumerate_string_column(ColKey)
-    {
-        return true; // No-op
-    }
-
     bool insert_column(ColKey)
     {
         m_schema_changed = true;
@@ -1351,64 +1316,10 @@ public:
         return true; // No-op
     }
 
-    bool set_link_type(ColKey) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool select_collection(ColKey, ObjKey) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool list_move(size_t, size_t) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool list_erase(size_t) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool list_clear(size_t) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool dictionary_insert(size_t, Mixed)
-    {
-        return true; // No-op
-    }
-    bool dictionary_set(size_t, Mixed)
-    {
-        return true; // No-op
-    }
-    bool dictionary_erase(size_t, Mixed)
-    {
-        return true; // No-op
-    }
-
-    bool set_insert(size_t)
-    {
-        return true; // No-op
-    }
-    bool set_erase(size_t)
-    {
-        return true; // No-op
-    }
-    bool set_clear(size_t)
-    {
-        return true; // No-op
-    }
-    bool typed_link_change(ColKey, TableKey)
-    {
-        return true; // No-op
-    }
-
 private:
     bool& m_schema_changed;
 };
+} // anonymous namespace
 
 
 void Group::update_allocator_wrappers(bool writable)
@@ -1471,7 +1382,7 @@ void Group::refresh_dirty_accessors()
 }
 
 
-void Group::advance_transact(ref_type new_top_ref, util::NoCopyInputStream& in, bool writable)
+void Group::advance_transact(ref_type new_top_ref, util::InputStream* in, bool writable)
 {
     REALM_ASSERT(is_attached());
     // Exception safety: If this function throws, the group accessor and all of
@@ -1508,10 +1419,10 @@ void Group::advance_transact(ref_type new_top_ref, util::NoCopyInputStream& in, 
     // This is no longer needed in Core, but we need to compute "schema_changed",
     // for the benefit of ObjectStore.
     bool schema_changed = false;
-    if (has_schema_change_notification_handler()) {
-        _impl::TransactLogParser parser; // Throws
+    if (in && has_schema_change_notification_handler()) {
         TransactAdvancer advancer(*this, schema_changed);
-        parser.parse(in, advancer); // Throws
+        _impl::TransactLogParser parser; // Throws
+        parser.parse(*in, advancer);     // Throws
     }
 
     m_top.detach();                                           // Soft detach

@@ -2384,12 +2384,15 @@ TEST(Query_TwoColumnsNumeric)
             size_t num_expected_matches = num_rows;
             if ((lhs_type == type_Mixed) != (rhs_type == type_Mixed)) {
                 // Only one prop is mixed
-                num_expected_matches = 6;
+                // see convert_for_test<Mixed>():
+                // matches on numerics: 1(int), 3(double), 5(decimal128), 9(int), 11(double)
+                num_expected_matches = 5;
             }
             if ((lhs_type == type_String) != (rhs_type == type_String)) {
                 // Only one prop is string
                 num_expected_matches = 0;
                 if ((lhs_type == type_Mixed) || (rhs_type == type_Mixed)) {
+                    // matches on "string 2" and "string 10"
                     num_expected_matches = 2;
                 }
             }
@@ -2901,7 +2904,6 @@ TEST_IF(Query_StrIndex3, TEST_DURATION > 0)
 
         std::vector<ObjKey> vec;
 
-        size_t n = 0;
 #if defined REALM_DEBUG || REALM_ANDROID
         for (int i = 0; i < 4; i++) {
 #else
@@ -2921,7 +2923,6 @@ TEST_IF(Query_StrIndex3, TEST_DURATION > 0)
                         ObjKey key =
                             ttt.create_object().set_all(0, longstrings ? "AAAAAAAAAAAAAAAAAAAAAAAA" : "AA").get_key();
                         if (!longstrings) {
-                            n++;
                             vec.push_back(key);
                         }
                     }

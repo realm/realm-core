@@ -164,9 +164,13 @@ public:
 
     /// Messages sent by the client.
 
-    void make_bind_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
-                           const std::string& server_path, const std::string& signed_user_token,
-                           bool need_client_file_ident, bool is_subserver);
+    void make_pbs_bind_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
+                               const std::string& server_path, const std::string& signed_user_token,
+                               bool need_client_file_ident, bool is_subserver);
+
+    void make_flx_bind_message(int protocol_version, OutputBuffer& out, session_ident_type session_ident,
+                               const nlohmann::json& json_data, const std::string& signed_user_token,
+                               bool need_client_file_ident, bool is_subserver);
 
     void make_pbs_ident_message(OutputBuffer&, session_ident_type session_ident, SaltedFileIdent client_file_ident,
                                 const SyncProgress& progress);
@@ -273,8 +277,8 @@ public:
                     info.client_reset_recovery_is_disabled = json["isRecoveryModeDisabled"];
                     info.try_again = json["tryAgain"];
                     info.message = json["message"];
-                    info.log_url = util::make_optional<std::string>(json["logURL"]);
-                    info.should_client_reset = util::make_optional<bool>(json["shouldClientReset"]);
+                    info.log_url = std::make_optional<std::string>(json["logURL"]);
+                    info.should_client_reset = std::make_optional<bool>(json["shouldClientReset"]);
                     info.server_requests_action = string_to_action(json["action"]); // Throws
 
                     if (auto backoff_interval = json.find("backoffIntervalSec"); backoff_interval != json.end()) {
@@ -285,6 +289,18 @@ public:
                             std::chrono::seconds{json.at("backoffMaxDelaySec").get<int>()};
                         info.resumption_delay_interval->resumption_delay_backoff_multiplier =
                             json.at("backoffMultiplier").get<int>();
+                    }
+
+                    if (info.raw_error_code == static_cast<int>(sync::ProtocolError::migrate_to_flx)) {
+                        auto query_string = json.find("partitionQuery");
+                        if (query_string == json.end() || !query_string->is_string() ||
+                            query_string->get<std::string_view>().empty()) {
+                            return report_error(
+                                Error::bad_syntax,
+                                "Missing/invalid partition query string in migrate to flexible sync error response");
+                        }
+
+                        info.migration_query_string.emplace(query_string->get<std::string_view>());
                     }
 
                     if (auto rejected_updates = json.find("rejectedUpdates"); rejected_updates != json.end()) {
@@ -486,6 +502,8 @@ private:
             {"DeleteRealm", action::DeleteRealm},
             {"ClientReset", action::ClientReset},
             {"ClientResetNoRecovery", action::ClientResetNoRecovery},
+            {"MigrateToFLX", action::MigrateToFLX},
+            {"RevertToPBS", action::RevertToPBS},
         };
 
         if (auto action_it = mapping.find(action_string); action_it != mapping.end()) {

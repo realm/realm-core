@@ -896,10 +896,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 session = test_app_session.app()->sync_manager()->get_existing_session(temp_config.path);
                 REQUIRE(session);
             }
-            realm::SyncError synthetic(sync::make_error_code(sync::ProtocolError::bad_client_file),
-                                       "A fake client reset error", true);
+            sync::SessionErrorInfo synthetic(sync::make_error_code(sync::ProtocolError::bad_client_file),
+                                             "A fake client reset error", false);
             synthetic.server_requests_action = sync::ProtocolErrorInfo::Action::ClientReset;
-            SyncSession::OnlyForTesting::handle_error(*session, synthetic);
+            SyncSession::OnlyForTesting::handle_error(*session, std::move(synthetic));
 
             session->revive_if_needed();
             timed_sleeping_wait_for(
@@ -949,6 +949,40 @@ TEST_CASE("sync: client reset", "[client reset]") {
             if (session) {
                 session->shutdown_and_wait();
             }
+            {
+                std::lock_guard<std::mutex> lock(mtx);
+                REQUIRE(before_callback_invoctions == 1);
+                REQUIRE(after_callback_invocations == 1);
+            }
+        }
+
+        SECTION("an interrupted reset can recover on the next session restart") {
+            test_reset->disable_wait_for_reset_completion();
+            SharedRealm realm;
+            test_reset
+                ->on_post_local_changes([&](SharedRealm local) {
+                    // retain a reference of the realm.
+                    realm = local;
+                })
+                ->run();
+
+            timed_wait_for([&] {
+                return util::File::exists(_impl::ClientResetOperation::get_fresh_path_for(local_config.path));
+            });
+
+            // Restart the session before the client reset finishes.
+            realm->sync_session()->restart_session();
+
+            REQUIRE(!wait_for_upload(*realm));
+            REQUIRE(!wait_for_download(*realm));
+            realm->refresh();
+
+            auto table = realm->read_group().get_table("class_object");
+            REQUIRE(table->size() == 1);
+            auto col = table->get_column_key("value");
+            int64_t value = table->begin()->get<Int>(col);
+            REQUIRE(value == 6);
+
             {
                 std::lock_guard<std::mutex> lock(mtx);
                 REQUIRE(before_callback_invoctions == 1);

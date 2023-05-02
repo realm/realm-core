@@ -1386,8 +1386,15 @@ TEST_CASE("C API", "[c_api]") {
         realm_set_log_callback(realm_log_func, RLM_LOG_LEVEL_DEBUG, &userdata, nullptr);
         auto config = make_config(test_file.path.c_str(), false);
         realm_t* realm = realm_open(config.get());
+        realm_begin_write(realm);
+        realm_commit(realm);
+        REQUIRE(userdata.log.size() == 3);
+        realm_set_log_level(RLM_LOG_LEVEL_INFO);
+        // Commit begin/end should not be logged at INFO level
+        realm_begin_write(realm);
+        realm_commit(realm);
+        REQUIRE(userdata.log.size() == 3);
         realm_release(realm);
-        REQUIRE(userdata.log.size() == 2);
         userdata.log.clear();
         realm_set_log_level(RLM_LOG_LEVEL_ERROR);
         realm = realm_open(config.get());
@@ -2532,6 +2539,12 @@ TEST_CASE("C API", "[c_api]") {
             SECTION("results") {
                 auto r = cptr_checked(realm_query_find_all(q.get()));
                 CHECK(!realm_is_frozen(r.get()));
+
+                SECTION("realm_results_is_valid") {
+                    bool valid;
+                    CHECK(checked(realm_results_is_valid(r.get(), &valid)));
+                    CHECK(valid);
+                }
 
                 SECTION("realm_results_count()") {
                     size_t count;
@@ -5085,6 +5098,7 @@ TEST_CASE("C API - binding callback thread observer", "[c_api][sync]") {
         REQUIRE(observer_ptr->test_get_create_callback_func() == bcto_on_thread_create);
         REQUIRE(observer_ptr->test_get_destroy_callback_func() == bcto_on_thread_destroy);
         REQUIRE(observer_ptr->test_get_error_callback_func() == bcto_on_thread_error);
+        REQUIRE(observer_ptr->has_handle_error());
         REQUIRE(observer_ptr->test_get_userdata_ptr() == &bcto_user_data);
 
         auto test_thread = std::thread([&]() {
@@ -5108,6 +5122,20 @@ TEST_CASE("C API - binding callback thread observer", "[c_api][sync]") {
     }
 
     REQUIRE(bcto_user_data.bcto_deleted == true);
+
+    {
+        auto config = cptr(realm_sync_client_config_new());
+        realm_sync_client_config_set_default_binding_thread_observer(config.get(), nullptr, nullptr, nullptr, nullptr,
+                                                                     nullptr);
+        auto no_handle_error_ptr =
+            static_cast<CBindingThreadObserver*>(config->default_socket_provider_thread_observer.get());
+        no_handle_error_ptr->did_create_thread();                          // should not crash
+        no_handle_error_ptr->will_destroy_thread();                        // should not crash
+        REQUIRE(!no_handle_error_ptr->has_handle_error());                 // no handler, returns false
+        REQUIRE(!no_handle_error_ptr->handle_error(MultipleSyncAgents())); // no handler, returns false
+        // No free_user_data function was provided and internal default should be used
+        // Should not crash at scope exit
+    }
 }
 #endif
 

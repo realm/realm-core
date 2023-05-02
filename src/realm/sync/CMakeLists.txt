@@ -52,16 +52,19 @@ set(SYNC_INSTALL_HEADERS
     protocol.hpp
     subscriptions.hpp
     transform.hpp
+)
 
+set(SYNC_NETWORK_INSTALL_HEADERS
+    network/default_socket.hpp
     network/http.hpp
+    network/network.hpp
+    network/network_ssl.hpp
+    network/websocket.hpp
 )
 
 set(NOINST_HEADERS
     trigger.hpp
-    network/default_socket.hpp
-    network/network.hpp
-    network/network_ssl.hpp
-    network/websocket.hpp
+
     noinst/changeset_index.hpp
     noinst/client_history_impl.hpp
     noinst/client_impl_base.hpp
@@ -87,6 +90,10 @@ add_library(Realm::Sync ALIAS Sync)
 set_target_properties(Sync PROPERTIES
     OUTPUT_NAME "realm-sync"
 )
+
+if(REALM_ENABLE_SYNC_MULTIPLEXING)
+    target_compile_definitions(Sync PUBLIC REALM_ENABLE_SYNC_MULTIPLEXING=1)
+endif()
 
 target_link_libraries(Sync PUBLIC Storage)
 
@@ -119,6 +126,10 @@ install(FILES ${IMPL_INSTALL_HEADERS}
 
 install(FILES ${SYNC_INSTALL_HEADERS}
         DESTINATION include/realm/sync
+        COMPONENT devel)
+
+install(FILES ${SYNC_NETWORK_INSTALL_HEADERS}
+        DESTINATION include/realm/sync/network
         COMPONENT devel)
 
 install(FILES ${UTIL_INSTALL_HEADERS}

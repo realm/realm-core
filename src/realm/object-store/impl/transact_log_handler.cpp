@@ -34,7 +34,7 @@ namespace {
 
 class KVOAdapter : public _impl::TransactionChangeInfo {
 public:
-    KVOAdapter(std::vector<BindingContext::ObserverState>& observers, BindingContext* context);
+    KVOAdapter(std::vector<BindingContext::ObserverState>& observers, BindingContext* context, bool is_rollback);
 
     void before(Transaction& sg);
     void after(Transaction& sg);
@@ -51,12 +51,15 @@ private:
     };
     std::vector<ListInfo> m_lists;
     VersionID m_version;
+    bool m_rollback;
 };
 
-KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, BindingContext* context)
+KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, BindingContext* context,
+                       bool is_rollback)
     : _impl::TransactionChangeInfo{}
     , m_context(context)
     , m_observers(observers)
+    , m_rollback(is_rollback)
 {
     if (m_observers.empty())
         return;
@@ -82,7 +85,7 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
     for (auto& tbl : tables_needed)
         tables[tbl] = {};
     for (auto& list : m_lists)
-        lists.push_back({list.observer->table_key, list.observer->obj_key, list.col, &list.builder});
+        collections.push_back({list.observer->table_key, list.observer->obj_key, list.col, &list.builder});
 }
 
 void KVOAdapter::before(Transaction& sg)
@@ -101,7 +104,7 @@ void KVOAdapter::before(Transaction& sg)
 
         auto const& table = it->second;
         auto key = observer.obj_key;
-        if (table.deletions_contains(key)) {
+        if (m_rollback ? table.insertions_contains(key) : table.deletions_contains(key)) {
             m_invalidated.push_back(observer.info);
             continue;
         }
@@ -134,7 +137,7 @@ void KVOAdapter::before(Transaction& sg)
 
         builder.modifications.remove(builder.insertions);
 
-        // KVO can't express moves (becaue NSArray doesn't have them), so
+        // KVO can't express moves (because NSArray doesn't have them), so
         // transform them into a series of sets on each affected index when possible
         if (!builder.moves.empty() && builder.insertions.count() == builder.moves.size() &&
             builder.deletions.count() == builder.moves.size()) {
@@ -184,6 +187,22 @@ void KVOAdapter::before(Transaction& sg)
             REALM_ASSERT(!builder.deletions.empty());
             changes.kind = BindingContext::ColumnInfo::Kind::Remove;
             changes.indices = builder.deletions;
+        }
+
+        // If we're rolling back a write transaction, insertions are actually
+        // deletions and vice-versa. More complicated scenarios which would
+        // require logic beyond this fortunately just aren't supported by KVO.
+        if (m_rollback) {
+            switch (changes.kind) {
+                case BindingContext::ColumnInfo::Kind::Insert:
+                    changes.kind = BindingContext::ColumnInfo::Kind::Remove;
+                    break;
+                case BindingContext::ColumnInfo::Kind::Remove:
+                    changes.kind = BindingContext::ColumnInfo::Kind::Insert;
+                    break;
+                default:
+                    break;
+            }
         }
     }
     m_context->will_change(m_observers, m_invalidated);
@@ -263,51 +282,27 @@ public:
     {
         return true;
     }
-    bool list_set(size_t)
+    bool collection_set(size_t)
     {
         return true;
     }
-    bool list_insert(size_t)
+    bool collection_insert(size_t)
     {
         return true;
     }
-    bool list_erase(size_t)
+    bool collection_erase(size_t)
     {
         return true;
     }
-    bool list_clear(size_t)
+    bool collection_clear(size_t)
     {
         return true;
     }
-    bool list_move(size_t, size_t)
+    bool collection_move(size_t, size_t)
     {
         return true;
     }
-    bool list_swap(size_t, size_t)
-    {
-        return true;
-    }
-    bool dictionary_insert(size_t, Mixed)
-    {
-        return true;
-    }
-    bool dictionary_set(size_t, Mixed)
-    {
-        return true;
-    }
-    bool dictionary_erase(size_t, Mixed)
-    {
-        return true;
-    }
-    bool set_insert(size_t)
-    {
-        return true;
-    }
-    bool set_erase(size_t)
-    {
-        return true;
-    }
-    bool set_clear(size_t)
+    bool collection_swap(size_t, size_t)
     {
         return true;
     }
@@ -337,19 +332,6 @@ class TransactLogObserver : public TransactLogValidationMixin {
     _impl::CollectionChangeBuilder* m_active_collection = nullptr;
     ObjectChangeSet* m_active_table = nullptr;
 
-    _impl::CollectionChangeBuilder* find_list(ObjKey obj, ColKey col)
-    {
-        // When there are multiple source versions there could be multiple
-        // change objects for a single LinkView, in which case we need to use
-        // the last one
-        auto table = current_table();
-        for (auto it = m_info.lists.rbegin(), end = m_info.lists.rend(); it != end; ++it) {
-            if (it->table_key == table && it->obj_key == obj && it->col_key == col)
-                return it->changes;
-        }
-        return nullptr;
-    }
-
 public:
     TransactLogObserver(_impl::TransactionChangeInfo& info)
         : m_info(info)
@@ -358,8 +340,8 @@ public:
 
     void parse_complete()
     {
-        for (auto& list : m_info.lists)
-            list.changes->clean_up_stale_moves();
+        for (auto& collection : m_info.collections)
+            collection.changes->clean_up_stale_moves();
         for (auto it = m_info.tables.begin(); it != m_info.tables.end();) {
             if (it->second.empty())
                 it = m_info.tables.erase(it);
@@ -373,47 +355,49 @@ public:
         TransactLogValidationMixin::select_table(key);
 
         TableKey table_key = current_table();
-        if (m_info.track_all)
-            m_active_table = &m_info.tables[table_key];
-        else {
-            auto it = m_info.tables.find(table_key);
-            if (it == m_info.tables.end())
-                m_active_table = nullptr;
-            else
-                m_active_table = &it->second;
-        }
+        if (auto it = m_info.tables.find(table_key); it != m_info.tables.end())
+            m_active_table = &it->second;
+        else
+            m_active_table = nullptr;
         return true;
     }
 
     bool select_collection(ColKey col, ObjKey obj)
     {
         modify_object(col, obj);
-        m_active_collection = find_list(obj, col);
+        auto table = current_table();
+        for (auto& c : m_info.collections) {
+            if (c.table_key == table && c.obj_key == obj && c.col_key == col) {
+                m_active_collection = c.changes;
+                return true;
+            }
+        }
+        m_active_collection = nullptr;
         return true;
     }
 
-    bool list_set(size_t index)
+    bool collection_set(size_t index)
     {
         if (m_active_collection)
             m_active_collection->modify(index);
         return true;
     }
 
-    bool list_insert(size_t index)
+    bool collection_insert(size_t index)
     {
         if (m_active_collection)
             m_active_collection->insert(index);
         return true;
     }
 
-    bool list_erase(size_t index)
+    bool collection_erase(size_t index)
     {
         if (m_active_collection)
             m_active_collection->erase(index);
         return true;
     }
 
-    bool list_swap(size_t index1, size_t index2)
+    bool collection_swap(size_t index1, size_t index2)
     {
         if (m_active_collection) {
             if (index1 > index2)
@@ -425,56 +409,17 @@ public:
         return true;
     }
 
-    bool list_clear(size_t old_size)
+    bool collection_clear(size_t old_size)
     {
         if (m_active_collection)
             m_active_collection->clear(old_size);
         return true;
     }
 
-    bool list_move(size_t from, size_t to)
+    bool collection_move(size_t from, size_t to)
     {
         if (m_active_collection)
             m_active_collection->move(from, to);
-        return true;
-    }
-
-    bool set_insert(size_t index)
-    {
-        if (m_active_collection)
-            m_active_collection->insert(index);
-        return true;
-    }
-    bool set_erase(size_t index)
-    {
-        if (m_active_collection)
-            m_active_collection->erase(index);
-        return true;
-    }
-    bool set_clear(size_t old_size)
-    {
-        if (m_active_collection)
-            m_active_collection->clear(old_size);
-        return true;
-    }
-    bool dictionary_insert(size_t index, Mixed)
-    {
-        if (m_active_collection) {
-            m_active_collection->insert(index);
-        }
-        return true;
-    }
-    bool dictionary_set(size_t index, Mixed)
-    {
-        if (m_active_collection) {
-            m_active_collection->modify(index);
-        }
-        return true;
-    }
-    bool dictionary_erase(size_t index, Mixed)
-    {
-        if (m_active_collection)
-            m_active_collection->erase(index);
         return true;
     }
 
@@ -493,14 +438,14 @@ public:
             m_active_table->deletions_add(key);
         m_active_table->modifications_remove(key);
 
-        for (size_t i = 0; i < m_info.lists.size(); ++i) {
-            auto& list = m_info.lists[i];
+        for (size_t i = 0; i < m_info.collections.size(); ++i) {
+            auto& list = m_info.collections[i];
             if (list.table_key != current_table())
                 continue;
             if (list.obj_key == key) {
-                if (i + 1 < m_info.lists.size())
-                    m_info.lists[i] = std::move(m_info.lists.back());
-                m_info.lists.pop_back();
+                if (i + 1 < m_info.collections.size())
+                    m_info.collections[i] = std::move(m_info.collections.back());
+                m_info.collections.pop_back();
                 continue;
             }
         }
@@ -541,9 +486,9 @@ class KVOTransactLogObserver : public TransactLogObserver {
 
 public:
     KVOTransactLogObserver(std::vector<BindingContext::ObserverState>& observers, BindingContext* context,
-                           _impl::NotifierPackage& notifiers, Transaction& sg)
+                           _impl::NotifierPackage& notifiers, Transaction& sg, bool is_rollback = false)
         : TransactLogObserver(m_adapter)
-        , m_adapter(observers, context)
+        , m_adapter(observers, context, is_rollback)
         , m_notifiers(notifiers)
         , m_sg(sg)
     {
@@ -663,18 +608,27 @@ void cancel(Transaction& tr, BindingContext* context)
     }
 
     _impl::NotifierPackage notifiers;
-    KVOTransactLogObserver o(observers, context, notifiers, tr);
-    tr.rollback_and_continue_as_read(&o);
+    KVOTransactLogObserver o(observers, context, notifiers, tr, true);
+    tr.rollback_and_continue_as_read(o);
 }
 
 void advance(Transaction& tr, TransactionChangeInfo& info, VersionID version)
 {
-    if (!info.track_all && info.tables.empty() && info.lists.empty()) {
+    if (info.tables.empty() && info.collections.empty()) {
         tr.advance_read(version);
     }
     else {
         TransactLogObserver o(info);
         tr.advance_read(&o, version);
+    }
+}
+
+void parse(Transaction& tr, TransactionChangeInfo& info, VersionID::version_type initial_version,
+           VersionID::version_type end_version)
+{
+    if (!info.tables.empty() || !info.collections.empty()) {
+        TransactLogObserver o(info);
+        tr.parse_history(o, initial_version, end_version);
     }
 }
 

@@ -20,15 +20,13 @@
 #define REALM_SYNC_CONFIG_HPP
 
 #include <realm/exceptions.hpp>
-#include <realm/db.hpp>
-#include <realm/util/assert.hpp>
-#include <realm/util/optional.hpp>
 #include <realm/sync/protocol.hpp>
 
 #include <functional>
-#include <memory>
-#include <string>
 #include <map>
+#include <memory>
+#include <optional>
+#include <string>
 #include <unordered_map>
 
 namespace realm {
@@ -71,7 +69,7 @@ struct SyncError : public SystemError {
     std::vector<sync::CompensatingWriteErrorInfo> compensating_writes_info;
 
     SyncError(std::error_code error_code, std::string_view msg, bool is_fatal,
-              util::Optional<std::string_view> serverLog = util::none,
+              std::optional<std::string_view> serverLog = std::nullopt,
               std::vector<sync::CompensatingWriteErrorInfo> compensating_writes = {});
 
     static constexpr const char c_original_file_path_key[] = "ORIGINAL_FILE_PATH";
@@ -141,6 +139,7 @@ enum class SyncClientHookAction {
     NoAction,
     EarlyReturn,
     SuspendWithRetryableError,
+    TriggerReconnect,
 };
 
 struct SyncClientHookData {

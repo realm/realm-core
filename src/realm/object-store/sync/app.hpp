@@ -266,8 +266,11 @@ public:
 
     /// Refreshes the custom data for a specified user
     /// @param user The user you want to refresh
+    /// @param update_location If true, the location metadata will be updated before refresh
+    void refresh_custom_data(const std::shared_ptr<SyncUser>& user, bool update_location,
+                             util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
     void refresh_custom_data(const std::shared_ptr<SyncUser>& user,
-                             util::UniqueFunction<void(util::Optional<AppError>)>&&);
+                             util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
     /// Log out the given user if they are not already logged out.
     void log_out(const std::shared_ptr<SyncUser>& user,
@@ -390,7 +393,7 @@ private:
     std::shared_ptr<SyncManager> m_sync_manager;
     std::shared_ptr<util::Logger> m_logger_ptr;
 
-    /// m_Logger_ptr is not set until the first call to one of these functions.
+    /// m_logger_ptr is not set until the first call to one of these functions.
     /// If configure() not been called, a logger will not be available yet.
     /// @returns true if the logger was set, otherwise false.
     bool init_logger();
@@ -404,7 +407,8 @@ private:
 
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion Passes an error should one occur.
-    void refresh_access_token(const std::shared_ptr<SyncUser>& user,
+    /// @param update_location If true, the location metadata will be updated before refresh
+    void refresh_access_token(const std::shared_ptr<SyncUser>& user, bool update_location,
                               util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
     /// Checks if an auth failure has taken place and if so it will attempt to refresh the

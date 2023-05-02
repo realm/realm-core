@@ -21,7 +21,7 @@ using namespace realm::fixtures;
 
 namespace {
 
-using ErrorInfo = Session::ErrorInfo;
+using ErrorInfo = SessionErrorInfo;
 
 TEST(ClientReset_TransferGroupWithDanglingLinks)
 {

@@ -1,5 +1,6 @@
 set(HEADERS
     ../util/crypt_key.hpp
+    ../util/spawned_process.hpp
     ../util/test_path.hpp
     util/event_loop.hpp
     util/index_helpers.hpp
@@ -32,6 +33,7 @@ set(SOURCES
     c_api/c_api.c
 
     ../util/crypt_key.cpp
+    ../util/spawned_process.cpp
     ../util/test_path.cpp
     util/event_loop.cpp
     util/test_file.cpp
@@ -59,6 +61,7 @@ if(REALM_ENABLE_SYNC)
         sync/flx_migration.cpp
         sync/flx_sync.cpp
         sync/metadata.cpp
+        sync/migration_store_test.cpp
         sync/remote_mongo_tests.cpp
         sync/session/connection_change_notifications.cpp
         sync/session/progress_notifications.cpp

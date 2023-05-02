@@ -26,7 +26,7 @@
 #include <atomic>
 #include <cstring>
 
-#ifdef REALM_DEBUG
+#if REALM_DEBUG
 #include <iostream>
 #include <unordered_set>
 #endif
@@ -695,9 +695,10 @@ std::string SlabAlloc::get_file_path_for_assertions() const
     return m_file.get_path();
 }
 
-ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
+ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::WriteObserver* write_observer)
 {
     m_cfg = cfg;
+    m_write_observer = write_observer;
     // ExceptionSafety: If this function throws, it must leave the allocator in
     // the detached state.
 
@@ -773,7 +774,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     size_t expected_size = size_t(-1);
     try {
         // we'll read header and (potentially) footer
-        File::Map<char> map_header(m_file, File::access_ReadOnly, sizeof(Header));
+        File::Map<char> map_header(m_file, File::access_ReadOnly, sizeof(Header), 0, m_write_observer);
         realm::util::encryption_read_barrier(map_header, 0, sizeof(Header));
         auto header = reinterpret_cast<const Header*>(map_header.get_addr());
 
@@ -784,7 +785,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             size_t footer_page_base = footer_ref & ~(page_size() - 1);
             size_t footer_offset = footer_ref - footer_page_base;
             map_footer = File::Map<char>(m_file, footer_page_base, File::access_ReadOnly,
-                                         sizeof(StreamingFooter) + footer_offset, 0);
+                                         sizeof(StreamingFooter) + footer_offset, 0, m_write_observer);
             realm::util::encryption_read_barrier(map_footer, footer_offset, sizeof(StreamingFooter));
             footer = reinterpret_cast<const StreamingFooter*>(map_footer.get_addr() + footer_offset);
         }
@@ -818,7 +819,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             size_t top_page_base = top_ref & ~(page_size() - 1);
             size_t top_offset = top_ref - top_page_base;
             size_t map_size = std::min(max_top_size + top_offset, size - top_page_base);
-            File::Map<char> map_top(m_file, top_page_base, File::access_ReadOnly, map_size, 0);
+            File::Map<char> map_top(m_file, top_page_base, File::access_ReadOnly, map_size, 0, m_write_observer);
             realm::util::encryption_read_barrier(map_top, top_offset, max_top_size);
             auto top_header = map_top.get_addr() + top_offset;
             auto top_data = NodeHeader::get_data_from_header(top_header);
@@ -1185,6 +1186,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
     std::lock_guard<std::mutex> lock(m_mapping_mutex);
     size_t old_baseline = m_baseline.load(std::memory_order_relaxed);
     if (file_size <= old_baseline) {
+        schedule_refresh_of_outdated_encrypted_pages();
         return;
     }
 
@@ -1232,14 +1234,14 @@ void SlabAlloc::update_reader_view(size_t file_size)
                 const size_t section_start_offset = get_section_base(k);
                 const size_t section_size = std::min<size_t>(1 << section_shift, file_size - section_start_offset);
                 if (section_size == (1 << section_shift)) {
-                    new_mappings.push_back(
-                        {util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size)});
+                    new_mappings.push_back({util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly,
+                                                                  section_size, 0, m_write_observer)});
                 }
                 else {
                     new_mappings.push_back({util::File::Map<char>()});
                     auto& mapping = new_mappings.back().primary_mapping;
-                    bool reserved =
-                        mapping.try_reserve(m_file, File::access_ReadOnly, 1 << section_shift, section_start_offset);
+                    bool reserved = mapping.try_reserve(m_file, File::access_ReadOnly, 1 << section_shift,
+                                                        section_start_offset, m_write_observer);
                     if (reserved) {
                         // if reservation is supported, first attempt at extending must succeed
                         if (!mapping.try_extend_to(section_size))
@@ -1247,7 +1249,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
                     }
                     else {
                         new_mappings.back().primary_mapping.map(m_file, File::access_ReadOnly, section_size, 0,
-                                                                section_start_offset);
+                                                                section_start_offset, m_write_observer);
                     }
                 }
             }
@@ -1299,6 +1301,25 @@ void SlabAlloc::update_reader_view(size_t file_size)
     // scheduling queue.
     //
     rebuild_translations(replace_last_mapping, old_num_mappings);
+
+    schedule_refresh_of_outdated_encrypted_pages();
+}
+
+
+void SlabAlloc::schedule_refresh_of_outdated_encrypted_pages()
+{
+#if REALM_ENABLE_ENCRYPTION
+    // callers must already hold m_mapping_mutex
+    for (auto& e : m_mappings) {
+        if (auto m = e.primary_mapping.get_encrypted_mapping()) {
+            encryption_mark_pages_for_IV_check(m);
+        }
+        if (auto m = e.xover_mapping.get_encrypted_mapping()) {
+            encryption_mark_pages_for_IV_check(m);
+        }
+    }
+    // unsafe to do outside writing thread: verify();
+#endif // REALM_ENABLE_ENCRYPTION
 }
 
 size_t SlabAlloc::get_allocated_size() const noexcept
@@ -1393,7 +1414,8 @@ void SlabAlloc::get_or_add_xover_mapping(RefTranslation& txl, size_t index, size
         auto end_offset = file_offset + size;
         auto mapping_file_offset = file_offset & ~(_page_size - 1);
         auto minimal_mapping_size = end_offset - mapping_file_offset;
-        util::File::Map<char> mapping(m_file, mapping_file_offset, File::access_ReadOnly, minimal_mapping_size);
+        util::File::Map<char> mapping(m_file, mapping_file_offset, File::access_ReadOnly, minimal_mapping_size, 0,
+                                      m_write_observer);
         map_entry->xover_mapping = std::move(mapping);
     }
     txl.xover_mapping_base = offset & ~(_page_size - 1);

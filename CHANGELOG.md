@@ -17,7 +17,167 @@
 -----------
 
 ### Internals
+* None.
+
+----------------------------------------------
+
+# 13.10.0 Release notes
+
+### Enhancements
+* PBS to FLX Migration for migrating a client app that uses partition based sync to use flexible sync under the hood if the server has been migrated to flexible sync. ([#6554](https://github.com/realm/realm-core/issues/6554))
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Bump the sync protocol version to v8 ([PR #6549](https://github.com/realm/realm-core/pull/6549))
+
+----------------------------------------------
+
+# 13.9.4 Release notes
+
+### Enhancements
+* Improve performance of rolling back write transactions after making changes. If no KVO observers are used this is now constant time rather than taking time proportional to the number of changes to be rolled back. Rollbacks with KVO observers are 10-20% faster. ([PR #6513](https://github.com/realm/realm-core/pull/6513))
+
+### Fixed
+* Performing a query like "{1, 2, 3, ...} IN list" where the array is longer than 8 and all elements are smaller than some values in list, the program would crash ([#1183](https://github.com/realm/realm-kotlin/issues/1183), v12.5.0)
+* Performing a large number of queries without ever performing a write resulted in steadily increasing memory usage, some of which was never fully freed due to an unbounded cache ([Swift #7978](https://github.com/realm/realm-swift/issues/7978), since v12.0.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Clear out SubscriptionStore and cancel pending notifications upon rollback to PBS after client migration to FLX. ([#6389](https://github.com/realm/realm-core/issues/6389))
+* Simplify the non-sync replication log by emitting the same instruction type for all three types of collections rather than different instructions per collection type. This has no functional effect but eliminates some duplicated code. ([PR #6513](https://github.com/realm/realm-core/pull/6513))
+* Remove TransactionChangeInfo::track_all, which was only ever used by the global notifier. ([PR #6513](https://github.com/realm/realm-core/pull/6513))
+* Delete util::InputStream and rename util::NoCopyInputStream to util::InputStream.
+
+----------------------------------------------
+
+# 13.9.3 Release notes
+
+### Fixed
+* If session multiplexing was enabled in the sync client and multiple realms for multiple users were being synchronized, a connection authenticated for the wrong user could have been used, reuslting in a UserMismatch error from the server. ([PR #6320](https://github.com/realm/realm-core/pull/6320), since v10.0.0).
+* If session multiplexing was enabled and an automatic client reset failed, it could cause all sessions to fail with a fatal ProtocolError rather than just the session that failed to client reset. This would mean that no other sync session would be able to be opened for up to an hour without restarting the app. ([PR #6320](https://github.com/realm/realm-core/pull/6320), since v11.5.0)
+* If a DOWNLOAD message was received after a sync session was de-activated but before the UNBOUND message was received by the client, a use-after-free error may have occurred when the sync session tried to process the download messaage. So far this has only been reproducible if session multiplexing was enabled. ([PR #6320](https://github.com/realm/realm-core/pull/6320), since v12.9.0)
+* HTTP and Websocket redirections are not properly updating URL locations if the network transport implementation handles redirect responses internally ([#6485](https://github.com/realm/realm-core/issues/6485), since v12.9.0)
+* Don't report non ssl related errors during ssl handshake as fatal in default socket provider. ([#6434](https://github.com/realm/realm-core/issues/6434), since v13.3.0)
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+----------------------------------------------
+
+# 13.9.2 Release notes
+
+### Enhancements
+* Improve performance of equality queries on a non-indexed mixed property by about 30%. ([#6506](https://github.com/realm/realm-core/issues/6506))
+
+### Fixed
+* Fix a build error due to an installed header depending on a non-installed on (since v13.9.1).
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Allow to run multiprocess encryption tests outside building folder.
+
+----------------------------------------------
+
+# 13.9.1 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Fixed a crash or exception when doing a fulltext search for multiple keywords when the intersection of results is not equal. ([#6465](https://github.com/realm/realm-core/issues/6465) since v13.2.0).
+* Fixed issue where build would not succeed when consuming core as an installed dependancy due to missing install headers ([#6479](https://github.com/realm/realm-core/pull/6479) since v13.4.1).
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Fix compiler warnings with MacOS Clang 14.0.3 ([PR #6467](https://github.com/realm/realm-core/pull/6467))
+* Perform a client reset to migrate a sync'd realm from PBS to FLX and vice versa ([#6393](https://github.com/realm/realm-core/issues/6393))
+* The following unused util headers have been deleted: call_with_tuple.hpp, get_file_size.hpp, inspect.hpp, substitute.hpp, type_list.hpp, and utf8.hpp.
+* Add migrated state information to flexible sync client BIND message for backfilling PBS partition value in objects once client has migrated to FLX. ([PR #6464](https://github.com/realm/realm-core/pull/6464))
+* Add unit test for MigrationStore ([PR #6495](https://github.com/realm/realm-core/pull/6495))
+
+----------------------------------------------
+
+# 13.9.0 Release notes
+
+### Enhancements
+* Enable multiple processes to operate on an encrypted Realm simultaneously. ([#1845](https://github.com/realm/realm-core/issues/1845))
+
+### Fixed
+* Fix a stack overflow crash when using the query parser with long chains of AND/OR conditions. ([#6428](https://github.com/realm/realm-core/pull/6428), since v11.7.0)
+* Changing the log level on the fly would not affect the core level log output ([#6440](https://github.com/realm/realm-core/issues/6440), since 13.7.0)
+* `SyncManager::immediately_run_file_actions()` no longer ignores the result of trying to remove a realm. This could have resulted in a client reset action being reported as successful when it actually failed on windows if the `Realm` was still open ([#6050](https://github.com/realm/realm-core/issues/6050)).
+* Fix a data race in `DB::VersionManager`. If one thread committed a write transaction which increased the number of live versions above the previous highest seen during the current session at the same time as another thread began a read, the reading thread could read from a no-longer-valid memory mapping ([PR #6411](https://github.com/realm/realm-core/pull/6411), since v13.0.0).
+* Performing count() on an undefined Query would crash. ([#6443](https://github.com/realm/realm-core/issues/6443), since v13.7.0)
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+* Lock file format: New format introduced for multiprocess encryption. All processes accessing the file must be upgraded to the new format.
+
+-----------
+
+### Internals
+* PrintChangeset sync CLI utility can now ingest trace-level log files and decode hex/base64-compressed changeset data within the logs ([#6375](https://github.com/realm/realm-core/pull/6375))
+
+----------------------------------------------
+
+# 13.8.0 Release notes
+
+### Enhancements
+* Performance improvement for the following queries ([6376](https://github.com/realm/realm-core/issues/6376)):
+    * Significant (~75%) improvement when counting (`Query::count()`) the number of exact matches (with no other query conditions) on a string/int/UUID/ObjectID property that has an index. This improvement will be especially noticiable if there are a large number of results returned (duplicate values).
+    * Significant (~99%) improvement when querying for an exact match on a Timestamp property that has an index.
+    * Significant (~99%) improvement when querying for a case insensitive match on a Mixed property that has an index.
+    * Moderate (~25%) improvement when querying for an exact match on a Boolean property that has an index.
+    * Small (~5%) improvement when querying for a case insensitive match on a Mixed property that does not have an index.
+* Expose `Results::is_valid()` in the C API, in order to prevent to use an invalid Results. (PR [#6407](https://github.com/realm/realm-core/pull/6407))
+* Restore `SyncManager::set_logger_factory()` to enable setting different loggers for different SyncManagers ([PR #6400](https://github.com/realm/realm-core/pull/6400)).
+
+### Fixed
+* Fixed a crash when querying a mixed property with a string operator (contains/like/beginswith/endswith) or with case insensitivity. ([6376](https://github.com/realm/realm-core/issues/6376) since introduction of Mixed)
+* Querying for equality of a string on an indexed mixed property was returning case insensitive matches. For example querying for `myIndexedMixed == "Foo"` would incorrectly match on values of "foo" or "FOO" etc. ([6376](https://github.com/realm/realm-core/issues/6376) since introduction of Mixed)
+* Adding an index to a Mixed property on a non-empty table would crash with an assertion. ([6376](https://github.com/realm/realm-core/issues/6376) since introduction of Mixed)
+* `SyncSession::pause()` could hold a reference to the database open after shutting down the sync session, preventing users from being able to delete the realm. ([#6372](https://github.com/realm/realm-core/issues/6372), since v13.3.0)
+* `Logger::set_default_logger()` did not perform any locking, resulting in data races if it was called while the default logger was being read on another thread ([PR #6398](https://github.com/realm/realm-core/pull/6398), since v13.7.0).
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
 * Add admin api and test for performing the PBS->FLX migration and roll back on the server. (PR [#6366](https://github.com/realm/realm-core/pull/6366))
+* Integrate protocol support for PBS->FLX client migration ([PR #6355](https://github.com/realm/realm-core/pull/6355))
+* `SyncManager::reset_for_testing()` could race with SyncSession's being torn down in other threads causing an assertion for `REALM_ASSERT_RELEASE(no_sessions)` to fail. `SyncManager::reset_for_testing()` now waits/yields for up to 5 seconds for sessions being torn down in other threads to finish tearing down before checking this assertion. ([#6271](https://github.com/realm/realm-core/issues/6271))
+* Update event loop to keep full stack trace if no observer is used ([PR #6410](https://github.com/realm/realm-core/pull/6410))
+* `SyncSession::OnlyForTesting::handle_error()` now takes a `realm::sync:SessionErrorInfo` instead of a `realm::SyncError` to reflect internal refactoring ([PR #6433](https://github.com/realm/realm-core/pull/6433)).
 
 ----------------------------------------------
 
@@ -174,7 +334,7 @@
 * Improve performance of interprocess mutexes on iOS which don't need to support reader-writer locking. The primary beneficiary of this is beginning and ending read transactions, which is now almost as fast as pre-v13.0.0 ([PR #6258](https://github.com/realm/realm-core/pull/6258)).
 
 ### Fixed
-* Sharing Realm files between a Catalyst app and Realm Studio did not properly synchronize access to the Realm file ([PR #6258](https://github.com/realm/realm-core/pull/6258), since v6.21.0).
+* Sharing Realm files between a Catalyst app and Realm Studio did not properly synchronize access to the Realm file ([PR #6258](https://github.com/realm/realm-core/pull/6258), since v6.0.21).
 * Fix websocket redirection after server migration if user is logged in ([#6056](https://github.com/realm/realm-core/issues/6056), since v12.9.0)
 * Freezing an immutable Realm would hit an assertion failure ([#6260]https://github.com/realm/realm-core/issues/6260), since v13.3.0).
 

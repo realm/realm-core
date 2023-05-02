@@ -1,10 +1,10 @@
 #include <realm/sync/network/default_socket.hpp>
 
 #include <realm/sync/binding_callback_thread_observer.hpp>
-
 #include <realm/sync/network/network.hpp>
 #include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/network/websocket.hpp>
+#include <realm/util/random.hpp>
 #include <realm/util/scope_exit.hpp>
 
 namespace realm::sync::websocket {
@@ -431,9 +431,15 @@ void DefaultWebSocketImpl::handle_ssl_handshake(std::error_code ec)
     if (ec) {
         REALM_ASSERT(ec != util::error::operation_aborted);
         constexpr bool was_clean = false;
-        websocket_error_and_close_handler(
-            was_clean,
-            Status{make_error_code(WebSocketError::websocket_tls_handshake_failed), ec.message()}); // Throws
+        std::error_code ec2;
+        if (ec == network::ssl::Errors::certificate_rejected) {
+            ec2 = make_error_code(WebSocketError::websocket_tls_handshake_failed);
+        }
+        else {
+            ec2 = make_error_code(WebSocketError::websocket_connection_failed);
+        }
+
+        websocket_error_and_close_handler(was_clean, Status{ec2, ec.message()}); // Throws
         return;
     }
 
@@ -568,18 +574,26 @@ void DefaultSocketProvider::event_loop()
         do_state_update(lock, State::Running);
     });
 
-    try {
+    // If there is no event loop observer or handle_error function registered, then just
+    // allow the exception to bubble to the top so we can get a true stack trace
+    if (!m_observer_ptr || !m_observer_ptr->has_handle_error()) {
         m_service.run_until_stopped(); // Throws
     }
-    catch (const std::exception& e) {
-        std::unique_lock<std::mutex> lock(m_mutex);
-        // Service is no longer running, event loop thread is stopping
-        do_state_update(lock, State::Stopping);
-        lock.unlock();
-        m_logger_ptr->error("Default event loop exception: ", e.what());
-        // If the observer_ptr is not set or the error was not handled, then throw the exception
-        if (!m_observer_ptr || !m_observer_ptr->handle_error(e))
-            throw;
+    else {
+        try {
+            m_service.run_until_stopped(); // Throws
+        }
+        catch (const std::exception& e) {
+            REALM_ASSERT(m_observer_ptr); // should not change while event loop is running
+            std::unique_lock<std::mutex> lock(m_mutex);
+            // Service is no longer running, event loop thread is stopping
+            do_state_update(lock, State::Stopping);
+            lock.unlock();
+            m_logger_ptr->error("Default event loop exception: ", e.what());
+            // If the error was not handled by the thread loop observer, then rethrow
+            if (!m_observer_ptr->handle_error(e))
+                throw;
+        }
     }
 }
 

@@ -1,8 +1,9 @@
-#include "realm/exceptions.hpp"
-#include "realm/object_id.hpp"
-#include "realm/sync/noinst/sync_metadata_schema.hpp"
-#include "realm/sync/subscriptions.hpp"
-#include "realm/sync/noinst/client_history_impl.hpp"
+#include <realm/exceptions.hpp>
+#include <realm/object_id.hpp>
+#include <realm/transaction.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/noinst/sync_metadata_schema.hpp>
+#include <realm/sync/subscriptions.hpp>
 
 #include "test.hpp"
 #include "util/test_path.hpp"
@@ -530,6 +531,317 @@ TEST(Sync_SubscriptionStoreSubSetHasTable)
     read_tr->advance_read();
     table_set = store->get_tables_for_latest(*read_tr);
     CHECK(table_set.empty());
+}
+
+TEST(Sync_SubscriptionStoreNotifyAll)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    SubscriptionStoreFixture fixture(sub_store_path);
+    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+
+    const Status status_abort(ErrorCodes::OperationAborted, "operation aborted");
+
+    size_t hit_count = 0;
+
+    auto state_handler = [this, &hit_count, &status_abort](StatusWith<SubscriptionSet::State> state) {
+        CHECK(!state.is_ok());
+        CHECK_EQUAL(state, status_abort);
+        hit_count++;
+    };
+
+    auto read_tr = fixture.db->start_read();
+    // We should have no subscriptions yet so this should return false.
+    auto table_set = store->get_tables_for_latest(*read_tr);
+    CHECK(table_set.empty());
+
+    Query query_a(read_tr->get_table(fixture.a_table_key));
+    query_a.equal(fixture.foo_col, StringData("JBR")).greater_equal(fixture.bar_col, int64_t(1));
+    Query query_b(read_tr->get_table(fixture.a_table_key));
+    query_b.equal(fixture.foo_col, "Realm");
+
+    // Create multiple pending subscriptions and notify all of them
+    {
+        auto mut_sub_set1 = store->get_latest().make_mutable_copy();
+        mut_sub_set1.insert_or_assign(query_a);
+        auto sub_set1 = mut_sub_set1.commit();
+
+        sub_set1.get_state_change_notification(SubscriptionSet::State::Complete)
+            .get_async([&state_handler](StatusWith<SubscriptionSet::State> state) {
+                state_handler(state);
+            });
+    }
+    {
+        auto mut_sub_set2 = store->get_latest().make_mutable_copy();
+        mut_sub_set2.insert_or_assign(query_b);
+        auto sub_set2 = mut_sub_set2.commit();
+
+        sub_set2.get_state_change_notification(SubscriptionSet::State::Complete)
+            .get_async([&state_handler](StatusWith<SubscriptionSet::State> state) {
+                state_handler(state);
+            });
+    }
+    {
+        auto mut_sub_set3 = store->get_latest().make_mutable_copy();
+        mut_sub_set3.insert_or_assign(query_a);
+        auto sub_set3 = mut_sub_set3.commit();
+
+        sub_set3.get_state_change_notification(SubscriptionSet::State::Complete)
+            .get_async([&state_handler](StatusWith<SubscriptionSet::State> state) {
+                state_handler(state);
+            });
+    }
+
+    auto pending_subs = store->get_pending_subscriptions();
+    CHECK_EQUAL(pending_subs.size(), 3);
+    for (auto& sub : pending_subs) {
+        CHECK_EQUAL(sub.state(), SubscriptionSet::State::Pending);
+    }
+
+    store->notify_all_state_change_notifications(status_abort);
+    CHECK_EQUAL(hit_count, 3);
+
+    // Any pending subscriptions should still be in the pending state after notify()
+    pending_subs = store->get_pending_subscriptions();
+    CHECK_EQUAL(pending_subs.size(), 3);
+    for (auto& sub : pending_subs) {
+        CHECK_EQUAL(sub.state(), SubscriptionSet::State::Pending);
+    }
+}
+
+TEST(Sync_SubscriptionStoreTerminate)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    SubscriptionStoreFixture fixture(sub_store_path);
+    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+
+    size_t hit_count = 0;
+
+    auto state_handler = [this, &hit_count](StatusWith<SubscriptionSet::State> state) {
+        CHECK(state.is_ok());
+        CHECK_EQUAL(state, SubscriptionSet::State::Superseded);
+        hit_count++;
+    };
+
+    auto read_tr = fixture.db->start_read();
+    // We should have no subscriptions yet so this should return false.
+    auto table_set = store->get_tables_for_latest(*read_tr);
+    CHECK(table_set.empty());
+
+    Query query_a(read_tr->get_table(fixture.a_table_key));
+    query_a.equal(fixture.foo_col, StringData("JBR")).greater_equal(fixture.bar_col, int64_t(1));
+    Query query_b(read_tr->get_table(fixture.a_table_key));
+    query_b.equal(fixture.foo_col, "Realm");
+
+    // Create multiple pending subscriptions and "terminate" all of them
+    {
+        auto mut_sub_set1 = store->get_latest().make_mutable_copy();
+        mut_sub_set1.insert_or_assign(query_a);
+        auto sub_set1 = mut_sub_set1.commit();
+
+        sub_set1.get_state_change_notification(SubscriptionSet::State::Complete)
+            .get_async([&state_handler](StatusWith<SubscriptionSet::State> state) {
+                state_handler(state);
+            });
+    }
+    {
+        auto mut_sub_set2 = store->get_latest().make_mutable_copy();
+        mut_sub_set2.insert_or_assign(query_b);
+        auto sub_set2 = mut_sub_set2.commit();
+
+        sub_set2.get_state_change_notification(SubscriptionSet::State::Complete)
+            .get_async([&state_handler](StatusWith<SubscriptionSet::State> state) {
+                state_handler(state);
+            });
+    }
+    {
+        auto mut_sub_set3 = store->get_latest().make_mutable_copy();
+        mut_sub_set3.insert_or_assign(query_a);
+        auto sub_set3 = mut_sub_set3.commit();
+
+        sub_set3.get_state_change_notification(SubscriptionSet::State::Complete)
+            .get_async([&state_handler](StatusWith<SubscriptionSet::State> state) {
+                state_handler(state);
+            });
+    }
+
+    CHECK_EQUAL(store->get_latest().version(), 3);
+    CHECK_EQUAL(store->get_pending_subscriptions().size(), 3);
+
+    store->terminate(); // notifications are called on this thread
+
+    CHECK_EQUAL(hit_count, 3);
+    CHECK_EQUAL(store->get_latest().version(), 0);
+    CHECK_EQUAL(store->get_pending_subscriptions().size(), 0);
+}
+
+// Copied from sync_metadata_schema.cpp
+constexpr static std::string_view c_flx_metadata_table("flx_metadata");
+constexpr static std::string_view c_meta_schema_version_field("schema_version");
+
+static void create_legacy_metadata_schema(DBRef db, int64_t version)
+{
+    // Create the legacy table
+    TableKey legacy_table_key;
+    ColKey legacy_version_key;
+    std::vector<SyncMetadataTable> legacy_table_def{
+        {&legacy_table_key, c_flx_metadata_table, {{&legacy_version_key, c_meta_schema_version_field, type_Int}}}};
+    auto tr = db->start_write();
+    create_sync_metadata_schema(tr, &legacy_table_def);
+    tr->commit_and_continue_writing();
+    auto legacy_meta_table = tr->get_table(legacy_table_key);
+    auto legacy_object = legacy_meta_table->create_object();
+    // Set the legacy version, which will be converted to the flx subscription store version
+    legacy_object.set(legacy_version_key, version);
+    tr->commit();
+}
+
+TEST(Sync_SyncMetadataSchemaVersionsReader)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    DBRef db = DB::create(make_client_replication(), sub_store_path);
+    std::string schema_group_name = "schema_group_name";
+    int64_t version = 123;
+    int64_t legacy_version = 345;
+
+    {
+        auto tr = db->start_read();
+        // Verify opening a reader on an unitialized versions table returns uninitialized
+        SyncMetadataSchemaVersionsReader reader(tr);
+        auto schema_version = reader.get_version_for(tr, schema_group_name);
+        CHECK(!schema_version);
+    }
+
+    {
+        auto tr = db->start_read();
+        // Initialize the schema versions table and set a schema version
+        SyncMetadataSchemaVersions schema_versions(tr);
+        tr->promote_to_write();
+        schema_versions.set_version_for(tr, schema_group_name, version);
+        tr->commit_and_continue_as_read();
+        auto schema_version = schema_versions.get_version_for(tr, schema_group_name);
+        CHECK(schema_version);
+        CHECK(*schema_version == version);
+    }
+
+    {
+        auto tr = db->start_read();
+        // Verify opening a reader on an initialized versions table returns initialized
+        SyncMetadataSchemaVersionsReader reader(tr);
+        auto schema_version = reader.get_version_for(tr, schema_group_name);
+        CHECK(schema_version);
+        CHECK(*schema_version == version);
+    }
+
+    // Create the legacy metadata schema table
+    create_legacy_metadata_schema(db, legacy_version);
+    {
+        auto tr = db->start_read();
+        // Verify opening a reader with legacy data returns uninitialized
+        SyncMetadataSchemaVersionsReader reader(tr);
+        auto schema_version = reader.get_version_for(tr, schema_group_name);
+        CHECK(!schema_version);
+    }
+
+    // Test case where both tables exist in database
+    {
+        auto tr = db->start_read();
+        // Initialize the schema versions table and verify the converted flx subscription store version
+        SyncMetadataSchemaVersions schema_versions(tr);
+        auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_subscription_store);
+        CHECK(schema_version);
+        CHECK(*schema_version == legacy_version);
+        // Verify the legacy table has been deleted after the conversion
+        CHECK(!tr->has_table(c_flx_metadata_table));
+    }
+}
+
+TEST(Sync_SyncMetadataSchemaVersions)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    DBRef db = DB::create(make_client_replication(), sub_store_path);
+    int64_t flx_version = 234, flx_version2 = 77777;
+    int64_t btstrp_version = 567, btstrp_version2 = 888888;
+    int64_t mig_version = 890, mig_version2 = 9999999;
+
+    auto check_version = [this, &db](SyncMetadataSchemaVersionsReader& schema_versions,
+                                     const std::string_view& group_name, int64_t expected_version) {
+        auto tr = db->start_read();
+        auto schema_version = schema_versions.get_version_for(tr, group_name);
+        CHECK(schema_version);
+        CHECK(*schema_version == expected_version);
+    };
+
+    {
+        // Initialize the table and write values
+        auto tr = db->start_read();
+        SyncMetadataSchemaVersions schema_versions(tr);
+        tr->promote_to_write();
+        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_subscription_store, flx_version);
+        schema_versions.set_version_for(tr, internal_schema_groups::c_pending_bootstraps, btstrp_version);
+        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_migration_store, mig_version);
+        tr->commit();
+
+        check_version(schema_versions, internal_schema_groups::c_flx_subscription_store, flx_version);
+        check_version(schema_versions, internal_schema_groups::c_pending_bootstraps, btstrp_version);
+        check_version(schema_versions, internal_schema_groups::c_flx_migration_store, mig_version);
+    }
+
+    {
+        // Re-read the data and verify the values
+        auto tr = db->start_read();
+        SyncMetadataSchemaVersions schema_versions(tr);
+
+        check_version(schema_versions, internal_schema_groups::c_flx_subscription_store, flx_version);
+        check_version(schema_versions, internal_schema_groups::c_pending_bootstraps, btstrp_version);
+        check_version(schema_versions, internal_schema_groups::c_flx_migration_store, mig_version);
+    }
+
+    {
+        // Write new values and verify the values
+        auto tr = db->start_read();
+        SyncMetadataSchemaVersions schema_versions(tr);
+        tr->promote_to_write();
+        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_subscription_store, flx_version2);
+        tr->commit_and_continue_writing();
+        schema_versions.set_version_for(tr, internal_schema_groups::c_pending_bootstraps, btstrp_version2);
+        tr->commit_and_continue_writing();
+        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_migration_store, mig_version2);
+        tr->commit();
+
+        check_version(schema_versions, internal_schema_groups::c_flx_subscription_store, flx_version2);
+        check_version(schema_versions, internal_schema_groups::c_pending_bootstraps, btstrp_version2);
+        check_version(schema_versions, internal_schema_groups::c_flx_migration_store, mig_version2);
+    }
+
+    {
+        // Re-read the data and verify the new values with a reader
+        auto tr = db->start_read();
+        SyncMetadataSchemaVersionsReader schema_versions(tr);
+
+        check_version(schema_versions, internal_schema_groups::c_flx_subscription_store, flx_version2);
+        check_version(schema_versions, internal_schema_groups::c_pending_bootstraps, btstrp_version2);
+        check_version(schema_versions, internal_schema_groups::c_flx_migration_store, mig_version2);
+    }
+}
+
+TEST(Sync_SyncMetadataSchemaVersions_LegacyTable)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    DBRef db = DB::create(make_client_replication(), sub_store_path);
+    int64_t version = 678;
+
+    // Create the legacy metadata schema table
+    create_legacy_metadata_schema(db, version);
+    {
+        auto tr = db->start_read();
+        // Converts the legacy table to the unified table
+        SyncMetadataSchemaVersions schema_versions(tr);
+        auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_subscription_store);
+        CHECK(schema_version);
+        CHECK(*schema_version == version);
+        // Verify the legacy table has been deleted after the conversion
+        CHECK(!tr->has_table(c_flx_metadata_table));
+    }
 }
 
 } // namespace realm::sync

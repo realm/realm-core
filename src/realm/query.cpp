@@ -992,12 +992,14 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key) const
             auto node = pn->m_children[best];
             if (node->has_search_index()) {
                 auto keys = node->index_based_keys();
+                REALM_ASSERT(keys);
                 // The node having the search index can be removed from the query as we know that
                 // all the objects will match this condition
                 pn->m_children[best] = pn->m_children.back();
                 pn->m_children.pop_back();
-                for (auto key : keys) {
-                    auto obj = m_table->get_object(key);
+                const size_t num_keys = keys->size();
+                for (size_t i = 0; i < num_keys; ++i) {
+                    auto obj = m_table->get_object(keys->get(i));
                     if (pn->m_children.empty() || eval_object(obj)) {
                         st.m_key_offset = obj.get_key().value;
                         st.match(realm::npos, obj.get<T>(column_key));
@@ -1181,6 +1183,11 @@ Query& Query::Or()
 
 ObjKey Query::find() const
 {
+    ObjKey ret;
+
+    if (!m_table)
+        return ret;
+
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Find);
 #endif
@@ -1195,7 +1202,6 @@ ObjKey Query::find() const
         do_log = true;
     }
 
-    ObjKey ret;
     init();
 
     // ordering could change the way in which objects are returned, in this case we need to run find_all()
@@ -1312,6 +1318,8 @@ void Query::do_find_all(TableView& ret, size_t limit) const
             auto best = find_best_node(pn);
             auto node = pn->m_children[best];
             if (node->has_search_index()) {
+                auto keys = node->index_based_keys();
+                REALM_ASSERT(keys);
                 KeyColumn& refs = ret.m_key_values;
 
                 // The node having the search index can be removed from the query as we know that
@@ -1319,8 +1327,9 @@ void Query::do_find_all(TableView& ret, size_t limit) const
                 pn->m_children[best] = pn->m_children.back();
                 pn->m_children.pop_back();
 
-                auto keys = node->index_based_keys();
-                for (auto key : keys) {
+                const size_t num_keys = keys->size();
+                for (size_t i = 0; i < num_keys; ++i) {
+                    ObjKey key = keys->get(i);
                     if (limit == 0)
                         break;
                     if (pn->m_children.empty()) {
@@ -1433,13 +1442,15 @@ size_t Query::do_count(size_t limit) const
         auto node = pn->m_children[best];
         if (node->has_search_index()) {
             auto keys = node->index_based_keys();
+            REALM_ASSERT(keys);
             if (pn->m_children.size() > 1) {
                 // The node having the search index can be removed from the query as we know that
                 // all the objects will match this condition
                 pn->m_children[best] = pn->m_children.back();
                 pn->m_children.pop_back();
-                for (auto key : keys) {
-                    auto obj = m_table->get_object(key);
+                const size_t num_keys = keys->size();
+                for (size_t i = 0; i < num_keys; ++i) {
+                    auto obj = m_table->get_object(keys->get(i));
                     if (eval_object(obj)) {
                         ++cnt;
                         if (cnt == limit)
@@ -1449,7 +1460,7 @@ size_t Query::do_count(size_t limit) const
             }
             else {
                 // The node having the search index is the only node
-                auto sz = keys.size();
+                auto sz = keys->size();
                 cnt = std::min(limit, sz);
             }
         }
@@ -1488,6 +1499,8 @@ size_t Query::count() const
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
 #endif
+    if (!m_table)
+        return 0;
     return do_count();
 }
 
@@ -1529,6 +1542,8 @@ size_t Query::count(const DescriptorOrdering& descriptor) const
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
 #endif
+    if (!m_table)
+        return 0;
     realm::util::Optional<size_t> min_limit = descriptor.get_min_limit();
 
     if (bool(min_limit) && *min_limit == 0)
