@@ -152,7 +152,7 @@ TEST_CASE("geospatial") {
             Geospatial geo = obj.obj().get<Geospatial>("location");
             REQUIRE(geo.get_type_string() == "Point");
             REQUIRE(geo.get_type() == Geospatial::Type::Point);
-            GeoPoint point = geo.get<GeoPoint>();
+            auto&& point = geo.get<GeoPoint>();
             REQUIRE(point.longitude == 1.1);
             REQUIRE(point.latitude == 2.2);
             REQUIRE(point.get_altitude());

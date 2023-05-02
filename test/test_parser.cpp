@@ -5698,7 +5698,7 @@ TEST(Parser_Geospatial)
 
     Geospatial box{GeoBox{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}}};
     Geospatial sphere{GeoCenterSphere{1000, GeoPoint{0.3, 0.3}}};
-    Geospatial polygon{GeoPolygon{{{{GeoPoint{0, 0}, GeoPoint{1, 0}, GeoPoint{1, 1}, GeoPoint{0, 1}}}}}};
+    Geospatial polygon{GeoPolygon{{GeoPoint{0, 0}, GeoPoint{1, 0}, GeoPoint{1, 1}, GeoPoint{0, 1}}}};
     Geospatial invalid;
     Geospatial point{GeoPoint{0, 0}};
     std::vector<Mixed> args = {Mixed{&box},          Mixed{&sphere}, Mixed{&polygon}, Mixed{&invalid},
