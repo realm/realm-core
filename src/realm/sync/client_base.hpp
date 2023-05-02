@@ -155,12 +155,12 @@ struct ClientConfig {
     /// For testing purposes only.
     ReconnectMode reconnect_mode = ReconnectMode::normal;
 
-    /// Create a separate connection for each session. For testing purposes
-    /// only.
-    ///
-    /// FIXME: This setting needs to be true for now, due to limitations in
-    /// the load balancer.
+    /// Create a separate connection for each session.
+#if REALM_ENABLE_SYNC_MULTIPLEXING
+    bool one_connection_per_session = false;
+#else
     bool one_connection_per_session = true;
+#endif
 
     /// Do not access the local file system. Sessions will act as if
     /// initiated on behalf of an empty (or nonexisting) local Realm

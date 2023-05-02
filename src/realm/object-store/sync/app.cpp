@@ -795,7 +795,13 @@ void App::link_user(const std::shared_ptr<SyncUser>& user, const AppCredentials&
 void App::refresh_custom_data(const std::shared_ptr<SyncUser>& user,
                               UniqueFunction<void(Optional<AppError>)>&& completion)
 {
-    refresh_access_token(user, std::move(completion));
+    refresh_access_token(user, false, std::move(completion));
+}
+
+void App::refresh_custom_data(const std::shared_ptr<SyncUser>& user, bool update_location,
+                              UniqueFunction<void(Optional<AppError>)>&& completion)
+{
+    refresh_access_token(user, update_location, std::move(completion));
 }
 
 std::string App::url_for_path(const std::string& path = "") const
@@ -820,7 +826,7 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
 {
     std::string route;
 
-    if (!new_hostname && (m_sync_manager->app_metadata() || m_location_updated)) {
+    if (!new_hostname && m_location_updated) {
         // Skip if the app_metadata/location data has already been initialized and a new hostname is not provided
         return completion(util::none); // early return
     }
@@ -909,8 +915,9 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& 
 {
     request.timeout_ms = default_timeout_ms;
 
-    // Normal do_request operation, just send the request to the server and return the response
-    if (m_sync_manager->app_metadata()) {
+    // Refresh the location metadata every time an app is created to ensure the http and
+    // websocket URL information is up to date.
+    if (m_location_updated) {
         m_config.transport->send_request_to_server(
             std::move(request), [self = shared_from_this(), completion = std::move(completion)](
                                     Request&& request, const Response& response) mutable {
@@ -1014,23 +1021,24 @@ void App::handle_auth_failure(const AppError& error, const Response& response, R
         return;
     }
 
-    App::refresh_access_token(sync_user, [self = shared_from_this(), request = std::move(request),
-                                          completion = std::move(completion), response = std::move(response),
-                                          sync_user](Optional<AppError>&& error) mutable {
-        if (!error) {
-            // assign the new access_token to the auth header
-            request.headers = get_request_headers(sync_user, RequestTokenType::AccessToken);
-            self->do_request(std::move(request), std::move(completion));
-        }
-        else {
-            // pass the error back up the chain
-            completion(std::move(response));
-        }
-    });
+    App::refresh_access_token(sync_user, false,
+                              [self = shared_from_this(), request = std::move(request),
+                               completion = std::move(completion), response = std::move(response),
+                               sync_user](Optional<AppError>&& error) mutable {
+                                  if (!error) {
+                                      // assign the new access_token to the auth header
+                                      request.headers = get_request_headers(sync_user, RequestTokenType::AccessToken);
+                                      self->do_request(std::move(request), std::move(completion));
+                                  }
+                                  else {
+                                      // pass the error back up the chain
+                                      completion(std::move(response));
+                                  }
+                              });
 }
 
 /// MARK: - refresh access token
-void App::refresh_access_token(const std::shared_ptr<SyncUser>& sync_user,
+void App::refresh_access_token(const std::shared_ptr<SyncUser>& sync_user, bool update_location,
                                util::UniqueFunction<void(Optional<AppError>)>&& completion)
 {
     if (!sync_user) {
@@ -1051,23 +1059,31 @@ void App::refresh_access_token(const std::shared_ptr<SyncUser>& sync_user,
 
     log_debug("App: refresh_access_token: email: %1", sync_user->user_profile().email());
 
-    do_request(Request{HttpMethod::post, std::move(route), m_request_timeout_ms,
-                       get_request_headers(sync_user, RequestTokenType::RefreshToken)},
-               [completion = std::move(completion), sync_user](const Response& response) {
-                   if (auto error = AppUtils::check_for_errors(response)) {
-                       return completion(std::move(error));
-                   }
+    Request request{HttpMethod::post, std::move(route), m_request_timeout_ms,
+                    get_request_headers(sync_user, RequestTokenType::RefreshToken)};
+    auto handler = [completion = std::move(completion), sync_user](const Response& response) {
+        if (auto error = AppUtils::check_for_errors(response)) {
+            return completion(std::move(error));
+        }
 
-                   try {
-                       auto json = parse<BsonDocument>(response.body);
-                       sync_user->update_access_token(get<std::string>(json, "access_token"));
-                   }
-                   catch (AppError& err) {
-                       return completion(std::move(err));
-                   }
+        try {
+            auto json = parse<BsonDocument>(response.body);
+            sync_user->update_access_token(get<std::string>(json, "access_token"));
+        }
+        catch (AppError& err) {
+            return completion(std::move(err));
+        }
 
-                   return completion(util::none);
-               });
+        return completion(util::none);
+    };
+
+    if (update_location) {
+        // If update_location, update the location metadata before sending the request
+        update_metadata_and_resend(std::move(request), std::move(handler));
+    }
+    else {
+        do_request(std::move(request), std::move(handler));
+    }
 }
 
 std::string App::function_call_url_path() const

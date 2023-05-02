@@ -566,8 +566,8 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                         .get();
                 REQUIRE(actual == sync::SubscriptionSet::State::Complete);
             })
-            ->on_post_reset([&, err_future = std::move(error_future)](SharedRealm local_realm) {
-                auto sync_error = std::move(err_future).get();
+            ->on_post_reset([&, err_future = std::move(error_future)](SharedRealm local_realm) mutable {
+                auto sync_error = wait_for_future(std::move(err_future)).get();
                 REQUIRE(before_reset_count == 1);
                 REQUIRE(after_reset_count == 0);
                 REQUIRE(sync_error.get_system_error() ==
@@ -613,8 +613,8 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
         };
 
         reset_utils::TestClientReset::Callback verify_post_reset_state = [&, err_future = std::move(error_future)](
-                                                                             SharedRealm local_realm) {
-            auto sync_error = std::move(err_future).get();
+                                                                             SharedRealm local_realm) mutable {
+            auto sync_error = wait_for_future(std::move(err_future)).get();
             REQUIRE(before_reset_count == 1);
             REQUIRE(after_reset_count == 0);
             REQUIRE(sync_error.get_system_error() ==
@@ -642,7 +642,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             auto&& [error_future2, err_handler2] = make_error_handler();
             config_copy.sync_config->error_handler = err_handler2;
             auto realm_post_reset = Realm::get_shared_realm(config_copy);
-            auto sync_error = std::move(error_future2).get();
+            auto sync_error = wait_for_future(std::move(error_future2)).get();
             REQUIRE(before_reset_count == 2);
             REQUIRE(after_reset_count == 0);
             REQUIRE(sync_error.get_system_error() ==
@@ -665,7 +665,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             };
             config_copy.sync_config->notify_after_client_reset = reset_handler;
             auto realm_post_reset = Realm::get_shared_realm(config_copy);
-            ClientResyncMode mode = client_reset_future.get();
+            ClientResyncMode mode = wait_for_future(std::move(client_reset_future)).get();
             REQUIRE(mode == ClientResyncMode::DiscardLocal);
             realm_post_reset->refresh();
             auto table = realm_post_reset->read_group().get_table("class_TopLevel");
@@ -687,11 +687,11 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             ->make_remote_changes([&](SharedRealm remote_realm) {
                 add_subscription_for_new_object(remote_realm, str_field_value, remote_added_int);
             })
-            ->on_post_reset([&, client_reset_future = std::move(reset_future)](SharedRealm local_realm) {
-                ClientResyncMode mode = client_reset_future.get();
+            ->on_post_reset([&, client_reset_future = std::move(reset_future)](SharedRealm local_realm) mutable {
+                ClientResyncMode mode = wait_for_future(std::move(client_reset_future)).get();
                 REQUIRE(mode == ClientResyncMode::DiscardLocal);
                 auto subs = local_realm->get_latest_subscription_set();
-                subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+                wait_for_future(subs.get_state_change_notification(sync::SubscriptionSet::State::Complete)).get();
                 local_realm->refresh();
                 auto table = local_realm->read_group().get_table("class_TopLevel");
                 auto queryable_str_field = table->get_column_key("queryable_str_field");
@@ -708,7 +708,8 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 add_subscription_for_new_object(local_realm, str_field_value, local_added_int);
                 auto latest_subs = local_realm->get_latest_subscription_set();
                 REQUIRE(latest_subs.version() > subs.version());
-                latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+                wait_for_future(latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete))
+                    .get();
                 local_realm->refresh();
                 count_of_foo = count_queries_with_str(latest_subs, util::format("\"%1\"", str_field_value));
                 REQUIRE(count_of_foo == 1);
@@ -779,8 +780,8 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 baas_sync_config.queryable_field_names->erase(it);
                 app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
             })
-            ->on_post_reset([&, err_future = std::move(error_future)](SharedRealm) {
-                auto sync_error = std::move(err_future).get();
+            ->on_post_reset([&, err_future = std::move(error_future)](SharedRealm) mutable {
+                auto sync_error = wait_for_future(std::move(err_future)).get();
                 // There is a race here depending on if the server produces a query error or responds to
                 // the ident message first. We consider either error to be a sufficient outcome.
                 if (sync_error.get_system_error() ==
@@ -1258,7 +1259,7 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
                 session->close();
                 promise->emplace_value();
 
-                return SyncClientHookAction::NoAction;
+                return SyncClientHookAction::TriggerReconnect;
             };
 
         auto realm = Realm::get_shared_realm(config);
@@ -1271,7 +1272,6 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
 
         interrupted.get();
         realm->sync_session()->shutdown_and_wait();
-        realm->close();
     }
 
     _impl::RealmCoordinator::assert_no_open_realms();
@@ -1588,6 +1588,15 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
     });
 }
 
+TEST_CASE("flx: verify PBS/FLX websocket protocol number and prefixes", "[sync][flx]") {
+    // Update the expected value whenever the protocol version is updated - this ensures
+    // that the current protocol version does not change unexpectedly.
+    REQUIRE(8 == sync::get_current_protocol_version());
+    // This was updated in Protocol V8 to use '#' instead of '/' to support the Web SDK
+    REQUIRE("com.mongodb.realm-sync#" == sync::get_pbs_websocket_protocol_prefix());
+    REQUIRE("com.mongodb.realm-query-sync#" == sync::get_flx_websocket_protocol_prefix());
+}
+
 TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bad_query");
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
@@ -1858,7 +1867,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
                     if (data.query_version == 1 && data.batch_state == sync::DownloadBatchState::MoreToCome) {
                         session->force_close();
                         promise->emplace_value();
-                        return SyncClientHookAction::EarlyReturn;
+                        return SyncClientHookAction::TriggerReconnect;
                     }
                     return SyncClientHookAction::NoAction;
                 };
@@ -1937,7 +1946,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
                     if (data.query_version == 1 && data.batch_state == sync::DownloadBatchState::LastInBatch) {
                         session->force_close();
                         promise->emplace_value();
-                        return SyncClientHookAction::EarlyReturn;
+                        return SyncClientHookAction::TriggerReconnect;
                     }
                     return SyncClientHookAction::NoAction;
                 };
@@ -2507,7 +2516,7 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app]") {
                 REQUIRE(table->find_primary_key(bar_obj_id));
                 REQUIRE_FALSE(table->find_primary_key(bizz_obj_id));
 
-                return SyncClientHookAction::SuspendWithRetryableError;
+                return SyncClientHookAction::TriggerReconnect;
             };
         auto problem_realm = Realm::get_shared_realm(triggered_config);
 
@@ -2752,7 +2761,7 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
                 REQUIRE_FALSE(data.error_info->compensating_writes.empty());
                 promise.get_promise().emplace_value();
 
-                return SyncClientHookAction::SuspendWithRetryableError;
+                return SyncClientHookAction::TriggerReconnect;
             };
 
         auto realm = Realm::get_shared_realm(config);

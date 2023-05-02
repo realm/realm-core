@@ -79,7 +79,11 @@ struct SyncClientConfig {
     LoggerFactory logger_factory;
     util::Logger::Level log_level = util::Logger::Level::info;
     ReconnectMode reconnect_mode = ReconnectMode::normal; // For internal sync-client testing only!
+#if REALM_ENABLE_SYNC_MULTIPLEXING
+    bool multiplex_sessions = true;
+#else
     bool multiplex_sessions = false;
+#endif
 
     // The SyncSocket instance used by the Sync Client for event synchronization
     // and creating WebSockets. If not provided the default implementation will be used.
@@ -253,6 +257,12 @@ public:
     SyncManager();
     SyncManager(const SyncManager&) = delete;
     SyncManager& operator=(const SyncManager&) = delete;
+
+    struct OnlyForTesting {
+        friend class TestHelper;
+
+        static void voluntary_disconnect_all_connections(SyncManager&);
+    };
 
 protected:
     friend class SyncUser;
