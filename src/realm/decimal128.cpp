@@ -1549,7 +1549,7 @@ int Decimal128::compare(const Decimal128& rhs) const noexcept
     if (lhs_is_nan && rhs_is_nan) {
         // We should have stable sorting of NaN
         if (m_value.w[1] == rhs.m_value.w[1]) {
-            return m_value.w[0] < rhs.m_value.w[0] ? -1 : 1;
+            return m_value.w[0] == rhs.m_value.w[0] ? 0 : m_value.w[0] < rhs.m_value.w[0] ? -1 : 1;
         }
         else {
             return m_value.w[1] < rhs.m_value.w[1] ? -1 : 1;

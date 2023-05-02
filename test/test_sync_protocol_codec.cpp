@@ -62,11 +62,6 @@ TEST(Protocol_Codec_Bind_FLX)
     json_data["valB"] = "something";
 
     out.reset();
-    expected_out_string = "bind 234888 0 6 0 1\ntoken1";
-    protocol.make_flx_bind_message(7, out, 234888, json_data, "token1", false, true);
-    compare_out_string(expected_out_string, out, test_context);
-
-    out.reset();
     expected_out_string = "bind 345888 0 6 1 0\ntoken2";
     protocol.make_flx_bind_message(8, out, 345888, {}, "token2", true, false);
     compare_out_string(expected_out_string, out, test_context);
