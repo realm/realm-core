@@ -21,6 +21,7 @@
 
 #include <stdint.h>
 #include <realm/util/to_string.hpp>
+#include <realm/util/features.h>
 
 namespace realm {
 

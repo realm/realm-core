@@ -19,6 +19,8 @@
 #ifndef REALM_GEOSPATIAL_HPP
 #define REALM_GEOSPATIAL_HPP
 
+#include "external/mpark/variant.hpp"
+
 #include <realm/keys.hpp>
 #include <realm/string_data.hpp>
 
@@ -94,31 +96,63 @@ struct GeoPoint {
 struct GeoBox {
     GeoPoint lo;
     GeoPoint hi;
+    bool operator==(const GeoBox& other) const
+    {
+        return lo == other.lo && hi == other.hi;
+    }
 };
 
 // A simple spherical polygon. It consists of a single
 // chain of vertices where the first vertex is implicitly connected to the
 // last. Chain of vertices is defined to have a CCW orientation, i.e. the interior
 // of the polygon is on the left side of the edges.
+// For Polygons with multiple rings:
+//   - The first described ring must be the exterior ring.
+//   - The exterior ring cannot self-intersect.
+//   - Any interior ring must be entirely contained by the outer ring.
+//   - Interior rings cannot intersect or overlap each other. Interior rings cannot share an edge.
 struct GeoPolygon {
-    GeoPolygon(std::initializer_list<GeoPoint>&& l)
-        : points(std::move(l))
-    {
-    }
     GeoPolygon(std::vector<GeoPoint>&& p)
+        : points({std::move(p)})
+    {
+    }
+    GeoPolygon(const std::vector<GeoPoint>& p)
+        : points({p})
+    {
+    }
+    GeoPolygon(std::vector<std::vector<GeoPoint>>&& p)
         : points(std::move(p))
     {
     }
-    GeoPolygon(std::vector<GeoPoint> p)
-        : points(std::move(p))
+    GeoPolygon(const std::vector<std::vector<GeoPoint>>& p)
+        : points(p)
     {
     }
-    std::vector<GeoPoint> points;
+    GeoPolygon(const GeoPolygon& other) = default;
+    GeoPolygon(GeoPolygon&& other) = default;
+    GeoPolygon& operator=(const GeoPolygon& other) = default;
+    GeoPolygon& operator=(GeoPolygon&& other) = default;
+    GeoPolygon& operator=(std::initializer_list<std::vector<GeoPoint>>&& p)
+    {
+        points = std::move(p);
+        return *this;
+    }
+
+    bool operator==(const GeoPolygon& other) const
+    {
+        return points == other.points;
+    }
+    std::vector<std::vector<GeoPoint>> points;
 };
 
 struct GeoCenterSphere {
     double radius_radians = 0.0;
     GeoPoint center;
+
+    bool operator==(const GeoCenterSphere& other) const
+    {
+        return radius_radians == other.radius_radians && center == other.center;
+    }
 
     // Equatorial radius of earth.
     static const double c_radius_meters;
@@ -131,32 +165,26 @@ struct GeoCenterSphere {
 
 class Geospatial {
 public:
-    // keep this type small so it doesn't bloat the size of a Mixed
     enum class Type : uint8_t { Point, Box, Polygon, CenterSphere, Invalid };
 
     Geospatial()
-        : m_type(Type::Invalid)
+        : m_value(mpark::monostate{})
     {
     }
     Geospatial(GeoPoint point)
-        : m_type(Type::Point)
-        , m_points({point})
+        : m_value(point)
     {
     }
     Geospatial(GeoBox box)
-        : m_type(Type::Box)
-        , m_points({box.lo, box.hi})
+        : m_value(box)
     {
     }
     Geospatial(GeoPolygon polygon)
-        : m_type(Type::Polygon)
-        , m_points(std::move(polygon.points))
+        : m_value(polygon)
     {
     }
     Geospatial(GeoCenterSphere centerSphere)
-        : m_type(Type::CenterSphere)
-        , m_points({centerSphere.center})
-        , m_radius_radians(centerSphere.radius_radians)
+        : m_value(centerSphere)
     {
     }
 
@@ -171,40 +199,23 @@ public:
     static bool is_geospatial(const TableRef table, ColKey link_col);
     void assign_to(Obj& link) const;
 
-    std::string get_type_string() const noexcept
-    {
-        return is_valid() ? std::string(c_types[static_cast<size_t>(m_type)]) : "Invalid";
-    }
-    Type get_type() const noexcept
-    {
-        return m_type;
-    }
+    std::string get_type_string() const noexcept;
+    Type get_type() const noexcept;
 
     template <class T>
-    T get() const noexcept;
+    const T& get() const noexcept;
 
     bool is_valid() const noexcept
     {
-        return m_type != Type::Invalid;
+        return get_type() != Type::Invalid;
     }
 
     bool is_within(const Geospatial& bounds) const noexcept;
-
-    const std::vector<GeoPoint>& get_points() const
-    {
-        return m_points;
-    }
-
-    void add_point_to_polygon(const GeoPoint& p)
-    {
-        REALM_ASSERT_EX(m_type == Type::Polygon, get_type_string());
-        m_points.push_back(p);
-    }
+    std::string to_string() const;
 
     bool operator==(const Geospatial& other) const
     {
-        return m_type == other.m_type && m_points == other.m_points &&
-               ((!is_radius_valid() && !other.is_radius_valid()) || (m_radius_radians == other.m_radius_radians));
+        return m_value == other.m_value;
     }
     bool operator!=(const Geospatial& other) const
     {
@@ -217,43 +228,36 @@ public:
 
     constexpr static std::string_view c_geo_point_type_col_name = "type";
     constexpr static std::string_view c_geo_point_coords_col_name = "coordinates";
-    constexpr static std::string_view c_types[] = {"Point", "Box", "Polygon", "CenterSphere"};
 
 private:
-    Type m_type;
-    std::vector<GeoPoint> m_points;
-
-    double m_radius_radians = get_nan();
-
-    constexpr static double get_nan()
-    {
-        return std::numeric_limits<double>::quiet_NaN();
-    }
-
-    bool is_radius_valid() const
-    {
-        return !std::isnan(m_radius_radians);
-    }
+    mpark::variant<mpark::monostate, GeoPoint, GeoBox, GeoPolygon, GeoCenterSphere> m_value;
 
     mutable std::shared_ptr<S2Region> m_region;
     S2Region& get_region() const;
 };
 
 template <>
-inline GeoCenterSphere Geospatial::get<GeoCenterSphere>() const noexcept
+inline const GeoCenterSphere& Geospatial::get<GeoCenterSphere>() const noexcept
 {
-    REALM_ASSERT_EX(m_type == Type::CenterSphere, get_type_string());
-    REALM_ASSERT(is_radius_valid());
-    REALM_ASSERT(m_points.size() >= 1);
-    return GeoCenterSphere{m_radius_radians, m_points[0]};
+    return mpark::get<GeoCenterSphere>(m_value);
 }
 
 template <>
-inline GeoPolygon Geospatial::get<GeoPolygon>() const noexcept
+inline const GeoBox& Geospatial::get<GeoBox>() const noexcept
 {
-    REALM_ASSERT_EX(m_type == Type::Polygon, get_type_string());
-    REALM_ASSERT(m_points.size() >= 1);
-    return GeoPolygon(m_points);
+    return mpark::get<GeoBox>(m_value);
+}
+
+template <>
+inline const GeoPoint& Geospatial::get<GeoPoint>() const noexcept
+{
+    return mpark::get<GeoPoint>(m_value);
+}
+
+template <>
+inline const GeoPolygon& Geospatial::get<GeoPolygon>() const noexcept
+{
+    return mpark::get<GeoPolygon>(m_value);
 }
 
 std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo);

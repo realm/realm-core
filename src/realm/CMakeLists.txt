@@ -311,10 +311,6 @@ add_library(Storage STATIC
     $<TARGET_OBJECTS:Bid>
 )
 
-if (REALM_ENABLE_GEOSPATIAL)
-    target_compile_definitions(Storage PUBLIC REALM_ENABLE_GEOSPATIAL=1)
-endif()
-
 add_library(Realm::Storage ALIAS Storage)
 
 set_target_properties(Storage PROPERTIES

@@ -198,22 +198,23 @@ public:
 
 class GeospatialNode : public ValueNode {
 public:
-    struct Box {
-    };
-    struct Polygon {
-    };
-    struct Sphere {
-    };
+    struct Box {};
+    struct Polygon {};
+    struct Loop {};
+    struct Sphere {};
 #if REALM_ENABLE_GEOSPATIAL
     GeospatialNode(Box, GeoPoint& p1, GeoPoint& p2);
     GeospatialNode(Sphere, GeoPoint& p, double radius);
     GeospatialNode(Polygon, GeoPoint& p);
-    void add_point_to_polygon(GeoPoint& p);
+    GeospatialNode(Loop, GeoPoint& p);
+    void add_point_to_loop(GeoPoint& p);
+    void add_loop_to_polygon(GeospatialNode*);
     bool is_constant() final
     {
         return true;
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
+    std::vector<std::vector<GeoPoint>> m_points;
     Geospatial m_geo;
 #else
     template <typename... Ts>
@@ -222,7 +223,11 @@ public:
         throw realm::LogicError(ErrorCodes::NotSupported, "Support for Geospatial queries is not enabled");
     }
     template <typename Point>
-    void add_point_to_polygon(Point&&)
+    void add_point_to_loop(Point&&)
+    {
+    }
+    template <typename Loop>
+    void add_loop_to_polygon(Loop&&)
     {
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override

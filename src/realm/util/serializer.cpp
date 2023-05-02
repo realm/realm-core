@@ -214,39 +214,13 @@ std::string print_value<>(realm::TypeOfValue type)
     return '"' + type.to_string() + '"';
 }
 
+#if REALM_ENABLE_GEOSPATIAL
 template <>
-std::string print_value<>(realm::Geospatial geo)
+std::string print_value<>(const realm::Geospatial& geo)
 {
-    const auto& data = geo.get_points();
-    auto point_str = [&](const GeoPoint& point) -> std::string {
-        if (point.get_altitude()) {
-            return util::format("[%1, %2, %3]", point.longitude, point.latitude, *point.get_altitude());
-        }
-        return util::format("[%1, %2]", point.longitude, point.latitude);
-    };
-    switch (geo.get_type()) {
-        case Geospatial::Type::Point:
-            REALM_ASSERT_EX(data.size() >= 1, data.size());
-            return util::format("GeoPoint(%1)", point_str(data[0]));
-        case Geospatial::Type::Box:
-            REALM_ASSERT_EX(data.size() >= 2, data.size());
-            return util::format("GeoBox(%1, %2)", point_str(data[0]), point_str(data[1]));
-        case Geospatial::Type::Polygon: {
-            std::string points = "";
-            for (size_t i = 0; i < data.size(); ++i) {
-                points += util::format("%1%2", i == 0 ? "" : ", ", point_str(data[i]));
-            }
-            return util::format("GeoPolygon(%1)", points);
-        }
-        case Geospatial::Type::CenterSphere: {
-            GeoCenterSphere sphere = geo.get<GeoCenterSphere>();
-            return util::format("GeoSphere(%1, %2)", point_str(sphere.center), sphere.radius_radians);
-        }
-        case Geospatial::Type::Invalid:
-            return "NULL";
-    }
-    return "NULL";
+    return geo.to_string();
 }
+#endif
 
 // The variable name must be unique with respect to the already chosen variables at
 // this level of subquery nesting and with respect to the names of the columns in the table.

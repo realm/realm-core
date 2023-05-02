@@ -5672,7 +5672,7 @@ TEST(Parser_Geospatial)
     CHECK_QUERY("link geoWithin geoBox([0.2, 0.2, 0.2], [0.7, 0.7, 0.7])");
     CHECK_QUERY("link geoWithin geoSphere([0.3, 0.3], 1000.0)");
     CHECK_QUERY("link geoWithin geoSphere([0.3, 0.3, 0.3], 1000.0)");
-    CHECK_QUERY("link geoWithin geoPolygon([0.0, 0.0], [1.0, 0.0], [1, 1], [0, 1])");
+    CHECK_QUERY("link geoWithin geoPolygon({[0.0, 0.0], [1.0, 0.0], [1, 1], [0, 1]})");
 
     CHECK_THROW_EX(verify_query_sub(test_context, table, "link GEOWITHIN $0", {}, 1), realm::LogicError,
                    CHECK(std::string(e.what()).find(error) != std::string::npos));
@@ -5689,7 +5689,11 @@ TEST(Parser_Geospatial)
     verify_query(test_context, table, "link geoWithin geoBox([0.2, 0.2, 0.2], [0.7, 0.7, 0.7])", 1);
     verify_query(test_context, table, "link geoWithin geoSphere([0.3, 0.3], 1000.0)", 4);
     verify_query(test_context, table, "link geoWithin geoSphere([0.3, 0.3, 0.3], 1000.0)", 4);
-    verify_query(test_context, table, "link geoWithin geoPolygon([0.0, 0.0], [1.0, 0.0], [1, 1], [0, 1])", 1);
+    verify_query(test_context, table, "link geoWithin geoPolygon({[0.0, 0.0], [1.0, 0.0], [1, 1], [0, 1]})", 1);
+    verify_query(test_context, table,
+                 "link geoWithin geoPolygon({[0.0, 0.0], [1.0, 0.0], [1, 1], [0, 1]}, "
+                 "{[0.25, 0.25], [0.75, 0.25], [0.75, 0.75], [0.25, 0.75]})",
+                 0); // polygon with hole
     verify_query(test_context, table, "link == NULL", 1);
 
     Geospatial box{GeoBox{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}}};

@@ -139,7 +139,7 @@ using namespace realm::query_parser;
 %type  <int> equality relational stringop aggr_op
 %type  <double> coordinate
 %type  <ConstantNode*> constant primary_key
-%type  <GeospatialNode*> geospatial geopoly_content
+%type  <GeospatialNode*> geospatial geoloop geoloop_content geopoly_content
 // std::optional<GeoPoint> is necessary because GeoPoint has deleted its default constructor
 // but bison must push a default value to the stack, even though it will be overwritten by a real value
 %type  <std::optional<GeoPoint>> geopoint
@@ -256,9 +256,15 @@ geopoint
     : '[' coordinate ',' coordinate ']' { $$ = GeoPoint{$2, $4}; }
     | '[' coordinate ',' coordinate ',' FLOAT ']' { $$ = GeoPoint{$2, $4, strtod($6.c_str(), nullptr)}; }
 
+geoloop_content
+    : geopoint { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Loop{}, *$1); }
+    | geoloop_content ',' geopoint { $1->add_point_to_loop(*$3); $$ = $1; }
+
+geoloop : '{' geoloop_content '}' { $$ = $2; }
+
 geopoly_content
-    : geopoint { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Polygon{}, *$1); }
-    | geopoly_content ',' geopoint { $1->add_point_to_polygon(*$3); $$ = $1; }
+    : geoloop { $$ = $1; }
+    | geopoly_content ',' geoloop { $1->add_loop_to_polygon($3); $$ = $1; }
 
 geospatial
     : GEOBOX '(' geopoint ',' geopoint ')'  { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Box{}, *$3, *$5); }
