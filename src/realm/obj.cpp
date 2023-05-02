@@ -1046,7 +1046,6 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
         else {
             auto val = get_any(ck);
             if (!val.is_null()) {
-                // out << open_str;
                 if (type == col_type_Link) {
                     std::string close_string;
                     bool is_embedded = target_table->is_embedded();
@@ -1072,7 +1071,6 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                 else {
                     val.to_json(out, output_mode);
                 }
-                // out << close_str;
             }
             else {
                 out << "null";
