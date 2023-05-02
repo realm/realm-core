@@ -148,10 +148,7 @@ void SlabAlloc::detach() noexcept
         case attach_SharedFile:
         case attach_UnsharedFile:
             m_data = 0;
-            {
-                std::lock_guard<std::mutex> lock(m_mapping_mutex);
-                m_mappings.clear();
-            }
+            m_mappings.clear();
             m_youngest_live_version = 0;
             m_file.close();
             break;
@@ -894,12 +891,9 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
 
     reset_free_space_tracking();
     update_reader_view(size);
-    {
-        std::lock_guard<std::mutex> lk(m_mapping_mutex);
-        REALM_ASSERT(m_mappings.size());
-        m_data = m_mappings[0].primary_mapping.get_addr();
-        realm::util::encryption_read_barrier(m_mappings[0].primary_mapping, 0, sizeof(Header));
-    }
+    REALM_ASSERT(m_mappings.size());
+    m_data = m_mappings[0].primary_mapping.get_addr();
+    realm::util::encryption_read_barrier(m_mappings[0].primary_mapping, 0, sizeof(Header));
     dg.release();  // Do not detach
     fcg.release(); // Do not close
 #if REALM_ENABLE_ENCRYPTION

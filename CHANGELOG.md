@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* `get_committed_file_format_version()` safe access to mappings vector from multiple threads.
 
 ----------------------------------------------
 
