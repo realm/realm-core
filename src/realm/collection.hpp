@@ -19,12 +19,13 @@ public:
     virtual ~Collection();
     /// The size of the collection.
     virtual size_t size() const = 0;
+    /// Get element at @a ndx as a `Mixed`.
+    virtual Mixed get_any(size_t ndx) const = 0;
     /// True if `size()` returns 0.
     bool is_empty() const
     {
         return size() == 0;
     }
-
     virtual void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const {}
 };
 
@@ -41,9 +42,6 @@ class CollectionBase : public Collection {
 public:
     /// True if the element at @a ndx is NULL.
     virtual bool is_null(size_t ndx) const = 0;
-
-    /// Get element at @a ndx as a `Mixed`.
-    virtual Mixed get_any(size_t ndx) const = 0;
 
     /// Clear the collection.
     virtual void clear() = 0;

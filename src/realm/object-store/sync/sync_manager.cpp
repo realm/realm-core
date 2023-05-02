@@ -797,3 +797,8 @@ void SyncManager::close_all_sessions()
 
     get_sync_client().wait_for_session_terminations();
 }
+
+void SyncManager::OnlyForTesting::voluntary_disconnect_all_connections(SyncManager& mgr)
+{
+    mgr.get_sync_client().voluntary_disconnect_all_connections();
+}

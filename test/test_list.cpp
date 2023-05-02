@@ -684,10 +684,14 @@ TEST(List_NestedList_Insert)
     CollectionListPtr list = obj.get_collection_list(list_col1);
     CHECK(list->is_empty());
     auto collection = list->insert_collection(0);
+    auto val = list->get_any(0);
+    CHECK(val.is_type(type_List));
     dynamic_cast<Lst<Int>*>(collection.get())->add(5);
 
     auto dict = obj.get_collection_list(list_col2);
     auto list2 = dict->insert_collection_list("Foo");
+    val = obj.get_any(list_col2);
+    CHECK(val.is_type(type_Dictionary));
     auto collection2 = list2->insert_collection(0);
     dynamic_cast<Lst<Int>*>(collection2.get())->add(5);
 

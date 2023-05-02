@@ -915,7 +915,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
         m_replication->set_logger(m_logger.get());
     }
     if (m_logger)
-        m_logger->log(util::Logger::Level::info, "Open file: %1", path);
+        m_logger->log(util::Logger::Level::detail, "Open file: %1", path);
     SlabAlloc& alloc = m_alloc;
     if (options.is_immutable) {
         SlabAlloc::Config cfg;
@@ -1838,7 +1838,7 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
         }
         m_info = nullptr;
         if (m_logger)
-            m_logger->log(util::Logger::Level::info, "DB closed");
+            m_logger->log(util::Logger::Level::detail, "DB closed");
     }
 }
 

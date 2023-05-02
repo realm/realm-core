@@ -508,6 +508,20 @@ void Table::nullify_links(CascadeState& cascade_state)
     }
 }
 
+CollectionType Table::get_collection_type(ColKey col_key, size_t level) const
+{
+    if (level < get_nesting_levels(col_key)) {
+        return get_nested_column_type(col_key, level);
+    }
+    if (col_key.is_list()) {
+        return CollectionType::List;
+    }
+    if (col_key.is_set()) {
+        return CollectionType::Set;
+    }
+    REALM_ASSERT(col_key.is_dictionary());
+    return CollectionType::Dictionary;
+}
 
 void Table::remove_column(ColKey col_key)
 {
