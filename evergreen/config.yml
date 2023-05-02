@@ -684,7 +684,10 @@ tasks:
             format_ref="${revision}"
         fi
 
-        readonly out=$(git clang-format -v --diff $format_ref)
+        clang_command="git clang-format -v --diff $format_ref"
+        out=$($clang_command)
+
+        echo -e "CLANG: $clang_command\n$out"
 
         if [[ "$out" == *"no modified files to format"* ]]; then
             exit 0
@@ -694,7 +697,7 @@ tasks:
         fi
 
         echo "ERROR: you need to run git clang-format on your commit"
-        echo $out
+        echo "COMMAND: git clang-format -f --commit $format_ref"
         exit 1
 
 - name: fuzzer
@@ -748,6 +751,20 @@ task_groups:
   tasks:
   - core-tests
 
+- name: core_sync_tests_group
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
+  tasks:
+  - compile
+  - core-tests
+  - sync-tests
+
 - name: benchmarks
   setup_group_can_fail_task: true
   setup_group:
@@ -790,26 +807,10 @@ task_groups:
   tasks:
   - fuzzer
 
-- name: object-store-tests-v8
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  - func: "compile"
-    vars:
-      long_running_test_duration: 2
-      target_to_build: ObjectStoreTests
-  teardown_task:
-  - func: "upload test results"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - object-store-tests
-
 buildvariants:
 - name: ubuntu2004
   display_name: "Ubuntu 20.04 x86_64 (Clang 11)"
-  run_on: ubuntu2004-small
+  run_on: ubuntu2004-large
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
@@ -819,10 +820,24 @@ buildvariants:
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
   tasks:
-  - name: lint
   - name: compile_test
+
+- name: ubuntu2204
+  display_name: "Ubuntu 22.04 x86_64 (Clang 16 + lint)"
+  run_on: ubuntu2204-large
+  expansions:
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-16.0.2-x86_64-linux-gnu-ubuntu-22.04.tar.xz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    run_tests_against_baas: On
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+  tasks:
+  - name: lint
     distros:
-    - ubuntu2004-large
+    - ubuntu2204-small
+  - name: core_sync_tests_group
 
 - name: ubuntu2004-session-multiplexing
   display_name: "Ubuntu 20.04 x86_64 (Sync Multiplexing Enabled)"

@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Add CI tests for Clang 16/Ubuntu 22.04 and update lint task ([]())
 
 ----------------------------------------------
 
