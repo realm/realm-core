@@ -545,7 +545,7 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         }
         case WebSocketError::websocket_tls_handshake_failed: {
             error_code = ClientError::ssl_server_cert_rejected;
-            constexpr bool is_fatal = true;
+            constexpr bool is_fatal = false;
             m_reconnect_info.m_reason = ConnectionTerminationReason::ssl_certificate_rejected;
             close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
             break;
@@ -2413,9 +2413,9 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
             handle_pending_client_reset_acknowledgement();
         }
 
-        // If a migration is in progress, mark it complete when client reset is completed.
+        // If a migration or rollback is in progress, mark it complete when client reset is completed.
         if (auto migration_store = get_migration_store()) {
-            migration_store->complete_migration();
+            migration_store->complete_migration_or_rollback();
         }
 
         return true;

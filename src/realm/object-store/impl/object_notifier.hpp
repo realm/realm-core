@@ -32,7 +32,7 @@ public:
 private:
     TableRef m_table;
     ObjKey m_obj_key;
-    TransactionChangeInfo* m_info;
+    TransactionChangeInfo* m_info = nullptr;
 
     void run() override REQUIRES(!m_callback_mutex);
     void reattach() override;

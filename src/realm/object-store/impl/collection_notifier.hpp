@@ -147,6 +147,12 @@ public:
         return m_has_run;
     }
 
+    // Detach from the source Realm's transaction and attach to either an existing
+    // transaction from another notifier (if any are the correct version) or a
+    // new one.
+    // precondition: RealmCoordinator::m_notifier_mutex is locked
+    void set_initial_transaction(const std::vector<std::shared_ptr<CollectionNotifier>>& other_notifiers);
+
     // Discard the notifier's Transaction and move the local data over to the
     // given Transaction. Must be called before the notifier is ever run.
     // precondition: RealmCoordinator::m_notifier_mutex is locked
@@ -169,6 +175,11 @@ public:
     bool have_callbacks() const noexcept
     {
         return m_have_callbacks;
+    }
+
+    Transaction& transaction() const noexcept
+    {
+        return *m_transaction;
     }
 
 protected:
@@ -199,11 +210,6 @@ protected:
     bool all_callbacks_filtered() const noexcept;
 
     void update_related_tables(Table const& table) REQUIRES(m_callback_mutex);
-
-    Transaction& transaction() const noexcept
-    {
-        return *m_transaction;
-    }
 
     // The actual change, calculated in run() and delivered in prepare_handover()
     CollectionChangeBuilder m_change;

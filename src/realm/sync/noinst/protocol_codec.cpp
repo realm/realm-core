@@ -26,9 +26,10 @@ void ClientProtocol::make_flx_bind_message(int protocol_version, OutputBuffer& o
                                            const nlohmann::json& json_data, const std::string& signed_user_token,
                                            bool need_client_file_ident, bool is_subserver)
 {
+    static_cast<void>(protocol_version);
     std::string json_data_stg;
     // Protocol version v8 and above accepts stringified json_data for the first data argument
-    if (protocol_version >= 8 && !json_data.empty()) {
+    if (!json_data.empty()) {
         json_data_stg = json_data.dump();
     }
 
