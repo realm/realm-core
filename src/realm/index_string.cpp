@@ -58,6 +58,21 @@ Mixed ClusterColumn::get_value(ObjKey key) const
     return obj.get_any(m_column_key);
 }
 
+std::vector<ObjKey> ClusterColumn::get_all_keys() const
+{
+    std::vector<ObjKey> ret;
+    ret.reserve(m_cluster_tree->size());
+    m_cluster_tree->traverse([&ret](const Cluster* cluster) {
+        auto sz = cluster->node_size();
+        for (size_t i = 0; i < sz; i++) {
+            ret.push_back(cluster->get_real_key(i));
+        }
+
+        return IteratorControl::AdvanceToNext;
+    });
+    return ret;
+}
+
 template <>
 int64_t IndexArray::from_list<index_FindFirst>(Mixed value, InternalFindResult& /* result_ref */,
                                                const IntegerColumn& key_values, const ClusterColumn& column) const
@@ -1189,6 +1204,9 @@ void StringIndex::find_all_fulltext(std::vector<ObjKey>& result, StringData valu
     auto tokenizer = Tokenizer::get_instance();
     tokenizer->reset({value.data(), value.size()});
     auto token_info = tokenizer->get_token_info();
+    if (token_info.empty()) {
+        throw InvalidArgument("Missing search token");
+    }
     struct Token {
         std::string_view token;
         bool exclude;
@@ -1208,7 +1226,7 @@ void StringIndex::find_all_fulltext(std::vector<ObjKey>& result, StringData valu
         }
     }
     if (exclude_start == tokens.begin()) {
-        throw InvalidArgument("Search string must include words to match");
+        result = m_target_column.get_all_keys();
     }
     for (auto& token : tokens) {
         FindRes res1 = find_all_no_copy(StringData{token.token}, res);

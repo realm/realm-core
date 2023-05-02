@@ -6127,10 +6127,7 @@ TEST(Query_FullTextMulti)
     CHECK_EQUAL(do_fulltext_find("-database databases"), Keys({}));
     CHECK_EQUAL(do_fulltext_find("database -databases"), Keys({1, 2, 4}));
     CHECK_EQUAL(do_fulltext_find("-databases database"), Keys({1, 2, 4}));
-
-    // invalid exclude searches
-    // There should always be at least one mandatory term
-    CHECK_THROW_ANY(do_fulltext_find("-databases"));
+    CHECK_EQUAL(do_fulltext_find("-database"), Keys({3, 5, 6, 7, 8, 9}));
 
     // Token should only appear once
     CHECK_THROW_ANY(do_fulltext_find("C# c++"));
