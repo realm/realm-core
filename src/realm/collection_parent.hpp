@@ -73,7 +73,7 @@ public:
     virtual TableRef get_table() const noexcept = 0;
 
 protected:
-    template <class, class>
+    template <class>
     friend class CollectionBaseImpl;
     friend class CollectionList;
 

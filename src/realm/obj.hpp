@@ -334,7 +334,7 @@ private:
     friend class ColumnListBase;
     friend class CollectionBase;
     friend class TableView;
-    template <class, class>
+    template <class>
     friend class CollectionBaseImpl;
     template <class>
     friend class Lst;
