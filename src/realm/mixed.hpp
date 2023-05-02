@@ -37,6 +37,11 @@
 
 namespace realm {
 
+enum JSONOutputMode {
+    output_mode_json,       // default / existing implementation for outputting realm to json
+    output_mode_xjson,      // extended json as described in the spec
+    output_mode_xjson_plus, // extended json as described in the spec with additional modifier used for sync
+};
 
 /// This class represents a polymorphic Realm value.
 ///
@@ -249,6 +254,8 @@ public:
     StringData get_index_data(std::array<char, 16>&) const noexcept;
     void use_buffer(std::string& buf) noexcept;
 
+    void to_json(std::ostream& out, JSONOutputMode output_mode);
+
 protected:
     friend std::ostream& operator<<(std::ostream& out, const Mixed& m);
 
@@ -291,6 +298,8 @@ private:
     {
         return _is_numeric(head) && _is_numeric(tail...);
     }
+    void to_xjson(std::ostream& out);
+    void to_xjson_plus(std::ostream& out);
 };
 
 class OwnedMixed : public Mixed {

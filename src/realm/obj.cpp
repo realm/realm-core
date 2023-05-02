@@ -951,217 +951,6 @@ Obj::Path Obj::get_path() const
     return result;
 }
 
-
-namespace {
-const char to_be_escaped[] = "\"\n\r\t\f\\\b";
-const char encoding[] = "\"nrtf\\b";
-
-template <class T>
-inline void out_floats(std::ostream& out, T value)
-{
-    std::streamsize old = out.precision();
-    out.precision(std::numeric_limits<T>::digits10 + 1);
-    out << std::scientific << value;
-    out.precision(old);
-}
-
-void out_string(std::ostream& out, std::string str)
-{
-    size_t p = str.find_first_of(to_be_escaped);
-    while (p != std::string::npos) {
-        char c = str[p];
-        auto found = strchr(to_be_escaped, c);
-        REALM_ASSERT(found);
-        out << str.substr(0, p) << '\\' << encoding[found - to_be_escaped];
-        str = str.substr(p + 1);
-        p = str.find_first_of(to_be_escaped);
-    }
-    out << str;
-}
-
-void out_binary(std::ostream& out, BinaryData bin)
-{
-    const char* start = bin.data();
-    const size_t len = bin.size();
-    std::string encode_buffer;
-    encode_buffer.resize(util::base64_encoded_size(len));
-    util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
-    out << encode_buffer;
-}
-
-void out_mixed_json(std::ostream& out, const Mixed& val)
-{
-    if (val.is_null()) {
-        out << "null";
-        return;
-    }
-    switch (val.get_type()) {
-        case type_Int:
-            out << val.get<Int>();
-            break;
-        case type_Bool:
-            out << (val.get<bool>() ? "true" : "false");
-            break;
-        case type_Float:
-            out_floats<float>(out, val.get<float>());
-            break;
-        case type_Double:
-            out_floats<double>(out, val.get<double>());
-            break;
-        case type_String: {
-            out << "\"";
-            out_string(out, val.get<String>());
-            out << "\"";
-            break;
-        }
-        case type_Binary: {
-            out << "\"";
-            out_binary(out, val.get<Binary>());
-            out << "\"";
-            break;
-        }
-        case type_Timestamp:
-            out << "\"";
-            out << val.get<Timestamp>();
-            out << "\"";
-            break;
-        case type_Decimal:
-            out << "\"";
-            out << val.get<Decimal128>();
-            out << "\"";
-            break;
-        case type_ObjectId:
-            out << "\"";
-            out << val.get<ObjectId>();
-            out << "\"";
-            break;
-        case type_UUID:
-            out << "\"";
-            out << val.get<UUID>();
-            out << "\"";
-            break;
-        case type_TypedLink:
-            out << "\"";
-            out << val.get<ObjLink>();
-            out << "\"";
-            break;
-        case type_Link:
-        case type_LinkList:
-        case type_Mixed:
-            break;
-    }
-}
-
-void out_mixed_xjson(std::ostream& out, const Mixed& val)
-{
-    if (val.is_null()) {
-        out << "null";
-        return;
-    }
-    switch (val.get_type()) {
-        case type_Int:
-            out << "{\"$numberLong\": \"";
-            out << val.get<Int>();
-            out << "\"}";
-            break;
-        case type_Bool:
-            out << (val.get<bool>() ? "true" : "false");
-            break;
-        case type_Float:
-            out << "{\"$numberDouble\": \"";
-            out_floats<float>(out, val.get<float>());
-            out << "\"}";
-            break;
-        case type_Double:
-            out << "{\"$numberDouble\": \"";
-            out_floats<double>(out, val.get<double>());
-            out << "\"}";
-            break;
-        case type_String: {
-            out << "\"";
-            out_string(out, val.get<String>());
-            out << "\"";
-            break;
-        }
-        case type_Binary: {
-            out << "{\"$binary\": {\"base64\": \"";
-            out_binary(out, val.get<Binary>());
-            out << "\", \"subType\": \"00\"}}";
-            break;
-        }
-        case type_Timestamp: {
-            out << "{\"$date\": {\"$numberLong\": \"";
-            auto ts = val.get<Timestamp>();
-            int64_t timeMillis = ts.get_seconds() * 1000 + ts.get_nanoseconds() / 1000000;
-            out << timeMillis;
-            out << "\"}}";
-            break;
-        }
-        case type_Decimal:
-            out << "{\"$numberDecimal\": \"";
-            out << val.get<Decimal128>();
-            out << "\"}";
-            break;
-        case type_ObjectId:
-            out << "{\"$oid\": \"";
-            out << val.get<ObjectId>();
-            out << "\"}";
-            break;
-        case type_UUID:
-            out << "{\"$binary\": {\"base64\": \"";
-            out << val.get<UUID>().to_base64();
-            out << "\", \"subType\": \"04\"}}";
-            break;
-
-        case type_TypedLink: {
-            out_mixed_xjson(out, val.get<ObjLink>().get_obj_key());
-            break;
-        }
-        case type_Link:
-        case type_LinkList:
-        case type_Mixed:
-            break;
-    }
-}
-
-void out_mixed_xjson_plus(std::ostream& out, const Mixed& val)
-{
-    if (val.is_null()) {
-        out << "null";
-        return;
-    }
-
-    // Special case for outputing a typedLink, otherwise just us out_mixed_xjson
-    if (val.is_type(type_TypedLink)) {
-        auto link = val.get<ObjLink>();
-        out << "{ \"$link\": { \"table\": \"" << link.get_table_key() << "\", \"key\": ";
-        out_mixed_xjson(out, link.get_obj_key());
-        out << "}}";
-        return;
-    }
-
-    out_mixed_xjson(out, val);
-}
-
-void out_mixed(std::ostream& out, const Mixed& val, JSONOutputMode output_mode)
-{
-    switch (output_mode) {
-        case output_mode_xjson: {
-            out_mixed_xjson(out, val);
-            return;
-        }
-        case output_mode_xjson_plus: {
-            out_mixed_xjson_plus(out, val);
-            return;
-        }
-        case output_mode_json: {
-            out_mixed_json(out, val);
-        }
-    }
-}
-
-} // anonymous namespace
-
 template <typename F>
 void Obj::print_leaf_collection(std::ostream& out, Collection* collection, ColKey col_key, F f) const
 {
@@ -1324,7 +1113,7 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
 
         auto print_value = [&](Mixed key, Mixed val) {
             if (!key.is_null()) {
-                out_mixed(out, key, output_mode);
+                key.to_json(out, output_mode);
                 out << ":";
             }
             if (val.is_type(type_Link, type_TypedLink)) {
@@ -1346,7 +1135,7 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                 }
                 if (pk_col_key && output_mode != output_mode_json) {
                     out << table_info;
-                    out_mixed_xjson(out, tt->get_primary_key(obj_key));
+                    tt->get_primary_key(obj_key).to_json(out, output_mode_xjson);
                     out << table_info_close;
                 }
                 else {
@@ -1372,7 +1161,7 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                 }
             }
             else {
-                out_mixed(out, val, output_mode);
+                val.to_json(out, output_mode);
             }
         };
 
