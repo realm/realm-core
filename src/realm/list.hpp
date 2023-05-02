@@ -507,6 +507,8 @@ public:
         m_list.set_owner(std::move(parent), index);
     }
 
+    void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
+
 private:
     friend class TableView;
     friend class Query;

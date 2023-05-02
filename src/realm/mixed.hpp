@@ -254,7 +254,7 @@ public:
     StringData get_index_data(std::array<char, 16>&) const noexcept;
     void use_buffer(std::string& buf) noexcept;
 
-    void to_json(std::ostream& out, JSONOutputMode output_mode);
+    void to_json(std::ostream& out, JSONOutputMode output_mode) const noexcept;
 
 protected:
     friend std::ostream& operator<<(std::ostream& out, const Mixed& m);
@@ -298,8 +298,8 @@ private:
     {
         return _is_numeric(head) && _is_numeric(tail...);
     }
-    void to_xjson(std::ostream& out);
-    void to_xjson_plus(std::ostream& out);
+    void to_xjson(std::ostream& out) const noexcept;
+    void to_xjson_plus(std::ostream& out) const noexcept;
 };
 
 class OwnedMixed : public Mixed {

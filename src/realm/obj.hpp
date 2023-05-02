@@ -417,15 +417,6 @@ private:
     inline void nullify_single_link(ColKey col, ValueType target);
 
     void fix_linking_object_during_schema_migration(Obj linking_obj, Obj obj, ColKey opposite_col_key) const;
-
-    template <typename Func>
-    void collection_to_json(std::ostream& out, const ColKey& col_key, Collection* collection, size_t level,
-                            size_t nested_levels, Func& func) const;
-
-    template <typename Func>
-    void print_leaf_collection(std::ostream& out, Collection* collection, ColKey col_key, Func f) const;
-
-    static void handle_nested_dictionary(std::ostream& out, CollectionList* collection_list, size_t ndx);
 };
 
 std::ostream& operator<<(std::ostream&, const Obj& obj);

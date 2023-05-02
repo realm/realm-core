@@ -833,7 +833,7 @@ void out_binary(std::ostream& out, BinaryData bin)
 } // anonymous namespace
 
 
-void Mixed::to_xjson(std::ostream& out)
+void Mixed::to_xjson(std::ostream& out) const noexcept
 {
     switch (get_type()) {
         case type_Int:
@@ -901,7 +901,7 @@ void Mixed::to_xjson(std::ostream& out)
     }
 }
 
-void Mixed::to_xjson_plus(std::ostream& out)
+void Mixed::to_xjson_plus(std::ostream& out) const noexcept
 {
 
     // Special case for outputing a typedLink, otherwise just us out_mixed_xjson
@@ -917,7 +917,7 @@ void Mixed::to_xjson_plus(std::ostream& out)
     to_xjson(out);
 }
 
-void Mixed::to_json(std::ostream& out, JSONOutputMode output_mode)
+void Mixed::to_json(std::ostream& out, JSONOutputMode output_mode) const noexcept
 {
     if (is_null()) {
         out << "null";

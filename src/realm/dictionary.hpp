@@ -165,6 +165,8 @@ public:
         get_key_type();
     }
 
+    void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
+
 private:
     template <typename T, typename Op>
     friend class CollectionColumnAggregate;

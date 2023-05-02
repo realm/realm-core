@@ -370,4 +370,37 @@ void CollectionList::get_all_keys(size_t levels, std::vector<ObjKey>& keys) cons
     }
 }
 
+void CollectionList::to_json(std::ostream& out, size_t link_depth, JSONOutputMode output_mode,
+                             util::FunctionRef<void(const Mixed&)> fn) const
+{
+    bool is_leaf = m_level == get_table()->get_nesting_levels(m_col_key);
+    bool is_dictionary = m_key_type == type_String;
+    auto sz = size();
+    auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
+
+    bool print_close = false;
+    if (output_mode == output_mode_xjson_plus && is_dictionary) {
+        out << "{ \"$dictionary\": ";
+        print_close = true;
+    }
+    out << (is_dictionary ? "{" : "[");
+    for (size_t i = 0; i < sz; i++) {
+        if (i > 0)
+            out << ",";
+        if (is_dictionary) {
+            out << Mixed(string_keys->get(i)) << ":";
+        }
+        if (is_leaf) {
+            get_collection(i)->to_json(out, link_depth, output_mode, fn);
+        }
+        else {
+            get_collection_list(i)->to_json(out, link_depth, output_mode, fn);
+        }
+    }
+    out << (is_dictionary ? "}" : "]");
+    if (print_close) {
+        out << " }";
+    }
+}
+
 } // namespace realm

@@ -99,6 +99,8 @@ public:
     ref_type get_child_ref(size_t child_ndx) const noexcept final;
     void update_child_ref(size_t child_ndx, ref_type new_ref) final;
 
+    void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
+
 private:
     friend class Cluster;
     friend class ClusterTree;

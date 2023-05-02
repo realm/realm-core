@@ -988,6 +988,38 @@ void Dictionary::migrate()
     }
 }
 
+template <>
+void CollectionBaseImpl<DictionaryBase>::to_json(std::ostream&, size_t, JSONOutputMode,
+                                                 util::FunctionRef<void(const Mixed&)>) const
+{
+}
+
+void Dictionary::to_json(std::ostream& out, size_t link_depth, JSONOutputMode output_mode,
+                         util::FunctionRef<void(const Mixed&)> fn) const
+{
+    auto [open_str, close_str] = get_open_close_strings(link_depth, output_mode);
+
+    out << open_str;
+    out << "{";
+
+    auto sz = size();
+    for (size_t i = 0; i < sz; i++) {
+        if (i > 0)
+            out << ",";
+        out << do_get_key(i) << ":";
+        Mixed val = do_get(i);
+        if (val.is_type(type_TypedLink)) {
+            fn(val);
+        }
+        else {
+            val.to_json(out, output_mode);
+        }
+    }
+
+    out << "}";
+    out << close_str;
+}
+
 /************************* DictionaryLinkValues *************************/
 
 DictionaryLinkValues::DictionaryLinkValues(const Obj& obj, ColKey col_key)

@@ -122,6 +122,28 @@ void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_or
     }
 }
 
+/********************************** LstBase *********************************/
+
+template <>
+void CollectionBaseImpl<LstBase>::to_json(std::ostream& out, size_t, JSONOutputMode output_mode,
+                                          util::FunctionRef<void(const Mixed&)> fn) const
+{
+    auto sz = size();
+    out << "[";
+    for (size_t i = 0; i < sz; i++) {
+        if (i > 0)
+            out << ",";
+        Mixed val = get_any(i);
+        if (val.is_type(type_TypedLink)) {
+            fn(val);
+        }
+        else {
+            val.to_json(out, output_mode);
+        }
+    }
+    out << "]";
+}
+
 /********************************* Lst<Key> *********************************/
 
 template <>
@@ -367,6 +389,26 @@ void LnkLst::remove_all_target_rows()
         update_if_needed();
         _impl::TableFriend::batch_erase_rows(*get_target_table(), *m_list.m_tree);
     }
+}
+
+void LnkLst::to_json(std::ostream& out, size_t link_depth, JSONOutputMode output_mode,
+                     util::FunctionRef<void(const Mixed&)> fn) const
+{
+    auto [open_str, close_str] = get_open_close_strings(link_depth, output_mode);
+
+    out << open_str;
+    out << "[";
+
+    auto sz = m_list.size();
+    for (size_t i = 0; i < sz; i++) {
+        if (i > 0)
+            out << ",";
+        Mixed val(m_list.get(i));
+        fn(val);
+    }
+
+    out << "]";
+    out << close_str;
 }
 
 // Force instantiation:

@@ -15,7 +15,6 @@
  * limitations under the License.
  *
  **************************************************************************/
-#include <iostream>
 
 #include "realm/obj.hpp"
 #include "realm/array_basic.hpp"
@@ -951,96 +950,6 @@ Obj::Path Obj::get_path() const
     return result;
 }
 
-template <typename F>
-void Obj::print_leaf_collection(std::ostream& out, Collection* collection, ColKey col_key, F f) const
-{
-    auto print_list = [&](CollectionBase* collection) {
-        auto sz = collection->size();
-        out << "[";
-        for (size_t i = 0; i < sz; i++) {
-            if (i > 0)
-                out << ",";
-            f(Mixed{}, collection->get_any(i));
-        }
-        out << "]";
-    };
-
-    auto print_dict = [&](const Dictionary& dict) {
-        out << "{";
-        bool first = true;
-        for (auto it : dict) {
-            if (!first)
-                out << ",";
-            first = false;
-            f(it.first, it.second);
-        }
-        out << "}";
-    };
-
-    if (col_key.is_list() || col_key.is_set()) {
-        auto list = dynamic_cast<CollectionBase*>(collection);
-        print_list(list);
-    }
-    else {
-        auto dict = dynamic_cast<Dictionary*>(collection);
-        print_dict(*dict);
-    }
-}
-
-void Obj::handle_nested_dictionary(std::ostream& out, CollectionList* collection_list, size_t ndx)
-{
-    auto index = collection_list->get_index(ndx);
-    auto on_col_key_index = [](ColKey) {
-        // not used
-    };
-    auto on_integer_index = [&](Int) {
-        // not used;
-    };
-    auto on_string_index = [&](StringData key) {
-        out << "\"" << key << "\":";
-    };
-    mpark::visit(util::overload{on_col_key_index, on_integer_index, on_string_index}, index);
-}
-
-template <typename F>
-void Obj::collection_to_json(std::ostream& out, const ColKey& col_key, Collection* collection, size_t level,
-                             size_t nested_levels, F& f) const
-{
-    if (level == nested_levels) {
-        print_leaf_collection(out, collection, col_key, f);
-        return;
-    }
-    // keep walking the tree up until we hit the leaf collection
-    auto type = m_table->get_nested_column_type(col_key, level);
-    auto sz = collection->size();
-    auto open = "[";
-    auto close = "]";
-    if (type == CollectionType::Dictionary) {
-        open = "{";
-        close = "}";
-    }
-
-    out << open;
-    for (size_t i = 0; i < sz; ++i) {
-        if (i > 0)
-            out << ", ";
-
-        auto coll_list = static_cast<CollectionList*>(collection);
-        if (type == CollectionType::Dictionary)
-            handle_nested_dictionary(out, coll_list, i);
-
-        const auto is_leaf_collection = (level + 1) == nested_levels;
-        if (is_leaf_collection) {
-            auto coll = coll_list->get_collection(i);
-            collection_to_json(out, col_key, coll.get(), level + 1, nested_levels, f);
-        }
-        else {
-            auto coll = coll_list->get_collection_list(i);
-            collection_to_json(out, col_key, coll.get(), level + 1, nested_levels, f);
-        }
-    }
-    out << close;
-}
 
 void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
                   std::vector<ObjLink>& followed, JSONOutputMode output_mode) const
@@ -1059,7 +968,6 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
 
     auto col_keys = m_table->get_column_keys();
     for (auto ck : col_keys) {
-        auto nesting_levels = m_table->get_nesting_levels(ck);
         name = m_table->get_column_name(ck);
         auto type = ck.get_type();
         if (type == col_type_LinkList)
@@ -1073,118 +981,98 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
         prefixComma = true;
 
         TableRef target_table;
-        std::string open_str;
-        std::string close_str;
         ColKey pk_col_key;
         if (type == col_type_Link) {
             target_table = get_target_table(ck);
             pk_col_key = target_table->get_primary_key_column();
-            bool is_embedded = target_table->is_embedded();
-            bool link_depth_reached = !is_embedded && (link_depth == 0);
-
-            if (output_mode == output_mode_xjson_plus) {
-                open_str = std::string("{ ") + (is_embedded ? "\"$embedded" : "\"$link");
-                open_str += collection_type_name(ck, true);
-                open_str += "\": ";
-                close_str += " }";
-            }
-
-            if ((link_depth_reached && output_mode != output_mode_xjson) || output_mode == output_mode_xjson_plus) {
-                open_str += "{ \"table\": \"" + std::string(get_target_table(ck)->get_name()) + "\", ";
-                open_str += ((is_embedded || ck.is_dictionary()) ? "\"value" : "\"key");
-                if (ck.is_collection())
-                    open_str += "s";
-                open_str += "\": ";
-                close_str += "}";
-            }
-        }
-        else {
-            if (output_mode == output_mode_xjson_plus) {
-                if (ck.is_set()) {
-                    open_str = "{ \"$set\": ";
-                    close_str = " }";
-                }
-                else if (ck.is_dictionary()) {
-                    open_str = "{ \"$dictionary\": ";
-                    close_str = " }";
-                }
-            }
         }
 
-        auto print_value = [&](Mixed key, Mixed val) {
-            if (!key.is_null()) {
-                key.to_json(out, output_mode);
-                out << ":";
+        auto print_link = [&](const Mixed& val) {
+            REALM_ASSERT(val.is_type(type_Link, type_TypedLink));
+            TableRef tt = target_table;
+            auto obj_key = val.get<ObjKey>();
+            std::string table_info;
+            std::string table_info_close;
+            if (!tt) {
+                // It must be a typed link
+                tt = m_table->get_parent_group()->get_table(val.get_link().get_table_key());
+                pk_col_key = tt->get_primary_key_column();
+                if (output_mode == output_mode_xjson_plus) {
+                    table_info = std::string("{ \"$link\": ");
+                    table_info_close = " }";
+                }
+
+                table_info += std::string("{ \"table\": \"") + std::string(tt->get_name()) + "\", \"key\": ";
+                table_info_close += " }";
             }
-            if (val.is_type(type_Link, type_TypedLink)) {
-                TableRef tt = target_table;
-                auto obj_key = val.get<ObjKey>();
-                std::string table_info;
-                std::string table_info_close;
-                if (!tt) {
-                    // It must be a typed link
-                    tt = m_table->get_parent_group()->get_table(val.get_link().get_table_key());
-                    pk_col_key = tt->get_primary_key_column();
-                    if (output_mode == output_mode_xjson_plus) {
-                        table_info = std::string("{ \"$link\": ");
-                        table_info_close = " }";
-                    }
-
-                    table_info += std::string("{ \"table\": \"") + std::string(tt->get_name()) + "\", \"key\": ";
-                    table_info_close += " }";
-                }
-                if (pk_col_key && output_mode != output_mode_json) {
-                    out << table_info;
-                    tt->get_primary_key(obj_key).to_json(out, output_mode_xjson);
-                    out << table_info_close;
-                }
-                else {
-                    ObjLink link(tt->get_key(), obj_key);
-                    if (obj_key.is_unresolved()) {
-                        out << "null";
-                        return;
-                    }
-                    if (!tt->is_embedded()) {
-                        if (link_depth == 0) {
-                            out << table_info << obj_key.value << table_info_close;
-                            return;
-                        }
-                        if ((link_depth == realm::npos &&
-                             std::find(followed.begin(), followed.end(), link) != followed.end())) {
-                            // We have detected a cycle in links
-                            out << "{ \"table\": \"" << tt->get_name() << "\", \"key\": " << obj_key.value << " }";
-                            return;
-                        }
-                    }
-
-                    tt->get_object(obj_key).to_json(out, new_depth, renames, followed, output_mode);
-                }
+            if (pk_col_key && output_mode != output_mode_json) {
+                out << table_info;
+                tt->get_primary_key(obj_key).to_json(out, output_mode_xjson);
+                out << table_info_close;
             }
             else {
-                val.to_json(out, output_mode);
+                ObjLink link(tt->get_key(), obj_key);
+                if (obj_key.is_unresolved()) {
+                    out << "null";
+                    return;
+                }
+                if (!tt->is_embedded()) {
+                    if (link_depth == 0) {
+                        out << table_info << obj_key.value << table_info_close;
+                        return;
+                    }
+                    if ((link_depth == realm::npos &&
+                         std::find(followed.begin(), followed.end(), link) != followed.end())) {
+                        // We have detected a cycle in links
+                        out << "{ \"table\": \"" << tt->get_name() << "\", \"key\": " << obj_key.value << " }";
+                        return;
+                    }
+                }
+
+                tt->get_object(obj_key).to_json(out, new_depth, renames, followed, output_mode);
             }
         };
 
-        if (ck.is_list() || ck.is_set() || ck.get_attrs().test(col_attr_Dictionary)) {
-            out << open_str;
-            if (nesting_levels > 0) {
-                // explore all the nested levels
-                auto nested_coll = get_collection_list(ck);
-                collection_to_json(out, ck, nested_coll.get(), 0, nesting_levels, print_value);
+        if (ck.is_collection()) {
+            if (m_table->get_nesting_levels(ck)) {
+                auto collection_list = get_collection_list(ck);
+                collection_list->to_json(out, link_depth, output_mode, print_link);
             }
             else {
-                // straight into leaf level
-                auto base_collection = get_collection_ptr(ck);
-                collection_to_json(out, ck, base_collection.get(), 0, nesting_levels, print_value);
+                auto collection = get_collection_ptr(ck);
+                collection->to_json(out, link_depth, output_mode, print_link);
             }
-            out << close_str;
         }
         else {
             auto val = get_any(ck);
             if (!val.is_null()) {
-                out << open_str;
-                print_value(Mixed{}, val);
-                out << close_str;
+                // out << open_str;
+                if (type == col_type_Link) {
+                    std::string close_string;
+                    bool is_embedded = target_table->is_embedded();
+                    bool link_depth_reached = !is_embedded && (link_depth == 0);
+
+                    if (output_mode == output_mode_xjson_plus) {
+                        out << "{ " << (is_embedded ? "\"$embedded" : "\"$link") << "\": ";
+                        close_string += "}";
+                    }
+                    if ((link_depth_reached && output_mode == output_mode_json) ||
+                        output_mode == output_mode_xjson_plus) {
+                        out << "{ \"table\": \"" << target_table->get_name() << "\", "
+                            << (is_embedded ? "\"value" : "\"key") << "\": ";
+                        close_string += "}";
+                    }
+
+                    print_link(val);
+                    out << close_string;
+                }
+                else if (val.is_type(type_TypedLink)) {
+                    print_link(val);
+                }
+                else {
+                    val.to_json(out, output_mode);
+                }
+                // out << close_str;
             }
             else {
                 out << "null";
