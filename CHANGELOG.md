@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* Add CI tests for Clang 16/Ubuntu 22.04 and update lint task ([]())
+* Add CI tests for Clang 16/Ubuntu 22.04 and update lint task ([PR #6563](https://github.com/realm/realm-core/pull/6563))
 
 ----------------------------------------------
 
