@@ -264,6 +264,9 @@ public:
 
 protected:
     friend class SubscriptionStore;
+    // Allow the MigrationStore access to insert_sub because it cannot use insert_or_assign due to having the query as
+    // a string and not a Query object.
+    friend class MigrationStore;
 
     MutableSubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj,
                            MakingMutableCopy making_mutable_copy = MakingMutableCopy{false});
@@ -346,6 +349,16 @@ public:
                                                                  DB::version_type after_client_version) const;
     std::vector<SubscriptionSet> get_pending_subscriptions() const;
 
+    // Notify all subscription state change notification handlers on this subscription store with the
+    // provided Status - this does not change the state of any pending subscriptions.
+    // Does not necessarily need to be called from the event loop thread.
+    void notify_all_state_change_notifications(Status status);
+
+    // Reset SubscriptionStore and erase all current subscriptions and supersede any pending
+    // subscriptions. Must be called from the event loop thread to prevent data race issues
+    // with the subscription store.
+    void terminate();
+
 private:
     using std::enable_shared_from_this<SubscriptionStore>::weak_from_this;
     DBRef m_db;
@@ -371,6 +384,10 @@ protected:
 
     SubscriptionSet get_by_version_impl(int64_t flx_version, util::Optional<DB::VersionID> version) const;
     MutableSubscriptionSet make_mutable_copy(const SubscriptionSet& set) const;
+
+    // Ensure the subscriptions table is properly initialized
+    // If clear_table is true, the subscriptions table will be cleared before initialization
+    void initialize_subscriptions_table(TransactionRef&& tr, bool clear_table);
 
     friend class MutableSubscriptionSet;
     friend class Subscription;

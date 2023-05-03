@@ -183,6 +183,12 @@ std::unique_ptr<SpawnedProcess> spawn_process(const std::string& test_name, cons
     std::string name_of_exe = test_util::get_test_exe_name();
     // need to use the same test path as parent so that tests use the same realm paths
     std::string test_path_prefix = test_util::get_test_path_prefix();
+#ifdef __linux__
+    // process the path in case we want to run the tests from outside the bulding directory
+    auto pos = name_of_exe.find_last_of('/');
+    if (pos != std::string::npos)
+        name_of_exe = test_path_prefix + "/" + name_of_exe.substr(pos + 1);
+#endif
     REALM_ASSERT(name_of_exe.size());
     char* arg_v[] = {name_of_exe.data(), test_path_prefix.data(), nullptr};
     char* env_v[] = {env_vars[0].data(),

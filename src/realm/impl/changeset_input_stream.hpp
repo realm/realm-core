@@ -25,7 +25,7 @@
 #include <realm/impl/cont_transact_hist.hpp>
 
 namespace realm::_impl {
-class ChangesetInputStream : public util::NoCopyInputStream {
+class ChangesetInputStream : public util::InputStream {
 public:
     using version_type = History::version_type;
     static constexpr unsigned NB_BUFFERS = 8;

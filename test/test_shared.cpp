@@ -1841,12 +1841,9 @@ TEST(Shared_StringIndexBug3)
     }
 
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    size_t transactions = 0;
     std::vector<ObjKey> keys;
     for (size_t n = 0; n < 100; ++n) {
         const uint64_t action = random.draw_int_mod(1000);
-
-        transactions++;
 
         if (action <= 500) {
             // delete random user
