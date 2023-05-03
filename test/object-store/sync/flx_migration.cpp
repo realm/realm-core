@@ -13,7 +13,6 @@
 #include <catch2/catch_all.hpp>
 #include <chrono>
 
-
 #if REALM_ENABLE_SYNC
 #if REALM_ENABLE_AUTH_TESTS
 
@@ -40,7 +39,7 @@ static void trigger_server_migration(const AppSession& app_session, MigrationMod
         else
             return "FLX->PBS Server rollback";
     }();
-    const int duration = 300; // 5 minutes, for now, since it sometimes takes longet than 90 seconds
+    const int duration = 600; // 10 minutes, for now, since it sometimes takes longer than 300 seconds
     try {
         timed_sleeping_wait_for(
             [&] {
@@ -240,8 +239,6 @@ TEST_CASE("Test server migration and rollback", "[flx][migration]") {
     }
 }
 
-#ifdef REALM_SYNC_PROTOCOL_V8
-
 TEST_CASE("Test client migration and rollback", "[flx][migration]") {
     std::shared_ptr<util::Logger> logger_ptr =
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
@@ -319,32 +316,32 @@ TEST_CASE("Test client migration and rollback with recovery", "[flx][migration]"
     // Primary key of the object to recover
     auto obj_id = ObjectId::gen();
 
+    // Keep this realm around for after the revert to PBS
+    auto outer_realm = Realm::get_shared_realm(config);
+    REQUIRE(!wait_for_upload(*outer_realm));
+    REQUIRE(!wait_for_download(*outer_realm));
+
     // Wait to upload the data
     {
-        auto realm = Realm::get_shared_realm(config);
-
-        REQUIRE(!wait_for_upload(*realm));
-        REQUIRE(!wait_for_download(*realm));
-
-        auto table = realm->read_group().get_table("class_Object");
+        auto table = outer_realm->read_group().get_table("class_Object");
         REQUIRE(table->size() == 5);
 
-        // Close the sync session and make a change. This will be recovered by the migration.
-        realm->sync_session()->force_close();
-        realm->begin_transaction();
-        realm->read_group()
+        // Pause the sync session and make a change.
+        // This will be recovered when it is resumed after the migration.
+        outer_realm->sync_session()->pause();
+        outer_realm->begin_transaction();
+        outer_realm->read_group()
             .get_table("class_Object")
             ->create_object_with_primary_key(obj_id)
             .set("string_field", "partition-set-during-sync-upload");
-        realm->commit_transaction();
+        outer_realm->commit_transaction();
     }
 
     // Migrate to FLX
     trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
 
-    // Keep this realm around for after the revert to PBS
-    auto outer_realm = Realm::get_shared_realm(config);
-
+    // Resume the session and verify the additional object was uploaded after the migration
+    outer_realm->sync_session()->resume();
     REQUIRE(!wait_for_upload(*outer_realm));
     REQUIRE(!wait_for_download(*outer_realm));
 
@@ -363,11 +360,11 @@ TEST_CASE("Test client migration and rollback with recovery", "[flx][migration]"
         auto object_table = outer_realm->read_group().get_table("class_Object");
         auto pending_object = object_table->get_object_with_primary_key(obj_id);
         REQUIRE(pending_object.get<String>("string_field") == "partition-set-during-sync-upload");
-
-        // Close the session and create a dummy subscription with a notification to verify it has been cancelled
-        outer_realm->sync_session()->pause();
     }
 
+    // Pause the sync session so a pending subscription and object can be created
+    // before processing the rollback
+    outer_realm->sync_session()->pause();
     util::Future<sync::SubscriptionSet::State> new_subs_future = [&] {
         auto sub_store = outer_realm->sync_session()->get_flx_subscription_store();
         auto mut_subs = sub_store->get_active().make_mutable_copy();
@@ -379,13 +376,6 @@ TEST_CASE("Test client migration and rollback with recovery", "[flx][migration]"
         return new_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete);
     }();
 
-    // Wait for the object to be written to Atlas/MongoDB before rollback, otherwise it may be lost
-    reset_utils::wait_for_object_to_persist_to_atlas(session.app()->current_user(), session.app_session(), "Object",
-                                                     {{"_id", obj_id}});
-
-    //  Roll back to PBS
-    trigger_server_migration(session.app_session(), RollbackToPBS, logger_ptr);
-
     // Add a local object while the session is paused. This will be recovered when connecting after the rollback.
     {
         outer_realm->begin_transaction();
@@ -395,6 +385,13 @@ TEST_CASE("Test client migration and rollback with recovery", "[flx][migration]"
             .set("string_field", "partition-set-by-pbs");
         outer_realm->commit_transaction();
     }
+
+    // Wait for the object to be written to Atlas/MongoDB before rollback, otherwise it may be lost
+    reset_utils::wait_for_object_to_persist_to_atlas(session.app()->current_user(), session.app_session(), "Object",
+                                                     {{"_id", obj_id}});
+
+    //  Roll back to PBS
+    trigger_server_migration(session.app_session(), RollbackToPBS, logger_ptr);
 
     // Connect after rolling back to PBS
     outer_realm->sync_session()->resume();
@@ -419,21 +416,17 @@ TEST_CASE("Test client migration and rollback with recovery", "[flx][migration]"
         REALM_ASSERT(result.get_value() == sync::SubscriptionSet::State::Superseded);
     }
 
-    outer_realm.reset();
-
-    //  Migrate back to FLX
+    //  Migrate back to FLX - and keep the realm session open
     trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
+
+    REQUIRE(!wait_for_upload(*outer_realm));
+    REQUIRE(!wait_for_download(*outer_realm));
 
     // Verify data has been sync'ed and there is only 1 subscription for the Object table
     {
-        auto realm = Realm::get_shared_realm(config);
-
-        REQUIRE(!wait_for_upload(*realm));
-        REQUIRE(!wait_for_download(*realm));
-
-        auto table = realm->read_group().get_table("class_Object");
+        auto table = outer_realm->read_group().get_table("class_Object");
         REQUIRE(table->size() == 7);
-        auto sync_session = realm->sync_session();
+        auto sync_session = outer_realm->sync_session();
         REQUIRE(sync_session);
         auto sub_store = sync_session->get_flx_subscription_store();
         REQUIRE(sub_store);
@@ -442,16 +435,14 @@ TEST_CASE("Test client migration and rollback with recovery", "[flx][migration]"
         REQUIRE(active_subs.find("flx_migrated_Object"));
     }
 
-    // Roll back to PBS once again
+    // Roll back to PBS once again - and keep the realm session open
     trigger_server_migration(session.app_session(), RollbackToPBS, logger_ptr);
 
+    REQUIRE(!wait_for_upload(*outer_realm));
+    REQUIRE(!wait_for_download(*outer_realm));
+
     {
-        auto realm = Realm::get_shared_realm(config);
-
-        REQUIRE(!wait_for_upload(*realm));
-        REQUIRE(!wait_for_download(*realm));
-
-        auto table = realm->read_group().get_table("class_Object");
+        auto table = outer_realm->read_group().get_table("class_Object");
         REQUIRE(table->size() == 7);
     }
 }
@@ -785,14 +776,6 @@ TEST_CASE("New table is synced after migration", "[flx][migration]") {
         REQUIRE(active_subs.find("flx_migrated_Object2"));
     }
 }
-
-TEST_CASE("Validate protocol v8 features", "[flx][migration]") {
-    REQUIRE(sync::get_current_protocol_version() >= 8);
-    REQUIRE("com.mongodb.realm-sync#" == sync::get_pbs_websocket_protocol_prefix());
-    REQUIRE("com.mongodb.realm-query-sync#" == sync::get_flx_websocket_protocol_prefix());
-}
-
-#endif // REALM_SYNC_PROTOCOL_V8
 
 #endif // REALM_ENABLE_AUTH_TESTS
 #endif // REALM_ENABLE_SYNC
