@@ -34,12 +34,15 @@ protected:
     static constexpr CollectionType s_collection_type = CollectionType::Dictionary;
 };
 
-class Dictionary final : public CollectionBaseImpl<DictionaryBase> {
+class Dictionary final : public CollectionBaseImpl<DictionaryBase>, public CollectionParent {
 public:
     using Base = CollectionBaseImpl<DictionaryBase>;
     class Iterator;
 
-    Dictionary() {}
+    Dictionary()
+        : CollectionParent(0)
+    {
+    }
     ~Dictionary();
 
     Dictionary(const Obj& obj, ColKey col_key)
@@ -47,9 +50,14 @@ public:
     {
         this->set_owner(obj, col_key);
     }
+    Dictionary(DummyParent& parent)
+        : Base(parent)
+    {
+    }
     Dictionary(ColKey col_key);
     Dictionary(const Dictionary& other)
         : Base(static_cast<const Base&>(other))
+        , CollectionParent(other.get_level())
         , m_key_type(other.m_key_type)
     {
         *this = other;
@@ -80,12 +88,28 @@ public:
     void sort_keys(std::vector<size_t>& indices, bool ascending = true) const;
     void distinct_keys(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const;
 
+    void set_owner(const Obj& obj, ColKey ck) override
+    {
+        Base::set_owner(obj, ck);
+        get_key_type();
+    }
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        Base::set_owner(std::move(parent), index);
+        get_key_type();
+    }
+
     // first points to inserted/updated element.
     // second is true if the element was inserted
     std::pair<Iterator, bool> insert(Mixed key, Mixed value);
     std::pair<Iterator, bool> insert(Mixed key, const Obj& obj);
 
     Obj create_and_insert_linked_object(Mixed key);
+
+    DictionaryPtr insert_dictionary(StringData key);
+    DictionaryPtr get_dictionary(StringData key) const;
+    std::shared_ptr<Lst<Mixed>> insert_list(StringData key);
+    std::shared_ptr<Lst<Mixed>> get_list(StringData key) const;
 
     // throws std::out_of_range if key is not found
     Mixed get(Mixed key) const;
@@ -153,17 +177,19 @@ public:
 
     void migrate();
 
-    void set_owner(const Obj& obj, ColKey ck) override
+    // Overriding members in CollectionParent
+    TableRef get_table() const noexcept override
     {
-        Base::set_owner(obj, ck);
-        get_key_type();
+        return get_obj().get_table();
     }
-
-    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    UpdateStatus update_if_needed_with_status() const noexcept override;
+    bool update_if_needed() const override;
+    const Obj& get_object() const noexcept override
     {
-        Base::set_owner(std::move(parent), index);
-        get_key_type();
+        return get_obj();
     }
+    ref_type get_collection_ref(Index, CollectionType) const override;
+    void set_collection_ref(Index, ref_type ref, CollectionType) override;
 
     void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
@@ -172,7 +198,6 @@ private:
     friend class CollectionColumnAggregate;
     friend class DictionaryLinkValues;
     friend class Cluster;
-    friend void Obj::assign_pk_and_backlinks(const Obj& other);
 
     mutable std::unique_ptr<Array> m_dictionary_top;
     mutable std::unique_ptr<BPlusTreeBase> m_keys;
@@ -202,7 +227,6 @@ private:
     template <typename AggregateType>
     void do_accumulate(size_t* return_ndx, AggregateType& agg) const;
 
-    UpdateStatus update_if_needed_with_status() const noexcept final;
     void ensure_created();
     inline bool update() const
     {
@@ -437,7 +461,7 @@ inline std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, const
 
 inline std::unique_ptr<CollectionBase> Dictionary::clone_collection() const
 {
-    return m_obj_mem.get_dictionary_ptr(this->get_col_key());
+    return std::make_unique<Dictionary>(m_obj_mem, this->get_col_key());
 }
 
 

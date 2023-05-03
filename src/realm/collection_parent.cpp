@@ -241,11 +241,6 @@ SetBasePtr CollectionParent::get_setbase_ptr(ColKey col_key) const
     REALM_TERMINATE("Unsupported column type.");
 }
 
-DictionaryPtr CollectionParent::get_dictionary_ptr(ColKey col_key) const
-{
-    return std::make_unique<Dictionary>(col_key);
-}
-
 CollectionBasePtr CollectionParent::get_collection_ptr(ColKey col_key) const
 {
     if (col_key.is_list()) {
@@ -255,16 +250,9 @@ CollectionBasePtr CollectionParent::get_collection_ptr(ColKey col_key) const
         return get_setbase_ptr(col_key);
     }
     else if (col_key.is_dictionary()) {
-        return get_dictionary_ptr(col_key);
+        return std::make_unique<Dictionary>(col_key);
     }
     return {};
-}
-
-
-const Obj& DummyParent::get_object() const noexcept
-{
-    static Obj dummy_obj;
-    return dummy_obj;
 }
 
 } // namespace realm

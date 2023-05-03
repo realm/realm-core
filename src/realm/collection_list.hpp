@@ -33,10 +33,7 @@ using CollectionListPtr = std::shared_ptr<CollectionList>;
  * by either an integer index or a string key.
  */
 
-class CollectionList final : public Collection,
-                             public CollectionParent,
-                             protected ArrayParent,
-                             public std::enable_shared_from_this<CollectionList> {
+class CollectionList final : public Collection, public CollectionParent, protected ArrayParent {
 public:
     [[nodiscard]] static CollectionListPtr create(std::shared_ptr<CollectionParent> parent, ColKey col_key,
                                                   Index index, CollectionType coll_type)
@@ -59,10 +56,6 @@ public:
 
     bool init_from_parent(bool allow_create) const;
 
-    size_t get_level() const noexcept final
-    {
-        return m_level;
-    }
     UpdateStatus update_if_needed_with_status() const noexcept final;
     bool update_if_needed() const final;
     TableRef get_table() const noexcept final
@@ -106,7 +99,6 @@ private:
     std::shared_ptr<CollectionParent> m_owned_parent;
     CollectionParent* m_parent;
     CollectionParent::Index m_index;
-    size_t m_level = 0;
     Allocator* m_alloc;
     ColKey m_col_key;
     mutable Array m_top;

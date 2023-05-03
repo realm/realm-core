@@ -14,6 +14,41 @@ namespace realm {
 template <class L>
 struct CollectionIterator;
 
+// Used in Cluster when removing owning object
+class DummyParent : public CollectionParent {
+public:
+    DummyParent(TableRef t, ref_type ref)
+        : m_obj(t, MemRef(), ObjKey(), 0)
+        , m_ref(ref)
+    {
+    }
+    TableRef get_table() const noexcept final
+    {
+        return m_obj.get_table();
+    }
+    const Obj& get_object() const noexcept final
+    {
+        return m_obj;
+    }
+
+protected:
+    Obj m_obj;
+    ref_type m_ref;
+    UpdateStatus update_if_needed_with_status() const noexcept final
+    {
+        return UpdateStatus::Updated;
+    }
+    bool update_if_needed() const final
+    {
+        return true;
+    }
+    ref_type get_collection_ref(Index, CollectionType) const final
+    {
+        return m_ref;
+    }
+    void set_collection_ref(Index, ref_type, CollectionType) {}
+};
+
 class Collection {
 public:
     virtual ~Collection();
@@ -109,7 +144,7 @@ public:
     }
 
     /// Get the table of the object that owns this collection.
-    virtual ConstTableRef get_table() const noexcept final
+    ConstTableRef get_table() const noexcept
     {
         return get_obj().get_table();
     }
@@ -460,6 +495,13 @@ protected:
     CollectionBaseImpl(ColKey col_key) noexcept
         : m_col_key(col_key)
         , m_nullable(col_key.is_nullable())
+    {
+    }
+
+    CollectionBaseImpl(DummyParent& parent) noexcept
+        : m_obj_mem(parent.get_object())
+        , m_parent(&parent)
+        , m_alloc(&m_obj_mem.get_alloc())
     {
     }
 

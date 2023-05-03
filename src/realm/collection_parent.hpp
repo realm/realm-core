@@ -44,7 +44,7 @@ using LstBasePtr = std::unique_ptr<LstBase>;
 using SetBasePtr = std::unique_ptr<SetBase>;
 using CollectionBasePtr = std::unique_ptr<CollectionBase>;
 using CollectionListPtr = std::shared_ptr<CollectionList>;
-using DictionaryPtr = std::unique_ptr<Dictionary>;
+using DictionaryPtr = std::shared_ptr<Dictionary>;
 
 /// The status of an accessor after a call to `update_if_needed()`.
 enum class UpdateStatus {
@@ -75,12 +75,14 @@ struct FullPath {
     Path path_from_top;
 };
 
-class CollectionParent {
+class CollectionParent : public std::enable_shared_from_this<CollectionParent> {
 public:
     using Index = mpark::variant<ColKey, int64_t, std::string>;
 
-    // Return the nesting level of the parent
-    virtual size_t get_level() const noexcept = 0;
+    size_t get_level() const noexcept
+    {
+        return m_level;
+    }
     /// Get table of owning object
     virtual TableRef get_table() const noexcept = 0;
 
@@ -88,6 +90,13 @@ protected:
     template <class>
     friend class CollectionBaseImpl;
     friend class CollectionList;
+
+    size_t m_level = 0;
+
+    constexpr CollectionParent(size_t level = 0)
+        : m_level(level)
+    {
+    }
 
     virtual ~CollectionParent();
     /// Update the accessor (and return `UpdateStatus::Detached` if the parent
@@ -112,44 +121,7 @@ protected:
 
     LstBasePtr get_listbase_ptr(ColKey col_key) const;
     SetBasePtr get_setbase_ptr(ColKey col_key) const;
-    DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
     CollectionBasePtr get_collection_ptr(ColKey col_key) const;
-};
-
-// Used in Cluster when removing owning object
-class DummyParent : public CollectionParent {
-public:
-    DummyParent(TableRef t, ref_type ref)
-        : m_table(t)
-        , m_ref(ref)
-    {
-    }
-    size_t get_level() const noexcept final
-    {
-        return 0;
-    }
-    TableRef get_table() const noexcept final
-    {
-        return m_table;
-    }
-
-protected:
-    TableRef m_table;
-    ref_type m_ref;
-    UpdateStatus update_if_needed_with_status() const noexcept final
-    {
-        return UpdateStatus::Updated;
-    }
-    bool update_if_needed() const final
-    {
-        return true;
-    }
-    const Obj& get_object() const noexcept final;
-    ref_type get_collection_ref(Index, CollectionType) const final
-    {
-        return m_ref;
-    }
-    void set_collection_ref(Index, ref_type, CollectionType) {}
 };
 
 } // namespace realm
