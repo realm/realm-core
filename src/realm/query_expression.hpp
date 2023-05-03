@@ -4390,7 +4390,7 @@ public:
         return not_found; // no match
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         if constexpr (realm::is_any_v<TCond, BeginsWith, BeginsWithIns, EndsWith, EndsWithIns, Contains, ContainsIns,
                                       Like, LikeIns>) {

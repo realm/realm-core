@@ -557,7 +557,7 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, const FileAttributes&
         f.info->fd = fd_duped;
         f.device = st.st_dev;
         f.inode = st.st_ino;
-#endif                                 // conditonal on _WIN32
+#endif // conditonal on _WIN32
 
         mappings_by_file.push_back(f); // can't throw due to reserve() above
         it = mappings_by_file.end() - 1;

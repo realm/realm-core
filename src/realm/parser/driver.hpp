@@ -503,7 +503,7 @@ public:
     {
         throw realm::LogicError(ErrorCodes::NotSupported, "Support for Geospatial queries is not enabled");
     }
-    virtual Query visit(ParserDriver*) override
+    Query visit(ParserDriver*) override
     {
         return {};
     }

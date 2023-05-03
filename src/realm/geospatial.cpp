@@ -62,9 +62,6 @@ static bool type_is_valid(std::string str_type)
 
 namespace realm {
 
-// src/mongo/db/geo/geoconstants.h
-const double GeoCenterSphere::c_radius_meters = 6378100.0;
-
 std::string Geospatial::get_type_string() const noexcept
 {
     return mpark::visit(util::overload{[&](const GeoPoint&) {

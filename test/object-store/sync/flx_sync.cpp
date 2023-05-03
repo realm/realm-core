@@ -1220,6 +1220,7 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
     }
 }
 
+#if REALM_ENABLE_GEOSPATIAL
 TEST_CASE("flx: geospatial", "[sync][flx][app]") {
     static std::optional<FLXSyncTestHarness> harness;
     if (!harness) {
@@ -1319,6 +1320,7 @@ TEST_CASE("flx: geospatial", "[sync][flx][app]") {
         harness.reset();
     }
 }
+#endif // REALM_ENABLE_GEOSPATIAL
 
 TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bootstrap_batching", {g_large_array_schema, {"queryable_int_field"}});

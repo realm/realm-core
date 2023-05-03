@@ -155,7 +155,8 @@ struct GeoCenterSphere {
     }
 
     // Equatorial radius of earth.
-    static const double c_radius_meters;
+    // src/mongo/db/geo/geoconstants.h
+    constexpr static double c_radius_meters = 6378100.0;
 
     static GeoCenterSphere from_kms(double km, GeoPoint&& p)
     {

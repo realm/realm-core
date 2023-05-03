@@ -154,7 +154,7 @@ static_assert(!type_OldTable.is_valid());
 static_assert(!type_OldDateTime.is_valid());
 static constexpr DataType type_TypeOfValue = DataType{18};
 #if REALM_ENABLE_GEOSPATIAL
-static constexpr DataType type_Geospatial = DataType{19};
+static constexpr DataType type_Geospatial = DataType{22};
 #endif
 
 constexpr inline DataType::operator util::Printable() const noexcept
