@@ -27,6 +27,7 @@ ArrayMixed::ArrayMixed(Allocator& a)
     , m_ints(a)
     , m_int_pairs(a)
     , m_strings(a)
+    , m_refs(a)
 {
     m_composite.set_parent(this, payload_idx_type);
 }
@@ -45,6 +46,7 @@ void ArrayMixed::init_from_mem(MemRef mem) noexcept
     m_ints.detach();
     m_int_pairs.detach();
     m_strings.detach();
+    m_refs.detach();
 }
 
 void ArrayMixed::add(Mixed value)
@@ -63,7 +65,8 @@ void ArrayMixed::set(size_t ndx, Mixed value)
         set_null(ndx);
         return;
     }
-    erase_linked_payload(ndx);
+    auto old_type = get_type(ndx);
+    erase_linked_payload(ndx, old_type != value.get_type()); // FIXME
     m_composite.set(ndx, store(value));
 }
 
@@ -80,7 +83,7 @@ void ArrayMixed::set_null(size_t ndx)
 {
     auto val = m_composite.get(ndx);
     if (val) {
-        erase_linked_payload(ndx);
+        erase_linked_payload(ndx, true);
         m_composite.set(ndx, 0);
     }
 }
@@ -163,7 +166,8 @@ Mixed ArrayMixed::get(size_t ndx) const
                 return Mixed(UUID(bytes));
             }
             default:
-                break;
+                ensure_ref_array();
+                return Mixed(m_refs.get(payload_ndx), CollectionType(int(type)));
         }
     }
 
@@ -176,23 +180,17 @@ void ArrayMixed::clear()
     m_ints.destroy();
     m_int_pairs.destroy();
     m_strings.destroy();
+    m_refs.destroy_deep();
     Array::set(payload_idx_int, 0);
     Array::set(payload_idx_pair, 0);
     Array::set(payload_idx_str, 0);
+    Array::set(payload_idx_ref, 0);
 }
 
 void ArrayMixed::erase(size_t ndx)
 {
-    erase_linked_payload(ndx);
+    erase_linked_payload(ndx, true);
     m_composite.erase(ndx);
-}
-
-void ArrayMixed::truncate_and_destroy_children(size_t ndx)
-{
-    for (size_t i = size(); i > ndx; i--) {
-        erase_linked_payload(i - 1);
-    }
-    m_composite.truncate(ndx);
 }
 
 void ArrayMixed::move(ArrayMixed& dst, size_t ndx)
@@ -204,7 +202,7 @@ void ArrayMixed::move(ArrayMixed& dst, size_t ndx)
         dst.add(val);
     }
     while (i > ndx) {
-        erase_linked_payload(--i);
+        erase_linked_payload(--i, false);
     }
     m_composite.truncate(ndx);
 }
@@ -239,7 +237,7 @@ void ArrayMixed::ensure_array_accessor(Array& arr, size_t ndx_in_parent) const
             arr.init_from_ref(ref);
         }
         else {
-            arr.create(type_Normal);
+            arr.create(ndx_in_parent == payload_idx_ref ? type_HasRefs : type_Normal);
             arr.update_parent();
         }
     }
@@ -270,6 +268,14 @@ void ArrayMixed::ensure_string_array() const
     }
 }
 
+void ArrayMixed::ensure_ref_array() const
+{
+    while (Array::size() < payload_idx_ref + 1) {
+        const_cast<ArrayMixed*>(this)->Array::add(0l);
+    }
+    ensure_array_accessor(m_refs, payload_idx_ref);
+}
+
 void ArrayMixed::replace_index(size_t old_ndx, size_t new_ndx, size_t payload_arr_index)
 {
     if (old_ndx != new_ndx) {
@@ -285,7 +291,7 @@ void ArrayMixed::replace_index(size_t old_ndx, size_t new_ndx, size_t payload_ar
     }
 }
 
-void ArrayMixed::erase_linked_payload(size_t ndx)
+void ArrayMixed::erase_linked_payload(size_t ndx, bool free_linked_arrays)
 {
     auto val = m_composite.get(ndx);
     auto payload_arr_index = size_t((val & s_payload_idx_mask) >> s_payload_idx_shift);
@@ -328,6 +334,19 @@ void ArrayMixed::erase_linked_payload(size_t ndx)
                     replace_index(last_ndx >> 1, erase_ndx >> 1, payload_arr_index);
                 }
                 m_int_pairs.truncate(last_ndx);
+                break;
+            }
+            case payload_idx_ref: {
+                ensure_ref_array();
+                last_ndx = m_refs.size() - 1;
+                auto old_ref = m_refs.get(erase_ndx);
+                if (erase_ndx != last_ndx) {
+                    m_refs.set(erase_ndx, m_refs.get(last_ndx));
+                    replace_index(last_ndx, erase_ndx, payload_arr_index);
+                }
+                m_refs.erase(last_ndx);
+                if (old_ref && free_linked_arrays)
+                    Array::destroy_deep(old_ref, m_composite.get_alloc());
                 break;
             }
             default:
@@ -440,7 +459,10 @@ int64_t ArrayMixed::store(const Mixed& value)
             break;
         }
         default:
-            val = 0;
+            ensure_ref_array();
+            size_t ndx = m_refs.size();
+            m_refs.add(value.get_ref());
+            val = int64_t(ndx << s_data_shift) | (payload_idx_ref << s_payload_idx_shift);
             break;
     }
     return val + int(type) + 1;

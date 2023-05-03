@@ -112,15 +112,7 @@ Mixed CollectionList::get_any(size_t ndx) const
     }
 
     ref_type ref = m_refs.get(ndx);
-    switch (get_table()->get_collection_type(m_col_key, m_level)) {
-        case CollectionType::List:
-            return Mixed(ref, Mixed::ListTag());
-        case CollectionType::Set:
-            return Mixed(ref, Mixed::SetTag());
-        case CollectionType::Dictionary:
-            return Mixed(ref, Mixed::DictionaryTag());
-    }
-    return {};
+    return Mixed(ref, get_table()->get_collection_type(m_col_key, m_level));
 }
 
 void CollectionList::ensure_created()

@@ -28,6 +28,15 @@ namespace realm {
 
 class Obj;
 
+enum class CollectionType {
+    // Part of the file format. Changing these values will be a
+    // file format breaking change. Must be kept in sync with the
+    // values in <realm/data_type.hpp>
+    List = 19,
+    Set = 20,
+    Dictionary = 21
+};
+
 struct TableKey {
     static constexpr uint32_t null_value = uint32_t(-1) >> 1; // free top bit
 

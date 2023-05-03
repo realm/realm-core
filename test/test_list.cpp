@@ -732,6 +732,20 @@ TEST(List_NestedList_Insert)
     CHECK_EQUAL(collection2->size(), 0);
 }
 
+TEST(List_Nested_InMixed)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(make_in_realm_history(), path);
+    auto tr = db->start_write();
+    auto table = tr->add_table("table");
+    auto col_any = table->add_column(type_Mixed, "something");
+
+    Obj obj = table->create_object();
+    obj.set(col_any, Mixed(ref_type(0), CollectionType::List));
+    tr->commit_and_continue_as_read();
+    CHECK(obj.get_any(col_any).is_type(type_List));
+}
+
 TEST(List_NestedList_Remove)
 {
     SHARED_GROUP_TEST_PATH(path);
