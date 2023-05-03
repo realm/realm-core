@@ -3180,12 +3180,15 @@ RLM_API bool realm_app_push_notification_client_deregister_device(const realm_ap
  * Run a named MongoDB Realm function.
  *
  * @param serialized_ejson_args The arguments array to invoke the function with,
- *                              serialized as an Extended JSON string.
+ *                        serialized as an Extended JSON string.
+ * @param service_name The name of the remote service whose system function to call. Can be null,
+ *                        in which case the called function is expected to be a user function.
  * @return true, if no error occurred.
  */
 RLM_API bool realm_app_call_function(const realm_app_t*, const realm_user_t*, const char* function_name,
-                                     const char* serialized_ejson_args, realm_return_string_func_t callback,
-                                     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
+                                     const char* serialized_ejson_args, const char* service_name,
+                                     realm_return_string_func_t callback, realm_userdata_t userdata,
+                                     realm_free_userdata_func_t userdata_free);
 
 /**
  * Instruct this app's sync client to immediately reconnect.

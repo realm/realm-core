@@ -9,7 +9,7 @@
 * None.
 
 ### Breaking changes
-* None.
+* Add `service_name` parameter to `realm_app_call_function` (PR [#6394](https://github.com/realm/realm-core/pull/6394)).
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
