@@ -2,6 +2,7 @@
 
 ### Enhancements
 * The query engine now supports `geowithin` queries on points. Points are embedded objects conforming to the geoJSON format, trying to use a geospatial query on data in the incorrect format produces a run time exception. Example RQL query: `location geoWithin geoPolygon({{-178.0, 10.0}, {178.0, 10.0}, {178.0, -10.0}, {-178.0, -10.0}, {-178.0, 10.0}})`. For SDKs who do not wish to add this yet, the feature can be compiled out by adding `-DREALM_ENABLE_GEOSPATIAL=OFF` to the cmake config. ([#6562](https://github.com/realm/realm-core/issues/6562))
+* New notifiers can now be registered in write transactions until changes have actually been made in the write transaction. This makes it so that new notifications can be registered inside change notifications triggered by beginning a write transaction (unless a previous callback performed writes).
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
