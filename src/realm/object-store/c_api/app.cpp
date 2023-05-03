@@ -622,7 +622,8 @@ RLM_API bool realm_app_call_function(const realm_app_t* app, const realm_user_t*
                 callback(userdata.get(), reply->c_str(), nullptr);
             }
         };
-        util::Optional<std::string> service_name_opt = service_name ? util::some<std::string>(service_name) : util::none;
+        util::Optional<std::string> service_name_opt =
+            service_name ? util::some<std::string>(service_name) : util::none;
         (*app)->call_function(*user, function_name, serialized_ejson_payload, service_name_opt, std::move(cb));
         return true;
     });
