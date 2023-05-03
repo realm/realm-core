@@ -507,7 +507,7 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
             [[fallthrough]];
         case WebSocketError::websocket_connection_failed: {
             constexpr bool try_again = true;
-            involuntary_disconnect(SessionErrorInfo{error_code, try_again},
+            involuntary_disconnect(SessionErrorInfo{error_code, status.reason(), try_again},
                                    ConnectionTerminationReason::connect_operation_failed); // Throws
             break;
         }
@@ -629,13 +629,16 @@ void Connection::initiate_reconnect_wait()
         m_reconnect_delay_in_progress = true;
         m_nonzero_reconnect_delay = true;
     }
+    else if (delay == std::chrono::milliseconds::zero()) {
+        m_nonzero_reconnect_delay = false;
+        m_reconnect_delay_in_progress = true;
+        m_client.post(std::move(cb));
+    }
     else {
-        if (delay > std::chrono::milliseconds::zero()) {
-            logger.detail("Allowing reconnection in %1 milliseconds", delay.count()); // Throws
-        }
+        logger.detail("Allowing reconnection in %1 milliseconds", delay.count()); // Throws
+        m_nonzero_reconnect_delay = true;
         m_reconnect_disconnect_timer = m_client.create_timer(delay, std::move(cb)); // Throws
         m_reconnect_delay_in_progress = true;
-        m_nonzero_reconnect_delay = true;
     }
 }
 
@@ -645,6 +648,9 @@ void Connection::handle_reconnect_wait(Status status)
     if (!status.is_ok()) {
         REALM_ASSERT(status != ErrorCodes::OperationAborted);
         throw Exception(status);
+    }
+    if (!m_reconnect_delay_in_progress) {
+        return;
     }
 
     m_reconnect_delay_in_progress = false;
