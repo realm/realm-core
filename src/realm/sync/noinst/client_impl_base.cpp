@@ -622,24 +622,27 @@ void Connection::initiate_reconnect_wait()
             handle_reconnect_wait(status); // Throws
     };
 
+    m_reconnect_delay_in_progress = true;
     auto delay = m_reconnect_info.delay_interval();
     if (delay == std::chrono::milliseconds::max()) {
         logger.detail("Reconnection delayed indefinitely"); // Throws
         // Not actually starting a timer corresponds to an infinite wait
-        m_reconnect_delay_in_progress = true;
         m_nonzero_reconnect_delay = true;
+        return;
     }
-    else if (delay == std::chrono::milliseconds::zero()) {
+
+    if (delay == std::chrono::milliseconds::zero()) {
         m_nonzero_reconnect_delay = false;
-        m_reconnect_delay_in_progress = true;
-        m_client.post(std::move(cb));
     }
     else {
         logger.detail("Allowing reconnection in %1 milliseconds", delay.count()); // Throws
         m_nonzero_reconnect_delay = true;
-        m_reconnect_disconnect_timer = m_client.create_timer(delay, std::move(cb)); // Throws
-        m_reconnect_delay_in_progress = true;
     }
+
+    // We create a timer for the reconnect_disconnect timer even if the delay is zero because
+    // we need it to be cancelable in case the connection is terminated before the timer
+    // callback is run.
+    m_reconnect_disconnect_timer = m_client.create_timer(delay, std::move(cb)); // Throws
 }
 
 
@@ -649,10 +652,8 @@ void Connection::handle_reconnect_wait(Status status)
         REALM_ASSERT(status != ErrorCodes::OperationAborted);
         throw Exception(status);
     }
-    if (!m_reconnect_delay_in_progress) {
-        return;
-    }
 
+    REALM_ASSERT(m_reconnect_delay_in_progress);
     m_reconnect_delay_in_progress = false;
 
     if (m_num_active_unsuspended_sessions > 0)
