@@ -161,14 +161,39 @@ std::unique_ptr<Tokenizer> Tokenizer::get_instance()
 }
 
 } // namespace realm
+
 #ifdef TOKENIZER_UNITTEST
 
 // compile: g++ -DTOKENIZER_UNITTEST=1 -I.. --std=c++17 -g -o test_tokenizer tokenizer.cpp
+// call like this:
+// ./tokenizer_test ~/some/path/to/file -d
+//  echo 'fasdfsdfsd fas df' | ./tokenizer_test -d
 
 #include <cassert>
-#include <iostream>
-#include <fstream>
 #include <chrono>
+#include <fstream>
+#include <iostream>
+
+static std::ostream& operator<<(std::ostream& out, const realm::TokenInfo& info)
+{
+    out << "\n\t\tweight: " << info.weight << "\n\t\tfrequency: " << info.frequency << "\n\t\tpositions: [";
+    for (auto p : info.positions)
+        out << p << ", ";
+    out << "]\n\t\tranges: [";
+    for (auto&& [s, e] : info.ranges)
+        out << "(" << s << ", " << e << "), ";
+    out << "]";
+    return out;
+}
+
+static std::ostream& operator<<(std::ostream& out, const realm::TokenInfoMap& infoMap)
+{
+    out << "TokenInfoMap(size: " << infoMap.size();
+    for (auto&& [token, info] : infoMap)
+        out << "\n\t" << token << " (" << info << ")";
+    out << ")";
+    return out;
+}
 
 using namespace std::chrono;
 
@@ -176,17 +201,24 @@ char buffer[256 * 256];
 
 int main(int argc, const char* argv[])
 {
-    if (argc < 2) {
-        std::cerr << "Please, provide the file to tokenize!\n";
-        return 1;
+    std::string_view arg1(argc > 1 ? argv[1] : "");
+    std::string_view arg2(argc > 2 ? argv[2] : "");
+    bool dump = arg2 == "-d" || arg1 == "-d";
+
+    std::string_view text;
+    if (!arg1.empty() && arg1 != "-d") {
+        std::cout << "Reading from file [" << argv[1] << "]..." << std::endl;
+        std::ifstream istr(argv[1]);
+        istr.read(buffer, sizeof(buffer));
+        text = std::string_view(buffer, istr.gcount());
+    }
+    else {
+        std::cout << "Reading from stdin..." << std::endl;
+        std::cin.read(buffer, sizeof(buffer));
+        text = std::string_view(buffer, std::cin.gcount());
     }
 
     auto tok = realm::Tokenizer::get_instance();
-
-    std::ifstream istr(argv[1]);
-    istr.read(buffer, sizeof(buffer));
-    std::string_view text(buffer, istr.gcount());
-
     tok->reset(text);
     auto t1 = steady_clock::now();
     auto tokens = tok->get_all_tokens();
@@ -196,6 +228,9 @@ int main(int argc, const char* argv[])
     auto t3 = steady_clock::now();
     std::cout << "tokenize: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
     std::cout << "info: " << duration_cast<microseconds>(t3 - t2).count() << " us" << std::endl;
+
+    if (dump)
+        std::cout << info << std::endl;
 
     return 0;
 }
