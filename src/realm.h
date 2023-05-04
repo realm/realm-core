@@ -2575,6 +2575,14 @@ RLM_API bool realm_results_find(realm_results_t*, realm_value_t* value, size_t* 
 RLM_API realm_object_t* realm_results_get_object(realm_results_t*, size_t index);
 
 /**
+ * Return the query associated to the results passed as argument.
+ *
+ * @param results the ptr to a valid results object.
+ * @return a valid ptr to realm_query_t if no error has occured
+ */
+RLM_API realm_query_t* realm_results_get_query(realm_results_t* results);
+
+/**
  * Find the index for the realm object passed as parameter inside realm results pointer passed a input parameter.
  *  @param value the value to find inside the realm results
  *  @param out_index the index where the object has been found, or realm::not_found
@@ -3180,12 +3188,15 @@ RLM_API bool realm_app_push_notification_client_deregister_device(const realm_ap
  * Run a named MongoDB Realm function.
  *
  * @param serialized_ejson_args The arguments array to invoke the function with,
- *                              serialized as an Extended JSON string.
+ *                        serialized as an Extended JSON string.
+ * @param service_name The name of the remote service whose system function to call. Can be null,
+ *                        in which case the called function is expected to be a user function.
  * @return true, if no error occurred.
  */
 RLM_API bool realm_app_call_function(const realm_app_t*, const realm_user_t*, const char* function_name,
-                                     const char* serialized_ejson_args, realm_return_string_func_t callback,
-                                     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
+                                     const char* serialized_ejson_args, const char* service_name,
+                                     realm_return_string_func_t callback, realm_userdata_t userdata,
+                                     realm_free_userdata_func_t userdata_free);
 
 /**
  * Instruct this app's sync client to immediately reconnect.
