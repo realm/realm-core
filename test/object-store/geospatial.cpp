@@ -105,7 +105,8 @@ TEST_CASE("geospatial") {
              {"location", PropertyType::Object | PropertyType::Nullable, "geoPointType"},
              {"array", PropertyType::Object | PropertyType::Array, "geoPointType"},
          }},
-        {"geoPointType", ObjectSchema::ObjectType::Embedded,
+        {"geoPointType",
+         ObjectSchema::ObjectType::Embedded,
          {
              {"type", PropertyType::String},
              {"coordinates", PropertyType::Double | PropertyType::Array},
@@ -142,7 +143,8 @@ TEST_CASE("geospatial") {
         auto linked_obj = util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "location")).obj();
         REQUIRE(linked_obj.is_valid());
         REQUIRE(linked_obj.get<String>("type") == "Point");
-        auto list = util::any_cast<List>(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "location")).get_property_value<std::any>(ctx, "coordinates"));
+        auto list = util::any_cast<List>(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "location"))
+                                             .get_property_value<std::any>(ctx, "coordinates"));
         REQUIRE(list.size() == 3);
         REQUIRE(list.get<double>(0) == 1.1);
         REQUIRE(list.get<double>(1) == 2.2);
@@ -164,7 +166,8 @@ TEST_CASE("geospatial") {
             realm->begin_transaction();
             obj.set_property_value(ctx, "location", std::any{geo});
             realm->commit_transaction();
-            Geospatial fetched = Geospatial::from_link(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "location")).obj());
+            Geospatial fetched = Geospatial::from_link(
+                util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "location")).obj());
             REQUIRE(geo == fetched);
         }
     }
