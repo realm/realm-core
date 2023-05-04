@@ -275,14 +275,6 @@ RLM_API realm_app_t* realm_app_create(const realm_app_config_t* app_config,
     });
 }
 
-RLM_API realm_app_t* realm_app_get(const realm_app_config_t* app_config,
-                                   const realm_sync_client_config_t* sync_client_config)
-{
-    return wrap_err([&] {
-        return new realm_app_t(App::get_shared_app(*app_config, *sync_client_config));
-    });
-}
-
 RLM_API void realm_clear_cached_apps(void) noexcept
 {
     App::clear_cached_apps();

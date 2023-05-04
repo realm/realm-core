@@ -2885,16 +2885,6 @@ RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credential
 RLM_API realm_app_t* realm_app_create(const realm_app_config_t*, const realm_sync_client_config_t*);
 
 /**
- * @note this API will be removed and it is now deprecated in favour of realm_app_create
- *
- * Get an existing @a realm_app_t* instance with the same app id, or create it with the
- * configuration if it doesn't exist.
- *
- * @return A non-null pointer if no error occurred.
- */
-RLM_API realm_app_t* realm_app_get(const realm_app_config_t*, const realm_sync_client_config_t*);
-
-/**
  * Clear all the cached @a realm_app_t* instances in the process.
  *
  * @a realm_app_t* instances will need to be disposed with realm_release()
