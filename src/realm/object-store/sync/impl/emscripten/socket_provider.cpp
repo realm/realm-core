@@ -130,8 +130,7 @@ private:
         double next_delay = 1;
     };
 
-    struct LivenessSentinel {
-    };
+    struct LivenessSentinel {};
 
     static void sending_poll_check(void* user_data)
     {

@@ -3,8 +3,7 @@
 using namespace realm;
 using namespace realm::sync;
 
-struct PKey::Impl {
-};
+struct PKey::Impl {};
 
 PKey::PKey()
 {
