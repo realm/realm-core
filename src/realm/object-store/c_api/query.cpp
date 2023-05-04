@@ -433,6 +433,16 @@ RLM_API realm_object_t* realm_results_get_object(realm_results_t* results, size_
     });
 }
 
+RLM_API realm_query_t* realm_results_get_query(realm_results_t* results)
+{
+    return wrap_err([&]() {
+        auto query = results->get_query();
+        auto shared_realm = results->get_realm();
+        auto ordering = query.get_ordering();
+        return new realm_query_t{std::move(query), std::move(ordering), shared_realm};
+    });
+}
+
 RLM_API bool realm_results_find_object(realm_results_t* results, realm_object_t* value, size_t* out_index,
                                        bool* out_found)
 {
