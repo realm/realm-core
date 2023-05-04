@@ -207,7 +207,7 @@ SharedApp App::get_cached_app(const std::string& app_id, const std::optional<std
     if (auto it = s_apps_cache.find(app_id); it != s_apps_cache.end()) {
         const auto& apps_by_url = it->second;
 
-        auto app_it = base_url.has_value() ? apps_by_url.find(*base_url) : apps_by_url.begin();
+        auto app_it = base_url ? apps_by_url.find(*base_url) : apps_by_url.begin();
         if (app_it != apps_by_url.end()) {
             return app_it->second;
         }

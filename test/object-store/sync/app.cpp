@@ -321,14 +321,14 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     }
 
     SECTION("retry custom confirmation for invalid user fails") {
-        client.retry_custom_confirmation(
-            util::format("%1@%2.com", random_string(5), random_string(5)), [&](Optional<AppError> error) {
-                REQUIRE(error);
-                CHECK(error->reason() == "user not found");
-                CHECK(error->is_service_error());
-                CHECK(error->code() == ErrorCodes::UserNotFound);
-                processed = true;
-            });
+        client.retry_custom_confirmation(util::format("%1@%2.com", random_string(5), random_string(5)),
+                                         [&](Optional<AppError> error) {
+                                             REQUIRE(error);
+                                             CHECK(error->reason() == "user not found");
+                                             CHECK(error->is_service_error());
+                                             CHECK(error->code() == ErrorCodes::UserNotFound);
+                                             processed = true;
+                                         });
         CHECK(processed);
     }
 
@@ -5193,7 +5193,7 @@ TEST_CASE("app: shared instances", "[sync][app]") {
 
     auto config2 = base_config;
     config2.app_id = "app1";
-    config2.base_url = "https://realm.mongodb.com";
+    config2.base_url = "https://realm.mongodb.com"; // equivalent to default_base_url
 
     auto config3 = base_config;
     config3.app_id = "app2";
@@ -5219,10 +5219,12 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     auto app2_2 = App::get_cached_app(config3.app_id, config3.base_url);
     auto app2_3 = App::get_shared_app(config4, sync_config);
     auto app2_4 = App::get_cached_app(config3.app_id);
+    auto app2_5 = App::get_cached_app(config4.app_id, "https://some.different.url");
 
     CHECK(app2_1 == app2_2);
     CHECK(app2_1 != app2_3);
     CHECK(app2_4 != nullptr);
+    CHECK(app2_5 == nullptr);
 
     CHECK(app1_1 != app2_1);
     CHECK(app1_1 != app2_3);
