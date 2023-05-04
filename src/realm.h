@@ -2575,6 +2575,14 @@ RLM_API bool realm_results_find(realm_results_t*, realm_value_t* value, size_t* 
 RLM_API realm_object_t* realm_results_get_object(realm_results_t*, size_t index);
 
 /**
+ * Return the query associated to the results passed as argument.
+ * 
+ * @param results the ptr to a valid results object.
+ * @return a valid ptr to realm_query_t if no error has occured
+ */
+RLM_API realm_query_t* realm_results_get_query(realm_results_t* results);
+
+/**
  * Find the index for the realm object passed as parameter inside realm results pointer passed a input parameter.
  *  @param value the value to find inside the realm results
  *  @param out_index the index where the object has been found, or realm::not_found
