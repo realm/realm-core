@@ -4,6 +4,7 @@
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * New notifiers can now be registered in write transactions until changes have actually been made in the write transaction. This makes it so that new notifications can be registered inside change notifications triggered by beginning a write transaction (unless a previous callback performed writes).
 * Expose `Results::get_query()` in the C-API. (PR [#6568](https://github.com/realm/realm-core/pull/6568))
+* Sync connection and session re-connect timing/backoff logic has been unified into a single implementation and is now configurable. Previously some errors would cause an hour-long wait before attempting to reconnect, now - by default - the sync client will wait for 1 second before retrying and double the timeout after each subsequent attempt up to 5 minutes, after which a retry will be attempted every 5 minutes. A successful connection will reset the timeout on the next error to the minimum again. (PR [#6526](https://github.com/realm/realm-core/pull/6526)).
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
