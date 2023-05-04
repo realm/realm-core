@@ -397,13 +397,14 @@ let package = Package(
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "RealmCore",
-            dependencies: ["Bid", "s2geometry"],
+            dependencies: ["Bid"],
             path: "src",
             exclude: ([
                 "CMakeLists.txt",
                 "external",
                 "realm/CMakeLists.txt",
                 "realm/exec",
+                "realm/geospatial.cpp",
                 "realm/metrics",
                 "realm/object-store/CMakeLists.txt",
                 "realm/object-store/c_api",
@@ -526,6 +527,7 @@ let package = Package(
                 "backup.cpp",
                 "benchmarks",
                 "c_api",
+                "geospatial.cpp",
                 "notifications-fuzzer",
                 "query.json",
                 "sync-metadata-v4.realm",
