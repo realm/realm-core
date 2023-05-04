@@ -151,6 +151,7 @@ public:
         return m_type == IndexType::Fulltext;
     }
     Mixed get_value(ObjKey key) const;
+    std::vector<ObjKey> get_all_keys() const;
 
 private:
     const ClusterTree* m_cluster_tree;

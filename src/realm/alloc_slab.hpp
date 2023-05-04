@@ -188,7 +188,7 @@ public:
 
     /// Reads file format from file header. Must be called from within a write
     /// transaction.
-    int get_committed_file_format_version() const noexcept;
+    int get_committed_file_format_version() noexcept;
 
     bool is_file_on_streaming_form() const
     {

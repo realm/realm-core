@@ -41,6 +41,32 @@ std::set<std::string> Tokenizer::get_all_tokens()
     return tokens;
 }
 
+TokenInfoMap Tokenizer::get_token_info()
+{
+    TokenInfoMap info;
+    unsigned num_tokens = 0;
+    while (next()) {
+        auto it = info.find(std::string(get_token()));
+        if (it == info.end()) {
+            info.emplace(std::string(get_token()), TokenInfo(num_tokens, get_range()));
+        }
+        else {
+            TokenInfo& i = it->second;
+            i.positions.emplace_back(num_tokens);
+            i.ranges.emplace_back(get_range());
+            i.weight *= 2;
+            i.frequency += (1 / i.weight);
+        }
+        num_tokens++;
+    }
+    for (auto& it : info) {
+        TokenInfo& i = it.second;
+        double coeff = (0.5 * i.positions.size() / num_tokens) + 0.5;
+        i.weight = i.frequency * coeff;
+    }
+    return info;
+}
+
 class DefaultTokenizer : public Tokenizer {
 public:
     bool next() override;
@@ -112,10 +138,14 @@ bool DefaultTokenizer::next()
         }
 
         if (is_alnum) {
+            if (state == searching) {
+                m_start = unsigned(m_cur_pos - m_start_pos);
+            }
             state = building;
         }
         else {
             if (state == building) {
+                m_end = unsigned(m_cur_pos - m_start_pos);
                 state = finished;
             }
         }
@@ -131,3 +161,77 @@ std::unique_ptr<Tokenizer> Tokenizer::get_instance()
 }
 
 } // namespace realm
+
+#ifdef TOKENIZER_UNITTEST
+
+// compile: g++ -DTOKENIZER_UNITTEST=1 -I.. --std=c++17 -g -o test_tokenizer tokenizer.cpp
+// call like this:
+// ./tokenizer_test ~/some/path/to/file -d
+//  echo 'fasdfsdfsd fas df' | ./tokenizer_test -d
+
+#include <cassert>
+#include <chrono>
+#include <fstream>
+#include <iostream>
+
+static std::ostream& operator<<(std::ostream& out, const realm::TokenInfo& info)
+{
+    out << "\n\t\tweight: " << info.weight << "\n\t\tfrequency: " << info.frequency << "\n\t\tpositions: [";
+    for (auto p : info.positions)
+        out << p << ", ";
+    out << "]\n\t\tranges: [";
+    for (auto&& [s, e] : info.ranges)
+        out << "(" << s << ", " << e << "), ";
+    out << "]";
+    return out;
+}
+
+static std::ostream& operator<<(std::ostream& out, const realm::TokenInfoMap& infoMap)
+{
+    out << "TokenInfoMap(size: " << infoMap.size();
+    for (auto&& [token, info] : infoMap)
+        out << "\n\t" << token << " (" << info << ")";
+    out << ")";
+    return out;
+}
+
+using namespace std::chrono;
+
+char buffer[256 * 256];
+
+int main(int argc, const char* argv[])
+{
+    std::string_view arg1(argc > 1 ? argv[1] : "");
+    std::string_view arg2(argc > 2 ? argv[2] : "");
+    bool dump = arg2 == "-d" || arg1 == "-d";
+
+    std::string_view text;
+    if (!arg1.empty() && arg1 != "-d") {
+        std::cout << "Reading from file [" << argv[1] << "]..." << std::endl;
+        std::ifstream istr(argv[1]);
+        istr.read(buffer, sizeof(buffer));
+        text = std::string_view(buffer, istr.gcount());
+    }
+    else {
+        std::cout << "Reading from stdin..." << std::endl;
+        std::cin.read(buffer, sizeof(buffer));
+        text = std::string_view(buffer, std::cin.gcount());
+    }
+
+    auto tok = realm::Tokenizer::get_instance();
+    tok->reset(text);
+    auto t1 = steady_clock::now();
+    auto tokens = tok->get_all_tokens();
+    auto t2 = steady_clock::now();
+    tok->reset(text);
+    auto info = tok->get_token_info();
+    auto t3 = steady_clock::now();
+    std::cout << "tokenize: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+    std::cout << "info: " << duration_cast<microseconds>(t3 - t2).count() << " us" << std::endl;
+
+    if (dump)
+        std::cout << info << std::endl;
+
+    return 0;
+}
+#endif
