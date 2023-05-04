@@ -104,7 +104,7 @@ functions:
           if [ -n "${enable_llvm_coverage|}" ]; then
               set_cmake_var realm_vars REALM_LLVM_COVERAGE BOOL On
           fi
-           
+          
           set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
           set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL On
 
