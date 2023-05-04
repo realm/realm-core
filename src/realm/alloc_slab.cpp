@@ -557,7 +557,7 @@ void SlabAlloc::do_free(ref_type ref, char* addr)
                 // We can do that just by adding the size
                 if (prev->first + prev->second == ref) {
                     prev->second += size;
-                    return; // Done!
+                    return;                                     // Done!
                 }
                 m_free_read_only.emplace_hint(next, ref, size); // Throws
             }
@@ -794,7 +794,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
 
         top_ref = validate_header(header, footer, size, path, cfg.encryption_key != nullptr); // Throws
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
-        m_data = map_header.get_addr(); // <-- needed below
+        m_data = map_header.get_addr();                                                       // <-- needed below
 
         if (cfg.session_initiator && is_file_on_streaming_form(*header)) {
             // Don't compare file format version fields as they are allowed to differ.
@@ -974,7 +974,7 @@ ref_type SlabAlloc::attach_buffer(const char* data, size_t size)
 void SlabAlloc::init_in_memory_buffer()
 {
     m_attach_mode = attach_Heap;
-    m_virtual_file_buffer.emplace_back(64 * 1024 * 1024, 0);
+    m_virtual_file_buffer.emplace_back(32 * 1024 * 1024, 0);
     m_data = m_virtual_file_buffer.back().addr;
     m_virtual_file_size = sizeof(empty_file_header);
     memcpy(const_cast<char*>(m_data), &empty_file_header, m_virtual_file_size);
@@ -1524,7 +1524,7 @@ void SlabAlloc::resize_file(size_t new_file_size)
             current_size += b.size;
         }
         if (new_file_size > current_size) {
-            m_virtual_file_buffer.emplace_back(64 * 1024 * 1024, current_size);
+            m_virtual_file_buffer.emplace_back(32 * 1024 * 1024, current_size);
         }
         m_virtual_file_size = new_file_size;
     }
