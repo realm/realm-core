@@ -747,16 +747,16 @@ void SyncManager::unregister_session(const std::string& path)
     lock.unlock();
 }
 
-void SyncManager::enable_session_multiplexing()
+void SyncManager::set_session_multiplexing(bool allowed)
 {
     util::CheckedLockGuard lock(m_mutex);
-    if (m_config.multiplex_sessions)
+    if (m_config.multiplex_sessions == allowed)
         return; // Already enabled, we can ignore
 
     if (m_sync_client)
         throw std::logic_error("Cannot enable session multiplexing after creating the sync client");
 
-    m_config.multiplex_sessions = true;
+    m_config.multiplex_sessions = allowed;
 }
 
 SyncClient& SyncManager::get_sync_client() const

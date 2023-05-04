@@ -389,8 +389,11 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     if (config.override_sync_route) {
         m_app->sync_manager()->set_sync_route(m_sync_server.base_url() + "/realm-sync");
     }
-    // initialize sync client
-    m_app->sync_manager()->get_sync_client();
+
+    if (config.start_sync_client) {
+        // initialize sync client
+        m_app->sync_manager()->get_sync_client();
+    }
 }
 
 TestSyncManager::~TestSyncManager()

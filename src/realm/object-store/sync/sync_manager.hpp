@@ -119,11 +119,11 @@ public:
     // The metadata and file management subsystems must also have already been configured.
     bool immediately_run_file_actions(const std::string& original_name) REQUIRES(!m_file_system_mutex);
 
-    // Use a single connection for all sync sessions for each host/port rather
+    // Enables/disables using a single connection for all sync sessions for each host/port/user rather
     // than one per session.
     // This must be called before any sync sessions are created, cannot be
     // disabled afterwards, and currently is incompatible with automatic failover.
-    void enable_session_multiplexing() REQUIRES(!m_mutex);
+    void set_session_multiplexing(bool allowed) REQUIRES(!m_mutex);
 
     // Destroys the sync manager, terminates all sessions created by it, and stops its SyncClient.
     ~SyncManager();

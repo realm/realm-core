@@ -728,6 +728,44 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
     }
 }
 
+TEST_CASE("sync_manager: set_session_multiplexing") {
+    TestSyncManager::Config tsm_config;
+    tsm_config.start_sync_client = false;
+    TestSyncManager tsm(std::move(tsm_config));
+    bool sync_multiplexing_allowed = false;
+    SECTION("allowed") {
+        sync_multiplexing_allowed = true;
+    }
+    SECTION("not allowed") {
+        sync_multiplexing_allowed = false;
+    }
+
+    auto sync_manager = tsm.app()->sync_manager();
+    sync_manager->set_session_multiplexing(sync_multiplexing_allowed);
+
+    auto user_1 = sync_manager->get_user("user-name-1", ENCODE_FAKE_JWT("not_a_real_token"),
+                                         ENCODE_FAKE_JWT("samesies"), "https://realm.example.org", dummy_device_id);
+    auto user_2 = sync_manager->get_user("user-name-2", ENCODE_FAKE_JWT("not_a_real_token"),
+                                         ENCODE_FAKE_JWT("samesies"), "https://realm.example.org", dummy_device_id);
+
+    SyncTestFile file_1(user_1, "partition1", util::none);
+    SyncTestFile file_2(user_1, "partition2", util::none);
+    SyncTestFile file_3(user_2, "partition3", util::none);
+
+    auto realm_1 = Realm::get_shared_realm(file_1);
+    auto realm_2 = Realm::get_shared_realm(file_2);
+    auto realm_3 = Realm::get_shared_realm(file_3);
+
+    if (sync_multiplexing_allowed) {
+        REQUIRE(conn_id_for_realm(realm_1) == conn_id_for_realm(realm_2));
+        REQUIRE(conn_id_for_realm(realm_2) != conn_id_for_realm(realm_3));
+    }
+    else {
+        REQUIRE(conn_id_for_realm(realm_1) != conn_id_for_realm(realm_2));
+        REQUIRE(conn_id_for_realm(realm_2) != conn_id_for_realm(realm_3));
+    }
+}
+
 TEST_CASE("sync_manager: has_active_sessions", "[active_sessions]") {
     TestSyncManager init_sync_manager({}, {false});
     auto sync_manager = init_sync_manager.app()->sync_manager();
