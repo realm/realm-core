@@ -1404,7 +1404,7 @@ TEST(Many_ConcurrentReaders)
         }
     };
 
-    constexpr int num_threads = 4;
+    constexpr int num_threads = 40;
     Thread threads[num_threads];
     for (int i = 0; i < num_threads; ++i) {
         threads[i].start(reader);
@@ -1628,7 +1628,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 #endif // encryption enabled
 
 // not ios or android
-//#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
+// #endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
 
 
 TEST(Shared_SpaceOveruse)
