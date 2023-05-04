@@ -58,16 +58,15 @@ public:
     void rollback() REQUIRES(!m_async_mutex);
     void end_read() REQUIRES(!m_async_mutex);
 
+    template <class O>
+    void parse_history(O& observer, DB::version_type begin, DB::version_type end);
+
     // Live transactions state changes, often taking an observer functor:
     VersionID commit_and_continue_as_read(bool commit_to_disk = true) REQUIRES(!m_async_mutex);
     VersionID commit_and_continue_writing();
     template <class O>
-    void rollback_and_continue_as_read(O* observer) REQUIRES(!m_async_mutex);
-    void rollback_and_continue_as_read() REQUIRES(!m_async_mutex)
-    {
-        _impl::NullInstructionObserver* o = nullptr;
-        rollback_and_continue_as_read(o);
-    }
+    void rollback_and_continue_as_read(O& observer) REQUIRES(!m_async_mutex);
+    void rollback_and_continue_as_read() REQUIRES(!m_async_mutex);
     template <class O>
     void advance_read(O* observer, VersionID target_version = VersionID());
     void advance_read(VersionID target_version = VersionID())
@@ -415,7 +414,24 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
 }
 
 template <class O>
-inline void Transaction::rollback_and_continue_as_read(O* observer)
+inline void Transaction::rollback_and_continue_as_read(O& observer)
+{
+    if (m_transact_stage != DB::transact_Writing)
+        throw WrongTransactionState("Not a write transaction");
+    Replication* repl = db->get_replication();
+    if (!repl)
+        throw IllegalOperation("No transaction log when rolling back");
+
+    BinaryData uncommitted_changes = repl->get_uncommitted_changes();
+    if (uncommitted_changes.size()) {
+        util::SimpleInputStream in(uncommitted_changes);
+        _impl::parse_transact_log(in, observer); // Throws
+    }
+
+    rollback_and_continue_as_read();
+}
+
+inline void Transaction::rollback_and_continue_as_read()
 {
     if (m_transact_stage != DB::transact_Writing)
         throw WrongTransactionState("Not a write transaction");
@@ -424,22 +440,6 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
     if (!repl)
         throw IllegalOperation("No transaction log when rolling back");
 
-    BinaryData uncommitted_changes = repl->get_uncommitted_changes();
-
-    // Possible optimization: We are currently creating two transaction log parsers, one here,
-    // and one in advance_transact(). That is wasteful as the parser creation is
-    // expensive.
-    util::SimpleInputStream in(uncommitted_changes);
-    _impl::TransactLogParser parser; // Throws
-    _impl::TransactReverser reverser;
-    parser.parse(in, reverser); // Throws
-
-    if (observer && uncommitted_changes.size()) {
-        _impl::ReversedNoCopyInputStream reversed_in(reverser);
-        parser.parse(reversed_in, *observer); // Throws
-        observer->parse_complete();           // Throws
-    }
-
     // Mark all managed space (beyond the attached file) as free.
     db->reset_free_space_tracking(); // Throws
 
@@ -447,11 +447,10 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
     ref_type top_ref = m_read_lock.m_top_ref;
     size_t file_size = m_read_lock.m_file_size;
 
-    _impl::ReversedNoCopyInputStream reversed_in(reverser);
     // since we had the write lock, we already have the latest encrypted pages in memory
     m_alloc.update_reader_view(file_size); // Throws
     update_allocator_wrappers(false);
-    advance_transact(top_ref, reversed_in, false); // Throws
+    advance_transact(top_ref, nullptr, false); // Throws
 
     if (!holds_write_mutex())
         db->end_write_on_correct_thread();
@@ -494,10 +493,8 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
     if (observer) {
         // This has to happen in the context of the originally bound snapshot
         // and while the read transaction is still in a fully functional state.
-        _impl::TransactLogParser parser;
         _impl::ChangesetInputStream in(hist, old_version, new_version);
-        parser.parse(in, *observer); // Throws
-        observer->parse_complete();  // Throws
+        _impl::parse_transact_log(in, *observer); // Throws
     }
 
     // The old read lock must be retained for as long as the change history is
@@ -510,12 +507,24 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
     // part of the Realm state, then it would not have been necessary to retain
     // the old read lock beyond this point.
     _impl::ChangesetInputStream in(hist, old_version, new_version);
-    advance_transact(new_top_ref, in, writable); // Throws
+    advance_transact(new_top_ref, &in, writable); // Throws
     g.release();
     db->release_read_lock(m_read_lock);
     m_read_lock = new_read_lock;
 
     return true; // _impl::History::update_early_from_top_ref() was called
+}
+
+template <class O>
+void Transaction::parse_history(O& observer, DB::version_type begin, DB::version_type end)
+{
+    REALM_ASSERT(m_transact_stage != DB::transact_Ready);
+    REALM_ASSERT(end <= m_read_lock.m_version);
+    auto hist = get_history(); // Throws
+    REALM_ASSERT(hist);
+    hist->ensure_updated(m_read_lock.m_version);
+    _impl::ChangesetInputStream in(*hist, begin, end);
+    _impl::parse_transact_log(in, observer); // Throws
 }
 
 } // namespace realm

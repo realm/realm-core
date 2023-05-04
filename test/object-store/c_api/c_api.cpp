@@ -2591,6 +2591,19 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(found == false);
                 }
 
+                SECTION("realm_results_get_query()") {
+                    auto q2 = cptr_checked(realm_query_parse(realm, class_foo.key, "int == 123", 0, nullptr));
+                    auto r2 = cptr_checked(realm_results_filter(r.get(), q2.get()));
+                    size_t count;
+                    CHECK(checked(realm_results_count(r2.get(), &count)));
+                    CHECK(count == 1);
+                    auto results_query = cptr_checked(realm_results_get_query(r2.get()));
+                    auto result = cptr_checked(realm_query_find_all(results_query.get()));
+                    size_t count1 = 0;
+                    CHECK(checked(realm_results_count(result.get(), &count1)));
+                    CHECK(count == count1);
+                }
+
                 SECTION("realm_results_get_object()") {
                     auto p = cptr_checked(realm_results_get_object(r.get(), 0));
                     CHECK(p.get());

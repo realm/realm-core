@@ -1588,6 +1588,15 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
     });
 }
 
+TEST_CASE("flx: verify PBS/FLX websocket protocol number and prefixes", "[sync][flx]") {
+    // Update the expected value whenever the protocol version is updated - this ensures
+    // that the current protocol version does not change unexpectedly.
+    REQUIRE(8 == sync::get_current_protocol_version());
+    // This was updated in Protocol V8 to use '#' instead of '/' to support the Web SDK
+    REQUIRE("com.mongodb.realm-sync#" == sync::get_pbs_websocket_protocol_prefix());
+    REQUIRE("com.mongodb.realm-query-sync#" == sync::get_flx_websocket_protocol_prefix());
+}
+
 TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bad_query");
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
