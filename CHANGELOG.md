@@ -21,6 +21,7 @@
 ### Internals
 * Reduce the memory footprint of an automatic (discard or recover) client reset when there are large incoming changes from the server. ([#6567](https://github.com/realm/realm-core/issues/6567))
 * `get_committed_file_format_version()` safe access to mappings vector from multiple threads.
+* Add CI tests for Clang 16/Ubuntu 22.04 and update lint task ([PR #6563](https://github.com/realm/realm-core/pull/6563))
 
 ----------------------------------------------
 
