@@ -6060,15 +6060,18 @@ TEST(Query_FullTextMulti)
     table->create_object().set(col, "three two one");
     table->create_object().set(col, "two one");
 
-    // object:      0, 1, 2, 4, 6
-    // objects:     0, 1, 3
-    // gemstone:    2, 4
-    // data:        3
-    // depot:       5
-    // emanant:     5
-    // database:    0, 1, 2, 4
-    // databases:   0
-    // duplicates:  6
+    // object:              0, 1, 2, 4, 6
+    // objects:             0, 1, 3
+    // 'object-oriented':   0, 1
+    // 'table-oriented':    0
+    // oriented:            0, 1
+    // gemstone:            2, 4
+    // data:                3
+    // depot:               5
+    // emanant:             5
+    // database:            0, 1, 2, 4
+    // databases:           0
+    // duplicates:          6
 
     int64_t id = 1000;
     for (auto& o : *table) {
@@ -6128,6 +6131,8 @@ TEST(Query_FullTextMulti)
     CHECK_EQUAL(do_fulltext_find("database -databases"), Keys({1, 2, 4}));
     CHECK_EQUAL(do_fulltext_find("-databases database"), Keys({1, 2, 4}));
     CHECK_EQUAL(do_fulltext_find("-database"), Keys({3, 5, 6, 7, 8, 9}));
+    CHECK_EQUAL(do_fulltext_find("-object"), Keys({3, 5, 7, 8, 9}));
+    CHECK_EQUAL(do_fulltext_find("-object -objects"), Keys({5, 7, 8, 9}));
 
     // Token should only appear once
     CHECK_THROW_ANY(do_fulltext_find("C# c++"));
@@ -6140,6 +6145,12 @@ TEST(Query_FullTextMulti)
     // many terms
     CHECK_EQUAL(do_fulltext_find("object database management brown"), Keys({1}));
     CHECK_EQUAL(do_query_find(table, "text TEXT 'object database management brown'"), Keys({1}));
+
+    // tokenization of search terms treats all these as separate tokens, also with exclusion
+    // not {}, as is the same as 'object -oriented -database'
+    CHECK_EQUAL(do_fulltext_find("object-oriented -database"), Keys({6}));
+    // not {1}, as is same as 'object -oriented -table -oriented' but throws since duplicate
+    CHECK_THROW_ANY(do_fulltext_find("object-oriented -table-oriented"));
 
     while (table->size() > 0) {
         table->begin()->remove();

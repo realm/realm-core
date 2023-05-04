@@ -278,6 +278,9 @@ TEST(Tokenizer_Basic)
     realm::TokenInfo& j(info["sø"]);
     CHECK_EQUAL(j.ranges[0].first, 17);
     CHECK_EQUAL(j.ranges[0].second, 20);
+
+    tok->reset("with-hyphen -term -other-term-plus");
+    CHECK(tok->get_all_tokens() == std::set<std::string>({"with", "hyphen", "term", "other", "plus"}));
 }
 
 TEST(StringIndex_NonIndexable)
