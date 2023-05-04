@@ -50,7 +50,7 @@ public:
         return ColKey(col_key.get_index(), type, col_key.get_attrs(), col_key.get_tag());
     }
 
-    std::unique_ptr<CollectionBase> clone_collection() const override
+    CollectionBasePtr clone_collection() const override
     {
         return std::make_unique<DictionaryKeyAdapter>(*this);
     }
@@ -346,7 +346,7 @@ public:
 private:
     realm::Dictionary& m_dict;
     TransactionRef m_prev_rt;
-    std::unique_ptr<realm::Dictionary> m_prev_dict;
+    std::shared_ptr<realm::Dictionary> m_prev_dict;
     Dictionary::CBFunc m_cb;
 };
 } // namespace

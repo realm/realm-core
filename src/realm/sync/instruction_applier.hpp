@@ -48,7 +48,7 @@ struct InstructionApplier {
 protected:
     util::Optional<Obj> get_top_object(const Instruction::ObjectInstruction&,
                                        const std::string_view& instr = "(unspecified)");
-    static std::unique_ptr<LstBase> get_list_from_path(Obj& obj, ColKey col);
+    static LstBasePtr get_list_from_path(Obj& obj, ColKey col);
     StringData get_string(InternString) const;
     StringData get_string(StringBufferRange) const;
     BinaryData get_binary(StringBufferRange) const;

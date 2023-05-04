@@ -1100,6 +1100,11 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                     Dictionary dict(parent);
                     dict.to_json(out, link_depth, output_mode, print_link);
                 }
+                else if (val.is_type(type_List)) {
+                    DummyParent parent(m_table, val.get_ref());
+                    Lst<Mixed> list(parent);
+                    list.to_json(out, link_depth, output_mode, print_link);
+                }
                 else {
                     val.to_json(out, output_mode);
                 }
@@ -1916,7 +1921,7 @@ Dictionary Obj::get_dictionary(ColKey col_key) const
     return Dictionary(Obj(*this), col_key);
 }
 
-LstPtr<Mixed> Obj::set_list_ptr(ColKey col_key)
+std::shared_ptr<Lst<Mixed>> Obj::set_list_ptr(ColKey col_key)
 {
     REALM_ASSERT(col_key.get_type() == col_type_Mixed);
     update_if_needed();

@@ -35,6 +35,7 @@
 #include "realm/table_view.hpp"
 #include "realm/group.hpp"
 #include "realm/replication.hpp"
+#include "realm/dictionary.hpp"
 
 namespace realm {
 
@@ -279,6 +280,8 @@ void Lst<ObjLink>::do_remove(size_t ndx)
     }
 }
 
+/******************************** Lst<Mixed> *********************************/
+
 size_t Lst<Mixed>::find_first(const Mixed& value) const
 {
     if (!update())
@@ -311,10 +314,6 @@ Mixed Lst<Mixed>::set(size_t ndx, Mixed value)
 
 void Lst<Mixed>::insert(size_t ndx, Mixed value)
 {
-    if (value_is_null(value) && !m_nullable)
-        throw InvalidArgument(ErrorCodes::PropertyNotNullable,
-                              util::format("List: %1", CollectionBase::get_property_name()));
-
     auto sz = size();
     CollectionBase::validate_index("insert()", ndx, sz + 1);
 
@@ -416,6 +415,50 @@ void Lst<Mixed>::swap(size_t ndx1, size_t ndx2)
     }
 }
 
+DictionaryPtr Lst<Mixed>::insert_dictionary(size_t ndx)
+{
+    m_tree->ensure_keys();
+    insert(ndx, Mixed(0, CollectionType::Dictionary));
+    int64_t key = generate_key(size());
+    while (m_tree->find_key(key) != realm::not_found) {
+        key++;
+    }
+    m_tree->set_key(ndx, key);
+    return get_dictionary(ndx);
+}
+
+DictionaryPtr Lst<Mixed>::get_dictionary(size_t ndx) const
+{
+    auto weak = const_cast<Lst<Mixed>*>(this)->weak_from_this();
+    REALM_ASSERT(!weak.expired());
+    auto shared = weak.lock();
+    DictionaryPtr ret = std::make_shared<Dictionary>(m_col_key, get_level() + 1);
+    ret->set_owner(shared, m_tree->get_key(ndx));
+    return ret;
+}
+
+std::shared_ptr<Lst<Mixed>> Lst<Mixed>::insert_list(size_t ndx)
+{
+    m_tree->ensure_keys();
+    insert(ndx, Mixed(0, CollectionType::List));
+    int64_t key = generate_key(size());
+    while (m_tree->find_key(key) != realm::not_found) {
+        key++;
+    }
+    m_tree->set_key(ndx, key);
+    return get_list(ndx);
+}
+
+std::shared_ptr<Lst<Mixed>> Lst<Mixed>::get_list(size_t ndx) const
+{
+    auto weak = const_cast<Lst<Mixed>*>(this)->weak_from_this();
+    REALM_ASSERT(!weak.expired());
+    auto shared = weak.lock();
+    std::shared_ptr<Lst<Mixed>> ret = std::make_shared<Lst<Mixed>>(m_col_key, get_level() + 1);
+    ret->set_owner(shared, m_tree->get_key(ndx));
+    return ret;
+}
+
 void Lst<Mixed>::do_set(size_t ndx, Mixed value)
 {
     ObjLink old_link;
@@ -431,7 +474,7 @@ void Lst<Mixed>::do_set(size_t ndx, Mixed value)
     }
 
     CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
-    bool recurse = replace_backlink(m_col_key, old_link, target_link, state);
+    bool recurse = Base::replace_backlink(m_col_key, old_link, target_link, state);
 
     m_tree->set(ndx, value);
 
@@ -444,7 +487,7 @@ void Lst<Mixed>::do_set(size_t ndx, Mixed value)
 void Lst<Mixed>::do_insert(size_t ndx, Mixed value)
 {
     if (value.is_type(type_TypedLink)) {
-        set_backlink(m_col_key, value.get<ObjLink>());
+        Base::set_backlink(m_col_key, value.get<ObjLink>());
     }
     m_tree->insert(ndx, value);
 }
@@ -456,7 +499,7 @@ void Lst<Mixed>::do_remove(size_t ndx)
 
         CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All
                                                                   : CascadeState::Mode::Strong);
-        bool recurse = remove_backlink(m_col_key, old_link, state);
+        bool recurse = Base::remove_backlink(m_col_key, old_link, state);
 
         m_tree->erase(ndx);
 
@@ -541,6 +584,74 @@ util::Optional<Mixed> Lst<Mixed>::avg(size_t* return_cnt) const
     return AverageHelper<Mixed>::not_found(return_cnt);
 }
 
+void Lst<Mixed>::to_json(std::ostream& out, size_t link_depth, JSONOutputMode output_mode,
+                         util::FunctionRef<void(const Mixed&)> fn) const
+{
+    auto [open_str, close_str] = get_open_close_strings(link_depth, output_mode);
+
+    out << open_str;
+    out << "[";
+
+    auto sz = size();
+    for (size_t i = 0; i < sz; i++) {
+        if (i > 0)
+            out << ",";
+        Mixed val = m_tree->get(i);
+        if (val.is_type(type_TypedLink)) {
+            fn(val);
+        }
+        else if (val.is_type(type_Dictionary)) {
+            DummyParent parent(this->get_table(), val.get_ref());
+            Dictionary dict(parent);
+            dict.to_json(out, link_depth, output_mode, fn);
+        }
+        else if (val.is_type(type_List)) {
+            DummyParent parent(this->get_table(), val.get_ref());
+            Lst<Mixed> list(parent);
+            list.to_json(out, link_depth, output_mode, fn);
+        }
+        else {
+            val.to_json(out, output_mode);
+        }
+    }
+
+    out << "]";
+    out << close_str;
+}
+
+ref_type Lst<Mixed>::get_collection_ref(Index index, CollectionType type) const
+{
+    auto ndx = m_tree->find_key(mpark::get<int64_t>(index));
+    if (ndx != realm::not_found) {
+        auto val = get(ndx);
+        if (val.is_null() || !val.is_type(DataType(int(type)))) {
+            throw IllegalOperation("Not proper collection type");
+        }
+        return val.get_ref();
+    }
+
+    return 0;
+}
+
+void Lst<Mixed>::set_collection_ref(Index index, ref_type ref, CollectionType type)
+{
+    auto ndx = m_tree->find_key(mpark::get<int64_t>(index));
+    if (ndx == realm::not_found) {
+        throw StaleAccessor("Collection has been deleted");
+    }
+    set(ndx, Mixed(ref, type));
+}
+
+bool Lst<Mixed>::update_if_needed() const
+{
+    auto status = update_if_needed_with_status();
+    if (status == UpdateStatus::Detached) {
+        throw StaleAccessor("CollectionList no longer exists");
+    }
+    return status == UpdateStatus::Updated;
+}
+
+/********************************** LnkLst ***********************************/
 
 Obj LnkLst::create_and_insert_linked_object(size_t ndx)
 {

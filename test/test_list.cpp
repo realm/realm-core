@@ -790,9 +790,11 @@ TEST(List_Nested_InMixed)
     list->add(8);
     list->add(9);
     tr->verify();
-    std::stringstream ss;
-    tr->to_json(ss, 0, nullptr, JSONOutputMode::output_mode_xjson_plus);
-    auto j = nlohmann::json::parse(ss.str());
+    {
+        std::stringstream ss;
+        tr->to_json(ss, 0, nullptr, JSONOutputMode::output_mode_xjson_plus);
+        auto j = nlohmann::json::parse(ss.str());
+    }
     // std::cout << std::setw(2) << j << std::endl;
     tr->commit_and_continue_as_read();
     /*
@@ -825,9 +827,44 @@ TEST(List_Nested_InMixed)
     auto list2 = obj.set_list_ptr(col_any);
     CHECK(list2->is_empty());
     list2->add("Hello");
+    dict2 = list2->insert_dictionary(0);
+    dict2->insert("Six", 6);
+    dict2->insert("Seven", 7);
+    dict2 = list2->insert_dictionary(2);
+    dict2->insert("Hello", "World");
+    dict2->insert("Date", Timestamp(std::chrono::system_clock::now()));
+    {
+        std::stringstream ss;
+        tr->to_json(ss, 0, nullptr, JSONOutputMode::output_mode_xjson_plus);
+        auto j = nlohmann::json::parse(ss.str());
+        std::cout << std::setw(2) << j << std::endl;
+    }
     tr->verify();
     tr->commit_and_continue_as_read();
-    CHECK_EQUAL(list2->get(0), Mixed("Hello"));
+    /*
+    {
+      "table": [
+        {
+          "_key": 0,
+          "something": [
+            {
+              "Seven": 7,
+              "Six": 6
+            },
+            "Hello",
+            {
+              "Date": "2023-05-09 07:52:49",
+              "Hello": "World"
+            }
+          ]
+        }
+      ]
+    }
+    */
+    CHECK_EQUAL(list2->get(1), Mixed("Hello"));
+    tr->promote_to_write();
+    list2->remove(1);
+    CHECK_EQUAL(dict2->get("Hello"), Mixed("World"));
 }
 
 TEST(List_NestedList_Remove)

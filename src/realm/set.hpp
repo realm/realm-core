@@ -144,7 +144,7 @@ public:
     util::Optional<Mixed> max(size_t* return_ndx = nullptr) const final;
     util::Optional<Mixed> sum(size_t* return_cnt = nullptr) const final;
     util::Optional<Mixed> avg(size_t* return_cnt = nullptr) const final;
-    std::unique_ptr<CollectionBase> clone_collection() const final
+    CollectionBasePtr clone_collection() const final
     {
         return std::make_unique<Set<T>>(*this);
     }

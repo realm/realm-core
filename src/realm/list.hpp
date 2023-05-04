@@ -289,7 +289,7 @@ private:
 };
 
 template <>
-class Lst<Mixed> final : public CollectionBaseImpl<LstBase> {
+class Lst<Mixed> final : public CollectionBaseImpl<LstBase>, public CollectionParent {
 public:
     using Base = CollectionBaseImpl<LstBase>;
     using iterator = LstIterator<Mixed>;
@@ -301,8 +301,9 @@ public:
     {
         this->set_owner(owner, col_key);
     }
-    Lst(ColKey col_key)
+    Lst(ColKey col_key, size_t level = 1)
         : Base(col_key)
+        , CollectionParent(level)
     {
         check_column_type<Mixed>(m_col_key);
     }
@@ -312,6 +313,7 @@ public:
     }
     Lst(const Lst& other)
         : Base(other)
+        , CollectionParent(other.get_level())
     {
     }
     Lst(Lst&&) noexcept;
@@ -337,6 +339,11 @@ public:
 
     void insert(size_t ndx, Mixed value);
     Mixed remove(size_t ndx);
+
+    DictionaryPtr insert_dictionary(size_t ndx);
+    DictionaryPtr get_dictionary(size_t ndx) const;
+    std::shared_ptr<Lst<Mixed>> insert_list(size_t ndx);
+    std::shared_ptr<Lst<Mixed>> get_list(size_t ndx) const;
 
     // Overriding members of CollectionBase:
     size_t size() const final
@@ -462,10 +469,73 @@ public:
         return update_if_needed_with_status() != UpdateStatus::Detached;
     }
 
-protected:
-    // Friend because it needs access to `m_tree` in the implementation of
-    // `ObjCollectionBase::get_mutable_tree()`.
-    friend class LnkLst;
+    // Overriding members in CollectionParent
+    TableRef get_table() const noexcept override
+    {
+        return get_obj().get_table();
+    }
+    bool update_if_needed() const override;
+    const Obj& get_object() const noexcept override
+    {
+        return get_obj();
+    }
+    ref_type get_collection_ref(Index, CollectionType) const override;
+    void set_collection_ref(Index, ref_type ref, CollectionType) override;
+
+    void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
+
+private:
+    class BPlusTreeMixed : public BPlusTree<Mixed> {
+    public:
+        BPlusTreeMixed(Allocator& alloc)
+            : BPlusTree<Mixed>(alloc)
+        {
+        }
+
+        void ensure_keys()
+        {
+            auto func = [&](BPlusTreeNode* node, size_t) {
+                return static_cast<LeafNode*>(node)->ensure_keys() ? IteratorControl::Stop
+                                                                   : IteratorControl::AdvanceToNext;
+            };
+
+            m_root->bptree_traverse(func);
+        }
+        size_t find_key(int64_t key) const noexcept
+        {
+            size_t ret = realm::npos;
+            auto func = [&](BPlusTreeNode* node, size_t) {
+                LeafNode* leaf = static_cast<LeafNode*>(node);
+                ret = leaf->find_key(key);
+                return ret == realm::not_found ? IteratorControl::AdvanceToNext : IteratorControl::Stop;
+            };
+
+            m_root->bptree_traverse(func);
+            return ret;
+        }
+
+        void set_key(size_t ndx, int64_t key) const noexcept
+        {
+            auto func = [key](BPlusTreeNode* node, size_t ndx) {
+                LeafNode* leaf = static_cast<LeafNode*>(node);
+                leaf->set_key(ndx, key);
+            };
+
+            m_root->bptree_access(ndx, func);
+        }
+
+        int64_t get_key(size_t ndx) const noexcept
+        {
+            size_t ret = 0;
+            auto func = [&ret](BPlusTreeNode* node, size_t ndx) {
+                LeafNode* leaf = static_cast<LeafNode*>(node);
+                ret = leaf->get_key(ndx);
+            };
+
+            m_root->bptree_access(ndx, func);
+            return ret;
+        }
+    };
 
     // `do_` methods here perform the action after preconditions have been
     // checked (bounds check, writability, etc.).
@@ -475,7 +545,7 @@ protected:
 
     // BPlusTree must be wrapped in an `std::unique_ptr` because it is not
     // default-constructible, due to its `Allocator&` member.
-    mutable std::unique_ptr<BPlusTree<Mixed>> m_tree;
+    mutable std::unique_ptr<BPlusTreeMixed> m_tree;
 
     using Base::bump_content_version;
     using Base::get_alloc;
@@ -485,7 +555,7 @@ protected:
     bool init_from_parent(bool allow_create) const
     {
         if (!m_tree) {
-            m_tree.reset(new BPlusTree<Mixed>(get_alloc()));
+            m_tree.reset(new BPlusTreeMixed(get_alloc()));
             const ArrayParent* parent = this;
             m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
         }
@@ -623,7 +693,7 @@ public:
     util::Optional<Mixed> max(size_t* return_ndx = nullptr) const final;
     util::Optional<Mixed> sum(size_t* return_cnt = nullptr) const final;
     util::Optional<Mixed> avg(size_t* return_cnt = nullptr) const final;
-    std::unique_ptr<CollectionBase> clone_collection() const final;
+    CollectionBasePtr clone_collection() const final;
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
     const Obj& get_obj() const noexcept final;
@@ -635,7 +705,7 @@ public:
     }
 
     // Overriding members of LstBase:
-    std::unique_ptr<LstBase> clone() const override
+    LstBasePtr clone() const override
     {
         return clone_linklist();
     }
@@ -1182,7 +1252,7 @@ inline util::Optional<Mixed> LnkLst::avg(size_t* return_cnt) const
     REALM_TERMINATE("Not implemented yet");
 }
 
-inline std::unique_ptr<CollectionBase> LnkLst::clone_collection() const
+inline CollectionBasePtr LnkLst::clone_collection() const
 {
     return clone_linklist();
 }
