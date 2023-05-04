@@ -507,10 +507,10 @@ bool RecoverLocalChangesetsHandler::resolve_path(ListPath& path, Obj remote_obj,
         ColKey col = it->col_key;
         REALM_ASSERT(col);
         if (col.is_list()) {
-            std::unique_ptr<LstBase> remote_list = get_list_from_path(remote_obj, col);
+            auto remote_list = get_list_from_path(remote_obj, col);
             ColKey local_col = local_obj.get_table()->get_column_key(remote_obj.get_table()->get_column_name(col));
             REALM_ASSERT(local_col);
-            std::unique_ptr<LstBase> local_list = get_list_from_path(local_obj, local_col);
+            auto local_list = get_list_from_path(local_obj, local_col);
             ++it;
             if (it == path.end()) {
                 callback(*remote_list, *local_list);

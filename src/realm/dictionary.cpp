@@ -47,8 +47,9 @@ void validate_key_value(const Mixed& key)
 
 /******************************** Dictionary *********************************/
 
-Dictionary::Dictionary(ColKey col_key)
+Dictionary::Dictionary(ColKey col_key, size_t level)
     : Base(col_key)
+    , CollectionParent(level)
 {
     if (!(col_key.is_dictionary() || col_key.get_type() == col_type_Mixed)) {
         throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a dictionary");
@@ -435,7 +436,7 @@ DictionaryPtr Dictionary::get_dictionary(StringData key) const
     auto weak = const_cast<Dictionary*>(this)->weak_from_this();
     REALM_ASSERT(!weak.expired());
     auto shared = weak.lock();
-    DictionaryPtr ret = std::make_shared<Dictionary>(m_col_key);
+    DictionaryPtr ret = std::make_shared<Dictionary>(m_col_key, get_level() + 1);
     ret->set_owner(shared, key);
     return ret;
 }
@@ -451,7 +452,7 @@ std::shared_ptr<Lst<Mixed>> Dictionary::get_list(StringData key) const
     auto weak = const_cast<Dictionary*>(this)->weak_from_this();
     REALM_ASSERT(!weak.expired());
     auto shared = weak.lock();
-    std::shared_ptr<Lst<Mixed>> ret = std::make_shared<Lst<Mixed>>(m_col_key);
+    std::shared_ptr<Lst<Mixed>> ret = std::make_shared<Lst<Mixed>>(m_col_key, get_level() + 1);
     ret->set_owner(shared, key);
     return ret;
 }

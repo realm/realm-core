@@ -46,7 +46,7 @@ public:
     ~Dictionary();
 
     Dictionary(const Obj& obj, ColKey col_key)
-        : Dictionary(col_key)
+        : Dictionary(col_key, 1)
     {
         this->set_owner(obj, col_key);
     }
@@ -54,7 +54,7 @@ public:
         : Base(parent)
     {
     }
-    Dictionary(ColKey col_key);
+    Dictionary(ColKey col_key, size_t level = 1);
     Dictionary(const Dictionary& other)
         : Base(static_cast<const Base&>(other))
         , CollectionParent(other.get_level())
@@ -71,7 +71,7 @@ public:
     Mixed get_key(size_t ndx) const;
 
     // Overriding members of CollectionBase:
-    std::unique_ptr<CollectionBase> clone_collection() const final;
+    CollectionBasePtr clone_collection() const final;
     size_t size() const final;
     bool is_null(size_t ndx) const final;
     Mixed get_any(size_t ndx) const final;
@@ -386,7 +386,7 @@ public:
     {
         return m_source.avg(return_cnt);
     }
-    std::unique_ptr<CollectionBase> clone_collection() const final
+    CollectionBasePtr clone_collection() const final
     {
         return std::make_unique<DictionaryLinkValues>(m_source);
     }
@@ -459,7 +459,7 @@ inline std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, const
     return insert(key, Mixed(obj.get_link()));
 }
 
-inline std::unique_ptr<CollectionBase> Dictionary::clone_collection() const
+inline CollectionBasePtr Dictionary::clone_collection() const
 {
     return std::make_unique<Dictionary>(m_obj_mem, this->get_col_key());
 }

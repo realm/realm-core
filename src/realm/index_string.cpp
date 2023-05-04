@@ -367,7 +367,8 @@ int32_t select_from_mask(int32_t a, int32_t b, int32_t mask) {
 // Permutation 8  = "aBCD"
 // Permutation 15 = "abcd"
 using key_type = StringIndex::key_type;
-key_type generate_key(key_type upper, key_type lower, int permutation) {
+static key_type generate_key(key_type upper, key_type lower, int permutation)
+{
     return select_from_mask(upper, lower, replicate_4_lsb_x8(permutation));
 }
 

@@ -250,7 +250,7 @@ public:
 
     template <typename U>
     Lst<U> get_list(ColKey col_key) const;
-    LstPtr<Mixed> set_list_ptr(ColKey col_key);
+    std::shared_ptr<Lst<Mixed>> set_list_ptr(ColKey col_key);
     template <typename U>
     LstPtr<U> get_list_ptr(ColKey col_key) const;
     template <typename U>
