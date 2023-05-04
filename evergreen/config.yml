@@ -205,7 +205,15 @@ functions:
           export TSAN_OPTIONS="suppressions=$(pwd)/test/tsan.suppress"
 
           cd build
-          $CTEST -C ${cmake_build_type|Debug} $TEST_FLAGS
+          if ! $CTEST -C ${cmake_build_type|Debug} $TEST_FLAGS; then
+            BAAS_PID=$(pgrep baas_server)
+            if [[ -n "$BAAS_PID" ]]; then
+              echo "Dumping baas to log file"
+              kill -3 $BAAS_PID
+              sleep 15
+            fi
+            exit 1
+          fi
 
   "upload test results":
   - command: attach.results
@@ -630,7 +638,7 @@ tasks:
                 export DEVELOPER_DIR="${xcode_developer_dir}"
             fi
 
-            ./evergreen/install_baas.sh -w ./baas-work-dir -b 4da4c3b3e9083ea834522bdf67a2e129fd701d86 2>&1 | tee install_baas_output.log
+            ./evergreen/install_baas.sh -w ./baas-work-dir -b 437b21ea4994bd5134abad87896d0fcc65b4b61c 2>&1 | tee install_baas_output.log
         fi
 
   - command: shell.exec
