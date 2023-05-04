@@ -22,6 +22,7 @@
 #include <realm.hpp>
 #include <realm/index_string.hpp>
 #include <realm/query_expression.hpp>
+#include <realm/tokenizer.hpp>
 #include <realm/util/to_string.hpp>
 #include <set>
 #include "test.hpp"
@@ -249,6 +250,38 @@ using nullable = std::true_type;
 using non_nullable = std::false_type;
 
 } // anonymous namespace
+
+TEST(Tokenizer_Basic)
+{
+    auto tok = realm::Tokenizer::get_instance();
+
+    tok->reset("to be or not to be");
+    auto tokens = tok->get_all_tokens();
+    CHECK_EQUAL(tokens.size(), 4);
+
+    tok->reset("To be or not to be");
+    realm::TokenInfoMap info = tok->get_token_info();
+    CHECK_EQUAL(info.size(), 4);
+    realm::TokenInfo& i(info["to"]);
+    CHECK_EQUAL(i.positions.size(), 2);
+    CHECK_EQUAL(i.positions[0], 0);
+    CHECK_EQUAL(i.positions[1], 4);
+    CHECK_EQUAL(i.ranges.size(), 2);
+    CHECK_EQUAL(i.ranges[0].first, 0);
+    CHECK_EQUAL(i.ranges[0].second, 2);
+    CHECK_EQUAL(i.ranges[1].first, 13);
+    CHECK_EQUAL(i.ranges[1].second, 15);
+
+    tok->reset("Jeg gik mig over sø og land");
+    info = tok->get_token_info();
+    CHECK_EQUAL(info.size(), 7);
+    realm::TokenInfo& j(info["sø"]);
+    CHECK_EQUAL(j.ranges[0].first, 17);
+    CHECK_EQUAL(j.ranges[0].second, 20);
+
+    tok->reset("with-hyphen -term -other-term-plus");
+    CHECK(tok->get_all_tokens() == std::set<std::string>({"with", "hyphen", "term", "other", "plus"}));
+}
 
 TEST(StringIndex_NonIndexable)
 {

@@ -2,14 +2,15 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* New notifiers can now be registered in write transactions until changes have actually been made in the write transaction. This makes it so that new notifications can be registered inside change notifications triggered by beginning a write transaction (unless a previous callback performed writes).
+* Expose `Results::get_query()` in the C-API. (PR [#6568](https://github.com/realm/realm-core/pull/6568))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Exclusion of words in a full text search does not work ([#6512](https://github.com/realm/realm-core/issues/6512), since v13.0.0 );
 
 ### Breaking changes
-* None.
+* Add `service_name` parameter to `realm_app_call_function` (PR [#6394](https://github.com/realm/realm-core/pull/6394)).
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
@@ -17,7 +18,8 @@
 -----------
 
 ### Internals
-* None.
+* Reduce the memory footprint of an automatic (discard or recover) client reset when there are large incoming changes from the server. ([#6567](https://github.com/realm/realm-core/issues/6567))
+* `get_committed_file_format_version()` safe access to mappings vector from multiple threads.
 
 ----------------------------------------------
 

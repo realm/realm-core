@@ -21,11 +21,32 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
+#include <map>
 #include <set>
 #include <memory>
 #include <optional>
 
 namespace realm {
+
+using TokenRange = std::pair<unsigned, unsigned>;
+using TokenRanges = std::vector<TokenRange>;
+using TokenPositions = std::vector<unsigned>;
+
+struct TokenInfo {
+    TokenInfo() = default;
+    explicit TokenInfo(unsigned position, TokenRange pos)
+    {
+        positions.emplace_back(position);
+        ranges.emplace_back(pos);
+    }
+    double weight = 1.;
+    double frequency = 1.;
+    TokenPositions positions;
+    TokenRanges ranges;
+};
+
+using TokenInfoMap = std::map<std::string, TokenInfo>;
 
 class Tokenizer {
 public:
@@ -39,6 +60,7 @@ public:
         return {m_buffer, m_size};
     }
     std::set<std::string> get_all_tokens();
+    TokenInfoMap get_token_info();
 
     static std::unique_ptr<Tokenizer> get_instance();
 
@@ -48,9 +70,17 @@ protected:
     const char* m_cur_pos = nullptr;
     const char* m_end_pos = nullptr;
     size_t m_size = 0;
+    unsigned m_start = 0;
+    unsigned m_end = 0;
+
     // Words longer than 64 chars will be truncated
     static constexpr int s_buffer_size = 64;
     char m_buffer[s_buffer_size];
+
+    TokenRange get_range()
+    {
+        return {m_start, m_end};
+    }
 };
 
 } // namespace realm
