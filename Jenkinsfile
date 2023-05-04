@@ -784,7 +784,7 @@ def doBuildEmscripten(String buildType) {
         rlmNode('docker') {
             getArchive()
 
-            docker.image('emscripten/emsdk:3.1.31').inside {
+            docker.image('emscripten/emsdk:3.1.37').inside {
                 dir('build') {
                     sh "emcmake cmake .. -DCMAKE_BUILD_TYPE=${buildType}"
 
