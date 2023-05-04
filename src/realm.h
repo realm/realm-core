@@ -2576,7 +2576,7 @@ RLM_API realm_object_t* realm_results_get_object(realm_results_t*, size_t index)
 
 /**
  * Return the query associated to the results passed as argument.
- * 
+ *
  * @param results the ptr to a valid results object.
  * @return a valid ptr to realm_query_t if no error has occured
  */
