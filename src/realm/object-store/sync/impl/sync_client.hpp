@@ -47,7 +47,7 @@ struct SyncClient {
             if (config.socket_provider) {
                 return config.socket_provider;
             }
-#ifdef __EMSCRIPTEN
+#ifdef __EMSCRIPTEN__
             return std::make_shared<EmscriptenSocketProvider>();
 #else
             auto user_agent = util::format("RealmSync/%1 (%2) %3 %4", REALM_VERSION_STRING, util::get_platform_info(),

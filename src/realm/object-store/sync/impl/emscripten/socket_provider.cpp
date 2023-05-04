@@ -97,11 +97,17 @@ public:
         check_result(emscripten_websocket_send_binary(m_socket, const_cast<char*>(data.data()), data.size()));
 
         // If the buffered amount is small enough we can just run the handler right away.
-        unsigned long long buffered_amount;
+        size_t buffered_amount;
         check_result(emscripten_websocket_get_buffered_amount(m_socket, &buffered_amount));
-        constexpr unsigned long long blocking_send_threshold = 65536;
+        constexpr size_t blocking_send_threshold = 65536;
         if (buffered_amount < blocking_send_threshold) {
-            handler(Status::OK());
+            emscripten_set_timeout(
+                [](void* user_data) {
+                    std::unique_ptr<SyncSocketProvider::FunctionHandler> handler(
+                        reinterpret_cast<SyncSocketProvider::FunctionHandler*>(user_data));
+                    (*handler)(Status::OK());
+                },
+                0, new SyncSocketProvider::FunctionHandler(std::move(handler)));
         }
         else {
             // Otherwise we start polling the buffer in a recursive timeout (see sending_poll_check below).
@@ -131,7 +137,7 @@ private:
     {
         std::unique_ptr<PollCheckState> state(reinterpret_cast<PollCheckState*>(user_data));
 
-        unsigned long long buffered_amount;
+        size_t buffered_amount;
         check_result(emscripten_websocket_get_buffered_amount(state->socket, &buffered_amount));
         if (buffered_amount == 0) {
             state->handler(Status::OK());
