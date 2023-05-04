@@ -78,10 +78,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
     // away immediately after anyways. This reduces the memory footprint of a client reset.
     ClientReplication* client_repl = dynamic_cast<ClientReplication*>(group_dst.get_replication());
     REALM_ASSERT_RELEASE(client_repl);
-    client_repl->set_short_circuit(true);
-    util::ScopeExit sync_history_guard([client_repl]() noexcept {
-        client_repl->set_short_circuit(false);
-    });
+    TempShortCircuitReplication sync_history_guard(*client_repl);
 
     // Find all tables in dst that should be removed.
     std::set<std::string> tables_to_remove;
