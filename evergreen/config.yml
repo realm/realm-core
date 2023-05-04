@@ -100,7 +100,7 @@ functions:
           if [ -n "${enable_llvm_coverage|}" ]; then
               set_cmake_var realm_vars REALM_LLVM_COVERAGE BOOL On
           fi
-           
+
           if [ -n "${enable_sync_multiplexing|}" ]; then
               set_cmake_var realm_vars REALM_ENABLE_SYNC_MULTIPLEXING BOOL On
           fi
