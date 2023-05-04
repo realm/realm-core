@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Reduce the memory footprint of an automatic (discard or recover) client reset when there are large incoming changes from the server. ([#6567](https://github.com/realm/realm-core/issues/6567))
 
 ----------------------------------------------
 
