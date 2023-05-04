@@ -615,12 +615,6 @@ void Connection::initiate_reconnect_wait()
     if (m_reconnect_info.get_scheduled_reset()) {
         m_reconnect_info.reset();
     }
-    auto cb = [this](Status status) {
-        // If the operation is aborted, the connection object may have been
-        // destroyed.
-        if (status != ErrorCodes::OperationAborted)
-            handle_reconnect_wait(status); // Throws
-    };
 
     m_reconnect_delay_in_progress = true;
     auto delay = m_reconnect_info.delay_interval();
@@ -642,7 +636,12 @@ void Connection::initiate_reconnect_wait()
     // We create a timer for the reconnect_disconnect timer even if the delay is zero because
     // we need it to be cancelable in case the connection is terminated before the timer
     // callback is run.
-    m_reconnect_disconnect_timer = m_client.create_timer(delay, std::move(cb)); // Throws
+    m_reconnect_disconnect_timer = m_client.create_timer(delay, [this](Status status) {
+        // If the operation is aborted, the connection object may have been
+        // destroyed.
+        if (status != ErrorCodes::OperationAborted)
+            handle_reconnect_wait(status); // Throws
+    }); // Throws
 }
 
 
