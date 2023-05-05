@@ -100,7 +100,7 @@ functions:
           if [ -n "${enable_llvm_coverage|}" ]; then
               set_cmake_var realm_vars REALM_LLVM_COVERAGE BOOL On
           fi
-           
+
           if [ -n "${enable_sync_multiplexing|}" ]; then
               set_cmake_var realm_vars REALM_ENABLE_SYNC_MULTIPLEXING BOOL On
           fi
@@ -229,7 +229,15 @@ functions:
           export TSAN_OPTIONS="suppressions=$(pwd)/test/tsan.suppress"
 
           cd build
-          $CTEST -C ${cmake_build_type|Debug} $TEST_FLAGS
+          if ! $CTEST -C ${cmake_build_type|Debug} $TEST_FLAGS; then
+            BAAS_PID=$(pgrep baas_server)
+            if [[ -n "$BAAS_PID" ]]; then
+              echo "Dumping baas to log file"
+              kill -3 $BAAS_PID
+              sleep 15
+            fi
+            exit 1
+          fi
 
   "upload test results":
   - command: attach.results
@@ -659,7 +667,7 @@ tasks:
                 export DEVELOPER_DIR="${xcode_developer_dir}"
             fi
 
-            ./evergreen/install_baas.sh -w ./baas-work-dir -b 4da4c3b3e9083ea834522bdf67a2e129fd701d86 2>&1 | tee install_baas_output.log
+            ./evergreen/install_baas.sh -w ./baas-work-dir -b 773fd0e93fb569b0b4304bb4ca9401f33351e0f1 2>&1 | tee install_baas_output.log
         fi
 
   - command: shell.exec
