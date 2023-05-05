@@ -267,11 +267,10 @@ std::string SerialisationState::get_column_name(ConstTableRef table, ColKey col_
     if (col_type == col_type_BackLink) {
         const Table::BacklinkOrigin origin = table->find_backlink_origin(col_key);
         REALM_ASSERT(origin);
-        std::string source_table_name = origin->first->get_class_name();
+        StringData source_table_name = origin->first->get_class_name();
         std::string source_col_name = get_column_name(origin->first, origin->second);
 
-        return "@links" + util::serializer::value_separator + source_table_name + util::serializer::value_separator +
-               source_col_name;
+        return format("@links.%1.%2", source_table_name, source_col_name);
     }
     else if (col_key != ColKey()) {
         std::string col_name = table->get_column_name(col_key);
