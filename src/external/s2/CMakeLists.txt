@@ -83,6 +83,7 @@ target_include_directories(s2geometry PRIVATE "." "..")
 target_compile_options(s2geometry PRIVATE
     $<$<CXX_COMPILER_ID:MSVC>: /wd4068 /wd4244 /wd4267 /wd4305>
 )
+set_target_properties(s2geometry PROPERTIES CXX_VISIBILITY_PRESET hidden)
 if (NOT MSVC)
     set(CMAKE_REQUIRED_QUIET ON)
     add_target_option_if_supported(s2geometry PRIVATE
