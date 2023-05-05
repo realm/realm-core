@@ -136,7 +136,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     auto create_object = [&](int value, bool with_links = false) {
         Obj obj = table->create_object();
         obj.set(value_col, value);
-        auto object_link_view = obj.get_linklist_ptr(object_link_col);
+        std::shared_ptr<LnkLst> object_link_view = obj.get_linklist_ptr(object_link_col);
 
         auto int_list = List(realm, obj, int_list_col);
         object_store::Dictionary int_dict(realm, obj, int_dict_col);
