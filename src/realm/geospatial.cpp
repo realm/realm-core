@@ -213,7 +213,53 @@ void Geospatial::assign_to(Obj& link) const
     }
 }
 
-std::unique_ptr<S2Region> Geospatial::get_region() const
+static std::string point_str(const GeoPoint& point)
+{
+    if (point.has_altitude()) {
+        return util::format("[%1, %2, %3]", point.longitude, point.latitude, point.altitude);
+    }
+    return util::format("[%1, %2]", point.longitude, point.latitude);
+}
+
+std::string Geospatial::to_string() const
+{
+    return mpark::visit(
+        util::overload{[](const GeoPoint& point) {
+                           return util::format("GeoPoint(%1)", point_str(point));
+                       },
+                       [](const GeoBox& box) {
+                           return util::format("GeoBox(%1, %2)", point_str(box.lo), point_str(box.hi));
+                       },
+                       [](const GeoPolygon& poly) {
+                           std::string points = "";
+                           for (size_t i = 0; i < poly.points.size(); ++i) {
+                               if (i != 0) {
+                                   points += ", ";
+                               }
+                               points += "{";
+                               for (size_t j = 0; j < poly.points[i].size(); ++j) {
+                                   points += util::format("%1%2", j == 0 ? "" : ", ", point_str(poly.points[i][j]));
+                               }
+                               points += "}";
+                           }
+                           return util::format("GeoPolygon(%1)", points);
+                       },
+                       [](const GeoCenterSphere& sphere) {
+                           return util::format("GeoSphere(%1, %2)", point_str(sphere.center), sphere.radius_radians);
+                       },
+                       [](const mpark::monostate&) {
+                           return std::string("NULL");
+                       }},
+        m_value);
+}
+
+std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo)
+{
+    ostr << geo.to_string();
+    return ostr;
+}
+
+GeoRegion::GeoRegion(const Geospatial& geo)
 {
     struct Visitor {
         std::unique_ptr<S2Region> operator()(const GeoBox& box) const
@@ -259,63 +305,15 @@ std::unique_ptr<S2Region> Geospatial::get_region() const
         }
     };
 
-    return mpark::visit(Visitor(), m_value);
+    m_region = mpark::visit(Visitor(), geo.m_value);
 }
 
-bool Geospatial::is_within(const Geospatial& geometry) const noexcept
-{
-    REALM_ASSERT(get_type() == Geospatial::Type::Point);
+GeoRegion::~GeoRegion() = default;
 
-    auto&& geo_point = mpark::get<GeoPoint>(m_value);
+bool GeoRegion::contains(const GeoPoint& geo_point) const noexcept
+{
     auto point = S2LatLng::FromDegrees(geo_point.latitude, geo_point.longitude).ToPoint();
-
-    return geometry.get_region()->VirtualContainsPoint(point);
-}
-
-static std::string point_str(const GeoPoint& point)
-{
-    if (point.has_altitude()) {
-        return util::format("[%1, %2, %3]", point.longitude, point.latitude, point.altitude);
-    }
-    return util::format("[%1, %2]", point.longitude, point.latitude);
-}
-
-std::string Geospatial::to_string() const
-{
-    return mpark::visit(
-        util::overload{[](const GeoPoint& point) {
-                           return util::format("GeoPoint(%1)", point_str(point));
-                       },
-                       [](const GeoBox& box) {
-                           return util::format("GeoBox(%1, %2)", point_str(box.lo), point_str(box.hi));
-                       },
-                       [](const GeoPolygon& poly) {
-                           std::string points = "";
-                           for (size_t i = 0; i < poly.points.size(); ++i) {
-                               if (i != 0) {
-                                   points += ", ";
-                               }
-                               points += "{";
-                               for (size_t j = 0; j < poly.points[i].size(); ++j) {
-                                   points += util::format("%1%2", j == 0 ? "" : ", ", point_str(poly.points[i][j]));
-                               }
-                               points += "}";
-                           }
-                           return util::format("GeoPolygon(%1)", points);
-                       },
-                       [](const GeoCenterSphere& sphere) {
-                           return util::format("GeoSphere(%1, %2)", point_str(sphere.center), sphere.radius_radians);
-                       },
-                       [](const mpark::monostate&) {
-                           return std::string("NULL");
-                       }},
-        m_value);
-}
-
-std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo)
-{
-    ostr << geo.to_string();
-    return ostr;
+    return m_region->VirtualContainsPoint(point);
 }
 
 } // namespace realm

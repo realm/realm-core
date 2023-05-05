@@ -234,7 +234,18 @@ private:
     // Must be in the same order as the Type enum
     mpark::variant<mpark::monostate, GeoPoint, GeoBox, GeoPolygon, GeoCenterSphere> m_value;
 
-    std::unique_ptr<S2Region> get_region() const;
+    friend class GeoRegion;
+};
+
+class GeoRegion {
+public:
+    GeoRegion(const Geospatial& geo);
+    ~GeoRegion();
+
+    bool contains(const GeoPoint& point) const noexcept;
+
+private:
+    std::unique_ptr<S2Region> m_region;
 };
 
 template <>

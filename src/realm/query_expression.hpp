@@ -1475,83 +1475,12 @@ private:
 #endif
 
 // Classes used for LinkMap (see below).
-struct LinkMapFunction {
-    // Your consume() method is given key within the linked-to table as argument, and you must return whether or
-    // not you want the LinkMapFunction to exit (return false) or continue (return true) harvesting the link tree
-    // for the current main table object (it will be a link tree if you have multiple type_LinkList columns
-    // in a link()->link() query.
-    virtual bool consume(ObjKey) = 0;
-};
 
-struct FindNullLinks : public LinkMapFunction {
-    bool consume(ObjKey) override
-    {
-        m_has_link = true;
-        return false; // we've found a key, so this can't be a null-link, so exit link harvesting
-    }
+// Your function is given key within the linked-to table as argument, and you must return whether or not you want the
+// LinkMapFunction to exit (return false) or continue (return true) harvesting the link tree for the current main
+// table object (it will be a link tree if you have multiple type_LinkList columns in a link()->link() query.
 
-    bool m_has_link = false;
-};
-
-struct MakeLinkVector : public LinkMapFunction {
-    MakeLinkVector(std::vector<ObjKey>& result)
-        : m_links(result)
-    {
-    }
-
-    bool consume(ObjKey key) override
-    {
-        m_links.push_back(key);
-        return true; // continue evaluation
-    }
-    std::vector<ObjKey>& m_links;
-};
-
-struct UnaryLinkResult : public LinkMapFunction {
-    bool consume(ObjKey key) override
-    {
-        m_result = key;
-        return false; // exit search, only one result ever expected
-    }
-    ObjKey m_result;
-};
-
-struct CountLinks : public LinkMapFunction {
-    bool consume(ObjKey) override
-    {
-        m_link_count++;
-        return true;
-    }
-
-    size_t result() const
-    {
-        return m_link_count;
-    }
-
-    size_t m_link_count = 0;
-};
-
-struct CountBacklinks : public LinkMapFunction {
-    CountBacklinks(ConstTableRef t)
-        : m_table(t)
-    {
-    }
-
-    bool consume(ObjKey key) override
-    {
-        m_link_count += m_table.unchecked_ptr()->get_object(key).get_backlink_count();
-        return true;
-    }
-
-    size_t result() const
-    {
-        return m_link_count;
-    }
-
-    ConstTableRef m_table;
-    size_t m_link_count = 0;
-};
-
+using LinkMapFunction = util::FunctionRef<bool(ObjKey)>;
 
 /*
 The LinkMap and LinkMapFunction classes are used for query conditions on links themselves (contrary to conditions on
@@ -1637,9 +1566,12 @@ public:
     ObjKey get_unary_link_or_not_found(size_t index) const
     {
         REALM_ASSERT(m_only_unary_links);
-        UnaryLinkResult res;
-        map_links(index, res);
-        return res.m_result;
+        ObjKey result;
+        map_links(index, [&](ObjKey key) {
+            result = key;
+            return false; // exit search, only one result ever expected
+        });
+        return result;
     }
 
     std::vector<ObjKey> get_links(size_t index) const
@@ -1653,19 +1585,26 @@ public:
 
     size_t count_links(size_t row) const
     {
-        CountLinks counter;
-        map_links(row, counter);
-        return counter.result();
+        size_t count = 0;
+        map_links(row, [&](ObjKey) {
+            ++count;
+            return true;
+        });
+        return count;
     }
 
     size_t count_all_backlinks(size_t row) const
     {
-        CountBacklinks counter(get_target_table());
-        map_links(row, counter);
-        return counter.result();
+        size_t count = 0;
+        auto table = get_target_table().unchecked_ptr();
+        map_links(row, [&](ObjKey key) {
+            count += table->get_object(key).get_backlink_count();
+            return true;
+        });
+        return count;
     }
 
-    void map_links(size_t row, LinkMapFunction& lm) const
+    void map_links(size_t row, LinkMapFunction lm) const
     {
         map_links(0, row, lm);
     }
@@ -1694,13 +1633,15 @@ public:
     static ref_type get_ref(const ArrayPayload* array_payload, ColumnType type, size_t ndx);
 
 private:
-    void map_links(size_t column, ObjKey key, LinkMapFunction& lm) const;
-    void map_links(size_t column, size_t row, LinkMapFunction& lm) const;
+    void map_links(size_t column, ObjKey key, LinkMapFunction lm) const;
+    void map_links(size_t column, size_t row, LinkMapFunction lm) const;
 
     void get_links(size_t row, std::vector<ObjKey>& result) const
     {
-        MakeLinkVector mlv = MakeLinkVector(result);
-        map_links(row, mlv);
+        map_links(row, [&](ObjKey key) {
+            result.push_back(key);
+            return true; // continue evaluation
+        });
     }
 
     mutable std::vector<ColKey> m_link_column_keys;
@@ -2242,13 +2183,14 @@ public:
 
     size_t find_first(size_t start, size_t end) const override
     {
-        for (; start < end;) {
-            FindNullLinks fnl;
-            m_link_map.map_links(start, fnl);
-            if (fnl.m_has_link == has_links)
+        for (; start < end; ++start) {
+            bool found_link = false;
+            m_link_map.map_links(start, [&](ObjKey) {
+                found_link = true;
+                return false; // we've found a key, so this can't be a null-link, so exit link harvesting
+            });
+            if (found_link == has_links)
                 return start;
-
-            start++;
         }
 
         return not_found;
@@ -2450,32 +2392,19 @@ public:
         return m_link_map.get_base_table();
     }
 
-    struct GeoWithinConsumer : public LinkMapFunction {
-        GeoWithinConsumer(ConstTableRef table, ColKey type_col, ColKey coords_col, const Geospatial& bounds)
-            : m_table(table)
-            , m_type(type_col)
-            , m_coords(coords_col)
-            , m_bounds(bounds)
-        {
-        }
-        bool consume(ObjKey key) override
-        {
-            m_found = Geospatial::from_obj(m_table->get_object(key), m_type, m_coords).is_within(m_bounds);
-            return m_found;
-        }
-        ConstTableRef m_table;
-        ColKey m_type;
-        ColKey m_coords;
-        const Geospatial& m_bounds;
-        bool m_found = false;
-    };
-
     size_t find_first(size_t start, size_t end) const override
     {
-        GeoWithinConsumer consumer(m_link_map.get_target_table(), m_type_col, m_coords_col, m_bounds);
+        GeoRegion region(m_bounds);
+        bool found = false;
+        auto table = m_link_map.get_target_table();
+
         while (start < end) {
-            m_link_map.map_links(start, consumer);
-            if (consumer.m_found)
+            m_link_map.map_links(start, [&](ObjKey key) {
+                found = region.contains(
+                    Geospatial::from_obj(table->get_object(key), m_type_col, m_coords_col).get<GeoPoint>());
+                return found;
+            });
+            if (found)
                 return start;
             start++;
         }
@@ -2494,17 +2423,10 @@ public:
     }
 
 private:
-    GeoWithinCompare(const GeoWithinCompare& other)
-        : Expression(other)
-        , m_link_map(other.m_link_map)
-        , m_bounds(other.m_bounds)
-    {
-    }
-
-    mutable LinkMap m_link_map;
-    mutable Geospatial m_bounds;
-    mutable ColKey m_type_col;
-    mutable ColKey m_coords_col;
+    LinkMap m_link_map;
+    Geospatial m_bounds;
+    ColKey m_type_col;
+    ColKey m_coords_col;
 };
 #endif
 
