@@ -10,7 +10,6 @@ set(S2_SOURCES
     s1interval.cc
     s2cap.cc
     s2cell.cc
-    s2cellunion.cc
     s2edgeindex.cc
     s2edgeutil.cc
     s2latlngrect.cc
@@ -21,9 +20,6 @@ set(S2_SOURCES
     s2polyline.cc
     s2r2rect.cc
     s2region.cc
-    s2regioncoverer.cc
-    s2regionintersection.cc
-    s2regionunion.cc
 
     base/basictypes.h
     base/casts.h
