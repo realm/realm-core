@@ -537,10 +537,7 @@ public:
                         }
                     }
                 }
-                if (compare_left == Compare::None || compare_left == Compare::All) {
-                    return true;
-                }
-                return false;
+                return compare_left == Compare::None || compare_left == Compare::All;
             };
 
             for (size_t i = 0; i < right_size; i++) {
@@ -581,10 +578,7 @@ public:
                         }
                     }
                 }
-                if (compare_right == Compare::None || compare_right == Compare::All) {
-                    return true;
-                }
-                return false;
+                return compare_right == Compare::None || compare_right == Compare::All;
             };
 
             for (size_t i = 0; i < left_size; i++) {
@@ -4214,10 +4208,9 @@ private:
     Mixed m_const_value;
 };
 
-template <class TCond>
-class Compare : public Expression {
+class CompareBase : public Expression {
 public:
-    Compare(std::unique_ptr<Subexpr> left, std::unique_ptr<Subexpr> right)
+    CompareBase(std::unique_ptr<Subexpr> left, std::unique_ptr<Subexpr> right)
         : m_left(std::move(left))
         , m_right(std::move(right))
     {
@@ -4247,6 +4240,94 @@ public:
             m_right->set_cluster(cluster);
         }
     }
+
+    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
+    // and binds it to a Query at a later time
+    ConstTableRef get_base_table() const override
+    {
+        ConstTableRef l = m_left->get_base_table();
+        ConstTableRef r = m_right->get_base_table();
+
+        // All main tables in each subexpression of a query (table.columns() or table.link()) must be the same.
+        REALM_ASSERT(l == nullptr || r == nullptr || l == r);
+
+        // nullptr pointer means expression which isn't yet associated with any table, or is a Value<T>
+        return (l) ? l : r;
+    }
+
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_left->collect_dependencies(tables);
+        m_right->collect_dependencies(tables);
+    }
+
+    size_t find_first_with_matches(size_t start, size_t end) const
+    {
+        if (m_index_end == 0 || start >= end)
+            return not_found;
+
+        ObjKey first_key = m_cluster->get_real_key(start);
+        ObjKey actual_key;
+
+        // Sequential lookup optimization: when the query isn't constrained
+        // to a LnkLst we'll get find_first() requests in ascending order,
+        // so we can do a simple linear scan.
+        if (m_index_get < m_index_end && m_matches[m_index_get] <= first_key) {
+            actual_key = m_matches[m_index_get];
+            // skip through keys which are in "earlier" leafs than the one selected by start..end:
+            while (first_key > actual_key) {
+                m_index_get++;
+                if (m_index_get == m_index_end)
+                    return not_found;
+                actual_key = m_matches[m_index_get];
+            }
+        }
+        // Otherwise if we get requests out of order we have to do a more
+        // expensive binary search
+        else {
+            auto it = std::lower_bound(m_matches.begin(), m_matches.end(), first_key);
+            if (it == m_matches.end())
+                return not_found;
+            actual_key = *it;
+        }
+
+        // if actual key is bigger than last key, it is not in this leaf
+        ObjKey last_key = start + 1 == end ? first_key : m_cluster->get_real_key(end - 1);
+        if (actual_key > last_key)
+            return not_found;
+
+        // key is known to be in this leaf, so find key whithin leaf keys
+        return m_cluster->lower_bound_key(ObjKey(actual_key.value - m_cluster->get_offset()));
+    }
+
+protected:
+    CompareBase(const CompareBase& other)
+        : m_left(other.m_left->clone())
+        , m_right(other.m_right->clone())
+    {
+        if (m_left->has_constant_evaluation()) {
+            m_left_const_values = dynamic_cast<ValueBase*>(m_left.get());
+        }
+        if (m_right->has_constant_evaluation()) {
+            m_right_const_values = dynamic_cast<ValueBase*>(m_right.get());
+        }
+    }
+
+    std::unique_ptr<Subexpr> m_left;
+    std::unique_ptr<Subexpr> m_right;
+    const Cluster* m_cluster;
+    ValueBase* m_left_const_values = nullptr;
+    ValueBase* m_right_const_values = nullptr;
+    bool m_has_matches = false;
+    std::vector<ObjKey> m_matches;
+    mutable size_t m_index_get = 0;
+    size_t m_index_end = 0;
+};
+
+template <class TCond>
+class Compare : public CompareBase {
+public:
+    using CompareBase::CompareBase;
 
     double init() override
     {
@@ -4305,64 +4386,10 @@ public:
         return dT;
     }
 
-    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
-    // and binds it to a Query at a later time
-    ConstTableRef get_base_table() const override
-    {
-        ConstTableRef l = m_left->get_base_table();
-        ConstTableRef r = m_right->get_base_table();
-
-        // All main tables in each subexpression of a query (table.columns() or table.link()) must be the same.
-        REALM_ASSERT(l == nullptr || r == nullptr || l == r);
-
-        // nullptr pointer means expression which isn't yet associated with any table, or is a Value<T>
-        return (l) ? l : r;
-    }
-
-    void collect_dependencies(std::vector<TableKey>& tables) const override
-    {
-        m_left->collect_dependencies(tables);
-        m_right->collect_dependencies(tables);
-    }
-
     size_t find_first(size_t start, size_t end) const override
     {
         if (m_has_matches) {
-            if (m_index_end == 0 || start >= end)
-                return not_found;
-
-            ObjKey first_key = m_cluster->get_real_key(start);
-            ObjKey actual_key;
-
-            // Sequential lookup optimization: when the query isn't constrained
-            // to a LnkLst we'll get find_first() requests in ascending order,
-            // so we can do a simple linear scan.
-            if (m_index_get < m_index_end && m_matches[m_index_get] <= first_key) {
-                actual_key = m_matches[m_index_get];
-                // skip through keys which are in "earlier" leafs than the one selected by start..end:
-                while (first_key > actual_key) {
-                    m_index_get++;
-                    if (m_index_get == m_index_end)
-                        return not_found;
-                    actual_key = m_matches[m_index_get];
-                }
-            }
-            // Otherwise if we get requests out of order we have to do a more
-            // expensive binary search
-            else {
-                auto it = std::lower_bound(m_matches.begin(), m_matches.end(), first_key);
-                if (it == m_matches.end())
-                    return not_found;
-                actual_key = *it;
-            }
-
-            // if actual key is bigger than last key, it is not in this leaf
-            ObjKey last_key = start + 1 == end ? first_key : m_cluster->get_real_key(end - 1);
-            if (actual_key > last_key)
-                return not_found;
-
-            // key is known to be in this leaf, so find key whithin leaf keys
-            return m_cluster->lower_bound_key(ObjKey(actual_key.value - m_cluster->get_offset()));
+            return find_first_with_matches(start, end);
         }
 
         size_t match;
@@ -4383,7 +4410,7 @@ public:
             if (match != not_found && match + start < end)
                 return start + match;
 
-            size_t rows = (left->m_from_list || right->m_from_list) ? 1 : minimum(right->size(), left->size());
+            size_t rows = (left->m_from_list || right->m_from_list) ? 1 : std::min(right->size(), left->size());
             start += rows;
         }
 
@@ -4396,8 +4423,8 @@ public:
                                       Like, LikeIns>) {
             // these string conditions have the arguments reversed but the order is important
             // operations ==, and != can be reversed because the produce the same results both ways
-            return util::serializer::print_value(m_right->description(state) + " " + TCond::description() + " " +
-                                                 m_left->description(state));
+            return util::serializer::print_value(util::format("%1 %2 %3", m_right->description(state),
+                                                              TCond::description(), m_left->description(state)));
         }
         else {
             state.target_table = m_right->get_target_table();
@@ -4412,29 +4439,6 @@ public:
     {
         return std::unique_ptr<Expression>(new Compare(*this));
     }
-
-private:
-    Compare(const Compare& other)
-        : m_left(other.m_left->clone())
-        , m_right(other.m_right->clone())
-    {
-        if (m_left->has_constant_evaluation()) {
-            m_left_const_values = dynamic_cast<ValueBase*>(m_left.get());
-        }
-        if (m_right->has_constant_evaluation()) {
-            m_right_const_values = dynamic_cast<ValueBase*>(m_right.get());
-        }
-    }
-
-    std::unique_ptr<Subexpr> m_left;
-    std::unique_ptr<Subexpr> m_right;
-    const Cluster* m_cluster;
-    ValueBase* m_left_const_values = nullptr;
-    ValueBase* m_right_const_values = nullptr;
-    bool m_has_matches = false;
-    std::vector<ObjKey> m_matches;
-    mutable size_t m_index_get = 0;
-    size_t m_index_end = 0;
 };
 } // namespace realm
 #endif // REALM_QUERY_EXPRESSION_HPP
