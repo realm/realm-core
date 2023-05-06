@@ -20,7 +20,6 @@
 #include <realm/group.hpp>
 #include <realm/table.hpp>
 #include <realm/query.hpp>
-#include <realm/query_engine.hpp>
 
 using namespace realm;
 using namespace realm::metrics;

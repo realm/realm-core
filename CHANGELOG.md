@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Simplify the implementation of query expression nodes which have a btree leaf cache.
 
 ----------------------------------------------
 
