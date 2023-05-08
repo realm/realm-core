@@ -519,15 +519,8 @@ void RealmCoordinator::init_external_helpers()
         std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
         SyncSession::Internal::set_sync_transact_callback(*m_sync_session, [weak_self](VersionID, VersionID) {
             if (auto self = weak_self.lock()) {
-#ifndef __EMSCRIPTEN__
                 if (self->m_notifier)
                     self->m_notifier->notify_others();
-#else
-                // The Emscripten ExternalCommitHelper is a no-op right now.
-                // While we run in single-threaded WebAssembly we take the short-cut of calling on_change()
-                // directly because we know everything, including Sync, runs on the same thread.
-                self->on_change();
-#endif
             }
         });
     }

@@ -402,6 +402,7 @@ let package = Package(
                 "realm/object-store/impl/epoll",
                 "realm/object-store/impl/generic",
                 "realm/object-store/impl/windows",
+                "realm/object-store/impl/emscripten",
                 "realm/object-store/sync/impl/emscripten",
                 "realm/parser",
                 "realm/sync/CMakeLists.txt",

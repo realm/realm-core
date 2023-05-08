@@ -16,8 +16,6 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/db.hpp>
-
 namespace realm {
 struct RealmConfig;
 
@@ -26,10 +24,13 @@ class RealmCoordinator;
 
 class ExternalCommitHelper {
 public:
-    ExternalCommitHelper(RealmCoordinator&, const RealmConfig&) {}
+    ExternalCommitHelper(RealmCoordinator& parent, const RealmConfig&);
     ~ExternalCommitHelper() = default;
 
-    void notify_others() {}
+    void notify_others();
+
+private:
+    RealmCoordinator& m_parent;
 };
 
 } // namespace _impl
