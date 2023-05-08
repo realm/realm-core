@@ -92,10 +92,14 @@ set(CORE_TEST_SOURCES
     test_util_scope_exit.cpp
     test_util_to_string.cpp
     test_uuid.cpp
-    )
+)
 
 if (REALM_ENABLE_ENCRYPTION)
     list(APPEND CORE_TEST_SOURCES test_encrypted_file_mapping.cpp)
+endif()
+
+if (REALM_ENABLE_GEOSPATIAL)
+    list(APPEND CORE_TEST_SOURCES test_query_geo.cpp)
 endif()
 
 set(LARGE_TEST_SOURCES

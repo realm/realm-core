@@ -21,6 +21,7 @@
 
 #include <realm/sync/network/http.hpp>
 #include <realm/util/base64.hpp>
+#include <realm/util/flat_map.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/object-store/sync/app_utils.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
@@ -178,7 +179,7 @@ const static uint64_t default_timeout_ms = 60000;
 const static std::string username_password_provider_key = "local-userpass";
 const static std::string user_api_key_provider_key_path = "api_keys";
 const static int max_http_redirects = 20;
-static std::unordered_map<std::string, std::shared_ptr<App>> s_apps_cache;
+static util::FlatMap<std::string, util::FlatMap<std::string, SharedApp>> s_apps_cache; // app_id -> base_url -> app
 std::mutex s_apps_mutex;
 
 } // anonymous namespace
@@ -189,7 +190,7 @@ namespace app {
 SharedApp App::get_shared_app(const Config& config, const SyncClientConfig& sync_client_config)
 {
     std::lock_guard<std::mutex> lock(s_apps_mutex);
-    auto& app = s_apps_cache[config.app_id];
+    auto& app = s_apps_cache[config.app_id][config.base_url.value_or(default_base_url)];
     if (!app) {
         app = std::make_shared<App>(config);
         app->configure(sync_client_config);
@@ -204,11 +205,16 @@ SharedApp App::get_uncached_app(const Config& config, const SyncClientConfig& sy
     return app;
 }
 
-std::shared_ptr<App> App::get_cached_app(const std::string& app_id)
+SharedApp App::get_cached_app(const std::string& app_id, const std::optional<std::string>& base_url)
 {
     std::lock_guard<std::mutex> lock(s_apps_mutex);
     if (auto it = s_apps_cache.find(app_id); it != s_apps_cache.end()) {
-        return it->second;
+        const auto& apps_by_url = it->second;
+
+        auto app_it = base_url ? apps_by_url.find(*base_url) : apps_by_url.begin();
+        if (app_it != apps_by_url.end()) {
+            return app_it->second;
+        }
     }
 
     return nullptr;
@@ -223,8 +229,10 @@ void App::clear_cached_apps()
 void App::close_all_sync_sessions()
 {
     std::lock_guard<std::mutex> lock(s_apps_mutex);
-    for (auto& app : s_apps_cache) {
-        app.second->sync_manager()->close_all_sessions();
+    for (auto& apps_by_url : s_apps_cache) {
+        for (auto& app : apps_by_url.second) {
+            app.second->sync_manager()->close_all_sessions();
+        }
     }
 }
 

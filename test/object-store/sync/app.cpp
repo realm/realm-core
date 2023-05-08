@@ -321,14 +321,14 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     }
 
     SECTION("retry custom confirmation for invalid user fails") {
-        client.retry_custom_confirmation(
-            util::format("%1@%2.com", random_string(5), random_string(5)), [&](Optional<AppError> error) {
-                REQUIRE(error);
-                CHECK(error->reason() == "user not found");
-                CHECK(error->is_service_error());
-                CHECK(error->code() == ErrorCodes::UserNotFound);
-                processed = true;
-            });
+        client.retry_custom_confirmation(util::format("%1@%2.com", random_string(5), random_string(5)),
+                                         [&](Optional<AppError> error) {
+                                             REQUIRE(error);
+                                             CHECK(error->reason() == "user not found");
+                                             CHECK(error->is_service_error());
+                                             CHECK(error->code() == ErrorCodes::UserNotFound);
+                                             processed = true;
+                                         });
         CHECK(processed);
     }
 
@@ -5177,4 +5177,56 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app]") {
     CHECK(cur_user == logged_in_user);
 
     mock_transport_worker.mark_complete();
+}
+
+TEST_CASE("app: shared instances", "[sync][app]") {
+    App::Config base_config;
+    set_app_config_defaults(base_config, instance_of<UnitTestTransport>);
+
+    SyncClientConfig sync_config;
+    sync_config.metadata_mode = SyncClientConfig::MetadataMode::NoMetadata;
+    sync_config.base_file_path = util::make_temp_dir() + random_string(10);
+    util::try_make_dir(sync_config.base_file_path);
+
+    auto config1 = base_config;
+    config1.app_id = "app1";
+
+    auto config2 = base_config;
+    config2.app_id = "app1";
+    config2.base_url = "https://realm.mongodb.com"; // equivalent to default_base_url
+
+    auto config3 = base_config;
+    config3.app_id = "app2";
+
+    auto config4 = base_config;
+    config4.app_id = "app2";
+    config4.base_url = "http://localhost:9090";
+
+    // should all point to same underlying app
+    auto app1_1 = App::get_shared_app(config1, sync_config);
+    auto app1_2 = App::get_shared_app(config1, sync_config);
+    auto app1_3 = App::get_cached_app(config1.app_id, config1.base_url);
+    auto app1_4 = App::get_shared_app(config2, sync_config);
+    auto app1_5 = App::get_cached_app(config1.app_id);
+
+    CHECK(app1_1 == app1_2);
+    CHECK(app1_1 == app1_3);
+    CHECK(app1_1 == app1_4);
+    CHECK(app1_1 == app1_5);
+
+    // config3 and config4 should point to different apps
+    auto app2_1 = App::get_shared_app(config3, sync_config);
+    auto app2_2 = App::get_cached_app(config3.app_id, config3.base_url);
+    auto app2_3 = App::get_shared_app(config4, sync_config);
+    auto app2_4 = App::get_cached_app(config3.app_id);
+    auto app2_5 = App::get_cached_app(config4.app_id, "https://some.different.url");
+
+    CHECK(app2_1 == app2_2);
+    CHECK(app2_1 != app2_3);
+    CHECK(app2_4 != nullptr);
+    CHECK(app2_5 == nullptr);
+
+    CHECK(app1_1 != app2_1);
+    CHECK(app1_1 != app2_3);
+    CHECK(app1_1 != app2_4);
 }

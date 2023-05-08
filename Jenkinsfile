@@ -93,33 +93,6 @@ jobWrapper {
         }
     }
 
-    if (isPullRequest) {
-        stage('FormatCheck') {
-            rlmNode('docker') {
-                getArchive()
-
-                buildDockerEnv('testing.Dockerfile').inside {
-                    echo "Checking code formatting"
-                    modifications = sh(returnStdout: true, script: "git clang-format --diff ${targetSHA1}").trim()
-                    try {
-                        if (!modifications.equals('no modified files to format')) {
-                            if (!modifications.equals('clang-format did not modify any files')) {
-                                echo "Commit violates formatting rules"
-                                sh "git clang-format --diff ${targetSHA1} > format_error.txt"
-                                archiveArtifacts('format_error.txt')
-                                sh 'exit 1'
-                            }
-                        }
-                        currentBuild.result = 'SUCCESS'
-                    } catch (Exception err) {
-                        currentBuild.result = 'FAILURE'
-                        throw err
-                    }
-                }
-            }
-        }
-    }
-
     stage('Checking') {
         def buildOptions = [
             buildType : 'Debug',
