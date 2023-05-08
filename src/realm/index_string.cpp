@@ -18,6 +18,7 @@
 
 #include <cstdio>
 #include <iomanip>
+#include <list>
 
 #ifdef REALM_DEBUG
 #include <iostream>
@@ -55,6 +56,21 @@ Mixed ClusterColumn::get_value(ObjKey key) const
 {
     const Obj obj{m_cluster_tree->get(key)};
     return obj.get_any(m_column_key);
+}
+
+std::vector<ObjKey> ClusterColumn::get_all_keys() const
+{
+    std::vector<ObjKey> ret;
+    ret.reserve(m_cluster_tree->size());
+    m_cluster_tree->traverse([&ret](const Cluster* cluster) {
+        auto sz = cluster->node_size();
+        for (size_t i = 0; i < sz; i++) {
+            ret.push_back(cluster->get_real_key(i));
+        }
+
+        return IteratorControl::AdvanceToNext;
+    });
+    return ret;
 }
 
 template <>
@@ -1187,11 +1203,37 @@ void StringIndex::find_all_fulltext(std::vector<ObjKey>& result, StringData valu
 
     auto tokenizer = Tokenizer::get_instance();
     tokenizer->reset({value.data(), value.size()});
-    while (tokenizer->next()) {
-        auto token = tokenizer->get_token();
-        FindRes res1 = find_all_no_copy(StringData{token.data(), token.size()}, res);
+    auto token_info = tokenizer->get_token_info();
+    if (token_info.empty()) {
+        throw InvalidArgument("Missing search token");
+    }
+    struct Token {
+        std::string_view token;
+        bool exclude;
+    };
+    std::list<Token> tokens;
+    auto exclude_start = tokens.begin();
+    // Order the tokens so that we handle words to match first
+    for (auto& info : token_info) {
+        auto start = std::get<0>(info.second.ranges[0]);
+        if (info.second.ranges.size() > 1) {
+            throw InvalidArgument("Search token should only appear once");
+        }
+        bool exclude = start == 0 ? false : value[start - 1] == '-';
+        auto it = tokens.insert(exclude_start, {info.first, exclude});
+        if (exclude) {
+            exclude_start = it;
+        }
+    }
+    if (exclude_start == tokens.begin()) {
+        result = m_target_column.get_all_keys();
+    }
+    for (auto& token : tokens) {
+        FindRes res1 = find_all_no_copy(StringData{token.token}, res);
         if (res1 == FindRes_not_found) {
-            result.clear();
+            if (!token.exclude) {
+                result.clear();
+            }
             return;
         }
         else if (res1 == FindRes_column) {
@@ -1210,17 +1252,27 @@ void StringIndex::find_all_fulltext(std::vector<ObjKey>& result, StringData valu
                 while (r != result.end() && m < res.end_ndx) {
                     auto key_val = indexes.get(m);
                     if (r->value < key_val) {
-                        r = result.erase(r); // remove if match is not in new set
+                        if (token.exclude) {
+                            ++r;
+                        }
+                        else {
+                            r = result.erase(r); // remove if match is not in new set
+                        }
                     }
                     else if (r->value > key_val) {
                         ++m; // ignore new matches
                     }
                     else {
-                        ++r;
+                        if (token.exclude) {
+                            r = result.erase(r); // remove if match is found in new set
+                        }
+                        else {
+                            ++r;
+                        }
                         ++m;
                     }
                 }
-                if (r != result.end()) {
+                if (!token.exclude && r != result.end()) {
                     result.erase(r, result.end());
                 }
             }
@@ -1237,12 +1289,19 @@ void StringIndex::find_all_fulltext(std::vector<ObjKey>& result, StringData valu
                 ObjKey key(res.payload);
                 auto pos = std::lower_bound(result.begin(), result.end(), key);
                 if (pos != result.end() && key == *pos) {
-                    result.clear();
-                    result.push_back(key);
+                    if (token.exclude) {
+                        result.erase(pos);
+                    }
+                    else {
+                        result.clear();
+                        result.push_back(key);
+                    }
                 }
                 else {
-                    result.clear();
-                    return;
+                    if (!token.exclude) {
+                        result.clear();
+                        return;
+                    }
                 }
             }
         }
