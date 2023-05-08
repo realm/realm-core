@@ -133,7 +133,8 @@ std::shared_ptr<Transaction> Realm::transaction_ref()
 
 std::shared_ptr<Transaction> Realm::duplicate() const
 {
-    return m_coordinator->begin_read(read_transaction_version(), is_frozen());
+    auto version = read_transaction_version(); // does the validity check first
+    return m_coordinator->begin_read(version, is_frozen());
 }
 
 std::shared_ptr<DB>& Realm::Internal::get_db(Realm& realm)
