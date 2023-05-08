@@ -46,6 +46,7 @@ using ReceivedChangesets          = ClientProtocol::ReceivedChangesets;
 void ClientImpl::ReconnectInfo::reset() noexcept
 {
     m_backoff_state.reset();
+    scheduled_reset = false;
 }
 
 
@@ -377,7 +378,7 @@ void Connection::cancel_reconnect_delay()
         // reset back to false, because in that case, we know that the
         // connection was not about to fail for a reason that preceded the
         // invocation of cancel_reconnect_delay().
-        m_reconnect_info.set_scheduled_reset();
+        m_reconnect_info.scheduled_reset = true;
         m_ping_after_scheduled_reset_of_reconnect_info = false;
 
         schedule_urgent_ping(); // Throws
@@ -612,7 +613,7 @@ void Connection::initiate_reconnect_wait()
         return;
     }
 
-    if (m_reconnect_info.get_scheduled_reset()) {
+    if (m_reconnect_info.scheduled_reset) {
         m_reconnect_info.reset();
     }
 
@@ -1000,7 +1001,7 @@ void Connection::send_ping()
     REALM_ASSERT(m_send_ping);
 
     m_send_ping = false;
-    if (m_reconnect_info.get_scheduled_reset())
+    if (m_reconnect_info.scheduled_reset)
         m_ping_after_scheduled_reset_of_reconnect_info = true;
 
     m_last_ping_sent_at = monotonic_clock_now();
@@ -1214,9 +1215,9 @@ void Connection::receive_pong(milliseconds_type timestamp)
     // the last invocation of cancel_reconnect_delay(), then the connection is
     // still good, and we do not have to skip the next reconnect delay.
     if (m_ping_after_scheduled_reset_of_reconnect_info) {
-        auto old_scheduled_reset = m_reconnect_info.get_and_clear_scheduled_reset();
-        REALM_ASSERT(old_scheduled_reset);
+        REALM_ASSERT(m_reconnect_info.scheduled_reset);
         m_ping_after_scheduled_reset_of_reconnect_info = false;
+        m_reconnect_info.scheduled_reset = false;
     }
 
     m_heartbeat_timer.reset();

@@ -178,33 +178,10 @@ public:
         void update(ConnectionTerminationReason reason, std::optional<ResumptionDelayInfo> new_delay_info);
         std::chrono::milliseconds delay_interval();
 
-        void set_scheduled_reset() noexcept
-        {
-            m_scheduled_reset = true;
-        }
-
-        bool get_scheduled_reset() const noexcept
-        {
-            return m_scheduled_reset;
-        }
-
-        bool get_and_clear_scheduled_reset() noexcept
-        {
-            auto ret = m_scheduled_reset;
-            m_scheduled_reset = false;
-            return ret;
-        }
-
         const std::optional<ConnectionTerminationReason> reason() const noexcept
         {
             return m_backoff_state.triggering_error;
         }
-
-    private:
-        using milliseconds_lim = std::numeric_limits<milliseconds_type>;
-
-        ReconnectMode m_reconnect_mode;
-        ErrorBackoffState<ConnectionTerminationReason, RandomEngine> m_backoff_state;
 
         // Set this flag to true to schedule a postponed invocation of reset(). See
         // Connection::cancel_reconnect_delay() for details and rationale.
@@ -212,7 +189,11 @@ public:
         // Will be set back to false when a PONG message arrives, and the
         // corresponding PING message was sent while `m_scheduled_reset` was
         // true. See receive_pong().
-        bool m_scheduled_reset = false;
+        bool scheduled_reset = false;
+
+    private:
+        ReconnectMode m_reconnect_mode;
+        ErrorBackoffState<ConnectionTerminationReason, RandomEngine> m_backoff_state;
     };
 
     static constexpr milliseconds_type default_connect_timeout = 120000;        // 2 minutes
