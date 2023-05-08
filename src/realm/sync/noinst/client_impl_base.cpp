@@ -735,6 +735,9 @@ void Connection::initiate_reconnect()
         }
     }
 
+    logger.info("Connecting to '%1%2:%3%4'", to_string(m_server_endpoint.envelope), m_server_endpoint.address,
+                m_server_endpoint.port, m_http_request_path_prefix);
+
     m_websocket_error_received = false;
     m_websocket =
         m_client.m_socket_provider->connect(std::make_unique<WebSocketObserverShim>(this),

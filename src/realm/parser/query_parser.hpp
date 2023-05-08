@@ -122,6 +122,9 @@ public:
     virtual Decimal128 decimal128_for_argument(size_t argument_index) = 0;
     virtual UUID uuid_for_argument(size_t argument_index) = 0;
     virtual ObjLink objlink_for_argument(size_t argument_index) = 0;
+#if REALM_ENABLE_GEOSPATIAL
+    virtual Geospatial geospatial_for_argument(size_t argument_index) = 0;
+#endif
     virtual std::vector<Mixed> list_for_argument(size_t argument_index) = 0;
     virtual bool is_argument_null(size_t argument_index) = 0;
     virtual bool is_argument_list(size_t argument_index) = 0;
@@ -207,6 +210,12 @@ public:
     {
         return get<ObjLink>(i);
     }
+#if REALM_ENABLE_GEOSPATIAL
+    Geospatial geospatial_for_argument(size_t i) override
+    {
+        return get<Geospatial>(i);
+    }
+#endif
     std::vector<Mixed> list_for_argument(size_t i) override
     {
         return get<std::vector<Mixed>>(i);
@@ -304,6 +313,12 @@ public:
     {
         throw NoArgsError();
     }
+#if REALM_ENABLE_GEOSPATIAL
+    Geospatial geospatial_for_argument(size_t)
+    {
+        throw NoArgsError();
+    }
+#endif
     bool is_argument_list(size_t)
     {
         throw NoArgsError();

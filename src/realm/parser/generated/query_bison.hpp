@@ -46,11 +46,17 @@
 # define YY_YY_GENERATED_QUERY_BISON_HPP_INCLUDED
 // "%code requires" blocks.
 
+  #include <memory>
   #include <string>
   #include <realm/mixed.hpp>
+  #include <realm/geospatial.hpp>
+  #include <array>
+  #include <optional>
+  using realm::GeoPoint;
   namespace realm::query_parser {
     class ParserDriver;
     class ConstantNode;
+    class GeospatialNode;
     class ListNode;
     class PostOpNode;
     class AggrNode;
@@ -79,6 +85,7 @@
 
   }
   using namespace realm::query_parser;
+
 
 
 # include <cassert>
@@ -457,45 +464,57 @@ namespace yy {
       // expr
       char dummy5[sizeof (ExpressionNode*)];
 
+      // geoloop_content
+      // geoloop
+      // geopoly_content
+      // geospatial
+      char dummy6[sizeof (GeospatialNode*)];
+
       // list
       // list_content
-      char dummy6[sizeof (ListNode*)];
+      char dummy7[sizeof (ListNode*)];
 
       // path_elem
-      char dummy7[sizeof (PathElem)];
+      char dummy8[sizeof (PathElem)];
 
       // path
-      char dummy8[sizeof (PathNode*)];
+      char dummy9[sizeof (PathNode*)];
 
       // post_op
-      char dummy9[sizeof (PostOpNode*)];
+      char dummy10[sizeof (PostOpNode*)];
 
       // prop
       // simple_prop
-      char dummy10[sizeof (PropertyNode*)];
+      char dummy11[sizeof (PropertyNode*)];
 
       // query
       // compare
-      char dummy11[sizeof (QueryNode*)];
+      char dummy12[sizeof (QueryNode*)];
 
       // subquery
-      char dummy12[sizeof (SubqueryNode*)];
+      char dummy13[sizeof (SubqueryNode*)];
 
       // boolexpr
-      char dummy13[sizeof (TrueOrFalseNode*)];
+      char dummy14[sizeof (TrueOrFalseNode*)];
 
       // value
-      char dummy14[sizeof (ValueNode*)];
+      char dummy15[sizeof (ValueNode*)];
 
       // direction
-      char dummy15[sizeof (bool)];
+      char dummy16[sizeof (bool)];
+
+      // coordinate
+      char dummy17[sizeof (double)];
 
       // comp_type
       // aggr_op
       // equality
       // relational
       // stringop
-      char dummy16[sizeof (int)];
+      char dummy18[sizeof (int)];
+
+      // geopoint
+      char dummy19[sizeof (std::optional<GeoPoint>)];
 
       // "identifier"
       // "string"
@@ -518,6 +537,7 @@ namespace yy {
       // "like"
       // "between"
       // "in"
+      // "geowithin"
       // "obj"
       // "sort"
       // "distinct"
@@ -528,7 +548,7 @@ namespace yy {
       // "@type"
       // "key or value"
       // id
-      char dummy17[sizeof (std::string)];
+      char dummy20[sizeof (std::string)];
     };
 
     /// The size of the largest semantic type.
@@ -599,36 +619,40 @@ namespace yy {
     TOK_AND = 279,                 // "&&"
     TOK_OR = 280,                  // "||"
     TOK_NOT = 281,                 // "!"
-    TOK_ID = 282,                  // "identifier"
-    TOK_STRING = 283,              // "string"
-    TOK_BASE64 = 284,              // "base64"
-    TOK_INFINITY = 285,            // "infinity"
-    TOK_NAN = 286,                 // "NaN"
-    TOK_NATURAL0 = 287,            // "natural0"
-    TOK_NUMBER = 288,              // "number"
-    TOK_FLOAT = 289,               // "float"
-    TOK_TIMESTAMP = 290,           // "date"
-    TOK_UUID = 291,                // "UUID"
-    TOK_OID = 292,                 // "ObjectId"
-    TOK_LINK = 293,                // "link"
-    TOK_TYPED_LINK = 294,          // "typed link"
-    TOK_ARG = 295,                 // "argument"
-    TOK_BEGINSWITH = 296,          // "beginswith"
-    TOK_ENDSWITH = 297,            // "endswith"
-    TOK_CONTAINS = 298,            // "contains"
-    TOK_TEXT = 299,                // "fulltext"
-    TOK_LIKE = 300,                // "like"
-    TOK_BETWEEN = 301,             // "between"
-    TOK_IN = 302,                  // "in"
-    TOK_OBJ = 303,                 // "obj"
-    TOK_SORT = 304,                // "sort"
-    TOK_DISTINCT = 305,            // "distinct"
-    TOK_LIMIT = 306,               // "limit"
-    TOK_ASCENDING = 307,           // "ascending"
-    TOK_DESCENDING = 308,          // "descending"
-    TOK_SIZE = 309,                // "@size"
-    TOK_TYPE = 310,                // "@type"
-    TOK_KEY_VAL = 311              // "key or value"
+    TOK_GEOBOX = 282,              // "geobox"
+    TOK_GEOPOLYGON = 283,          // "geopolygon"
+    TOK_GEOSPHERE = 284,           // "geosphere"
+    TOK_ID = 285,                  // "identifier"
+    TOK_STRING = 286,              // "string"
+    TOK_BASE64 = 287,              // "base64"
+    TOK_INFINITY = 288,            // "infinity"
+    TOK_NAN = 289,                 // "NaN"
+    TOK_NATURAL0 = 290,            // "natural0"
+    TOK_NUMBER = 291,              // "number"
+    TOK_FLOAT = 292,               // "float"
+    TOK_TIMESTAMP = 293,           // "date"
+    TOK_UUID = 294,                // "UUID"
+    TOK_OID = 295,                 // "ObjectId"
+    TOK_LINK = 296,                // "link"
+    TOK_TYPED_LINK = 297,          // "typed link"
+    TOK_ARG = 298,                 // "argument"
+    TOK_BEGINSWITH = 299,          // "beginswith"
+    TOK_ENDSWITH = 300,            // "endswith"
+    TOK_CONTAINS = 301,            // "contains"
+    TOK_TEXT = 302,                // "fulltext"
+    TOK_LIKE = 303,                // "like"
+    TOK_BETWEEN = 304,             // "between"
+    TOK_IN = 305,                  // "in"
+    TOK_GEOWITHIN = 306,           // "geowithin"
+    TOK_OBJ = 307,                 // "obj"
+    TOK_SORT = 308,                // "sort"
+    TOK_DISTINCT = 309,            // "distinct"
+    TOK_LIMIT = 310,               // "limit"
+    TOK_ASCENDING = 311,           // "ascending"
+    TOK_DESCENDING = 312,          // "descending"
+    TOK_SIZE = 313,                // "@size"
+    TOK_TYPE = 314,                // "@type"
+    TOK_KEY_VAL = 315              // "key or value"
       };
       /// Backward compatibility alias (Bison 3.6).
       typedef token_kind_type yytokentype;
@@ -645,7 +669,7 @@ namespace yy {
     {
       enum symbol_kind_type
       {
-        YYNTOKENS = 69, ///< Number of tokens.
+        YYNTOKENS = 73, ///< Number of tokens.
         SYM_YYEMPTY = -2,
         SYM_YYEOF = 0,                           // "end of file"
         SYM_YYerror = 1,                         // error
@@ -674,79 +698,89 @@ namespace yy {
         SYM_AND = 24,                            // "&&"
         SYM_OR = 25,                             // "||"
         SYM_NOT = 26,                            // "!"
-        SYM_ID = 27,                             // "identifier"
-        SYM_STRING = 28,                         // "string"
-        SYM_BASE64 = 29,                         // "base64"
-        SYM_INFINITY = 30,                       // "infinity"
-        SYM_NAN = 31,                            // "NaN"
-        SYM_NATURAL0 = 32,                       // "natural0"
-        SYM_NUMBER = 33,                         // "number"
-        SYM_FLOAT = 34,                          // "float"
-        SYM_TIMESTAMP = 35,                      // "date"
-        SYM_UUID = 36,                           // "UUID"
-        SYM_OID = 37,                            // "ObjectId"
-        SYM_LINK = 38,                           // "link"
-        SYM_TYPED_LINK = 39,                     // "typed link"
-        SYM_ARG = 40,                            // "argument"
-        SYM_BEGINSWITH = 41,                     // "beginswith"
-        SYM_ENDSWITH = 42,                       // "endswith"
-        SYM_CONTAINS = 43,                       // "contains"
-        SYM_TEXT = 44,                           // "fulltext"
-        SYM_LIKE = 45,                           // "like"
-        SYM_BETWEEN = 46,                        // "between"
-        SYM_IN = 47,                             // "in"
-        SYM_OBJ = 48,                            // "obj"
-        SYM_SORT = 49,                           // "sort"
-        SYM_DISTINCT = 50,                       // "distinct"
-        SYM_LIMIT = 51,                          // "limit"
-        SYM_ASCENDING = 52,                      // "ascending"
-        SYM_DESCENDING = 53,                     // "descending"
-        SYM_SIZE = 54,                           // "@size"
-        SYM_TYPE = 55,                           // "@type"
-        SYM_KEY_VAL = 56,                        // "key or value"
-        SYM_57_ = 57,                            // '+'
-        SYM_58_ = 58,                            // '-'
-        SYM_59_ = 59,                            // '*'
-        SYM_60_ = 60,                            // '/'
-        SYM_61_ = 61,                            // '('
-        SYM_62_ = 62,                            // ')'
-        SYM_63_ = 63,                            // '.'
-        SYM_64_ = 64,                            // ','
-        SYM_65_ = 65,                            // '{'
-        SYM_66_ = 66,                            // '}'
-        SYM_67_ = 67,                            // '['
-        SYM_68_ = 68,                            // ']'
-        SYM_YYACCEPT = 69,                       // $accept
-        SYM_final = 70,                          // final
-        SYM_query = 71,                          // query
-        SYM_compare = 72,                        // compare
-        SYM_expr = 73,                           // expr
-        SYM_value = 74,                          // value
-        SYM_prop = 75,                           // prop
-        SYM_aggregate = 76,                      // aggregate
-        SYM_simple_prop = 77,                    // simple_prop
-        SYM_subquery = 78,                       // subquery
-        SYM_post_query = 79,                     // post_query
-        SYM_distinct = 80,                       // distinct
-        SYM_distinct_param = 81,                 // distinct_param
-        SYM_sort = 82,                           // sort
-        SYM_sort_param = 83,                     // sort_param
-        SYM_limit = 84,                          // limit
-        SYM_direction = 85,                      // direction
-        SYM_list = 86,                           // list
-        SYM_list_content = 87,                   // list_content
-        SYM_constant = 88,                       // constant
-        SYM_primary_key = 89,                    // primary_key
-        SYM_boolexpr = 90,                       // boolexpr
-        SYM_comp_type = 91,                      // comp_type
-        SYM_post_op = 92,                        // post_op
-        SYM_aggr_op = 93,                        // aggr_op
-        SYM_equality = 94,                       // equality
-        SYM_relational = 95,                     // relational
-        SYM_stringop = 96,                       // stringop
-        SYM_path = 97,                           // path
-        SYM_path_elem = 98,                      // path_elem
-        SYM_id = 99                              // id
+        SYM_GEOBOX = 27,                         // "geobox"
+        SYM_GEOPOLYGON = 28,                     // "geopolygon"
+        SYM_GEOSPHERE = 29,                      // "geosphere"
+        SYM_ID = 30,                             // "identifier"
+        SYM_STRING = 31,                         // "string"
+        SYM_BASE64 = 32,                         // "base64"
+        SYM_INFINITY = 33,                       // "infinity"
+        SYM_NAN = 34,                            // "NaN"
+        SYM_NATURAL0 = 35,                       // "natural0"
+        SYM_NUMBER = 36,                         // "number"
+        SYM_FLOAT = 37,                          // "float"
+        SYM_TIMESTAMP = 38,                      // "date"
+        SYM_UUID = 39,                           // "UUID"
+        SYM_OID = 40,                            // "ObjectId"
+        SYM_LINK = 41,                           // "link"
+        SYM_TYPED_LINK = 42,                     // "typed link"
+        SYM_ARG = 43,                            // "argument"
+        SYM_BEGINSWITH = 44,                     // "beginswith"
+        SYM_ENDSWITH = 45,                       // "endswith"
+        SYM_CONTAINS = 46,                       // "contains"
+        SYM_TEXT = 47,                           // "fulltext"
+        SYM_LIKE = 48,                           // "like"
+        SYM_BETWEEN = 49,                        // "between"
+        SYM_IN = 50,                             // "in"
+        SYM_GEOWITHIN = 51,                      // "geowithin"
+        SYM_OBJ = 52,                            // "obj"
+        SYM_SORT = 53,                           // "sort"
+        SYM_DISTINCT = 54,                       // "distinct"
+        SYM_LIMIT = 55,                          // "limit"
+        SYM_ASCENDING = 56,                      // "ascending"
+        SYM_DESCENDING = 57,                     // "descending"
+        SYM_SIZE = 58,                           // "@size"
+        SYM_TYPE = 59,                           // "@type"
+        SYM_KEY_VAL = 60,                        // "key or value"
+        SYM_61_ = 61,                            // '+'
+        SYM_62_ = 62,                            // '-'
+        SYM_63_ = 63,                            // '*'
+        SYM_64_ = 64,                            // '/'
+        SYM_65_ = 65,                            // '('
+        SYM_66_ = 66,                            // ')'
+        SYM_67_ = 67,                            // '.'
+        SYM_68_ = 68,                            // ','
+        SYM_69_ = 69,                            // '['
+        SYM_70_ = 70,                            // ']'
+        SYM_71_ = 71,                            // '{'
+        SYM_72_ = 72,                            // '}'
+        SYM_YYACCEPT = 73,                       // $accept
+        SYM_final = 74,                          // final
+        SYM_query = 75,                          // query
+        SYM_compare = 76,                        // compare
+        SYM_expr = 77,                           // expr
+        SYM_value = 78,                          // value
+        SYM_prop = 79,                           // prop
+        SYM_aggregate = 80,                      // aggregate
+        SYM_simple_prop = 81,                    // simple_prop
+        SYM_subquery = 82,                       // subquery
+        SYM_coordinate = 83,                     // coordinate
+        SYM_geopoint = 84,                       // geopoint
+        SYM_geoloop_content = 85,                // geoloop_content
+        SYM_geoloop = 86,                        // geoloop
+        SYM_geopoly_content = 87,                // geopoly_content
+        SYM_geospatial = 88,                     // geospatial
+        SYM_post_query = 89,                     // post_query
+        SYM_distinct = 90,                       // distinct
+        SYM_distinct_param = 91,                 // distinct_param
+        SYM_sort = 92,                           // sort
+        SYM_sort_param = 93,                     // sort_param
+        SYM_limit = 94,                          // limit
+        SYM_direction = 95,                      // direction
+        SYM_list = 96,                           // list
+        SYM_list_content = 97,                   // list_content
+        SYM_constant = 98,                       // constant
+        SYM_primary_key = 99,                    // primary_key
+        SYM_boolexpr = 100,                      // boolexpr
+        SYM_comp_type = 101,                     // comp_type
+        SYM_post_op = 102,                       // post_op
+        SYM_aggr_op = 103,                       // aggr_op
+        SYM_equality = 104,                      // equality
+        SYM_relational = 105,                    // relational
+        SYM_stringop = 106,                      // stringop
+        SYM_path = 107,                          // path
+        SYM_path_elem = 108,                     // path_elem
+        SYM_id = 109                             // id
       };
     };
 
@@ -806,6 +840,13 @@ namespace yy {
         value.move< ExpressionNode* > (std::move (that.value));
         break;
 
+      case symbol_kind::SYM_geoloop_content: // geoloop_content
+      case symbol_kind::SYM_geoloop: // geoloop
+      case symbol_kind::SYM_geopoly_content: // geopoly_content
+      case symbol_kind::SYM_geospatial: // geospatial
+        value.move< GeospatialNode* > (std::move (that.value));
+        break;
+
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.move< ListNode* > (std::move (that.value));
@@ -849,12 +890,20 @@ namespace yy {
         value.move< bool > (std::move (that.value));
         break;
 
+      case symbol_kind::SYM_coordinate: // coordinate
+        value.move< double > (std::move (that.value));
+        break;
+
       case symbol_kind::SYM_comp_type: // comp_type
       case symbol_kind::SYM_aggr_op: // aggr_op
       case symbol_kind::SYM_equality: // equality
       case symbol_kind::SYM_relational: // relational
       case symbol_kind::SYM_stringop: // stringop
         value.move< int > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.move< std::optional<GeoPoint> > (std::move (that.value));
         break;
 
       case symbol_kind::SYM_ID: // "identifier"
@@ -878,6 +927,7 @@ namespace yy {
       case symbol_kind::SYM_LIKE: // "like"
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_IN: // "in"
+      case symbol_kind::SYM_GEOWITHIN: // "geowithin"
       case symbol_kind::SYM_OBJ: // "obj"
       case symbol_kind::SYM_SORT: // "sort"
       case symbol_kind::SYM_DISTINCT: // "distinct"
@@ -967,6 +1017,18 @@ namespace yy {
       {}
 #else
       basic_symbol (typename Base::kind_type t, const ExpressionNode*& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, GeospatialNode*&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const GeospatialNode*& v)
         : Base (t)
         , value (v)
       {}
@@ -1093,12 +1155,36 @@ namespace yy {
 #endif
 
 #if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, double&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const double& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
       basic_symbol (typename Base::kind_type t, int&& v)
         : Base (t)
         , value (std::move (v))
       {}
 #else
       basic_symbol (typename Base::kind_type t, const int& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, std::optional<GeoPoint>&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const std::optional<GeoPoint>& v)
         : Base (t)
         , value (v)
       {}
@@ -1185,6 +1271,13 @@ switch (yykind)
         value.template destroy< ExpressionNode* > ();
         break;
 
+      case symbol_kind::SYM_geoloop_content: // geoloop_content
+      case symbol_kind::SYM_geoloop: // geoloop
+      case symbol_kind::SYM_geopoly_content: // geopoly_content
+      case symbol_kind::SYM_geospatial: // geospatial
+        value.template destroy< GeospatialNode* > ();
+        break;
+
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.template destroy< ListNode* > ();
@@ -1228,12 +1321,20 @@ switch (yykind)
         value.template destroy< bool > ();
         break;
 
+      case symbol_kind::SYM_coordinate: // coordinate
+        value.template destroy< double > ();
+        break;
+
       case symbol_kind::SYM_comp_type: // comp_type
       case symbol_kind::SYM_aggr_op: // aggr_op
       case symbol_kind::SYM_equality: // equality
       case symbol_kind::SYM_relational: // relational
       case symbol_kind::SYM_stringop: // stringop
         value.template destroy< int > ();
+        break;
+
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.template destroy< std::optional<GeoPoint> > ();
         break;
 
       case symbol_kind::SYM_ID: // "identifier"
@@ -1257,6 +1358,7 @@ switch (yykind)
       case symbol_kind::SYM_LIKE: // "like"
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_IN: // "in"
+      case symbol_kind::SYM_GEOWITHIN: // "geowithin"
       case symbol_kind::SYM_OBJ: // "obj"
       case symbol_kind::SYM_SORT: // "sort"
       case symbol_kind::SYM_DISTINCT: // "distinct"
@@ -1365,7 +1467,7 @@ switch (yykind)
       {
 #if !defined _MSC_VER || defined __clang__
         YY_ASSERT (tok == token::TOK_END
-                   || (token::TOK_YYerror <= tok && tok <= token::TOK_NOT)
+                   || (token::TOK_YYerror <= tok && tok <= token::TOK_GEOSPHERE)
                    || tok == 43
                    || tok == 45
                    || tok == 42
@@ -1373,10 +1475,10 @@ switch (yykind)
                    || (40 <= tok && tok <= 41)
                    || tok == 46
                    || tok == 44
-                   || tok == 123
-                   || tok == 125
                    || tok == 91
-                   || tok == 93);
+                   || tok == 93
+                   || tok == 123
+                   || tok == 125);
 #endif
       }
 #if 201103L <= YY_CPLUSPLUS
@@ -1846,6 +1948,51 @@ switch (yykind)
 #if 201103L <= YY_CPLUSPLUS
       static
       symbol_type
+      make_GEOBOX ()
+      {
+        return symbol_type (token::TOK_GEOBOX);
+      }
+#else
+      static
+      symbol_type
+      make_GEOBOX ()
+      {
+        return symbol_type (token::TOK_GEOBOX);
+      }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+      static
+      symbol_type
+      make_GEOPOLYGON ()
+      {
+        return symbol_type (token::TOK_GEOPOLYGON);
+      }
+#else
+      static
+      symbol_type
+      make_GEOPOLYGON ()
+      {
+        return symbol_type (token::TOK_GEOPOLYGON);
+      }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+      static
+      symbol_type
+      make_GEOSPHERE ()
+      {
+        return symbol_type (token::TOK_GEOSPHERE);
+      }
+#else
+      static
+      symbol_type
+      make_GEOSPHERE ()
+      {
+        return symbol_type (token::TOK_GEOSPHERE);
+      }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+      static
+      symbol_type
       make_ID (std::string v)
       {
         return symbol_type (token::TOK_ID, std::move (v));
@@ -2161,6 +2308,21 @@ switch (yykind)
 #if 201103L <= YY_CPLUSPLUS
       static
       symbol_type
+      make_GEOWITHIN (std::string v)
+      {
+        return symbol_type (token::TOK_GEOWITHIN, std::move (v));
+      }
+#else
+      static
+      symbol_type
+      make_GEOWITHIN (const std::string& v)
+      {
+        return symbol_type (token::TOK_GEOWITHIN, v);
+      }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+      static
+      symbol_type
       make_OBJ (std::string v)
       {
         return symbol_type (token::TOK_OBJ, std::move (v));
@@ -2343,7 +2505,7 @@ switch (yykind)
     /// \param yyvalue   the value to check
     static bool yy_table_value_is_error_ (int yyvalue) YY_NOEXCEPT;
 
-    static const signed char yypact_ninf_;
+    static const short yypact_ninf_;
     static const signed char yytable_ninf_;
 
     /// Convert a scanner token kind \a t to a symbol kind.
@@ -2369,7 +2531,7 @@ switch (yykind)
     static const signed char yydefact_[];
 
     // YYPGOTO[NTERM-NUM].
-    static const signed char yypgoto_[];
+    static const short yypgoto_[];
 
     // YYDEFGOTO[NTERM-NUM].
     static const unsigned char yydefgoto_[];
@@ -2621,8 +2783,8 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 551,     ///< Last index in yytable_.
-      yynnts_ = 31,  ///< Number of nonterminal symbols.
+      yylast_ = 555,     ///< Last index in yytable_.
+      yynnts_ = 37,  ///< Number of nonterminal symbols.
       yyfinal_ = 66 ///< Termination state number.
     };
 
@@ -2647,15 +2809,15 @@ switch (yykind)
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-      61,    62,    59,    57,    64,    58,    63,    60,     2,     2,
+      65,    66,    63,    61,    68,    62,    67,    64,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,    67,     2,    68,     2,     2,     2,     2,     2,     2,
+       2,    69,     2,    70,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,    65,     2,    66,     2,     2,     2,     2,
+       2,     2,     2,    71,     2,    72,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -2674,10 +2836,10 @@ switch (yykind)
       25,    26,    27,    28,    29,    30,    31,    32,    33,    34,
       35,    36,    37,    38,    39,    40,    41,    42,    43,    44,
       45,    46,    47,    48,    49,    50,    51,    52,    53,    54,
-      55,    56
+      55,    56,    57,    58,    59,    60
     };
     // Last valid token kind.
-    const int code_max = 311;
+    const int code_max = 315;
 
     if (t <= 0)
       return symbol_kind::SYM_YYEOF;
@@ -2718,6 +2880,13 @@ switch (yykind)
 
       case symbol_kind::SYM_expr: // expr
         value.copy< ExpressionNode* > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_geoloop_content: // geoloop_content
+      case symbol_kind::SYM_geoloop: // geoloop
+      case symbol_kind::SYM_geopoly_content: // geopoly_content
+      case symbol_kind::SYM_geospatial: // geospatial
+        value.copy< GeospatialNode* > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_list: // list
@@ -2763,12 +2932,20 @@ switch (yykind)
         value.copy< bool > (YY_MOVE (that.value));
         break;
 
+      case symbol_kind::SYM_coordinate: // coordinate
+        value.copy< double > (YY_MOVE (that.value));
+        break;
+
       case symbol_kind::SYM_comp_type: // comp_type
       case symbol_kind::SYM_aggr_op: // aggr_op
       case symbol_kind::SYM_equality: // equality
       case symbol_kind::SYM_relational: // relational
       case symbol_kind::SYM_stringop: // stringop
         value.copy< int > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.copy< std::optional<GeoPoint> > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_ID: // "identifier"
@@ -2792,6 +2969,7 @@ switch (yykind)
       case symbol_kind::SYM_LIKE: // "like"
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_IN: // "in"
+      case symbol_kind::SYM_GEOWITHIN: // "geowithin"
       case symbol_kind::SYM_OBJ: // "obj"
       case symbol_kind::SYM_SORT: // "sort"
       case symbol_kind::SYM_DISTINCT: // "distinct"
@@ -2861,6 +3039,13 @@ switch (yykind)
         value.move< ExpressionNode* > (YY_MOVE (s.value));
         break;
 
+      case symbol_kind::SYM_geoloop_content: // geoloop_content
+      case symbol_kind::SYM_geoloop: // geoloop
+      case symbol_kind::SYM_geopoly_content: // geopoly_content
+      case symbol_kind::SYM_geospatial: // geospatial
+        value.move< GeospatialNode* > (YY_MOVE (s.value));
+        break;
+
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.move< ListNode* > (YY_MOVE (s.value));
@@ -2904,12 +3089,20 @@ switch (yykind)
         value.move< bool > (YY_MOVE (s.value));
         break;
 
+      case symbol_kind::SYM_coordinate: // coordinate
+        value.move< double > (YY_MOVE (s.value));
+        break;
+
       case symbol_kind::SYM_comp_type: // comp_type
       case symbol_kind::SYM_aggr_op: // aggr_op
       case symbol_kind::SYM_equality: // equality
       case symbol_kind::SYM_relational: // relational
       case symbol_kind::SYM_stringop: // stringop
         value.move< int > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_geopoint: // geopoint
+        value.move< std::optional<GeoPoint> > (YY_MOVE (s.value));
         break;
 
       case symbol_kind::SYM_ID: // "identifier"
@@ -2933,6 +3126,7 @@ switch (yykind)
       case symbol_kind::SYM_LIKE: // "like"
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_IN: // "in"
+      case symbol_kind::SYM_GEOWITHIN: // "geowithin"
       case symbol_kind::SYM_OBJ: // "obj"
       case symbol_kind::SYM_SORT: // "sort"
       case symbol_kind::SYM_DISTINCT: // "distinct"
