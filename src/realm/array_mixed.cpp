@@ -66,7 +66,14 @@ void ArrayMixed::set(size_t ndx, Mixed value)
         return;
     }
     auto old_type = get_type(ndx);
-    erase_linked_payload(ndx, old_type != value.get_type()); // FIXME
+    // If we replace a collections ref value with one of the
+    // same type, then it is just an update of of the
+    // ref stored in the parent. If the new type is a different
+    // type then it means that we are overwriting a collection
+    // with some other value and hence the collection must be
+    // destroyed.
+    bool destroy_collection = old_type != value.get_type();
+    erase_linked_payload(ndx, destroy_collection);
     m_composite.set(ndx, store(value));
 }
 
@@ -166,8 +173,11 @@ Mixed ArrayMixed::get(size_t ndx) const
                 return Mixed(UUID(bytes));
             }
             default:
-                ensure_ref_array();
-                return Mixed(m_refs.get(payload_ndx), CollectionType(int(type)));
+                if (size_t((val & s_payload_idx_mask) >> s_payload_idx_shift) == payload_idx_ref) {
+                    ensure_ref_array();
+                    return Mixed(m_refs.get(payload_ndx), CollectionType(int(type)));
+                }
+                break;
         }
     }
 
@@ -459,6 +469,7 @@ int64_t ArrayMixed::store(const Mixed& value)
             break;
         }
         default:
+            REALM_ASSERT(type == type_List || type == type_Dictionary || type == type_Set);
             ensure_ref_array();
             size_t ndx = m_refs.size();
             m_refs.add(value.get_ref());

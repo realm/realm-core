@@ -801,6 +801,7 @@ TEST(List_NestedList_Remove)
     list->remove(0);
     CHECK_THROW_ANY(dict->remove("Bar"));
     dict->remove("Foo");
+    // The above operation removed list2
     CHECK_THROW_ANY(list2->insert_collection(1));
     tr->verify();
     tr->commit_and_continue_as_read();
