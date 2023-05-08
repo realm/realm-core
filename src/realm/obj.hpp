@@ -73,7 +73,7 @@ public:
     {
         return 0;
     }
-    UpdateStatus update_if_needed_with_status() const final;
+    UpdateStatus update_if_needed_with_status() const noexcept final;
     bool update_if_needed() const final;
     TableRef get_table() const noexcept final
     {

@@ -168,27 +168,12 @@ public:
     {
     }
 
-    struct ListTag {
-    };
-    Mixed(ref_type ref, ListTag) noexcept
-        : m_type(int(type_List) + 1)
+    Mixed(ref_type ref, CollectionType collection_type) noexcept
+        : m_type(int(collection_type) + 1)
         , int_val(int64_t(ref))
     {
     }
-    struct SetTag {
-    };
-    Mixed(ref_type ref, SetTag) noexcept
-        : m_type(int(type_Set) + 1)
-        , int_val(int64_t(ref))
-    {
-    }
-    struct DictionaryTag {
-    };
-    Mixed(ref_type ref, DictionaryTag) noexcept
-        : m_type(int(type_Dictionary) + 1)
-        , int_val(int64_t(ref))
-    {
-    }
+    ref_type get_ref() const noexcept;
 
     ~Mixed() noexcept {}
 
@@ -601,6 +586,11 @@ inline int Mixed::get<int>() const noexcept
 inline int64_t Mixed::get_int() const noexcept
 {
     return get<int64_t>();
+}
+
+inline ref_type Mixed::get_ref() const noexcept
+{
+    return ref_type(int_val);
 }
 
 template <>

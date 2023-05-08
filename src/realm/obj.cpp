@@ -370,7 +370,7 @@ inline bool Obj::_update_if_needed() const
     return false;
 }
 
-UpdateStatus Obj::update_if_needed_with_status() const
+UpdateStatus Obj::update_if_needed_with_status() const noexcept
 {
     if (!m_table) {
         // Table deleted
@@ -552,15 +552,7 @@ Mixed Obj::get_any(ColKey col_key) const
     auto col_ndx = col_key.get_index();
     if (col_key.is_collection()) {
         ref_type ref = to_ref(_get<int64_t>(col_ndx));
-        switch (get_table()->get_collection_type(col_key, 0)) {
-            case CollectionType::List:
-                return Mixed(ref, Mixed::ListTag());
-            case CollectionType::Set:
-                return Mixed(ref, Mixed::SetTag());
-            case CollectionType::Dictionary:
-                return Mixed(ref, Mixed::DictionaryTag());
-        }
-        return {};
+        return Mixed(ref, get_table()->get_collection_type(col_key, 0));
     }
     switch (col_key.get_type()) {
         case col_type_Int:

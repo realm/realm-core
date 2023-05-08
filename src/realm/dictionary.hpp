@@ -202,11 +202,11 @@ private:
     template <typename AggregateType>
     void do_accumulate(size_t* return_ndx, AggregateType& agg) const;
 
-    UpdateStatus update_if_needed() const final;
-    UpdateStatus ensure_created() final;
+    UpdateStatus update_if_needed_with_status() const noexcept final;
+    void ensure_created();
     inline bool update() const
     {
-        return update_if_needed() != UpdateStatus::Detached;
+        return update_if_needed_with_status() != UpdateStatus::Detached;
     }
     void verify() const;
     void get_key_type();
@@ -390,7 +390,7 @@ public:
     {
         return m_source.get_col_key();
     }
-    bool has_changed() const final
+    bool has_changed() const noexcept final
     {
         return m_source.has_changed();
     }
@@ -398,7 +398,7 @@ public:
     // Overrides of ObjCollectionBase:
     UpdateStatus do_update_if_needed() const final
     {
-        return m_source.update_if_needed();
+        return m_source.update_if_needed_with_status();
     }
     BPlusTree<ObjKey>* get_mutable_tree() const final
     {

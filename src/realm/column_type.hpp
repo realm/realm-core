@@ -24,14 +24,6 @@
 
 namespace realm {
 
-enum class CollectionType {
-    // Part of the file format. Changing these values will be a
-    // file format breaking change.
-    List = 0,
-    Set = 1,
-    Dictionary = 2
-};
-
 struct ColumnType {
     // Note: Enumeration value assignments must be kept in sync with
     // <realm/data_type.hpp>.

@@ -171,9 +171,9 @@ public:
         return *m_tree;
     }
 
-    UpdateStatus update_if_needed() const final
+    UpdateStatus update_if_needed_with_status() const noexcept final
     {
-        auto status = Base::update_if_needed();
+        auto status = Base::get_update_status();
         switch (status) {
             case UpdateStatus::Detached: {
                 m_tree.reset();
@@ -188,40 +188,26 @@ public:
                 [[fallthrough]];
             case UpdateStatus::Updated: {
                 bool attached = init_from_parent(false);
+                Base::update_content_version();
                 return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
             }
         }
         REALM_UNREACHABLE();
     }
 
-    UpdateStatus ensure_created() final
+    void ensure_created()
     {
-        auto status = Base::ensure_created();
-        switch (status) {
-            case UpdateStatus::Detached:
-                break; // Not possible (would have thrown earlier).
-            case UpdateStatus::NoChange: {
-                if (m_tree && m_tree->is_attached()) {
-                    return UpdateStatus::NoChange;
-                }
-                // The tree has not been initialized yet for this accessor, so
-                // perform lazy initialization by treating it as an update.
-                [[fallthrough]];
-            }
-            case UpdateStatus::Updated: {
-                bool attached = init_from_parent(true);
-                REALM_ASSERT(attached);
-                return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
-            }
+        if (Base::should_update() || !(m_tree && m_tree->is_attached())) {
+            bool attached = init_from_parent(true);
+            Base::update_content_version();
+            REALM_ASSERT(attached);
         }
-
-        REALM_UNREACHABLE();
     }
 
     /// Update the accessor and return true if it is attached after the update.
     inline bool update() const
     {
-        return update_if_needed() != UpdateStatus::Detached;
+        return update_if_needed_with_status() != UpdateStatus::Detached;
     }
 
     size_t translate_index(size_t ndx) const noexcept override
@@ -411,7 +397,7 @@ public:
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
     const Obj& get_obj() const noexcept final;
-    bool has_changed() const final;
+    bool has_changed() const noexcept final;
     ColKey get_col_key() const noexcept final;
 
     // Overriding members of LstBase:
@@ -519,7 +505,7 @@ private:
 
     UpdateStatus do_update_if_needed() const final
     {
-        return m_list.update_if_needed();
+        return m_list.update_if_needed_with_status();
     }
 
     BPlusTree<ObjKey>* get_mutable_tree() const final
@@ -1029,7 +1015,7 @@ inline const Obj& LnkLst::get_obj() const noexcept
     return m_list.get_obj();
 }
 
-inline bool LnkLst::has_changed() const
+inline bool LnkLst::has_changed() const noexcept
 {
     return m_list.has_changed();
 }
