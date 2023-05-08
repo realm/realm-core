@@ -362,22 +362,17 @@ void Connection::cancel_reconnect_delay()
         initiate_reconnect_wait(); // Throws
         return;
     }
+
+    // If we are not disconnected, then we need to make sure the next time we get disconnected
+    // that we are allowed to re-connect as quickly as possible.
+    //
+    // Setting m_reconnect_info.scheduled_reset will cause initiate_reconnect_wait to reset the
+    // backoff/delay state before calculating the next delay, unless a PONG message is received
+    // for the urgent PING message we send below.
+    //
+    // If we get a PONG message for the urgent PING message sent below, then the connection is
+    // healthy and we can calculate the next delay normally.
     if (m_state != ConnectionState::disconnected) {
-        // A currently established connection, or an in-progress attempt to
-        // establish the connection may be about to fail for a reason that
-        // precedes the invocation of Session::cancel_reconnect_delay(). For
-        // that reason, it is important that at least one new reconnect attempt
-        // is initiated without delay after the invocation of
-        // Session::cancel_reconnect_delay(). The operation that resets the
-        // reconnect delay (ReconnectInfo::reset()) needs to be postponed,
-        // because some parts of `m_reconnect_info` may get clobbered before
-        // initiate_reconnect_wait() is called again.
-        //
-        // If a PONG message arrives, and it is a response to the urgent PING
-        // message sent below, `m_reconnect_info.m_scheduled_reset` will be
-        // reset back to false, because in that case, we know that the
-        // connection was not about to fail for a reason that preceded the
-        // invocation of cancel_reconnect_delay().
         m_reconnect_info.scheduled_reset = true;
         m_ping_after_scheduled_reset_of_reconnect_info = false;
 
