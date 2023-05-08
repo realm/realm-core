@@ -50,7 +50,7 @@ struct CollectionChangeInfo {
 struct TransactionChangeInfo {
     std::vector<CollectionChangeInfo> collections;
     std::unordered_map<TableKey, ObjectChangeSet> tables;
-    bool schema_changed;
+    bool schema_changed = false;
 };
 
 /**

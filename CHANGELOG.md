@@ -1,13 +1,33 @@
 # NEXT RELEASE
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* New notifiers can now be registered in write transactions until changes have actually been made in the write transaction. This makes it so that new notifications can be registered inside change notifications triggered by beginning a write transaction (unless a previous callback performed writes).
+* The query engine now supports `geowithin` queries on points. Points are embedded objects conforming to the geoJSON format, trying to use a geospatial query on data in the incorrect format produces a run time exception. Example RQL query: `location geoWithin geoPolygon({{-178.0, 10.0}, {178.0, 10.0}, {178.0, -10.0}, {-178.0, -10.0}, {-178.0, 10.0}})`. For SDKs who do not wish to add this yet, the feature can be compiled out by adding `-DREALM_ENABLE_GEOSPATIAL=OFF` to the cmake config. ([#6562](https://github.com/realm/realm-core/issues/6562))
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.10.1 Release notes
+
+### Enhancements
+* New notifiers can now be registered in write transactions until changes have actually been made in the write transaction. This makes it so that new notifications can be registered inside change notifications triggered by beginning a write transaction (unless a previous callback performed writes). (PR [#6560](https://github.com/realm/realm-core/pull/6560))
 * Expose `Results::get_query()` in the C-API. (PR [#6568](https://github.com/realm/realm-core/pull/6568))
 * `get_shared_app` will now generate unique app instances for configurations with the same app ID but different base URLs. `get_cached_app` now accepts the base URL as an optional second parameter which should be provided to ensure the correct app instance is returned when there are multiple instances of the same app ID with different base URLs. The deprecated `realm_app_get_cached` and `realm_app_get` C api methods have been removed ([#6480](https://github.com/realm/realm-core/pull/6480))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Exclusion of words in a full text search does not work ([#6512](https://github.com/realm/realm-core/issues/6512), since v13.0.0 );
 
 ### Breaking changes
@@ -21,6 +41,7 @@
 ### Internals
 * Reduce the memory footprint of an automatic (discard or recover) client reset when there are large incoming changes from the server. ([#6567](https://github.com/realm/realm-core/issues/6567))
 * `get_committed_file_format_version()` safe access to mappings vector from multiple threads.
+* Add CI tests for Clang 16/Ubuntu 22.04 and update lint task ([PR #6563](https://github.com/realm/realm-core/pull/6563))
 
 ----------------------------------------------
 

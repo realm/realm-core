@@ -289,6 +289,19 @@ if(NOT MSVC)
     list(APPEND REALM_SOURCES util/interprocess_mutex.cpp)
 endif()
 
+if (REALM_ENABLE_GEOSPATIAL)
+    list(APPEND REALM_SOURCES geospatial.cpp)
+    list(APPEND REALM_INSTALL_HEADERS geospatial.hpp)
+
+    set_source_files_properties(geospatial.cpp PROPERTIES
+        INCLUDE_DIRECTORIES "${RealmCore_SOURCE_DIR}/src/external"
+        # the only flag not supported with pragma diagnostic disable in src file by gcc until 13.
+        COMPILE_FLAGS "$<$<CXX_COMPILER_ID:GNU>: -Wno-unknown-pragmas>"
+    )
+
+    list(APPEND REALM_OBJECT_FILES $<TARGET_OBJECTS:s2geometry>)
+endif()
+
 add_library(Storage STATIC
     ${REALM_SOURCES}
     ${UTIL_SOURCES}
@@ -297,6 +310,7 @@ add_library(Storage STATIC
     ${REALM_OBJECT_FILES}
     $<TARGET_OBJECTS:Bid>
 )
+
 add_library(Realm::Storage ALIAS Storage)
 
 set_target_properties(Storage PROPERTIES

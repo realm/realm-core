@@ -88,6 +88,21 @@ inline bool is_ssl(ProtocolEnvelope protocol) noexcept
     return false;
 }
 
+inline std::string_view to_string(ProtocolEnvelope protocol) noexcept
+{
+    switch (protocol) {
+        case ProtocolEnvelope::realm:
+            return "realm://";
+        case ProtocolEnvelope::realms:
+            return "realms://";
+        case ProtocolEnvelope::ws:
+            return "ws://";
+        case ProtocolEnvelope::wss:
+            return "wss://";
+    }
+    return "";
+}
+
 
 // These integer types are selected so that they accomodate the requirements of
 // the protocol specification (`/doc/protocol.md`).
