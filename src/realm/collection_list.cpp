@@ -39,7 +39,7 @@ CollectionList::CollectionList(std::shared_ptr<CollectionParent> parent, ColKey 
     , m_col_key(col_key)
     , m_top(*m_alloc)
     , m_refs(*m_alloc)
-    , m_key_type(coll_type == CollectionType::List ? type_Int : type_String)
+    , m_coll_type(coll_type)
 {
     m_top.set_parent(this, 0);
     m_refs.set_parent(&m_top, 1);
@@ -51,7 +51,7 @@ CollectionList::CollectionList(CollectionParent* obj, ColKey col_key)
     , m_col_key(col_key)
     , m_top(*m_alloc)
     , m_refs(*m_alloc)
-    , m_key_type(get_table()->get_nested_column_type(col_key, 0) == CollectionType::List ? type_Int : type_String)
+    , m_coll_type(get_table()->get_nested_column_type(col_key, 0))
 {
     m_top.set_parent(this, 0);
     m_refs.set_parent(&m_top, 1);
@@ -61,14 +61,14 @@ CollectionList::~CollectionList() {}
 
 bool CollectionList::init_from_parent(bool allow_create) const
 {
-    auto ref = m_parent->get_collection_ref(m_index);
+    auto ref = m_parent->get_collection_ref(m_index, m_coll_type);
     if ((ref || allow_create) && !m_keys) {
-        switch (m_key_type) {
-            case type_String: {
+        switch (m_coll_type) {
+            case CollectionType::Dictionary: {
                 m_keys.reset(new BPlusTree<StringData>(*m_alloc));
                 break;
             }
-            case type_Int: {
+            case CollectionType::List: {
                 m_keys.reset(new BPlusTree<Int>(*m_alloc));
                 break;
             }
@@ -170,19 +170,19 @@ bool CollectionList::update_if_needed() const
 
 ref_type CollectionList::get_child_ref(size_t) const noexcept
 {
-    return m_parent->get_collection_ref(m_col_key);
+    return m_parent->get_collection_ref(m_col_key, m_coll_type);
 }
 
 void CollectionList::update_child_ref(size_t, ref_type ref)
 {
-    m_parent->set_collection_ref(m_index, ref);
+    m_parent->set_collection_ref(m_index, ref, m_coll_type);
 }
 
 CollectionBasePtr CollectionList::insert_collection(size_t ndx)
 {
     REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) == m_level);
     ensure_created();
-    REALM_ASSERT(m_key_type == type_Int);
+    REALM_ASSERT(m_coll_type == CollectionType::List);
     auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
     int64_t key = 0;
     if (auto max = bptree_maximum(*int_keys, nullptr)) {
@@ -202,7 +202,7 @@ CollectionBasePtr CollectionList::insert_collection(StringData key)
 {
     REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) == m_level);
     ensure_created();
-    REALM_ASSERT(m_key_type == type_String);
+    REALM_ASSERT(m_coll_type == CollectionType::Dictionary);
     auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
     StringData actual;
     IteratorAdapter help(string_keys);
@@ -231,7 +231,7 @@ CollectionBasePtr CollectionList::get_collection(size_t ndx) const
     if (ndx >= sz) {
         throw OutOfBounds("CollectionList::get_collection_ptr()", ndx, sz);
     }
-    if (m_key_type == type_Int) {
+    if (m_coll_type == CollectionType::List) {
         auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
         index = int_keys->get(ndx);
     }
@@ -246,7 +246,7 @@ CollectionBasePtr CollectionList::get_collection(size_t ndx) const
 CollectionListPtr CollectionList::insert_collection_list(size_t ndx)
 {
     ensure_created();
-    REALM_ASSERT(m_key_type == type_Int);
+    REALM_ASSERT(m_coll_type == CollectionType::List);
     auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
     int64_t key = 0;
     if (auto max = bptree_maximum(*int_keys, nullptr)) {
@@ -263,7 +263,7 @@ CollectionListPtr CollectionList::insert_collection_list(size_t ndx)
 CollectionListPtr CollectionList::insert_collection_list(StringData key)
 {
     ensure_created();
-    REALM_ASSERT(m_key_type == type_String);
+    REALM_ASSERT(m_coll_type == CollectionType::Dictionary);
     auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
     StringData actual;
     IteratorAdapter help(string_keys);
@@ -289,7 +289,7 @@ CollectionListPtr CollectionList::get_collection_list(size_t ndx) const
     if (ndx >= sz) {
         throw OutOfBounds("CollectionList::get_collection_ptr()", ndx, sz);
     }
-    if (m_key_type == type_Int) {
+    if (m_coll_type == CollectionType::List) {
         auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
         index = int_keys->get(ndx);
     }
@@ -303,7 +303,7 @@ CollectionListPtr CollectionList::get_collection_list(size_t ndx) const
 
 void CollectionList::remove(size_t ndx)
 {
-    REALM_ASSERT(m_key_type == type_Int);
+    REALM_ASSERT(m_coll_type == CollectionType::List);
     auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
     const auto sz = int_keys->size();
     if (ndx >= sz) {
@@ -331,7 +331,7 @@ void CollectionList::remove(size_t ndx)
 
 void CollectionList::remove(StringData key)
 {
-    REALM_ASSERT(m_key_type == type_String);
+    REALM_ASSERT(m_coll_type == CollectionType::Dictionary);
     auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
     IteratorAdapter help(string_keys);
     auto it = std::lower_bound(help.begin(), help.end(), key);
@@ -347,10 +347,10 @@ void CollectionList::remove(StringData key)
     bump_content_version();
 }
 
-ref_type CollectionList::get_collection_ref(Index index) const noexcept
+ref_type CollectionList::get_collection_ref(Index index, CollectionType) const noexcept
 {
     size_t ndx;
-    if (m_key_type == type_Int) {
+    if (m_coll_type == CollectionType::List) {
         auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
         ndx = int_keys->find_first(mpark::get<int64_t>(index));
     }
@@ -361,10 +361,10 @@ ref_type CollectionList::get_collection_ref(Index index) const noexcept
     return ndx == realm::not_found ? 0 : m_refs.get(ndx);
 }
 
-void CollectionList::set_collection_ref(Index index, ref_type ref)
+void CollectionList::set_collection_ref(Index index, ref_type ref, CollectionType)
 {
     size_t ndx;
-    if (m_key_type == type_Int) {
+    if (m_coll_type == CollectionType::List) {
         auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
         ndx = int_keys->find_first(mpark::get<int64_t>(index));
     }
@@ -380,7 +380,7 @@ void CollectionList::set_collection_ref(Index index, ref_type ref)
 
 auto CollectionList::get_index(size_t ndx) const noexcept -> Index
 {
-    if (m_key_type == type_Int) {
+    if (m_coll_type == CollectionType::List) {
         auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
         return int_keys->get(ndx);
     }
@@ -431,7 +431,7 @@ void CollectionList::to_json(std::ostream& out, size_t link_depth, JSONOutputMod
                              util::FunctionRef<void(const Mixed&)> fn) const
 {
     bool is_leaf = m_level == get_table()->get_nesting_levels(m_col_key);
-    bool is_dictionary = m_key_type == type_String;
+    bool is_dictionary = m_coll_type == CollectionType::Dictionary;
     auto sz = size();
     auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
 

@@ -2262,14 +2262,31 @@ ref_type Obj::Internal::get_ref(const Obj& obj, ColKey col_key)
     return to_ref(obj._get<int64_t>(col_key.get_index()));
 }
 
-ref_type Obj::get_collection_ref(Index index) const noexcept
+ref_type Obj::get_collection_ref(Index index, CollectionType type) const
 {
-    return to_ref(_get<int64_t>(mpark::get<ColKey>(index).get_index()));
+    ColKey col_key = mpark::get<ColKey>(index);
+    if (col_key.is_collection()) {
+        return to_ref(_get<int64_t>(col_key.get_index()));
+    }
+    if (col_key.get_type() == col_type_Mixed) {
+        auto val = _get<Mixed>(col_key.get_index());
+        if (val.is_null() || !val.is_type(DataType(int(type)))) {
+            throw IllegalOperation("Not proper collection type");
+        }
+        return val.get_ref();
+    }
+    return 0;
 }
 
-void Obj::set_collection_ref(Index index, ref_type ref)
+void Obj::set_collection_ref(Index index, ref_type ref, CollectionType type)
 {
-    set_int(mpark::get<ColKey>(index), from_ref(ref));
+    ColKey col_key = mpark::get<ColKey>(index);
+    if (col_key.is_collection()) {
+        set_int(col_key, from_ref(ref));
+        return;
+    }
+    REALM_ASSERT(col_key.get_type() == col_type_Mixed);
+    set(col_key, Mixed(ref, type));
 }
 
 } // namespace realm

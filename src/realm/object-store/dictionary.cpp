@@ -116,6 +116,10 @@ public:
     {
         m_dictionary->set_owner(std::move(parent), index);
     }
+    CollectionType get_collection_type() const noexcept override
+    {
+        return CollectionType::List;
+    }
 
 private:
     std::shared_ptr<Dictionary> m_dictionary;

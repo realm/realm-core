@@ -96,8 +96,9 @@ std::pair<std::string, std::string> CollectionBase::get_open_close_strings(size_
 {
     std::string open_str;
     std::string close_str;
-    auto ck = get_col_key();
+    auto collection_type = get_collection_type();
     Table* target_table = get_target_table().unchecked_ptr();
+    auto ck = get_col_key();
     auto type = ck.get_type();
     if (type == col_type_LinkList)
         type = col_type_Link;
@@ -107,29 +108,31 @@ std::pair<std::string, std::string> CollectionBase::get_open_close_strings(size_
 
         if (output_mode == output_mode_xjson_plus) {
             open_str = std::string("{ ") + (is_embedded ? "\"$embedded" : "\"$link");
-            open_str += collection_type_name(ck, true);
+            open_str += collection_type_name(collection_type, true);
             open_str += "\": ";
             close_str += " }";
         }
 
         if ((link_depth_reached && output_mode != output_mode_xjson) || output_mode == output_mode_xjson_plus) {
             open_str += "{ \"table\": \"" + std::string(target_table->get_name()) + "\", ";
-            open_str += ((is_embedded || ck.is_dictionary()) ? "\"value" : "\"key");
-            if (ck.is_collection())
-                open_str += "s";
+            open_str += ((is_embedded || collection_type == CollectionType::Dictionary) ? "\"values" : "\"keys");
             open_str += "\": ";
             close_str += "}";
         }
     }
     else {
         if (output_mode == output_mode_xjson_plus) {
-            if (ck.is_set()) {
-                open_str = "{ \"$set\": ";
-                close_str = " }";
-            }
-            else if (ck.is_dictionary()) {
-                open_str = "{ \"$dictionary\": ";
-                close_str = " }";
+            switch (collection_type) {
+                case CollectionType::List:
+                    break;
+                case CollectionType::Set:
+                    open_str = "{ \"$set\": ";
+                    close_str = " }";
+                    break;
+                case CollectionType::Dictionary:
+                    open_str = "{ \"$dictionary\": ";
+                    close_str = " }";
+                    break;
             }
         }
     }

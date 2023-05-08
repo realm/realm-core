@@ -394,6 +394,10 @@ public:
     {
         return m_source.has_changed();
     }
+    CollectionType get_collection_type() const noexcept override
+    {
+        return CollectionType::List;
+    }
 
     // Overrides of ObjCollectionBase:
     UpdateStatus do_update_if_needed() const final

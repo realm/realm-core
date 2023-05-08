@@ -83,8 +83,8 @@ public:
     {
         return *this;
     }
-    ref_type get_collection_ref(Index index) const noexcept final;
-    void set_collection_ref(Index index, ref_type ref) final;
+    ref_type get_collection_ref(Index, CollectionType) const final;
+    void set_collection_ref(Index, ref_type, CollectionType) final;
 
     // Operator overloads
     bool operator==(const Obj& other) const;

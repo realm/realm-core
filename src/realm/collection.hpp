@@ -90,6 +90,9 @@ public:
     /// the internal state of the accessor if it has changed.
     virtual bool has_changed() const noexcept = 0;
 
+    /// Get collection type (set, list, dictionary)
+    virtual CollectionType get_collection_type() const noexcept = 0;
+
     /// Returns true if the accessor is in the attached state. By default, this
     /// checks if the owning object is still valid.
     virtual bool is_attached() const
@@ -154,21 +157,23 @@ protected:
     std::pair<std::string, std::string> get_open_close_strings(size_t link_depth, JSONOutputMode output_mode) const;
 };
 
-inline std::string_view collection_type_name(ColKey col, bool uppercase = false)
+inline std::string_view collection_type_name(CollectionType col_type, bool uppercase = false)
 {
-    if (col.is_list())
-        return uppercase ? "List" : "list";
-    if (col.is_set())
-        return uppercase ? "Set" : "set";
-    if (col.is_dictionary())
-        return uppercase ? "Dictionary" : "dictionary";
+    switch (col_type) {
+        case CollectionType::List:
+            return uppercase ? "List" : "list";
+        case CollectionType::Set:
+            return uppercase ? "Set" : "set";
+        case CollectionType::Dictionary:
+            return uppercase ? "Dictionary" : "dictionary";
+    }
     return "";
 }
 
 inline void CollectionBase::validate_index(const char* msg, size_t index, size_t size) const
 {
     if (index >= size) {
-        throw OutOfBounds(util::format("%1 on %2 '%3.%4'", msg, collection_type_name(get_col_key()),
+        throw OutOfBounds(util::format("%1 on %2 '%3.%4'", msg, collection_type_name(get_collection_type()),
                                        get_table()->get_class_name(), get_property_name()),
                           index, size);
     }
@@ -382,6 +387,11 @@ public:
         return false;
     }
 
+    CollectionType get_collection_type() const noexcept override
+    {
+        return Interface::s_collection_type;
+    }
+
     void set_owner(const Obj& obj, ColKey ck) override
     {
         m_obj_mem = obj;
@@ -471,7 +481,7 @@ protected:
     ref_type get_collection_ref() const noexcept
     {
         try {
-            return m_parent->get_collection_ref(m_index);
+            return m_parent->get_collection_ref(m_index, Interface::s_collection_type);
         }
         catch (const KeyNotFound&) {
             return ref_type(0);
@@ -480,7 +490,7 @@ protected:
 
     void set_collection_ref(ref_type ref)
     {
-        m_parent->set_collection_ref(m_index, ref);
+        m_parent->set_collection_ref(m_index, ref, Interface::s_collection_type);
     }
 
     UpdateStatus get_update_status() const noexcept
