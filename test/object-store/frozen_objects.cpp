@@ -263,17 +263,15 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         auto dict_results = dict.as_results();
 
         Results frozen_res = dict_results.freeze(frozen_realm);
-
-        write([&]() {
-            table->remove_object(table->get_object(0).get_key());
-        });
-
         JoiningThread thread1([&] {
             REQUIRE(frozen_res.is_frozen());
             REQUIRE(frozen_res.size() == 5);
             REQUIRE(frozen_res.get<Int>(0) == 2);
         });
 
+        write([&]() {
+            table->remove_object(table->get_object(0).get_key());
+        });
         VERIFY_STALE_RESULTS(dict_results, realm);
     }
 
