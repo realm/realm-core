@@ -641,7 +641,7 @@ void Connection::initiate_reconnect_wait()
         // destroyed.
         if (status != ErrorCodes::OperationAborted)
             handle_reconnect_wait(status); // Throws
-    }); // Throws
+    });                                    // Throws
 }
 
 
