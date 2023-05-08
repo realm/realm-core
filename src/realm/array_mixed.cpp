@@ -281,7 +281,7 @@ void ArrayMixed::ensure_string_array() const
 void ArrayMixed::ensure_ref_array() const
 {
     while (Array::size() < payload_idx_ref + 1) {
-        const_cast<ArrayMixed*>(this)->Array::add(0l);
+        const_cast<ArrayMixed*>(this)->Array::add(0);
     }
     ensure_array_accessor(m_refs, payload_idx_ref);
 }
