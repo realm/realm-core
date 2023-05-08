@@ -966,6 +966,7 @@ buildvariants:
     run_tests_against_baas: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
+    extra_flags: -DREALM_ENABLE_GEOSPATIAL=OFF # can be removed once SDKs pick this feature up
   tasks:
   - name: compile_test
 
@@ -1245,7 +1246,7 @@ buildvariants:
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64 -DREALM_ENABLE_GEOSPATIAL=OFF
   tasks:
   - name: compile_test
     distros:

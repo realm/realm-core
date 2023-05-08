@@ -20,6 +20,7 @@
 #define REALM_UTIL_SERIALIZER_HPP
 
 #include <realm/table_ref.hpp>
+#include <realm/util/features.h>
 #include <realm/util/optional.hpp>
 
 #include <string>
@@ -41,6 +42,10 @@ class UUID;
 class TypeOfValue;
 class Group;
 enum class ExpressionComparisonType : unsigned char;
+
+#if REALM_ENABLE_GEOSPATIAL
+class Geospatial;
+#endif // REALM_ENABLE_GEOSPATIAL
 
 namespace util {
 namespace serializer {
@@ -76,6 +81,11 @@ template <>
 std::string print_value<>(realm::UUID);
 template <>
 std::string print_value<>(realm::TypeOfValue);
+
+#if REALM_ENABLE_GEOSPATIAL
+template <>
+std::string print_value<>(const realm::Geospatial&);
+#endif // REALM_ENABLE_GEOSPATIAL
 
 // General implementation for most types
 template <typename T>

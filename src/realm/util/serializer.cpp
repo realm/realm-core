@@ -19,6 +19,7 @@
 #include <realm/util/serializer.hpp>
 
 #include <realm/binary_data.hpp>
+#include <realm/geospatial.hpp>
 #include <realm/keys.hpp>
 #include <realm/null.hpp>
 #include <realm/query_expression.hpp>
@@ -212,6 +213,14 @@ std::string print_value<>(realm::TypeOfValue type)
 {
     return '"' + type.to_string() + '"';
 }
+
+#if REALM_ENABLE_GEOSPATIAL
+template <>
+std::string print_value<>(const realm::Geospatial& geo)
+{
+    return geo.to_string();
+}
+#endif
 
 // The variable name must be unique with respect to the already chosen variables at
 // this level of subquery nesting and with respect to the names of the columns in the table.

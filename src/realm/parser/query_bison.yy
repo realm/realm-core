@@ -8,11 +8,17 @@
 %define parse.assert
 
 %code requires {
+  #include <memory>
   #include <string>
   #include <realm/mixed.hpp>
+  #include <realm/geospatial.hpp>
+  #include <array>
+  #include <optional>
+  using realm::GeoPoint;
   namespace realm::query_parser {
     class ParserDriver;
     class ConstantNode;
+    class GeospatialNode;
     class ListNode;
     class PostOpNode;
     class AggrNode;
@@ -41,6 +47,7 @@
 
   }
   using namespace realm::query_parser;
+
 }
 
 // The parsing context.
@@ -92,6 +99,9 @@ using namespace realm::query_parser;
   AND     "&&"
   OR      "||"
   NOT     "!"
+  GEOBOX        "geobox"
+  GEOPOLYGON    "geopolygon"
+  GEOSPHERE     "geosphere"
 ;
 
 %token <std::string> ID "identifier"
@@ -115,6 +125,7 @@ using namespace realm::query_parser;
 %token <std::string> LIKE    "like"
 %token <std::string> BETWEEN "between"
 %token <std::string> IN "in"
+%token <std::string> GEOWITHIN "geowithin"
 %token <std::string> OBJ "obj"
 %token <std::string> SORT "sort"
 %token <std::string> DISTINCT "distinct"
@@ -126,7 +137,12 @@ using namespace realm::query_parser;
 %token <std::string> KEY_VAL "key or value"
 %type  <bool> direction
 %type  <int> equality relational stringop aggr_op
+%type  <double> coordinate
 %type  <ConstantNode*> constant primary_key
+%type  <GeospatialNode*> geospatial geoloop geoloop_content geopoly_content
+// std::optional<GeoPoint> is necessary because GeoPoint has deleted its default constructor
+// but bison must push a default value to the stack, even though it will be overwritten by a real value
+%type  <std::optional<GeoPoint>> geopoint
 %type  <ListNode*> list list_content
 %type  <AggrNode*> aggregate
 %type  <SubqueryNode*> subquery 
@@ -146,6 +162,14 @@ using namespace realm::query_parser;
 
 %destructor { } <int>
 
+%printer {
+           if (!$$) {
+               yyo << "null";
+           } else {
+             yyo << "['" << $$->longitude << "', '" << $$->latitude;
+             if (auto alt = $$->get_altitude())
+               yyo << "', '" << *alt; 
+             yyo << "']"; }}  <std::optional<GeoPoint>>;
 %printer { yyo << $$.id; } <PathElem>;
 %printer { yyo << $$; } <*>;
 %printer { yyo << "<>"; } <>;
@@ -186,6 +210,8 @@ compare
                                     $$ = tmp;
                                 }
     | value BETWEEN list        { $$ = drv.m_parse_nodes.create<BetweenNode>($1, $3); }
+    | prop GEOWITHIN geospatial { $$ = drv.m_parse_nodes.create<GeoWithinNode>($1, $3); }
+    | prop GEOWITHIN ARG        { $$ = drv.m_parse_nodes.create<GeoWithinNode>($1, $3); }
 
 expr
     : value                     { $$ = $1; }
@@ -221,6 +247,29 @@ simple_prop
 
 subquery
     : SUBQUERY '(' simple_prop ',' id ',' query ')' '.' SIZE   { $$ = drv.m_parse_nodes.create<SubqueryNode>($3, $5, $7); }
+
+coordinate
+    : FLOAT         { $$ = strtod($1.c_str(), nullptr); }
+    | NATURAL0      { $$ = double(strtoll($1.c_str(), nullptr, 0)); }
+
+geopoint
+    : '[' coordinate ',' coordinate ']' { $$ = GeoPoint{$2, $4}; }
+    | '[' coordinate ',' coordinate ',' FLOAT ']' { $$ = GeoPoint{$2, $4, strtod($6.c_str(), nullptr)}; }
+
+geoloop_content
+    : geopoint { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Loop{}, *$1); }
+    | geoloop_content ',' geopoint { $1->add_point_to_loop(*$3); $$ = $1; }
+
+geoloop : '{' geoloop_content '}' { $$ = $2; }
+
+geopoly_content
+    : geoloop { $$ = $1; }
+    | geopoly_content ',' geoloop { $1->add_loop_to_polygon($3); $$ = $1; }
+
+geospatial
+    : GEOBOX '(' geopoint ',' geopoint ')'  { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Box{}, *$3, *$5); }
+    | GEOSPHERE '(' geopoint ',' coordinate ')' { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Sphere{}, *$3, $5); }
+    | GEOPOLYGON '(' geopoly_content ')'    { $$ = $3; }
 
 post_query
     : %empty                    { $$ = drv.m_parse_nodes.create<DescriptorOrderingNode>();}

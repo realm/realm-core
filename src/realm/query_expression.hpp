@@ -139,6 +139,9 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/column_integer.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/dictionary.hpp>
+#if REALM_ENABLE_GEOSPATIAL
+#include <realm/geospatial.hpp>
+#endif
 #include <realm/table.hpp>
 #include <realm/index_string.hpp>
 #include <realm/query.hpp>
@@ -741,7 +744,7 @@ public:
         REALM_ASSERT(false); // Unimplemented
     }
 
-    virtual Mixed get_mixed()
+    virtual Mixed get_mixed() const
     {
         return {};
     }
@@ -1165,6 +1168,18 @@ public:
     }
 };
 
+#if REALM_ENABLE_GEOSPATIAL
+template <>
+class Subexpr2<Geospatial> : public Subexpr, public Overloads<Geospatial, Geospatial> {
+public:
+    // FIXME: Query geoWithin(const Geospatial& other);
+    DataType get_type() const final
+    {
+        return type_Geospatial;
+    }
+};
+#endif
+
 struct TrueExpression : Expression {
     size_t find_first(size_t start, size_t end) const override
     {
@@ -1307,7 +1322,7 @@ public:
         m_comparison_type = type;
     }
 
-    Mixed get_mixed() override
+    Mixed get_mixed() const override
     {
         return get(0);
     }
@@ -1434,6 +1449,36 @@ private:
 
     OwnedBinaryData m_buffer;
 };
+
+#if REALM_ENABLE_GEOSPATIAL
+class ConstantGeospatialValue : public Value<Geospatial> {
+public:
+    ConstantGeospatialValue(const Geospatial& geo)
+        : Value()
+        , m_geospatial(geo)
+    {
+        if (geo.is_valid()) {
+            set(0, Mixed{&m_geospatial});
+        }
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new ConstantGeospatialValue(*this));
+    }
+
+private:
+    ConstantGeospatialValue(const ConstantGeospatialValue& other)
+        : Value()
+        , m_geospatial(other.m_geospatial)
+    {
+        if (m_geospatial.is_valid()) {
+            set(0, Mixed{&m_geospatial});
+        }
+    }
+    Geospatial m_geospatial;
+};
+#endif
 
 // Classes used for LinkMap (see below).
 struct LinkMapFunction {
@@ -2371,6 +2416,104 @@ private:
     LinkMap m_link_map;
 };
 
+#if REALM_ENABLE_GEOSPATIAL
+class GeoWithinCompare : public Expression {
+public:
+    GeoWithinCompare(const LinkMap& lm, Geospatial bounds)
+        : m_link_map(lm)
+        , m_bounds(bounds)
+    {
+    }
+
+    void set_base_table(ConstTableRef table) override
+    {
+        m_link_map.set_base_table(table);
+        ColKey coords_col = m_link_map.get_target_table()->get_column_key("coordinates");
+        ColKey type_col = m_link_map.get_target_table()->get_column_key("type");
+        if (!coords_col || !type_col || !coords_col.is_list() ||
+            coords_col.get_type() != ColumnType(ColumnType::Type::Double) ||
+            type_col.get_type() != ColumnType(ColumnType::Type::String) || type_col.is_collection()) {
+            util::serializer::SerialisationState none;
+            throw std::runtime_error(util::format(
+                "Query '%1' links to data in the wrong format for a geoWithin query", this->description(none)));
+        }
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_link_map.set_cluster(cluster);
+    }
+
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_link_map.collect_dependencies(tables);
+    }
+
+    // Return main table of query (table on which table->where()... is invoked). Note that this is not the same as
+    // any linked-to payload tables
+    ConstTableRef get_base_table() const override
+    {
+        return m_link_map.get_base_table();
+    }
+
+    struct GeoWithinConsumer : public LinkMapFunction {
+        GeoWithinConsumer(ConstTableRef table, ColKey type_col, ColKey coords_col, const Geospatial& bounds)
+            : m_table(table)
+            , m_type(type_col)
+            , m_coords(coords_col)
+            , m_bounds(bounds)
+        {
+        }
+        bool consume(ObjKey key) override
+        {
+            m_found = Geospatial::from_obj(m_table->get_object(key), m_type, m_coords).is_within(m_bounds);
+            return m_found;
+        }
+        ConstTableRef m_table;
+        ColKey m_type;
+        ColKey m_coords;
+        const Geospatial& m_bounds;
+        bool m_found = false;
+    };
+
+    size_t find_first(size_t start, size_t end) const override
+    {
+        GeoWithinConsumer consumer(m_link_map.get_target_table(), m_type_col, m_coords_col, m_bounds);
+        while (start < end) {
+            m_link_map.map_links(start, consumer);
+            if (consumer.m_found)
+                return start;
+            start++;
+        }
+
+        return not_found;
+    }
+
+    virtual std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return state.describe_columns(m_link_map, ColKey()) + " GEOWITHIN " + util::serializer::print_value(m_bounds);
+    }
+
+    std::unique_ptr<Expression> clone() const override
+    {
+        return std::unique_ptr<Expression>(new GeoWithinCompare(*this));
+    }
+
+private:
+    GeoWithinCompare(const GeoWithinCompare& other)
+        : Expression(other)
+        , m_link_map(other.m_link_map)
+        , m_bounds(other.m_bounds)
+    {
+    }
+
+    mutable LinkMap m_link_map;
+    mutable Geospatial m_bounds;
+    mutable ColKey m_type_col;
+    mutable ColKey m_coords_col;
+};
+#endif
+
 template <class T, class TExpr>
 class SizeOperator : public Subexpr2<Int> {
 public:
@@ -2590,6 +2733,13 @@ public:
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
         return make_expression<UnaryLinkCompare<true>>(m_link_map);
     }
+
+#if REALM_ENABLE_GEOSPATIAL
+    Query geo_within(Geospatial bounds) const
+    {
+        return make_expression<GeoWithinCompare>(m_link_map, bounds);
+    }
+#endif
 
     LinkCount count() const
     {
@@ -4240,7 +4390,7 @@ public:
         return not_found; // no match
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         if constexpr (realm::is_any_v<TCond, BeginsWith, BeginsWithIns, EndsWith, EndsWithIns, Contains, ContainsIns,
                                       Like, LikeIns>) {
