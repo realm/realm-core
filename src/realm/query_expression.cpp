@@ -73,7 +73,7 @@ std::string LinkMap::description(util::serializer::SerialisationState& state) co
     return s;
 }
 
-void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
+void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction lm) const
 {
     bool last = (column + 1 == m_link_column_keys.size());
     ColumnType type = m_link_types[column];
@@ -86,7 +86,7 @@ void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
             if (ObjKey k = coll->get_key(t)) {
                 // Unresolved links are filtered out
                 if (last) {
-                    lm.consume(k);
+                    lm(k);
                 }
                 else
                     map_links(column + 1, k, lm);
@@ -97,7 +97,7 @@ void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
         if (ObjKey k = obj.get<ObjKey>(column_key)) {
             if (!k.is_unresolved()) {
                 if (last)
-                    lm.consume(k);
+                    lm(k);
                 else
                     map_links(column + 1, k, lm);
             }
@@ -107,7 +107,7 @@ void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
         auto backlinks = obj.get_all_backlinks(column_key);
         for (auto k : backlinks) {
             if (last) {
-                lm.consume(k);
+                lm(k);
             }
             else
                 map_links(column + 1, k, lm);
@@ -125,7 +125,7 @@ ref_type LinkMap::get_ref(const ArrayPayload* array_payload, ColumnType type, si
     return static_cast<const ArrayKey*>(array_payload)->get_as_ref(row);
 }
 
-void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
+void LinkMap::map_links(size_t column, size_t row, LinkMapFunction lm) const
 {
     REALM_ASSERT(m_leaf_ptr != nullptr);
 
@@ -156,7 +156,7 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
                             auto k = link.get_obj_key();
                             if (!k.is_unresolved()) {
                                 if (last)
-                                    lm.consume(k);
+                                    lm(k);
                                 else
                                     map_links(column + 1, k, lm);
                             }
@@ -171,7 +171,7 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
             if (ObjKey k = static_cast<const ArrayKey*>(m_leaf_ptr)->get(row)) {
                 if (!k.is_unresolved()) {
                     if (last)
-                        lm.consume(k);
+                        lm(k);
                     else
                         map_links(column + 1, k, lm);
                 }
@@ -187,7 +187,7 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
                 ObjKey k = links.get(t);
                 if (!k.is_unresolved()) {
                     if (last) {
-                        if (!lm.consume(k)) {
+                        if (!lm(k)) {
                             return;
                         }
                     }
@@ -203,8 +203,7 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
         for (size_t t = 0; t < sz; t++) {
             ObjKey k = back_links->get_backlink(row, t);
             if (last) {
-                bool continue2 = lm.consume(k);
-                if (!continue2)
+                if (!lm(k))
                     return;
             }
             else

@@ -166,7 +166,7 @@ struct GeoCenterSphere {
 
 class Geospatial {
 public:
-    enum class Type : uint8_t { Point, Box, Polygon, CenterSphere, Invalid };
+    enum class Type : uint8_t { Invalid, Point, Box, Polygon, CenterSphere };
 
     Geospatial()
         : m_value(mpark::monostate{})
@@ -231,10 +231,21 @@ public:
     constexpr static std::string_view c_geo_point_coords_col_name = "coordinates";
 
 private:
+    // Must be in the same order as the Type enum
     mpark::variant<mpark::monostate, GeoPoint, GeoBox, GeoPolygon, GeoCenterSphere> m_value;
 
-    mutable std::shared_ptr<S2Region> m_region;
-    S2Region& get_region() const;
+    friend class GeoRegion;
+};
+
+class GeoRegion {
+public:
+    GeoRegion(const Geospatial& geo);
+    ~GeoRegion();
+
+    bool contains(const GeoPoint& point) const noexcept;
+
+private:
+    std::unique_ptr<S2Region> m_region;
 };
 
 template <>

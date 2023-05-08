@@ -64,42 +64,24 @@ namespace realm {
 
 std::string Geospatial::get_type_string() const noexcept
 {
-    return mpark::visit(util::overload{[&](const GeoPoint&) {
-                                           return "Point";
-                                       },
-                                       [&](const GeoBox&) {
-                                           return "Box";
-                                       },
-                                       [&](const GeoPolygon&) {
-                                           return "Polygon";
-                                       },
-                                       [&](const GeoCenterSphere&) {
-                                           return "CenterSphere";
-                                       },
-                                       [&](const mpark::monostate&) {
-                                           return "Invalid";
-                                       }},
-                        m_value);
+    switch (get_type()) {
+        case Type::Point:
+            return "Point";
+        case Type::Box:
+            return "Box";
+        case Type::Polygon:
+            return "Polygon";
+        case Type::CenterSphere:
+            return "CenterSphere";
+        case Type::Invalid:
+            return "Invalid";
+    }
+    REALM_UNREACHABLE();
 }
 
 Geospatial::Type Geospatial::get_type() const noexcept
 {
-    return mpark::visit(util::overload{[&](const GeoPoint&) {
-                                           return Type::Point;
-                                       },
-                                       [&](const GeoBox&) {
-                                           return Type::Box;
-                                       },
-                                       [&](const GeoPolygon&) {
-                                           return Type::Polygon;
-                                       },
-                                       [&](const GeoCenterSphere&) {
-                                           return Type::CenterSphere;
-                                       },
-                                       [&](const mpark::monostate&) {
-                                           return Type::Invalid;
-                                       }},
-                        m_value);
+    return static_cast<Type>(m_value.index());
 }
 
 bool Geospatial::is_geospatial(const TableRef table, ColKey link_col)
@@ -231,92 +213,24 @@ void Geospatial::assign_to(Obj& link) const
     }
 }
 
-S2Region& Geospatial::get_region() const
+static std::string point_str(const GeoPoint& point)
 {
-    if (m_region)
-        return *m_region.get();
-
-    mpark::visit(util::overload{
-                     [&](const GeoPoint&) {
-                         REALM_UNREACHABLE();
-                     },
-                     [&](const GeoBox& box) {
-                         m_region =
-                             std::make_unique<S2LatLngRect>(S2LatLng::FromDegrees(box.lo.latitude, box.lo.longitude),
-                                                            S2LatLng::FromDegrees(box.hi.latitude, box.hi.longitude));
-                     },
-                     [&](const GeoPolygon& polygon) {
-                         REALM_ASSERT(polygon.points.size() >= 1);
-                         std::vector<S2Loop*> loops;
-                         for (size_t i = 0; i < polygon.points.size(); ++i) {
-                             std::vector<S2Point> points;
-                             points.reserve(polygon.points[i].size());
-                             for (auto&& p : polygon.points[i]) {
-                                 // FIXME rewrite without copying
-                                 points.emplace_back(S2LatLng::FromDegrees(p.latitude, p.longitude).ToPoint());
-                             }
-                             loops.push_back(new S2Loop(points));
-                         }
-                         // S2Polygon takes ownership of all the S2Loop pointers
-                         m_region = std::make_unique<S2Polygon>(&loops);
-                     },
-                     [&](const GeoCenterSphere& sphere) {
-                         auto center =
-                             S2LatLng::FromDegrees(sphere.center.latitude, sphere.center.longitude).ToPoint();
-                         auto radius = S1Angle::Radians(sphere.radius_radians);
-                         m_region.reset(S2Cap::FromAxisAngle(center, radius).Clone()); // FIXME without extra copy
-                     },
-                     [&](const mpark::monostate&) {
-                         REALM_UNREACHABLE();
-                     }},
-                 m_value);
-
-    return *m_region.get();
-}
-
-bool Geospatial::is_within(const Geospatial& geometry) const noexcept
-{
-    REALM_ASSERT(get_type() == Geospatial::Type::Point);
-
-    auto&& geo_point = mpark::get<GeoPoint>(m_value);
-    auto point = S2LatLng::FromDegrees(geo_point.latitude, geo_point.longitude).ToPoint();
-
-    auto& region = geometry.get_region();
-    return mpark::visit(util::overload{[&](const GeoPoint&) {
-                                           return false;
-                                       },
-                                       [&](const GeoBox&) {
-                                           return static_cast<S2LatLngRect&>(region).Contains(point);
-                                       },
-                                       [&](const GeoPolygon&) {
-                                           return static_cast<S2Polygon&>(region).Contains(point);
-                                       },
-                                       [&](const GeoCenterSphere&) {
-                                           return static_cast<S2Cap&>(region).Contains(point);
-                                       },
-                                       [&](const mpark::monostate&) {
-                                           return false;
-                                       }},
-                        geometry.m_value);
+    if (point.has_altitude()) {
+        return util::format("[%1, %2, %3]", point.longitude, point.latitude, point.altitude);
+    }
+    return util::format("[%1, %2]", point.longitude, point.latitude);
 }
 
 std::string Geospatial::to_string() const
 {
-    auto point_str = [&](const GeoPoint& point) -> std::string {
-        if (point.get_altitude()) {
-            return util::format("[%1, %2, %3]", point.longitude, point.latitude, *point.get_altitude());
-        }
-        return util::format("[%1, %2]", point.longitude, point.latitude);
-    };
-
     return mpark::visit(
-        util::overload{[&](const GeoPoint& point) {
+        util::overload{[](const GeoPoint& point) {
                            return util::format("GeoPoint(%1)", point_str(point));
                        },
-                       [&](const GeoBox& box) {
+                       [](const GeoBox& box) {
                            return util::format("GeoBox(%1, %2)", point_str(box.lo), point_str(box.hi));
                        },
-                       [&](const GeoPolygon& poly) {
+                       [](const GeoPolygon& poly) {
                            std::string points = "";
                            for (size_t i = 0; i < poly.points.size(); ++i) {
                                if (i != 0) {
@@ -330,20 +244,76 @@ std::string Geospatial::to_string() const
                            }
                            return util::format("GeoPolygon(%1)", points);
                        },
-                       [&](const GeoCenterSphere& sphere) {
+                       [](const GeoCenterSphere& sphere) {
                            return util::format("GeoSphere(%1, %2)", point_str(sphere.center), sphere.radius_radians);
                        },
-                       [&](const mpark::monostate&) {
+                       [](const mpark::monostate&) {
                            return std::string("NULL");
                        }},
         m_value);
-    return "NULL";
 }
 
 std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo)
 {
     ostr << geo.to_string();
     return ostr;
+}
+
+GeoRegion::GeoRegion(const Geospatial& geo)
+{
+    struct Visitor {
+        std::unique_ptr<S2Region> operator()(const GeoBox& box) const
+        {
+            return std::make_unique<S2LatLngRect>(S2LatLng::FromDegrees(box.lo.latitude, box.lo.longitude),
+                                                  S2LatLng::FromDegrees(box.hi.latitude, box.hi.longitude));
+        }
+
+        std::unique_ptr<S2Region> operator()(const GeoPolygon& polygon) const
+        {
+            REALM_ASSERT(polygon.points.size() >= 1);
+            std::vector<S2Loop*> loops;
+            loops.reserve(polygon.points.size());
+            std::vector<S2Point> points;
+            for (auto& geo_points : polygon.points) {
+                points.clear();
+                points.reserve(geo_points.size());
+                for (auto&& p : geo_points) {
+                    // FIXME rewrite without copying
+                    points.push_back(S2LatLng::FromDegrees(p.latitude, p.longitude).ToPoint());
+                }
+                loops.push_back(new S2Loop(points));
+            }
+            // S2Polygon takes ownership of all the S2Loop pointers
+            return std::make_unique<S2Polygon>(&loops);
+        }
+
+        std::unique_ptr<S2Region> operator()(const GeoCenterSphere& sphere) const
+        {
+            auto center = S2LatLng::FromDegrees(sphere.center.latitude, sphere.center.longitude).ToPoint();
+            auto radius = S1Angle::Radians(sphere.radius_radians);
+            return std::make_unique<S2Cap>(S2Cap::FromAxisAngle(center, radius));
+        }
+
+        std::unique_ptr<S2Region> operator()(const mpark::monostate&) const
+        {
+            REALM_UNREACHABLE();
+        }
+
+        std::unique_ptr<S2Region> operator()(const GeoPoint&) const
+        {
+            REALM_UNREACHABLE();
+        }
+    };
+
+    m_region = mpark::visit(Visitor(), geo.m_value);
+}
+
+GeoRegion::~GeoRegion() = default;
+
+bool GeoRegion::contains(const GeoPoint& geo_point) const noexcept
+{
+    auto point = S2LatLng::FromDegrees(geo_point.latitude, geo_point.longitude).ToPoint();
+    return m_region->VirtualContainsPoint(point);
 }
 
 } // namespace realm
