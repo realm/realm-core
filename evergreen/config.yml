@@ -816,8 +816,11 @@ tasks:
             format_ref="${revision}"
         fi
 
+        clang-format --version
+
         clang_command="git clang-format -v --diff $format_ref"
-        out=$($clang_command)
+        # Don't error out on clang-format errors
+        out=$($clang_command) && :
 
         echo -e "CLANG: $clang_command\n$out"
 
