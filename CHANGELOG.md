@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Add CMake toolchains for cross-targeting Linux x86_64, armv7, and aarch64. (PR [#6559](https://github.com/realm/realm-core/pull/6559))
 
 ----------------------------------------------
 
