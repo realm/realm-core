@@ -391,6 +391,12 @@ let package = Package(
         .target(
             name: "s2geometry",
             path: "src/external/s2",
+            exclude: [
+                "s2cellunion.cc",
+                "s2regioncoverer.cc",
+                "s2regionintersection.cc",
+                "s2regionunion.cc"
+            ],
             publicHeadersPath: ".",
             cxxSettings: ([
                 .headerSearchPath(".."),
