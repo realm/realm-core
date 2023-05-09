@@ -15,6 +15,13 @@ if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
 
 endif()
 
+add_executable(ClickBench EXCLUDE_FROM_ALL clickbench.cpp )
+set_target_properties(ClickBench PROPERTIES
+    OUTPUT_NAME "clickbench"
+)
+target_link_libraries(ClickBench Storage)
+
+
 add_executable(RealmTrawler EXCLUDE_FROM_ALL realm_trawler.cpp )
 set_target_properties(RealmTrawler PROPERTIES
     OUTPUT_NAME "realm-trawler"
