@@ -145,11 +145,11 @@ protected:
         return true;
     }
     const Obj& get_object() const noexcept final;
-    ref_type get_collection_ref(Index) const noexcept final
+    ref_type get_collection_ref(Index, CollectionType) const final
     {
         return m_ref;
     }
-    void set_collection_ref(Index, ref_type) {}
+    void set_collection_ref(Index, ref_type, CollectionType) {}
 };
 
 } // namespace realm
