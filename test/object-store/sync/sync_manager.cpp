@@ -756,6 +756,10 @@ TEST_CASE("sync_manager: set_session_multiplexing") {
     auto realm_2 = Realm::get_shared_realm(file_2);
     auto realm_3 = Realm::get_shared_realm(file_3);
 
+    wait_for_download(*realm_1);
+    wait_for_download(*realm_2);
+    wait_for_download(*realm_3);
+
     if (sync_multiplexing_allowed) {
         REQUIRE(conn_id_for_realm(realm_1) == conn_id_for_realm(realm_2));
         REQUIRE(conn_id_for_realm(realm_2) != conn_id_for_realm(realm_3));
