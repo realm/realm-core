@@ -1,3 +1,6 @@
+# Some tests take up to 4 hours to run, so give a very generous timeout project-wide, but generally try to complete tasks within 30 minutes.
+exec_timeout_secs: 14400
+
 functions:
   "fetch binaries":
     - command: shell.exec
@@ -700,7 +703,6 @@ tasks:
       verbose_test_output: true
 
 - name: process_coverage_data
-  display_name: Process Coverage Data
   tags: [ "for_pull_requests" ]
   exec_timeout_secs: 1800
   commands:
@@ -765,7 +767,6 @@ tasks:
         curl -X POST https://coveralls.io/api/v1/jobs -F 'json_file=@coveralls_${task_name}.json'
 
 - name: finalize_coverage_data
-  display_name: Finalize Coverage Data
   tags: [ "for_pull_requests" ]
   depends_on:
     - name: "process_coverage_data"
@@ -966,6 +967,7 @@ buildvariants:
     run_tests_against_baas: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
+    extra_flags: -DREALM_ENABLE_GEOSPATIAL=OFF # can be removed once SDKs pick this feature up
   tasks:
   - name: compile_test
 
@@ -1245,7 +1247,7 @@ buildvariants:
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
-    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64 -DREALM_ENABLE_GEOSPATIAL=OFF
   tasks:
   - name: compile_test
     distros:

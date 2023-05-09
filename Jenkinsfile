@@ -120,6 +120,7 @@ jobWrapper {
             buildAppleTV_Debug      : doBuildApplePlatform('appletvos', 'Debug', false),
             buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
             buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
+            buildEmscripten         : doBuildEmscripten('Debug'),
             threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
             addressSanitizer        : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'address']),
         ]
@@ -751,6 +752,27 @@ def doBuildApplePlatform(String platform, String buildType, boolean test = false
             stash includes: tarball, name: stashName
             cocoaStashes << stashName
             publishingStashes << stashName
+        }
+    }
+}
+
+def doBuildEmscripten(String buildType) {
+    return {
+        rlmNode('docker') {
+            getArchive()
+
+            docker.image('emscripten/emsdk:3.1.37').inside {
+                dir('build') {
+                    sh "emcmake cmake .. -DCMAKE_BUILD_TYPE=${buildType}"
+
+                    runAndCollectWarnings(
+                        parser: 'clang',
+                        script: 'make -j$(nproc) 2>&1',
+                        name: "emscripten-${buildType}",
+                        filters: warningFilters,
+                    )
+                }
+            }
         }
     }
 }

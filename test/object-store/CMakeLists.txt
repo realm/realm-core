@@ -40,6 +40,10 @@ set(SOURCES
     util/test_utils.cpp
 )
 
+if (REALM_ENABLE_GEOSPATIAL)
+    list(APPEND SOURCES geospatial.cpp)
+endif()
+
 file(GLOB RESOURCES RELATIVE ${CMAKE_CURRENT_BINARY_DIR}
      "*.realm")
 
@@ -128,8 +132,9 @@ target_include_directories(ObjectStoreTests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 # on Apple platforms we use the built-in CFRunLoop
+# on WebAssembly we use an Emscripten-specific Scheduler and runloop
 # everywhere else it's libuv, except UWP where it doesn't build
-if(NOT APPLE AND NOT WINDOWS_STORE)
+if(NOT APPLE AND NOT EMSCRIPTEN AND NOT WINDOWS_STORE)
     option(REALM_FETCH_MISSING_DEPENDENCIES "Download missing dependencies with CMake's FetchContent where possible" ON)
     if(REALM_FETCH_MISSING_DEPENDENCIES)
         find_package(LibUV)
