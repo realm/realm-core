@@ -819,8 +819,8 @@ tasks:
         clang-format --version
 
         clang_command="git clang-format -v --diff $format_ref"
-        # Don't error out on clang-format errors
-        out=$($clang_command) && :
+        # Don't fail the task early on clang-format errors
+        out=$($clang_command) && true
 
         echo -e "CLANG: $clang_command\n$out"
 
