@@ -189,12 +189,7 @@ size_t MixedNode<Equal>::find_first_local(size_t start, size_t end)
         return m_index_evaluator->do_search_index(m_cluster, start, end);
     }
     else {
-        Equal cond;
-        for (size_t i = start; i < end; i++) {
-            QueryValue val(m_leaf_ptr->get(i));
-            if (cond(val, m_value))
-                return i;
-        }
+        return m_leaf_ptr->find_first(m_value, start, end);
     }
 
     return not_found;

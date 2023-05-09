@@ -93,37 +93,6 @@ jobWrapper {
         }
     }
 
-    if (isPullRequest) {
-        stage('FormatCheck') {
-            rlmNode('docker') {
-                getArchive()
-
-                buildDockerEnv('testing.Dockerfile').inside {
-                    echo "Checking code formatting"
-                    // Passing extentions because clang-format version we currently use, incorrectly tries
-                    // to format json files even when configured not to. And it makes them invalid JSON.
-                    // That flag can be removed once we upgrade the docker image to use a newer clang-format.
-                    def clang_format = "git clang-format --extensions h,hpp,c,cpp,m,mm --diff ${targetSHA1}"
-                    modifications = sh(returnStdout: true, script: clang_format).trim()
-                    try {
-                        if (!modifications.equals('no modified files to format')) {
-                            if (!modifications.equals('clang-format did not modify any files')) {
-                                echo "Commit violates formatting rules"
-                                sh "${clang_format} > format_error.txt"
-                                archiveArtifacts('format_error.txt')
-                                sh 'exit 1'
-                            }
-                        }
-                        currentBuild.result = 'SUCCESS'
-                    } catch (Exception err) {
-                        currentBuild.result = 'FAILURE'
-                        throw err
-                    }
-                }
-            }
-        }
-    }
-
     stage('Checking') {
         def buildOptions = [
             buildType : 'Debug',

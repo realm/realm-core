@@ -483,7 +483,7 @@ public:
                         }
                         else {
                             if (left[left_idx] < right[right_idx]) {
-                                if (any && left_idx < left_size) {
+                                if (any && left_idx < left_size - 1) {
                                     left_idx++;
                                 }
                                 else {

@@ -40,6 +40,7 @@
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/subscriptions.hpp>
 #include "sync/flx_sync_harness.hpp"
 #endif
 
@@ -3034,19 +3035,22 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
     table->create_object();
     r1->commit_transaction();
 
-    // Cannot be a member var of Context since Realm.close will free the context.
-    static SharedRealm* shared_realm;
-    shared_realm = &r1;
     struct Context : public BindingContext {
+        Context(std::shared_ptr<Realm>& realm)
+            : realm(&realm)
+        {
+        }
+        std::shared_ptr<Realm>* realm;
         void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
         {
-            (*shared_realm)->close();
-            (*shared_realm).reset();
+            auto realm = this->realm; // close() will delete `this`
+            (*realm)->close();
+            realm->reset();
         }
     };
 
     SECTION("did_change") {
-        r1->m_binding_context.reset(new Context());
+        r1->m_binding_context.reset(new Context(r1));
         r1->invalidate();
 
         auto r2 = Realm::get_shared_realm(config);
@@ -3059,7 +3063,7 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
     }
 
     SECTION("did_change with async results") {
-        r1->m_binding_context.reset(new Context());
+        r1->m_binding_context.reset(new Context(r1));
         Results results(r1, table->where());
         auto token = results.add_notification_callback([&](CollectionChangeSet) {
             // Should not be called.
@@ -3079,7 +3083,7 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
     }
 
     SECTION("refresh") {
-        r1->m_binding_context.reset(new Context());
+        r1->m_binding_context.reset(new Context(r1));
 
         auto r2 = Realm::get_shared_realm(config);
         r2->begin_transaction();
@@ -3089,8 +3093,6 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
 
         REQUIRE_FALSE(r1->refresh());
     }
-
-    shared_realm = nullptr;
 }
 
 TEST_CASE("RealmCoordinator: schema cache") {

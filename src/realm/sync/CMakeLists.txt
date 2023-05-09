@@ -91,6 +91,10 @@ set_target_properties(Sync PROPERTIES
     OUTPUT_NAME "realm-sync"
 )
 
+if(REALM_ENABLE_SYNC_MULTIPLEXING)
+    target_compile_definitions(Sync PUBLIC REALM_ENABLE_SYNC_MULTIPLEXING=1)
+endif()
+
 target_link_libraries(Sync PUBLIC Storage)
 
 if(APPLE AND NOT REALM_FORCE_OPENSSL)
