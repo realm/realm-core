@@ -31,15 +31,15 @@
 #include <stdexcept>
 
 namespace realm {
-[[noreturn]] static void unsupported_operation(ColKey col_key, std::optional<CollectionType> coll_type,
-                                               Table const& table, const char* operation)
+[[noreturn]] static void unsupported_operation(ColKey column, Table const& table, const char* operation)
 {
-    auto type = ObjectSchema::from_core_type(col_key);
-    std::string_view collection_type = coll_type ? collection_type_name(*coll_type) : "property";
+    auto type = ObjectSchema::from_core_type(column);
+    std::string_view collection_type =
+        column.is_collection() ? collection_type_name(table.get_collection_type(column, 0)) : "property";
     const char* column_type = string_for_property_type(type & ~PropertyType::Collection);
     throw IllegalOperation(util::format("Operation '%1' not supported for %2%3 %4 '%5.%6'", operation, column_type,
-                                        col_key.is_nullable() ? "?" : "", collection_type, table.get_class_name(),
-                                        table.get_column_name(col_key)));
+                                        column.is_nullable() ? "?" : "", collection_type, table.get_class_name(),
+                                        table.get_column_name(column)));
 }
 
 Results::Results() = default;
@@ -619,11 +619,10 @@ util::Optional<Mixed> Results::aggregate(ColKey column, const char* name, Aggreg
     // which is the collection if it's not a link collection and the target
     // of the links otherwise
     if (m_mode == Mode::Collection && do_get_type() != PropertyType::Object) {
-        unsupported_operation(m_collection->get_col_key(), m_collection->get_collection_type(),
-                              *m_collection->get_table(), name);
+        unsupported_operation(m_collection->get_col_key(), *m_collection->get_table(), name);
     }
     else {
-        unsupported_operation(column, {}, *m_table, name);
+        unsupported_operation(column, *m_table, name);
     }
 }
 
