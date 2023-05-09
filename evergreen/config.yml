@@ -1,3 +1,6 @@
+# Some tests take up to 4 hours to run, so give a very generous timeout project-wide, but generally try to complete tasks within 30 minutes.
+exec_timeout_secs: 14400
+
 functions:
   "fetch binaries":
     - command: shell.exec
@@ -700,7 +703,6 @@ tasks:
       verbose_test_output: true
 
 - name: process_coverage_data
-  display_name: Process Coverage Data
   tags: [ "for_pull_requests" ]
   exec_timeout_secs: 1800
   commands:
@@ -765,7 +767,6 @@ tasks:
         curl -X POST https://coveralls.io/api/v1/jobs -F 'json_file=@coveralls_${task_name}.json'
 
 - name: finalize_coverage_data
-  display_name: Finalize Coverage Data
   tags: [ "for_pull_requests" ]
   depends_on:
     - name: "process_coverage_data"
@@ -816,8 +817,11 @@ tasks:
             format_ref="${revision}"
         fi
 
+        clang-format --version
+
         clang_command="git clang-format -v --diff $format_ref"
-        out=$($clang_command)
+        # Don't fail the task early on clang-format errors
+        out=$($clang_command) && true
 
         echo -e "CLANG: $clang_command\n$out"
 
