@@ -17,15 +17,17 @@
 #include <realm/util/logger.hpp>
 #include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/network/default_socket.hpp>
-#include "realm/util/span.hpp"
+#include <realm/util/span.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
+#include <realm/sync/noinst/migration_store.hpp>
+#include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/subscriptions.hpp>
 #include <realm/sync/trigger.hpp>
+#include <realm/sync/noinst/migration_store.hpp>
 
 
 namespace realm {
@@ -35,7 +37,32 @@ namespace sync {
 //
 // `protocol` is included for convenience, even though it is not strictly part
 // of an endpoint.
-using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, network::Endpoint::port_type>;
+
+struct ServerEndpoint {
+    ProtocolEnvelope envelope;
+    std::string address;
+    network::Endpoint::port_type port;
+    std::string user_id;
+    SyncServerMode server_mode = SyncServerMode::PBS;
+
+private:
+    auto to_tuple() const
+    {
+        return std::make_tuple(server_mode, envelope, std::ref(address), port, std::ref(user_id));
+    }
+
+public:
+    friend inline bool operator==(const ServerEndpoint& lhs, const ServerEndpoint& rhs)
+    {
+        return lhs.to_tuple() == rhs.to_tuple();
+    }
+
+
+    friend inline bool operator<(const ServerEndpoint& lhs, const ServerEndpoint& rhs)
+    {
+        return lhs.to_tuple() < rhs.to_tuple();
+    }
+};
 
 class SessionWrapper;
 
@@ -160,6 +187,7 @@ public:
 
     void cancel_reconnect_delay();
     bool wait_for_session_terminations_or_client_stopped();
+    void voluntary_disconnect_all_connections();
 
 private:
     using connection_ident_type = std::int_fast64_t;
@@ -269,8 +297,7 @@ private:
                                            bool verify_servers_ssl_certificate,
                                            util::Optional<std::string> ssl_trust_certificate_path,
                                            std::function<SyncConfig::SSLVerifyCallback>,
-                                           util::Optional<SyncConfig::ProxyConfig>, SyncServerMode,
-                                           bool& was_created);
+                                           util::Optional<SyncConfig::ProxyConfig>, bool& was_created);
 
     // Destroys the specified connection.
     void remove_connection(ClientImpl::Connection&) noexcept;
@@ -415,10 +442,14 @@ public:
 
     void resume_active_sessions();
 
+    void voluntary_disconnect();
+
+    std::string get_active_appservices_connection_id();
+
     Connection(ClientImpl&, connection_ident_type, ServerEndpoint, const std::string& authorization_header_name,
                const std::map<std::string, std::string>& custom_http_headers, bool verify_servers_ssl_certificate,
                util::Optional<std::string> ssl_trust_certificate_path, std::function<SSLVerifyCallback>,
-               util::Optional<ProxyConfig>, ReconnectInfo, SyncServerMode);
+               util::Optional<ProxyConfig>, ReconnectInfo);
 
     ~Connection();
 
@@ -480,7 +511,6 @@ private:
     void close_due_to_protocol_error(std::error_code, std::optional<std::string_view> msg = std::nullopt);
     void close_due_to_client_side_error(std::error_code, std::optional<std::string_view> msg, bool is_fatal);
     void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
-    void voluntary_disconnect();
     void involuntary_disconnect(const SessionErrorInfo& info);
     void disconnect(const SessionErrorInfo& info);
     void change_state_to_disconnected() noexcept;
@@ -517,9 +547,6 @@ private:
     ClientImpl& m_client;
     util::bind_ptr<LifecycleSentinel> m_websocket_sentinel;
     std::unique_ptr<WebSocketInterface> m_websocket;
-    const ProtocolEnvelope m_protocol_envelope;
-    const std::string m_address;
-    const port_type m_port;
 
     /// DEPRECATED - These will be removed in a future release
     const bool m_verify_servers_ssl_certificate;
@@ -529,8 +556,6 @@ private:
 
     ReconnectInfo m_reconnect_info;
     int m_negotiated_protocol_version = 0;
-    SyncServerMode m_sync_mode = SyncServerMode::PBS;
-    bool m_is_flx_sync_connection = false;
 
     ConnectionState m_state = ConnectionState::disconnected;
 
@@ -741,12 +766,15 @@ public:
     /// or after initiation of deactivation.
     void request_download_completion_notification();
 
-    /// \brief Gets or creates the subscription store associated with this Session.
+    /// \brief Gets the subscription store associated with this Session.
     SubscriptionStore* get_flx_subscription_store();
+
+    /// \brief Gets the migration store associated with this Session.
+    MigrationStore* get_migration_store();
 
     /// Update internal client state when a flx subscription becomes complete outside
     /// of the normal sync process. This can happen during client reset.
-    void non_sync_flx_completion(int64_t version);
+    void on_flx_sync_version_complete(int64_t version);
 
     /// \brief Callback for when a new subscription set has been created for FLX sync.
     void on_new_flx_subscription_set(int64_t new_version);
@@ -963,12 +991,12 @@ private:
     // These are reset when the session is activated, and again whenever the
     // connection is lost or the rebinding process is initiated.
     bool m_enlisted_to_send;
-    bool m_bind_message_sent;        // Sending of BIND message has been initiated
-    bool m_ident_message_sent;       // Sending of IDENT message has been initiated
-    bool m_unbind_message_sent;      // Sending of UNBIND message has been initiated
-    bool m_unbind_message_sent_2;    // Sending of UNBIND message has been completed
-    bool m_error_message_received;   // Session specific ERROR message received
-    bool m_unbound_message_received; // UNBOUND message received
+    bool m_bind_message_sent;            // Sending of BIND message has been initiated
+    bool m_ident_message_sent;           // Sending of IDENT message has been initiated
+    bool m_unbind_message_sent;          // Sending of UNBIND message has been initiated
+    bool m_unbind_message_send_complete; // Sending of UNBIND message has been completed
+    bool m_error_message_received;       // Session specific ERROR message received
+    bool m_unbound_message_received;     // UNBOUND message received
     bool m_error_to_send;
 
     // True when there is a new FLX sync query we need to send to the server.
@@ -1107,8 +1135,8 @@ private:
     void initiate_deactivation();
     void complete_deactivation();
     void connection_established(bool fast_reconnect);
+    void suspend(const SessionErrorInfo& session_error);
     void connection_lost();
-    void close_connection();
     void send_message();
     void message_sent();
     void send_bind_message();
@@ -1197,7 +1225,7 @@ inline ConnectionState ClientImpl::Connection::get_state() const noexcept
 
 inline SyncServerMode ClientImpl::Connection::get_sync_server_mode() const noexcept
 {
-    return m_sync_mode;
+    return m_server_endpoint.server_mode;
 }
 
 inline auto ClientImpl::Connection::get_reconnect_info() const noexcept -> ReconnectInfo
@@ -1335,9 +1363,10 @@ inline void ClientImpl::Session::recognize_sync_version(version_type version)
     bool resume_upload = do_recognize_sync_version(version);
     if (REALM_LIKELY(resume_upload)) {
         // Since the deactivation process has not been initiated, the UNBIND
-        // message cannot have been sent unless an ERROR message was received.
-        REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
-        if (m_ident_message_sent && !m_error_message_received)
+        // message cannot have been sent unless the session was suspended due to
+        // an error.
+        REALM_ASSERT(m_suspended || !m_unbind_message_sent);
+        if (m_ident_message_sent && !m_suspended)
             ensure_enlisted_to_send(); // Throws
     }
 }
@@ -1358,8 +1387,8 @@ inline void ClientImpl::Session::request_download_completion_notification()
 
     // Since the deactivation process has not been initiated, the UNBIND message
     // cannot have been sent unless an ERROR message was received.
-    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
-    if (m_ident_message_sent && !m_error_message_received)
+    REALM_ASSERT(m_suspended || !m_unbind_message_sent);
+    if (m_ident_message_sent && !m_suspended)
         ensure_enlisted_to_send(); // Throws
 }
 
@@ -1398,7 +1427,7 @@ inline bool ClientImpl::Session::have_client_file_ident() const noexcept
 
 inline bool ClientImpl::Session::unbind_process_complete() const noexcept
 {
-    return (m_unbind_message_sent_2 && (m_error_message_received || m_unbound_message_received));
+    return (m_unbind_message_send_complete && (m_error_message_received || m_unbound_message_received));
 }
 
 inline void ClientImpl::Session::connection_established(bool fast_reconnect)
@@ -1448,14 +1477,14 @@ inline void ClientImpl::Session::message_sent()
     REALM_ASSERT(m_state == Active || m_state == Deactivating);
 
     // No message will be sent after the UNBIND message
-    REALM_ASSERT(!m_unbind_message_sent_2);
+    REALM_ASSERT(!m_unbind_message_send_complete);
 
     if (m_unbind_message_sent) {
         REALM_ASSERT(!m_enlisted_to_send);
 
         // If the sending of the UNBIND message has been initiated, this must be
         // the time when the sending of that message completes.
-        m_unbind_message_sent_2 = true;
+        m_unbind_message_send_complete = true;
 
         // Detect the completion of the unbinding process
         if (m_error_message_received || m_unbound_message_received) {
@@ -1498,7 +1527,7 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     m_error_to_send                       = false;
     m_ident_message_sent = false;
     m_unbind_message_sent = false;
-    m_unbind_message_sent_2 = false;
+    m_unbind_message_send_complete = false;
     m_error_message_received = false;
     m_unbound_message_received = false;
     m_client_error = util::none;

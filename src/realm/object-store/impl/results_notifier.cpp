@@ -101,7 +101,7 @@ bool ResultsNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     // when key path filters are set hence we need to recalculate every time the callbacks are changed.
     util::CheckedLockGuard lock(m_callback_mutex);
     if (m_did_modify_callbacks) {
-        update_related_tables(*(m_query->get_table()));
+        update_related_tables(*m_query->get_table());
     }
 
     return m_query->get_table() && has_run() && have_callbacks();
@@ -141,7 +141,7 @@ void ResultsNotifier::calculate_changes()
 
 void ResultsNotifier::run()
 {
-    REALM_ASSERT(m_info);
+    REALM_ASSERT(m_info || !has_run());
 
     // Table's been deleted, so report all objects as deleted
     if (!m_query->get_table()) {
@@ -279,7 +279,8 @@ bool ListResultsNotifier::do_add_required_change_info(TransactionChangeInfo& inf
     if (!m_list->is_attached())
         return false; // origin row was deleted after the notification was added
 
-    info.lists.push_back({m_list->get_table()->get_key(), m_list->get_owner_key(), m_list->get_col_key(), &m_change});
+    info.collections.push_back(
+        {m_list->get_table()->get_key(), m_list->get_owner_key(), m_list->get_col_key(), &m_change});
 
     m_info = &info;
     return true;
@@ -287,7 +288,7 @@ bool ListResultsNotifier::do_add_required_change_info(TransactionChangeInfo& inf
 
 bool ListResultsNotifier::need_to_run()
 {
-    REALM_ASSERT(m_info);
+    REALM_ASSERT(m_info || !has_run());
 
     // Don't run the query if the results aren't actually going to be used
     if (!is_alive() || (!have_callbacks() && !m_results_were_used))
@@ -322,7 +323,7 @@ void ListResultsNotifier::calculate_changes()
 
 void ListResultsNotifier::run()
 {
-    if (!m_list->is_attached()) {
+    if (!m_list || !m_list->is_attached()) {
         // List was deleted, so report all of the rows being removed
         m_change = {};
         m_change.deletions.set(m_previous_indices.size());

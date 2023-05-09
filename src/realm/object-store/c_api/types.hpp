@@ -21,6 +21,7 @@
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/sync/binding_callback_thread_observer.hpp>
+#include <realm/sync/subscriptions.hpp>
 #endif
 
 #include <stdexcept>

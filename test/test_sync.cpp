@@ -3003,7 +3003,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     session_config.ssl_trust_certificate_path = util::none;
     session_config.ssl_verify_callback = ssl_verify_callback;
 
-    Session session(client, db, nullptr, std::move(session_config));
+    Session session(client, db, nullptr, nullptr, std::move(session_config));
     session.bind();
     session.wait_for_download_complete_or_client_stopped();
 
@@ -3141,7 +3141,7 @@ TEST(Sync_UploadDownloadProgress_1)
         sess_config.realm_identifier = "/test";
         sess_config.signed_user_token = g_signed_test_user_token;
 
-        Session session(client, db, nullptr, std::move(sess_config));
+        Session session(client, db, nullptr, nullptr, std::move(sess_config));
 
         int number_of_handler_calls = 0;
 
@@ -3414,7 +3414,7 @@ TEST(Sync_UploadDownloadProgress_3)
     config.server_port = server_port;
     config.realm_identifier = "/test";
 
-    Session session(client, db, nullptr, std::move(config));
+    Session session(client, db, nullptr, nullptr, std::move(config));
 
     // entry is used to count the number of calls to
     // progress_handler. At the first call, the server is
@@ -3696,7 +3696,7 @@ TEST(Sync_UploadDownloadProgress_6)
     session_config.signed_user_token = g_signed_test_user_token;
 
     std::mutex mutex;
-    auto session = std::make_unique<Session>(client, db, nullptr, std::move(session_config));
+    auto session = std::make_unique<Session>(client, db, nullptr, nullptr, std::move(session_config));
 
     auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
@@ -4523,7 +4523,7 @@ TEST(Sync_ServerDiscardDeadConnections)
 
     BowlOfStonesSemaphore bowl;
     auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        bool valid_error = ec == sync::websocket::WebSocketError::websocket_read_error;
+        bool valid_error = (ec == sync::websocket::WebSocketError::websocket_read_error);
         CHECK(valid_error);
         bowl.add_stone();
     };
@@ -5113,7 +5113,7 @@ TEST_IF(Sync_SSL_Certificates, false)
         // Invalid token for the cloud.
         session_config.signed_user_token = g_signed_test_user_token;
 
-        Session session{client, db, nullptr, std::move(session_config)};
+        Session session{client, db, nullptr, nullptr, std::move(session_config)};
 
         auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
             if (state == ConnectionState::disconnected) {
@@ -6337,7 +6337,7 @@ TEST(Sync_DanglingLinksCountInPriorSize)
         CHECK_EQUAL(changesets_to_upload.size(), static_cast<size_t>(1));
         realm::sync::Changeset parsed_changeset;
         auto unparsed_changeset = changesets_to_upload[0].changeset.get_first_chunk();
-        realm::util::SimpleNoCopyInputStream changeset_stream(unparsed_changeset);
+        realm::util::SimpleInputStream changeset_stream(unparsed_changeset);
         realm::sync::parse_changeset(changeset_stream, parsed_changeset);
         test_context.logger->info("changeset at version %1: %2", last_version, parsed_changeset);
         last_version_observed = last_version;
@@ -6690,6 +6690,49 @@ TEST(Sync_InvalidChangesetFromServer)
                    StringData(e.what()).contains("Failed to parse received changeset: Invalid interned string"));
 }
 
+TEST(Sync_DifferentUsersMultiplexing)
+{
+    ClientServerFixture::Config fixture_config;
+    fixture_config.one_connection_per_session = false;
+
+    TEST_DIR(server_dir);
+    ClientServerFixture fixture(server_dir, test_context, std::move(fixture_config));
+
+    struct SessionBundle {
+        test_util::DBTestPathGuard path_guard;
+        DBRef db;
+        Session sess;
+
+        SessionBundle(unit_test::TestContext& ctx, ClientServerFixture& fixture, std::string name,
+                      std::string signed_token, std::string user_id)
+            : path_guard(realm::test_util::get_test_path(ctx.get_test_name(), "." + name + ".realm"))
+            , db(DB::create(make_client_replication(), path_guard))
+        {
+            Session::Config config;
+            config.signed_user_token = signed_token;
+            config.user_id = user_id;
+            sess = fixture.make_bound_session(db, "/test", std::move(config));
+            sess.wait_for_download_complete_or_client_stopped();
+        }
+    };
+
+    fixture.start();
+
+    SessionBundle user_1_sess_1(test_context, fixture, "user_1_db_1", g_user_0_token, "user_0");
+    SessionBundle user_2_sess_1(test_context, fixture, "user_2_db_1", g_user_1_token, "user_1");
+    SessionBundle user_1_sess_2(test_context, fixture, "user_1_db_2", g_user_0_token, "user_0");
+    SessionBundle user_2_sess_2(test_context, fixture, "user_2_db_2", g_user_1_token, "user_1");
+
+    CHECK_EQUAL(user_1_sess_1.sess.get_appservices_connection_id(),
+                user_1_sess_2.sess.get_appservices_connection_id());
+    CHECK_EQUAL(user_2_sess_1.sess.get_appservices_connection_id(),
+                user_2_sess_2.sess.get_appservices_connection_id());
+    CHECK_NOT_EQUAL(user_1_sess_1.sess.get_appservices_connection_id(),
+                    user_2_sess_1.sess.get_appservices_connection_id());
+    CHECK_NOT_EQUAL(user_1_sess_2.sess.get_appservices_connection_id(),
+                    user_2_sess_2.sess.get_appservices_connection_id());
+}
+
 // Tests that an empty reciprocal changesets is set and retrieved correctly.
 TEST(Sync_SetAndGetEmptyReciprocalChangeset)
 {
@@ -6782,7 +6825,6 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
 
 TEST(Sync_TransformAgainstEmptyReciprocalChangeset)
 {
-    TEST_DIR(dir);
     TEST_CLIENT_DB(seed_db);
     TEST_CLIENT_DB(db_1);
     TEST_CLIENT_DB(db_2);
@@ -6805,52 +6847,56 @@ TEST(Sync_TransformAgainstEmptyReciprocalChangeset)
         tr->commit();
     }
 
-    MultiClientServerFixture fixture(3, 1, dir, test_context);
-    fixture.start();
+    {
+        TEST_DIR(dir);
+        MultiClientServerFixture fixture(3, 1, dir, test_context);
+        fixture.start();
 
-    util::Optional<Session> seed_session = fixture.make_bound_session(0, seed_db, 0, "/test");
-    util::Optional<Session> db_1_session = fixture.make_bound_session(1, db_1, 0, "/test");
-    util::Optional<Session> db_2_session = fixture.make_bound_session(2, db_2, 0, "/test");
+        util::Optional<Session> seed_session = fixture.make_bound_session(0, seed_db, 0, "/test");
+        util::Optional<Session> db_1_session = fixture.make_bound_session(1, db_1, 0, "/test");
+        util::Optional<Session> db_2_session = fixture.make_bound_session(2, db_2, 0, "/test");
 
-    seed_session->wait_for_upload_complete_or_client_stopped();
-    db_1_session->wait_for_download_complete_or_client_stopped();
-    db_2_session->wait_for_download_complete_or_client_stopped();
-    seed_session.reset();
-    db_2_session.reset();
+        seed_session->wait_for_upload_complete_or_client_stopped();
+        db_1_session->wait_for_download_complete_or_client_stopped();
+        db_2_session->wait_for_download_complete_or_client_stopped();
+        seed_session.reset();
+        db_2_session.reset();
 
-    auto move_element = [&](const DBRef& db, size_t from, size_t to, size_t string_size = 0) {
-        auto wt = db->start_write();
-        auto table = wt->get_table("class_table");
-        auto obj = table->get_object_with_primary_key(42);
-        auto ints = obj.get_list<int64_t>("ints");
-        ints.move(from, to);
-        obj.set("string", std::string(string_size, 'a'));
-        wt->commit();
-    };
+        auto move_element = [&](const DBRef& db, size_t from, size_t to, size_t string_size = 0) {
+            auto wt = db->start_write();
+            auto table = wt->get_table("class_table");
+            auto obj = table->get_object_with_primary_key(42);
+            auto ints = obj.get_list<int64_t>("ints");
+            ints.move(from, to);
+            obj.set("string", std::string(string_size, 'a'));
+            wt->commit();
+        };
 
-    // Client 1 uploads two move instructions.
-    move_element(db_1, 7, 2);
-    move_element(db_1, 7, 6);
+        // Client 1 uploads two move instructions.
+        move_element(db_1, 7, 2);
+        move_element(db_1, 7, 6);
 
-    db_1_session->wait_for_upload_complete_or_client_stopped();
+        db_1_session->wait_for_upload_complete_or_client_stopped();
 
-    std::this_thread::sleep_for(std::chrono::milliseconds{10});
+        std::this_thread::sleep_for(std::chrono::milliseconds{10});
 
-    // Client 2 uploads two move instructions.
-    // The sync client uploads at most 128 KB of data so we make the first changeset large enough so two upload
-    // messages are sent to the server instead of one. Each change is transformed against the changes from Client 1.
+        // Client 2 uploads two move instructions.
+        // The sync client uploads at most 128 KB of data so we make the first changeset large enough so two upload
+        // messages are sent to the server instead of one. Each change is transformed against the changes from
+        // Client 1.
 
-    // First change discards the first change (move(7, 2)) of Client 1.
-    move_element(db_2, 7, 0, 200 * 1024);
-    // Second change is tranformed against an empty reciprocal changeset as result of the change above.
-    move_element(db_2, 7, 5);
-    db_2_session = fixture.make_bound_session(2, db_2, 0, "/test");
+        // First change discards the first change (move(7, 2)) of Client 1.
+        move_element(db_2, 7, 0, 200 * 1024);
+        // Second change is tranformed against an empty reciprocal changeset as result of the change above.
+        move_element(db_2, 7, 5);
+        db_2_session = fixture.make_bound_session(2, db_2, 0, "/test");
 
-    db_1_session->wait_for_upload_complete_or_client_stopped();
-    db_2_session->wait_for_upload_complete_or_client_stopped();
+        db_1_session->wait_for_upload_complete_or_client_stopped();
+        db_2_session->wait_for_upload_complete_or_client_stopped();
 
-    db_1_session->wait_for_download_complete_or_client_stopped();
-    db_2_session->wait_for_download_complete_or_client_stopped();
+        db_1_session->wait_for_download_complete_or_client_stopped();
+        db_2_session->wait_for_download_complete_or_client_stopped();
+    }
 
     ReadTransaction rt_1(db_1);
     ReadTransaction rt_2(db_2);

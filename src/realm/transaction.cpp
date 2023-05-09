@@ -322,12 +322,20 @@ TransactionRef Transaction::freeze()
 TransactionRef Transaction::duplicate()
 {
     auto version = VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
-    if (m_transact_stage == DB::transact_Reading)
-        return db->start_read(version);
-    if (m_transact_stage == DB::transact_Frozen)
-        return db->start_frozen(version);
-
-    throw WrongTransactionState("Can only duplicate a read/frozen transaction");
+    switch (m_transact_stage) {
+        case DB::transact_Ready:
+            throw WrongTransactionState("Cannot duplicate a transaction which does not have a read lock.");
+        case DB::transact_Reading:
+            return db->start_read(version);
+        case DB::transact_Frozen:
+            return db->start_frozen(version);
+        case DB::transact_Writing:
+            if (get_commit_size() != 0)
+                throw WrongTransactionState(
+                    "Can only duplicate a write transaction before any changes have been made.");
+            return db->start_read(version);
+    }
+    REALM_UNREACHABLE();
 }
 
 void Transaction::copy_to(TransactionRef dest) const

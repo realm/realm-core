@@ -104,6 +104,17 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
         return from_capi(m_args[i].arg[0].link);
     }
 
+#if REALM_ENABLE_GEOSPATIAL
+    Geospatial geospatial_for_argument(size_t i) final
+    {
+        verify_ndx(i);
+        // FIXME: implement this
+        throw LogicError{
+            ErrorCodes::RuntimeError,
+            util::format("geospatial in the C-API is not yet implemented (for argument %1)", i)}; // LCOV_EXCL_LINE
+    }
+#endif
+
     bool is_argument_null(size_t i) final
     {
         verify_ndx(i);
@@ -419,6 +430,16 @@ RLM_API realm_object_t* realm_results_get_object(realm_results_t* results, size_
         auto shared_realm = results->get_realm();
         auto obj = results->get<Obj>(index);
         return new realm_object_t{Object{shared_realm, std::move(obj)}};
+    });
+}
+
+RLM_API realm_query_t* realm_results_get_query(realm_results_t* results)
+{
+    return wrap_err([&]() {
+        auto query = results->get_query();
+        auto shared_realm = results->get_realm();
+        auto ordering = query.get_ordering();
+        return new realm_query_t{std::move(query), std::move(ordering), shared_realm};
     });
 }
 

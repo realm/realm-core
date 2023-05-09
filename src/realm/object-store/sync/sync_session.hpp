@@ -309,6 +309,11 @@ public:
         {
             return session.get_file_ident();
         }
+
+        static std::shared_ptr<sync::SubscriptionStore> get_subscription_store_base(SyncSession& session)
+        {
+            return session.get_subscription_store_base();
+        }
     };
 
 private:
@@ -355,14 +360,17 @@ private:
     std::shared_ptr<SyncManager> sync_manager() const REQUIRES(!m_state_mutex);
 
     static util::UniqueFunction<void(util::Optional<app::AppError>)>
-    handle_refresh(const std::shared_ptr<SyncSession>&, bool = false);
+    handle_refresh(const std::shared_ptr<SyncSession>&, bool);
 
     SyncSession(_impl::SyncClient&, std::shared_ptr<DB>, const RealmConfig&, SyncManager* sync_manager);
 
     // Initialize or tear down the subscription store based on whether or not flx_sync_requested is true
-    void update_subscription_store(bool flx_sync_requested) REQUIRES(m_state_mutex);
+    void update_subscription_store(bool flx_sync_requested) REQUIRES(!m_state_mutex);
+    void create_subscription_store() REQUIRES(m_state_mutex);
+    void set_write_validator_factory(std::weak_ptr<sync::SubscriptionStore> weak_sub_mgr);
     // Update the sync config after a PBS->FLX migration or FLX->PBS rollback occurs
-    void update_sync_config_after_migration() REQUIRES(!m_config_mutex, !m_state_mutex);
+    void apply_sync_config_after_migration_or_rollback() REQUIRES(!m_config_mutex, !m_state_mutex);
+    void save_sync_config_after_migration_or_rollback() REQUIRES(!m_config_mutex);
 
     void download_fresh_realm(sync::ProtocolErrorInfo::Action server_requests_action)
         REQUIRES(!m_config_mutex, !m_state_mutex, !m_connection_state_mutex);
@@ -372,7 +380,10 @@ private:
     void handle_error(sync::SessionErrorInfo) REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     void handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status error_code, std::string_view context_message)
         REQUIRES(!m_state_mutex, !m_config_mutex);
-    void cancel_pending_waits(util::CheckedUniqueLock, Status) RELEASE(m_state_mutex);
+    // If sub_notify_error is set (including Status::OK()), then the pending subscription waiters will
+    // also be called with the sub_notify_error status value.
+    void cancel_pending_waits(util::CheckedUniqueLock, Status, std::optional<Status> subs_notify_error = std::nullopt)
+        RELEASE(m_state_mutex);
     enum class ShouldBackup { yes, no };
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup) REQUIRES(m_state_mutex, !m_config_mutex);
     void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
@@ -423,6 +434,12 @@ private:
 
     void assert_mutex_unlocked() ASSERT_CAPABILITY(!m_state_mutex) ASSERT_CAPABILITY(!m_config_mutex) {}
 
+    // Create active subscription set after PBS -> FLX migration to cover the data.
+    void make_active_subscription_set() REQUIRES(!m_state_mutex);
+
+    // Return the subscription_store_base - to be used only for testing
+    std::shared_ptr<sync::SubscriptionStore> get_subscription_store_base() REQUIRES(!m_state_mutex);
+
     mutable util::CheckedMutex m_state_mutex;
     mutable util::CheckedMutex m_connection_state_mutex;
 
@@ -437,11 +454,17 @@ private:
     mutable util::CheckedMutex m_config_mutex;
     RealmConfig m_config GUARDED_BY(m_config_mutex);
     const std::shared_ptr<DB> m_db;
+    // The subscription store base is lazily created when needed, but never destroyed
+    std::shared_ptr<sync::SubscriptionStore> m_subscription_store_base GUARDED_BY(m_state_mutex);
+    // m_flx_subscription_store will either point to m_subscription_store_base if currently using FLX
+    // or set to nullptr if currently using PBS (mutable for client PBS->FLX migration)
     std::shared_ptr<sync::SubscriptionStore> m_flx_subscription_store GUARDED_BY(m_state_mutex);
-    std::optional<bool> m_needs_subscription_store_updated GUARDED_BY(m_state_mutex);
+    std::optional<sync::SubscriptionSet> m_active_subscriptions_after_migration GUARDED_BY(m_state_mutex);
     // Original sync config for reverting back to PBS if FLX migration is rolled back
     const std::shared_ptr<SyncConfig> m_original_sync_config; // does not change after construction
+    std::shared_ptr<SyncConfig> m_migrated_sync_config GUARDED_BY(m_config_mutex);
     const std::shared_ptr<sync::MigrationStore> m_migration_store;
+    std::optional<int64_t> m_migration_sentinel_query_version GUARDED_BY(m_state_mutex);
     sync::ProtocolErrorInfo::Action
         m_server_requests_action GUARDED_BY(m_state_mutex) = sync::ProtocolErrorInfo::Action::NoAction;
     DBRef m_client_reset_fresh_copy GUARDED_BY(m_state_mutex);

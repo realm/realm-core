@@ -245,9 +245,21 @@ public:
         SharedApp m_parent;
     };
 
+    /// Retrieve a cached app instance if one was previously generated for `config`'s app_id+base_url combo,
+    /// otherwise generate and return a new instance and persist it in the cache.
     static SharedApp get_shared_app(const Config& config, const SyncClientConfig& sync_client_config);
+
+    /// Generate and return a new app instance for the given config, bypassing the app cache.
     static SharedApp get_uncached_app(const Config& config, const SyncClientConfig& sync_client_config);
-    static std::shared_ptr<App> get_cached_app(const std::string& app_id);
+
+    /// Return a cached app instance if one was previously generated for the `app_id`+`base_url` combo using
+    /// `get_shared_app`.
+    /// If base_url is not provided, and there are multiple cached apps with the same app_id but different base_urls,
+    /// then a non-determinstic one will be returned.
+    ///
+    /// Prefer using `get_shared_app` or populating `base_url` to avoid the non-deterministic behavior.
+    static SharedApp get_cached_app(const std::string& app_id,
+                                    const std::optional<std::string>& base_url = std::nullopt);
 
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a
@@ -266,8 +278,11 @@ public:
 
     /// Refreshes the custom data for a specified user
     /// @param user The user you want to refresh
+    /// @param update_location If true, the location metadata will be updated before refresh
+    void refresh_custom_data(const std::shared_ptr<SyncUser>& user, bool update_location,
+                             util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
     void refresh_custom_data(const std::shared_ptr<SyncUser>& user,
-                             util::UniqueFunction<void(util::Optional<AppError>)>&&);
+                             util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
     /// Log out the given user if they are not already logged out.
     void log_out(const std::shared_ptr<SyncUser>& user,
@@ -404,7 +419,8 @@ private:
 
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion Passes an error should one occur.
-    void refresh_access_token(const std::shared_ptr<SyncUser>& user,
+    /// @param update_location If true, the location metadata will be updated before refresh
+    void refresh_access_token(const std::shared_ptr<SyncUser>& user, bool update_location,
                               util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
     /// Checks if an auth failure has taken place and if so it will attempt to refresh the

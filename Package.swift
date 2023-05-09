@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "13.9.0"
+let versionStr = "13.10.1"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -16,6 +16,7 @@ var cxxSettings: [CXXSetting] = [
     .define("REALM_ENABLE_ASSERTIONS", to: "1"),
     .define("REALM_ENABLE_ENCRYPTION", to: "1"),
     .define("REALM_ENABLE_SYNC", to: "1"),
+    .define("REALM_ENABLE_GEOSPATIAL", to: "0"),
 
     .define("REALM_VERSION_MAJOR", to: String(versionCompontents[0])),
     .define("REALM_VERSION_MINOR", to: String(versionCompontents[1])),
@@ -32,6 +33,7 @@ let syncServerSources: [String] =  [
 let syncExcludes: [String] = [
     // Server files
     "realm/sync/noinst/server/crypto_server_openssl.cpp",
+    "realm/sync/noinst/server/crypto_server_stub.cpp",
 
     // CLI Tools
     "realm/sync/tools",
@@ -387,6 +389,20 @@ let package = Package(
             publicHeadersPath: "."
         ),
         .target(
+            name: "s2geometry",
+            path: "src/external/s2",
+            exclude: [
+                "s2cellunion.cc",
+                "s2regioncoverer.cc",
+                "s2regionintersection.cc",
+                "s2regionunion.cc"
+            ],
+            publicHeadersPath: ".",
+            cxxSettings: ([
+                .headerSearchPath(".."),
+                .headerSearchPath("../.."),
+            ] + cxxSettings) as [CXXSetting]),
+        .target(
             name: "RealmCore",
             dependencies: ["Bid"],
             path: "src",
@@ -395,12 +411,15 @@ let package = Package(
                 "external",
                 "realm/CMakeLists.txt",
                 "realm/exec",
+                "realm/geospatial.cpp",
                 "realm/metrics",
                 "realm/object-store/CMakeLists.txt",
                 "realm/object-store/c_api",
                 "realm/object-store/impl/epoll",
                 "realm/object-store/impl/generic",
                 "realm/object-store/impl/windows",
+                "realm/object-store/impl/emscripten",
+                "realm/object-store/sync/impl/emscripten",
                 "realm/parser",
                 "realm/sync/CMakeLists.txt",
                 "realm/tools",
@@ -410,7 +429,9 @@ let package = Package(
                 "win32",
             ] + syncExcludes + syncServerSources) as [String],
             publicHeadersPath: ".",
-            cxxSettings: cxxSettings,
+            cxxSettings: ([
+                .headerSearchPath("external"),
+            ] + cxxSettings) as [CXXSetting],
             linkerSettings: [
                 .linkedLibrary("compression"),
                 .linkedLibrary("z"),
@@ -515,6 +536,7 @@ let package = Package(
                 "backup.cpp",
                 "benchmarks",
                 "c_api",
+                "geospatial.cpp",
                 "notifications-fuzzer",
                 "query.json",
                 "sync-metadata-v4.realm",

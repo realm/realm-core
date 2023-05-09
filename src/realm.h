@@ -194,7 +194,6 @@ typedef struct realm_value {
         realm_decimal128_t decimal128;
         realm_object_id_t object_id;
         realm_uuid_t uuid;
-
         realm_link_t link;
 
         char data[16];
@@ -2575,6 +2574,14 @@ RLM_API bool realm_results_find(realm_results_t*, realm_value_t* value, size_t* 
 RLM_API realm_object_t* realm_results_get_object(realm_results_t*, size_t index);
 
 /**
+ * Return the query associated to the results passed as argument.
+ *
+ * @param results the ptr to a valid results object.
+ * @return a valid ptr to realm_query_t if no error has occured
+ */
+RLM_API realm_query_t* realm_results_get_query(realm_results_t* results);
+
+/**
  * Find the index for the realm object passed as parameter inside realm results pointer passed a input parameter.
  *  @param value the value to find inside the realm results
  *  @param out_index the index where the object has been found, or realm::not_found
@@ -2877,25 +2884,6 @@ RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credential
 RLM_API realm_app_t* realm_app_create(const realm_app_config_t*, const realm_sync_client_config_t*);
 
 /**
- * @note this API will be removed and it is now deprecated in favour of realm_app_create
- *
- * Get an existing @a realm_app_t* instance with the same app id, or create it with the
- * configuration if it doesn't exist.
- *
- * @return A non-null pointer if no error occurred.
- */
-RLM_API realm_app_t* realm_app_get(const realm_app_config_t*, const realm_sync_client_config_t*);
-
-/**
- * @note this API will be removed and it is now deprecated in favour of realm_app_create
- *
- * Get an existing @a realm_app_t* instance from the cache.
- *
- * @return Cached app instance, or null if no cached app exists for this @a app_id.
- */
-RLM_API realm_app_t* realm_app_get_cached(const char* app_id) RLM_API_NOEXCEPT;
-
-/**
  * Clear all the cached @a realm_app_t* instances in the process.
  *
  * @a realm_app_t* instances will need to be disposed with realm_release()
@@ -3180,12 +3168,15 @@ RLM_API bool realm_app_push_notification_client_deregister_device(const realm_ap
  * Run a named MongoDB Realm function.
  *
  * @param serialized_ejson_args The arguments array to invoke the function with,
- *                              serialized as an Extended JSON string.
+ *                        serialized as an Extended JSON string.
+ * @param service_name The name of the remote service whose system function to call. Can be null,
+ *                        in which case the called function is expected to be a user function.
  * @return true, if no error occurred.
  */
 RLM_API bool realm_app_call_function(const realm_app_t*, const realm_user_t*, const char* function_name,
-                                     const char* serialized_ejson_args, realm_return_string_func_t callback,
-                                     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
+                                     const char* serialized_ejson_args, const char* service_name,
+                                     realm_return_string_func_t callback, realm_userdata_t userdata,
+                                     realm_free_userdata_func_t userdata_free);
 
 /**
  * Instruct this app's sync client to immediately reconnect.

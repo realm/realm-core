@@ -662,8 +662,12 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string
 std::shared_ptr<SyncSession> SyncManager::get_session(std::shared_ptr<DB> db, const RealmConfig& config)
 {
     auto& client = get_sync_client(); // Throws
+#ifndef __EMSCRIPTEN__
     auto path = db->get_path();
     REALM_ASSERT_EX(path == config.path, path, config.path);
+#else
+    auto path = config.path;
+#endif
     REALM_ASSERT(config.sync_config);
 
     util::CheckedUniqueLock lock(m_session_mutex);
@@ -796,4 +800,9 @@ void SyncManager::close_all_sessions()
     }
 
     get_sync_client().wait_for_session_terminations();
+}
+
+void SyncManager::OnlyForTesting::voluntary_disconnect_all_connections(SyncManager& mgr)
+{
+    mgr.get_sync_client().voluntary_disconnect_all_connections();
 }

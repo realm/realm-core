@@ -31,6 +31,8 @@
 #elif REALM_PLATFORM_APPLE
 #include <realm/util/cf_ptr.hpp>
 #include <CoreFoundation/CoreFoundation.h>
+#elif defined(__EMSCRIPTEN__)
+// TODO: implement event loop for Emscripten
 #else
 #error "No EventLoop implementation selected, tests will fail"
 #endif

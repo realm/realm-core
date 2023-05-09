@@ -29,6 +29,17 @@ if(REALM_COVERAGE)
     endif()
 endif()
 
+option(REALM_LLVM_COVERAGE "Compile with llvm's code coverage support." OFF)
+if (REALM_LLVM_COVERAGE)
+    if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-instr-generate -fcoverage-mapping")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_LINK_FLAGS} -fprofile-instr-generate -fcoverage-mapping")
+    else()
+        message(FATAL_ERROR "Code coverage is only supported with clang")
+    endif()
+endif()
+
+
 # -------------
 # AFL
 # -------------

@@ -150,10 +150,10 @@ ClientImpl::ClientImpl(ClientConfig config)
     // FIXME: Would be better if seeding was up to the application.
     util::seed_prng_nondeterministically(m_random); // Throws
 
-    logger.debug("Realm sync client (%1)", REALM_VER_CHUNK); // Throws
+    logger.info("Realm sync client (%1)", REALM_VER_CHUNK); // Throws
     logger.debug("Supported protocol versions: %1-%2", get_oldest_supported_protocol_version(),
                  get_current_protocol_version()); // Throws
-    logger.debug("Platform: %1", util::get_platform_info());
+    logger.info("Platform: %1", util::get_platform_info());
     const char* build_mode;
 #if REALM_DEBUG
     build_mode = "Debug";
@@ -545,7 +545,7 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         }
         case WebSocketError::websocket_tls_handshake_failed: {
             error_code = ClientError::ssl_server_cert_rejected;
-            constexpr bool is_fatal = true;
+            constexpr bool is_fatal = false;
             m_reconnect_info.m_reason = ConnectionTerminationReason::ssl_certificate_rejected;
             close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
             break;
@@ -865,15 +865,18 @@ void Connection::initiate_reconnect()
         }
     }
 
+    logger.info("Connecting to '%1%2:%3%4'", to_string(m_server_endpoint.envelope), m_server_endpoint.address,
+                m_server_endpoint.port, m_http_request_path_prefix);
+
     m_websocket_error_received = false;
     m_websocket =
         m_client.m_socket_provider->connect(std::make_unique<WebSocketObserverShim>(this),
                                             WebSocketEndpoint{
-                                                m_address,
-                                                m_port,
+                                                m_server_endpoint.address,
+                                                m_server_endpoint.port,
                                                 get_http_request_path(),
                                                 std::move(sec_websocket_protocol),
-                                                is_ssl(m_protocol_envelope),
+                                                is_ssl(m_server_endpoint.envelope),
                                                 /// DEPRECATED - The following will be removed in a future release
                                                 {m_custom_http_headers.begin(), m_custom_http_headers.end()},
                                                 m_verify_servers_ssl_certificate,
@@ -1327,7 +1330,7 @@ void Connection::disconnect(const SessionErrorInfo& info)
 
 bool Connection::is_flx_sync_connection() const noexcept
 {
-    return m_sync_mode != SyncServerMode::PBS;
+    return m_server_endpoint.server_mode != SyncServerMode::PBS;
 }
 
 void Connection::receive_pong(milliseconds_type timestamp)
@@ -1575,6 +1578,15 @@ void Connection::enlist_to_send(Session* sess)
 }
 
 
+std::string Connection::get_active_appservices_connection_id()
+{
+    if (!m_websocket) {
+        return {};
+    }
+
+    return std::string{m_websocket->get_appservices_request_id()};
+}
+
 void Session::cancel_resumption_delay()
 {
     REALM_ASSERT(m_state == Active);
@@ -1686,8 +1698,8 @@ void Session::on_integration_failure(const IntegrationException& error)
 
     // Since the deactivation process has not been initiated, the UNBIND
     // message cannot have been sent unless an ERROR message was received.
-    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
-    if (m_ident_message_sent && !m_error_message_received) {
+    REALM_ASSERT(m_suspended || m_error_message_received || !m_unbind_message_sent);
+    if (m_ident_message_sent && !m_error_message_received && !m_suspended) {
         ensure_enlisted_to_send(); // Throws
     }
 }
@@ -1712,10 +1724,16 @@ void Session::on_changesets_integrated(version_type client_version, const SyncPr
     do_recognize_sync_version(client_version); // Allows upload process to resume
     check_for_download_completion();           // Throws
 
+    // If the client migrated from PBS to FLX, create subscriptions when new tables are received from server.
+    if (auto migration_store = get_migration_store(); migration_store && m_is_flx_sync_session) {
+        auto& flx_subscription_store = *get_flx_subscription_store();
+        get_migration_store()->create_subscriptions(flx_subscription_store);
+    }
+
     // Since the deactivation process has not been initiated, the UNBIND
     // message cannot have been sent unless an ERROR message was received.
-    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
-    if (m_ident_message_sent && !m_error_message_received) {
+    REALM_ASSERT(m_suspended || m_error_message_received || !m_unbind_message_sent);
+    if (m_ident_message_sent && !m_error_message_received && !m_suspended) {
         ensure_enlisted_to_send(); // Throws
     }
 }
@@ -1846,6 +1864,7 @@ void Session::initiate_deactivation()
 
 void Session::complete_deactivation()
 {
+    REALM_ASSERT(m_state == Deactivating);
     m_state = Deactivated;
 
     logger.debug("Deactivation completed"); // Throws
@@ -1862,7 +1881,7 @@ void Session::send_message()
     REALM_ASSERT(m_state == Active || m_state == Deactivating);
     REALM_ASSERT(m_enlisted_to_send);
     m_enlisted_to_send = false;
-    if (m_state == Deactivating || m_error_message_received) {
+    if (m_state == Deactivating || m_error_message_received || m_suspended) {
         // Deactivation has been initiated. If the UNBIND message has not been
         // sent yet, there is no point in sending it. Instead, we can let the
         // deactivation process complete.
@@ -1910,6 +1929,29 @@ void Session::send_message()
     if (m_target_download_mark > m_last_download_mark_sent)
         return send_mark_message(); // Throws
 
+    auto is_upload_allowed = [&]() -> bool {
+        if (!m_is_flx_sync_session) {
+            return true;
+        }
+
+        auto migration_store = get_migration_store();
+        if (!migration_store) {
+            return true;
+        }
+
+        auto sentinel_query_version = migration_store->get_sentinel_subscription_set_version();
+        if (!sentinel_query_version) {
+            return true;
+        }
+
+        // Do not allow upload if the last query sent is the sentinel one used by the migration store.
+        return m_last_sent_flx_query_version != *sentinel_query_version;
+    };
+
+    if (!is_upload_allowed()) {
+        return;
+    }
+
     auto check_pending_flx_version = [&]() -> bool {
         if (!m_is_flx_sync_session) {
             return false;
@@ -1946,7 +1988,6 @@ void Session::send_bind_message()
     REALM_ASSERT(m_state == Active);
 
     session_ident_type session_ident = m_ident;
-    const std::string& path = get_virt_path();
     bool need_client_file_ident = !have_client_file_ident();
     const bool is_subserver = false;
 
@@ -1955,9 +1996,31 @@ void Session::send_bind_message()
     int protocol_version = m_conn.get_negotiated_protocol_version();
     OutputBuffer& out = m_conn.get_output_buffer();
     // Discard the token since it's ignored by the server.
-    std::string empty_access_token{};
-    protocol.make_bind_message(protocol_version, out, session_ident, path, empty_access_token, need_client_file_ident,
-                               is_subserver); // Throws
+    std::string empty_access_token;
+    if (m_is_flx_sync_session) {
+        nlohmann::json bind_json_data;
+        if (auto migrated_partition = get_migration_store()->get_migrated_partition()) {
+            bind_json_data["migratedPartition"] = *migrated_partition;
+        }
+        if (logger.would_log(util::Logger::Level::debug)) {
+            std::string json_data_dump;
+            if (!bind_json_data.empty()) {
+                json_data_dump = bind_json_data.dump();
+            }
+            logger.debug(
+                "Sending: BIND(session_ident=%1, need_client_file_ident=%2 is_subserver=%3 json_data=\"%4\")",
+                session_ident, need_client_file_ident, is_subserver, json_data_dump);
+        }
+        protocol.make_flx_bind_message(protocol_version, out, session_ident, bind_json_data, empty_access_token,
+                                       need_client_file_ident, is_subserver); // Throws
+    }
+    else {
+        std::string server_path = get_virt_path();
+        logger.debug("Sending: BIND(session_ident=%1, need_client_file_ident=%2 is_subserver=%3 server_path=%4)",
+                     session_ident, need_client_file_ident, is_subserver, server_path);
+        protocol.make_pbs_bind_message(protocol_version, out, session_ident, server_path, empty_access_token,
+                                       need_client_file_ident, is_subserver); // Throws
+    }
     m_conn.initiate_write_message(out, this); // Throws
 
     m_bind_message_sent = true;
@@ -2027,8 +2090,8 @@ void Session::send_query_change_message()
     auto sub_store = get_flx_subscription_store();
     auto latest_sub_set = sub_store->get_by_version(m_pending_flx_sub_set->query_version);
     auto latest_queries = latest_sub_set.to_ext_json();
-    logger.debug("Sending: QUERY(query_version=%1, query_size=%2, query=\"%3\"", latest_sub_set.version(),
-                 latest_queries.size(), latest_queries);
+    logger.debug("Sending: QUERY(query_version=%1, query_size=%2, query=\"%3\", snapshot_version=%4)",
+                 latest_sub_set.version(), latest_queries.size(), latest_queries, latest_sub_set.snapshot_version());
 
     OutputBuffer& out = m_conn.get_output_buffer();
     session_ident_type session_ident = get_ident();
@@ -2191,7 +2254,7 @@ void Session::send_mark_message()
 
 void Session::send_unbind_message()
 {
-    REALM_ASSERT(m_state == Deactivating || m_error_message_received);
+    REALM_ASSERT(m_state == Deactivating || m_error_message_received || m_suspended);
     REALM_ASSERT(m_bind_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
 
@@ -2260,18 +2323,6 @@ void Session::send_test_command_message()
 }
 
 
-void Session::close_connection()
-{
-    REALM_ASSERT(m_state == Active);
-    REALM_ASSERT(m_ident_message_sent);
-    REALM_ASSERT(!m_unbind_message_sent);
-    REALM_ASSERT(m_client_error);
-
-    m_conn.close_due_to_protocol_error(m_client_error->code(), m_client_error->what()); // Throws
-    m_client_error = util::none;
-}
-
-
 std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident)
 {
     logger.debug("Received: IDENT(client_file_ident=%1, client_file_ident_salt=%2)", client_file_ident.ident,
@@ -2323,7 +2374,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         // this point forward.
         auto client_reset_operation = std::move(m_client_reset_operation);
         util::UniqueFunction<void(int64_t)> on_flx_subscription_complete = [this](int64_t version) {
-            this->non_sync_flx_completion(version);
+            this->on_flx_sync_version_complete(version);
         };
         if (!client_reset_operation->finalize(client_file_ident, get_flx_subscription_store(),
                                               std::move(on_flx_subscription_complete))) {
@@ -2352,6 +2403,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
 
         m_upload_target_version = m_last_version_available;
         m_upload_progress = m_progress.upload;
+        m_download_progress = m_progress.download;
         // In recovery mode, there may be new changesets to upload and nothing left to download.
         // In FLX DiscardLocal mode, there may be new commits due to subscription handling.
         // For both, we want to allow uploads again without needing external changes to download first.
@@ -2363,6 +2415,12 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         if (has_pending_client_reset) {
             handle_pending_client_reset_acknowledgement();
         }
+
+        // If a migration or rollback is in progress, mark it complete when client reset is completed.
+        if (auto migration_store = get_migration_store()) {
+            migration_store->complete_migration_or_rollback();
+        }
+
         return true;
     };
     // if a client reset happens, it will take care of setting the file ident
@@ -2372,14 +2430,17 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         did_client_reset = client_reset_if_needed();
     }
     catch (const std::exception& e) {
-        logger.error("A fatal error occured during client reset: '%1'", e.what());
-        return make_error_code(sync::ClientError::auto_client_reset_failure);
+        auto err_msg = util::format("A fatal error occured during client reset: '%1'", e.what());
+        logger.error(err_msg.c_str());
+        SessionErrorInfo err_info(make_error_code(ClientError::auto_client_reset_failure), err_msg, false);
+        suspend(err_info);
+        return {};
     }
     if (!did_client_reset) {
         repl.get_history().set_client_file_ident(client_file_ident, m_fix_up_object_ids); // Throws
-        this->m_progress.download.last_integrated_client_version = 0;
-        this->m_progress.upload.client_version = 0;
-        this->m_last_version_selected_for_upload = 0;
+        m_progress.download.last_integrated_client_version = 0;
+        m_progress.upload.client_version = 0;
+        m_last_version_selected_for_upload = 0;
     }
 
     // Ready to send the IDENT message
@@ -2391,6 +2452,12 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
                                        DownloadBatchState batch_state, int64_t query_version,
                                        const ReceivedChangesets& received_changesets)
 {
+    // Ignore the message if the deactivation process has been initiated,
+    // because in that case, the associated Realm must not be accessed any
+    // longer.
+    if (m_state != Active)
+        return;
+
     if (is_steady_state_download_message(batch_state, query_version)) {
         batch_state = DownloadBatchState::SteadyState;
     }
@@ -2410,12 +2477,6 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
         logger.debug("Ignoring download message because the client detected an integration error");
         return;
     }
-
-    // Ignore the message if the deactivation process has been initiated,
-    // because in that case, the associated Realm must not be accessed any
-    // longer.
-    if (m_state != Active)
-        return;
 
     bool legal_at_this_time = (m_ident_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
@@ -2539,13 +2600,14 @@ std::error_code Session::receive_unbound_message()
 
     // The fact that the UNBIND message has been sent, but an ERROR message has
     // not been received, implies that the deactivation process must have been
-    // initiated, so this session must be in the Deactivating state.
-    REALM_ASSERT(m_state == Deactivating);
+    // initiated, so this session must be in the Deactivating state or the session
+    // has been suspended because of a client side error.
+    REALM_ASSERT(m_state == Deactivating || m_suspended);
 
     m_unbound_message_received = true;
 
     // Detect completion of the unbinding process
-    if (m_unbind_message_sent_2) {
+    if (m_unbind_message_send_complete && m_state == Deactivating) {
         // The deactivation process completes when the unbinding process
         // completes.
         complete_deactivation(); // Throws
@@ -2570,11 +2632,6 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, error_action=%4)", info.message,
                 info.raw_error_code, info.try_again, info.server_requests_action); // Throws
 
-    auto debug_action = call_debug_hook(SyncClientHookEvent::ErrorMessageReceived, info);
-    if (debug_action == SyncClientHookAction::EarlyReturn) {
-        return {};
-    }
-
     bool legal_at_this_time = (m_bind_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
         logger.error("Illegal message at this time");
@@ -2592,6 +2649,10 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
         return ClientError::bad_error_code;
     }
 
+    auto debug_action = call_debug_hook(SyncClientHookEvent::ErrorMessageReceived, info);
+    if (debug_action == SyncClientHookAction::EarlyReturn) {
+        return {};
+    }
     // For compensating write errors, we need to defer raising them to the SDK until after the server version
     // containing the compensating write has appeared in a download message.
     if (error_code == ProtocolError::compensating_write) {
@@ -2599,19 +2660,24 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
         return {};
     }
 
+    m_error_message_received = true;
+    suspend(SessionErrorInfo{info, make_error_code(error_code)});
+    return {};
+}
+
+void Session::suspend(const SessionErrorInfo& info)
+{
     REALM_ASSERT(!m_suspended);
     REALM_ASSERT(m_state == Active || m_state == Deactivating);
     logger.debug("Suspended"); // Throws
 
-    m_error_message_received = true;
     m_suspended = true;
 
     // Detect completion of the unbinding process
-    if (m_unbind_message_sent_2) {
-        // The fact that the UNBIND message has been sent, but an ERROR message
-        // has not been received, implies that the deactivation process must
-        // have been initiated, so this session must be in the Deactivating
-        // state.
+    if (m_unbind_message_send_complete && m_error_message_received) {
+        // The fact that the UNBIND message has been sent, but we are not being suspended because
+        // we received an ERROR message implies that the deactivation process must
+        // have been initiated, so this session must be in the Deactivating state.
         REALM_ASSERT(m_state == Deactivating);
 
         // The deactivation process completes when the unbinding process
@@ -2624,7 +2690,7 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     // still in the Active state
     if (m_state == Active) {
         m_conn.one_less_active_unsuspended_session();                      // Throws
-        on_suspended(SessionErrorInfo{info, make_error_code(error_code)}); // Throws
+        on_suspended(info);                                                // Throws
     }
 
     if (info.try_again) {
@@ -2634,8 +2700,6 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     // Ready to send the UNBIND message, if it has not been sent already
     if (!m_unbind_message_sent)
         ensure_enlisted_to_send(); // Throws
-
-    return std::error_code{}; // Success;
 }
 
 std::error_code Session::receive_test_command_response(request_ident_type ident, std::string_view body)

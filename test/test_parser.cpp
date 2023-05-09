@@ -293,6 +293,7 @@ static std::vector<std::string> invalid_queries = {
     "0 contains1",
     "a contains_something",
     "endswith 0",
+    "link geoWithin 5.0",
 
     // atoms/groups
     "0=0)",
@@ -4035,6 +4036,7 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "ALL {8, 10} / 2 >= ANY items.price", 1);
     verify_query(test_context, t, "NONE {1, 2, 3} * 20 <= ANY items.price", 3);
     verify_query(test_context, t, "ANY {1, 2, 3, 4, 5, 6} + 2 == ANY items.price", 1);
+    verify_query(test_context, t, "ANY {0, 1, 2, 3, 5, 6, 7, 8, 9} == ANY items.price", 0); // No hit and all smaller
 
     // list property vs list property
     verify_query(test_context, t, "items.price IN items.price", 3);
@@ -5646,6 +5648,111 @@ TEST(Parser_PrimaryKey)
     q = linking->query(query_string);
     CHECK_EQUAL(q.count(), 1);
     CHECK_EQUAL(q.get_description(), query_string);
+}
+
+TEST(Parser_Geospatial)
+{
+    Group g;
+    auto table = g.add_table_with_primary_key("Restaurant", type_ObjectId, "_id");
+    auto geo_table = g.add_table("Position", Table::Type::Embedded);
+    geo_table->add_column(type_String, "type");
+    geo_table->add_column_list(type_Double, "coordinates");
+    table->add_column_list(*geo_table, "links");
+    table->add_column(*table, "self_link");
+
+#if !REALM_ENABLE_GEOSPATIAL
+    auto error = "Support for Geospatial queries is not enabled";
+
+#define CHECK_QUERY(query)                                                                                           \
+    do {                                                                                                             \
+        CHECK_THROW_EX(verify_query(test_context, table, query, 1), realm::LogicError,                               \
+                       CHECK(std::string(e.what()).find(error) != std::string::npos));                               \
+    } while (false)
+
+    CHECK_QUERY("link geoWithin geoBox([0.2, 0.2], [0.7, 0.7])");
+    CHECK_QUERY("link geoWithin geoBox([0.2, 0.2, 0.2], [0.7, 0.7, 0.7])");
+    CHECK_QUERY("link geoWithin geoSphere([0.3, 0.3], 1000.0)");
+    CHECK_QUERY("link geoWithin geoSphere([0.3, 0.3, 0.3], 1000.0)");
+    CHECK_QUERY("link geoWithin geoPolygon({[0.0, 0.0], [1.0, 0.0], [1, 1], [0, 1]})");
+
+    CHECK_THROW_EX(verify_query_sub(test_context, table, "link GEOWITHIN $0", {}, 1), realm::LogicError,
+                   CHECK(std::string(e.what()).find(error) != std::string::npos));
+#else
+    auto col_link = table->add_column(*geo_table, "link");
+    std::vector<Geospatial> point_data = {GeoPoint{0, 0}, GeoPoint{0.5, 0.5}, GeoPoint{1, 1}, GeoPoint{2, 2}};
+    for (auto& geo : point_data) {
+        table->create_object_with_primary_key(ObjectId::gen()).set(col_link, geo);
+    }
+    // add one object with a null link
+    table->create_object_with_primary_key(ObjectId::gen());
+
+    verify_query(test_context, table, "link geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 1);
+    verify_query(test_context, table, "link geoWithin geoBox([0.2, 0.2, 0.2], [0.7, 0.7, 0.7])", 1);
+    verify_query(test_context, table, "link geoWithin geoSphere([0.3, 0.3], 1000.0)", 4);
+    verify_query(test_context, table, "link geoWithin geoSphere([0.3, 0.3, 0.3], 1000.0)", 4);
+    verify_query(test_context, table, "link geoWithin geoPolygon({[0.0, 0.0], [1.0, 0.0], [1, 1], [0, 1]})", 1);
+    verify_query(test_context, table,
+                 "link geoWithin geoPolygon({[0.0, 0.0], [1.0, 0.0], [1, 1], [0, 1]}, "
+                 "{[0.25, 0.25], [0.75, 0.25], [0.75, 0.75], [0.25, 0.75]})",
+                 0); // polygon with hole
+    verify_query(test_context, table, "link == NULL", 1);
+
+    Geospatial box{GeoBox{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}}};
+    Geospatial sphere{GeoCenterSphere{1000, GeoPoint{0.3, 0.3}}};
+    Geospatial polygon{GeoPolygon{{GeoPoint{0, 0}, GeoPoint{1, 0}, GeoPoint{1, 1}, GeoPoint{0, 1}}}};
+    Geospatial invalid;
+    Geospatial point{GeoPoint{0, 0}};
+    std::vector<Mixed> args = {Mixed{&box},          Mixed{&sphere}, Mixed{&polygon}, Mixed{&invalid},
+                               Mixed{realm::null()}, Mixed{1.2},     Mixed{1000},     Mixed{"string value"}};
+    verify_query_sub(test_context, table, "link GEOWITHIN $0", args, 1);
+    verify_query_sub(test_context, table, "link GEOWITHIN $1", args, 4);
+    verify_query_sub(test_context, table, "link GEOWITHIN $2", args, 1);
+
+    CHECK_THROW_EX(
+        verify_query(test_context, table, "_id geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 1),
+        query_parser::InvalidQueryError,
+        CHECK(std::string(e.what()).find("The left hand side of 'geoWithin' must be a link to geoJSON formatted "
+                                         "data. But the provided type is 'objectId'") != std::string::npos));
+    CHECK_THROW_ANY(verify_query(test_context, table, "link geoWithin _id", 0));
+    CHECK_THROW_ANY(verify_query(test_context, table, "link geoWithin link", 0));
+    CHECK_THROW_EX(
+        verify_query(test_context, table, "self_link geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 0),
+        std::runtime_error,
+        CHECK(std::string(e.what()).find("Query 'self_link GEOWITHIN GeoBox([0.2, 0.2], [0.7, 0.7])' links to data "
+                                         "in the wrong format for a geoWithin query") != std::string::npos));
+    CHECK_THROW_EX(
+        verify_query(test_context, table, "link geoWithin NULL", 1), query_parser::SyntaxError,
+        CHECK(std::string(e.what()).find("Invalid predicate: 'link geoWithin NULL': syntax error, unexpected null") !=
+              std::string::npos));
+    CHECK_THROW_EX(
+        verify_query(test_context, table, "link geoWithin 1.2", 1), query_parser::SyntaxError,
+        CHECK(std::string(e.what()).find("Invalid predicate: 'link geoWithin 1.2': syntax error, unexpected float") !=
+              std::string::npos));
+    CHECK_THROW_EX(verify_query(test_context, table, "link geoWithin 'test string'", 1), query_parser::SyntaxError,
+                   CHECK(std::string(e.what()).find(
+                             "Invalid predicate: 'link geoWithin 'test string'': syntax error, unexpected string") !=
+                         std::string::npos));
+    CHECK_THROW_EX(
+        verify_query_sub(test_context, table, "link GEOWITHIN $4", args, 1), query_parser::InvalidQueryError,
+        CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
+                                         "But the provided type is 'null'") != std::string::npos));
+    CHECK_THROW_EX(
+        verify_query_sub(test_context, table, "link GEOWITHIN $5", args, 1), query_parser::InvalidQueryError,
+        CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
+                                         "But the provided type is 'double'") != std::string::npos));
+    CHECK_THROW_EX(
+        verify_query_sub(test_context, table, "link GEOWITHIN $6", args, 1), query_parser::InvalidQueryError,
+        CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
+                                         "But the provided type is 'int'") != std::string::npos));
+    CHECK_THROW_EX(
+        verify_query_sub(test_context, table, "link GEOWITHIN $7", args, 1), query_parser::InvalidQueryError,
+        CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
+                                         "But the provided type is 'string'") != std::string::npos));
+    CHECK_THROW_EX(verify_query_sub(test_context, table, "link GEOWITHIN $3", args, 0),
+                   query_parser::InvalidQueryError,
+                   CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a valid "
+                                                    "Geospatial value, got 'NULL'") != std::string::npos));
+#endif
 }
 
 TEST(Parser_RecursiveLogial)

@@ -8,3 +8,11 @@
 
 race:realm::util::AESCryptor::read
 race:realm::util::EncryptedFileMapping::copy_up_to_date_page
+
+# Avoid a false positive instance of lock-order-inversion.
+# SyncManager::m_sessions_mutex and SyncSession::m_state_mutex are locked
+# in this order when a SyncSession is created, and in reverse order when 
+# SyncSession::become_inactive is called. Creating a SyncSession and becoming
+# inactive cannot happen at the same time.
+deadlock:realm::sync::MigrationStore::create_sentinel_subscription_set
+deadlock:realm::sync::MigrationStore::create_subscriptions

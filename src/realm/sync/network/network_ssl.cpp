@@ -200,6 +200,7 @@ bool ErrorCategory::equivalent(const std::error_code& ec, int condition) const n
                 }
             }
 #endif
+            static_cast<void>(ec);
             return false;
     }
     return false;
@@ -1514,12 +1515,6 @@ std::size_t Stream::ssl_write(const char*, std::size_t, std::error_code&, Want&)
 
 
 bool Stream::ssl_shutdown(std::error_code&, Want&) noexcept
-{
-    return false;
-}
-
-
-bool is_server_cert_rejected_error(std::error_code&)
 {
     return false;
 }
