@@ -301,7 +301,6 @@ public:
 
     DictionaryPtr set_dictionary_ptr(ColKey col_key);
     DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
-    // std::shared_ptr<Dictionary> get_dictionary_ptr(const std::vector<CollectionParent::Index>& path) const;
 
     CollectionBasePtr get_collection_ptr(ColKey col_key) const;
     CollectionBasePtr get_collection_ptr(StringData col_name) const;
