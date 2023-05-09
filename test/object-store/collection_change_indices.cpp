@@ -16,6 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include <exception>
 #include <catch2/catch_all.hpp>
 
 #include <realm/object-store/impl/collection_notifier.hpp>
