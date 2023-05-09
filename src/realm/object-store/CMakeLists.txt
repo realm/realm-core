@@ -175,7 +175,7 @@ else()
     target_sources(ObjectStore PRIVATE impl/generic/external_commit_helper.cpp)
 endif()
 
-if(REALM_ENABLE_SYNC AND REALM_DISABLE_SYNC_MULTIPLEXING)
+if(REALM_ENABLE_SYNC AND NOT REALM_SYNC_MULTIPLEXING)
     target_compile_definitions(ObjectStore PUBLIC REALM_DISABLE_SYNC_MULTIPLEXING=1)
 endif()
 

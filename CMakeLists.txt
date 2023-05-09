@@ -255,7 +255,7 @@ endif()
 option(REALM_ENABLE_MEMDEBUG "Add additional memory checks" OFF)
 option(REALM_VALGRIND "Tell the test suite we are running with valgrind" OFF)
 option(REALM_METRICS "Enable various metric tracking" ON)
-option(REALM_DISABLE_SYNC_MULTIPLEXING "Disables sync session multi-plexing by default")
+option(REALM_SYNC_MULTIPLEXING "Enables/disables sync session multiplexing by default" ON)
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 option(REALM_ENABLE_GEOSPATIAL "Enable geospatial types and queries." ON)
 
