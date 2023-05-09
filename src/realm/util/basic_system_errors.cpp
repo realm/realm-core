@@ -16,6 +16,9 @@
  *
  **************************************************************************/
 
+// opt into the POSIX version of strerror_r
+#define _POSIX_C_SOURCE 200112L
+
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -62,8 +65,11 @@ std::string system_category::message(int value) const
             return buffer;
         }
     }
-
-#elif (!REALM_ANDROID && _GNU_SOURCE) || (defined(__USE_GNU) && __ANDROID_API__ >= 23)
+// When compiling C++ on Linux _GNU_SOURCE is always defined by the compiler because it's needed for libstdc++, so
+// even if we define _POSIX_C_SOURCE like we do above we still need the GNU path because _GNU_SOURCE trumps
+// _POSIX_C_SOURCE. _GNU_SOURCE causes __USE_GNU to be defined, so if we have it then we have the GNU strerror_r.
+// On Android the GNU variant was only added in API level 23.
+#elif defined(__USE_GNU) && __USE_GNU && (!defined(__ANDROID_API__) || __ANDROID_API__ >= 23)
 
     {
         char* msg = nullptr;
