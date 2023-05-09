@@ -7,6 +7,7 @@
     "noEmit": true,
     "esModuleInterop": true,
     "baseUrl": "./",
+    "skipLibCheck": true,
     "paths": {
       "@realm/bindgen/*": [ "./src/*" ]
     }
