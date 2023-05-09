@@ -430,7 +430,9 @@ void RealmCoordinator::open_db()
         }
 
         DBOptions options;
+#ifndef __EMSCRIPTEN__
         options.enable_async_writes = true;
+#endif
         options.durability = m_config.in_memory ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full;
         options.is_immutable = m_config.immutable();
         options.logger = util::Logger::get_default_logger();
@@ -442,12 +444,19 @@ void RealmCoordinator::open_db()
         options.allow_file_format_upgrade = !m_config.disable_format_upgrade && !schema_mode_reset_file;
         if (history) {
             options.backup_at_file_format_change = m_config.backup_at_file_format_change;
+#ifdef __EMSCRIPTEN__
+            // Force the DB to be created in memory-only mode, ignoring the filesystem path supplied in the config.
+            // This is so we can run an SDK on top without having to solve the browser persistence problem yet,
+            // or teach RealmConfig and SDKs about pure in-memory realms.
+            m_db = DB::create(std::move(history), options);
+#else
             if (m_config.path.size()) {
                 m_db = DB::create(std::move(history), m_config.path, options);
             }
             else {
                 m_db = DB::create(std::move(history), options);
             }
+#endif
         }
         else {
             m_db = DB::create(m_config.path, true, options);
