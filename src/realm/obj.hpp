@@ -83,8 +83,8 @@ public:
     {
         return *this;
     }
-    ref_type get_collection_ref(Index index) const noexcept final;
-    void set_collection_ref(Index index, ref_type ref) final;
+    ref_type get_collection_ref(Index, CollectionType) const final;
+    void set_collection_ref(Index, ref_type, CollectionType) final;
 
     // Operator overloads
     bool operator==(const Obj& other) const;
@@ -402,6 +402,7 @@ private:
     }
 
     void set_int(ColKey col_key, int64_t value);
+    void set_ref(ColKey col_key, ref_type value, CollectionType type);
     void add_backlink(ColKey backlink_col, ObjKey origin_key);
     bool remove_one_backlink(ColKey backlink_col, ObjKey origin_key);
     void nullify_link(ColKey origin_col, ObjLink target_key) &&;

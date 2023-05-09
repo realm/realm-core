@@ -39,6 +39,8 @@ public:
     virtual std::pair<size_t, bool> erase_any(Mixed value) = 0;
 
 protected:
+    static constexpr CollectionType s_collection_type = CollectionType::Set;
+
     void insert_repl(Replication* repl, size_t index, Mixed value) const;
     void erase_repl(Replication* repl, size_t index, Mixed value) const;
     void clear_repl(Replication* repl) const;
@@ -332,6 +334,10 @@ public:
     bool is_attached() const final;
     bool has_changed() const noexcept final;
     ColKey get_col_key() const noexcept final;
+    CollectionType get_collection_type() const noexcept override
+    {
+        return CollectionType::Set;
+    }
 
     // Overriding members of SetBase:
     SetBasePtr clone() const override

@@ -76,8 +76,8 @@ public:
 
     Index get_index(size_t ndx) const noexcept;
 
-    ref_type get_collection_ref(Index index) const noexcept final;
-    void set_collection_ref(Index index, ref_type ref) final;
+    ref_type get_collection_ref(Index index, CollectionType) const noexcept final;
+    void set_collection_ref(Index index, ref_type ref, CollectionType) final;
 
     // If this list is at the outermost nesting level, use these functions to
     // get the leaf collections
@@ -112,7 +112,7 @@ private:
     mutable Array m_top;
     mutable std::unique_ptr<BPlusTreeBase> m_keys;
     mutable BPlusTree<ref_type> m_refs;
-    DataType m_key_type;
+    CollectionType m_coll_type;
     mutable uint_fast64_t m_content_version = 0;
 
 

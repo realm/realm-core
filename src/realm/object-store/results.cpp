@@ -34,7 +34,8 @@ namespace realm {
 [[noreturn]] static void unsupported_operation(ColKey column, Table const& table, const char* operation)
 {
     auto type = ObjectSchema::from_core_type(column);
-    std::string_view collection_type = column.is_collection() ? collection_type_name(column) : "property";
+    std::string_view collection_type =
+        column.is_collection() ? collection_type_name(table.get_collection_type(column, 0)) : "property";
     const char* column_type = string_for_property_type(type & ~PropertyType::Collection);
     throw IllegalOperation(util::format("Operation '%1' not supported for %2%3 %4 '%5.%6'", operation, column_type,
                                         column.is_nullable() ? "?" : "", collection_type, table.get_class_name(),

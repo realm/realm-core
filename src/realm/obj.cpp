@@ -1658,6 +1658,24 @@ void Obj::set_int(ColKey col_key, int64_t value)
     sync(fields);
 }
 
+void Obj::set_ref(ColKey col_key, ref_type value, CollectionType type)
+{
+    update_if_needed();
+
+    ColKey::Idx col_ndx = col_key.get_index();
+    Allocator& alloc = get_alloc();
+    alloc.bump_content_version();
+    Array fallback(alloc);
+    Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
+    REALM_ASSERT(col_ndx.val + 1 < fields.size());
+    ArrayMixed values(alloc);
+    values.set_parent(&fields, col_ndx.val + 1);
+    values.init_from_parent();
+    values.set(m_row_ndx, Mixed(value, type));
+
+    sync(fields);
+}
+
 void Obj::add_backlink(ColKey backlink_col_key, ObjKey origin_key)
 {
     ColKey::Idx backlink_col_ndx = backlink_col_key.get_index();
@@ -2262,14 +2280,31 @@ ref_type Obj::Internal::get_ref(const Obj& obj, ColKey col_key)
     return to_ref(obj._get<int64_t>(col_key.get_index()));
 }
 
-ref_type Obj::get_collection_ref(Index index) const noexcept
+ref_type Obj::get_collection_ref(Index index, CollectionType type) const
 {
-    return to_ref(_get<int64_t>(mpark::get<ColKey>(index).get_index()));
+    ColKey col_key = mpark::get<ColKey>(index);
+    if (col_key.is_collection()) {
+        return to_ref(_get<int64_t>(col_key.get_index()));
+    }
+    if (col_key.get_type() == col_type_Mixed) {
+        auto val = _get<Mixed>(col_key.get_index());
+        if (val.is_null() || !val.is_type(DataType(int(type)))) {
+            throw IllegalOperation("Not proper collection type");
+        }
+        return val.get_ref();
+    }
+    return 0;
 }
 
-void Obj::set_collection_ref(Index index, ref_type ref)
+void Obj::set_collection_ref(Index index, ref_type ref, CollectionType type)
 {
-    set_int(mpark::get<ColKey>(index), from_ref(ref));
+    ColKey col_key = mpark::get<ColKey>(index);
+    if (col_key.is_collection()) {
+        set_int(col_key, from_ref(ref));
+        return;
+    }
+    REALM_ASSERT(col_key.get_type() == col_type_Mixed);
+    set_ref(col_key, ref, type);
 }
 
 } // namespace realm

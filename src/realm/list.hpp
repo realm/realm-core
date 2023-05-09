@@ -68,6 +68,7 @@ public:
     virtual void swap(size_t ndx1, size_t ndx2) = 0;
 
 protected:
+    static constexpr CollectionType s_collection_type = CollectionType::List;
     void swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const;
 };
 
@@ -399,6 +400,10 @@ public:
     const Obj& get_obj() const noexcept final;
     bool has_changed() const noexcept final;
     ColKey get_col_key() const noexcept final;
+    CollectionType get_collection_type() const noexcept override
+    {
+        return CollectionType::List;
+    }
 
     // Overriding members of LstBase:
     std::unique_ptr<LstBase> clone() const override

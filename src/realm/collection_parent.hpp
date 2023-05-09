@@ -99,9 +99,9 @@ protected:
     /// Get owning object
     virtual const Obj& get_object() const noexcept = 0;
     /// Get the top ref from pareht
-    virtual ref_type get_collection_ref(Index) const noexcept = 0;
-    /// Set the top ref from pareht
-    virtual void set_collection_ref(Index, ref_type ref) = 0;
+    virtual ref_type get_collection_ref(Index, CollectionType) const = 0;
+    /// Set the top ref in parent
+    virtual void set_collection_ref(Index, ref_type ref, CollectionType) = 0;
 
     // Used when inserting a new link. You will not remove existing links in this process
     void set_backlink(ColKey col_key, ObjLink new_link) const;
@@ -145,11 +145,11 @@ protected:
         return true;
     }
     const Obj& get_object() const noexcept final;
-    ref_type get_collection_ref(Index) const noexcept final
+    ref_type get_collection_ref(Index, CollectionType) const final
     {
         return m_ref;
     }
-    void set_collection_ref(Index, ref_type) {}
+    void set_collection_ref(Index, ref_type, CollectionType) {}
 };
 
 } // namespace realm
