@@ -1658,6 +1658,24 @@ void Obj::set_int(ColKey col_key, int64_t value)
     sync(fields);
 }
 
+void Obj::set_ref(ColKey col_key, ref_type value, CollectionType type)
+{
+    update_if_needed();
+
+    ColKey::Idx col_ndx = col_key.get_index();
+    Allocator& alloc = get_alloc();
+    alloc.bump_content_version();
+    Array fallback(alloc);
+    Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
+    REALM_ASSERT(col_ndx.val + 1 < fields.size());
+    ArrayMixed values(alloc);
+    values.set_parent(&fields, col_ndx.val + 1);
+    values.init_from_parent();
+    values.set(m_row_ndx, Mixed(value, type));
+
+    sync(fields);
+}
+
 void Obj::add_backlink(ColKey backlink_col_key, ObjKey origin_key)
 {
     ColKey::Idx backlink_col_ndx = backlink_col_key.get_index();
@@ -2286,7 +2304,7 @@ void Obj::set_collection_ref(Index index, ref_type ref, CollectionType type)
         return;
     }
     REALM_ASSERT(col_key.get_type() == col_type_Mixed);
-    set(col_key, Mixed(ref, type));
+    set_ref(col_key, ref, type);
 }
 
 } // namespace realm
