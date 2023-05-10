@@ -346,9 +346,45 @@ void IndexEvaluator::init(std::vector<ObjKey>* storage)
     }
 }
 
+void IndexEvaluator::init_for_iteration(StringIndex* index, Mixed value)
+{
+    REALM_ASSERT(index);
+    m_matching_keys = nullptr;
+    m_last_start_key = ObjKey();
+    m_results_start = 0;
+    m_index_matches.reset();
+    m_results_ndx = m_results_start;
+    m_index_iterator = index->find_gte(value);
+}
+
+void IndexEvaluator::update_index(StringIndex* index)
+{
+    if (m_index_iterator) {
+        m_index_iterator->update_index(index);
+    }
+}
+
 size_t IndexEvaluator::do_search_index(const Cluster* cluster, size_t start, size_t end)
 {
     if (start >= end) {
+        return not_found;
+    }
+    if (m_index_iterator) {
+        if (!m_index_iterator->get_key()) {
+            // FIXME: cache first matching key
+            // no matches
+            return not_found;
+        }
+        for (size_t i = start; i < end; ++i) {
+            ObjKey key = cluster->get_real_key(i);
+            IndexIterator it = *m_index_iterator;
+            while (ObjKey match = it.get_key()) {
+                if (match == key) {
+                    return i;
+                }
+                ++it;
+            }
+        }
         return not_found;
     }
 
@@ -381,6 +417,42 @@ size_t IndexEvaluator::do_search_index(const Cluster* cluster, size_t start, siz
         return cluster->lower_bound_key(ObjKey(m_actual_key.value - cluster->get_offset()));
     }
     return not_found;
+}
+
+IndexEvaluator::Iterator::Iterator(const IndexEvaluator* parent)
+    : m_pos(0)
+    , m_parent(parent)
+    , m_iterator(parent->m_index_iterator)
+{
+}
+
+ObjKey IndexEvaluator::Iterator::get_key()
+{
+    if (m_iterator) {
+        return m_iterator->get_key();
+    }
+    if (m_pos < m_parent->size()) {
+        return m_parent->get(m_pos);
+    }
+    return ObjKey();
+}
+
+void IndexEvaluator::Iterator::advance()
+{
+    if (m_iterator) {
+        m_iterator = m_iterator->next();
+    }
+    else {
+        ++m_pos;
+    }
+}
+
+bool IndexEvaluator::Iterator::is_valid()
+{
+    if (m_iterator) {
+        return bool(m_iterator->get_key());
+    }
+    return m_pos < m_parent->size();
 }
 
 void StringNode<Equal>::_search_index_init()

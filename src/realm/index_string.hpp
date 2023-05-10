@@ -24,6 +24,8 @@
 #include <array>
 #include <set>
 
+#include <iostream>
+
 #include <realm/array.hpp>
 #include <realm/cluster_tree.hpp>
 
@@ -66,11 +68,56 @@ strings, the rows are sorted in ascending order.
 namespace realm {
 
 class Spec;
+class StringIndex;
 class Timestamp;
 class ClusterColumn;
 
 template <class T>
 class BPlusTree;
+
+struct IndexIterator {
+    IndexIterator& operator++();
+    IndexIterator next() const;
+    ObjKey get_key() const;
+    void update_index(StringIndex* index);
+
+private:
+    std::vector<size_t> m_positions;
+    StringIndex* m_index;
+    ObjKey m_key;
+    friend class IndexArray;
+};
+
+enum FindRes {
+    // Indicate that no results were found in the search
+    FindRes_not_found,
+    // Indicates a single result is found
+    FindRes_single,
+    // Indicates more than one result is found and they are stored in a column
+    FindRes_column
+};
+
+enum IndexMethod {
+    index_FindFirst,
+    index_FindAll_nocopy,
+    index_Count,
+    index_FindGTE,
+};
+
+// Combined result of the index_FindAll_nocopy operation. The column returned
+// can contain results that are not matches but all matches are within the
+// returned start_ndx and end_ndx.
+struct InternalFindResult {
+    // Reference to a IntegerColumn containing result rows, or a single row
+    // value if the result is FindRes_single.
+    int64_t payload;
+    // Offset into the result column to start at.
+    size_t start_ndx;
+    // Offset index in the result column to end at.
+    size_t end_ndx;
+    // An iterator to the result of find_first the match position.
+    IndexIterator position;
+};
 
 /// Each StringIndex node contains an array of this type
 class IndexArray : public Array {
@@ -81,10 +128,12 @@ public:
     }
 
     ObjKey index_string_find_first(Mixed value, const ClusterColumn& column) const;
+    IndexIterator index_string_find_gte(Mixed value, const ClusterColumn& column) const;
     void index_string_find_all(std::vector<ObjKey>& result, Mixed value, const ClusterColumn& column,
                                bool case_insensitive = false) const;
     FindRes index_string_find_all_no_copy(Mixed value, const ClusterColumn& column, InternalFindResult& result) const;
     size_t index_string_count(Mixed value, const ClusterColumn& column) const;
+    IndexIterator next(const IndexIterator& it) const;
 
 private:
     template <IndexMethod>
@@ -220,6 +269,10 @@ public:
     FindRes find_all_no_copy(T value, InternalFindResult& result) const;
     template <class T>
     size_t count(T value) const;
+    IndexIterator next(const IndexIterator& it) const;
+
+    template <class T>
+    IndexIterator find_gte(T value) const;
 
     void find_all_fulltext(std::vector<ObjKey>& result, StringData value) const;
 
@@ -479,6 +532,13 @@ void StringIndex::set(ObjKey key, util::Optional<T> new_value)
     else {
         set(key, null{});
     }
+}
+
+template <class T>
+IndexIterator StringIndex::find_gte(T value) const
+{
+    // this->do_dump_node_structure(std::cout, 0);
+    return m_array->index_string_find_gte(Mixed(value), m_target_column);
 }
 
 template <class T>
