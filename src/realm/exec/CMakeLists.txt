@@ -27,6 +27,10 @@ set_target_properties(RealmEnumerate PROPERTIES
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
 target_link_libraries(RealmEnumerate ObjectStore)
+# FIXME can be fixed for others, but requires link and install fixes for libuv target
+if (NOT APPLE)
+    set_target_properties(RealmEnumerate PROPERTIES EXCLUDE_FROM_ALL TRUE)
+endif()
 
 add_executable(RealmDecrypt realm_decrypt.cpp)
 set_target_properties(RealmDecrypt PROPERTIES
@@ -68,14 +72,3 @@ set_target_properties(RealmDump PROPERTIES
 install(TARGETS ${ExecTargetsToInstall}
         COMPONENT runtime
         DESTINATION bin)
-
-set(OptionalToolsTargets RealmImporter RealmTrawler RealmEnumerate
-    RealmDecrypt RealmEncrypt RealmBrowser RealmDump)
-
-add_custom_target(build_all DEPENDS ${OptionalToolsTargets})
-if (ExecTargetsToInstall)
-    add_dependencies(build_all ${ExecTargetsToInstall})
-endif()
-
-message("Will try to build tools by default for: ${CMAKE_SYSTEM_NAME}...")
-# set_target_properties(${OptionalToolsTargets} PROPERTIES EXCLUDE_FROM_ALL TRUE)
