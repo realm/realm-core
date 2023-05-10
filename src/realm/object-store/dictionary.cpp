@@ -346,7 +346,7 @@ public:
 private:
     realm::Dictionary& m_dict;
     TransactionRef m_prev_rt;
-    std::shared_ptr<realm::Dictionary> m_prev_dict;
+    std::unique_ptr<realm::Dictionary> m_prev_dict;
     Dictionary::CBFunc m_cb;
 };
 } // namespace

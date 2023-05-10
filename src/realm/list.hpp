@@ -526,7 +526,7 @@ private:
 
         int64_t get_key(size_t ndx) const noexcept
         {
-            size_t ret = 0;
+            int64_t ret = 0;
             auto func = [&ret](BPlusTreeNode* node, size_t ndx) {
                 LeafNode* leaf = static_cast<LeafNode*>(node);
                 ret = leaf->get_key(ndx);
