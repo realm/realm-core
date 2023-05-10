@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This pre-commit hook prevents us from creating commits that contains ill-formatted files
 
