@@ -1,3 +1,21 @@
+////////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2023 Realm Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+////////////////////////////////////////////////////////////////////////////
+
 #include <sync/flx_sync_harness.hpp>
 #include <sync/sync_test_utils.hpp>
 #include <util/baas_admin_api.hpp>
@@ -5,6 +23,9 @@
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/thread_safe_reference.hpp>
+#include <realm/object-store/sync/async_open_task.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
@@ -774,6 +795,88 @@ TEST_CASE("New table is synced after migration", "[flx][migration]") {
         auto active_subs = sub_store->get_active();
         REQUIRE(active_subs.size() == 2);
         REQUIRE(active_subs.find("flx_migrated_Object2"));
+    }
+}
+
+TEST_CASE("Async open + client reset", "[flx][migration]") {
+    std::shared_ptr<util::Logger> logger_ptr =
+        std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+
+    const std::string base_url = get_base_url();
+    const std::string partition = "migration-test";
+    ObjectSchema shared_object("Object", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                          {"string_field", PropertyType::String | PropertyType::Nullable},
+                                          {"realm_id", PropertyType::String | PropertyType::Nullable}});
+    const Schema mig_schema{shared_object};
+    size_t num_before_reset_notifications = 0;
+    size_t num_after_reset_notifications = 0;
+    auto server_app_config = minimal_app_config(base_url, "server_migrate_rollback", mig_schema);
+    TestAppSession session(create_app(server_app_config));
+    SyncTestFile config(session.app(), partition, server_app_config.schema);
+    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+    config.sync_config->notify_before_client_reset = [&](SharedRealm before) {
+        logger_ptr->debug("notify_before_client_reset");
+        REQUIRE(before);
+        auto table = before->read_group().get_table("class_Object");
+        CHECK(!table);
+        ++num_before_reset_notifications;
+    };
+    config.sync_config->notify_after_client_reset = [&](SharedRealm before, ThreadSafeReference after_ref,
+                                                        bool did_recover) {
+        logger_ptr->debug("notify_after_client_reset");
+        CHECK(!did_recover);
+        REQUIRE(before);
+        auto table_before = before->read_group().get_table("class_Object");
+        CHECK(!table_before);
+        SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
+        REQUIRE(after);
+        auto table_after = after->read_group().get_table("class_Object");
+        REQUIRE(table_after);
+        REQUIRE(table_after->size() == 0);
+        ++num_after_reset_notifications;
+    };
+
+    std::mutex mutex;
+
+    auto async_open_realm = [&](const Realm::Config& config) {
+        ThreadSafeReference realm_ref;
+        std::exception_ptr error;
+        auto task = Realm::get_synchronized_realm(config);
+        task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
+            std::lock_guard lock(mutex);
+            realm_ref = std::move(ref);
+            error = e;
+        });
+        util::EventLoop::main().run_until([&] {
+            std::lock_guard lock(mutex);
+            return realm_ref || error;
+        });
+        return std::pair(std::move(realm_ref), error);
+    };
+
+    // Migrate to FLX
+    trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
+
+    {
+        config.schema = {shared_object, ObjectSchema("LocallyAdded",
+                                                     {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                                      {"string_field", PropertyType::String | PropertyType::Nullable},
+                                                      {"realm_id", PropertyType::String | PropertyType::Nullable}})};
+
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+
+        auto realm = Realm::get_shared_realm(std::move(ref));
+
+        auto table = realm->read_group().get_table("class_Object");
+        REQUIRE(table->size() == 0);
+        REQUIRE(num_before_reset_notifications == 1);
+        REQUIRE(num_after_reset_notifications == 1);
+
+        auto locally_added_table = realm->read_group().get_table("class_LocallyAdded");
+        REQUIRE(locally_added_table);
+        REQUIRE(locally_added_table->size() == 0);
     }
 }
 
