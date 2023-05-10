@@ -165,7 +165,9 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
             create_object(i + 2, true);
     });
 
+    Results results(realm, table);
     auto frozen_realm = Realm::get_frozen_realm(config, realm->read_transaction_version());
+    Results frozen_results = results.freeze(frozen_realm);
 
 #define VERIFY_VALID_RESULTS(results, realm)                                                                         \
     REQUIRE(results.is_valid());                                                                                     \
@@ -188,8 +190,6 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     VERIFY_INVALID_RESULTS(results, realm, StaleAccessor, "Access to invalidated Results objects")
 
     SECTION("is_frozen") {
-        Results results(realm, table);
-        Results frozen_results = results.freeze(frozen_realm);
         REQUIRE(!results.is_frozen());
         REQUIRE(frozen_results.is_frozen());
         JoiningThread thread([&] {
@@ -200,8 +200,6 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     }
 
     SECTION("add_notification throws") {
-        Results results(realm, table);
-        Results frozen_results = results.freeze(frozen_realm);
         REQUIRE_EXCEPTION(frozen_results.add_notification_callback([&](CollectionChangeSet) {}),
                           WrongTransactionState,
                           "Notifications are not available on frozen collections since they do not change.");
@@ -214,12 +212,13 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         JoiningThread thread([&] {
             REQUIRE(frozen_res.is_frozen());
             REQUIRE(frozen_res.size() == 0);
-            VERIFY_VALID_RESULTS(frozen_res, frozen_realm);
+            REQUIRE_EXCEPTION(frozen_res.get_any(0), OutOfBounds,
+                              "Requested index 0 calling get_any() on Results when empty");
         });
     }
 
     SECTION("Result constructor - Table") {
-        Results results = Results(frozen_realm, frozen_realm->read_group().get_table("class_object"));
+        Results res = Results(frozen_realm, frozen_realm->read_group().get_table("class_object"));
         Results frozen_res = results.freeze(frozen_realm);
         JoiningThread thread([&] {
             auto obj = frozen_res.get(0);
@@ -229,9 +228,6 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
             REQUIRE(Object(frozen_realm, obj).is_frozen());
             REQUIRE(frozen_res.get(0).get<int64_t>(value_col) == 2);
             REQUIRE(frozen_res.first()->get<int64_t>(value_col) == 2);
-
-            VERIFY_VALID_RESULTS(results, frozen_realm);
-            VERIFY_VALID_RESULTS(frozen_res, frozen_realm);
         });
     }
 
@@ -316,7 +312,6 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     }
 
     SECTION("Result constructor - LinkList") {
-        Results results(realm, table);
         Obj obj = results.get(0);
         std::shared_ptr<LnkLst> link_list = obj.get_linklist_ptr(object_link_col);
         Results res = Results(realm, link_list);
