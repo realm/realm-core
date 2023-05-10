@@ -997,9 +997,9 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key) const
                 // all the objects will match this condition
                 pn->m_children[best] = pn->m_children.back();
                 pn->m_children.pop_back();
-                const size_t num_keys = keys->size();
-                for (size_t i = 0; i < num_keys; ++i) {
-                    auto obj = m_table->get_object(keys->get(i));
+
+                for (auto it = keys->begin(); it.is_valid(); it.advance()) {
+                    auto obj = m_table->get_object(it.get_key());
                     if (pn->m_children.empty() || eval_object(obj)) {
                         st.m_key_offset = obj.get_key().value;
                         st.match(realm::npos, obj.get<T>(column_key));
@@ -1327,9 +1327,8 @@ void Query::do_find_all(TableView& ret, size_t limit) const
                 pn->m_children[best] = pn->m_children.back();
                 pn->m_children.pop_back();
 
-                const size_t num_keys = keys->size();
-                for (size_t i = 0; i < num_keys; ++i) {
-                    ObjKey key = keys->get(i);
+                for (auto it = keys->begin(); it.is_valid(); it.advance()) {
+                    ObjKey key = it.get_key();
                     if (limit == 0)
                         break;
                     if (pn->m_children.empty()) {
@@ -1448,9 +1447,8 @@ size_t Query::do_count(size_t limit) const
                 // all the objects will match this condition
                 pn->m_children[best] = pn->m_children.back();
                 pn->m_children.pop_back();
-                const size_t num_keys = keys->size();
-                for (size_t i = 0; i < num_keys; ++i) {
-                    auto obj = m_table->get_object(keys->get(i));
+                for (auto it = keys->begin(); it.is_valid(); it.advance()) {
+                    auto obj = m_table->get_object(it.get_key());
                     if (eval_object(obj)) {
                         ++cnt;
                         if (cnt == limit)

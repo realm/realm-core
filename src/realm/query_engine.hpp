@@ -346,6 +346,8 @@ public:
 
     void init(StringIndex* index, Mixed value);
     void init(std::vector<ObjKey>* storage);
+    void init_for_iteration(StringIndex* index, Mixed value);
+    void update_index(StringIndex* index);
 
     size_t do_search_index(const Cluster* cluster, size_t start, size_t end);
 
@@ -354,11 +356,39 @@ public:
         if (m_matching_keys) {
             return m_matching_keys->size();
         }
+        else if (m_index_iterator) {
+            // FIXME: optimize!
+            IndexIterator copy_index = *m_index_iterator;
+            size_t count = 0;
+            while (copy_index.get_key()) {
+                ++copy_index;
+                ++count;
+            }
+            return count;
+        }
         return m_results_end - m_results_start;
     }
+
     ObjKey get(size_t ndx) const
     {
         return get_internal(ndx + m_results_start);
+    }
+
+    struct Iterator {
+        Iterator(const IndexEvaluator* parent);
+        ObjKey get_key();
+        void advance();
+        bool is_valid();
+
+    private:
+        size_t m_pos = 0;
+        const IndexEvaluator* m_parent;
+        std::optional<IndexIterator> m_iterator;
+    };
+
+    Iterator begin() const
+    {
+        return Iterator(this);
     }
 
 private:
@@ -366,6 +396,9 @@ private:
     {
         if (m_matching_keys) {
             return m_matching_keys->at(ndx);
+        }
+        if (m_index_iterator) {
+            return m_index_iterator->get_key();
         }
         if (m_index_matches) {
             return ObjKey(m_index_matches->get(ndx));
@@ -378,6 +411,7 @@ private:
     }
 
     std::shared_ptr<IntegerColumn> m_index_matches;
+    std::optional<IndexIterator> m_index_iterator;
     ObjKey m_actual_key;
     ObjKey m_last_start_key;
     size_t m_results_start = 0;
@@ -471,7 +505,7 @@ protected:
 };
 
 
-template <class LeafType, class TConditionFunction>
+template <class LeafType, class TConditionFunction, typename = void>
 class IntegerNode : public IntegerNodeBase<LeafType> {
     using BaseType = IntegerNodeBase<LeafType>;
     using ThisType = IntegerNode<LeafType, TConditionFunction>;
@@ -570,8 +604,14 @@ public:
 
     bool has_search_index() const override
     {
-        return this->m_table->search_index_type(IntegerNodeBase<LeafType>::m_condition_column_key) ==
-               IndexType::General;
+
+        bool has_index =
+            this->m_table->search_index_type(IntegerNodeBase<LeafType>::m_condition_column_key) == IndexType::General;
+        if (has_index && m_index_evaluator) {
+            StringIndex* index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+            const_cast<IndexEvaluator&>(*m_index_evaluator).update_index(index);
+        }
+        return has_index;
     }
 
     const IndexEvaluator* index_based_keys() override
@@ -643,6 +683,119 @@ private:
     IntegerNode(const IntegerNode<LeafType, Equal>& from)
         : BaseType(from)
         , m_needles(from.m_needles)
+    {
+    }
+};
+
+template <class LeafType, class TConditionFunction>
+class IntegerNode<LeafType, TConditionFunction,
+                  std::enable_if_t<realm::is_any_v<TConditionFunction, Greater, GreaterEqual>>>
+    : public IntegerNodeBase<LeafType> {
+public:
+    using BaseType = IntegerNodeBase<LeafType>;
+    using TConditionValue = typename BaseType::TConditionValue;
+    using ThisType = IntegerNode<LeafType, TConditionFunction>;
+
+    IntegerNode(TConditionValue value, ColKey column_key)
+        : BaseType(value, column_key)
+    {
+    }
+
+    void init(bool will_query_ranges) override
+    {
+        BaseType::init(will_query_ranges);
+
+        if (has_search_index()) {
+            StringIndex* index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+            m_index_evaluator = IndexEvaluator();
+            if constexpr (std::is_same_v<TConditionFunction, Greater>) {
+                if constexpr (std::is_same_v<decltype(BaseType::m_value), util::Optional<int64_t>>) {
+                    if (BaseType::m_value) {
+                        m_index_evaluator->init_for_iteration(index, *BaseType::m_value + int64_t(1));
+                    }
+                    else {
+                        // FIXME: > null is always true
+                        m_index_evaluator->init_for_iteration(index, BaseType::m_value);
+                    }
+                }
+                else {
+                    static_assert(std::is_same_v<decltype(BaseType::m_value), int64_t>);
+                    m_index_evaluator->init_for_iteration(index, BaseType::m_value + int64_t(1));
+                }
+            }
+            else {
+                static_assert(std::is_same_v<TConditionFunction, GreaterEqual>);
+                m_index_evaluator->init_for_iteration(index, BaseType::m_value);
+            }
+            IntegerNodeBase<LeafType>::m_dT = 0;
+        }
+    }
+
+    void table_changed() override
+    {
+        if (m_index_evaluator) {
+            StringIndex* index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+            m_index_evaluator->update_index(index);
+        }
+    }
+
+    bool has_search_index() const override
+    {
+        bool has_index =
+            this->m_table->search_index_type(IntegerNodeBase<LeafType>::m_condition_column_key) == IndexType::General;
+        if (has_index && m_index_evaluator) {
+            StringIndex* index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+            const_cast<IndexEvaluator&>(*m_index_evaluator).update_index(index);
+        }
+        return has_index;
+    }
+
+    const IndexEvaluator* index_based_keys() override
+    {
+        return m_index_evaluator ? &(*m_index_evaluator) : nullptr;
+    }
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        REALM_ASSERT(this->m_table);
+        size_t s = realm::npos;
+
+        if (start < end) {
+            if (m_index_evaluator) {
+                return m_index_evaluator->do_search_index(BaseType::m_cluster, start, end);
+            }
+            else {
+                s = this->m_leaf_ptr->template find_first<TConditionFunction>(this->m_value, start, end);
+            }
+        }
+
+        return s;
+    }
+
+    size_t find_all_local(size_t start, size_t end) override
+    {
+        return BaseType::template find_all_local<TConditionFunction>(start, end);
+    }
+
+    std::string describe(util::serializer::SerialisationState& state) const override
+    {
+        REALM_ASSERT(this->m_condition_column_key);
+        std::string col_descr = state.describe_column(this->m_table, this->m_condition_column_key);
+
+        return col_descr + " " + TConditionFunction::description() + " " +
+               util::serializer::print_value(IntegerNodeBase<LeafType>::m_value);
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new ThisType(*this));
+    }
+
+private:
+    std::optional<IndexEvaluator> m_index_evaluator;
+
+    IntegerNode(const IntegerNode<LeafType, TConditionFunction>& from)
+        : BaseType(from)
     {
     }
 };

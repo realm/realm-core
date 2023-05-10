@@ -528,7 +528,7 @@ public:
 
     void dump_values(std::ostream& o, int level) const
     {
-        std::string indent(" ", level * 2);
+        std::string indent(level * 2, ' ');
 
         auto func = [&o, indent](BPlusTreeNode* node, size_t) {
             LeafNode* leaf = static_cast<LeafNode*>(node);

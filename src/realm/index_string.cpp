@@ -57,6 +57,29 @@ Mixed ClusterColumn::get_value(ObjKey key) const
     return obj.get_any(m_column_key);
 }
 
+IndexIterator& IndexIterator::operator++()
+{
+    auto next = m_index->next(*this);
+    m_positions = next.m_positions;
+    m_key = next.m_key;
+    return *this;
+}
+
+IndexIterator IndexIterator::next() const
+{
+    return m_index->next(*this);
+}
+
+ObjKey IndexIterator::get_key() const
+{
+    return m_key;
+}
+
+void IndexIterator::update_index(StringIndex* index)
+{
+    m_index = index;
+}
+
 template <>
 int64_t IndexArray::from_list<index_FindFirst>(Mixed value, InternalFindResult& /* result_ref */,
                                                const IntegerColumn& key_values, const ClusterColumn& column) const
@@ -73,6 +96,32 @@ int64_t IndexArray::from_list<index_FindFirst>(Mixed value, InternalFindResult& 
     Mixed actual = column.get_value(ObjKey(first_key_value));
     if (actual != value)
         return null_key.value;
+
+    return first_key_value;
+}
+
+template <>
+int64_t IndexArray::from_list<index_FindGTE>(Mixed value, InternalFindResult& result_ref,
+                                             const IntegerColumn& key_values, const ClusterColumn& column) const
+{
+    SortedListComparator slc(column);
+
+    IntegerColumn::const_iterator it_end = key_values.cend();
+    IntegerColumn::const_iterator lower = std::lower_bound(key_values.cbegin(), it_end, value, slc);
+    if (lower == it_end) {
+        REALM_ASSERT(key_values.size());
+        return null_key.value;
+    }
+
+    int64_t first_key_value = *lower;
+
+    Mixed actual = column.get_value(ObjKey(first_key_value));
+
+    if (actual != value)
+        return null_key.value;
+
+    result_ref.position.m_positions.push_back(size_t(lower.get_position()));
+    result_ref.position.m_key = ObjKey(first_key_value);
 
     return first_key_value;
 }
@@ -152,7 +201,7 @@ template <IndexMethod method>
 int64_t IndexArray::index_string(Mixed value, InternalFindResult& result_ref, const ClusterColumn& column) const
 {
     // Return`realm::not_found`, or an index to the (any) match
-    constexpr bool first(method == index_FindFirst);
+    constexpr bool first(method == index_FindFirst || method == index_FindGTE);
     // Return 0, or the number of items that match the specified `value`
     constexpr bool get_count(method == index_Count);
     // Same as `index_FindAll` but does not copy matching rows into `column`
@@ -188,12 +237,20 @@ int64_t IndexArray::index_string(Mixed value, InternalFindResult& result_ref, co
         size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
 
         // If key is outside range, we know there can be no match
-        if (pos == offsets_size)
+        if (pos == offsets_size) {
+            if constexpr (method == index_FindGTE) {
+                result_ref.position = IndexIterator();
+            }
             return local_not_found;
+        }
 
         // Get entry under key
         size_t pos_refs = pos + 1; // first entry in refs points to offsets
         uint64_t ref = get_direct(data, width, pos_refs);
+
+        if constexpr (method == index_FindGTE) {
+            result_ref.position.m_positions.push_back(pos_refs);
+        }
 
         if (is_inner_node) {
             // Set vars for next iteration
@@ -220,6 +277,9 @@ int64_t IndexArray::index_string(Mixed value, InternalFindResult& result_ref, co
 
             Mixed a = column.get_value(ObjKey(key_value));
             if (a == value) {
+                if constexpr (method == index_FindGTE) {
+                    result_ref.position.m_key = ObjKey(key_value);
+                }
                 result_ref.payload = key_value;
                 return first ? key_value : get_count ? 1 : FindRes_single;
             }
@@ -255,7 +315,6 @@ int64_t IndexArray::index_string(Mixed value, InternalFindResult& result_ref, co
         key = StringIndex::create_key(index_data, stringoffset);
     }
 }
-
 
 void IndexArray::from_list_all_ins(StringData upper_value, std::vector<ObjKey>& result, const IntegerColumn& rows,
                                    const ClusterColumn& column) const
@@ -587,12 +646,18 @@ void IndexArray::index_string_all(Mixed value, std::vector<ObjKey>& result, cons
     }
 }
 
+IndexIterator IndexArray::index_string_find_gte(Mixed value, const ClusterColumn& column) const
+{
+    InternalFindResult result;
+    index_string<index_FindGTE>(value, result, column);
+    return result.position;
+}
+
 ObjKey IndexArray::index_string_find_first(Mixed value, const ClusterColumn& column) const
 {
     InternalFindResult unused;
     return ObjKey(index_string<index_FindFirst>(value, unused, column));
 }
-
 
 void IndexArray::index_string_find_all(std::vector<ObjKey>& result, Mixed value, const ClusterColumn& column,
                                        bool case_insensitive) const
@@ -615,6 +680,115 @@ size_t IndexArray::index_string_count(Mixed value, const ClusterColumn& column) 
 {
     InternalFindResult unused;
     return to_size_t(index_string<index_Count>(value, unused, column));
+}
+
+IndexIterator IndexArray::next(const IndexIterator& it) const
+{
+    struct IndexHelper {
+        const char* data = nullptr;
+        const char* header = nullptr;
+        uint_least8_t width = 0;
+        bool is_inner_node = false;
+        size_t size = 0;
+        size_t index_in_array = 0;
+    };
+
+    auto make_iterator_from = [&it](const std::vector<IndexHelper>& positions, ObjKey k) {
+        IndexIterator ret;
+        ret.m_key = k;
+        ret.m_index = it.m_index;
+        for (auto& ndx : positions) {
+            ret.m_positions.push_back(ndx.index_in_array);
+        }
+        return ret;
+    };
+    auto ascend_increment = [](std::vector<IndexHelper>& positions) {
+        while (!positions.empty()) {
+            ++positions.back().index_in_array;
+            if (positions.back().index_in_array < positions.back().size) {
+                break;
+            }
+            positions.pop_back();
+        }
+    };
+    if (it.m_positions.size() == 0) {
+        return IndexIterator(); // invalid
+    }
+    std::vector<IndexHelper> positions;
+    positions.push_back(IndexHelper{m_data, nullptr, m_width, m_is_inner_bptree_node, size(), it.m_positions[0]});
+    bool find_next_valid = false;
+
+    for (;;) {
+        if (positions.empty()) {
+            REALM_ASSERT(find_next_valid);
+            return IndexIterator(); // invalid
+        }
+        size_t index = positions.back().index_in_array;
+
+        // Get entry under key
+        uint64_t ref = get_direct(positions.back().data, positions.back().width, index);
+
+        if (positions.back().is_inner_node) {
+            const char* header = m_alloc.translate(ref_type(ref));
+            size_t next_index = find_next_valid ? 1 : it.m_positions[positions.size()];
+            positions.push_back(IndexHelper{get_data_from_header(header), header, get_width_from_header(header),
+                                            get_is_inner_bptree_node_from_header(header),
+                                            get_size_from_header(header), next_index});
+            continue;
+        }
+
+        // Literal row index (tagged)
+        if (ref & 1) {
+            if (find_next_valid) {
+                ObjKey k(int64_t(ref >> 1));
+                return make_iterator_from(positions, k);
+            }
+            else {
+                ascend_increment(positions);
+                find_next_valid = true;
+                continue;
+            }
+        }
+
+        const char* sub_header = m_alloc.translate(ref_type(ref));
+        const bool sub_isindex = get_context_flag_from_header(sub_header);
+
+        // List of row indices with common prefix up to this point, in sorted order.
+        if (!sub_isindex) {
+            const IntegerColumn sub(m_alloc, ref_type(ref));
+
+            if (find_next_valid) {
+                // we have descended down to this leaf, use the first element (there must be one)
+                REALM_ASSERT(sub.size() > 0);
+                positions.push_back(IndexHelper()); // zero index
+                ObjKey key(sub.get(0));
+                return make_iterator_from(positions, key);
+            }
+
+            size_t sub_index = it.m_positions[positions.size()];
+            if (sub_index + 1 < sub.size()) {
+                IndexHelper index_only;
+                index_only.index_in_array = sub_index + 1;
+                positions.push_back(index_only);
+                ObjKey key(sub.get(sub_index + 1));
+                return make_iterator_from(positions, key);
+            }
+            else {
+                ascend_increment(positions);
+                find_next_valid = true;
+                continue; // find next
+            }
+        }
+
+        size_t next_index = find_next_valid ? 1 : it.m_positions[positions.size()];
+        // Recurse into sub-index;
+        positions.push_back(IndexHelper{
+            get_data_from_header(sub_header), sub_header, get_width_from_header(sub_header),
+            get_is_inner_bptree_node_from_header(sub_header), get_size_from_header(sub_header), next_index});
+    }
+
+    REALM_UNREACHABLE();
+    return IndexIterator(); // invalid
 }
 
 std::unique_ptr<IndexArray> StringIndex::create_node(Allocator& alloc, bool is_leaf)
@@ -641,6 +815,10 @@ void StringIndex::set_target(const ClusterColumn& target_column) noexcept
     m_target_column = target_column;
 }
 
+IndexIterator StringIndex::next(const IndexIterator& it) const
+{
+    return m_array->next(it);
+}
 
 StringIndex::key_type StringIndex::get_last_key() const
 {
@@ -1718,7 +1896,6 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
         }
         return;
     }
-
 
     size_t num_children = node_size - 1;
     size_t child_ref_begin = 1;

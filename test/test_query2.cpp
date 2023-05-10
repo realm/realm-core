@@ -5422,6 +5422,47 @@ TEST_TYPES(Query_PrimaryKeySearchForNull, Prop<String>, Prop<Int>, Prop<ObjectId
     CHECK_NOT(table.find_first(col, type{}));
 }
 
+ONLY(Query_IntIndexedGreater)
+{
+    Group g;
+    auto table = g.add_table("Foo");
+    auto col_int_indexed = table->add_column(type_Int, "indexed");
+    auto col_int = table->add_column(type_Int, "int");
+    table->add_search_index(col_int_indexed);
+
+    std::vector<int64_t> values = {0, -1, -1, 2, 2, 2, 3, 4, 4, 4, 4, 5, -2, -2, -2, -2};
+    //    for (int64_t i = 0; i < int64_t(1); ++i) {
+    //        values.push_back(i);
+    //        values.push_back(-i);
+    //        values.push_back(i + 0xffffffffll);
+    //        values.push_back(-(0xffffffffll) - i);
+    //    }
+
+
+    for (int64_t val : values) {
+        table->create_object().set(col_int_indexed, val).set(col_int, val);
+    }
+    // FIXME: check just count() as well.
+    std::sort(values.begin(), values.end());
+    for (int64_t val : values) {
+        auto it = std::lower_bound(values.begin(), values.end(), val);
+        REALM_ASSERT(it != values.end());
+        size_t num_expected = values.end() - it;
+        Query q = (table->column<Int>(col_int_indexed) >= val);
+        TableView tv = q.find_all();
+        CHECK_EQUAL(tv.size(), num_expected);
+        if (tv.size() != num_expected) {
+            util::format(std::cout, "search for '%1', expected %2, found %3\n", val, num_expected, tv.size());
+            for (size_t i = 0; i < tv.size(); ++i) {
+                Obj obj = tv[i];
+                util::format(std::cout, "\tfound: %1\n", obj.get<Int>(col_int_indexed));
+            }
+        }
+        tv = (table->column<Int>(col_int) >= val).find_all();
+        CHECK_EQUAL(tv.size(), num_expected);
+    }
+}
+
 TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
 {
     bool has_index = TEST_TYPE::value;

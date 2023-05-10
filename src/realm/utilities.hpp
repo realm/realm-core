@@ -237,36 +237,6 @@ ReturnType type_punning(OriginalType variable) noexcept
     return both.out;
 }
 
-// Also see the comments in Array::index_string()
-enum FindRes {
-    // Indicate that no results were found in the search
-    FindRes_not_found,
-    // Indicates a single result is found
-    FindRes_single,
-    // Indicates more than one result is found and they are stored in a column
-    FindRes_column
-};
-
-enum IndexMethod {
-    index_FindFirst,
-    index_FindAll_nocopy,
-    index_Count,
-};
-
-// Combined result of the index_FindAll_nocopy operation. The column returned
-// can contain results that are not matches but all matches are within the
-// returned start_ndx and end_ndx.
-struct InternalFindResult {
-    // Reference to a IntegerColumn containing result rows, or a single row
-    // value if the result is FindRes_single.
-    int64_t payload;
-    // Offset into the result column to start at.
-    size_t start_ndx;
-    // Offset index in the result column to end at.
-    size_t end_ndx;
-};
-
-
 // realm::is_any<T, U1, U2, U3, ...> ==
 // std::is_same<T, U1>::value || std::is_same<T, U2>::value || std::is_same<T, U3>::value ...
 template <typename... T>
