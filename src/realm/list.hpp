@@ -88,11 +88,15 @@ public:
     Lst(ColKey col_key)
         : Base(col_key)
     {
-        if (!col_key.is_list()) {
+        if (!(col_key.is_list() || col_key.get_type() == col_type_Mixed)) {
             throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a list");
         }
 
         check_column_type<T>(m_col_key);
+    }
+    Lst(DummyParent& parent)
+        : Base(parent)
+    {
     }
     Lst(const Lst& other);
     Lst(Lst&&) noexcept;

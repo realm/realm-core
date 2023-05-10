@@ -21,6 +21,7 @@
 #include <realm/array_mixed.hpp>
 #include <realm/array_ref.hpp>
 #include <realm/group.hpp>
+#include <realm/list.hpp>
 #include <realm/replication.hpp>
 
 #include <algorithm>
@@ -49,7 +50,7 @@ void validate_key_value(const Mixed& key)
 Dictionary::Dictionary(ColKey col_key)
     : Base(col_key)
 {
-    if (!col_key.is_dictionary()) {
+    if (!(col_key.is_dictionary() || col_key.get_type() == col_type_Mixed)) {
         throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a dictionary");
     }
 }
@@ -423,6 +424,38 @@ Obj Dictionary::create_and_insert_linked_object(Mixed key)
     return o;
 }
 
+DictionaryPtr Dictionary::insert_dictionary(StringData key)
+{
+    insert(key, Mixed(0, CollectionType::Dictionary));
+    return get_dictionary(key);
+}
+
+DictionaryPtr Dictionary::get_dictionary(StringData key) const
+{
+    auto weak = const_cast<Dictionary*>(this)->weak_from_this();
+    REALM_ASSERT(!weak.expired());
+    auto shared = weak.lock();
+    DictionaryPtr ret = std::make_shared<Dictionary>(m_col_key);
+    ret->set_owner(shared, key);
+    return ret;
+}
+
+std::shared_ptr<Lst<Mixed>> Dictionary::insert_list(StringData key)
+{
+    insert(key, Mixed(0, CollectionType::List));
+    return get_list(key);
+}
+
+std::shared_ptr<Lst<Mixed>> Dictionary::get_list(StringData key) const
+{
+    auto weak = const_cast<Dictionary*>(this)->weak_from_this();
+    REALM_ASSERT(!weak.expired());
+    auto shared = weak.lock();
+    std::shared_ptr<Lst<Mixed>> ret = std::make_shared<Lst<Mixed>>(m_col_key);
+    ret->set_owner(shared, key);
+    return ret;
+}
+
 Mixed Dictionary::get(Mixed key) const
 {
     if (auto opt_val = try_get(key)) {
@@ -542,7 +575,7 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
 
     if (new_link != old_link) {
         CascadeState cascade_state(CascadeState::Mode::Strong);
-        bool recurse = replace_backlink(m_col_key, old_link, new_link, cascade_state);
+        bool recurse = Base::replace_backlink(m_col_key, old_link, new_link, cascade_state);
         if (recurse)
             _impl::TableFriend::remove_recursive(*my_table, cascade_state); // Throws
     }
@@ -704,7 +737,7 @@ void Dictionary::clear()
 
 bool Dictionary::init_from_parent(bool allow_create) const
 {
-    auto ref = get_collection_ref();
+    auto ref = Base::get_collection_ref();
 
     if ((ref || allow_create) && !m_dictionary_top) {
         Allocator& alloc = get_alloc();
@@ -728,7 +761,7 @@ bool Dictionary::init_from_parent(bool allow_create) const
     }
 
     if (ref) {
-        m_dictionary_top->init_from_parent();
+        m_dictionary_top->init_from_ref(ref);
         m_keys->init_from_parent();
         m_values->init_from_parent();
     }
@@ -852,7 +885,7 @@ std::pair<Mixed, Mixed> Dictionary::do_get_pair(size_t ndx) const
 bool Dictionary::clear_backlink(Mixed value, CascadeState& state) const
 {
     if (value.is_type(type_TypedLink)) {
-        return remove_backlink(m_col_key, value.get_link(), state);
+        return Base::remove_backlink(m_col_key, value.get_link(), state);
     }
     return false;
 }
@@ -935,12 +968,12 @@ void Dictionary::migrate()
         ArrayParent* m_owner;
     };
 
-    if (auto dict_ref = get_collection_ref()) {
+    if (auto dict_ref = Base::get_collection_ref()) {
         Allocator& alloc = get_alloc();
         DictionaryClusterTree cluster_tree(this, alloc, 0);
         if (cluster_tree.init_from_parent()) {
             // Create an empty dictionary in the old ones place
-            set_collection_ref(0);
+            Base::set_collection_ref(0);
             ensure_created();
 
             ArrayString keys(alloc); // We only support string type keys.
@@ -996,6 +1029,16 @@ void Dictionary::to_json(std::ostream& out, size_t link_depth, JSONOutputMode ou
         if (val.is_type(type_TypedLink)) {
             fn(val);
         }
+        else if (val.is_type(type_Dictionary)) {
+            DummyParent parent(this->get_table(), val.get_ref());
+            Dictionary dict(parent);
+            dict.to_json(out, link_depth, output_mode, fn);
+        }
+        else if (val.is_type(type_List)) {
+            DummyParent parent(this->get_table(), val.get_ref());
+            Lst<Mixed> list(parent);
+            list.to_json(out, link_depth, output_mode, fn);
+        }
         else {
             val.to_json(out, output_mode);
         }
@@ -1003,6 +1046,38 @@ void Dictionary::to_json(std::ostream& out, size_t link_depth, JSONOutputMode ou
 
     out << "}";
     out << close_str;
+}
+
+ref_type Dictionary::get_collection_ref(Index index, CollectionType type) const
+{
+    auto ndx = do_find_key(StringData(mpark::get<std::string>(index)));
+    if (ndx != realm::not_found) {
+        auto val = m_values->get(ndx);
+        if (val.is_null() || !val.is_type(DataType(int(type)))) {
+            throw IllegalOperation("Not proper collection type");
+        }
+        return val.get_ref();
+    }
+
+    return 0;
+}
+
+void Dictionary::set_collection_ref(Index index, ref_type ref, CollectionType type)
+{
+    auto ndx = do_find_key(StringData(mpark::get<std::string>(index)));
+    if (ndx == realm::not_found) {
+        throw StaleAccessor("Collection has been deleted");
+    }
+    m_values->set(ndx, Mixed(ref, type));
+}
+
+bool Dictionary::update_if_needed() const
+{
+    auto status = update_if_needed_with_status();
+    if (status == UpdateStatus::Detached) {
+        throw StaleAccessor("CollectionList no longer exists");
+    }
+    return status == UpdateStatus::Updated;
 }
 
 /************************* DictionaryLinkValues *************************/

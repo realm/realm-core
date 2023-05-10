@@ -1095,6 +1095,11 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                 else if (val.is_type(type_TypedLink)) {
                     print_link(val);
                 }
+                else if (val.is_type(type_Dictionary)) {
+                    DummyParent parent(m_table, val.get_ref());
+                    Dictionary dict(parent);
+                    dict.to_json(out, link_depth, output_mode, print_link);
+                }
                 else {
                     val.to_json(out, output_mode);
                 }
@@ -1906,22 +1911,36 @@ SetBasePtr Obj::get_setbase_ptr(ColKey col_key) const
 
 Dictionary Obj::get_dictionary(ColKey col_key) const
 {
-    REALM_ASSERT(col_key.is_dictionary());
+    REALM_ASSERT(col_key.is_dictionary() || col_key.get_type() == col_type_Mixed);
     update_if_needed();
     return Dictionary(Obj(*this), col_key);
 }
 
-DictionaryPtr Obj::get_dictionary_ptr(ColKey col_key) const
+LstPtr<Mixed> Obj::set_list_ptr(ColKey col_key)
 {
-    auto dict = CollectionParent::get_dictionary_ptr(col_key);
-    dict->set_owner(*this, col_key);
-    return dict;
+    REALM_ASSERT(col_key.get_type() == col_type_Mixed);
+    update_if_needed();
+    auto old_val = get<Mixed>(col_key);
+    if (!old_val.is_type(type_List)) {
+        set(col_key, Mixed(0, CollectionType::List));
+    }
+    return get_list_ptr<Mixed>(col_key);
 }
 
-std::shared_ptr<Dictionary> Obj::get_dictionary_ptr(const std::vector<CollectionParent::Index>& path) const
+DictionaryPtr Obj::set_dictionary_ptr(ColKey col_key)
 {
-    REALM_ASSERT(mpark::get<ColKey>(path[0]).is_dictionary());
-    return std::dynamic_pointer_cast<Dictionary>(get_collection_ptr(path));
+    REALM_ASSERT(col_key.get_type() == col_type_Mixed);
+    update_if_needed();
+    auto old_val = get<Mixed>(col_key);
+    if (!old_val.is_type(type_Dictionary)) {
+        set(col_key, Mixed(ref_type(0), CollectionType::Dictionary));
+    }
+    return get_dictionary_ptr(col_key);
+}
+
+DictionaryPtr Obj::get_dictionary_ptr(ColKey col_key) const
+{
+    return std::make_shared<Dictionary>(get_dictionary(col_key));
 }
 
 Dictionary Obj::get_dictionary(StringData col_name) const

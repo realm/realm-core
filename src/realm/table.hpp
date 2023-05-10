@@ -1215,9 +1215,12 @@ inline ColumnAttrMask Table::get_column_attr(ColKey column_key) const noexcept
 
 inline DataType Table::get_dictionary_key_type(ColKey column_key) const noexcept
 {
-    auto spec_ndx = colkey2spec_ndx(column_key);
-    REALM_ASSERT_3(spec_ndx, <, get_column_count());
-    return m_spec.get_dictionary_key_type(spec_ndx);
+    if (column_key.is_dictionary()) {
+        auto spec_ndx = colkey2spec_ndx(column_key);
+        REALM_ASSERT_3(spec_ndx, <, get_column_count());
+        return m_spec.get_dictionary_key_type(spec_ndx);
+    }
+    return type_String;
 }
 
 

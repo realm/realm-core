@@ -69,10 +69,6 @@ public:
     Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
 
     // Overriding members of CollectionParent:
-    size_t get_level() const noexcept final
-    {
-        return 0;
-    }
     UpdateStatus update_if_needed_with_status() const noexcept final;
     bool update_if_needed() const final;
     TableRef get_table() const noexcept final
@@ -254,6 +250,7 @@ public:
 
     template <typename U>
     Lst<U> get_list(ColKey col_key) const;
+    LstPtr<Mixed> set_list_ptr(ColKey col_key);
     template <typename U>
     LstPtr<U> get_list_ptr(ColKey col_key) const;
     template <typename U>
@@ -300,9 +297,10 @@ public:
     LnkSetPtr get_linkset_ptr(ColKey col_key) const;
     SetBasePtr get_setbase_ptr(ColKey col_key) const;
     Dictionary get_dictionary(ColKey col_key) const;
-    DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
-    std::shared_ptr<Dictionary> get_dictionary_ptr(const std::vector<CollectionParent::Index>& path) const;
     Dictionary get_dictionary(StringData col_name) const;
+
+    DictionaryPtr set_dictionary_ptr(ColKey col_key);
+    DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
 
     CollectionBasePtr get_collection_ptr(ColKey col_key) const;
     CollectionBasePtr get_collection_ptr(StringData col_name) const;

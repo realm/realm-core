@@ -30,6 +30,7 @@
 using namespace std::chrono;
 
 #include <realm.hpp>
+#include <external/json/json.hpp>
 #include "test.hpp"
 #include "test_types_helper.hpp"
 
@@ -741,9 +742,92 @@ TEST(List_Nested_InMixed)
     auto col_any = table->add_column(type_Mixed, "something");
 
     Obj obj = table->create_object();
-    obj.set(col_any, Mixed(ref_type(0), CollectionType::List));
+
+    auto dict = obj.set_dictionary_ptr(col_any);
+    CHECK(dict->is_empty());
+    dict->insert("Four", 4);
+    tr->verify();
     tr->commit_and_continue_as_read();
-    CHECK(obj.get_any(col_any).is_type(type_List));
+    /*
+    {
+      "table": [
+        {
+          "_key": 0,
+          "something": {
+            "Four": 4
+          }
+        }
+      ]
+    }
+    */
+    CHECK_EQUAL(dict->get("Four"), Mixed(4));
+
+    tr->promote_to_write();
+    auto dict2 = dict->insert_dictionary("Dict");
+    CHECK(dict2->is_empty());
+    dict2->insert("Five", 5);
+    tr->verify();
+    tr->commit_and_continue_as_read();
+    /*
+    {
+      "table": [
+        {
+          "_key": 0,
+          "something": {
+            "Dict": {
+              "Five": 5
+            },
+            "Four": 4
+          }
+        }
+      ]
+    }
+    */
+
+    tr->promote_to_write();
+    auto list = dict2->insert_list("List");
+    CHECK(list->is_empty());
+    list->add(8);
+    list->add(9);
+    tr->verify();
+    std::stringstream ss;
+    tr->to_json(ss, 0, nullptr, JSONOutputMode::output_mode_xjson_plus);
+    auto j = nlohmann::json::parse(ss.str());
+    // std::cout << std::setw(2) << j << std::endl;
+    tr->commit_and_continue_as_read();
+    /*
+    {
+      "table": [
+        {
+          "_key": 0,
+          "something": {
+            "Dict": {
+              "Five": 5,
+              "List": [
+                8,
+                9
+              ]
+            },
+            "Four": 4
+          }
+        }
+      ]
+    }
+    */
+
+    tr->promote_to_write();
+    obj.set(col_any, Mixed(5));
+    tr->verify();
+    tr->commit_and_continue_as_read();
+
+    tr->promote_to_write();
+    // Assign another collection type. The old dictionary should be disposed.
+    auto list2 = obj.set_list_ptr(col_any);
+    CHECK(list2->is_empty());
+    list2->add("Hello");
+    tr->verify();
+    tr->commit_and_continue_as_read();
+    CHECK_EQUAL(list2->get(0), Mixed("Hello"));
 }
 
 TEST(List_NestedList_Remove)

@@ -31,10 +31,10 @@ namespace realm {
 
 CollectionList::CollectionList(std::shared_ptr<CollectionParent> parent, ColKey col_key, Index index,
                                CollectionType coll_type)
-    : m_owned_parent(parent)
+    : CollectionParent(parent->get_level() + 1)
+    , m_owned_parent(parent)
     , m_parent(m_owned_parent.get())
     , m_index(index)
-    , m_level(parent->get_level() + 1)
     , m_alloc(&get_table()->get_alloc())
     , m_col_key(col_key)
     , m_top(*m_alloc)
