@@ -732,14 +732,7 @@ TEST_CASE("sync_manager: set_session_multiplexing") {
     TestSyncManager::Config tsm_config;
     tsm_config.start_sync_client = false;
     TestSyncManager tsm(std::move(tsm_config));
-    bool sync_multiplexing_allowed = false;
-    SECTION("allowed") {
-        sync_multiplexing_allowed = true;
-    }
-    SECTION("not allowed") {
-        sync_multiplexing_allowed = false;
-    }
-
+    bool sync_multiplexing_allowed = GENERATE(true, false);
     auto sync_manager = tsm.app()->sync_manager();
     sync_manager->set_session_multiplexing(sync_multiplexing_allowed);
 
@@ -767,6 +760,7 @@ TEST_CASE("sync_manager: set_session_multiplexing") {
     else {
         REQUIRE(conn_id_for_realm(realm_1) != conn_id_for_realm(realm_2));
         REQUIRE(conn_id_for_realm(realm_2) != conn_id_for_realm(realm_3));
+        REQUIRE(conn_id_for_realm(realm_1) != conn_id_for_realm(realm_3));
     }
 }
 

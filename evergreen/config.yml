@@ -101,7 +101,7 @@ functions:
           fi
 
           if [ -n "${disable_sync_multiplexing|}" ]; then
-              set_cmake_var realm_vars REALM_DISABLE_SYNC_MULTIPLEXING BOOL On
+              set_cmake_var realm_vars REALM_SYNC_MULTIPLEXING BOOL Off
           fi
 
           if [ -n "${enable_llvm_coverage|}" ]; then
