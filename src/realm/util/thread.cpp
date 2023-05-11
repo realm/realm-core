@@ -151,6 +151,7 @@ bool Thread::get_name(std::string& name) noexcept
         name.resize(WideCharToMultiByte(CP_UTF8, 0, name_wide, length_wide, nullptr, 0, nullptr, nullptr));
         WideCharToMultiByte(CP_UTF8, 0, name_wide, length_wide, name.data(), name.size(), nullptr, nullptr);
         LocalFree(name_wide);
+        return true;
     }
     return false;
 #else
