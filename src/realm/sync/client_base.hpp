@@ -156,10 +156,10 @@ struct ClientConfig {
     ReconnectMode reconnect_mode = ReconnectMode::normal;
 
     /// Create a separate connection for each session.
-#if REALM_ENABLE_SYNC_MULTIPLEXING
-    bool one_connection_per_session = false;
-#else
+#if REALM_DISABLE_SYNC_MULTIPLEXING
     bool one_connection_per_session = true;
+#else
+    bool one_connection_per_session = false;
 #endif
 
     /// Do not access the local file system. Sessions will act as if

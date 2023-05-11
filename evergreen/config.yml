@@ -1,3 +1,6 @@
+# Some tests take up to 4 hours to run, so give a very generous timeout project-wide, but generally try to complete tasks within 30 minutes.
+exec_timeout_secs: 14400
+
 functions:
   "fetch binaries":
     - command: shell.exec
@@ -97,12 +100,12 @@ functions:
               set_cmake_var realm_vars REALM_TEST_DURATION STRING "${long_running_test_duration}"
           fi
 
-          if [ -n "${enable_llvm_coverage|}" ]; then
-              set_cmake_var realm_vars REALM_LLVM_COVERAGE BOOL On
+          if [ -n "${disable_sync_multiplexing|}" ]; then
+              set_cmake_var realm_vars REALM_SYNC_MULTIPLEXING BOOL Off
           fi
 
-          if [ -n "${enable_sync_multiplexing|}" ]; then
-              set_cmake_var realm_vars REALM_ENABLE_SYNC_MULTIPLEXING BOOL On
+          if [ -n "${enable_llvm_coverage|}" ]; then
+              set_cmake_var realm_vars REALM_LLVM_COVERAGE BOOL On
           fi
 
           set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
@@ -700,7 +703,6 @@ tasks:
       verbose_test_output: true
 
 - name: process_coverage_data
-  display_name: Process Coverage Data
   tags: [ "for_pull_requests" ]
   exec_timeout_secs: 1800
   commands:
@@ -759,13 +761,14 @@ tasks:
             --service-flag-name="${coveralls_flag_name}" \
             --commit-sha="${github_commit}" \
             --vcs-branch="${branch_name}" \
+            --ignore='external/**' \
+            --ignore='src/external/**' \
             --parallel \
             --output-path=coveralls_${task_name}.json
 
         curl -X POST https://coveralls.io/api/v1/jobs -F 'json_file=@coveralls_${task_name}.json'
 
 - name: finalize_coverage_data
-  display_name: Finalize Coverage Data
   tags: [ "for_pull_requests" ]
   depends_on:
     - name: "process_coverage_data"
@@ -816,8 +819,11 @@ tasks:
             format_ref="${revision}"
         fi
 
+        clang-format --version
+
         clang_command="git clang-format -v --diff $format_ref"
-        out=$($clang_command)
+        # Don't fail the task early on clang-format errors
+        out=$($clang_command) && true
 
         echo -e "CLANG: $clang_command\n$out"
 
@@ -987,8 +993,8 @@ buildvariants:
     - ubuntu2204-small
   - name: core_sync_tests_group
 
-- name: ubuntu2004-session-multiplexing
-  display_name: "Ubuntu 20.04 x86_64 (Sync Multiplexing Enabled)"
+- name: ubuntu2004-no-session-multiplexing
+  display_name: "Ubuntu 20.04 x86_64 (Sync Multiplexing Disabled)"
   run_on: ubuntu2004-large
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
@@ -998,7 +1004,7 @@ buildvariants:
     run_tests_against_baas: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
-    enable_sync_multiplexing: On
+    disable_sync_multiplexing: On
   tasks:
   - name: compile_test
 

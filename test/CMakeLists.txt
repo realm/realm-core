@@ -3,7 +3,7 @@ add_custom_target(benchmarks)
 add_subdirectory(object-store)
 
 # AFL and LIBFUZZER not yet supported by Windows
-if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
+if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NOT EMSCRIPTEN)
     add_subdirectory(fuzzy)
     add_subdirectory(realm-fuzzer)
 endif()
