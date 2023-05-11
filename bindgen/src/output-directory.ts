@@ -37,9 +37,10 @@ type OutputFile = {
 
 export type OutputDirectory = {
   /**
-   * @param filePath Relative path to the file within the output directory.
-   * @param formatter An optional formatter to apply after the file has been closed.
-   * @returns An outputter, able to write into the file.
+   * @param filePath The file path, relative to the output directory.
+   * @param formatter An optional formatter to run after the template has returned.
+   * The invocation is batched, such that a single formatter is only ever executed once but passed all file paths which use
+   * @returns An outputter, which can be used to write to the file.
    */
   file(filePath: string, formatter?: Formatter): Outputter;
   /**
