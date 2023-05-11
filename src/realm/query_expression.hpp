@@ -1451,7 +1451,7 @@ public:
         : Value()
         , m_geospatial(geo)
     {
-        if (geo.is_valid()) {
+        if (geo.get_type() != Geospatial::Type::Invalid) {
             set(0, Mixed{&m_geospatial});
         }
     }
@@ -1466,7 +1466,7 @@ private:
         : Value()
         , m_geospatial(other.m_geospatial)
     {
-        if (m_geospatial.is_valid()) {
+        if (m_geospatial.get_type() != Geospatial::Type::Invalid) {
             set(0, Mixed{&m_geospatial});
         }
     }
@@ -2358,17 +2358,31 @@ public:
     GeoWithinCompare(const LinkMap& lm, Geospatial bounds)
         : m_link_map(lm)
         , m_bounds(bounds)
+        , m_region(m_bounds)
+    {
+        Status status = m_region.get_conversion_status();
+        if (!status.is_ok()) {
+            throw InvalidArgument(status.code(),
+                                  util::format("Invalid region in GEOWITHIN query for parameter '%1': '%2'", m_bounds,
+                                               status.reason()));
+        }
+    }
+
+    GeoWithinCompare(const GeoWithinCompare& other)
+        : m_link_map(other.m_link_map)
+        , m_bounds(other.m_bounds)
+        , m_region(m_bounds)
     {
     }
 
     void set_base_table(ConstTableRef table) override
     {
         m_link_map.set_base_table(table);
-        ColKey coords_col = m_link_map.get_target_table()->get_column_key("coordinates");
-        ColKey type_col = m_link_map.get_target_table()->get_column_key("type");
-        if (!coords_col || !type_col || !coords_col.is_list() ||
-            coords_col.get_type() != ColumnType(ColumnType::Type::Double) ||
-            type_col.get_type() != ColumnType(ColumnType::Type::String) || type_col.is_collection()) {
+        m_coords_col = m_link_map.get_target_table()->get_column_key(Geospatial::c_geo_point_coords_col_name);
+        m_type_col = m_link_map.get_target_table()->get_column_key(Geospatial::c_geo_point_type_col_name);
+        if (!m_coords_col || !m_type_col || !m_coords_col.is_list() ||
+            m_coords_col.get_type() != ColumnType(ColumnType::Type::Double) ||
+            m_type_col.get_type() != ColumnType(ColumnType::Type::String) || m_type_col.is_collection()) {
             util::serializer::SerialisationState none;
             throw std::runtime_error(util::format(
                 "Query '%1' links to data in the wrong format for a geoWithin query", this->description(none)));
@@ -2394,13 +2408,12 @@ public:
 
     size_t find_first(size_t start, size_t end) const override
     {
-        GeoRegion region(m_bounds);
         bool found = false;
         auto table = m_link_map.get_target_table();
 
         while (start < end) {
             m_link_map.map_links(start, [&](ObjKey key) {
-                found = region.contains(
+                found = m_region.contains(
                     Geospatial::from_obj(table->get_object(key), m_type_col, m_coords_col).get<GeoPoint>());
                 return found;
             });
@@ -2425,6 +2438,7 @@ public:
 private:
     LinkMap m_link_map;
     Geospatial m_bounds;
+    GeoRegion m_region;
     ColKey m_type_col;
     ColKey m_coords_col;
 };

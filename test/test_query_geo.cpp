@@ -64,13 +64,13 @@ TEST(Geospatial_Assignment)
 
     obj.set(location_column_key, std::optional<Geospatial>{});
     CHECK(obj.is_null(location_column_key));
-    CHECK(!obj.get<Geospatial>(location_column_key).is_valid());
+    CHECK(obj.get<Geospatial>(location_column_key).get_type() == Geospatial::Type::Invalid);
     CHECK(!obj.get<std::optional<Geospatial>>(location_column_key));
 
     obj.set(location_column_key, geo);
     obj.set(location_column_key, Geospatial{});
     CHECK(obj.is_null(location_column_key));
-    CHECK(!obj.get<Geospatial>(location_column_key).is_valid());
+    CHECK(obj.get<Geospatial>(location_column_key).get_type() == Geospatial::Type::Invalid);
     CHECK(!obj.get<std::optional<Geospatial>>(location_column_key));
 
     Geospatial geo_without_altitude{GeoPoint{5.5, 6.6}};
@@ -104,13 +104,20 @@ TEST(Query_GeoWithinBasics)
     CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}}).count(), 1);
     CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{-2, -1.5}, GeoPoint{0.7, 0.5}}).count(), 3);
 
-    GeoPolygon p{{GeoPoint{-0.5, -0.5}, GeoPoint{1.0, 2.5}, GeoPoint{2.5, -0.5}}};
+    GeoPolygon p{{GeoPoint{-0.5, -0.5}, GeoPoint{1.0, 2.5}, GeoPoint{2.5, -0.5}, GeoPoint{-0.5, -0.5}}};
     CHECK_EQUAL(location.geo_within(p).count(), 3);
-    p = {{{-3.0, -1.0}, {-2.0, -2.0}, {-1.0, -1.0}, {1.5, -1.0}, {-1.0, 1.5}}};
+    p = {{{-3.0, -1.0}, {-2.0, -2.0}, {-1.0, -1.0}, {1.5, -1.0}, {-1.0, 1.5}, {-3.0, -1.0}}};
     CHECK_EQUAL(location.geo_within(p).count(), 2);
 
     CHECK_EQUAL(location.geo_within(GeoCenterSphere::from_kms(150.0, GeoPoint{1.0, 0.5})).count(), 3);
     CHECK_EQUAL(location.geo_within(GeoCenterSphere::from_kms(90.0, GeoPoint{-1.5, -1.5})).count(), 2);
+
+    CHECK_THROW_CONTAINING_MESSAGE(location.geo_within(Geospatial{GeoPoint{0.0, 0.0}}),
+                                   "Invalid region in GEOWITHIN query for parameter 'GeoPoint([0, 0])': 'A point "
+                                   "cannot be used on the right hand side of GEOWITHIN query");
+    CHECK_THROW_CONTAINING_MESSAGE(location.geo_within(Geospatial{}),
+                                   "Invalid region in GEOWITHIN query for parameter 'NULL': 'NULL cannot be used on "
+                                   "the right hand side of a GEOWITHIN query");
 }
 
 TEST(Geospatial_MeridianQuery)
@@ -178,6 +185,68 @@ TEST(Geospatial_GeoWithinShapes)
             util::format(std::cerr, "Failing query: '%1'\n", query.get_description());
         }
     }
+}
+
+TEST(Geospatial_PolygonValidation)
+{
+    Group g;
+    std::vector<Geospatial> points = {GeoPoint{40.7128, -74.0060}, GeoPoint{55.6761, 12.5683},
+                                      GeoPoint{55.6280, 12.0826}};
+    TableRef table = setup_with_points(g, points);
+    ColKey location_column_key = table->get_column_key("location");
+    Geospatial geo_poly{GeoPolygon{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683}, GeoPoint{55.628, 12.0826},
+                                    GeoPoint{40.7128, -74.006}}}};
+    CHECK(geo_poly.is_valid().is_ok());
+    Query query = table->column<Link>(location_column_key).geo_within(geo_poly);
+    CHECK_EQUAL(query.count(), 1);
+
+    Geospatial poly_mismatch_loop{GeoPolygon{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683},
+                                              GeoPoint{55.628, 12.0826}, GeoPoint{40.7128, -74.000}}}};
+    Status status = poly_mismatch_loop.is_valid();
+    CHECK(!status.is_ok());
+    CHECK_EQUAL(status.reason(), "Loop is not closed, first vertex 'GeoPoint([40.7128, -74.006])' does not equal "
+                                 "last vertex 'GeoPoint([40.7128, -74])'");
+
+    Geospatial poly_three_point{
+        GeoPolygon{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683}, GeoPoint{40.7128, -74.006}}}};
+    status = poly_three_point.is_valid();
+    CHECK(!status.is_ok());
+    CHECK_EQUAL(status.reason(), "Loop 0 must have at least 3 different vertices, 2 unique vertices were provided");
+
+    Geospatial loop_outside{
+        GeoPolygon{{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683}, GeoPoint{55.628, 12.0826},
+                     GeoPoint{40.7128, -74.006}},
+                    {GeoPoint{39, -74.006}, GeoPoint{56, 12.5683}, GeoPoint{56, 12.0826}, GeoPoint{39, -74.006}}}}};
+    status = loop_outside.is_valid();
+    CHECK(!status.is_ok());
+    CHECK_EQUAL(
+        status.reason(),
+        "Secondary loop 1 not contained by first exterior loop - secondary loops must be holes in the first loop");
+
+    Geospatial touching_vertices{GeoPolygon{{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683},
+                                              GeoPoint{55.628, 12.0826}, GeoPoint{40.7128, -74.006}},
+                                             {GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683},
+                                              GeoPoint{55.628, 12.0826}, GeoPoint{40.7128, -74.006}}}}};
+    status = touching_vertices.is_valid();
+    CHECK(!status.is_ok());
+    CHECK_EQUAL(status.reason(), "Polygon isn't valid: 'Duplicate edge: loop 1, edge 0 and loop 0, edge 0'");
+
+    Geospatial touching_interior_holes{
+        GeoPolygon{{{GeoPoint{55.652263, 12.046461}, GeoPoint{55.621198, 12.051422}, GeoPoint{55.615860, 12.132292},
+                     GeoPoint{55.658441, 12.115444}, GeoPoint{55.652263, 12.046461}},
+                    {GeoPoint{55.629568, 12.098421}, GeoPoint{55.628449, 12.098661}, GeoPoint{55.628670, 12.100613},
+                     GeoPoint{55.629670, 12.100283}, GeoPoint{55.629568, 12.098421}},
+                    {// shares the same north edge as the previous hole
+                     GeoPoint{55.629568, 12.098421}, GeoPoint{55.626245, 12.099442}, GeoPoint{55.626432, 12.100973},
+                     GeoPoint{55.629670, 12.100283}, GeoPoint{55.629568, 12.098421}}}}};
+    status = touching_interior_holes.is_valid();
+    CHECK(!status.is_ok());
+    CHECK_EQUAL(status.reason(), "Polygon isn't valid: 'Duplicate edge: loop 2, edge 3 and loop 1, edge 3'");
+
+    Geospatial empty_poly{GeoPolygon{std::vector<std::vector<GeoPoint>>{}}};
+    status = empty_poly.is_valid();
+    CHECK(!status.is_ok());
+    CHECK_EQUAL(status.reason(), "Polygon has no loops.");
 }
 
 #endif

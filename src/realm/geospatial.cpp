@@ -49,6 +49,7 @@
 #include <realm/table.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/util/overload.hpp>
+#include <realm/util/scope_exit.hpp>
 
 namespace {
 
@@ -120,8 +121,8 @@ Geospatial Geospatial::from_obj(const Obj& obj, ColKey type_col, ColKey coords_c
         coords_col = obj.get_table()->get_column_key(StringData(c_geo_point_coords_col_name));
     }
     else {
-        REALM_ASSERT_EX(type_col.get_type() == ColumnType(ColumnType::Type::Double), type_col.get_type());
-        REALM_ASSERT(type_col.is_list());
+        REALM_ASSERT_EX(coords_col.get_type() == ColumnType(ColumnType::Type::Double), coords_col.get_type());
+        REALM_ASSERT(coords_col.is_list());
     }
 
     String geo_type = obj.get<String>(type_col);
@@ -221,6 +222,15 @@ static std::string point_str(const GeoPoint& point)
     return util::format("[%1, %2]", point.longitude, point.latitude);
 }
 
+Status Geospatial::is_valid() const noexcept
+{
+    if (get_type() == Type::Polygon) {
+        GeoRegion region(*this);
+        return region.get_conversion_status();
+    }
+    return Status::OK();
+}
+
 std::string Geospatial::to_string() const
 {
     return mpark::visit(
@@ -259,9 +269,155 @@ std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo)
     return ostr;
 }
 
+// The following validation follows the server:
+// https://github.com/mongodb/mongo/blob/053ff9f355555cddddf3a476ffa9ddf899b1657d/src/mongo/db/geo/geoparser.cpp#L140
+static void erase_duplicate_points(std::vector<S2Point>* vertices)
+{
+    for (size_t i = 1; i < vertices->size(); ++i) {
+        if ((*vertices)[i - 1] == (*vertices)[i]) {
+            vertices->erase(vertices->begin() + i);
+            // We could have > 2 adjacent identical vertices, and must examine i again.
+            --i;
+        }
+    }
+}
+
+static Status is_loop_closed(const std::vector<S2Point>& loop, const std::vector<GeoPoint>& points)
+{
+    if (loop.empty()) {
+        return Status(ErrorCodes::InvalidQueryArg, "Loop has no vertices");
+    }
+
+    if (points[0] != points[points.size() - 1]) {
+        return Status(ErrorCodes::InvalidQueryArg,
+                      util::format("Loop is not closed, first vertex '%1' does not equal last vertex '%2'", points[0],
+                                   points[points.size() - 1]));
+    }
+
+    return Status::OK();
+}
+
+static Status parse_polygon_coordinates(const GeoPolygon& polygon, S2Polygon* out)
+{
+    std::vector<S2Loop*> loops;
+    loops.reserve(polygon.points.size());
+    Status status = Status::OK();
+    std::string err;
+
+    // if the polygon is successfully created s2 takes ownership
+    // of the pointers and clears our vector
+    auto guard = util::make_scope_exit([&loops]() noexcept {
+        for (auto& loop : loops) {
+            delete loop;
+        }
+    });
+    // Iterate all loops of the polygon.
+    for (size_t i = 0; i < polygon.points.size(); ++i) {
+        // Check if the loop is closed.
+        std::vector<S2Point> points;
+        points.reserve(polygon.points[i].size());
+        for (auto&& p : polygon.points[i]) {
+            // FIXME rewrite without copying
+            points.push_back(S2LatLng::FromDegrees(p.latitude, p.longitude).ToPoint());
+        }
+
+        status = is_loop_closed(points, polygon.points[i]);
+        if (!status.is_ok())
+            return status;
+
+        erase_duplicate_points(&points);
+        // Drop the duplicated last point.
+        points.resize(points.size() - 1);
+
+        // At least 3 vertices.
+        if (points.size() < 3) {
+            return Status(
+                ErrorCodes::InvalidQueryArg,
+                util::format("Loop %1 must have at least 3 different vertices, %2 unique vertices were provided", i,
+                             points.size()));
+        }
+
+        loops.push_back(new S2Loop(points));
+        S2Loop* loop = loops.back();
+
+        // Check whether this loop is valid if vaildation hasn't been already done on 2dSphere index
+        // insertion which is controlled by the 'skipValidation' flag.
+        // 1. At least 3 vertices.
+        // 2. All vertices must be unit length. Guaranteed by parsePoints().
+        // 3. Loops are not allowed to have any duplicate vertices.
+        // 4. Non-adjacent edges are not allowed to intersect.
+        if (!loop->IsValid(&err)) {
+            return Status(ErrorCodes::InvalidQueryArg, util::format("Loop %1 is not valid: '%2'", i, err));
+        }
+        // If the loop is more than one hemisphere, invert it.
+        loop->Normalize();
+
+        // Check the first loop must be the exterior ring and any others must be
+        // interior rings or holes.
+        if (loops.size() > 1 && !loops[0]->Contains(loop)) {
+            return Status(ErrorCodes::InvalidQueryArg,
+                          util::format("Secondary loop %1 not contained by first exterior loop - "
+                                       "secondary loops must be holes in the first loop",
+                                       i));
+        }
+    }
+
+    if (loops.empty()) {
+        return Status(ErrorCodes::InvalidQueryArg, "Polygon has no loops.");
+    }
+
+    // Check if the given loops form a valid polygon.
+    // 1. If a loop contains an edge AB, then no other loop may contain AB or BA.
+    // 2. No loop covers more than half of the sphere.
+    // 3. No two loops cross.
+    if (!S2Polygon::IsValid(loops, &err))
+        return Status(ErrorCodes::InvalidQueryArg, util::format("Polygon isn't valid: '%1'", err));
+
+    // Given all loops are valid / normalized and S2Polygon::IsValid() above returns true.
+    // The polygon must be valid. See S2Polygon member function IsValid().
+
+    {
+        // Transfer ownership of the loops and clears loop vector.
+        out->Init(&loops);
+    }
+
+    // Check if every loop of this polygon shares at most one vertex with
+    // its parent loop.
+    if (!out->IsNormalized(&err))
+        // "err" looks like "Loop 1 shares more than one vertex with its parent loop 0"
+        return Status(ErrorCodes::InvalidQueryArg, util::format("Polygon is not normalized: '%1'", err));
+
+    // S2Polygon contains more than one ring, which is allowed by S2, but not by GeoJSON.
+    //
+    // Loops are indexed according to a preorder traversal of the nesting hierarchy.
+    // GetLastDescendant() returns the index of the last loop that is contained within
+    // a given loop. We guarantee that the first loop is the exterior ring.
+    if (out->GetLastDescendant(0) < out->num_loops() - 1) {
+        return Status(ErrorCodes::InvalidQueryArg, "Only one exterior polygon loop is allowed");
+    }
+
+    // In GeoJSON, only one nesting is allowed.
+    // The depth of a loop is set by polygon according to the nesting hierarchy of polygon,
+    // so the exterior ring's depth is 0, a hole in it is 1, etc.
+    for (int i = 0; i < out->num_loops(); i++) {
+        if (out->loop(i)->depth() > 1) {
+            return Status(ErrorCodes::InvalidQueryArg,
+                          util::format("Polygon interior loops cannot be nested: %1", i));
+        }
+    }
+    return Status::OK();
+}
+
 GeoRegion::GeoRegion(const Geospatial& geo)
+    : m_status(Status::OK())
 {
     struct Visitor {
+        Visitor(Status& out)
+            : m_status_out(out)
+        {
+            m_status_out = Status::OK();
+        }
+        Status& m_status_out;
         std::unique_ptr<S2Region> operator()(const GeoBox& box) const
         {
             return std::make_unique<S2LatLngRect>(S2LatLng::FromDegrees(box.lo.latitude, box.lo.longitude),
@@ -270,21 +426,9 @@ GeoRegion::GeoRegion(const Geospatial& geo)
 
         std::unique_ptr<S2Region> operator()(const GeoPolygon& polygon) const
         {
-            REALM_ASSERT(polygon.points.size() >= 1);
-            std::vector<S2Loop*> loops;
-            loops.reserve(polygon.points.size());
-            std::vector<S2Point> points;
-            for (auto& geo_points : polygon.points) {
-                points.clear();
-                points.reserve(geo_points.size());
-                for (auto&& p : geo_points) {
-                    // FIXME rewrite without copying
-                    points.push_back(S2LatLng::FromDegrees(p.latitude, p.longitude).ToPoint());
-                }
-                loops.push_back(new S2Loop(points));
-            }
-            // S2Polygon takes ownership of all the S2Loop pointers
-            return std::make_unique<S2Polygon>(&loops);
+            auto poly = std::make_unique<S2Polygon>();
+            m_status_out = parse_polygon_coordinates(polygon, poly.get());
+            return poly;
         }
 
         std::unique_ptr<S2Region> operator()(const GeoCenterSphere& sphere) const
@@ -296,24 +440,36 @@ GeoRegion::GeoRegion(const Geospatial& geo)
 
         std::unique_ptr<S2Region> operator()(const mpark::monostate&) const
         {
-            REALM_UNREACHABLE();
+            m_status_out = Status(ErrorCodes::InvalidQueryArg,
+                                  "NULL cannot be used on the right hand side of a GEOWITHIN query");
+            return nullptr;
         }
 
         std::unique_ptr<S2Region> operator()(const GeoPoint&) const
         {
-            REALM_UNREACHABLE();
+            m_status_out = Status(ErrorCodes::InvalidQueryArg,
+                                  "A point cannot be used on the right hand side of GEOWITHIN query");
+            return nullptr;
         }
     };
 
-    m_region = mpark::visit(Visitor(), geo.m_value);
+    m_region = mpark::visit(Visitor(m_status), geo.m_value);
 }
 
 GeoRegion::~GeoRegion() = default;
 
 bool GeoRegion::contains(const GeoPoint& geo_point) const noexcept
 {
+    if (!m_status.is_ok()) {
+        return false;
+    }
     auto point = S2LatLng::FromDegrees(geo_point.latitude, geo_point.longitude).ToPoint();
     return m_region->VirtualContainsPoint(point);
+}
+
+Status GeoRegion::get_conversion_status() const noexcept
+{
+    return m_status;
 }
 
 } // namespace realm

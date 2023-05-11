@@ -126,9 +126,11 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops, string* err) {
             continue;
         }
         pair<int, int> other = edges[key];
-          s2_logger()->error("Duplicate edge: loop %1, edge %2 and loop %3, edge %4", i, j, other.first, other.second);
         if (err) {
             *err = realm::util::format("Duplicate edge: loop %1, edge %2 and loop %3, edge %4", i, j, other.first, other.second);
+        }
+        else {
+            s2_logger()->error("Duplicate edge: loop %1, edge %2 and loop %3, edge %4", i, j, other.first, other.second);
         }
         return false;
       }
