@@ -31,7 +31,7 @@ type OutputFile = {
   fd: number;
   resolvedPath: string;
   debug: Debugger;
-  formatters: Formatter[];
+  formatter?: Formatter;
 };
 
 export type OutputDirectory = {
@@ -64,7 +64,7 @@ export function createOutputDirectory(outputPath: string): OutputDirectory {
   }
   const openFiles: OutputFile[] = [];
   return {
-    file(filePath: string, ...formatters: Formatter[]) {
+    file(filePath: string, formatter?: Formatter) {
       const resolvedPath = path.resolve(outputPath, filePath);
       const parentDirectoryPath = path.dirname(resolvedPath);
       if (!fs.existsSync(parentDirectoryPath)) {
@@ -75,9 +75,9 @@ export function createOutputDirectory(outputPath: string): OutputDirectory {
 
       fileDebug(chalk.dim("Opening", resolvedPath));
       const fd = fs.openSync(resolvedPath, "w");
-      openFiles.push({ fd, formatters, resolvedPath, debug: fileDebug });
+      openFiles.push({ fd, formatter, resolvedPath, debug: fileDebug });
 
-      for (const formatter of formatters) {
+      if (formatter) {
         usedFormatters.add(formatter);
       }
 
@@ -93,7 +93,7 @@ export function createOutputDirectory(outputPath: string): OutputDirectory {
     },
     format() {
       for (const formatter of usedFormatters) {
-        const relevantFiles = openFiles.filter((f) => f.formatters.includes(formatter)).map((f) => f.resolvedPath);
+        const relevantFiles = openFiles.filter((file) => file.formatter === formatter).map((f) => f.resolvedPath);
         format(formatter, outputPath, relevantFiles);
       }
     },
