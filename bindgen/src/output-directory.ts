@@ -16,10 +16,11 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+import fs from "node:fs";
+import path from "node:path";
+import { strict as assert } from "node:assert";
 import chalk from "chalk";
 import { Debugger } from "debug";
-import fs from "fs";
-import path from "path";
 
 import { extend } from "./debug";
 import { Outputter, createOutputter } from "./outputter";
@@ -73,13 +74,14 @@ export function createOutputDirectory(outputPath: string): OutputDirectory {
       }
       const fileDebug = debug.extend(filePath);
 
+      if (formatter) {
+        assert(formatter.name, "Expected a function with a non-empty name property");
+        usedFormatters.add(formatter);
+      }
+
       fileDebug(chalk.dim("Opening", resolvedPath));
       const fd = fs.openSync(resolvedPath, "w");
       openFiles.push({ fd, formatter, resolvedPath, debug: fileDebug });
-
-      if (formatter) {
-        usedFormatters.add(formatter);
-      }
 
       return createOutputter((data) => {
         fs.writeFileSync(fd, data, { encoding: "utf8" });
