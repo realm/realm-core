@@ -59,6 +59,10 @@ void ClientImpl::ReconnectInfo::update(ConnectionTerminationReason new_reason,
 
 std::chrono::milliseconds ClientImpl::ReconnectInfo::delay_interval()
 {
+    if (scheduled_reset) {
+        reset();
+    }
+
     if (!m_backoff_state.triggering_error) {
         return std::chrono::milliseconds::zero();
     }
@@ -608,10 +612,6 @@ void Connection::initiate_reconnect_wait()
         return;
     }
 
-    if (m_reconnect_info.scheduled_reset) {
-        m_reconnect_info.reset();
-    }
-
     m_reconnect_delay_in_progress = true;
     auto delay = m_reconnect_info.delay_interval();
     if (delay == std::chrono::milliseconds::max()) {
@@ -1039,7 +1039,6 @@ void Connection::handle_write_ping()
 
 void Connection::handle_message_received(util::Span<const char> data)
 {
-    m_reconnect_info.reset();
     // parse_message_received() parses the message and calls the proper handler
     // on the Connection object (this).
     get_client_protocol().parse_message_received<Connection>(*this, std::string_view(data.data(), data.size()));
