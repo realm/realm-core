@@ -415,7 +415,7 @@ void Lst<Mixed>::swap(size_t ndx1, size_t ndx2)
     }
 }
 
-DictionaryPtr Lst<Mixed>::insert_dictionary(size_t ndx)
+void Lst<Mixed>::insert_dictionary(size_t ndx)
 {
     m_tree->ensure_keys();
     insert(ndx, Mixed(0, CollectionType::Dictionary));
@@ -424,7 +424,6 @@ DictionaryPtr Lst<Mixed>::insert_dictionary(size_t ndx)
         key++;
     }
     m_tree->set_key(ndx, key);
-    return get_dictionary(ndx);
 }
 
 DictionaryPtr Lst<Mixed>::get_dictionary(size_t ndx) const
@@ -437,7 +436,7 @@ DictionaryPtr Lst<Mixed>::get_dictionary(size_t ndx) const
     return ret;
 }
 
-std::shared_ptr<Lst<Mixed>> Lst<Mixed>::insert_list(size_t ndx)
+void Lst<Mixed>::insert_list(size_t ndx)
 {
     m_tree->ensure_keys();
     insert(ndx, Mixed(0, CollectionType::List));
@@ -446,7 +445,6 @@ std::shared_ptr<Lst<Mixed>> Lst<Mixed>::insert_list(size_t ndx)
         key++;
     }
     m_tree->set_key(ndx, key);
-    return get_list(ndx);
 }
 
 std::shared_ptr<Lst<Mixed>> Lst<Mixed>::get_list(size_t ndx) const
@@ -602,12 +600,12 @@ void Lst<Mixed>::to_json(std::ostream& out, size_t link_depth, JSONOutputMode ou
         }
         else if (val.is_type(type_Dictionary)) {
             DummyParent parent(this->get_table(), val.get_ref());
-            Dictionary dict(parent);
+            Dictionary dict(parent, i);
             dict.to_json(out, link_depth, output_mode, fn);
         }
         else if (val.is_type(type_List)) {
             DummyParent parent(this->get_table(), val.get_ref());
-            Lst<Mixed> list(parent);
+            Lst<Mixed> list(parent, i);
             list.to_json(out, link_depth, output_mode, fn);
         }
         else {
@@ -639,7 +637,7 @@ void Lst<Mixed>::set_collection_ref(Index index, ref_type ref, CollectionType ty
     if (ndx == realm::not_found) {
         throw StaleAccessor("Collection has been deleted");
     }
-    set(ndx, Mixed(ref, type));
+    m_tree->set(ndx, Mixed(ref, type));
 }
 
 bool Lst<Mixed>::update_if_needed() const

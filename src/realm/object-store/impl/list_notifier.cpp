@@ -49,6 +49,7 @@ void ListNotifier::attach(CollectionBase const& src)
     auto& tr = transaction();
     try {
         auto obj = tr.get_table(src.get_table()->get_key())->get_object(src.get_owner_key());
+        // FIXME: Use path for list when supporting notifications for nested collections
         m_list = obj.get_collection_ptr(src.get_col_key());
     }
     catch (const KeyNotFound&) {

@@ -425,10 +425,9 @@ Obj Dictionary::create_and_insert_linked_object(Mixed key)
     return o;
 }
 
-DictionaryPtr Dictionary::insert_dictionary(StringData key)
+void Dictionary::insert_dictionary(StringData key)
 {
     insert(key, Mixed(0, CollectionType::Dictionary));
-    return get_dictionary(key);
 }
 
 DictionaryPtr Dictionary::get_dictionary(StringData key) const
@@ -441,10 +440,9 @@ DictionaryPtr Dictionary::get_dictionary(StringData key) const
     return ret;
 }
 
-std::shared_ptr<Lst<Mixed>> Dictionary::insert_list(StringData key)
+void Dictionary::insert_list(StringData key)
 {
     insert(key, Mixed(0, CollectionType::List));
-    return get_list(key);
 }
 
 std::shared_ptr<Lst<Mixed>> Dictionary::get_list(StringData key) const
@@ -1032,12 +1030,12 @@ void Dictionary::to_json(std::ostream& out, size_t link_depth, JSONOutputMode ou
         }
         else if (val.is_type(type_Dictionary)) {
             DummyParent parent(this->get_table(), val.get_ref());
-            Dictionary dict(parent);
+            Dictionary dict(parent, 0);
             dict.to_json(out, link_depth, output_mode, fn);
         }
         else if (val.is_type(type_List)) {
             DummyParent parent(this->get_table(), val.get_ref());
-            Lst<Mixed> list(parent);
+            Lst<Mixed> list(parent, 0);
             list.to_json(out, link_depth, output_mode, fn);
         }
         else {

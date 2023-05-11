@@ -152,6 +152,7 @@ public:
             REALM_ASSERT(list);
             m_key = list->get_owner_key();
             m_table_key = list->get_table()->get_key();
+            // FIXME: Use path for list when supporting notifications for nested collections
             m_col_key = list->get_col_key();
         }
         else {

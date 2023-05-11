@@ -50,8 +50,8 @@ public:
     {
         this->set_owner(obj, col_key);
     }
-    Dictionary(DummyParent& parent)
-        : Base(parent)
+    Dictionary(CollectionParent& parent, Index index)
+        : Base(parent, index)
     {
     }
     Dictionary(ColKey col_key, size_t level = 1);
@@ -106,9 +106,9 @@ public:
 
     Obj create_and_insert_linked_object(Mixed key);
 
-    DictionaryPtr insert_dictionary(StringData key);
+    void insert_dictionary(StringData key);
     DictionaryPtr get_dictionary(StringData key) const;
-    std::shared_ptr<Lst<Mixed>> insert_list(StringData key);
+    void insert_list(StringData key);
     std::shared_ptr<Lst<Mixed>> get_list(StringData key) const;
 
     // throws std::out_of_range if key is not found

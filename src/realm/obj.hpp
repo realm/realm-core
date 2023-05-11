@@ -250,13 +250,12 @@ public:
 
     template <typename U>
     Lst<U> get_list(ColKey col_key) const;
-    std::shared_ptr<Lst<Mixed>> set_list_ptr(ColKey col_key);
+    void set_list(ColKey col_key);
     template <typename U>
     LstPtr<U> get_list_ptr(ColKey col_key) const;
     template <typename U>
-    std::shared_ptr<Lst<U>> get_list_ptr(const std::vector<CollectionParent::Index>& path) const
+    std::shared_ptr<Lst<U>> get_list_ptr(const Path& path) const
     {
-        REALM_ASSERT(mpark::get<ColKey>(path[0]).get_type() == ColumnTypeTraits<U>::column_id);
         return std::dynamic_pointer_cast<Lst<U>>(get_collection_ptr(path));
     }
 
@@ -287,11 +286,11 @@ public:
     template <typename U>
     SetPtr<U> get_set_ptr(ColKey col_key) const;
     template <typename U>
-    std::shared_ptr<Set<U>> get_set_ptr(const std::vector<CollectionParent::Index>& path) const
+    std::shared_ptr<Lst<U>> get_set_ptr(const Path& path) const
     {
-        REALM_ASSERT(mpark::get<ColKey>(path[0]).get_type() == ColumnTypeTraits<U>::column_id);
         return std::dynamic_pointer_cast<Set<U>>(get_collection_ptr(path));
     }
+
     LnkSet get_linkset(ColKey col_key) const;
     LnkSet get_linkset(StringData col_name) const;
     LnkSetPtr get_linkset_ptr(ColKey col_key) const;
@@ -299,17 +298,17 @@ public:
     Dictionary get_dictionary(ColKey col_key) const;
     Dictionary get_dictionary(StringData col_name) const;
 
-    DictionaryPtr set_dictionary_ptr(ColKey col_key);
+    void set_dictionary(ColKey col_key);
     DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
+    DictionaryPtr get_dictionary_ptr(const Path& path) const;
 
     CollectionBasePtr get_collection_ptr(ColKey col_key) const;
     CollectionBasePtr get_collection_ptr(StringData col_name) const;
+    CollectionPtr get_collection_ptr(const Path& path) const;
     LinkCollectionPtr get_linkcollection_ptr(ColKey col_key) const;
 
     // Get a collection to hold other collections
     CollectionListPtr get_collection_list(ColKey col_key) const;
-
-    CollectionPtr get_collection_ptr(const std::vector<CollectionParent::Index>&) const;
 
     void assign_pk_and_backlinks(const Obj& other);
 

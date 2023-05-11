@@ -656,9 +656,9 @@ TEST(List_NestedListColumns)
 
     tr->promote_to_write();
     Obj obj = table->create_object();
-    auto int_lst = obj.get_list_ptr<Int>({list_col2, "Foo", 0});
+    auto int_lst = obj.get_list_ptr<Int>({"int_dict_list_list", "Foo", 0});
     int_lst->add(7);
-    int_lst = obj.get_list_ptr<Int>({list_col2, "Bar", 0});
+    int_lst = obj.get_list_ptr<Int>({"int_dict_list_list", "Bar", 0});
     int_lst->add(5);
     tr->commit_and_continue_as_read();
 
@@ -684,53 +684,60 @@ TEST(List_NestedList_Insert)
 
     CollectionListPtr list = obj.get_collection_list(list_col1);
     CHECK(list->is_empty());
-    auto collection = list->insert_collection(0);
+    list->insert_collection(0);
+    auto collection = list->get_collection(0);
     auto val = list->get_any(0);
     CHECK(val.is_type(type_List));
     dynamic_cast<Lst<Int>*>(collection.get())->add(5);
 
     auto dict = obj.get_collection_list(list_col2);
-    auto list2 = dict->insert_collection_list("Foo");
+    dict->insert_collection_list("Foo");
+    auto list_foo = dict->get_collection_list("Foo");
     val = obj.get_any(list_col2);
     CHECK(val.is_type(type_Dictionary));
-    auto collection2 = list2->insert_collection(0);
-    dynamic_cast<Lst<Int>*>(collection2.get())->add(5);
+    list_foo->insert_collection(0);
+    auto list_foo_0 = list_foo->get_collection(0);
+    dynamic_cast<Lst<Int>*>(list_foo_0.get())->add(5);
 
     // Get collection by path
-    auto int_lst = obj.get_list_ptr<Int>({list_col2, "Foo", 0});
+    auto int_lst = obj.get_list_ptr<Int>({"int_dict_list_list", "Foo", 0});
+
     CHECK_EQUAL(int_lst->get(0), 5);
 
-    auto list3 = dict->insert_collection_list("Foo");
+    dict->insert_collection_list("Foo");
+    auto list3 = dict->get_collection_list("Foo");
     // list3 points to the same list as list2
-    auto collection3 = list3->insert_collection(0);
+    list3->insert_collection(0);
+    auto collection3 = list3->get_collection(0);
     dynamic_cast<Lst<Int>*>(collection3.get())->insert(0, 8);
     // list2 must now update so that the following get() does not return 8
-    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection2.get())->get(0), 5);
+    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(list_foo_0.get())->get(0), 5);
 
     tr->commit_and_continue_as_read();
     CHECK_NOT(list->is_empty());
     CHECK_EQUAL(obj.get_collection_list(list_col1)->get_collection(0)->get_any(0).get_int(), 5);
+    // tr->to_json(std::cout);
     tr->promote_to_write();
     {
         list->insert_collection(0);
         auto lst = list->get_collection(0);
         dynamic_cast<Lst<Int>*>(lst.get())->add(47);
 
-        lst = obj.get_collection_list(list_col2)->insert_collection_list("Foo")->get_collection(0);
-        dynamic_cast<Lst<Int>*>(collection2.get())->set(0, 100);
+        obj.get_list_ptr<Int>({"int_dict_list_list", "Foo", 1})->set(0, 100);
     }
     tr->commit_and_continue_as_read();
+    // tr->to_json(std::cout);
     CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection.get())->get(0), 5);
-    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection2.get())->get(0), 100);
+    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(list_foo_0.get())->get(0), 100);
 
     tr->promote_to_write();
     obj.remove();
     tr->commit_and_continue_as_read();
     CHECK_EQUAL(list->size(), 0);
     CHECK_EQUAL(dict->size(), 0);
-    CHECK_EQUAL(list2->size(), 0);
+    CHECK_EQUAL(list_foo->size(), 0);
     CHECK_EQUAL(collection->size(), 0);
-    CHECK_EQUAL(collection2->size(), 0);
+    CHECK_EQUAL(list_foo_0->size(), 0);
 }
 
 TEST(List_Nested_InMixed)
@@ -743,7 +750,8 @@ TEST(List_Nested_InMixed)
 
     Obj obj = table->create_object();
 
-    auto dict = obj.set_dictionary_ptr(col_any);
+    obj.set_dictionary(col_any);
+    auto dict = obj.get_dictionary_ptr(col_any);
     CHECK(dict->is_empty());
     dict->insert("Four", 4);
     tr->verify();
@@ -763,7 +771,8 @@ TEST(List_Nested_InMixed)
     CHECK_EQUAL(dict->get("Four"), Mixed(4));
 
     tr->promote_to_write();
-    auto dict2 = dict->insert_dictionary("Dict");
+    dict->insert_dictionary("Dict");
+    auto dict2 = dict->get_dictionary("Dict");
     CHECK(dict2->is_empty());
     dict2->insert("Five", 5);
     tr->verify();
@@ -785,7 +794,8 @@ TEST(List_Nested_InMixed)
     */
 
     tr->promote_to_write();
-    auto list = dict2->insert_list("List");
+    dict2->insert_list("List");
+    auto list = dict2->get_list("List");
     CHECK(list->is_empty());
     list->add(8);
     list->add(9);
@@ -818,26 +828,30 @@ TEST(List_Nested_InMixed)
     */
 
     tr->promote_to_write();
+    // Assign another value. The old dictionary should be disposed.
     obj.set(col_any, Mixed(5));
     tr->verify();
     tr->commit_and_continue_as_read();
 
     tr->promote_to_write();
-    // Assign another collection type. The old dictionary should be disposed.
-    auto list2 = obj.set_list_ptr(col_any);
+    obj.set_list(col_any);
+    auto list2 = std::dynamic_pointer_cast<Lst<Mixed>>(obj.get_collection_ptr(col_any));
     CHECK(list2->is_empty());
     list2->add("Hello");
-    dict2 = list2->insert_dictionary(0);
+    list2->insert_dictionary(0);
+    dict2 = list2->get_dictionary(0);
     dict2->insert("Six", 6);
+    tr->verify();
     dict2->insert("Seven", 7);
-    dict2 = list2->insert_dictionary(2);
+    list2->insert_dictionary(2);
+    dict2 = list2->get_dictionary(2);
     dict2->insert("Hello", "World");
     dict2->insert("Date", Timestamp(std::chrono::system_clock::now()));
     {
         std::stringstream ss;
         tr->to_json(ss, 0, nullptr, JSONOutputMode::output_mode_xjson_plus);
         auto j = nlohmann::json::parse(ss.str());
-        std::cout << std::setw(2) << j << std::endl;
+        // std::cout << std::setw(2) << j << std::endl;
     }
     tr->verify();
     tr->commit_and_continue_as_read();
@@ -881,55 +895,41 @@ TEST(List_NestedList_Remove)
     CHECK_EQUAL(table->get_nesting_levels(list_col2), 2);
 
     Obj obj = table->create_object();
-
-    auto list = obj.get_collection_list(list_col);
-    CHECK(list->is_empty());
-    auto collection = list->insert_collection(0);
-    dynamic_cast<Lst<Int>*>(collection.get())->add(5);
-
-    auto dict = obj.get_collection_list(list_col2);
-    auto list2 = dict->insert_collection_list("Foo");
-    auto collection2 = list2->insert_collection(0);
-    dynamic_cast<Lst<Int>*>(collection2.get())->add(5);
+    auto list1 = obj.get_list_ptr<Int>({"int_list_list", 0});
+    list1->add(5);
+    auto list2 = obj.get_list_ptr<Int>({"int_dict_list_list", "Foo", 0});
+    list2->add(5);
 
     tr->commit_and_continue_as_read();
-    CHECK_NOT(list->is_empty());
+    CHECK_NOT(list1->is_empty());
+    CHECK_NOT(list2->is_empty());
     CHECK_EQUAL(obj.get_collection_list(list_col)->get_collection(0)->get_any(0).get_int(), 5);
-    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection2.get())->get(0), 5);
+    CHECK_EQUAL(list2->get(0), 5);
     // transaction
     {
         tr->promote_to_write();
 
-        auto lst = list->get_collection(0);
-        dynamic_cast<Lst<Int>*>(lst.get())->add(47);
-
-        lst = obj.get_collection_list(list_col2)->insert_collection_list("Foo")->get_collection(0);
-        dynamic_cast<Lst<Int>*>(collection2.get())->set(0, 100);
+        list1->add(47);
+        list2->set(0, 100);
 
         tr->commit_and_continue_as_read();
     }
-    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection.get())->get(0), 5);
-    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection.get())->get(1), 47);
-    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection2.get())->get(0), 100);
-
-    CHECK(list->size() == 1);
-    CHECK(dict->size() == 1);
-    CHECK(list2->size() == 1);
-    CHECK(collection->size() == 2);
-    CHECK(collection2->size() == 1);
+    CHECK_EQUAL(list1->get(0), 5);
+    CHECK_EQUAL(list1->get(1), 47);
+    CHECK_EQUAL(list2->get(0), 100);
 
     tr->promote_to_write();
-    list->remove(0);
-    CHECK_THROW_ANY(dict->remove("Bar"));
-    dict->remove("Foo");
-    // The above operation removed list2
-    CHECK_THROW_ANY(list2->insert_collection(1));
+    obj.get_collection_list(list_col)->remove(0);
+    CHECK_THROW_ANY(obj.get_collection_list(list_col2)->remove("Bar"));
+    auto list_foo = obj.get_collection_list(list_col2)->get_collection_list("Foo");
+    obj.get_collection_list(list_col2)->remove("Foo");
+    // The above operation removed list_foo
+    CHECK_THROW_ANY(list_foo->insert_collection(1));
     tr->verify();
     tr->commit_and_continue_as_read();
 
-    CHECK_EQUAL(list->size(), 0);
-    CHECK_EQUAL(dict->size(), 0);
-    CHECK_EQUAL(collection->size(), 0);
+    CHECK_EQUAL(list1->size(), 0);
+    CHECK_EQUAL(list2->size(), 0);
     tr->promote_to_write();
     obj.remove();
     tr->commit_and_continue_as_read();
@@ -949,8 +949,10 @@ TEST(List_NestedList_Links)
 
     auto list = o.get_collection_list(list_col);
     CHECK(list->is_empty());
-    dynamic_cast<LnkLst*>(list->insert_collection(0).get())->add(target->create_object().get_key());
-    auto collection = list->insert_collection(1);
+    list->insert_collection(0);
+    dynamic_cast<LnkLst*>(list->get_collection(0).get())->add(target->create_object().get_key());
+    list->insert_collection(1);
+    auto collection = list->get_collection(1);
     auto ll = dynamic_cast<LnkLst*>(collection.get());
     ll->add(t.get_key());
     CHECK_EQUAL(t.get_backlink_count(), 1);
@@ -980,7 +982,8 @@ TEST(List_NestedList_Embedded)
         // Remove entry in parent list
         auto list = o.get_collection_list(list_col);
         CHECK(list->is_empty());
-        auto collection = list->insert_collection(0);
+        list->insert_collection(0);
+        auto collection = list->get_collection(0);
         auto ll = dynamic_cast<LnkLst*>(collection.get());
         ll->create_and_insert_linked_object(0);
         CHECK_EQUAL(target->size(), 1);
@@ -991,7 +994,8 @@ TEST(List_NestedList_Embedded)
         // Remove object
         auto list = o.get_collection_list(list_col);
         CHECK(list->is_empty());
-        auto collection = list->insert_collection(0);
+        list->insert_collection(0);
+        auto collection = list->get_collection(0);
         auto ll = dynamic_cast<LnkLst*>(collection.get());
         ll->create_and_insert_linked_object(0);
         CHECK_EQUAL(target->size(), 1);
@@ -1003,7 +1007,8 @@ TEST(List_NestedList_Embedded)
         // Clear table
         auto list = o.get_collection_list(list_col);
         CHECK(list->is_empty());
-        auto collection = list->insert_collection(0);
+        list->insert_collection(0);
+        auto collection = list->get_collection(0);
         auto ll = dynamic_cast<LnkLst*>(collection.get());
         ll->create_and_insert_linked_object(0);
         CHECK_EQUAL(target->size(), 1);
@@ -1026,8 +1031,10 @@ TEST(List_NestedSet_Links)
 
     auto list = o.get_collection_list(list_col);
     CHECK(list->is_empty());
-    dynamic_cast<LnkSet*>(list->insert_collection(0).get())->insert(target->create_object().get_key());
-    auto collection = list->insert_collection(1);
+    list->insert_collection(0);
+    dynamic_cast<LnkSet*>(list->get_collection(0).get())->insert(target->create_object().get_key());
+    list->insert_collection(1);
+    auto collection = list->get_collection(1);
     auto ll = dynamic_cast<LnkSet*>(collection.get());
     ll->insert(t.get_key());
     CHECK_EQUAL(t.get_backlink_count(), 1);
@@ -1058,8 +1065,10 @@ TEST(List_NestedDict_Links)
 
     auto list = o.get_collection_list(list_col);
     CHECK(list->is_empty());
-    dynamic_cast<Dictionary*>(list->insert_collection(0).get())->insert("Key", target->create_object().get_key());
-    auto collection = list->insert_collection(1);
+    list->insert_collection(0);
+    dynamic_cast<Dictionary*>(list->get_collection(0).get())->insert("Key", target->create_object().get_key());
+    list->insert_collection(1);
+    auto collection = list->get_collection(1);
     auto dict = dynamic_cast<Dictionary*>(collection.get());
     dict->insert("Hello", t.get_key());
     CHECK_EQUAL(t.get_backlink_count(), 1);
@@ -1083,20 +1092,16 @@ TEST(List_NestedDictList_Links)
     auto tr = db->start_write();
     auto target = tr->add_table("target");
     auto origin = tr->add_table("origin");
-    auto list_col = origin->add_column(*target, "obj_list_list",
-                                       {CollectionType::Dictionary, CollectionType::List, CollectionType::List});
+    origin->add_column(*target, "obj_list_list",
+                       {CollectionType::Dictionary, CollectionType::List, CollectionType::List});
 
     Obj o = origin->create_object();
     Obj t = target->create_object();
 
-    auto dict = o.get_collection_list(list_col);
-    CHECK(dict->is_empty());
-    auto list_foo = dict->insert_collection_list("Foo");
-    auto list_bar = dict->insert_collection_list("Bar");
-    auto foo_coll_0 = list_foo->insert_collection(0);
-    auto foo_coll_1 = list_foo->insert_collection(1);
-    auto bar_coll_0 = list_bar->insert_collection(0);
-    auto bar_coll_1 = list_bar->insert_collection(1);
+    auto foo_coll_0 = o.get_collection_ptr({"obj_list_list", "Foo", 0});
+    auto foo_coll_1 = o.get_collection_ptr({"obj_list_list", "Foo", 1});
+    auto bar_coll_0 = o.get_collection_ptr({"obj_list_list", "Bar", 0});
+    auto bar_coll_1 = o.get_collection_ptr({"obj_list_list", "Bar", 1});
     auto foo_ll0 = dynamic_cast<LnkLst*>(foo_coll_0.get());
     auto foo_ll1 = dynamic_cast<LnkLst*>(foo_coll_1.get());
     auto bar_ll0 = dynamic_cast<LnkLst*>(bar_coll_0.get());
@@ -1118,20 +1123,15 @@ TEST(List_NestedList_Unresolved)
     auto tr = db->start_write();
     auto target = tr->add_table_with_primary_key("target", type_String, "_id");
     auto origin = tr->add_table("origin");
-    auto list_col = origin->add_column(*target, "obj_dict_list",
-                                       {CollectionType::Dictionary, CollectionType::List, CollectionType::List});
+    origin->add_column(*target, "links", {CollectionType::Dictionary, CollectionType::List, CollectionType::List});
 
     Obj o = origin->create_object();
     Obj t = target->create_object_with_primary_key("Adam");
 
-    auto dict = o.get_collection_list(list_col);
-    CHECK(dict->is_empty());
-    auto list_foo = dict->insert_collection_list("Foo");
-    auto list_bar = dict->insert_collection_list("Bar");
-    auto foo_coll_0 = list_foo->insert_collection(0);
-    auto foo_coll_1 = list_foo->insert_collection(1);
-    auto bar_coll_0 = list_bar->insert_collection(0);
-    auto bar_coll_1 = list_bar->insert_collection(1);
+    auto foo_coll_0 = o.get_collection_ptr({"links", "Foo", 0});
+    auto foo_coll_1 = o.get_collection_ptr({"links", "Foo", 1});
+    auto bar_coll_0 = o.get_collection_ptr({"links", "Bar", 0});
+    auto bar_coll_1 = o.get_collection_ptr({"links", "Bar", 1});
     auto foo_ll0 = dynamic_cast<LnkLst*>(foo_coll_0.get());
     auto foo_ll1 = dynamic_cast<LnkLst*>(foo_coll_1.get());
     auto bar_ll0 = dynamic_cast<LnkLst*>(bar_coll_0.get());
@@ -1155,20 +1155,16 @@ TEST(List_NestedSet_Unresolved)
     auto tr = db->start_write();
     auto target = tr->add_table_with_primary_key("target", type_String, "_id");
     auto origin = tr->add_table("origin");
-    auto list_col = origin->add_column(type_Mixed, "obj_dict_list", true,
-                                       {CollectionType::Dictionary, CollectionType::List, CollectionType::Set});
+    origin->add_column(type_Mixed, "links", true,
+                       {CollectionType::Dictionary, CollectionType::List, CollectionType::Set});
 
     Obj o = origin->create_object();
     Obj t = target->create_object_with_primary_key("Adam");
 
-    auto dict = o.get_collection_list(list_col);
-    CHECK(dict->is_empty());
-    auto list_foo = dict->insert_collection_list("Foo");
-    auto list_bar = dict->insert_collection_list("Bar");
-    auto foo_coll_0 = list_foo->insert_collection(0);
-    auto foo_coll_1 = list_foo->insert_collection(1);
-    auto bar_coll_0 = list_bar->insert_collection(0);
-    auto bar_coll_1 = list_bar->insert_collection(1);
+    auto foo_coll_0 = o.get_collection_ptr({"links", "Foo", 0});
+    auto foo_coll_1 = o.get_collection_ptr({"links", "Foo", 1});
+    auto bar_coll_0 = o.get_collection_ptr({"links", "Bar", 0});
+    auto bar_coll_1 = o.get_collection_ptr({"links", "Bar", 1});
     auto foo_ll0 = dynamic_cast<Set<Mixed>*>(foo_coll_0.get());
     auto foo_ll1 = dynamic_cast<Set<Mixed>*>(foo_coll_1.get());
     auto bar_ll0 = dynamic_cast<Set<Mixed>*>(bar_coll_0.get());
@@ -1193,21 +1189,16 @@ TEST(List_NestedDict_Unresolved)
     auto tr = db->start_write();
     auto target = tr->add_table_with_primary_key("target", type_String, "_id");
     auto origin = tr->add_table("origin");
-    auto list_col =
-        origin->add_column(type_Mixed, "obj_dict_list", true,
-                           {CollectionType::Dictionary, CollectionType::List, CollectionType::Dictionary});
+    origin->add_column(type_Mixed, "links", true,
+                       {CollectionType::Dictionary, CollectionType::List, CollectionType::Dictionary});
 
     Obj o = origin->create_object();
     Obj t = target->create_object_with_primary_key("Adam");
 
-    auto dict = o.get_collection_list(list_col);
-    CHECK(dict->is_empty());
-    auto list_foo = dict->insert_collection_list("Foo");
-    auto list_bar = dict->insert_collection_list("Bar");
-    auto foo_coll_0 = list_foo->insert_collection(0);
-    auto foo_coll_1 = list_foo->insert_collection(1);
-    auto bar_coll_0 = list_bar->insert_collection(0);
-    auto bar_coll_1 = list_bar->insert_collection(1);
+    auto foo_coll_0 = o.get_collection_ptr({"links", "Foo", 0});
+    auto foo_coll_1 = o.get_collection_ptr({"links", "Foo", 1});
+    auto bar_coll_0 = o.get_collection_ptr({"links", "Bar", 0});
+    auto bar_coll_1 = o.get_collection_ptr({"links", "Bar", 1});
     auto foo_ll0 = dynamic_cast<Dictionary*>(foo_coll_0.get());
     auto foo_ll1 = dynamic_cast<Dictionary*>(foo_coll_1.get());
     auto bar_ll0 = dynamic_cast<Dictionary*>(bar_coll_0.get());

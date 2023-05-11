@@ -58,6 +58,7 @@ public:
 
     virtual ~LstBase() {}
     virtual LstBasePtr clone() const = 0;
+    virtual DataType get_data_type() const noexcept = 0;
     virtual void set_null(size_t ndx) = 0;
     virtual void set_any(size_t ndx, Mixed val) = 0;
     virtual void insert_null(size_t ndx) = 0;
@@ -94,8 +95,8 @@ public:
 
         check_column_type<T>(m_col_key);
     }
-    Lst(DummyParent& parent)
-        : Base(parent)
+    Lst(DummyParent& parent, CollectionParent::Index index)
+        : Base(parent, index)
     {
     }
     Lst(const Lst& other)
@@ -139,6 +140,10 @@ public:
     LstBasePtr clone() const final;
     void set_null(size_t ndx) final;
     void set_any(size_t ndx, Mixed val) final;
+    DataType get_data_type() const noexcept final
+    {
+        return ColumnTypeTraits<T>::id;
+    }
     void insert_null(size_t ndx) final;
     void insert_any(size_t ndx, Mixed val) final;
     size_t find_any(Mixed val) const final;
@@ -307,8 +312,8 @@ public:
     {
         check_column_type<Mixed>(m_col_key);
     }
-    Lst(DummyParent& parent)
-        : Base(parent)
+    Lst(CollectionParent& parent, Index index)
+        : Base(parent, index)
     {
     }
     Lst(const Lst& other)
@@ -340,9 +345,9 @@ public:
     void insert(size_t ndx, Mixed value);
     Mixed remove(size_t ndx);
 
-    DictionaryPtr insert_dictionary(size_t ndx);
+    void insert_dictionary(size_t ndx);
     DictionaryPtr get_dictionary(size_t ndx) const;
-    std::shared_ptr<Lst<Mixed>> insert_list(size_t ndx);
+    void insert_list(size_t ndx);
     std::shared_ptr<Lst<Mixed>> get_list(size_t ndx) const;
 
     // Overriding members of CollectionBase:
@@ -382,6 +387,10 @@ public:
     void set_any(size_t ndx, Mixed val) final
     {
         set(ndx, val);
+    }
+    DataType get_data_type() const noexcept final
+    {
+        return type_Mixed;
     }
     void insert_null(size_t ndx) final
     {
@@ -716,6 +725,10 @@ public:
     }
     void set_null(size_t ndx) final;
     void set_any(size_t ndx, Mixed val) final;
+    DataType get_data_type() const noexcept final
+    {
+        return type_Link;
+    }
     void insert_null(size_t ndx) final;
     void insert_any(size_t ndx, Mixed val) final;
     size_t find_any(Mixed value) const final;
