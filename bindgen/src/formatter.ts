@@ -38,17 +38,17 @@ export function executeCommand(cwd: string, command: string, ...args: string[]) 
   }
 }
 
-export function createCommandFormatter(formatterName: string, [command, ...args]: string[]): Formatter {
+export function createCommandFormatter(name: string, [command, ...args]: string[]): Formatter {
   const formatter: Formatter = (cwd, filePaths) => {
     executeCommand(cwd, command, ...args, ...filePaths);
   };
-  Object.defineProperty(formatter, "name", { value: formatterName });
+  Object.defineProperty(formatter, "name", { value: name });
   return formatter;
 }
 
 export class FormatError extends Error {
   constructor(formatterName: string, filePaths: string[], cause: Error) {
-    super(`Failure when running the '${formatterName}' formatter on ${JSON.stringify(filePaths)}: ${cause.message}`);
+    super(`Failure when running the '${formatterName}' formatter on ${JSON.stringify(filePaths)}`, { cause });
   }
 }
 
