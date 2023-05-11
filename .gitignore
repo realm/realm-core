@@ -101,3 +101,4 @@ compile_commands.json
 # Bindgen generated files and npm stuff
 /bindgen/generated/
 node_modules/
+tsconfig.tsbuildinfo
