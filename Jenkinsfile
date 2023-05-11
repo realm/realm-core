@@ -261,7 +261,7 @@ def doCheckInDocker(Map options = [:]) {
             }
 
             if (options.useToolchain) {
-                cmakeDefinitions += " -DCMAKE_TOOLCHAIN_FILE=\"${env.WORKSPACE}/tools/cmake/x86_64.toolchain.cmake\""
+                cmakeDefinitions += " -DCMAKE_TOOLCHAIN_FILE=\"${env.WORKSPACE}/tools/cmake/x86_64-linux-gnu.toolchain.cmake\""
             }
 
             def buildSteps = { String dockerArgs = "" ->
@@ -388,7 +388,7 @@ def doBuildLinux(String buildType) {
                    rm -rf build-dir
                    mkdir build-dir
                    cd build-dir
-                   cmake -DCMAKE_BUILD_TYPE=${buildType} -DCMAKE_TOOLCHAIN_FILE=../tools/cmake/x86_64.toolchain.cmake -DREALM_NO_TESTS=1 -DREALM_VERSION="${gitDescribeVersion}" -G Ninja ..
+                   cmake -DCMAKE_BUILD_TYPE=${buildType} -DCMAKE_TOOLCHAIN_FILE=../tools/cmake/x86_64-linux-gnu.toolchain.cmake -DREALM_NO_TESTS=1 -DREALM_VERSION="${gitDescribeVersion}" -G Ninja ..
                    ninja
                    cpack -G TGZ
                 """
