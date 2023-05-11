@@ -40,7 +40,7 @@ export type OutputDirectory = {
    * @param formatter An optional formatter to apply after the file has been closed.
    * @returns An outputter, able to write into the file.
    */
-  file(filePath: string, ...formatters: Formatter[]): Outputter;
+  file(filePath: string, formatter?: Formatter): Outputter;
   /**
    * Close all files opened during the lifetime of the output directory.
    */
