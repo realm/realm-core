@@ -46,8 +46,6 @@ export function createCommandFormatter(formatterName: string, [command, ...args]
   return formatter;
 }
 
-export const clangFormatter = createCommandFormatter("clang", ["npx", "clang-format", "-i"]);
-
 export class FormatError extends Error {
   constructor(formatterName: string, filePaths: string[], cause: Error) {
     super(`Failure when running the '${formatterName}' formatter on ${JSON.stringify(filePaths)}: ${cause.message}`);
@@ -68,3 +66,5 @@ export function format(formatter: Formatter, cwd: string, filePaths: string[]): 
     }
   }
 }
+
+export const clangFormat = createCommandFormatter("clang", ["npx", "clang-format", "-i"]);
