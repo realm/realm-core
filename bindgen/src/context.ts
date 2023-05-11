@@ -22,5 +22,12 @@ import { Spec } from "./spec";
 
 export type TemplateContext = {
   spec: Spec;
+  /**
+   * @param path The file path, relative to the output directory.
+   * @param formatters A list of formatters to run after the template has returned.
+   * The invocation of these are batched, such that a single formatter is only ever executed once but passed all file paths which list the formatter.
+   * NOTE: The order of invocation is the order in which formatters has been referenced globally not the order they're passed on the individual invocation of this method.
+   * @returns An outputter, which can be used to write to the file.
+   */
   file: (path: string, ...formatters: Formatter[]) => Outputter;
 };
