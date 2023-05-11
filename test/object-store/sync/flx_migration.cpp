@@ -798,6 +798,17 @@ TEST_CASE("New table is synced after migration", "[flx][migration]") {
     }
 }
 
+// There is a sequence of events where we tried to open a frozen Realm with new
+// object types in the schema and this fails schema validation causing client reset
+// to fail.
+//   - Add a new class to the schema, but use async open to initiate
+//     sync without any schema
+//   - Have the server send a client reset.
+//   - The client tries to populate the notify_before callback with a frozen Realm using
+//     the schema with the new class, but the class is not stored on disk yet.
+// This hits the update_schema() check that makes sure that the frozen Realm's schema is
+// a subset of the one found on disk. Since it is not, a schema exception is thrown
+// which is eventually forwarded to the sync error handler and client reset fails.
 TEST_CASE("Async open + client reset", "[flx][migration]") {
     std::shared_ptr<util::Logger> logger_ptr =
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
