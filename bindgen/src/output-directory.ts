@@ -23,7 +23,7 @@ import path from "path";
 
 import { extend } from "./debug";
 import { Outputter, createOutputter } from "./outputter";
-import { FormatterName, format, getFormatterNames } from "./formatter";
+import { format, Formatter } from "./formatter";
 
 const debug = extend("out");
 
@@ -31,7 +31,7 @@ type OutputFile = {
   fd: number;
   resolvedPath: string;
   debug: Debugger;
-  formatters: FormatterName[];
+  formatter?: Formatter;
 };
 
 export type OutputDirectory = {
@@ -40,7 +40,7 @@ export type OutputDirectory = {
    * @param formatter An optional formatter to apply after the file has been closed.
    * @returns An outputter, able to write into the file.
    */
-  file(filePath: string, ...formatters: FormatterName[]): Outputter;
+  file(filePath: string, ...formatters: Formatter[]): Outputter;
   /**
    * Close all files opened during the lifetime of the output directory.
    */
@@ -50,6 +50,8 @@ export type OutputDirectory = {
    */
   format(): void;
 };
+
+export const usedFormatters = new Set<Formatter>();
 
 /**
  * @param outputPath Path on disk, to the output directory.
@@ -62,7 +64,7 @@ export function createOutputDirectory(outputPath: string): OutputDirectory {
   }
   const openFiles: OutputFile[] = [];
   return {
-    file(filePath: string, ...formatters: FormatterName[]) {
+    file(filePath: string, formatter?: Formatter) {
       const resolvedPath = path.resolve(outputPath, filePath);
       const parentDirectoryPath = path.dirname(resolvedPath);
       if (!fs.existsSync(parentDirectoryPath)) {
@@ -71,16 +73,13 @@ export function createOutputDirectory(outputPath: string): OutputDirectory {
       }
       const fileDebug = debug.extend(filePath);
 
-      // Check that all formatters are known
-      const knownFormatters = getFormatterNames();
-      const missingFormatters = formatters.filter((name) => !knownFormatters.includes(name));
-      if (missingFormatters.length > 0) {
-        throw new Error(`Unexpected formatter(s): ${missingFormatters}`);
-      }
-
       fileDebug(chalk.dim("Opening", resolvedPath));
       const fd = fs.openSync(resolvedPath, "w");
-      openFiles.push({ fd, formatters, resolvedPath, debug: fileDebug });
+      openFiles.push({ fd, formatter, resolvedPath, debug: fileDebug });
+
+      if (formatter) {
+        usedFormatters.add(formatter);
+      }
 
       return createOutputter((data) => {
         fs.writeFileSync(fd, data, { encoding: "utf8" });
@@ -93,9 +92,9 @@ export function createOutputDirectory(outputPath: string): OutputDirectory {
       }
     },
     format() {
-      for (const formatterName of getFormatterNames()) {
-        const relevantFiles = openFiles.filter((f) => f.formatters.includes(formatterName)).map((f) => f.resolvedPath);
-        format(formatterName, outputPath, relevantFiles);
+      for (const formatter of usedFormatters) {
+        const relevantFiles = openFiles.filter((file) => file.formatter === formatter).map((f) => f.resolvedPath);
+        format(formatter, outputPath, relevantFiles);
       }
     },
   };

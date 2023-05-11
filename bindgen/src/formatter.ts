@@ -22,51 +22,49 @@ import cp from "child_process";
 import { extend } from "./debug";
 const debug = extend("format");
 
-const FORMATTERS: Record<string, string[]> = {
-  eslint: ["npx", "eslint", "--fix", "--format=stylish"],
-  "clang-format": ["npx", "clang-format", "-i"],
-  // "typescript-checker": ["npx", "tsc", "--noEmit"],
-};
+export type Formatter = (cwd: string, filePaths: string[]) => void;
 
-export function addFormatter(name: string, commandAndArgs: string[]) {
-  if (name in FORMATTERS) {
-    throw new Error(`Cannot add ${name} as it's already there`);
-  } else {
-    FORMATTERS[name] = commandAndArgs;
+export function executeCommand(cwd: string, command: string, ...args: string[]) {
+  console.log(chalk.dim(command, ...args));
+  const result = cp.spawnSync(command, args, {
+    cwd,
+    encoding: "utf8",
+    stdio: "inherit",
+    shell: true,
+  });
+  if (result.error) throw result.error;
+  if (result.status) {
+    throw new Error(`Exited with status ${result.status}`)
   }
 }
 
-export function getFormatterNames() {
-  return Object.keys(FORMATTERS);
+export function createCommandFormatter(formatterName: string, [command, ...args]: string[]): Formatter {
+  const formatter: Formatter = (cwd, filePaths) => {
+    executeCommand(cwd, command, ...args, ...filePaths);
+  };
+  Object.defineProperty(formatter, "name", { value: formatterName });
+  return formatter;
 }
-
-export type FormatterName = string;
 
 export class FormatError extends Error {
-  constructor(formatterName: string, filePaths: string[]) {
-    super(`Failure when running the '${formatterName}' formatter on ${JSON.stringify(filePaths)}`);
+  constructor(formatterName: string, filePaths: string[], cause: Error) {
+    super(`Failure when running the '${formatterName}' formatter on ${JSON.stringify(filePaths)}: ${cause.message}`);
   }
 }
 
-export function format(formatterName: FormatterName, cwd: string, filePaths: string[]): void {
+export function format(formatter: Formatter, cwd: string, filePaths: string[]): void {
   if (filePaths.length === 0) {
-    debug(chalk.dim("Skipped running formatter '%s' (no files need it)"), formatterName);
+    debug(chalk.dim("Skipped running formatter '%s' (no files need it)"), formatter.name);
     return;
   } else {
-    debug(chalk.dim("Running formatter '%s' on %d files"), formatterName, filePaths.length);
-    if (formatterName in FORMATTERS) {
-      const [command, ...args] = FORMATTERS[formatterName].concat(filePaths);
-      console.log(`Running '${formatterName}' formatter`, chalk.dim(command, ...args));
-      const result = cp.spawnSync(command, args, {
-        cwd,
-        encoding: "utf8",
-        stdio: "inherit",
-        shell: true,
-      });
-      if (result.error) throw result.error;
-      if (result.status) {
-        throw new FormatError(formatterName, filePaths);
-      }
+    debug(chalk.dim("Running formatter '%s' on %d files"), formatter.name, filePaths.length);
+    console.log(`Running '${formatter.name}' formatter`);
+    try {
+      formatter(cwd, filePaths);
+    } catch (err) {
+      throw new FormatError(formatter.name, filePaths, err instanceof Error ? err : new Error(String(err)));
     }
   }
 }
+
+export const clangFormat = createCommandFormatter("clang", ["npx", "clang-format", "-i"]);
