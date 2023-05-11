@@ -22,7 +22,7 @@ import cp from "child_process";
 import { extend } from "./debug";
 const debug = extend("format");
 
-type Formatter = (cwd: string, filePaths: string[]) => void;
+export type Formatter = (cwd: string, filePaths: string[]) => void;
 
 export function executeCommand(cwd: string, command: string, ...args: string[]) {
   console.log(chalk.dim(command, ...args));
@@ -38,34 +38,15 @@ export function executeCommand(cwd: string, command: string, ...args: string[]) 
   }
 }
 
-function createCommandFormatter(commandAndArgs: string[]): Formatter {
-  return (cwd, filePaths) => {
-    const [command, ...args] = [...commandAndArgs, ...filePaths];
-    executeCommand(cwd, command, ...args);
+export function createCommandFormatter(formatterName: string, [command, ...args]: string[]): Formatter {
+  const formatter: Formatter = (cwd, filePaths) => {
+    executeCommand(cwd, command, ...args, ...filePaths);
   };
+  Object.defineProperty(formatter, "name", { value: formatterName });
+  return formatter;
 }
 
-const FORMATTERS: Record<string, Formatter> = {
-  eslint: createCommandFormatter(["npx", "eslint", "--fix", "--format=stylish"]),
-  "clang-format": createCommandFormatter(["npx", "clang-format", "-i"]),
-  // "typescript-checker": ["npx", "tsc", "--noEmit"],
-};
-
-export function addFormatter(name: string, callbackOrCommandAndArgs: Formatter | string[]) {
-  if (name in FORMATTERS) {
-    throw new Error(`Cannot add ${name} as it's already there`);
-  } else if (Array.isArray(callbackOrCommandAndArgs)) {
-    FORMATTERS[name] = createCommandFormatter(callbackOrCommandAndArgs);
-  } else {
-    FORMATTERS[name] = callbackOrCommandAndArgs;
-  }
-}
-
-export function getFormatterNames() {
-  return Object.keys(FORMATTERS);
-}
-
-export type FormatterName = string;
+export const clangFormatter = createCommandFormatter("clang", ["npx", "clang-format", "-i"]);
 
 export class FormatError extends Error {
   constructor(formatterName: string, filePaths: string[], cause: Error) {
@@ -73,19 +54,17 @@ export class FormatError extends Error {
   }
 }
 
-export function format(formatterName: FormatterName, cwd: string, filePaths: string[]): void {
+export function format(formatter: Formatter, cwd: string, filePaths: string[]): void {
   if (filePaths.length === 0) {
-    debug(chalk.dim("Skipped running formatter '%s' (no files need it)"), formatterName);
+    debug(chalk.dim("Skipped running formatter '%s' (no files need it)"), formatter.name);
     return;
   } else {
-    debug(chalk.dim("Running formatter '%s' on %d files"), formatterName, filePaths.length);
-    if (formatterName in FORMATTERS) {
-      console.log(`Running '${formatterName}' formatter`);
-      try {
-        FORMATTERS[formatterName](cwd, filePaths);
-      } catch (err) {
-        throw new FormatError(formatterName, filePaths, err instanceof Error ? err : new Error(String(err)));
-      }
+    debug(chalk.dim("Running formatter '%s' on %d files"), formatter.name, filePaths.length);
+    console.log(`Running '${formatter.name}' formatter`);
+    try {
+      formatter(cwd, filePaths);
+    } catch (err) {
+      throw new FormatError(formatter.name, filePaths, err instanceof Error ? err : new Error(String(err)));
     }
   }
 }

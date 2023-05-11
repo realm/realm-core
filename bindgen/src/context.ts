@@ -16,11 +16,11 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-import { FormatterName } from "./formatter";
+import { Formatter } from "./formatter";
 import { Outputter } from "./outputter";
 import { Spec } from "./spec";
 
 export type TemplateContext = {
   spec: Spec;
-  file: (path: string, ...formatters: FormatterName[]) => Outputter;
+  file: (path: string, ...formatters: Formatter[]) => Outputter;
 };
