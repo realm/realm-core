@@ -84,6 +84,14 @@ void ArrayMixed::insert(size_t ndx, Mixed value)
         return;
     }
     m_composite.insert(ndx, store(value));
+    if (Array::size() > payload_idx_key) {
+        if (auto ref = Array::get_as_ref(payload_idx_key)) {
+            Array keys(Array::get_alloc());
+            keys.set_parent(const_cast<ArrayMixed*>(this), payload_idx_key);
+            keys.init_from_ref(ref);
+            keys.insert(ndx, 0);
+        }
+    }
 }
 
 void ArrayMixed::set_null(size_t ndx)
@@ -201,6 +209,14 @@ void ArrayMixed::erase(size_t ndx)
 {
     erase_linked_payload(ndx, true);
     m_composite.erase(ndx);
+    if (Array::size() > payload_idx_key) {
+        if (auto ref = Array::get_as_ref(payload_idx_key)) {
+            Array keys(Array::get_alloc());
+            keys.set_parent(const_cast<ArrayMixed*>(this), payload_idx_key);
+            keys.init_from_ref(ref);
+            keys.erase(ndx);
+        }
+    }
 }
 
 void ArrayMixed::move(ArrayMixed& dst, size_t ndx)
@@ -210,6 +226,20 @@ void ArrayMixed::move(ArrayMixed& dst, size_t ndx)
     while (i < sz) {
         auto val = get(i++);
         dst.add(val);
+    }
+    if (Array::size() > payload_idx_key) {
+        if (auto ref = Array::get_as_ref(payload_idx_key)) {
+            dst.ensure_keys();
+            Array keys(Array::get_alloc());
+            keys.set_parent(const_cast<ArrayMixed*>(this), payload_idx_key);
+            keys.init_from_ref(ref);
+            i = ndx;
+            while (i < sz) {
+                dst.set_key(i, keys.get(i));
+                i++;
+            }
+            keys.truncate(ndx);
+        }
     }
     while (i > ndx) {
         erase_linked_payload(--i, false);
@@ -231,6 +261,40 @@ size_t ArrayMixed::find_first(Mixed value, size_t begin, size_t end) const noexc
         }
     }
     return realm::npos;
+}
+
+bool ArrayMixed::ensure_keys()
+{
+    if (Array::size() < payload_idx_key + 1 || Array::get(payload_idx_key) == 0) {
+        Array keys(Array::get_alloc());
+        keys.set_parent(const_cast<ArrayMixed*>(this), payload_idx_key);
+        keys.create(type_Normal, false, size(), 0);
+        keys.update_parent();
+
+        return false;
+    }
+    return true;
+}
+
+size_t ArrayMixed::find_key(int64_t key) const noexcept
+{
+    Array keys(Array::get_alloc());
+    ensure_array_accessor(keys, payload_idx_key);
+    return keys.find_first(key);
+}
+
+void ArrayMixed::set_key(size_t ndx, int64_t key)
+{
+    Array keys(Array::get_alloc());
+    ensure_array_accessor(keys, payload_idx_key);
+    return keys.set(ndx, key);
+}
+
+int64_t ArrayMixed::get_key(size_t ndx) const
+{
+    Array keys(Array::get_alloc());
+    ensure_array_accessor(keys, payload_idx_key);
+    return keys.get(ndx);
 }
 
 void ArrayMixed::verify() const

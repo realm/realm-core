@@ -1182,14 +1182,14 @@ util::Optional<Obj> InstructionApplier::get_top_object(const Instruction::Object
     }
 }
 
-std::unique_ptr<LstBase> InstructionApplier::get_list_from_path(Obj& obj, ColKey col)
+LstBasePtr InstructionApplier::get_list_from_path(Obj& obj, ColKey col)
 {
     // For link columns, `Obj::get_listbase_ptr()` always returns an instance whose concrete type is
     // `LnkLst`, which uses condensed indexes. However, we are interested in using non-condensed
     // indexes, so we need to manually construct a `Lst<ObjKey>` instead for lists of non-embedded
     // links.
     REALM_ASSERT(col.is_list());
-    std::unique_ptr<LstBase> list;
+    LstBasePtr list;
     if (col.get_type() == col_type_Link || col.get_type() == col_type_LinkList) {
         auto table = obj.get_table();
         if (!table->get_link_target(col)->is_embedded()) {
@@ -1350,7 +1350,7 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
 
     if (col.is_list()) {
         if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
-            std::unique_ptr<LstBase> list = InstructionApplier::get_list_from_path(obj, col);
+            auto list = InstructionApplier::get_list_from_path(obj, col);
             ++m_it_begin;
             return resolve_list_element(*list, *pindex);
         }

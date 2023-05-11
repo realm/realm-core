@@ -35,6 +35,7 @@
 #include "realm/table_view.hpp"
 #include "realm/group.hpp"
 #include "realm/replication.hpp"
+#include "realm/dictionary.hpp"
 
 namespace realm {
 
@@ -69,12 +70,12 @@ void Lst<T>::sort(std::vector<size_t>& indices, bool ascending) const
     auto tree = m_tree.get();
     if (ascending) {
         do_sort(indices, size(), [tree](size_t i1, size_t i2) {
-            return unresolved_to_null(tree->get(i1)) < unresolved_to_null(tree->get(i2));
+            return tree->get(i1) < tree->get(i2);
         });
     }
     else {
         do_sort(indices, size(), [tree](size_t i1, size_t i2) {
-            return unresolved_to_null(tree->get(i1)) > unresolved_to_null(tree->get(i2));
+            return tree->get(i1) > tree->get(i2);
         });
     }
 }
@@ -110,7 +111,7 @@ void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_or
 
     auto tree = m_tree.get();
     auto duplicates = min_unique(indices.begin(), indices.end(), [tree](size_t i1, size_t i2) noexcept {
-        return unresolved_to_null(tree->get(i1)) == unresolved_to_null(tree->get(i2));
+        return tree->get(i1) == tree->get(i2);
     });
 
     // Erase the duplicates
@@ -279,7 +280,185 @@ void Lst<ObjLink>::do_remove(size_t ndx)
     }
 }
 
-template <>
+/******************************** Lst<Mixed> *********************************/
+
+size_t Lst<Mixed>::find_first(const Mixed& value) const
+{
+    if (!update())
+        return not_found;
+
+    if (value.is_null()) {
+        auto ndx = m_tree->find_first(value);
+        auto size = ndx == not_found ? m_tree->size() : ndx;
+        for (size_t i = 0; i < size; ++i) {
+            if (m_tree->get(i).is_unresolved_link())
+                return i;
+        }
+        return ndx;
+    }
+    return m_tree->find_first(value);
+}
+Mixed Lst<Mixed>::set(size_t ndx, Mixed value)
+{
+    // get will check for ndx out of bounds
+    Mixed old = do_get(ndx, "set()");
+    if (Replication* repl = Base::get_replication()) {
+        repl->list_set(*this, ndx, value);
+    }
+    if (!(old.is_same_type(value) && old == value)) {
+        do_set(ndx, value);
+        bump_content_version();
+    }
+    return old;
+}
+
+void Lst<Mixed>::insert(size_t ndx, Mixed value)
+{
+    auto sz = size();
+    CollectionBase::validate_index("insert()", ndx, sz + 1);
+
+    ensure_created();
+
+    if (Replication* repl = Base::get_replication()) {
+        repl->list_insert(*this, ndx, value, sz);
+    }
+    do_insert(ndx, value);
+    bump_content_version();
+}
+
+void Lst<Mixed>::resize(size_t new_size)
+{
+    size_t current_size = size();
+    if (new_size != current_size) {
+        while (new_size > current_size) {
+            insert_null(current_size++);
+        }
+        remove(new_size, current_size);
+        Base::bump_both_versions();
+    }
+}
+
+Mixed Lst<Mixed>::remove(size_t ndx)
+{
+    // get will check for ndx out of bounds
+    Mixed old = do_get(ndx, "remove()");
+    if (Replication* repl = Base::get_replication()) {
+        repl->list_erase(*this, ndx);
+    }
+
+    do_remove(ndx);
+    bump_content_version();
+    return old;
+}
+
+void Lst<Mixed>::remove(size_t from, size_t to)
+{
+    while (from < to) {
+        remove(--to);
+    }
+}
+
+void Lst<Mixed>::clear()
+{
+    if (size() > 0) {
+        if (Replication* repl = Base::get_replication()) {
+            repl->list_clear(*this);
+        }
+        size_t ndx = size();
+        while (ndx--) {
+            do_remove(ndx);
+        }
+        bump_content_version();
+    }
+}
+
+void Lst<Mixed>::move(size_t from, size_t to)
+{
+    auto sz = size();
+    CollectionBase::validate_index("move()", from, sz);
+    CollectionBase::validate_index("move()", to, sz);
+
+    if (from != to) {
+        if (Replication* repl = Base::get_replication()) {
+            repl->list_move(*this, from, to);
+        }
+        if (to > from) {
+            to++;
+        }
+        else {
+            from++;
+        }
+        // We use swap here as it handles the special case for StringData where
+        // 'to' and 'from' points into the same array. In this case you cannot
+        // set an entry with the result of a get from another entry in the same
+        // leaf.
+        m_tree->insert(to, Mixed());
+        m_tree->swap(from, to);
+        m_tree->erase(from);
+
+        bump_content_version();
+    }
+}
+
+void Lst<Mixed>::swap(size_t ndx1, size_t ndx2)
+{
+    auto sz = size();
+    CollectionBase::validate_index("swap()", ndx1, sz);
+    CollectionBase::validate_index("swap()", ndx2, sz);
+
+    if (ndx1 != ndx2) {
+        if (Replication* repl = Base::get_replication()) {
+            LstBase::swap_repl(repl, ndx1, ndx2);
+        }
+        m_tree->swap(ndx1, ndx2);
+        bump_content_version();
+    }
+}
+
+DictionaryPtr Lst<Mixed>::insert_dictionary(size_t ndx)
+{
+    m_tree->ensure_keys();
+    insert(ndx, Mixed(0, CollectionType::Dictionary));
+    int64_t key = generate_key(size());
+    while (m_tree->find_key(key) != realm::not_found) {
+        key++;
+    }
+    m_tree->set_key(ndx, key);
+    return get_dictionary(ndx);
+}
+
+DictionaryPtr Lst<Mixed>::get_dictionary(size_t ndx) const
+{
+    auto weak = const_cast<Lst<Mixed>*>(this)->weak_from_this();
+    REALM_ASSERT(!weak.expired());
+    auto shared = weak.lock();
+    DictionaryPtr ret = std::make_shared<Dictionary>(m_col_key, get_level() + 1);
+    ret->set_owner(shared, m_tree->get_key(ndx));
+    return ret;
+}
+
+std::shared_ptr<Lst<Mixed>> Lst<Mixed>::insert_list(size_t ndx)
+{
+    m_tree->ensure_keys();
+    insert(ndx, Mixed(0, CollectionType::List));
+    int64_t key = generate_key(size());
+    while (m_tree->find_key(key) != realm::not_found) {
+        key++;
+    }
+    m_tree->set_key(ndx, key);
+    return get_list(ndx);
+}
+
+std::shared_ptr<Lst<Mixed>> Lst<Mixed>::get_list(size_t ndx) const
+{
+    auto weak = const_cast<Lst<Mixed>*>(this)->weak_from_this();
+    REALM_ASSERT(!weak.expired());
+    auto shared = weak.lock();
+    std::shared_ptr<Lst<Mixed>> ret = std::make_shared<Lst<Mixed>>(m_col_key, get_level() + 1);
+    ret->set_owner(shared, m_tree->get_key(ndx));
+    return ret;
+}
+
 void Lst<Mixed>::do_set(size_t ndx, Mixed value)
 {
     ObjLink old_link;
@@ -295,7 +474,7 @@ void Lst<Mixed>::do_set(size_t ndx, Mixed value)
     }
 
     CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
-    bool recurse = replace_backlink(m_col_key, old_link, target_link, state);
+    bool recurse = Base::replace_backlink(m_col_key, old_link, target_link, state);
 
     m_tree->set(ndx, value);
 
@@ -305,16 +484,14 @@ void Lst<Mixed>::do_set(size_t ndx, Mixed value)
     }
 }
 
-template <>
 void Lst<Mixed>::do_insert(size_t ndx, Mixed value)
 {
     if (value.is_type(type_TypedLink)) {
-        set_backlink(m_col_key, value.get<ObjLink>());
+        Base::set_backlink(m_col_key, value.get<ObjLink>());
     }
     m_tree->insert(ndx, value);
 }
 
-template <>
 void Lst<Mixed>::do_remove(size_t ndx)
 {
     if (Mixed old_value = m_tree->get(ndx); old_value.is_type(type_TypedLink)) {
@@ -322,7 +499,7 @@ void Lst<Mixed>::do_remove(size_t ndx)
 
         CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All
                                                                   : CascadeState::Mode::Strong);
-        bool recurse = remove_backlink(m_col_key, old_link, state);
+        bool recurse = Base::remove_backlink(m_col_key, old_link, state);
 
         m_tree->erase(ndx);
 
@@ -336,14 +513,145 @@ void Lst<Mixed>::do_remove(size_t ndx)
     }
 }
 
-template <>
-void Lst<Mixed>::do_clear()
+void Lst<Mixed>::sort(std::vector<size_t>& indices, bool ascending) const
 {
-    size_t ndx = size();
-    while (ndx--) {
-        do_remove(ndx);
+    update();
+
+    auto tree = m_tree.get();
+    if (ascending) {
+        do_sort(indices, size(), [tree](size_t i1, size_t i2) {
+            return unresolved_to_null(tree->get(i1)) < unresolved_to_null(tree->get(i2));
+        });
+    }
+    else {
+        do_sort(indices, size(), [tree](size_t i1, size_t i2) {
+            return unresolved_to_null(tree->get(i1)) > unresolved_to_null(tree->get(i2));
+        });
     }
 }
+
+void Lst<Mixed>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
+{
+    indices.clear();
+    sort(indices, sort_order.value_or(true));
+    if (indices.empty()) {
+        return;
+    }
+
+    auto tree = m_tree.get();
+    auto duplicates = min_unique(indices.begin(), indices.end(), [tree](size_t i1, size_t i2) noexcept {
+        return unresolved_to_null(tree->get(i1)) == unresolved_to_null(tree->get(i2));
+    });
+
+    // Erase the duplicates
+    indices.erase(duplicates, indices.end());
+
+    if (!sort_order) {
+        // Restore original order
+        std::sort(indices.begin(), indices.end());
+    }
+}
+
+util::Optional<Mixed> Lst<Mixed>::min(size_t* return_ndx) const
+{
+    if (update()) {
+        return MinHelper<Mixed>::eval(*m_tree, return_ndx);
+    }
+    return MinHelper<Mixed>::not_found(return_ndx);
+}
+
+util::Optional<Mixed> Lst<Mixed>::max(size_t* return_ndx) const
+{
+    if (update()) {
+        return MaxHelper<Mixed>::eval(*m_tree, return_ndx);
+    }
+    return MaxHelper<Mixed>::not_found(return_ndx);
+}
+
+util::Optional<Mixed> Lst<Mixed>::sum(size_t* return_cnt) const
+{
+    if (update()) {
+        return SumHelper<Mixed>::eval(*m_tree, return_cnt);
+    }
+    return SumHelper<Mixed>::not_found(return_cnt);
+}
+
+util::Optional<Mixed> Lst<Mixed>::avg(size_t* return_cnt) const
+{
+    if (update()) {
+        return AverageHelper<Mixed>::eval(*m_tree, return_cnt);
+    }
+    return AverageHelper<Mixed>::not_found(return_cnt);
+}
+
+void Lst<Mixed>::to_json(std::ostream& out, size_t link_depth, JSONOutputMode output_mode,
+                         util::FunctionRef<void(const Mixed&)> fn) const
+{
+    auto [open_str, close_str] = get_open_close_strings(link_depth, output_mode);
+
+    out << open_str;
+    out << "[";
+
+    auto sz = size();
+    for (size_t i = 0; i < sz; i++) {
+        if (i > 0)
+            out << ",";
+        Mixed val = m_tree->get(i);
+        if (val.is_type(type_TypedLink)) {
+            fn(val);
+        }
+        else if (val.is_type(type_Dictionary)) {
+            DummyParent parent(this->get_table(), val.get_ref());
+            Dictionary dict(parent);
+            dict.to_json(out, link_depth, output_mode, fn);
+        }
+        else if (val.is_type(type_List)) {
+            DummyParent parent(this->get_table(), val.get_ref());
+            Lst<Mixed> list(parent);
+            list.to_json(out, link_depth, output_mode, fn);
+        }
+        else {
+            val.to_json(out, output_mode);
+        }
+    }
+
+    out << "]";
+    out << close_str;
+}
+
+ref_type Lst<Mixed>::get_collection_ref(Index index, CollectionType type) const
+{
+    auto ndx = m_tree->find_key(mpark::get<int64_t>(index));
+    if (ndx != realm::not_found) {
+        auto val = get(ndx);
+        if (val.is_null() || !val.is_type(DataType(int(type)))) {
+            throw IllegalOperation("Not proper collection type");
+        }
+        return val.get_ref();
+    }
+
+    return 0;
+}
+
+void Lst<Mixed>::set_collection_ref(Index index, ref_type ref, CollectionType type)
+{
+    auto ndx = m_tree->find_key(mpark::get<int64_t>(index));
+    if (ndx == realm::not_found) {
+        throw StaleAccessor("Collection has been deleted");
+    }
+    set(ndx, Mixed(ref, type));
+}
+
+bool Lst<Mixed>::update_if_needed() const
+{
+    auto status = update_if_needed_with_status();
+    if (status == UpdateStatus::Detached) {
+        throw StaleAccessor("CollectionList no longer exists");
+    }
+    return status == UpdateStatus::Updated;
+}
+
+/********************************** LnkLst ***********************************/
 
 Obj LnkLst::create_and_insert_linked_object(size_t ndx)
 {
@@ -413,7 +721,6 @@ void LnkLst::to_json(std::ostream& out, size_t link_depth, JSONOutputMode output
 
 // Force instantiation:
 template class Lst<ObjKey>;
-template class Lst<Mixed>;
 template class Lst<ObjLink>;
 template class Lst<int64_t>;
 template class Lst<bool>;

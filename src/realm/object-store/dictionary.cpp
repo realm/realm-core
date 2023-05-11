@@ -50,7 +50,7 @@ public:
         return ColKey(col_key.get_index(), type, col_key.get_attrs(), col_key.get_tag());
     }
 
-    std::unique_ptr<CollectionBase> clone_collection() const override
+    CollectionBasePtr clone_collection() const override
     {
         return std::make_unique<DictionaryKeyAdapter>(*this);
     }

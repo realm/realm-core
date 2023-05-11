@@ -99,7 +99,7 @@ public:
 
     /// Produce a clone of the collection accessor referring to the same
     /// underlying memory.
-    virtual std::unique_ptr<CollectionBase> clone_collection() const = 0;
+    virtual CollectionBasePtr clone_collection() const = 0;
 
     /// Modifies a vector of indices so that they refer to values sorted
     /// according to the specified sort order.

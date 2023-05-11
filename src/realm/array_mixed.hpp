@@ -94,11 +94,23 @@ public:
     void move(ArrayMixed& dst, size_t ndx);
 
     size_t find_first(Mixed value, size_t begin = 0, size_t end = realm::npos) const noexcept;
+    bool ensure_keys();
+    size_t find_key(int64_t) const noexcept;
+    void set_key(size_t ndx, int64_t key);
+    int64_t get_key(size_t ndx) const;
 
     void verify() const;
 
 private:
-    enum { payload_idx_type, payload_idx_int, payload_idx_pair, payload_idx_str, payload_idx_ref, payload_idx_size };
+    enum {
+        payload_idx_type,
+        payload_idx_int,
+        payload_idx_pair,
+        payload_idx_str,
+        payload_idx_ref,
+        payload_idx_key,
+        payload_idx_size
+    };
 
     static constexpr int64_t s_data_type_mask = 0b0001'1111;
     static constexpr int64_t s_payload_idx_mask = 0b1110'0000;

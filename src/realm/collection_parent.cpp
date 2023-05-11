@@ -21,6 +21,12 @@
 #include "realm/set.hpp"
 #include "realm/dictionary.hpp"
 
+#include <random>
+#include <mutex>
+
+#include <random>
+#include <mutex>
+
 namespace realm {
 
 /***************************** CollectionParent ******************************/
@@ -160,7 +166,7 @@ LstBasePtr CollectionParent::get_listbase_ptr(ColKey col_key) const
             return std::make_unique<Lst<ObjLink>>(col_key);
         }
         case type_Mixed: {
-            return std::make_unique<Lst<Mixed>>(col_key);
+            return std::make_unique<Lst<Mixed>>(col_key, get_level() + 1);
         }
         case type_LinkList:
             return std::make_unique<LnkLst>(col_key);
@@ -250,9 +256,31 @@ CollectionBasePtr CollectionParent::get_collection_ptr(ColKey col_key) const
         return get_setbase_ptr(col_key);
     }
     else if (col_key.is_dictionary()) {
-        return std::make_unique<Dictionary>(col_key);
+        return std::make_unique<Dictionary>(col_key, get_level() + 1);
     }
     return {};
 }
+
+
+int64_t CollectionParent::generate_key(size_t sz) const
+{
+    static std::mt19937 gen32;
+
+    int64_t key;
+    do {
+        if (sz < 0x10) {
+            key = int8_t(gen32());
+        }
+        else if (sz < 0x1000) {
+            key = int32_t(gen32());
+        }
+        else {
+            key = int64_t(gen32());
+        }
+    } while (key == 0);
+
+    return key;
+}
+
 
 } // namespace realm
