@@ -44,8 +44,6 @@ inline std::string get_library_platform()
     return "Windows";
 #elif REALM_UWP
     return "UWP";
-#elif REALM_IOS
-    return "iOS";
 #elif REALM_MACCATALYST // test Catalyst first because it's a subset of iOS
     return "Mac Catalyst";
 #elif REALM_IOS
@@ -54,7 +52,7 @@ inline std::string get_library_platform()
     return "tvOS";
 #elif REALM_WATCHOS
     return "watchOS";
-#elif REALM_APPLE_PLATFORM
+#elif REALM_PLATFORM_APPLE
     return "macOS";
 #elif REALM_LINUX
     return "Linux";

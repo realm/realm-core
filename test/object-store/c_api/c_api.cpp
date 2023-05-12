@@ -343,16 +343,17 @@ private:
               nlohmann::json({{"device",
                                {{"appId", "app_id_123"},
                                 {"appVersion", "some_app_version"},
-                                {"platform", "some_platform_name"},
+                                {"platform", util::get_library_platform()},
                                 {"platformVersion", "some_platform_version"},
                                 {"sdk", "some_sdk_name"},
                                 {"sdkVersion", "some_sdk_version"},
-                                {"cpuArch", "some_cpu_arch"},
+                                {"cpuArch", util::get_library_cpu_arch()},
                                 {"deviceName", "some_device_name"},
                                 {"deviceVersion", "some_device_version"},
                                 {"frameworkName", "some_framework_name"},
                                 {"frameworkVersion", "some_framework_version"},
-                                {"coreVersion", REALM_VERSION_STRING}}}}));
+                                {"coreVersion", REALM_VERSION_STRING},
+                                {"bundleId", "Bundle Id"}}}}));
 
         CHECK(request.timeout_ms == 60000);
 
