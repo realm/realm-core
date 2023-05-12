@@ -200,18 +200,25 @@ TEST(Geospatial_PolygonValidation)
     Query query = table->column<Link>(location_column_key).geo_within(geo_poly);
     CHECK_EQUAL(query.count(), 1);
 
+    // same as above because the normalized polygon inverts when covering more than a hemisphere
+    Geospatial geo_poly_reversed{GeoPolygon{{GeoPoint{40.7128, -74.006}, GeoPoint{55.628, 12.0826},
+                                             GeoPoint{55.6761, 12.5683}, GeoPoint{40.7128, -74.006}}}};
+    CHECK(geo_poly_reversed.is_valid().is_ok());
+    query = table->column<Link>(location_column_key).geo_within(geo_poly_reversed);
+    CHECK_EQUAL(query.count(), 1);
+
     Geospatial poly_mismatch_loop{GeoPolygon{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683},
                                               GeoPoint{55.628, 12.0826}, GeoPoint{40.7128, -74.000}}}};
     Status status = poly_mismatch_loop.is_valid();
     CHECK(!status.is_ok());
-    CHECK_EQUAL(status.reason(), "Loop is not closed, first vertex 'GeoPoint([40.7128, -74.006])' does not equal "
+    CHECK_EQUAL(status.reason(), "Ring is not closed, first vertex 'GeoPoint([40.7128, -74.006])' does not equal "
                                  "last vertex 'GeoPoint([40.7128, -74])'");
 
     Geospatial poly_three_point{
         GeoPolygon{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683}, GeoPoint{40.7128, -74.006}}}};
     status = poly_three_point.is_valid();
     CHECK(!status.is_ok());
-    CHECK_EQUAL(status.reason(), "Loop 0 must have at least 3 different vertices, 2 unique vertices were provided");
+    CHECK_EQUAL(status.reason(), "Ring 0 must have at least 3 different vertices, 2 unique vertices were provided");
 
     Geospatial loop_outside{
         GeoPolygon{{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683}, GeoPoint{55.628, 12.0826},
@@ -221,7 +228,7 @@ TEST(Geospatial_PolygonValidation)
     CHECK(!status.is_ok());
     CHECK_EQUAL(
         status.reason(),
-        "Secondary loop 1 not contained by first exterior loop - secondary loops must be holes in the first loop");
+        "Secondary ring 1 not contained by first exterior ring - secondary rings must be holes in the first ring");
 
     Geospatial touching_vertices{GeoPolygon{{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683},
                                               GeoPoint{55.628, 12.0826}, GeoPoint{40.7128, -74.006}},
@@ -229,7 +236,7 @@ TEST(Geospatial_PolygonValidation)
                                               GeoPoint{55.628, 12.0826}, GeoPoint{40.7128, -74.006}}}}};
     status = touching_vertices.is_valid();
     CHECK(!status.is_ok());
-    CHECK_EQUAL(status.reason(), "Polygon isn't valid: 'Duplicate edge: loop 1, edge 0 and loop 0, edge 0'");
+    CHECK_EQUAL(status.reason(), "Polygon isn't valid: 'Duplicate edge: ring 1, edge 0 and ring 0, edge 0'");
 
     Geospatial touching_interior_holes{
         GeoPolygon{{{GeoPoint{55.652263, 12.046461}, GeoPoint{55.621198, 12.051422}, GeoPoint{55.615860, 12.132292},
@@ -241,12 +248,30 @@ TEST(Geospatial_PolygonValidation)
                      GeoPoint{55.629670, 12.100283}, GeoPoint{55.629568, 12.098421}}}}};
     status = touching_interior_holes.is_valid();
     CHECK(!status.is_ok());
-    CHECK_EQUAL(status.reason(), "Polygon isn't valid: 'Duplicate edge: loop 2, edge 3 and loop 1, edge 3'");
+    CHECK_EQUAL(status.reason(), "Polygon isn't valid: 'Duplicate edge: ring 2, edge 3 and ring 1, edge 3'");
 
     Geospatial empty_poly{GeoPolygon{std::vector<std::vector<GeoPoint>>{}}};
     status = empty_poly.is_valid();
     CHECK(!status.is_ok());
-    CHECK_EQUAL(status.reason(), "Polygon has no loops.");
+    CHECK_EQUAL(status.reason(), "Polygon has no rings.");
+
+    Geospatial poly_duplicates{
+        GeoPolygon{{GeoPoint{0, 0}, GeoPoint{0, 1}, GeoPoint{0, 1}, GeoPoint{0, 1}, GeoPoint{1, 1}, GeoPoint{0, 0}}}};
+    status = poly_duplicates.is_valid();
+    CHECK(status.is_ok()); // adjacent duplicates are removed
+
+    Geospatial poly_intersect{
+        GeoPolygon{{GeoPoint{0, 0}, GeoPoint{0, 1}, GeoPoint{2, 1}, GeoPoint{2, 2}, GeoPoint{0, 0}}}};
+    status = poly_intersect.is_valid();
+    CHECK(!status.is_ok());
+    CHECK_EQUAL(status.reason(),
+                "Ring 0 is not valid: 'Edges 1 and 3 cross. Edge locations in degrees: [1.0000000, "
+                "0.0000000]-[1.0000000, 2.0000000] and [2.0000000, 2.0000000]-[0.0000000, 0.0000000]'");
+
+    // this appears to be a line, but because the points are mapped to a sphere, it is not
+    Geospatial poly_line{GeoPolygon{{GeoPoint{0, 0}, GeoPoint{1, 1}, GeoPoint{2, 2}, GeoPoint{0, 0}}}};
+    status = poly_line.is_valid();
+    CHECK(status.is_ok());
 }
 
 #endif

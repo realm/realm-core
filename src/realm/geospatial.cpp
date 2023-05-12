@@ -282,15 +282,15 @@ static void erase_duplicate_points(std::vector<S2Point>* vertices)
     }
 }
 
-static Status is_loop_closed(const std::vector<S2Point>& loop, const std::vector<GeoPoint>& points)
+static Status is_ring_closed(const std::vector<S2Point>& ring, const std::vector<GeoPoint>& points)
 {
-    if (loop.empty()) {
-        return Status(ErrorCodes::InvalidQueryArg, "Loop has no vertices");
+    if (ring.empty()) {
+        return Status(ErrorCodes::InvalidQueryArg, "Ring has no vertices");
     }
 
     if (points[0] != points[points.size() - 1]) {
         return Status(ErrorCodes::InvalidQueryArg,
-                      util::format("Loop is not closed, first vertex '%1' does not equal last vertex '%2'", points[0],
+                      util::format("Ring is not closed, first vertex '%1' does not equal last vertex '%2'", points[0],
                                    points[points.size() - 1]));
     }
 
@@ -299,21 +299,21 @@ static Status is_loop_closed(const std::vector<S2Point>& loop, const std::vector
 
 static Status parse_polygon_coordinates(const GeoPolygon& polygon, S2Polygon* out)
 {
-    std::vector<S2Loop*> loops;
-    loops.reserve(polygon.points.size());
+    std::vector<S2Loop*> rings;
+    rings.reserve(polygon.points.size());
     Status status = Status::OK();
     std::string err;
 
     // if the polygon is successfully created s2 takes ownership
     // of the pointers and clears our vector
-    auto guard = util::make_scope_exit([&loops]() noexcept {
-        for (auto& loop : loops) {
-            delete loop;
+    auto guard = util::make_scope_exit([&rings]() noexcept {
+        for (auto& ring : rings) {
+            delete ring;
         }
     });
-    // Iterate all loops of the polygon.
+    // Iterate all rings of the polygon.
     for (size_t i = 0; i < polygon.points.size(); ++i) {
-        // Check if the loop is closed.
+        // Check if the ring is closed.
         std::vector<S2Point> points;
         points.reserve(polygon.points[i].size());
         for (auto&& p : polygon.points[i]) {
@@ -321,7 +321,7 @@ static Status parse_polygon_coordinates(const GeoPolygon& polygon, S2Polygon* ou
             points.push_back(S2LatLng::FromDegrees(p.latitude, p.longitude).ToPoint());
         }
 
-        status = is_loop_closed(points, polygon.points[i]);
+        status = is_ring_closed(points, polygon.points[i]);
         if (!status.is_ok())
             return status;
 
@@ -333,76 +333,76 @@ static Status parse_polygon_coordinates(const GeoPolygon& polygon, S2Polygon* ou
         if (points.size() < 3) {
             return Status(
                 ErrorCodes::InvalidQueryArg,
-                util::format("Loop %1 must have at least 3 different vertices, %2 unique vertices were provided", i,
+                util::format("Ring %1 must have at least 3 different vertices, %2 unique vertices were provided", i,
                              points.size()));
         }
 
-        loops.push_back(new S2Loop(points));
-        S2Loop* loop = loops.back();
+        rings.push_back(new S2Loop(points));
+        S2Loop* ring = rings.back();
 
-        // Check whether this loop is valid if vaildation hasn't been already done on 2dSphere index
+        // Check whether this ring is valid if vaildation hasn't been already done on 2dSphere index
         // insertion which is controlled by the 'skipValidation' flag.
         // 1. At least 3 vertices.
         // 2. All vertices must be unit length. Guaranteed by parsePoints().
-        // 3. Loops are not allowed to have any duplicate vertices.
+        // 3. Rings are not allowed to have any duplicate vertices.
         // 4. Non-adjacent edges are not allowed to intersect.
-        if (!loop->IsValid(&err)) {
-            return Status(ErrorCodes::InvalidQueryArg, util::format("Loop %1 is not valid: '%2'", i, err));
+        if (!ring->IsValid(&err)) {
+            return Status(ErrorCodes::InvalidQueryArg, util::format("Ring %1 is not valid: '%2'", i, err));
         }
-        // If the loop is more than one hemisphere, invert it.
-        loop->Normalize();
+        // If the ring is more than one hemisphere, invert it.
+        ring->Normalize();
 
-        // Check the first loop must be the exterior ring and any others must be
+        // Check the first ring must be the exterior ring and any others must be
         // interior rings or holes.
-        if (loops.size() > 1 && !loops[0]->Contains(loop)) {
+        if (rings.size() > 1 && !rings[0]->Contains(ring)) {
             return Status(ErrorCodes::InvalidQueryArg,
-                          util::format("Secondary loop %1 not contained by first exterior loop - "
-                                       "secondary loops must be holes in the first loop",
+                          util::format("Secondary ring %1 not contained by first exterior ring - "
+                                       "secondary rings must be holes in the first ring",
                                        i));
         }
     }
 
-    if (loops.empty()) {
-        return Status(ErrorCodes::InvalidQueryArg, "Polygon has no loops.");
+    if (rings.empty()) {
+        return Status(ErrorCodes::InvalidQueryArg, "Polygon has no rings.");
     }
 
-    // Check if the given loops form a valid polygon.
-    // 1. If a loop contains an edge AB, then no other loop may contain AB or BA.
-    // 2. No loop covers more than half of the sphere.
-    // 3. No two loops cross.
-    if (!S2Polygon::IsValid(loops, &err))
+    // Check if the given rings form a valid polygon.
+    // 1. If a ring contains an edge AB, then no other ring may contain AB or BA.
+    // 2. No ring covers more than half of the sphere.
+    // 3. No two ring cross.
+    if (!S2Polygon::IsValid(rings, &err))
         return Status(ErrorCodes::InvalidQueryArg, util::format("Polygon isn't valid: '%1'", err));
 
-    // Given all loops are valid / normalized and S2Polygon::IsValid() above returns true.
+    // Given all rings are valid / normalized and S2Polygon::IsValid() above returns true.
     // The polygon must be valid. See S2Polygon member function IsValid().
 
     {
-        // Transfer ownership of the loops and clears loop vector.
-        out->Init(&loops);
+        // Transfer ownership of the rings and clears ring vector.
+        out->Init(&rings);
     }
 
-    // Check if every loop of this polygon shares at most one vertex with
-    // its parent loop.
+    // Check if every ring of this polygon shares at most one vertex with
+    // its parent ring.
     if (!out->IsNormalized(&err))
-        // "err" looks like "Loop 1 shares more than one vertex with its parent loop 0"
+        // "err" looks like "Ring 1 shares more than one vertex with its parent ring 0"
         return Status(ErrorCodes::InvalidQueryArg, util::format("Polygon is not normalized: '%1'", err));
 
     // S2Polygon contains more than one ring, which is allowed by S2, but not by GeoJSON.
     //
-    // Loops are indexed according to a preorder traversal of the nesting hierarchy.
-    // GetLastDescendant() returns the index of the last loop that is contained within
-    // a given loop. We guarantee that the first loop is the exterior ring.
+    // Rings are indexed according to a preorder traversal of the nesting hierarchy.
+    // GetLastDescendant() returns the index of the last ring that is contained within
+    // a given ring. We guarantee that the first ring is the exterior ring.
     if (out->GetLastDescendant(0) < out->num_loops() - 1) {
-        return Status(ErrorCodes::InvalidQueryArg, "Only one exterior polygon loop is allowed");
+        return Status(ErrorCodes::InvalidQueryArg, "Only one exterior polygon ring is allowed");
     }
 
     // In GeoJSON, only one nesting is allowed.
-    // The depth of a loop is set by polygon according to the nesting hierarchy of polygon,
+    // The depth of a ring is set by polygon according to the nesting hierarchy of polygon,
     // so the exterior ring's depth is 0, a hole in it is 1, etc.
     for (int i = 0; i < out->num_loops(); i++) {
         if (out->loop(i)->depth() > 1) {
             return Status(ErrorCodes::InvalidQueryArg,
-                          util::format("Polygon interior loops cannot be nested: %1", i));
+                          util::format("Polygon interior rings cannot be nested: %1", i));
         }
     }
     return Status::OK();
