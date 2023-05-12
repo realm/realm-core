@@ -36,18 +36,19 @@ namespace realm {
 
 class Obj;
 class TableRef;
+class Geospatial;
 
 struct GeoPoint {
     GeoPoint() = delete;
     GeoPoint(double lon, double lat)
-        : longitude(lon)
-        , latitude(lat)
+    : longitude(lon)
+    , latitude(lat)
     {
     }
     GeoPoint(double lon, double lat, double alt)
-        : longitude(lon)
-        , latitude(lat)
-        , altitude(alt)
+    : longitude(lon)
+    , latitude(lat)
+    , altitude(alt)
     {
     }
 
@@ -58,8 +59,8 @@ struct GeoPoint {
     bool operator==(const GeoPoint& other) const
     {
         return (longitude == other.longitude || (std::isnan(longitude) && std::isnan(other.longitude))) &&
-               (latitude == other.latitude || (std::isnan(latitude) && std::isnan(other.latitude))) &&
-               ((!has_altitude() && !other.has_altitude()) || altitude == other.altitude);
+        (latitude == other.latitude || (std::isnan(latitude) && std::isnan(other.latitude))) &&
+        ((!has_altitude() && !other.has_altitude()) || altitude == other.altitude);
     }
     bool operator!=(const GeoPoint& other) const
     {
@@ -117,19 +118,19 @@ struct GeoBox {
 //   - Interior rings cannot intersect or overlap each other. Interior rings cannot share an edge.
 struct GeoPolygon {
     GeoPolygon(std::vector<GeoPoint>&& p)
-        : points({std::move(p)})
+    : points({std::move(p)})
     {
     }
     GeoPolygon(const std::vector<GeoPoint>& p)
-        : points({p})
+    : points({p})
     {
     }
     GeoPolygon(std::vector<std::vector<GeoPoint>>&& p)
-        : points(std::move(p))
+    : points(std::move(p))
     {
     }
     GeoPolygon(const std::vector<std::vector<GeoPoint>>& p)
-        : points(p)
+    : points(p)
     {
     }
     GeoPolygon(const GeoPolygon& other) = default;
@@ -168,6 +169,19 @@ struct GeoCenterSphere {
     }
 };
 
+class GeoRegion {
+public:
+    GeoRegion(const Geospatial& geo);
+    ~GeoRegion();
+
+    bool contains(const GeoPoint& point) const noexcept;
+    Status get_conversion_status() const noexcept;
+
+private:
+    std::unique_ptr<S2Region> m_region;
+    Status m_status;
+};
+
 class Geospatial {
 public:
     enum class Type : uint8_t { Invalid, Point, Box, Polygon, CenterSphere };
@@ -193,8 +207,17 @@ public:
     {
     }
 
-    Geospatial(const Geospatial&) = default;
-    Geospatial& operator=(const Geospatial&) = default;
+    Geospatial(const Geospatial& other)
+        : m_value(other.m_value)
+    {
+    }
+    Geospatial& operator=(const Geospatial& other)
+    {
+        if (this != &other) {
+            m_value = other.m_value;
+        }
+        return *this;
+    }
 
     Geospatial(Geospatial&& other) = default;
     Geospatial& operator=(Geospatial&&) = default;
@@ -212,7 +235,8 @@ public:
 
     Status is_valid() const noexcept;
 
-    bool is_within(const Geospatial& bounds) const noexcept;
+    bool contains(const Geospatial& geometry) const noexcept;
+
     std::string to_string() const;
 
     bool operator==(const Geospatial& other) const
@@ -236,19 +260,9 @@ private:
     mpark::variant<mpark::monostate, GeoPoint, GeoBox, GeoPolygon, GeoCenterSphere> m_value;
 
     friend class GeoRegion;
-};
 
-class GeoRegion {
-public:
-    GeoRegion(const Geospatial& geo);
-    ~GeoRegion();
-
-    bool contains(const GeoPoint& point) const noexcept;
-    Status get_conversion_status() const noexcept;
-
-private:
-    std::unique_ptr<S2Region> m_region;
-    Status m_status;
+    mutable std::unique_ptr<GeoRegion> m_region;
+    GeoRegion& get_region() const;
 };
 
 template <>

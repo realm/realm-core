@@ -224,11 +224,21 @@ static std::string point_str(const GeoPoint& point)
 
 Status Geospatial::is_valid() const noexcept
 {
-    if (get_type() == Type::Polygon) {
-        GeoRegion region(*this);
-        return region.get_conversion_status();
+    switch (get_type()) {
+        case Type::Polygon:
+        case Type::Box:
+        case Type::CenterSphere:
+            return get_region().get_conversion_status();
+        default:
+            return Status::OK();
     }
-    return Status::OK();
+}
+
+GeoRegion& Geospatial::get_region() const
+{
+    if (!m_region)
+        m_region = std::make_unique<GeoRegion>(*this);
+    return *m_region.get();
 }
 
 std::string Geospatial::to_string() const

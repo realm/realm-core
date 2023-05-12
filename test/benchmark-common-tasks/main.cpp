@@ -1958,7 +1958,7 @@ struct BenchmarkFetchGeoPoints : BenchmarkWithGeoPoints {
     {
         for (size_t i = 0; i < BASE_SIZE; ++i) {
             auto g = m_table->get_object(i).get<Geospatial>(m_col);
-            if (!g.is_valid() || g.get_type() != Geospatial::Type::Point)
+            if (!g.is_valid().is_ok() || g.get_type() != Geospatial::Type::Point)
                 throw std::logic_error("Invalid GeoPoint");
         }
     }
@@ -2022,7 +2022,7 @@ struct BenchmarkGeoPointsWithinPolygon : BenchmarkWithGeoPoints {
 
     void operator()(DBRef) override
     {
-        GeoPolygon geometry{{{-24, -24}, {-34, 34}, {44, 44}, {-55, 55}}};
+        GeoPolygon geometry{{{-24, -24}, {-34, 34}, {44, 44}, {-55, 55}, {-24, -24}}};
         m_table->column<Link>(m_col).geo_within(geometry).count();
     }
 };
@@ -2035,7 +2035,7 @@ struct BenchmarkGeoPointsWithinPolygonRQL : BenchmarkWithGeoPoints {
 
     void operator()(DBRef) override
     {
-        m_table->query("location geoWithin geoPolygon({[-24.0, -24.0], [-34.0, 34.0], [44.0, 44.0], [-55.0, 55]})")
+        m_table->query("location geoWithin geoPolygon({[-24.0, -24.0], [-34.0, 34.0], [44.0, 44.0], [-55.0, 55], [-24.0, -24.0]})")
             .count();
     }
 };
