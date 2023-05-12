@@ -2355,7 +2355,7 @@ private:
 #if REALM_ENABLE_GEOSPATIAL
 class GeoWithinCompare : public Expression {
 public:
-    GeoWithinCompare(const LinkMap& lm, Geospatial bounds)
+    GeoWithinCompare(const LinkMap& lm, Geospatial&& bounds)
         : m_link_map(lm)
         , m_bounds(bounds)
         , m_region(m_bounds)
@@ -2667,7 +2667,7 @@ public:
 #if REALM_ENABLE_GEOSPATIAL
     Query geo_within(Geospatial bounds) const
     {
-        return make_expression<GeoWithinCompare>(m_link_map, bounds);
+        return make_expression<GeoWithinCompare>(m_link_map, std::move(bounds));
     }
 #endif
 
