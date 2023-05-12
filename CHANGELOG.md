@@ -7,7 +7,8 @@
 * Fixed a fatal error (reported to the sync error handler) during client reset (or automatic PBS to FLX migration) if the reset has been triggered during an async open and the schema being applied has added new classes. ([#6601](https://github.com/realm/realm-core/issues/6601), since automatic client resets were introduced in v11.5.0)
 
 ### Breaking changes
-* None.
+* `platform` and `cpu_arch` fields in the `device_device` structure in App::Config can no longer be provided by the SDK's, they are inferred by the library ([PR #6612](https://github.com/realm/realm-core/pull/6612))
+* `bundle_id` is now a required field in the `device_device` structure in App::Config ([PR #6612](https://github.com/realm/realm-core/pull/6612))
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
