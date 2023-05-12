@@ -64,7 +64,7 @@ inline std::string get_library_cpu_arch()
 #elif REALM_ARCHITECTURE_X86_32
     return "x86";
 #elif REALM_ARCHITECTURE_X86_64
-    return "x66_64";
+    return "x86_64";
 #endif
 
     return "unknown";
