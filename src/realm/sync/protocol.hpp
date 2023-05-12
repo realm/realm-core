@@ -39,6 +39,10 @@ namespace sync {
 //     FLX sync BIND message can include JSON data in place of server path string
 //     Updated format for Sec-Websocket-Protocol strings
 //
+//   9 Client reset updated to not provide the local schema when creating frozen
+//     realms - this informs the server to not send the schema before sending the
+//     migrate to FLX server action
+//
 //  XX Changes:
 //     - TBD
 //
@@ -46,7 +50,7 @@ constexpr int get_current_protocol_version() noexcept
 {
     // Also update the current protocol version test in flx_sync.cpp when
     // updating this value
-    return 8;
+    return 9;
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
