@@ -36,6 +36,39 @@ inline std::string get_platform_info()
             info.machine); // Throws
 }
 
+inline std::string get_library_platform()
+{
+#if REALM_ANDROID
+    return "Android";
+#elif REALM_WINDOWS
+    return "Windows";
+#elif REALM_UWP
+    return "UWP";
+#elif REALM_IOS
+    return "iOS";
+#elif REALM_PLATFORM_APPLE
+    return "MacOS";
+#elif REALM_LINUX
+    return "Linux";
+#endif
+
+    return "unknown";
+}
+
+inline std::string get_library_cpu_arch()
+{
+#if REALM_ARCHITECTURE_ARM32
+    return "armeabi-v7a";
+#elif REALM_ARCHITECTURE_ARM64
+    return "arm64";
+#elif REALM_ARCHITECTURE_X86_32
+    return "x86";
+#elif REALM_ARCHITECTURE_X86_64
+    return "x66_64";
+#endif
+
+    return "unknown";
+}
 
 } // namespace util
 } // namespace realm

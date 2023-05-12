@@ -632,9 +632,6 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_app_config_set_default_request_timeout(app_config.get(), 2500);
         CHECK(app_config->default_request_timeout_ms == 2500);
 
-        realm_app_config_set_platform(app_config.get(), "some_platform_name");
-        CHECK(app_config->device_info.platform == "some_platform_name");
-
         realm_app_config_set_platform_version(app_config.get(), "some_platform_version");
         CHECK(app_config->device_info.platform_version == "some_platform_version");
 
@@ -643,9 +640,6 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
         realm_app_config_set_sdk(app_config.get(), "some_sdk_name");
         CHECK(app_config->device_info.sdk == "some_sdk_name");
-
-        realm_app_config_set_cpu_arch(app_config.get(), "some_cpu_arch");
-        CHECK(app_config->device_info.cpu_arch == "some_cpu_arch");
 
         realm_app_config_set_device_name(app_config.get(), "some_device_name");
         CHECK(app_config->device_info.device_name == "some_device_name");
@@ -658,6 +652,9 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
         realm_app_config_set_framework_version(app_config.get(), "some_framework_version");
         CHECK(app_config->device_info.framework_version == "some_framework_version");
+
+        realm_app_config_set_bundle_id(app_config.get(), "some_bundle_id");
+        CHECK(app_config->device_info.bundle_id == "some_bundle_id");
 
         auto test_app = std::make_shared<app::App>(*app_config);
         auto credentials = app::AppCredentials::anonymous();
