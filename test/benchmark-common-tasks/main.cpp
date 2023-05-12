@@ -23,6 +23,9 @@
 #include <set>
 
 #include <realm.hpp>
+#if REALM_ENABLE_GEOSPATIAL
+#include <realm/geospatial.hpp>
+#endif
 #include <realm/string_data.hpp>
 #include <realm/util/file.hpp>
 
@@ -1846,6 +1849,199 @@ struct TransactionDuplicate : Benchmark {
     void after_each(DBRef) {}
 };
 
+#if REALM_ENABLE_GEOSPATIAL
+
+struct BenchmarkWithGeospatial : Benchmark {
+    std::string loc_name() const
+    {
+        return std::string(name()) + "Location";
+    }
+
+    void before_all(DBRef group) override
+    {
+        WriteTransaction tr(group);
+
+        bool was_added = false;
+        auto t = tr.get_or_add_table(name(), Table::Type::TopLevel, &was_added);
+
+        if (was_added) {
+            auto loc = tr.add_table(loc_name(), Table::Type::Embedded);
+            loc->add_column(type_String, "type");
+            loc->add_column_list(type_Double, "coordinates");
+            m_col = t->add_column(*loc, "location");
+        }
+
+        tr.commit();
+    }
+
+    void after_all(DBRef group) override
+    {
+        (void)group;
+        WriteTransaction tr(group);
+        tr.get_group().remove_table(name());
+        tr.get_group().remove_table(loc_name());
+        tr.commit();
+    }
+
+    void assign_points(TableRef table)
+    {
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
+            double lon = ((double)i / BASE_SIZE) * 360 - 180;
+            double lat = (i / 1000.0) / (BASE_SIZE / 1000.0) * 180 - 90;
+            table->get_object(i).set(m_col, Geospatial{GeoPoint{lon, lat, 42.24}});
+        }
+    }
+
+    void add_records(TableRef table, bool assign_value = true)
+    {
+        for (size_t i = 0; i < BASE_SIZE; ++i)
+            table->create_object();
+
+        if (assign_value)
+            assign_points(table);
+    }
+};
+
+struct BenchmarkWithGeoPoints : BenchmarkWithGeospatial {
+    void before_all(DBRef group) override
+    {
+        BenchmarkWithGeospatial::before_all(group);
+        WriteTransaction tr(group);
+        add_records(tr.get_table(name()));
+        tr.commit();
+    }
+};
+
+struct BenchmarkAssignGeoPoints : BenchmarkWithGeoPoints {
+    const char* name() const override
+    {
+        return "AssignGeoPoints";
+    }
+
+    void operator()(DBRef) override
+    {
+        assign_points(m_table);
+        m_tr->commit();
+    }
+};
+
+struct BenchmarkAssignGeoPointsFromNull : BenchmarkWithGeoPoints {
+    const char* name() const override
+    {
+        return "AssignGeoPointsFromNull";
+    }
+
+    void before_each(DBRef db) override
+    {
+        WriteTransaction tr(db);
+        auto table = tr.get_table(name());
+        table->clear();
+        add_records(table, false);
+        tr.commit();
+        BenchmarkWithGeoPoints::before_each(db);
+    }
+
+    void operator()(DBRef) override
+    {
+        assign_points(m_table);
+        m_tr->commit();
+    }
+};
+
+struct BenchmarkFetchGeoPoints : BenchmarkWithGeoPoints {
+    const char* name() const override
+    {
+        return "FetchGeoPoints";
+    }
+
+    void operator()(DBRef) override
+    {
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
+            auto g = m_table->get_object(i).get<Geospatial>(m_col);
+            if (!g.is_valid() || g.get_type() != Geospatial::Type::Point)
+                throw std::logic_error("Invalid GeoPoint");
+        }
+    }
+};
+
+struct BenchmarkGeoPointsWithinBox : BenchmarkWithGeoPoints {
+    const char* name() const override
+    {
+        return "GeoPointsWithinBox";
+    }
+
+    void operator()(DBRef) override
+    {
+        auto geometry = GeoBox{{-34.0, -34.0}, {42.0, 42.0}};
+        m_table->column<Link>(m_col).geo_within(geometry).count();
+    }
+};
+
+struct BenchmarkGeoPointsWithinBoxRQL : BenchmarkWithGeoPoints {
+    const char* name() const override
+    {
+        return "GeoPointsWithinBoxRQL";
+    }
+
+    void operator()(DBRef) override
+    {
+        m_table->query("location geoWithin geoBox([-34.0, -34.0], [42.0, 42.0])").count();
+    }
+};
+
+struct BenchmarkGeoPointsWithinCenterSphere : BenchmarkWithGeoPoints {
+    const char* name() const override
+    {
+        return "GeoPointsWithinCenterSphere";
+    }
+
+    void operator()(DBRef) override
+    {
+        auto geometry = GeoCenterSphere::from_kms(5000, {42.0, 42.0});
+        m_table->column<Link>(m_col).geo_within(geometry).count();
+    }
+};
+
+struct BenchmarkGeoPointsWithinCenterSphereRQL : BenchmarkWithGeoPoints {
+    const char* name() const override
+    {
+        return "GeoPointsWithinCenterSphereRQL";
+    }
+
+    void operator()(DBRef) override
+    {
+        m_table->query("location geoWithin geoSphere([42.0, 42.0], 0.78393252)").count();
+    }
+};
+
+struct BenchmarkGeoPointsWithinPolygon : BenchmarkWithGeoPoints {
+    const char* name() const override
+    {
+        return "GeoPointsWithinPolygon";
+    }
+
+    void operator()(DBRef) override
+    {
+        GeoPolygon geometry{{{-24, -24}, {-34, 34}, {44, 44}, {-55, 55}}};
+        m_table->column<Link>(m_col).geo_within(geometry).count();
+    }
+};
+
+struct BenchmarkGeoPointsWithinPolygonRQL : BenchmarkWithGeoPoints {
+    const char* name() const override
+    {
+        return "GeoPointsWithinPolygonRQL";
+    }
+
+    void operator()(DBRef) override
+    {
+        m_table->query("location geoWithin geoPolygon({[-24.0, -24.0], [-34.0, 34.0], [44.0, 44.0], [-55.0, 55]})")
+            .count();
+    }
+};
+
+#endif
+
 const char* to_lead_cstr(DBOptions::Durability level)
 {
     switch (level) {
@@ -2070,6 +2266,18 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkWithIntUIDsRandomOrderRandomCreate);
 
     BENCH(TransactionDuplicate);
+
+#if REALM_ENABLE_GEOSPATIAL
+    BENCH(BenchmarkAssignGeoPoints);
+    BENCH(BenchmarkAssignGeoPointsFromNull);
+    BENCH(BenchmarkFetchGeoPoints);
+    BENCH(BenchmarkGeoPointsWithinBox);
+    BENCH(BenchmarkGeoPointsWithinBoxRQL);
+    BENCH(BenchmarkGeoPointsWithinCenterSphere);
+    BENCH(BenchmarkGeoPointsWithinCenterSphereRQL);
+    BENCH(BenchmarkGeoPointsWithinPolygon);
+    BENCH(BenchmarkGeoPointsWithinPolygonRQL);
+#endif
 
 #undef BENCH
 #undef BENCH2
