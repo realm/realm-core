@@ -353,7 +353,7 @@ private:
                                 {"frameworkName", "some_framework_name"},
                                 {"frameworkVersion", "some_framework_version"},
                                 {"coreVersion", REALM_VERSION_STRING},
-                                {"bundleId", "Bundle Id"}}}}));
+                                {"bundleId", "some_bundle_id"}}}}));
 
         CHECK(request.timeout_ms == 60000);
 
