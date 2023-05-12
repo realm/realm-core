@@ -5,6 +5,7 @@
 
 ### Fixed
 * Fixed a fatal error (reported to the sync error handler) during client reset (or automatic PBS to FLX migration) if the reset has been triggered during an async open and the schema being applied has added new classes. ([#6601](https://github.com/realm/realm-core/issues/6601), since automatic client resets were introduced in v11.5.0)
+* Full text search would sometimes find words where the word only matches the beginning of the search token ([#6591](https://github.com/realm/realm-core/issues/6591), since v13.0.0)
 
 ### Breaking changes
 * None.
