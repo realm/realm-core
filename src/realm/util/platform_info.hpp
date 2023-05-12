@@ -46,8 +46,16 @@ inline std::string get_library_platform()
     return "UWP";
 #elif REALM_IOS
     return "iOS";
-#elif REALM_PLATFORM_APPLE
-    return "MacOS";
+#elif REALM_MACCATALYST // test Catalyst first because it's a subset of iOS
+    return "Mac Catalyst";
+#elif REALM_IOS
+    return "iOS";
+#elif REALM_TVOS
+    return "tvOS";
+#elif REALM_WATCHOS
+    return "watchOS";
+#elif REALM_APPLE_PLATFORM
+    return "macOS";
 #elif REALM_LINUX
     return "Linux";
 #endif
@@ -58,7 +66,7 @@ inline std::string get_library_platform()
 inline std::string get_library_cpu_arch()
 {
 #if REALM_ARCHITECTURE_ARM32
-    return "armeabi-v7a";
+    return "arm";
 #elif REALM_ARCHITECTURE_ARM64
     return "arm64";
 #elif REALM_ARCHITECTURE_X86_32
