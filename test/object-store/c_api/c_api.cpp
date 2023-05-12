@@ -2366,6 +2366,28 @@ TEST_CASE("C API", "[c_api]") {
                 CHECK_ERR_CAT(RLM_ERR_INDEX_OUT_OF_BOUNDS, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
             }
 
+            SECTION("string in list") {
+                char foo[] = "foo";
+                realm_value_t str = rlm_str_val(foo);
+                realm_value_t list_arg[2] = {str, rlm_str_val("bar")};
+
+                write([&]() {
+                    CHECK(realm_set_value(obj1.get(), foo_properties["string"], rlm_str_val("foo"), false));
+                });
+
+                static const size_t num_args = 1;
+                realm_query_arg_t args[num_args] = { realm_query_arg_t{2, true, &list_arg[0]} };
+                realm_query_arg_t* arg_list = &args[0];
+                auto q_string_in_list = cptr_checked(realm_query_parse(realm, class_foo.key, "string IN $0", num_args, arg_list));
+                    
+                char* s = foo;
+                s[0] = 'a';
+                size_t count;
+
+                CHECK(checked(realm_query_count(q_string_in_list.get(), &count)));
+                CHECK(1 == count);
+            }
+
             SECTION("decimal NaN") {
                 realm_value_t decimal = rlm_decimal_nan();
 
