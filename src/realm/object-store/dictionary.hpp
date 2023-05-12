@@ -25,6 +25,7 @@
 
 namespace realm {
 
+class List;
 struct DictionaryChangeSet {
     DictionaryChangeSet(size_t max_keys)
     {
@@ -124,6 +125,12 @@ public:
 
     Iterator begin() const;
     Iterator end() const;
+
+    // nested collections
+    void insert_list(StringData);
+    List get_list(StringData);
+    void insert_dictionary(StringData);
+    object_store::Dictionary get_dictionary(StringData);
 
 private:
     const char* type_name() const noexcept override

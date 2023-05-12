@@ -314,6 +314,7 @@ public:
     Lst(const Lst& other)
         : Base(other)
         , CollectionParent(other.get_level())
+    //        , m_tree(std::move(other.m_tree))
     {
     }
     Lst(Lst&&) noexcept;

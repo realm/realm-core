@@ -39,6 +39,14 @@ Collection::Collection(const Object& parent_obj, const Property* prop)
 {
 }
 
+Collection::Collection(Obj& parent_obj, ColKey col, std::shared_ptr<Realm> r) // this is tmp, it is very hacky
+    : m_realm(std::move(r))
+    , m_parent_object(parent_obj)
+    , m_col_key(col)
+{
+    REALM_ASSERT(m_col_key.get_type() == col_type_Mixed);
+}
+
 Collection::Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
     : Collection(std::move(r), parent_obj.get_collection_ptr(col),
                  ObjectSchema::from_core_type(col) & ~PropertyType::Collection)
@@ -259,6 +267,22 @@ size_t Collection::hash() const noexcept
 {
     auto& impl = *m_coll_base;
     return hash_combine(impl.get_owner_key().value, impl.get_table()->get_key().value, impl.get_col_key().value);
+}
+
+void Collection::set_list()
+{
+    REALM_ASSERT(m_col_key.get_type() == col_type_Mixed);
+    m_coll_base = m_parent_object.set_list_ptr(m_col_key);
+    REALM_ASSERT(m_coll_base->is_empty());
+    REALM_ASSERT(is_valid());
+}
+
+void Collection::set_dictionary()
+{
+    REALM_ASSERT(m_col_key.get_type() == col_type_Mixed);
+    m_coll_base = m_parent_object.set_dictionary_ptr(m_col_key);
+    REALM_ASSERT(m_coll_base->is_empty());
+    REALM_ASSERT(is_valid());
 }
 
 } // namespace realm::object_store

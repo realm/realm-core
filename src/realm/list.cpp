@@ -439,6 +439,7 @@ DictionaryPtr Lst<Mixed>::get_dictionary(size_t ndx) const
 
 std::shared_ptr<Lst<Mixed>> Lst<Mixed>::insert_list(size_t ndx)
 {
+    ensure_created();
     m_tree->ensure_keys();
     insert(ndx, Mixed(0, CollectionType::List));
     int64_t key = generate_key(size());

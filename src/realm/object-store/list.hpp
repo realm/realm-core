@@ -36,6 +36,10 @@ class ThreadSafeReference;
 struct ColKey;
 struct ObjKey;
 
+namespace object_store {
+class Dictionary;
+}
+
 class List : public object_store::Collection {
 public:
     using object_store::Collection::Collection;
@@ -109,6 +113,12 @@ public:
     // Replace the values in this list with the values from an enumerable object
     template <typename T, typename Context>
     void assign(Context&, T&& value, CreatePolicy = CreatePolicy::SetLink);
+
+    // nested collections
+    void insert_list(size_t);
+    List get_list(size_t);
+    void insert_dictionary(size_t);
+    object_store::Dictionary get_dictionary(size_t);
 
 private:
     const char* type_name() const noexcept override

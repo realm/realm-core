@@ -23,6 +23,9 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
 
+#include <realm/object-store/list.hpp>
+#include <realm/object-store/dictionary.hpp>
+
 #include <realm/db.hpp>
 #include <realm/collection_list.hpp>
 #include <realm/list.hpp>
@@ -30,6 +33,55 @@
 #include <realm/dictionary.hpp>
 
 using namespace realm;
+
+TEST_CASE("nested-list-mixed", "[nested-colllections]") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"any", {{"any_val", PropertyType::Mixed | PropertyType::Nullable}}},
+    });
+
+    r->begin_transaction();
+
+    auto table = r->read_group().get_table("class_any");
+    auto obj = table->create_object();
+    auto col = table->get_column_key("any_val");
+
+    // List
+    List list_os{obj, col, r};
+    list_os.set_list();
+    list_os.insert_list(0);
+    list_os.insert_list(1);
+    list_os.insert_dictionary(2);
+    auto nested_list = list_os.get_list(0);
+    nested_list.add(Mixed{5});
+    nested_list.add(Mixed{10});
+    nested_list.add(Mixed{"Hello"});
+    auto nested_list1 = list_os.get_list(1);
+    nested_list1.add(Mixed{6});
+    nested_list1.add(Mixed{7});
+    nested_list1.add(Mixed{"World"});
+    const char* json_doc_list = "{\"_key\":0,\"any_val\":[[5,10,\"Hello\"],[6,7,\"World\"],{}]}";
+    REQUIRE(list_os.get_impl().get_obj().to_string() == json_doc_list);
+
+    // Dictionary.
+    object_store::Dictionary dict_os{obj, col, r};
+    dict_os.set_dictionary();
+    dict_os.insert_dictionary("Dict");
+    auto nested_dict = dict_os.get_dictionary("Dict");
+    nested_dict.insert({"Test"}, Mixed{10});
+    nested_dict.insert({"Test1"}, Mixed{11});
+    dict_os.insert_list("List");
+    auto nested_list_dict = dict_os.get_list("List");
+    nested_list_dict.add(Mixed{"value"});
+    const char* json_doc_dict =
+        "{\"_key\":0,\"any_val\":{\"Dict\":{},\"List\":[\"value\"],\"Test\":10,\"Test1\":11}}";
+    REQUIRE(dict_os.get_impl().get_obj().to_string() == json_doc_dict);
+
+    r->commit_transaction();
+}
 
 TEST_CASE("nested-list", "[nested-collections]") {
     InMemoryTestFile config;
