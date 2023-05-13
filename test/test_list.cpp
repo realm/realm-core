@@ -691,7 +691,7 @@ TEST(List_NestedList_Insert)
     dynamic_cast<Lst<Int>*>(collection.get())->add(5);
 
     auto dict = obj.get_collection_list(list_col2);
-    dict->insert_collection_list("Foo");
+    dict->insert_collection("Foo");
     auto list_foo = dict->get_collection_list("Foo");
     val = obj.get_any(list_col2);
     CHECK(val.is_type(type_Dictionary));
@@ -704,7 +704,7 @@ TEST(List_NestedList_Insert)
 
     CHECK_EQUAL(int_lst->get(0), 5);
 
-    dict->insert_collection_list("Foo");
+    dict->insert_collection("Foo");
     auto list3 = dict->get_collection_list("Foo");
     // list3 points to the same list as list2
     list3->insert_collection(0);
@@ -750,7 +750,7 @@ TEST(List_Nested_InMixed)
 
     Obj obj = table->create_object();
 
-    obj.set_dictionary(col_any);
+    obj.set_collection(col_any, CollectionType::Dictionary);
     auto dict = obj.get_dictionary_ptr(col_any);
     CHECK(dict->is_empty());
     dict->insert("Four", 4);
@@ -771,7 +771,7 @@ TEST(List_Nested_InMixed)
     CHECK_EQUAL(dict->get("Four"), Mixed(4));
 
     tr->promote_to_write();
-    dict->insert_dictionary("Dict");
+    dict->insert_collection("Dict", CollectionType::Dictionary);
     auto dict2 = dict->get_dictionary("Dict");
     CHECK(dict2->is_empty());
     dict2->insert("Five", 5);
@@ -794,11 +794,13 @@ TEST(List_Nested_InMixed)
     */
 
     tr->promote_to_write();
-    dict2->insert_list("List");
-    auto list = dict2->get_list("List");
-    CHECK(list->is_empty());
-    list->add(8);
-    list->add(9);
+    dict2->insert_collection("List", CollectionType::List);
+    {
+        auto list = dict2->get_list("List");
+        CHECK(list->is_empty());
+        list->add(8);
+        list->add(9);
+    }
     tr->verify();
     {
         std::stringstream ss;
@@ -827,6 +829,9 @@ TEST(List_Nested_InMixed)
     }
     */
 
+    auto list = obj.get_collection_ptr({"something", "Dict", "List"});
+    CHECK_EQUAL(dynamic_cast<Lst<Mixed>*>(list.get())->get(0).get_int(), 8);
+
     tr->promote_to_write();
     // Assign another value. The old dictionary should be disposed.
     obj.set(col_any, Mixed(5));
@@ -834,16 +839,16 @@ TEST(List_Nested_InMixed)
     tr->commit_and_continue_as_read();
 
     tr->promote_to_write();
-    obj.set_list(col_any);
+    obj.set_collection(col_any, CollectionType::List);
     auto list2 = std::dynamic_pointer_cast<Lst<Mixed>>(obj.get_collection_ptr(col_any));
     CHECK(list2->is_empty());
     list2->add("Hello");
-    list2->insert_dictionary(0);
+    list2->insert_collection(0, CollectionType::Dictionary);
     dict2 = list2->get_dictionary(0);
     dict2->insert("Six", 6);
     tr->verify();
     dict2->insert("Seven", 7);
-    list2->insert_dictionary(2);
+    list2->insert_collection(2, CollectionType::Dictionary);
     dict2 = list2->get_dictionary(2);
     dict2->insert("Hello", "World");
     dict2->insert("Date", Timestamp(std::chrono::system_clock::now()));

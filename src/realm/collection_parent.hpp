@@ -39,11 +39,15 @@ class LstBase;
 class SetBase;
 class Dictionary;
 
+template <class T>
+class Lst;
+
 using CollectionPtr = std::shared_ptr<Collection>;
 using LstBasePtr = std::unique_ptr<LstBase>;
 using SetBasePtr = std::unique_ptr<SetBase>;
 using CollectionBasePtr = std::shared_ptr<CollectionBase>;
 using CollectionListPtr = std::shared_ptr<CollectionList>;
+using ListMixedPtr = std::shared_ptr<Lst<Mixed>>;
 using DictionaryPtr = std::shared_ptr<Dictionary>;
 
 /// The status of an accessor after a call to `update_if_needed()`.

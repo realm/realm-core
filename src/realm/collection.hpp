@@ -64,6 +64,11 @@ public:
     virtual void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const {}
     /// Get collection type (set, list, dictionary)
     virtual CollectionType get_collection_type() const noexcept = 0;
+
+    virtual void insert_collection(const PathElement&, CollectionType)
+    {
+        throw IllegalOperation("insert_collection is not legal on this collection type");
+    }
 };
 
 using CollectionPtr = std::shared_ptr<Collection>;
@@ -157,6 +162,15 @@ public:
     virtual size_t translate_index(size_t ndx) const noexcept
     {
         return ndx;
+    }
+
+    virtual DictionaryPtr get_dictionary(const PathElement&) const
+    {
+        return nullptr;
+    }
+    virtual ListMixedPtr get_list(const PathElement&) const
+    {
+        return nullptr;
     }
 
     virtual void set_owner(const Obj& obj, ColKey) = 0;

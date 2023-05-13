@@ -178,28 +178,13 @@ void CollectionList::update_child_ref(size_t, ref_type ref)
     m_parent->set_collection_ref(m_index, ref, m_coll_type);
 }
 
-void CollectionList::insert_collection(PathElement index)
+void CollectionList::insert_collection(const PathElement& index, CollectionType)
 {
-    REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) == m_level);
-    insert_collection_list(index);
-}
-
-CollectionBasePtr CollectionList::get_collection(PathElement path_element) const
-{
-    REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) == m_level);
-    Index index = get_index(path_element);
-    CollectionBasePtr coll = CollectionParent::get_collection_ptr(m_col_key);
-    coll->set_owner(const_cast<CollectionList*>(this)->shared_from_this(), index);
-    return coll;
-}
-
-void CollectionList::insert_collection_list(PathElement index)
-{
+    REALM_ASSERT(m_level <= get_table()->get_nesting_levels(m_col_key));
     ensure_created();
     size_t ndx;
-    if (index.is_ndx()) {
+    if (m_coll_type == CollectionType::List) {
         ndx = index.get_ndx();
-        REALM_ASSERT(m_coll_type == CollectionType::List);
         auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
         int64_t key = generate_key(size());
         while (int_keys->find_first(key) != realm::not_found) {
@@ -210,7 +195,6 @@ void CollectionList::insert_collection_list(PathElement index)
     }
     else {
         auto key = index.get_key();
-        REALM_ASSERT(m_coll_type == CollectionType::Dictionary);
         auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
         StringData actual;
         IteratorAdapter help(string_keys);
@@ -227,7 +211,16 @@ void CollectionList::insert_collection_list(PathElement index)
     bump_content_version();
 }
 
-auto CollectionList::get_index(PathElement path_element) const -> Index
+CollectionBasePtr CollectionList::get_collection(const PathElement& path_element) const
+{
+    REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) == m_level);
+    Index index = get_index(path_element);
+    CollectionBasePtr coll = CollectionParent::get_collection_ptr(m_col_key);
+    coll->set_owner(const_cast<CollectionList*>(this)->shared_from_this(), index);
+    return coll;
+}
+
+auto CollectionList::get_index(const PathElement& path_element) const -> Index
 {
     auto sz = size();
     if (path_element.is_ndx()) {
@@ -257,7 +250,7 @@ auto CollectionList::get_index(PathElement path_element) const -> Index
     }
 }
 
-CollectionListPtr CollectionList::get_collection_list(PathElement path_element) const
+CollectionListPtr CollectionList::get_collection_list(const PathElement& path_element) const
 {
     REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) > m_level);
     Index index = get_index(path_element);

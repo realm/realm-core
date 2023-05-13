@@ -1921,23 +1921,27 @@ Dictionary Obj::get_dictionary(ColKey col_key) const
     return Dictionary(Obj(*this), col_key);
 }
 
-void Obj::set_list(ColKey col_key)
+void Obj::set_collection(ColKey col_key, CollectionType type)
 {
     REALM_ASSERT(col_key.get_type() == col_type_Mixed);
     update_if_needed();
     auto old_val = get<Mixed>(col_key);
-    if (!old_val.is_type(type_List)) {
-        set(col_key, Mixed(0, CollectionType::List));
-    }
-}
-
-void Obj::set_dictionary(ColKey col_key)
-{
-    REALM_ASSERT(col_key.get_type() == col_type_Mixed);
-    update_if_needed();
-    auto old_val = get<Mixed>(col_key);
-    if (!old_val.is_type(type_Dictionary)) {
-        set(col_key, Mixed(ref_type(0), CollectionType::Dictionary));
+    switch (type) {
+        case CollectionType::Set:
+            if (!old_val.is_type(type_Set)) {
+                set(col_key, Mixed(0, CollectionType::Set));
+            }
+            break;
+        case CollectionType::List:
+            if (!old_val.is_type(type_List)) {
+                set(col_key, Mixed(0, CollectionType::List));
+            }
+            break;
+        case CollectionType::Dictionary:
+            if (!old_val.is_type(type_Dictionary)) {
+                set(col_key, Mixed(ref_type(0), CollectionType::Dictionary));
+            }
+            break;
     }
 }
 
@@ -1971,50 +1975,79 @@ CollectionPtr Obj::get_collection_ptr(const Path& path) const
     auto col_key = m_table->get_column_key(path[0].get_key());
     REALM_ASSERT(col_key);
     size_t nesting_levels = m_table->get_nesting_levels(col_key);
-    if (nesting_levels == 0) {
-        return get_collection_ptr(col_key);
-    }
-    CollectionListPtr list = get_collection_list(col_key);
-    if (path.size() > 1) {
-        size_t levels_left = path.size() - 2;
-        for (size_t level = 1; level < path.size(); level++) {
+    CollectionListPtr list;
+    size_t level = 0;
+    while (nesting_levels > 0) {
+        if (!list) {
+            list = get_collection_list(col_key);
+        }
+        else {
+            if (level == path.size()) {
+                return list;
+            }
             auto& path_elem = path[level];
-            if (levels_left == 0) {
-                if (list->get_collection_type() == CollectionType::List) {
-                    // if list and index is one past last,'
-                    // then we can insert automatically
-                    if (path_elem.get_ndx() == list->size()) {
-                        list->insert_collection(path_elem);
-                    }
-                }
-                else {
-                    // If dictionary, inserting an already
-                    // existing element is idempotent
+            if (list->get_collection_type() == CollectionType::List) {
+                // if list and index is one past last,'
+                // then we can insert automatically
+                if (path_elem.get_ndx() == list->size()) {
                     list->insert_collection(path_elem);
                 }
-                return list->get_collection(path_elem);
             }
             else {
-                if (list->get_collection_type() == CollectionType::List) {
-                    // if list and index is one past last,'
-                    // then we can insert automatically
-                    if (path_elem.get_ndx() == list->size()) {
-                        list->insert_collection_list(path_elem);
-                    }
-                }
-                else {
-                    // If dictionary, inserting an already
-                    // existing element is idempotent
-                    list->insert_collection_list(path_elem);
-                }
-                list = list->get_collection_list(path_elem);
+                // If dictionary, inserting an already
+                // existing element is idempotent
+                list->insert_collection(path_elem);
             }
-            levels_left--;
+            list = list->get_collection_list(path_elem);
         }
+        level++;
+        nesting_levels--;
+    }
+    CollectionBasePtr collection;
+    if (list) {
+        if (level == path.size()) {
+            return list;
+        }
+        auto& path_elem = path[level];
+        if (list->get_collection_type() == CollectionType::List) {
+            // if list and index is one past last,'
+            // then we can insert automatically
+            if (path_elem.get_ndx() == list->size()) {
+                list->insert_collection(path_elem);
+            }
+        }
+        else {
+            // If dictionary, inserting an already
+            // existing element is idempotent
+            list->insert_collection(path_elem);
+        }
+        collection = list->get_collection(path_elem);
+    }
+    else {
+        collection = get_collection_ptr(col_key);
     }
 
-    // Return intermediate collection
-    return list;
+    level++;
+
+    while (level < path.size()) {
+        auto& path_elem = path[level];
+        Mixed ref;
+        if (collection->get_collection_type() == CollectionType::List) {
+            ref = collection->get_any(path_elem.get_ndx());
+        }
+        else {
+            ref = dynamic_cast<Dictionary*>(collection.get())->get(path_elem.get_key());
+        }
+        if (ref.is_type(type_List)) {
+            collection = collection->get_list(path_elem);
+        }
+        else if (ref.is_type(type_Dictionary)) {
+            collection = collection->get_dictionary(path_elem);
+        }
+        level++;
+    }
+
+    return collection;
 }
 
 CollectionBasePtr Obj::get_collection_ptr(ColKey col_key) const

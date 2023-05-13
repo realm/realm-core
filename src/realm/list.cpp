@@ -415,45 +415,32 @@ void Lst<Mixed>::swap(size_t ndx1, size_t ndx2)
     }
 }
 
-void Lst<Mixed>::insert_dictionary(size_t ndx)
+void Lst<Mixed>::insert_collection(const PathElement& path_elem, CollectionType dict_or_list)
 {
     m_tree->ensure_keys();
-    insert(ndx, Mixed(0, CollectionType::Dictionary));
+    insert(path_elem.get_ndx(), Mixed(0, dict_or_list));
     int64_t key = generate_key(size());
     while (m_tree->find_key(key) != realm::not_found) {
         key++;
     }
-    m_tree->set_key(ndx, key);
+    m_tree->set_key(path_elem.get_ndx(), key);
 }
 
-DictionaryPtr Lst<Mixed>::get_dictionary(size_t ndx) const
+DictionaryPtr Lst<Mixed>::get_dictionary(const PathElement& path_elem) const
 {
     auto weak = const_cast<Lst<Mixed>*>(this)->weak_from_this();
-    REALM_ASSERT(!weak.expired());
-    auto shared = weak.lock();
+    auto shared = weak.expired() ? std::make_shared<Lst<Mixed>>(*this) : weak.lock();
     DictionaryPtr ret = std::make_shared<Dictionary>(m_col_key, get_level() + 1);
-    ret->set_owner(shared, m_tree->get_key(ndx));
+    ret->set_owner(shared, m_tree->get_key(path_elem.get_ndx()));
     return ret;
 }
 
-void Lst<Mixed>::insert_list(size_t ndx)
-{
-    m_tree->ensure_keys();
-    insert(ndx, Mixed(0, CollectionType::List));
-    int64_t key = generate_key(size());
-    while (m_tree->find_key(key) != realm::not_found) {
-        key++;
-    }
-    m_tree->set_key(ndx, key);
-}
-
-std::shared_ptr<Lst<Mixed>> Lst<Mixed>::get_list(size_t ndx) const
+std::shared_ptr<Lst<Mixed>> Lst<Mixed>::get_list(const PathElement& path_elem) const
 {
     auto weak = const_cast<Lst<Mixed>*>(this)->weak_from_this();
-    REALM_ASSERT(!weak.expired());
-    auto shared = weak.lock();
+    auto shared = weak.expired() ? std::make_shared<Lst<Mixed>>(*this) : weak.lock();
     std::shared_ptr<Lst<Mixed>> ret = std::make_shared<Lst<Mixed>>(m_col_key, get_level() + 1);
-    ret->set_owner(shared, m_tree->get_key(ndx));
+    ret->set_owner(shared, m_tree->get_key(path_elem.get_ndx()));
     return ret;
 }
 

@@ -250,7 +250,6 @@ public:
 
     template <typename U>
     Lst<U> get_list(ColKey col_key) const;
-    void set_list(ColKey col_key);
     template <typename U>
     LstPtr<U> get_list_ptr(ColKey col_key) const;
     template <typename U>
@@ -298,7 +297,7 @@ public:
     Dictionary get_dictionary(ColKey col_key) const;
     Dictionary get_dictionary(StringData col_name) const;
 
-    void set_dictionary(ColKey col_key);
+    void set_collection(ColKey col_key, CollectionType type);
     DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
     DictionaryPtr get_dictionary_ptr(const Path& path) const;
 

@@ -425,33 +425,26 @@ Obj Dictionary::create_and_insert_linked_object(Mixed key)
     return o;
 }
 
-void Dictionary::insert_dictionary(StringData key)
+void Dictionary::insert_collection(const PathElement& path_elem, CollectionType dict_or_list)
 {
-    insert(key, Mixed(0, CollectionType::Dictionary));
+    insert(path_elem.get_key(), Mixed(0, dict_or_list));
 }
 
-DictionaryPtr Dictionary::get_dictionary(StringData key) const
+DictionaryPtr Dictionary::get_dictionary(const PathElement& path_elem) const
 {
     auto weak = const_cast<Dictionary*>(this)->weak_from_this();
-    REALM_ASSERT(!weak.expired());
-    auto shared = weak.lock();
+    auto shared = weak.expired() ? std::make_shared<Dictionary>(*this) : weak.lock();
     DictionaryPtr ret = std::make_shared<Dictionary>(m_col_key, get_level() + 1);
-    ret->set_owner(shared, key);
+    ret->set_owner(shared, path_elem.get_key());
     return ret;
 }
 
-void Dictionary::insert_list(StringData key)
-{
-    insert(key, Mixed(0, CollectionType::List));
-}
-
-std::shared_ptr<Lst<Mixed>> Dictionary::get_list(StringData key) const
+std::shared_ptr<Lst<Mixed>> Dictionary::get_list(const PathElement& path_elem) const
 {
     auto weak = const_cast<Dictionary*>(this)->weak_from_this();
-    REALM_ASSERT(!weak.expired());
-    auto shared = weak.lock();
+    auto shared = weak.expired() ? std::make_shared<Dictionary>(*this) : weak.lock();
     std::shared_ptr<Lst<Mixed>> ret = std::make_shared<Lst<Mixed>>(m_col_key, get_level() + 1);
-    ret->set_owner(shared, key);
+    ret->set_owner(shared, path_elem.get_key());
     return ret;
 }
 

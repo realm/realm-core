@@ -106,10 +106,9 @@ public:
 
     Obj create_and_insert_linked_object(Mixed key);
 
-    void insert_dictionary(StringData key);
-    DictionaryPtr get_dictionary(StringData key) const;
-    void insert_list(StringData key);
-    std::shared_ptr<Lst<Mixed>> get_list(StringData key) const;
+    void insert_collection(const PathElement&, CollectionType dict_or_list) override;
+    DictionaryPtr get_dictionary(const PathElement& path_elem) const override;
+    ListMixedPtr get_list(const PathElement& path_elem) const override;
 
     // throws std::out_of_range if key is not found
     Mixed get(Mixed key) const;

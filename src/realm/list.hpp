@@ -345,10 +345,9 @@ public:
     void insert(size_t ndx, Mixed value);
     Mixed remove(size_t ndx);
 
-    void insert_dictionary(size_t ndx);
-    DictionaryPtr get_dictionary(size_t ndx) const;
-    void insert_list(size_t ndx);
-    std::shared_ptr<Lst<Mixed>> get_list(size_t ndx) const;
+    void insert_collection(const PathElement&, CollectionType dict_or_list) override;
+    DictionaryPtr get_dictionary(const PathElement& path_elem) const override;
+    ListMixedPtr get_list(const PathElement& path_elem) const override;
 
     // Overriding members of CollectionBase:
     size_t size() const final

@@ -74,13 +74,12 @@ public:
 
     // If this list is at the outermost nesting level, use these functions to
     // get the leaf collections
-    void insert_collection(PathElement index);
-    CollectionBasePtr get_collection(PathElement index) const;
+    void insert_collection(const PathElement& index, CollectionType = CollectionType::Dictionary) override;
+    CollectionBasePtr get_collection(const PathElement& index) const;
 
     // If this list is at an intermediate nesting level, use these functions to
     // get a CollectionList at next level
-    void insert_collection_list(PathElement index);
-    CollectionListPtr get_collection_list(PathElement) const;
+    CollectionListPtr get_collection_list(const PathElement&) const;
 
     void remove(size_t ndx);
     void remove(StringData key);
@@ -124,7 +123,7 @@ private:
     }
     void get_all_keys(size_t levels, std::vector<ObjKey>&) const;
 
-    Index get_index(PathElement) const;
+    Index get_index(const PathElement&) const;
 };
 
 } // namespace realm
