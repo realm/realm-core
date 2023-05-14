@@ -34,7 +34,7 @@ export function executeCommand(cwd: string, command: string, ...args: string[]) 
   });
   if (result.error) throw result.error;
   if (result.status) {
-    throw new Error(`Exited with status ${result.status}`)
+    throw new Error(`Exited with status ${result.status}`);
   }
 }
 
