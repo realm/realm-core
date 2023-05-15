@@ -39,11 +39,15 @@ class LstBase;
 class SetBase;
 class Dictionary;
 
+template <class T>
+class Lst;
+
 using CollectionPtr = std::shared_ptr<Collection>;
 using LstBasePtr = std::unique_ptr<LstBase>;
 using SetBasePtr = std::unique_ptr<SetBase>;
-using CollectionBasePtr = std::unique_ptr<CollectionBase>;
+using CollectionBasePtr = std::shared_ptr<CollectionBase>;
 using CollectionListPtr = std::shared_ptr<CollectionList>;
+using ListMixedPtr = std::shared_ptr<Lst<Mixed>>;
 using DictionaryPtr = std::shared_ptr<Dictionary>;
 
 /// The status of an accessor after a call to `update_if_needed()`.
@@ -65,7 +69,53 @@ enum class UpdateStatus {
 };
 
 
-using PathElement = Mixed;
+class PathElement : private Mixed {
+public:
+    PathElement(int ndx)
+        : Mixed(int64_t(ndx))
+    {
+        REALM_ASSERT(ndx >= 0);
+    }
+    PathElement(size_t ndx)
+        : Mixed(int64_t(ndx))
+    {
+    }
+    PathElement(const char* key)
+        : Mixed(key)
+    {
+    }
+    PathElement(StringData key)
+        : Mixed(key)
+    {
+    }
+    bool is_ndx() const noexcept
+    {
+        return is_type(type_Int);
+    }
+    bool is_key() const noexcept
+    {
+        return is_type(type_String);
+    }
+
+    const size_t* get_if_ndx() const noexcept
+    {
+        return reinterpret_cast<const size_t*>(get_if<Int>());
+    }
+    const StringData* get_if_key() const noexcept
+    {
+        return get_if<String>();
+    }
+
+    size_t get_ndx() const noexcept
+    {
+        return size_t(get_int());
+    }
+    StringData get_key() const noexcept
+    {
+        return get_string();
+    }
+};
+
 using Path = std::vector<PathElement>;
 
 // Path from the group level.

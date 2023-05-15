@@ -425,35 +425,26 @@ Obj Dictionary::create_and_insert_linked_object(Mixed key)
     return o;
 }
 
-DictionaryPtr Dictionary::insert_dictionary(StringData key)
+void Dictionary::insert_collection(const PathElement& path_elem, CollectionType dict_or_list)
 {
-    insert(key, Mixed(0, CollectionType::Dictionary));
-    return get_dictionary(key);
+    insert(path_elem.get_key(), Mixed(0, dict_or_list));
 }
 
-DictionaryPtr Dictionary::get_dictionary(StringData key) const
+DictionaryPtr Dictionary::get_dictionary(const PathElement& path_elem) const
 {
     auto weak = const_cast<Dictionary*>(this)->weak_from_this();
-    REALM_ASSERT(!weak.expired());
-    auto shared = weak.lock();
+    auto shared = weak.expired() ? std::make_shared<Dictionary>(*this) : weak.lock();
     DictionaryPtr ret = std::make_shared<Dictionary>(m_col_key, get_level() + 1);
-    ret->set_owner(shared, key);
+    ret->set_owner(shared, path_elem.get_key());
     return ret;
 }
 
-std::shared_ptr<Lst<Mixed>> Dictionary::insert_list(StringData key)
-{
-    insert(key, Mixed(0, CollectionType::List));
-    return get_list(key);
-}
-
-std::shared_ptr<Lst<Mixed>> Dictionary::get_list(StringData key) const
+std::shared_ptr<Lst<Mixed>> Dictionary::get_list(const PathElement& path_elem) const
 {
     auto weak = const_cast<Dictionary*>(this)->weak_from_this();
-    REALM_ASSERT(!weak.expired());
-    auto shared = weak.lock();
+    auto shared = weak.expired() ? std::make_shared<Dictionary>(*this) : weak.lock();
     std::shared_ptr<Lst<Mixed>> ret = std::make_shared<Lst<Mixed>>(m_col_key, get_level() + 1);
-    ret->set_owner(shared, key);
+    ret->set_owner(shared, path_elem.get_key());
     return ret;
 }
 
@@ -1032,12 +1023,12 @@ void Dictionary::to_json(std::ostream& out, size_t link_depth, JSONOutputMode ou
         }
         else if (val.is_type(type_Dictionary)) {
             DummyParent parent(this->get_table(), val.get_ref());
-            Dictionary dict(parent);
+            Dictionary dict(parent, 0);
             dict.to_json(out, link_depth, output_mode, fn);
         }
         else if (val.is_type(type_List)) {
             DummyParent parent(this->get_table(), val.get_ref());
-            Lst<Mixed> list(parent);
+            Lst<Mixed> list(parent, 0);
             list.to_json(out, link_depth, output_mode, fn);
         }
         else {

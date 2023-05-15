@@ -178,131 +178,89 @@ void CollectionList::update_child_ref(size_t, ref_type ref)
     m_parent->set_collection_ref(m_index, ref, m_coll_type);
 }
 
-CollectionBasePtr CollectionList::insert_collection(size_t ndx)
+void CollectionList::insert_collection(const PathElement& index, CollectionType)
 {
-    REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) == m_level);
+    REALM_ASSERT(m_level <= get_table()->get_nesting_levels(m_col_key));
     ensure_created();
-    REALM_ASSERT(m_coll_type == CollectionType::List);
-    auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
-    int64_t key = generate_key(size());
-    while (int_keys->find_first(key) != realm::not_found) {
-        key++;
-    }
-    int_keys->insert(ndx, key);
-    m_refs.insert(ndx, 0);
-    CollectionBasePtr coll = CollectionParent::get_collection_ptr(m_col_key);
-    coll->set_owner(shared_from_this(), key);
-
-    bump_content_version();
-
-    return coll;
-}
-
-CollectionBasePtr CollectionList::insert_collection(StringData key)
-{
-    REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) == m_level);
-    ensure_created();
-    REALM_ASSERT(m_coll_type == CollectionType::Dictionary);
-    auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
-    StringData actual;
-    IteratorAdapter help(string_keys);
-    auto it = std::lower_bound(help.begin(), help.end(), key);
-    if (it.index() < string_keys->size()) {
-        actual = *it;
-    }
-    if (actual != key) {
-        string_keys->insert(it.index(), key);
-        m_refs.insert(it.index(), 0);
-    }
-    CollectionBasePtr coll = CollectionParent::get_collection_ptr(m_col_key);
-    coll->set_owner(shared_from_this(), key);
-
-    bump_content_version();
-
-    return coll;
-}
-
-CollectionBasePtr CollectionList::get_collection(size_t ndx) const
-{
-    REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) == m_level);
-    CollectionBasePtr coll = CollectionParent::get_collection_ptr(m_col_key);
-    Index index;
-    auto sz = size();
-    if (ndx >= sz) {
-        throw OutOfBounds("CollectionList::get_collection_ptr()", ndx, sz);
-    }
+    size_t ndx;
     if (m_coll_type == CollectionType::List) {
+        ndx = index.get_ndx();
         auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
-        index = int_keys->get(ndx);
+        int64_t key = generate_key(size());
+        while (int_keys->find_first(key) != realm::not_found) {
+            key++;
+        }
+        int_keys->insert(ndx, key);
+        m_refs.insert(ndx, 0);
     }
     else {
+        auto key = index.get_key();
         auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
-        index = std::string(string_keys->get(ndx));
+        StringData actual;
+        IteratorAdapter help(string_keys);
+        auto it = std::lower_bound(help.begin(), help.end(), key);
+        if (it.index() < string_keys->size()) {
+            actual = *it;
+        }
+        if (actual != key) {
+            string_keys->insert(it.index(), key);
+            m_refs.insert(it.index(), 0);
+        }
     }
+
+    bump_content_version();
+}
+
+CollectionBasePtr CollectionList::get_collection(const PathElement& path_element) const
+{
+    REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) == m_level);
+    Index index = get_index(path_element);
+    CollectionBasePtr coll = CollectionParent::get_collection_ptr(m_col_key);
     coll->set_owner(const_cast<CollectionList*>(this)->shared_from_this(), index);
     return coll;
 }
 
-CollectionListPtr CollectionList::insert_collection_list(size_t ndx)
+auto CollectionList::get_index(const PathElement& path_element) const -> Index
 {
-    ensure_created();
-    REALM_ASSERT(m_coll_type == CollectionType::List);
-    auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
-    int64_t key = generate_key(size());
-    while (int_keys->find_first(key) != realm::not_found) {
-        key++;
-    }
-    int_keys->insert(ndx, key);
-    m_refs.insert(ndx, 0);
-
-    bump_content_version();
-
-    return get_collection_list(ndx);
-}
-
-CollectionListPtr CollectionList::insert_collection_list(StringData key)
-{
-    ensure_created();
-    REALM_ASSERT(m_coll_type == CollectionType::Dictionary);
-    auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
-    StringData actual;
-    IteratorAdapter help(string_keys);
-    auto it = std::lower_bound(help.begin(), help.end(), key);
-    if (it.index() < string_keys->size()) {
-        actual = *it;
-    }
-    if (actual != key) {
-        string_keys->insert(it.index(), key);
-        m_refs.insert(it.index(), 0);
-    }
-
-    bump_content_version();
-
-    return get_collection_list(it.index());
-}
-
-CollectionListPtr CollectionList::get_collection_list(size_t ndx) const
-{
-    REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) > m_level);
-    Index index;
     auto sz = size();
-    if (ndx >= sz) {
-        throw OutOfBounds("CollectionList::get_collection_ptr()", ndx, sz);
-    }
-    if (m_coll_type == CollectionType::List) {
-        auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
-        index = int_keys->get(ndx);
+    if (path_element.is_ndx()) {
+        size_t ndx = path_element.get_ndx();
+        if (ndx >= sz) {
+            throw OutOfBounds("CollectionList::get_collection...()", ndx, sz);
+        }
+        if (m_coll_type == CollectionType::List) {
+            auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
+            return int_keys->get(ndx);
+        }
+        else {
+            auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
+            return std::string(string_keys->get(ndx));
+        }
     }
     else {
+        REALM_ASSERT(m_coll_type == CollectionType::Dictionary);
+        auto key = path_element.get_key();
         auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
-        index = std::string(string_keys->get(ndx));
+        IteratorAdapter help(string_keys);
+        auto it = std::lower_bound(help.begin(), help.end(), key);
+        if (it == help.end() || *it != key) {
+            throw KeyNotFound("CollectionList::get_collection_list");
+        }
+        return std::string(string_keys->get(it.index()));
     }
+}
+
+CollectionListPtr CollectionList::get_collection_list(const PathElement& path_element) const
+{
+    REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) > m_level);
+    Index index = get_index(path_element);
     auto coll_type = get_table()->get_nested_column_type(m_col_key, m_level);
     return CollectionList::create(const_cast<CollectionList*>(this)->shared_from_this(), m_col_key, index, coll_type);
 }
 
 void CollectionList::remove(size_t ndx)
 {
+    update();
     REALM_ASSERT(m_coll_type == CollectionType::List);
     auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
     const auto sz = int_keys->size();
@@ -331,6 +289,7 @@ void CollectionList::remove(size_t ndx)
 
 void CollectionList::remove(StringData key)
 {
+    update();
     REALM_ASSERT(m_coll_type == CollectionType::Dictionary);
     auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
     IteratorAdapter help(string_keys);

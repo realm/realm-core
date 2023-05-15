@@ -65,7 +65,7 @@ std::vector<NestedCollectionInfo> init_levels(Obj& obj, ColKey origin_col_key, s
 
     levels.emplace_back(obj.get_collection_list(origin_col_key));
     for (size_t i = 1; i < nesting_levels; i++) {
-        levels.emplace_back(levels.back().list->get_collection_list(0));
+        levels.emplace_back(levels.back().list->get_collection_list(0ul));
     }
 
     return levels;
@@ -947,7 +947,7 @@ FullPath Obj::get_path() const
                 Obj obj = origin_table->get_object(backlinks[0]); // always the first (and only)
                 result = obj.get_path();
                 auto next_col_key = m_table->get_opposite_column(col_key);
-                result.path_from_top.push_back(Mixed(obj.get_table()->get_column_name(next_col_key)));
+                result.path_from_top.emplace_back(obj.get_table()->get_column_name(next_col_key));
 
                 ColumnAttrMask attr = next_col_key.get_attrs();
                 Mixed index;
@@ -956,13 +956,13 @@ FullPath Obj::get_path() const
                     LnkLst link_list = obj.get_linklist(next_col_key);
                     auto i = link_list.find_first(get_key());
                     REALM_ASSERT(i != realm::not_found);
-                    result.path_from_top.push_back(Mixed(int64_t(i)));
+                    result.path_from_top.emplace_back(i);
                 }
                 else if (attr.test(col_attr_Dictionary)) {
                     auto dict = obj.get_dictionary(next_col_key);
                     auto ndx = dict.find_first(get_link());
                     REALM_ASSERT(ndx != realm::not_found);
-                    result.path_from_top.push_back(dict.get_key(ndx));
+                    result.path_from_top.emplace_back(dict.get_key(ndx).get_string());
                 }
 
                 return IteratorControl::Stop; // early out
@@ -1097,12 +1097,12 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                 }
                 else if (val.is_type(type_Dictionary)) {
                     DummyParent parent(m_table, val.get_ref());
-                    Dictionary dict(parent);
+                    Dictionary dict(parent, 0);
                     dict.to_json(out, link_depth, output_mode, print_link);
                 }
                 else if (val.is_type(type_List)) {
                     DummyParent parent(m_table, val.get_ref());
-                    Lst<Mixed> list(parent);
+                    Lst<Mixed> list(parent, 0);
                     list.to_json(out, link_depth, output_mode, print_link);
                 }
                 else {
@@ -1921,31 +1921,38 @@ Dictionary Obj::get_dictionary(ColKey col_key) const
     return Dictionary(Obj(*this), col_key);
 }
 
-std::shared_ptr<Lst<Mixed>> Obj::set_list_ptr(ColKey col_key)
+void Obj::set_collection(ColKey col_key, CollectionType type)
 {
     REALM_ASSERT(col_key.get_type() == col_type_Mixed);
     update_if_needed();
     auto old_val = get<Mixed>(col_key);
-    if (!old_val.is_type(type_List)) {
-        set(col_key, Mixed(0, CollectionType::List));
+    switch (type) {
+        case CollectionType::Set:
+            if (!old_val.is_type(type_Set)) {
+                set(col_key, Mixed(0, CollectionType::Set));
+            }
+            break;
+        case CollectionType::List:
+            if (!old_val.is_type(type_List)) {
+                set(col_key, Mixed(0, CollectionType::List));
+            }
+            break;
+        case CollectionType::Dictionary:
+            if (!old_val.is_type(type_Dictionary)) {
+                set(col_key, Mixed(ref_type(0), CollectionType::Dictionary));
+            }
+            break;
     }
-    return get_list_ptr<Mixed>(col_key);
-}
-
-DictionaryPtr Obj::set_dictionary_ptr(ColKey col_key)
-{
-    REALM_ASSERT(col_key.get_type() == col_type_Mixed);
-    update_if_needed();
-    auto old_val = get<Mixed>(col_key);
-    if (!old_val.is_type(type_Dictionary)) {
-        set(col_key, Mixed(ref_type(0), CollectionType::Dictionary));
-    }
-    return get_dictionary_ptr(col_key);
 }
 
 DictionaryPtr Obj::get_dictionary_ptr(ColKey col_key) const
 {
     return std::make_shared<Dictionary>(get_dictionary(col_key));
+}
+
+DictionaryPtr Obj::get_dictionary_ptr(const Path& path) const
+{
+    return std::dynamic_pointer_cast<Dictionary>(get_collection_ptr(path));
 }
 
 Dictionary Obj::get_dictionary(StringData col_name) const
@@ -1960,60 +1967,104 @@ CollectionListPtr Obj::get_collection_list(ColKey col_key) const
     return CollectionList::create(std::make_shared<Obj>(*this), col_key, col_key, coll_type);
 }
 
-CollectionPtr Obj::get_collection_ptr(const std::vector<CollectionParent::Index>& path) const
+CollectionPtr Obj::get_collection_ptr(const Path& path) const
 {
     REALM_ASSERT(path.size() > 0);
 
+    // First element in path must be column name
+    auto col_key = m_table->get_column_key(path[0].get_key());
+    REALM_ASSERT(col_key);
+    size_t nesting_levels = m_table->get_nesting_levels(col_key);
     CollectionListPtr list;
-    size_t levels_left = path.size() - 1;
-    for (auto& index : path) {
-        if (levels_left == 0) {
-            return mpark::visit(util::overload{[&](ColKey col_key) {
-                                                   return get_collection_ptr(col_key);
-                                               },
-                                               [&](int64_t i) {
-                                                   auto ndx = size_t(i);
-                                                   if (ndx < list->size()) {
-                                                       return list->get_collection(ndx);
-                                                   }
-                                                   REALM_ASSERT(ndx == list->size());
-                                                   return list->insert_collection(ndx);
-                                               },
-                                               [&](const std::string& key) {
-                                                   return list->insert_collection(StringData(key));
-                                               }},
-                                index);
+    size_t level = 0;
+    while (nesting_levels > 0) {
+        if (!list) {
+            list = get_collection_list(col_key);
         }
         else {
-            list = mpark::visit(util::overload{[&](ColKey col_key) {
-                                                   return get_collection_list(col_key);
-                                               },
-                                               [&](int64_t i) {
-                                                   auto ndx = size_t(i);
-                                                   if (ndx < list->size()) {
-                                                       return list->get_collection_list(ndx);
-                                                   }
-                                                   REALM_ASSERT(ndx == list->size());
-                                                   return list->insert_collection_list(ndx);
-                                               },
-                                               [&](const std::string& key) {
-                                                   return list->insert_collection_list(StringData(key));
-                                               }},
-                                index);
+            if (level == path.size()) {
+                return list;
+            }
+            auto& path_elem = path[level];
+            if (list->get_collection_type() == CollectionType::List) {
+                // if list and index is one past last,'
+                // then we can insert automatically
+                if (path_elem.get_ndx() == list->size()) {
+                    list->insert_collection(path_elem);
+                }
+            }
+            else {
+                // If dictionary, inserting an already
+                // existing element is idempotent
+                list->insert_collection(path_elem);
+            }
+            list = list->get_collection_list(path_elem);
         }
-        levels_left--;
+        level++;
+        nesting_levels--;
+    }
+    CollectionBasePtr collection;
+    if (list) {
+        if (level == path.size()) {
+            return list;
+        }
+        auto& path_elem = path[level];
+        if (list->get_collection_type() == CollectionType::List) {
+            // if list and index is one past last,'
+            // then we can insert automatically
+            if (path_elem.get_ndx() == list->size()) {
+                list->insert_collection(path_elem);
+            }
+        }
+        else {
+            // If dictionary, inserting an already
+            // existing element is idempotent
+            list->insert_collection(path_elem);
+        }
+        collection = list->get_collection(path_elem);
+    }
+    else {
+        collection = get_collection_ptr(col_key);
     }
 
-    // Return intermediate collection
-    return list;
-}
+    level++;
 
+    while (level < path.size()) {
+        auto& path_elem = path[level];
+        Mixed ref;
+        if (collection->get_collection_type() == CollectionType::List) {
+            ref = collection->get_any(path_elem.get_ndx());
+        }
+        else {
+            ref = dynamic_cast<Dictionary*>(collection.get())->get(path_elem.get_key());
+        }
+        if (ref.is_type(type_List)) {
+            collection = collection->get_list(path_elem);
+        }
+        else if (ref.is_type(type_Dictionary)) {
+            collection = collection->get_dictionary(path_elem);
+        }
+        level++;
+    }
+
+    return collection;
+}
 
 CollectionBasePtr Obj::get_collection_ptr(ColKey col_key) const
 {
-    auto collection = CollectionParent::get_collection_ptr(col_key);
-    collection->set_owner(*this, col_key);
-    return collection;
+    if (col_key.is_collection()) {
+        REALM_ASSERT(m_table->get_nesting_levels(col_key) == 0);
+        auto collection = CollectionParent::get_collection_ptr(col_key);
+        collection->set_owner(*this, col_key);
+        return collection;
+    }
+    REALM_ASSERT(col_key.get_type() == col_type_Mixed);
+    auto val = get<Mixed>(col_key);
+    if (val.is_type(type_List)) {
+        return std::make_shared<Lst<Mixed>>(*this, col_key);
+    }
+    REALM_ASSERT(val.is_type(type_Dictionary));
+    return std::make_shared<Dictionary>(*this, col_key);
 }
 
 CollectionBasePtr Obj::get_collection_ptr(StringData col_name) const
