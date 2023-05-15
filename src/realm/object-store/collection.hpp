@@ -112,6 +112,11 @@ public:
         return *m_coll_base;
     }
 
+    void insert_collection(const PathElement& path_elem, CollectionType type)
+    {
+        m_coll_base->insert_collection(path_elem, type);
+    }
+
 protected:
     std::shared_ptr<Realm> m_realm;
     PropertyType m_type;
