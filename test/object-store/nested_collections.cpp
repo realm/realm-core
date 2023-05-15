@@ -80,7 +80,7 @@ TEST_CASE("nested-list-mixed", "[nested-colllections]") {
         auto nested_list_dict = dict_os.get_list("List");
         nested_list_dict.add(Mixed{"value"});
         const char* json_doc_dict =
-            "{\"_key\":0,\"any_val\":{\"Dict\":{},\"List\":[\"value\"],\"Test\":10,\"Test1\":11}}";
+            "{\"_key\":0,\"any_val\":{\"Dict\":{\"Test\":10,\"Test1\":11},\"List\":[\"value\"]}}";
         REQUIRE(dict_os.get_impl().get_obj().to_string() == json_doc_dict);
     }
 

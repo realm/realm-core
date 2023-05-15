@@ -276,7 +276,7 @@ List Collection::get_list(const PathElement& path)
 
 Dictionary Collection::get_dictionary(const PathElement& path)
 {
-    return Dictionary{m_realm, m_coll_base->get_list(path)};
+    return Dictionary{m_realm, m_coll_base->get_dictionary(path)};
 }
 
 } // namespace realm::object_store
