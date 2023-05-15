@@ -289,10 +289,10 @@ void import(const char* filename)
     int buf_cnt = 0;
     const int bufs_per_commit = 100;
     while (auto buf = mbx.receive()) {
-        t->create_objects(buf);
-        // for (auto& val : buf->values) {
-        //     t->create_object(ObjKey(), val);
-        // }
+        // t->create_objects(buf);
+        for (auto& val : buf->values) {
+            t->create_object(ObjKey(), val);
+        }
         resp.send(buf);
         if (buf_cnt++ > bufs_per_commit) {
             tr->commit_and_continue_as_read();
@@ -334,6 +334,9 @@ void dump_prop(const char* filename, const char* prop_name)
 
 int main(int argc, const char* argv[])
 {
+    if (argc == 1) {
+        import("/home/finn/Downloads/mill.tsv");
+    }
     if (argc == 2) {
         import(argv[1]);
     }

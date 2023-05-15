@@ -67,9 +67,14 @@ public:
 
     // Auto Enumerated string columns
     void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref);
-    size_t _get_enumkeys_ndx(size_t column_ndx) const noexcept;
+    // size_t _get_enumkeys_ndx(size_t column_ndx) const noexcept;
     bool is_string_enum_type(size_t column_ndx) const noexcept;
-    ref_type get_enumkeys_ref(size_t column_ndx, ArrayParent*& keys_parent) noexcept;
+    // ref_type get_enumkeys_ref(size_t column_ndx, ArrayParent*& keys_parent) noexcept;
+    size_t add_insert_enum_string(size_t column_ndx, StringData value);
+    size_t search_enum_string(size_t column_ndx, StringData value);
+    size_t get_num_unique_values(size_t column_ndx) const;
+    StringData get_enum_string(size_t column_ndx, size_t id);
+    bool is_null_enum_string(size_t column_ndx, size_t id);
 
     //@{
     /// Compare two table specs for equality.
@@ -96,6 +101,13 @@ private:
     Array m_enumkeys; // 5th slot in m_top
     Array m_keys;     // 6th slot in m_top
     size_t m_num_public_columns;
+
+    // in-memory support for string interning (temporary)
+    struct Interner {
+        std::vector<std::string> strings;
+        std::unordered_map<std::string_view, size_t> string_map;
+    };
+    std::vector<Interner> m_interners;
 
     Spec(Allocator&) noexcept; // Unattached
 

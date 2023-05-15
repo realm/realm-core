@@ -1044,12 +1044,13 @@ size_t Table::get_num_unique_values(ColKey col_key) const
     if (!is_enumerated(col_key))
         return 0;
 
-    ArrayParent* parent;
-    ref_type ref = const_cast<Spec&>(m_spec).get_enumkeys_ref(colkey2spec_ndx(col_key), parent);
-    BPlusTree<StringData> col(get_alloc());
-    col.init_from_ref(ref);
+    return m_spec.get_num_unique_values(colkey2spec_ndx(col_key));
+    // ArrayParent* parent;
+    // ref_type ref = const_cast<Spec&>(m_spec).get_enumkeys_ref(colkey2spec_ndx(col_key), parent);
+    // BPlusTree<StringData> col(get_alloc());
+    // col.init_from_ref(ref);
 
-    return col.size();
+    // return col.size();
 }
 
 
@@ -2097,7 +2098,7 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
         top.add(v); // Throws
         dg_2.release();
     }
-    top.add(0); // Old position for columns
+    top.add(0);                                            // Old position for columns
     {
         MemRef mem = Cluster::create_empty_cluster(alloc); // Throws
         dg_2.reset(mem.get_ref());
@@ -2219,7 +2220,7 @@ Group* Table::get_parent_group() const noexcept
         return 0;                             // Subtable with shared descriptor
     ArrayParent* parent = m_top.get_parent(); // ArrayParent guaranteed to be Table::Parent
     if (!parent)
-        return 0; // Free-standing table
+        return 0;                             // Free-standing table
 
     return static_cast<Group*>(parent);
 }
@@ -2236,7 +2237,7 @@ size_t Table::get_index_in_group() const noexcept
         return realm::npos;                   // Subtable with shared descriptor
     ArrayParent* parent = m_top.get_parent(); // ArrayParent guaranteed to be Table::Parent
     if (!parent)
-        return realm::npos; // Free-standing table
+        return realm::npos;                   // Free-standing table
     return m_top.get_ndx_in_parent();
 }
 

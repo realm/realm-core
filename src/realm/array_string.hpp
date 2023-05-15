@@ -139,7 +139,7 @@ private:
     mutable size_t m_col_ndx = realm::npos;
     bool m_nullable = true;
 
-    std::unique_ptr<ArrayString> m_string_enum_values;
+    // std::unique_ptr<ArrayString> m_string_enum_values;
 
     Type upgrade_leaf(size_t value_size);
 };
@@ -161,6 +161,6 @@ inline StringData ArrayString::get(const char* header, size_t ndx, Allocator& al
     }
 }
 
-}
+} // namespace realm
 
 #endif /* REALM_ARRAY_STRING_HPP */

@@ -315,7 +315,11 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
     if (m_enumkeys.is_attached() && type != col_type_BackLink) {
         m_enumkeys.insert(column_ndx, 0);
     }
-
+    if (column_ndx > m_interners.size()) {
+        m_interners.resize(column_ndx + 1);
+    }
+    REALM_ASSERT(column_ndx <= m_interners.size());
+    m_interners.insert(m_interners.begin() + column_ndx, {});
     update_internals();
 }
 
@@ -354,7 +358,7 @@ void Spec::erase_column(size_t column_ndx)
     m_types.erase(column_ndx); // Throws
     m_attr.erase(column_ndx);  // Throws
     m_keys.erase(column_ndx);
-
+    m_interners.erase(m_interners.begin() + column_ndx);
     update_internals();
 }
 
@@ -403,9 +407,11 @@ void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref)
 
 bool Spec::is_string_enum_type(size_t column_ndx) const noexcept
 {
-    return m_enumkeys.is_attached() ? (m_enumkeys.get(column_ndx) != 0) : false;
+    return true;
+    // return m_enumkeys.is_attached() ? (m_enumkeys.get(column_ndx) != 0) : false;
 }
 
+#ifdef OLD_STRINGS
 ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent*& keys_parent) noexcept
 {
     // We also need to return parent info
@@ -413,6 +419,7 @@ ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent*& keys_parent) no
 
     return m_enumkeys.get_as_ref(column_ndx);
 }
+#endif
 
 TableKey Spec::get_opposite_link_table_key(size_t column_ndx) const noexcept
 {
@@ -555,4 +562,65 @@ void Spec::verify() const
     REALM_ASSERT(m_names.get_ref() == m_top.get_as_ref(1));
     REALM_ASSERT(m_attr.get_ref() == m_top.get_as_ref(2));
 #endif
+}
+
+size_t Spec::add_insert_enum_string(size_t column_ndx, StringData value)
+{
+    // REALM_ASSERT(value.data());
+    if (value.data() == nullptr) {
+        return 0;
+    }
+    if (column_ndx >= m_interners.size()) {
+        m_interners.resize(column_ndx + 1);
+    }
+    REALM_ASSERT(column_ndx < m_interners.size());
+    Interner& interner = m_interners[column_ndx];
+    std::string_view v(value.data(), value.size());
+    auto it = interner.string_map.find(v);
+    if (it != interner.string_map.end()) {
+        return it->second;
+    }
+    std::string s(value.data(), value.size());
+    interner.strings.push_back(s);
+    size_t id = interner.strings.size();
+    interner.string_map[std::string_view(s)] = id;
+    return id;
+}
+
+size_t Spec::search_enum_string(size_t column_ndx, StringData value)
+{
+    // REALM_ASSERT(value.data());
+    if (value.data() == nullptr) {
+        return 0;
+    }
+    REALM_ASSERT(column_ndx < m_interners.size());
+    Interner& interner = m_interners[column_ndx];
+    std::string_view v(value.data(), value.size());
+    auto it = interner.string_map.find(v);
+    if (it != interner.string_map.end()) {
+        return it->second;
+    }
+    return npos;
+}
+
+size_t Spec::get_num_unique_values(size_t column_ndx) const
+{
+    REALM_ASSERT(column_ndx < m_interners.size());
+    const Interner& interner = m_interners[column_ndx];
+    return interner.strings.size();
+}
+
+StringData Spec::get_enum_string(size_t column_ndx, size_t id)
+{
+    if (!id) {
+        return {nullptr, 0};
+    }
+    REALM_ASSERT(column_ndx < m_interners.size());
+    Interner& interner = m_interners[column_ndx];
+    return interner.strings[id + 1];
+}
+
+bool Spec::is_null_enum_string(size_t column_ndx, size_t id)
+{
+    return id == 0;
 }
