@@ -250,7 +250,7 @@ void List::insert_list(size_t list_ndx)
 {
     // here I am assuming that List<Mixed>
     verify_in_transaction();
-    as<Mixed>().insert_list(list_ndx);
+    as<Mixed>().insert_collection(list_ndx, CollectionType::List);
 }
 List List::get_list(size_t list_ndx)
 {
@@ -262,7 +262,7 @@ List List::get_list(size_t list_ndx)
 void List::insert_dictionary(size_t list_ndx)
 {
     verify_in_transaction();
-    as<Mixed>().insert_dictionary(list_ndx);
+    as<Mixed>().insert_collection(list_ndx, CollectionType::Dictionary);
 }
 
 object_store::Dictionary List::get_dictionary(size_t list_ndx)

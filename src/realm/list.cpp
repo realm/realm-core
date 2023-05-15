@@ -417,6 +417,8 @@ void Lst<Mixed>::swap(size_t ndx1, size_t ndx2)
 
 void Lst<Mixed>::insert_collection(const PathElement& path_elem, CollectionType dict_or_list)
 {
+    ensure_created(); // this is needed otherwise the b+tree won't be created..
+
     m_tree->ensure_keys();
     insert(path_elem.get_ndx(), Mixed(0, dict_or_list));
     int64_t key = generate_key(size());

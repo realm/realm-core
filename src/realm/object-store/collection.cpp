@@ -272,7 +272,8 @@ size_t Collection::hash() const noexcept
 void Collection::set_list()
 {
     REALM_ASSERT(m_col_key.get_type() == col_type_Mixed);
-    m_coll_base = m_parent_object.set_list_ptr(m_col_key);
+    m_parent_object.set_collection(m_col_key, CollectionType::List);
+    m_coll_base = m_parent_object.get_collection_ptr(m_col_key);
     REALM_ASSERT(m_coll_base->is_empty());
     REALM_ASSERT(is_valid());
 }
@@ -280,7 +281,8 @@ void Collection::set_list()
 void Collection::set_dictionary()
 {
     REALM_ASSERT(m_col_key.get_type() == col_type_Mixed);
-    m_coll_base = m_parent_object.set_dictionary_ptr(m_col_key);
+    m_parent_object.set_collection(m_col_key, CollectionType::Dictionary);
+    m_coll_base = m_parent_object.get_collection_ptr(m_col_key);
     REALM_ASSERT(m_coll_base->is_empty());
     REALM_ASSERT(is_valid());
 }
