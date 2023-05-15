@@ -659,35 +659,40 @@ void App::log_in_with_credentials(
     BsonDocument body = credentials.serialize_as_bson();
     attach_auth_options(body);
 
-    do_request({HttpMethod::post, route, m_request_timeout_ms,
-                get_request_headers(linking_user, RequestTokenType::AccessToken), Bson(body).to_string()},
-               [completion = std::move(completion), credentials, linking_user,
-                self = shared_from_this()](const Response& response) mutable {
-                   if (auto error = AppUtils::check_for_errors(response)) {
-                       self->log_error("App: log_in_with_credentials failed: %1 message: %2",
-                                       response.http_status_code, error->what());
-                       return completion(nullptr, std::move(error));
-                   }
+    // Always update the location on a login to keep the location metadata up to date in cases where
+    // the transport handles the redirection automatically and does not return the redirect response
+    // Since the user is logged out as part of a deployment model change, the user will need to log in
+    // again, but Core will not know that this was driven by an HTTP redirection.
+    update_metadata_and_resend(
+        {HttpMethod::post, route, m_request_timeout_ms,
+         get_request_headers(linking_user, RequestTokenType::AccessToken), Bson(body).to_string()},
+        [completion = std::move(completion), credentials, linking_user,
+         self = shared_from_this()](const Response& response) mutable {
+            if (auto error = AppUtils::check_for_errors(response)) {
+                self->log_error("App: log_in_with_credentials failed: %1 message: %2", response.http_status_code,
+                                error->what());
+                return completion(nullptr, std::move(error));
+            }
 
-                   std::shared_ptr<realm::SyncUser> sync_user = linking_user;
-                   try {
-                       auto json = parse<BsonDocument>(response.body);
-                       if (linking_user) {
-                           linking_user->update_access_token(get<std::string>(json, "access_token"));
-                       }
-                       else {
-                           sync_user = self->m_sync_manager->get_user(
-                               get<std::string>(json, "user_id"), get<std::string>(json, "refresh_token"),
-                               get<std::string>(json, "access_token"), credentials.provider_as_string(),
-                               get<std::string>(json, "device_id"));
-                       }
-                   }
-                   catch (const AppError& e) {
-                       return completion(nullptr, e);
-                   }
+            std::shared_ptr<realm::SyncUser> sync_user = linking_user;
+            try {
+                auto json = parse<BsonDocument>(response.body);
+                if (linking_user) {
+                    linking_user->update_access_token(get<std::string>(json, "access_token"));
+                }
+                else {
+                    sync_user = self->m_sync_manager->get_user(
+                        get<std::string>(json, "user_id"), get<std::string>(json, "refresh_token"),
+                        get<std::string>(json, "access_token"), credentials.provider_as_string(),
+                        get<std::string>(json, "device_id"));
+                }
+            }
+            catch (const AppError& e) {
+                return completion(nullptr, e);
+            }
 
-                   self->get_profile(sync_user, std::move(completion));
-               });
+            self->get_profile(sync_user, std::move(completion));
+        });
 }
 
 void App::log_in_with_credentials(
