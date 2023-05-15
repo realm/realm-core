@@ -1209,7 +1209,7 @@ classes:
       has_existing_sessions: bool
     methods:
       immediately_run_file_actions: '(original_name: std::string) -> bool'
-      enable_session_multiplexing: ()
+      set_session_multiplexing: '(allowed: bool)'
       set_log_level: '(level: LoggerLevel)'
       set_logger_factory: '(factory: LoggerFactory)'
       set_user_agent: '(user_agent: std::string)'
