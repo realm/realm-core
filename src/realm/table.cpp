@@ -313,6 +313,12 @@ const char* get_data_type_name(DataType type) noexcept
         default:
             if (type == type_TypeOfValue)
                 return "@type";
+#if REALM_ENABLE_GEOSPATIAL
+            else if (type == type_Geospatial)
+                return "geospatial";
+#endif
+            else if (type == ColumnTypeTraits<null>::id)
+                return "null";
     }
     return "unknown";
 }

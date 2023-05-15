@@ -19,6 +19,7 @@
 #include <realm/util/serializer.hpp>
 
 #include <realm/binary_data.hpp>
+#include <realm/geospatial.hpp>
 #include <realm/keys.hpp>
 #include <realm/null.hpp>
 #include <realm/query_expression.hpp>
@@ -213,6 +214,14 @@ std::string print_value<>(realm::TypeOfValue type)
     return '"' + type.to_string() + '"';
 }
 
+#if REALM_ENABLE_GEOSPATIAL
+template <>
+std::string print_value<>(const realm::Geospatial& geo)
+{
+    return geo.to_string();
+}
+#endif
+
 // The variable name must be unique with respect to the already chosen variables at
 // this level of subquery nesting and with respect to the names of the columns in the table.
 // This assumes that columns can start with '$' and that we might one day want to support
@@ -258,11 +267,10 @@ std::string SerialisationState::get_column_name(ConstTableRef table, ColKey col_
     if (col_type == col_type_BackLink) {
         const Table::BacklinkOrigin origin = table->find_backlink_origin(col_key);
         REALM_ASSERT(origin);
-        std::string source_table_name = origin->first->get_class_name();
+        StringData source_table_name = origin->first->get_class_name();
         std::string source_col_name = get_column_name(origin->first, origin->second);
 
-        return "@links" + util::serializer::value_separator + source_table_name + util::serializer::value_separator +
-               source_col_name;
+        return format("@links.%1.%2", source_table_name, source_col_name);
     }
     else if (col_key != ColKey()) {
         std::string col_name = table->get_column_name(col_key);

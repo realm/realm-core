@@ -32,6 +32,10 @@
 #include <realm/object-store/util/android/scheduler.hpp>
 #endif
 
+#if defined(__EMSCRIPTEN__)
+#include <realm/object-store/util/emscripten/scheduler.hpp>
+#endif
+
 #include <realm/object-store/util/generic/scheduler.hpp>
 
 namespace realm::util {
@@ -123,6 +127,8 @@ std::shared_ptr<Scheduler> Scheduler::make_platform_default()
     return make_runloop(nullptr);
 #elif REALM_ANDROID
     return make_alooper();
+#elif defined(__EMSCRIPTEN__)
+    return std::make_shared<EmscriptenScheduler>();
 #else
     REALM_TERMINATE("No built-in scheduler implementation for this platform. Register your own with "
                     "Scheduler::set_default_factory()");

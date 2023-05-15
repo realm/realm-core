@@ -1,3 +1,26 @@
+# 13.11.0 Release notes
+
+### Enhancements
+* The query engine now supports `geowithin` queries on points. Points are embedded objects conforming to the geoJSON format, trying to use a geospatial query on data in the incorrect format produces a run time exception. Example RQL query: `location geoWithin geoPolygon({{-178.0, 10.0}, {178.0, 10.0}, {178.0, -10.0}, {-178.0, -10.0}, {-178.0, 10.0}})`. For SDKs who do not wish to add this yet, the feature can be compiled out by adding `-DREALM_ENABLE_GEOSPATIAL=OFF` to the cmake config. ([#6562](https://github.com/realm/realm-core/issues/6562))
+* Partition-Based to Flexible Sync Migration for migrating a client app that uses partition based sync to use flexible sync under the hood if the server has been migrated to flexible sync is officially supported with this release. Any clients using an older version of Realm (including the original support released in Core 13.10.0) will receive a "switch to flexible sync" error message when trying to sync with the app. ([#6554](https://github.com/realm/realm-core/issues/6554))
+
+### Fixed
+* Fixed a fatal error (reported to the sync error handler) during client reset (or automatic PBS to FLX migration) if the reset has been triggered during an async open and the schema being applied has added new classes. ([#6601](https://github.com/realm/realm-core/issues/6601), since automatic client resets were introduced in v11.5.0)
+* Full text search would sometimes find words where the word only matches the beginning of the search token ([#6591](https://github.com/realm/realm-core/issues/6591), since v13.0.0)
+* Added missing includes of `<cstdint>` surfaced by gcc13 ([#6616](https://github.com/realm/realm-core/pull/6616))
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Add initial support for targeting WebAssembly with Emscripten ([PR #6263](https://github.com/realm/realm-core/pull/6263)).
+* Sync session multiplexing is now enabled by default. The method `SyncManager::enable_session_multiplexing()` has been renamed `SyncManager::set_session_multiplexing()`. (PR [#6557](https://github.com/realm/realm-core/pull/6557))
+* Bump protocol to v9 to indicate client has fix for client reset error during async open ([#6609](https://github.com/realm/realm-core/issues/6609))
+
+----------------------------------------------
+
 # 13.10.1 Release notes
 
 ### Enhancements
@@ -7,6 +30,7 @@
 
 ### Fixed
 * Exclusion of words in a full text search does not work ([#6512](https://github.com/realm/realm-core/issues/6512), since v13.0.0 );
+* Prevent crashing on Results.freeze if underlying object or table were removed by making Results.is_valid correctly report its state. ([#6401](https://github.com/realm/realm-core/issues/6401))
 
 ### Breaking changes
 * Add `service_name` parameter to `realm_app_call_function` (PR [#6394](https://github.com/realm/realm-core/pull/6394)).
@@ -20,6 +44,7 @@
 * Reduce the memory footprint of an automatic (discard or recover) client reset when there are large incoming changes from the server. ([#6567](https://github.com/realm/realm-core/issues/6567))
 * `get_committed_file_format_version()` safe access to mappings vector from multiple threads.
 * Add CI tests for Clang 16/Ubuntu 22.04 and update lint task ([PR #6563](https://github.com/realm/realm-core/pull/6563))
+* Fixed `Results::is_valid()` in order to return `false` if the results is bound to a deleted object or table. (PR [#6445](https://github.com/realm/realm-core/pull/6445))
 
 ----------------------------------------------
 
