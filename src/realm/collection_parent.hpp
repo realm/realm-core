@@ -173,7 +173,7 @@ protected:
     SetBasePtr get_setbase_ptr(ColKey col_key) const;
     CollectionBasePtr get_collection_ptr(ColKey col_key) const;
 
-    int64_t generate_key(size_t sz) const;
+    static int64_t generate_key(size_t sz);
 };
 
 } // namespace realm
