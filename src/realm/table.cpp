@@ -1053,6 +1053,10 @@ size_t Table::get_num_unique_values(ColKey col_key) const
     // return col.size();
 }
 
+void Table::dump_interning_stats()
+{
+    m_spec.dump_interning_stats();
+}
 
 void Table::erase_root_column(ColKey col_key)
 {

@@ -305,6 +305,7 @@ void import(const char* filename)
     tr->commit_and_continue_as_read();
 
     parse_file_thread.join();
+    t->dump_interning_stats();
     std::cout << std::endl;
     std::cout << t->size() << std::endl;
 }

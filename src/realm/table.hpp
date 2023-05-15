@@ -62,8 +62,7 @@ class LinkChain;
 class Subexpr;
 class StringIndex;
 
-struct Link {
-};
+struct Link {};
 typedef Link BackLink;
 
 
@@ -224,6 +223,7 @@ public:
     /// stored. Otherwise it returns zero. This function is mainly intended for
     /// debugging purposes.
     size_t get_num_unique_values(ColKey col_key) const;
+    void dump_interning_stats();
 
     template <class T>
     Columns<T> column(ColKey col_key, util::Optional<ExpressionComparisonType> = util::none) const;
@@ -695,13 +695,13 @@ private:
     {
         m_alloc.refresh_ref_translation();
     }
-    Spec m_spec;                                    // 1st slot in m_top
-    ClusterTree m_clusters;                         // 3rd slot in m_top
-    std::unique_ptr<ClusterTree> m_tombstones;      // 13th slot in m_top
-    TableKey m_key;                                 // 4th slot in m_top
-    Array m_index_refs;                             // 5th slot in m_top
-    Array m_opposite_table;                         // 7th slot in m_top
-    Array m_opposite_column;                        // 8th slot in m_top
+    Spec m_spec;                               // 1st slot in m_top
+    ClusterTree m_clusters;                    // 3rd slot in m_top
+    std::unique_ptr<ClusterTree> m_tombstones; // 13th slot in m_top
+    TableKey m_key;                            // 4th slot in m_top
+    Array m_index_refs;                        // 5th slot in m_top
+    Array m_opposite_table;                    // 7th slot in m_top
+    Array m_opposite_column;                   // 8th slot in m_top
     std::vector<std::unique_ptr<StringIndex>> m_index_accessors;
     ColKey m_primary_key_col;
     Replication* const* m_repl;

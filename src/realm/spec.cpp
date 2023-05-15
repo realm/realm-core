@@ -21,9 +21,22 @@
 #include <realm/replication.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/group.hpp>
+#include <iostream>
+
 using namespace realm;
 
 Spec::~Spec() noexcept {}
+
+void Spec::dump_interning_stats()
+{
+    for (auto col = 0; col < m_interners.size(); ++col) {
+        auto& e = m_interners[col];
+        if (e.strings.size()) {
+            std::cout << "Column " << col << " holding " << e.strings.size() << " unique strings in "
+                      << e.string_memory << " bytes" << std::endl;
+        }
+    }
+}
 
 void Spec::detach() noexcept
 {
@@ -575,15 +588,15 @@ size_t Spec::add_insert_enum_string(size_t column_ndx, StringData value)
     }
     REALM_ASSERT(column_ndx < m_interners.size());
     Interner& interner = m_interners[column_ndx];
-    std::string_view v(value.data(), value.size());
-    auto it = interner.string_map.find(v);
+    std::string s(value.data(), value.size());
+    auto it = interner.string_map.find(s);
     if (it != interner.string_map.end()) {
         return it->second;
     }
-    std::string s(value.data(), value.size());
     interner.strings.push_back(s);
+    interner.string_memory += value.size();
     size_t id = interner.strings.size();
-    interner.string_map[std::string_view(s)] = id;
+    interner.string_map[s] = id;
     return id;
 }
 
@@ -595,8 +608,8 @@ size_t Spec::search_enum_string(size_t column_ndx, StringData value)
     }
     REALM_ASSERT(column_ndx < m_interners.size());
     Interner& interner = m_interners[column_ndx];
-    std::string_view v(value.data(), value.size());
-    auto it = interner.string_map.find(v);
+    std::string s(value.data(), value.size());
+    auto it = interner.string_map.find(s);
     if (it != interner.string_map.end()) {
         return it->second;
     }

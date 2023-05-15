@@ -75,6 +75,7 @@ public:
     size_t get_num_unique_values(size_t column_ndx) const;
     StringData get_enum_string(size_t column_ndx, size_t id);
     bool is_null_enum_string(size_t column_ndx, size_t id);
+    void dump_interning_stats();
 
     //@{
     /// Compare two table specs for equality.
@@ -104,8 +105,9 @@ private:
 
     // in-memory support for string interning (temporary)
     struct Interner {
+        size_t string_memory = 0;
         std::vector<std::string> strings;
-        std::unordered_map<std::string_view, size_t> string_map;
+        std::unordered_map<std::string, size_t> string_map;
     };
     std::vector<Interner> m_interners;
 
