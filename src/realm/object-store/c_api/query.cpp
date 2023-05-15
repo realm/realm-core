@@ -155,6 +155,12 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
                 return type_Decimal;
             case RLM_TYPE_UUID:
                 return type_UUID;
+            case RLM_TYPE_LIST:
+                return type_List;
+            case RLM_TYPE_SET:
+                return type_Set;
+            case RLM_TYPE_DICTIONARY:
+                return type_Dictionary;
         }
         throw LogicError{ErrorCodes::TypeMismatch, "Unsupported type"}; // LCOV_EXCL_LINE
         return type_Int;

@@ -83,6 +83,14 @@ RLM_API bool realm_list_insert(realm_list_t* list, size_t index, realm_value_t v
     });
 }
 
+RLM_API bool realm_list_insert_collection(realm_list_t* list, size_t index, realm_collection_type_e type)
+{
+    return wrap_err([&]() {
+        list->insert_collection(index, *from_capi(type));
+        return true;
+    });
+}
+
 RLM_API bool realm_list_move(realm_list_t* list, size_t from_index, size_t to_index)
 {
     return wrap_err([&]() {
