@@ -246,32 +246,6 @@ Obj List::get_object(size_t list_ndx)
     return {};
 }
 
-void List::insert_list(size_t list_ndx)
-{
-    // here I am assuming that List<Mixed>
-    verify_in_transaction();
-    as<Mixed>().insert_collection(list_ndx, CollectionType::List);
-}
-List List::get_list(size_t list_ndx)
-{
-    REALM_ASSERT(list_ndx < size());
-    auto nested_list = as<Mixed>().get_list(list_ndx);
-    return List{m_realm, nested_list->clone_collection()}; // really inefficient.
-}
-
-void List::insert_dictionary(size_t list_ndx)
-{
-    verify_in_transaction();
-    as<Mixed>().insert_collection(list_ndx, CollectionType::Dictionary);
-}
-
-object_store::Dictionary List::get_dictionary(size_t list_ndx)
-{
-    REALM_ASSERT(list_ndx < size());
-    auto dict = as<Mixed>().get_dictionary(list_ndx);
-    return object_store::Dictionary{m_realm, dict->clone_collection()}; // really inefficient.
-}
-
 void List::swap(size_t ndx1, size_t ndx2)
 {
     verify_in_transaction();
@@ -319,42 +293,6 @@ List List::freeze(std::shared_ptr<Realm> const& frozen_realm) const
         return List{};
     }
 }
-
-// List List::insert_list(size_t list_ndx)
-// {
-//     //let's assume for now only mixed
-//     verify_in_transaction();
-//     auto coll = as<Mixed>();
-//     //coll.is_empty(); //tmp hack to allow to create the internal bplus tree
-//     //crashing m_root is null!
-//     auto res = coll.insert_list(list_ndx);
-//     //auto coll = std::dynamic_pointer_cast<Lst<Mixed>>(m_coll_base)->insert_list(list_ndx); //
-//     list_base().insert_collection(list_ndx); return List{m_realm, *res};
-// }
-
-// List List::get_list(size_t list_ndx)
-// {
-//     REALM_ASSERT(list_ndx < size());
-//     auto coll = as<Mixed>();
-//     auto nested = coll.get_list(list_ndx);
-//     return List{m_realm, *nested};
-// }
-
-// List List::insert_dictionary(size_t list_ndx)
-// {
-
-// }
-
-// List List::get_dictionary(size_t list_ndx)
-// {
-
-// }
-
-// void List::delete_list(size_t)
-// {
-//     verify_in_transaction();
-// }
-
 
 #define REALM_PRIMITIVE_LIST_TYPE(T)                                                                                 \
     template T List::get<T>(size_t) const;                                                                           \

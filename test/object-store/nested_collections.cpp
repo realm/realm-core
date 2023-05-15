@@ -50,35 +50,39 @@ TEST_CASE("nested-list-mixed", "[nested-colllections]") {
     auto col = table->get_column_key("any_val");
 
     // List
-    List list_os{obj, col, r};
-    list_os.set_list();
-    list_os.insert_list(0);
-    list_os.insert_list(1);
-    list_os.insert_dictionary(2);
-    auto nested_list = list_os.get_list(0);
-    nested_list.add(Mixed{5});
-    nested_list.add(Mixed{10});
-    nested_list.add(Mixed{"Hello"});
-    auto nested_list1 = list_os.get_list(1);
-    nested_list1.add(Mixed{6});
-    nested_list1.add(Mixed{7});
-    nested_list1.add(Mixed{"World"});
-    const char* json_doc_list = "{\"_key\":0,\"any_val\":[[5,10,\"Hello\"],[6,7,\"World\"],{}]}";
-    REQUIRE(list_os.get_impl().get_obj().to_string() == json_doc_list);
+    {
+        obj.set_collection(col, CollectionType::List);
+        List list_os{r, obj, col};
+        list_os.insert_collection(0, CollectionType::List);
+        list_os.insert_collection(1, CollectionType::List);
+        list_os.insert_collection(2, CollectionType::Dictionary);
+        auto nested_list = list_os.get_list(0);
+        nested_list.add(Mixed{5});
+        nested_list.add(Mixed{10});
+        nested_list.add(Mixed{"Hello"});
+        auto nested_list1 = list_os.get_list(1);
+        nested_list1.add(Mixed{6});
+        nested_list1.add(Mixed{7});
+        nested_list1.add(Mixed{"World"});
+        const char* json_doc_list = "{\"_key\":0,\"any_val\":[[5,10,\"Hello\"],[6,7,\"World\"],{}]}";
+        REQUIRE(list_os.get_impl().get_obj().to_string() == json_doc_list);
+    }
 
     // Dictionary.
-    object_store::Dictionary dict_os{obj, col, r};
-    dict_os.set_dictionary();
-    dict_os.insert_dictionary("Dict");
-    auto nested_dict = dict_os.get_dictionary("Dict");
-    nested_dict.insert({"Test"}, Mixed{10});
-    nested_dict.insert({"Test1"}, Mixed{11});
-    dict_os.insert_list("List");
-    auto nested_list_dict = dict_os.get_list("List");
-    nested_list_dict.add(Mixed{"value"});
-    const char* json_doc_dict =
-        "{\"_key\":0,\"any_val\":{\"Dict\":{},\"List\":[\"value\"],\"Test\":10,\"Test1\":11}}";
-    REQUIRE(dict_os.get_impl().get_obj().to_string() == json_doc_dict);
+    {
+        obj.set_collection(col, CollectionType::Dictionary);
+        object_store::Dictionary dict_os{r, obj, col};
+        dict_os.insert_collection("Dict", CollectionType::Dictionary);
+        auto nested_dict = dict_os.get_dictionary("Dict");
+        nested_dict.insert({"Test"}, Mixed{10}); // this crashes..
+        nested_dict.insert({"Test1"}, Mixed{11});
+        dict_os.insert_collection("List", CollectionType::List);
+        auto nested_list_dict = dict_os.get_list("List");
+        nested_list_dict.add(Mixed{"value"});
+        const char* json_doc_dict =
+            "{\"_key\":0,\"any_val\":{\"Dict\":{},\"List\":[\"value\"],\"Test\":10,\"Test1\":11}}";
+        REQUIRE(dict_os.get_impl().get_obj().to_string() == json_doc_dict);
+    }
 
     r->commit_transaction();
 }

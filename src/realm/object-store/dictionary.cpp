@@ -301,29 +301,6 @@ Dictionary::Iterator Dictionary::end() const
 {
     return dict().end();
 }
-
-void Dictionary::insert_list(StringData key)
-{
-    verify_in_transaction();
-    dict().insert_collection(key, CollectionType::List);
-}
-List Dictionary::get_list(StringData key)
-{
-    auto list = dict().get_list(key);
-    return List{m_realm, list->clone_collection()};
-}
-void Dictionary::insert_dictionary(StringData key)
-{
-    verify_in_transaction();
-    dict().insert_collection(key, CollectionType::Dictionary);
-}
-
-object_store::Dictionary Dictionary::get_dictionary(StringData key)
-{
-    auto coll = dict().get_dictionary(key);
-    return object_store::Dictionary{m_realm, coll->clone_collection()};
-}
-
 namespace {
 class NotificationHandler {
 public:

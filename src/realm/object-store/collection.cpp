@@ -25,6 +25,8 @@
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/shared_realm.hpp>
+#include <realm/object-store/list.hpp>
+#include <realm/object-store/dictionary.hpp>
 
 namespace realm::object_store {
 
@@ -37,14 +39,6 @@ Collection::Collection(const Object& parent_obj, const Property* prop)
     : Collection(std::shared_ptr(parent_obj.get_realm()), parent_obj.obj().get_collection_ptr(prop->column_key),
                  prop->type)
 {
-}
-
-Collection::Collection(Obj& parent_obj, ColKey col, std::shared_ptr<Realm> r) // this is tmp, it is very hacky
-    : m_realm(std::move(r))
-    , m_parent_object(parent_obj)
-    , m_col_key(col)
-{
-    REALM_ASSERT(m_col_key.get_type() == col_type_Mixed);
 }
 
 Collection::Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
@@ -269,22 +263,20 @@ size_t Collection::hash() const noexcept
     return hash_combine(impl.get_owner_key().value, impl.get_table()->get_key().value, impl.get_col_key().value);
 }
 
-void Collection::set_list()
+void Collection::insert_collection(const PathElement& path, CollectionType type)
 {
-    REALM_ASSERT(m_col_key.get_type() == col_type_Mixed);
-    m_parent_object.set_collection(m_col_key, CollectionType::List);
-    m_coll_base = m_parent_object.get_collection_ptr(m_col_key);
-    REALM_ASSERT(m_coll_base->is_empty());
-    REALM_ASSERT(is_valid());
+    verify_in_transaction();
+    m_coll_base->insert_collection(path, type);
 }
 
-void Collection::set_dictionary()
+List Collection::get_list(const PathElement& path)
 {
-    REALM_ASSERT(m_col_key.get_type() == col_type_Mixed);
-    m_parent_object.set_collection(m_col_key, CollectionType::Dictionary);
-    m_coll_base = m_parent_object.get_collection_ptr(m_col_key);
-    REALM_ASSERT(m_coll_base->is_empty());
-    REALM_ASSERT(is_valid());
+    return List{m_realm, m_coll_base->get_list(path)};
+}
+
+Dictionary Collection::get_dictionary(const PathElement& path)
+{
+    return Dictionary{m_realm, m_coll_base->get_list(path)};
 }
 
 } // namespace realm::object_store

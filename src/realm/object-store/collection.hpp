@@ -30,18 +30,18 @@ namespace realm {
 class Realm;
 class Results;
 class ObjectSchema;
+class List;
 
 namespace _impl {
 class ListNotifier;
 }
 
-
 namespace object_store {
+class Dictionary;
 class Collection {
 public:
     Collection(PropertyType type) noexcept;
     Collection(const Object& parent_obj, const Property* prop);
-    Collection(Obj& parent_obj, ColKey col, std::shared_ptr<Realm> r);
     Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
     Collection(std::shared_ptr<Realm> r, const CollectionBase& coll);
     Collection(std::shared_ptr<Realm> r, CollectionBasePtr coll);
@@ -114,8 +114,10 @@ public:
         return *m_coll_base;
     }
 
-    void set_list();
-    void set_dictionary();
+    // nested collections
+    void insert_collection(const PathElement&, CollectionType);
+    List get_list(const PathElement&);
+    Dictionary get_dictionary(const PathElement&);
 
 protected:
     std::shared_ptr<Realm> m_realm;
@@ -124,8 +126,6 @@ protected:
     mutable util::CopyableAtomic<const ObjectSchema*> m_object_schema = nullptr;
     _impl::CollectionNotifier::Handle<_impl::ListNotifier> m_notifier;
     bool m_is_embedded = false;
-    Obj m_parent_object;
-    ColKey m_col_key;
 
     Collection(const Collection&);
     Collection& operator=(const Collection&);
