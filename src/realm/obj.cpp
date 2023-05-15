@@ -65,7 +65,7 @@ std::vector<NestedCollectionInfo> init_levels(Obj& obj, ColKey origin_col_key, s
 
     levels.emplace_back(obj.get_collection_list(origin_col_key));
     for (size_t i = 1; i < nesting_levels; i++) {
-        levels.emplace_back(levels.back().list->get_collection_list(0ul));
+        levels.emplace_back(levels.back().list->get_collection_list(0));
     }
 
     return levels;
@@ -1925,23 +1925,10 @@ void Obj::set_collection(ColKey col_key, CollectionType type)
 {
     REALM_ASSERT(col_key.get_type() == col_type_Mixed);
     update_if_needed();
+    Mixed new_val(0, type);
     auto old_val = get<Mixed>(col_key);
-    switch (type) {
-        case CollectionType::Set:
-            if (!old_val.is_type(type_Set)) {
-                set(col_key, Mixed(0, CollectionType::Set));
-            }
-            break;
-        case CollectionType::List:
-            if (!old_val.is_type(type_List)) {
-                set(col_key, Mixed(0, CollectionType::List));
-            }
-            break;
-        case CollectionType::Dictionary:
-            if (!old_val.is_type(type_Dictionary)) {
-                set(col_key, Mixed(ref_type(0), CollectionType::Dictionary));
-            }
-            break;
+    if (old_val != new_val) {
+        set(col_key, Mixed(0, type));
     }
 }
 
