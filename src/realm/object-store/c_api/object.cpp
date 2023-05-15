@@ -366,7 +366,7 @@ RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_property_key_
         auto col_key = ColKey(key);
         table->check_column(col_key);
 
-        if (!col_key.is_list()) {
+        if (!(col_key.is_list() || col_key.get_type() == col_type_Mixed)) {
             report_type_mismatch(object->get_realm(), *table, col_key);
         }
 

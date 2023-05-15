@@ -4909,7 +4909,19 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         REQUIRE(value.type == RLM_TYPE_DICTIONARY);
         auto dict = cptr_checked(realm_get_dictionary(obj1.get(), foo_any_col_key));
         checked(realm_dictionary_insert(dict.get(), rlm_str_val("Hello"), rlm_str_val("world"), nullptr, nullptr));
+        //dict -> list
         realm_dictionary_insert_collection(dict.get(), rlm_str_val("Godbye"), RLM_COLLECTION_TYPE_LIST);
+        auto list = cptr_checked(realm_dictionary_get_list(dict.get(), rlm_str_val("Godbye")));
+        realm_list_insert(list.get(), 0, rlm_str_val("Hello"));
+        realm_list_insert(list.get(), 0, rlm_str_val("42"));
+        realm_list_insert(list.get(), 0, rlm_int_val(42));
+        //dict -> dict
+        realm_dictionary_insert_collection(dict.get(), rlm_str_val("Hi"), RLM_COLLECTION_TYPE_DICTIONARY);
+        auto dict2 = cptr_checked(realm_dictionary_get_dictionary(dict.get(), rlm_str_val("Hi")));
+        checked(realm_dictionary_insert(dict2.get(), rlm_str_val("Nested-Hello"), rlm_str_val("Nested-World"), nullptr, nullptr));
+        size_t size;
+        checked(realm_dictionary_size(dict.get(), &size));
+        REQUIRE(size == 3);
     }
 
     SECTION("list") {
@@ -4920,7 +4932,18 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         auto list = cptr_checked(realm_get_list(obj1.get(), foo_any_col_key));
         realm_list_insert(list.get(), 0, rlm_str_val("Hello"));
         realm_list_insert(list.get(), 1, rlm_str_val("World"));
-        realm_list_insert_collection(list.get(), 0, RLM_COLLECTION_TYPE_DICTIONARY);
+        //list -> dict
+        realm_list_insert_collection(list.get(), 1, RLM_COLLECTION_TYPE_DICTIONARY);
+        auto dict = cptr_checked(realm_list_get_dictionary(list.get(), 1));
+        checked(realm_dictionary_insert(dict.get(), rlm_str_val("Hello"), rlm_str_val("world"), nullptr, nullptr));
+        //list -> list
+        realm_list_insert_collection(list.get(), 2, RLM_COLLECTION_TYPE_LIST);
+        auto list2 = cptr_checked(realm_list_get_list(list.get(), 2));
+        realm_list_insert(list2.get(), 0, rlm_str_val("Nested-Hello"));
+        realm_list_insert(list2.get(), 1, rlm_str_val("Nested-World"));
+        size_t size;
+        checked(realm_list_size(list.get(), &size));
+        REQUIRE(size == 4);
     }
 }
 
