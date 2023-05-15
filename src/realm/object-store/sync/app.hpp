@@ -59,17 +59,25 @@ public:
     struct Config {
         // Information about the device where the app is running
         struct DeviceInfo {
-            std::string platform;          // json: platform
             std::string platform_version;  // json: platformVersion
             std::string sdk_version;       // json: sdkVersion
             std::string sdk;               // json: sdk
-            std::string cpu_arch;          // json: cpuArch
             std::string device_name;       // json: deviceName
             std::string device_version;    // json: deviceVersion
             std::string framework_name;    // json: frameworkName
             std::string framework_version; // json: frameworkVersion
-            // Other parameters provided to server no included here:
-            // * CoreVersion - populated by Sync when the device info is sent
+            std::string bundle_id;         // json: bundleId
+
+            DeviceInfo();
+            DeviceInfo(std::string, std::string, std::string, std::string, std::string, std::string, std::string,
+                       std::string);
+
+        private:
+            friend App;
+
+            std::string platform;     // json: platform
+            std::string cpu_arch;     // json: cpuArch
+            std::string core_version; // json: coreVersion
         };
 
         std::string app_id;
