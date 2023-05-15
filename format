@@ -1,0 +1,57 @@
+diff --git a/src/realm.h b/src/realm.h
+index fd2738ee6..5261cb237 100644
+--- a/src/realm.h
++++ b/src/realm.h
+@@ -1786,29 +1786,29 @@ RLM_API bool realm_list_set(realm_list_t*, size_t index, realm_value_t value);
+ RLM_API bool realm_list_insert(realm_list_t*, size_t index, realm_value_t value);
+ 
+ /**
+- * Insert a collection inside a list (only available for mixed properities) 
+- * 
++ * Insert a collection inside a list (only available for mixed properities)
++ *
+  * @param list valid ptr to a list where a nested collection needs to be added
+- * @param index position in the list where to add the collection 
+- * @return RLM_API 
++ * @param index position in the list where to add the collection
++ * @return RLM_API
+  */
+ RLM_API bool realm_list_insert_collection(realm_list_t* list, size_t index, realm_collection_type_e);
+ 
+ /**
+  * Returns a nested list if such collection exists, NULL otherwise.
+- * 
++ *
+  * @param list pointer to the list that containes the nested list
+  * @param index index of collection in the list
+- * @return a pointer to the the nested list found at the index passed as argument 
++ * @return a pointer to the the nested list found at the index passed as argument
+  */
+ RLM_API realm_list_t* realm_list_get_list(realm_list_t* list, size_t index);
+ 
+ /**
+  * Returns a nested dictionary if such collection exists, NULL otherwise.
+- * 
++ *
+  * @param list pointer to the list that containes the nested collection into
+  * @param index position of collection in the list
+- * @return a pointer to the the nested dictionary found at index passed as argument 
++ * @return a pointer to the the nested dictionary found at index passed as argument
+  */
+ RLM_API realm_dictionary_t* realm_list_get_dictionary(realm_list_t* list, size_t index);
+ 
+Running clang-format on the following files:
+    src/realm.h
+    src/realm/obj.cpp
+    src/realm/object-store/c_api/conversion.hpp
+    src/realm/object-store/c_api/dictionary.cpp
+    src/realm/object-store/c_api/list.cpp
+    src/realm/object-store/c_api/object.cpp
+    src/realm/object-store/c_api/query.cpp
+    src/realm/object-store/collection.cpp
+    src/realm/object-store/collection.hpp
+    src/realm/object-store/property.hpp
+    test/object-store/c_api/c_api.cpp
+    test/object-store/nested_collections.cpp
+old tree: 0d46c3304d9a671bedf925b8db4045ba4373c010
+new tree: cf2609c3c7354f597b417d2c1663a6bfdf5893d2

@@ -1786,29 +1786,29 @@ RLM_API bool realm_list_set(realm_list_t*, size_t index, realm_value_t value);
 RLM_API bool realm_list_insert(realm_list_t*, size_t index, realm_value_t value);
 
 /**
- * Insert a collection inside a list (only available for mixed properities) 
- * 
+ * Insert a collection inside a list (only available for mixed properities)
+ *
  * @param list valid ptr to a list where a nested collection needs to be added
- * @param index position in the list where to add the collection 
- * @return RLM_API 
+ * @param index position in the list where to add the collection
+ * @return RLM_API
  */
 RLM_API bool realm_list_insert_collection(realm_list_t* list, size_t index, realm_collection_type_e);
 
 /**
  * Returns a nested list if such collection exists, NULL otherwise.
- * 
+ *
  * @param list pointer to the list that containes the nested list
  * @param index index of collection in the list
- * @return a pointer to the the nested list found at the index passed as argument 
+ * @return a pointer to the the nested list found at the index passed as argument
  */
 RLM_API realm_list_t* realm_list_get_list(realm_list_t* list, size_t index);
 
 /**
  * Returns a nested dictionary if such collection exists, NULL otherwise.
- * 
+ *
  * @param list pointer to the list that containes the nested collection into
  * @param index position of collection in the list
- * @return a pointer to the the nested dictionary found at index passed as argument 
+ * @return a pointer to the the nested dictionary found at index passed as argument
  */
 RLM_API realm_dictionary_t* realm_list_get_dictionary(realm_list_t* list, size_t index);
 
