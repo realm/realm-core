@@ -262,11 +262,13 @@ CollectionBasePtr CollectionParent::get_collection_ptr(ColKey col_key) const
 }
 
 
-int64_t CollectionParent::generate_key(size_t sz) const
+int64_t CollectionParent::generate_key(size_t sz)
 {
     static std::mt19937 gen32;
+    static std::mutex mutex;
 
     int64_t key;
+    const std::lock_guard<std::mutex> lock(mutex);
     do {
         if (sz < 0x10) {
             key = int8_t(gen32());

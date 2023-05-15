@@ -28,7 +28,7 @@
 
 namespace realm {
 namespace {
-static const int sorting_rank[19] = {
+static const int sorting_rank[] = {
     // Observe! Changing these values breaks the file format for Set<Mixed>
 
     -1, // null
@@ -47,9 +47,13 @@ static const int sorting_rank[19] = {
     7,  // type_Link = 12,
     -1, // type_LinkList = 13,
     -1,
-    4, // type_ObjectId = 15,
-    6, // type_TypedLink = 16
-    5, // type_UUID = 17
+    4,  // type_ObjectId = 15,
+    6,  // type_TypedLink = 16
+    5,  // type_UUID = 17
+    7,  // type_TypeOfValue = 18
+    8,  // type_List = 19
+    9,  // type_Set = 20
+    10, // type_Dictionary = 21
 
     // Observe! Changing these values breaks the file format for Set<Mixed>
 };
