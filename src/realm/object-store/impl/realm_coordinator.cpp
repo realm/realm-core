@@ -720,6 +720,12 @@ void RealmCoordinator::commit_write(Realm& realm, bool commit_to_disk)
     REALM_ASSERT(realm.is_in_transaction());
 
     Transaction& tr = Realm::Internal::get_transaction(realm);
+#if REALM_ENABLE_SYNC
+    if (m_sync_session) {
+        SyncSession::Internal::flush_subscription_changes(*m_sync_session, tr);
+    }
+#endif
+
     VersionID new_version;
     {
         // Need to acquire this lock before committing or another process could

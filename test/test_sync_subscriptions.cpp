@@ -28,6 +28,13 @@ struct SubscriptionStoreFixture {
         write->commit();
     }
 
+    DB::version_type flush(SubscriptionStoreRef& store)
+    {
+        auto write = db->start_write();
+        store->flush_changes(*write);
+        return write->commit();
+    }
+
     DBRef db;
     TableKey a_table_key;
     ColKey foo_col;
@@ -40,7 +47,7 @@ TEST(Sync_SubscriptionStoreBasic)
     SHARED_GROUP_TEST_PATH(sub_store_path);
     {
         SubscriptionStoreFixture fixture(sub_store_path);
-        auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+        auto store = SubscriptionStore::create(fixture.db, test_context.logger, [](int64_t) {});
         // Because there are no subscription sets yet, get_latest should point to an empty object
         auto latest = store->get_latest();
         CHECK(latest.begin() == latest.end());
@@ -77,13 +84,17 @@ TEST(Sync_SubscriptionStoreBasic)
         CHECK(name.is_null());
         anon_sub_id = it->id;
 
+        out.update_state(SubscriptionSet::State::Bootstrapping);
+        out.update_state(SubscriptionSet::State::AwaitingMark);
+
         out.commit();
+        fixture.flush(store);
     }
 
     // Destroy the DB and reload it and make sure we can get the subscriptions we set in the previous block.
     {
         SubscriptionStoreFixture fixture(sub_store_path);
-        auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+        auto store = SubscriptionStore::create(fixture.db, test_context.logger, [](int64_t) {});
 
         auto read_tr = fixture.db->start_read();
         Query query_a(read_tr->get_table(fixture.a_table_key));
@@ -92,6 +103,7 @@ TEST(Sync_SubscriptionStoreBasic)
         auto set = store->get_latest();
         CHECK_EQUAL(set.version(), 1);
         CHECK_EQUAL(set.size(), 2);
+        CHECK_EQUAL(set.state(), SubscriptionSet::State::AwaitingMark);
         auto ptr = set.find(query_a);
         CHECK(ptr);
         CHECK_EQUAL(ptr->name, "a sub");
@@ -113,7 +125,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db, test_context.logger, [](int64_t) {});
 
     auto read_tr = fixture.db->start_read();
     Query query_a(read_tr->get_table("class_a"));
@@ -154,6 +166,9 @@ TEST(Sync_SubscriptionStoreStateUpdates)
         auto latest = store->get_latest();
         CHECK_NOT_EQUAL(active.version(), latest.version());
         CHECK_EQUAL(active.state(), SubscriptionSet::State::Complete);
+        CHECK_EQUAL(latest.state(), SubscriptionSet::State::PendingFlush);
+        fixture.flush(store);
+        latest.refresh();
         CHECK_EQUAL(latest.state(), SubscriptionSet::State::Pending);
 
         auto it_a = active.begin();
@@ -208,7 +223,7 @@ TEST(Sync_SubscriptionStoreUpdateExisting)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db, test_context.logger, [](int64_t) {});
 
     auto read_tr = fixture.db->start_read();
     Query query_a(read_tr->get_table("class_a"));
@@ -248,7 +263,7 @@ TEST(Sync_SubscriptionStoreAssignAnonAndNamed)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db, test_context.logger, [](int64_t) {});
 
     auto read_tr = fixture.db->start_read();
     Query query_a(read_tr->get_table("class_a"));
@@ -280,11 +295,28 @@ TEST(Sync_SubscriptionStoreAssignAnonAndNamed)
     }
 }
 
+TEST(Sync_SubscriptionStorePendingFlush)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path);
+    SubscriptionStoreFixture fixture(sub_store_path);
+    auto store = SubscriptionStore::create(fixture.db, test_context.logger, [](int64_t) {});
+    auto sub_set = store->get_latest().make_mutable_copy();
+    auto pending_fut = sub_set.get_state_change_notification(SubscriptionSet::State::Pending);
+    auto pending_flush_fut = sub_set.get_state_change_notification(SubscriptionSet::State::PendingFlush);
+    sub_set.commit();
+
+    CHECK_EQUAL(pending_flush_fut.get(), SubscriptionSet::State::PendingFlush);
+    CHECK_NOT(pending_fut.is_ready());
+
+    fixture.flush(store);
+    CHECK_EQUAL(pending_fut.get(), SubscriptionSet::State::Pending);
+}
+
 TEST(Sync_SubscriptionStoreNotifications)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db, test_context.logger, [](int64_t) {});
 
     std::vector<util::Future<SubscriptionSet::State>> notification_futures;
     auto sub_set = store->get_latest().make_mutable_copy();
@@ -301,6 +333,7 @@ TEST(Sync_SubscriptionStoreNotifications)
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
     sub_set.commit();
 
+    fixture.flush(store);
     // This should complete immediately because transitioning to the Pending state happens when you commit.
     CHECK_EQUAL(notification_futures[0].get(), SubscriptionSet::State::Pending);
 
@@ -404,7 +437,7 @@ TEST(Sync_SubscriptionStoreRefreshSubscriptionSetInvalid)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db, test_context.logger, [](int64_t) {});
     // Because there are no subscription sets yet, get_latest should point to an empty object
     auto latest = std::make_unique<SubscriptionSet>(store->get_latest());
     CHECK(latest->begin() == latest->end());
@@ -431,7 +464,7 @@ TEST(Sync_SubscriptionStoreInternalSchemaMigration)
     CHECK(util::File::exists(path.string()));
     util::File::copy(path.string(), sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db, test_context.logger, [](int64_t) {});
     auto [active_version, latest_version, pending_mark_version] = store->get_version_info();
     CHECK_EQUAL(active_version, latest_version);
     auto active = store->get_active();
@@ -453,9 +486,10 @@ TEST(Sync_SubscriptionStoreInternalSchemaMigration)
 
 TEST(Sync_SubscriptionStoreNextPendingVersion)
 {
+    util::Logger::set_default_level_threshold(util::Logger::Level::debug);
     SHARED_GROUP_TEST_PATH(sub_store_path)
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db, test_context.logger, [](int64_t) {});
 
     auto mut_sub_set = store->get_latest().make_mutable_copy();
     auto sub_set = mut_sub_set.commit();
@@ -480,10 +514,28 @@ TEST(Sync_SubscriptionStoreNextPendingVersion)
     auto pending_version = store->get_next_pending_version(0, DB::version_type{});
     CHECK(pending_version);
     CHECK_EQUAL(pending_version->query_version, bootstrapping_set);
+    CHECK_NOT(pending_version->snapshot_version);
 
     pending_version = store->get_next_pending_version(bootstrapping_set, DB::version_type{});
     CHECK(pending_set);
     CHECK_EQUAL(pending_version->query_version, pending_set);
+    CHECK_NOT(pending_version->snapshot_version);
+
+    pending_version = store->get_next_pending_version(pending_set, DB::version_type{});
+    CHECK(!pending_version);
+
+    // the snapshot version of each pending subscription set should be the version we commit at during flush
+    // minus 1.
+    auto committed_at = fixture.flush(store);
+    pending_version = store->get_next_pending_version(0, DB::version_type{});
+    CHECK(pending_version);
+    CHECK_EQUAL(pending_version->query_version, bootstrapping_set);
+    CHECK_EQUAL(pending_version->snapshot_version, committed_at - 1);
+
+    pending_version = store->get_next_pending_version(bootstrapping_set, DB::version_type{});
+    CHECK(pending_set);
+    CHECK_EQUAL(pending_version->query_version, pending_set);
+    CHECK_EQUAL(pending_version->snapshot_version, committed_at - 1);
 
     pending_version = store->get_next_pending_version(pending_set, DB::version_type{});
     CHECK(!pending_version);
@@ -493,7 +545,7 @@ TEST(Sync_SubscriptionStoreSubSetHasTable)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db, test_context.logger, [](int64_t) {});
 
     auto read_tr = fixture.db->start_read();
     // We should have no subscriptions yet so this should return false.
@@ -510,7 +562,6 @@ TEST(Sync_SubscriptionStoreSubSetHasTable)
     mut_sub_set.insert_or_assign(query_b);
     auto sub_set = mut_sub_set.commit();
 
-    read_tr->advance_read();
     table_set = store->get_tables_for_latest(*read_tr);
     CHECK(table_set.find("a") != table_set.end());
     CHECK(table_set.find("fake_table_that_doesnt_exist") == table_set.end());
@@ -519,6 +570,7 @@ TEST(Sync_SubscriptionStoreSubSetHasTable)
     mut_sub_set.erase(query_a);
     sub_set = mut_sub_set.commit();
 
+    fixture.flush(store);
     read_tr->advance_read();
     table_set = store->get_tables_for_latest(*read_tr);
     CHECK(table_set.find("a") != table_set.end());
@@ -537,7 +589,7 @@ TEST(Sync_SubscriptionStoreNotifyAll)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db, test_context.logger, [](int64_t) {});
 
     const Status status_abort(ErrorCodes::OperationAborted, "operation aborted");
 
@@ -591,6 +643,8 @@ TEST(Sync_SubscriptionStoreNotifyAll)
             });
     }
 
+    fixture.flush(store);
+
     auto pending_subs = store->get_pending_subscriptions();
     CHECK_EQUAL(pending_subs.size(), 3);
     for (auto& sub : pending_subs) {
@@ -612,7 +666,7 @@ TEST(Sync_SubscriptionStoreTerminate)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db, test_context.logger, [](int64_t) {});
 
     size_t hit_count = 0;
 
@@ -663,6 +717,8 @@ TEST(Sync_SubscriptionStoreTerminate)
                 state_handler(state);
             });
     }
+
+    fixture.flush(store);
 
     CHECK_EQUAL(store->get_latest().version(), 3);
     CHECK_EQUAL(store->get_pending_subscriptions().size(), 3);

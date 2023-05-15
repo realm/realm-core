@@ -1043,6 +1043,16 @@ void SyncSession::set_sync_transact_callback(std::function<sync::Session::SyncTr
     m_sync_transact_callback = std::move(callback);
 }
 
+void SyncSession::flush_subscription_changes(Transaction& tr)
+{
+    util::CheckedUniqueLock lock(m_state_mutex);
+    if (!m_flx_subscription_store) {
+        return;
+    }
+
+    m_flx_subscription_store->flush_changes(tr);
+}
+
 void SyncSession::nonsync_transact_notify(sync::version_type version)
 {
     m_progress_notifier.set_local_version(version);
@@ -1446,16 +1456,17 @@ void SyncSession::create_subscription_store()
     // remain valid afterwards for the life of the SyncSession, but m_flx_subscription_store
     // will be reset when rolling back to PBS after a client FLX migration
     if (!m_subscription_store_base) {
-        m_subscription_store_base = sync::SubscriptionStore::create(m_db, [this](int64_t new_version) {
-            util::CheckedLockGuard lk(m_state_mutex);
-            if (m_state != State::Active && m_state != State::WaitingForAccessToken) {
-                return;
-            }
-            // There may be no session yet (i.e., waiting to refresh the access token).
-            if (m_session) {
-                m_session->on_new_flx_sync_subscription(new_version);
-            }
-        });
+        m_subscription_store_base =
+            sync::SubscriptionStore::create(m_db, m_sync_manager->get_logger(), [this](int64_t new_version) {
+                util::CheckedLockGuard lk(m_state_mutex);
+                if (m_state != State::Active && m_state != State::WaitingForAccessToken) {
+                    return;
+                }
+                // There may be no session yet (i.e., waiting to refresh the access token).
+                if (m_session) {
+                    m_session->on_new_flx_sync_subscription(new_version);
+                }
+            });
     }
 
     // m_subscription_store_base is always around for the life of SyncSession, but the

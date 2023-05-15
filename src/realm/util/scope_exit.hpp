@@ -52,6 +52,11 @@ public:
             (*m_handler)();
     }
 
+    void release() noexcept
+    {
+        m_handler = none;
+    }
+
     static_assert(noexcept(std::declval<H>()()), "Handler must be nothrow executable");
     static_assert(std::is_nothrow_destructible<H>::value, "Handler must be nothrow destructible");
 

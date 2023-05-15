@@ -2120,10 +2120,11 @@ void Session::send_upload_message()
             m_pending_flx_sub_set = get_flx_subscription_store()->get_next_pending_version(
                 m_last_sent_flx_query_version, m_upload_progress.client_version);
         }
-        if (m_pending_flx_sub_set && m_pending_flx_sub_set->snapshot_version < m_upload_target_version) {
+        if (m_pending_flx_sub_set && m_pending_flx_sub_set->snapshot_version &&
+            *m_pending_flx_sub_set->snapshot_version < m_upload_target_version) {
             logger.trace("Limiting UPLOAD message up to version %1 to send QUERY version %2",
                          m_pending_flx_sub_set->snapshot_version, m_pending_flx_sub_set->query_version);
-            target_upload_version = m_pending_flx_sub_set->snapshot_version;
+            target_upload_version = *m_pending_flx_sub_set->snapshot_version;
         }
     }
 
@@ -2292,7 +2293,7 @@ void Session::send_json_error_message()
     error_body_json["message"] = message;
     protocol.make_json_error_message(out, session_ident, static_cast<int>(protocol_error),
                                      error_body_json.dump()); // Throws
-    m_conn.initiate_write_message(out, this); // Throws
+    m_conn.initiate_write_message(out, this);                 // Throws
 
     m_error_to_send = false;
     enlist_to_send(); // Throws
@@ -2689,8 +2690,8 @@ void Session::suspend(const SessionErrorInfo& info)
     // Notify the application of the suspension of the session if the session is
     // still in the Active state
     if (m_state == Active) {
-        m_conn.one_less_active_unsuspended_session();                      // Throws
-        on_suspended(info);                                                // Throws
+        m_conn.one_less_active_unsuspended_session(); // Throws
+        on_suspended(info);                           // Throws
     }
 
     if (info.try_again) {
