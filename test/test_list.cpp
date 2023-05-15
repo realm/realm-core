@@ -845,11 +845,12 @@ TEST(List_Nested_InMixed)
     CHECK(list2->is_empty());
     list2->add("Hello");
     list2->insert_collection(0, CollectionType::Dictionary);
+    list2->add(42);
     dict2 = list2->get_dictionary(0);
     dict2->insert("Six", 6);
     tr->verify();
     dict2->insert("Seven", 7);
-    list2->insert_collection(2, CollectionType::Dictionary);
+    list2->set_collection(2, CollectionType::Dictionary);
     dict2 = list2->get_dictionary(2);
     dict2->insert("Hello", "World");
     dict2->insert("Date", Timestamp(std::chrono::system_clock::now()));
