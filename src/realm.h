@@ -1794,6 +1794,23 @@ RLM_API bool realm_list_insert(realm_list_t*, size_t index, realm_value_t value)
  */
 RLM_API bool realm_list_insert_collection(realm_list_t* list, size_t index, realm_collection_type_e);
 
+/**
+ * Returns a nested list if such collection exists, NULL otherwise.
+ * 
+ * @param list pointer to the list that containes the nested list
+ * @param index index of collection in the list
+ * @return a pointer to the the nested list found at the index passed as argument 
+ */
+RLM_API realm_list_t* realm_list_get_list(realm_list_t* list, size_t index);
+
+/**
+ * Returns a nested dictionary if such collection exists, NULL otherwise.
+ * 
+ * @param list pointer to the list that containes the nested collection into
+ * @param index position of collection in the list
+ * @return a pointer to the the nested dictionary found at index passed as argument 
+ */
+RLM_API realm_dictionary_t* realm_list_get_dictionary(realm_list_t* list, size_t index);
 
 /**
  * Move the element at @a from_index to @a to_index.
@@ -2276,6 +2293,18 @@ RLM_API realm_object_t* realm_dictionary_insert_embedded(realm_dictionary_t*, re
  * Insert a nested collection
  */
 RLM_API bool realm_dictionary_insert_collection(realm_dictionary_t*, realm_value_t key, realm_collection_type_e);
+
+/**
+ * Fetch a list from a dictionary.
+ * @return a valid list that needs to be deleted by the caller or nullptr in case of an error.
+ */
+RLM_API realm_list_t* realm_dictionary_get_list(realm_dictionary_t* dictionary, realm_value_t key);
+
+/**
+ * Fetch a dictioanry from a dictionary.
+ * @return a valid dictionary that needs to be deleted by the caller or nullptr in case of an error.
+ */
+RLM_API realm_dictionary_t* realm_dictionary_get_dictionary(realm_dictionary_t* dictionary, realm_value_t key);
 
 /**
  * Get object identified by key

@@ -91,6 +91,21 @@ RLM_API bool realm_list_insert_collection(realm_list_t* list, size_t index, real
     });
 }
 
+
+RLM_API realm_list_t* realm_list_get_list(realm_list_t* list, size_t index)
+{
+    return wrap_err([&](){
+        return new realm_list_t{list->get_list(index)};
+    });
+}
+
+RLM_API realm_dictionary_t* realm_list_get_dictionary(realm_list_t* list, size_t index)
+{
+    return wrap_err([&](){
+        return new realm_dictionary_t{list->get_dictionary(index)};
+    });
+}
+
 RLM_API bool realm_list_move(realm_list_t* list, size_t from_index, size_t to_index)
 {
     return wrap_err([&]() {
