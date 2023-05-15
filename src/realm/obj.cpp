@@ -65,7 +65,7 @@ std::vector<NestedCollectionInfo> init_levels(Obj& obj, ColKey origin_col_key, s
 
     levels.emplace_back(obj.get_collection_list(origin_col_key));
     for (size_t i = 1; i < nesting_levels; i++) {
-        levels.emplace_back(levels.back().list->get_collection_list(0ul));
+        levels.emplace_back(levels.back().list->get_collection_list(0));
     }
 
     return levels;
