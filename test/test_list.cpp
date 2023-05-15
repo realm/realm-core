@@ -754,6 +754,7 @@ TEST(List_Nested_InMixed)
     auto dict = obj.get_dictionary_ptr(col_any);
     CHECK(dict->is_empty());
     dict->insert("Four", 4);
+    obj.set_collection(col_any, CollectionType::Dictionary); // Idempotent
     tr->verify();
     tr->commit_and_continue_as_read();
     /*

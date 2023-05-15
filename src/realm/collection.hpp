@@ -69,6 +69,10 @@ public:
     {
         throw IllegalOperation("insert_collection is not legal on this collection type");
     }
+    virtual void set_collection(const PathElement&, CollectionType)
+    {
+        throw IllegalOperation("set_collection is not legal on this collection type");
+    }
 };
 
 using CollectionPtr = std::shared_ptr<Collection>;

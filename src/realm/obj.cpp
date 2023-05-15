@@ -1925,23 +1925,10 @@ void Obj::set_collection(ColKey col_key, CollectionType type)
 {
     REALM_ASSERT(col_key.get_type() == col_type_Mixed);
     update_if_needed();
+    Mixed new_val(0, type);
     auto old_val = get<Mixed>(col_key);
-    switch (type) {
-        case CollectionType::Set:
-            if (!old_val.is_type(type_Set)) {
-                set(col_key, Mixed(0, CollectionType::Set));
-            }
-            break;
-        case CollectionType::List:
-            if (!old_val.is_type(type_List)) {
-                set(col_key, Mixed(0, CollectionType::List));
-            }
-            break;
-        case CollectionType::Dictionary:
-            if (!old_val.is_type(type_Dictionary)) {
-                set(col_key, Mixed(ref_type(0), CollectionType::Dictionary));
-            }
-            break;
+    if (old_val != new_val) {
+        set(col_key, Mixed(0, type));
     }
 }
 
