@@ -36,10 +36,6 @@ class ThreadSafeReference;
 struct ColKey;
 struct ObjKey;
 
-namespace object_store {
-class Dictionary;
-}
-
 class List : public object_store::Collection {
 public:
     using object_store::Collection::Collection;

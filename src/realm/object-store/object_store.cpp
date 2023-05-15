@@ -101,11 +101,11 @@ DataType to_core_type(PropertyType type)
 std::vector<CollectionType> process_nested_collection(const Property& property)
 {
     std::vector<CollectionType> collection_types;
-
     // process the list of nested levels
     for (const auto& prop_type : property.nested_types) {
         collection_types.push_back(prop_type);
     }
+
     // check if the final type is itself a collection.
     if (is_array(property.type)) {
         collection_types.push_back(CollectionType::List);

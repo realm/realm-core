@@ -17,7 +17,6 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/dictionary.hpp>
-#include <realm/object-store/list.hpp>
 
 #include <realm/object-store/results.hpp>
 #include <realm/table.hpp>
@@ -301,6 +300,7 @@ Dictionary::Iterator Dictionary::end() const
 {
     return dict().end();
 }
+
 namespace {
 class NotificationHandler {
 public:

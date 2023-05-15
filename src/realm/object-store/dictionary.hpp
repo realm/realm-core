@@ -25,7 +25,6 @@
 
 namespace realm {
 
-class List;
 struct DictionaryChangeSet {
     DictionaryChangeSet(size_t max_keys)
     {
