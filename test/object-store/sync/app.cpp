@@ -2614,7 +2614,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 return true;
             };
             int request_count = 0;
-            int max_http_redirects = 20; // from app.cpp in object-store
+            const int max_http_redirects = 20; // from app.cpp in object-store
             redir_transport->request_hook = [&](const Request& request) {
                 logger->trace("request.url (%1): %2", request_count, request.url);
                 if (request_count++ == 0) {
@@ -2624,7 +2624,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 }
                 if (request.url.find("/location") != std::string::npos) {
                     // Keep returning the redirected response
-                    REQUIRE(request.redirect_count < 20);
+                    REQUIRE(request.redirect_count < max_http_redirects);
                     redir_transport->simulated_response = {
                         static_cast<int>(sync::HTTPStatus::MovedPermanently),
                         0,
