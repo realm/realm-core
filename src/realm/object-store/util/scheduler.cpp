@@ -154,7 +154,11 @@ std::shared_ptr<Scheduler> Scheduler::make_dummy()
 #if REALM_PLATFORM_APPLE
 std::shared_ptr<Scheduler> Scheduler::make_runloop(CFRunLoopRef run_loop)
 {
-    return std::make_shared<RunLoopScheduler>(run_loop ?: CFRunLoopGetCurrent());
+    if (!run_loop)
+        run_loop = CFRunLoopGetCurrent();
+    if (run_loop == CFRunLoopGetMain())
+        return std::make_shared<MainRunLoopScheduler>();
+    return std::make_shared<RunLoopScheduler>(run_loop);
 }
 
 std::shared_ptr<Scheduler> Scheduler::make_dispatch(void* queue)

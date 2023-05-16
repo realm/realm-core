@@ -2,7 +2,8 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Improve performance of SectionedResults. With a single section it is now ~10% faster, and the runtime of sectioning no longer scales significantly with section count, giving >100% speedups when there are large numbers of sections ([PR #6606](https://github.com/realm/realm-core/pull/6606)).
+* Very slightly improve performance of runtime thread checking on the main thread on Apple platforms. ([PR #6606](https://github.com/realm/realm-core/pull/6606))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -11,6 +12,7 @@
 ### Breaking changes
 * `platform` and `cpu_arch` fields in the `device_info` structure in App::Config can no longer be provided by the SDK's, they are inferred by the library ([PR #6612](https://github.com/realm/realm-core/pull/6612))
 * `bundle_id` is now a required field in the `device_info` structure in App::Config ([PR #6612](https://github.com/realm/realm-core/pull/6612))
+* The API for sectioned results change notifications has changed. Changes are now reported in a vector rather than a sparse map.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
