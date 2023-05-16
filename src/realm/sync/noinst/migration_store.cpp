@@ -324,7 +324,7 @@ void MigrationStore::create_subscriptions(SubscriptionStore& subs_store, const s
     auto mut_sub = subs_store.get_latest().make_mutable_copy();
     auto sub_count = mut_sub.size();
 
-    auto tr = m_db->start_read();
+    auto tr = m_db->start_write();
     // List of tables covered by latest subscription set.
     auto tables = subs_store.get_tables_for_latest(*tr);
 
@@ -352,6 +352,8 @@ void MigrationStore::create_subscriptions(SubscriptionStore& subs_store, const s
 
     // Commit new subscription set.
     mut_sub.commit();
+    subs_store.flush_changes(*tr);
+    tr->commit();
 }
 
 void MigrationStore::create_sentinel_subscription_set(SubscriptionStore& subs_store)
@@ -372,6 +374,7 @@ void MigrationStore::create_sentinel_subscription_set(SubscriptionStore& subs_st
     REALM_ASSERT(!migration_table->is_empty());
     auto migration_store_obj = migration_table->get_object(0);
     migration_store_obj.set(m_sentinel_query_version, *m_sentinel_subscription_set_version);
+    subs_store.flush_changes(*tr);
     tr->commit();
 }
 

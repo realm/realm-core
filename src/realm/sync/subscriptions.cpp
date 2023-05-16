@@ -649,9 +649,16 @@ void SubscriptionStore::initialize_subscriptions_table(TransactionRef&& tr, bool
                    .Or()
                    .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::AwaitingMark))
                    .find_all(descriptor_ordering);
-    m_active_version = res.is_empty() ? 0 : res.get_object(0).get_primary_key().get_int();
-    m_logger->trace("Initialized subscription store. Latest version: %1 Active version: %2 Next version number: %3",
-                    m_latest_version, m_active_version, m_next_new_subscription_set_version);
+    m_active_version = res.is_empty() ? SubscriptionSet::EmptyVersion : res.get_object(0).get_primary_key().get_int();
+
+    res = sub_sets->where()
+              .equal(m_sub_set_state, state_to_storage(SubscriptionSet::State::AwaitingMark))
+              .find_all(descriptor_ordering);
+    m_awaiting_mark_version =
+        res.is_empty() ? SubscriptionSet::EmptyVersion : res.get_object(0).get_primary_key().get_int();
+    m_logger->trace("Initialized subscription store. Latest version: %1, Active version: %2, Awaiting Mark version: "
+                    "%3 Next version number: %4",
+                    m_latest_version, m_active_version, m_awaiting_mark_version, m_next_new_subscription_set_version);
 }
 
 
@@ -821,6 +828,14 @@ MutableSubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version
 SubscriptionSet SubscriptionStore::get_by_version_impl(std::unique_lock<std::mutex>&, int64_t version_id,
                                                        std::optional<TransactionRef> opt_tr)
 {
+    // Special case that if the version_id is the "empty" version ID then we
+    if (version_id == SubscriptionSet::EmptyVersion) {
+        if (m_latest_version != 0) {
+            throw std::logic_error("Cannot get a subscription set with the \"empty\" version unless the latest "
+                                   "subscription set version is zero");
+        }
+        version_id = 0;
+    }
     if (version_id < m_min_outstanding_version) {
         return SubscriptionSet(weak_from_this(), version_id, SubscriptionSet::SupersededTag{});
     }
@@ -900,11 +915,11 @@ void SubscriptionStore::supercede_prior_to(Transaction& tr, int64_t version_id) 
     remove_query.remove();
 }
 
-void SubscriptionStore::flush_changes(Transaction& tr)
+bool SubscriptionStore::flush_changes(Transaction& tr)
 {
     std::unique_lock<std::mutex> lk(m_cached_sub_sets_mutex);
     if (m_unpersisted_subscription_sets.empty()) {
-        return;
+        return false;
     }
 
     bool commit_and_continue_as_read = false;
@@ -967,6 +982,8 @@ void SubscriptionStore::flush_changes(Transaction& tr)
     for (auto&& [version, sub_set] : to_notify) {
         process_notifications_for(sub_set);
     }
+
+    return true;
 }
 
 void SubscriptionStore::process_notifications_for(const SubscriptionSet& mut_sub_set)

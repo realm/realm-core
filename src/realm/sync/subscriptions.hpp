@@ -379,7 +379,7 @@ public:
     // with the subscription store.
     void terminate();
 
-    void flush_changes(Transaction& tr);
+    bool flush_changes(Transaction& tr);
 
 private:
     using std::enable_shared_from_this<SubscriptionStore>::weak_from_this;
