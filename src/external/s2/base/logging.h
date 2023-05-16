@@ -38,7 +38,7 @@
 #define DCHECK_GE(val1, val2) REALM_ASSERT_DEBUG_EX(val1 >= val2, val1, val2)
 #define DCHECK_GT(val1, val2) REALM_ASSERT_DEBUG_EX(val1 > val2, val1, val2)
 
-static std::shared_ptr<realm::util::Logger>& s2_logger()
+static inline std::shared_ptr<realm::util::Logger>& s2_logger()
 {
     return realm::util::Logger::get_default_logger();
 }
