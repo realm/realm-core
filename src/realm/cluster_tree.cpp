@@ -53,7 +53,6 @@ namespace realm {
 class ClusterNodeInner : public ClusterNode {
 public:
     ClusterNodeInner(Allocator& allocator, const ClusterTree& tree_top);
-    ~ClusterNodeInner() override;
 
     void create(int sub_tree_depth);
     void init(MemRef mem) override;
@@ -195,8 +194,6 @@ ClusterNodeInner::ClusterNodeInner(Allocator& allocator, const ClusterTree& tree
     : ClusterNode(0, allocator, tree_top)
 {
 }
-
-ClusterNodeInner::~ClusterNodeInner() {}
 
 void ClusterNodeInner::create(int sub_tree_depth)
 {
@@ -1453,6 +1450,25 @@ ClusterTree::Iterator::pointer ClusterTree::Iterator::operator->() const
     }
 
     return &m_obj;
+}
+
+ClusterTree::LeafCache::LeafCache(const Table& table)
+    : m_tree(table.m_clusters)
+    , m_leaf(0, m_tree.get_alloc(), m_tree)
+{
+}
+
+Obj ClusterTree::LeafCache::get(ObjKey key)
+{
+    ClusterNode::State state;
+    auto k2 = ObjKey(key.value - m_leaf.m_offset);
+    if (m_leaf.is_attached() && m_leaf.try_get(k2, state)) {
+        return Obj(m_tree.get_table_ref(), m_leaf.get_mem(), key, state.index);
+    }
+    ClusterNode::IteratorState state2(m_leaf);
+    bool found = m_tree.get_leaf(key, state2);
+    REALM_ASSERT(found);
+    return Obj(m_tree.get_table_ref(), m_leaf.get_mem(), key, state2.m_current_index);
 }
 
 } // namespace realm

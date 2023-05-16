@@ -356,6 +356,7 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
 
     auto& col = m_columns[0];
     ColKey ck = col.col_key;
+    ClusterTree::LeafCache cache(*col.table);
     for (size_t i = 0; i < v.size(); i++) {
         IndexPair& index = v[i];
         ObjKey key = index.key_for_object;
@@ -368,7 +369,7 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
             }
         }
 
-        index.cached_value = col.table->get_object(key).get_any(ck);
+        index.cached_value = cache.get(key).get_any(ck);
     }
 }
 

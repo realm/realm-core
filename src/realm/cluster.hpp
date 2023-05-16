@@ -113,9 +113,6 @@ public:
     {
         m_keys.set_parent(this, 0);
     }
-    virtual ~ClusterNode()
-    {
-    }
     void init_from_parent()
     {
         ref_type ref = get_ref_from_parent();
@@ -163,7 +160,7 @@ public:
     /// Locate object identified by 'key' and update 'state' accordingly
     void get(ObjKey key, State& state) const;
     /// Locate object identified by 'key' and update 'state' accordingly
-    /// Returns `false` if the object doesn't not exist.
+    /// Returns `false` if the object doesn't exist.
     virtual bool try_get(ObjKey key, State& state) const noexcept = 0;
     /// Locate object identified by 'ndx' and update 'state' accordingly
     virtual ObjKey get(size_t ndx, State& state) const = 0;
@@ -220,7 +217,6 @@ public:
         : ClusterNode(offset, allocator, tree_top)
     {
     }
-    ~Cluster() override;
 
     static MemRef create_empty_cluster(Allocator& alloc);
 

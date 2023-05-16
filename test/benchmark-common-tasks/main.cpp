@@ -197,13 +197,10 @@ struct BenchmarkWithStrings : BenchmarkWithStringsTable {
         BenchmarkWithStringsTable::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table(name());
+        t->add_column(type_Int, "filter");
 
         for (size_t i = 0; i < BASE_SIZE; ++i) {
-            std::stringstream ss;
-            ss << rand();
-            auto s = ss.str();
-            Obj obj = t->create_object();
-            obj.set<StringData>(m_col, s);
+            Obj obj = t->create_object().set_all(util::to_string(rand()), int64_t(i % 256));
             m_keys.push_back(obj.get_key());
         }
         tr.commit();
@@ -219,9 +216,7 @@ struct BenchmarkWithStringsFewDup : BenchmarkWithStringsTable {
 
         Random r;
         for (size_t i = 0; i < BASE_SIZE; ++i) {
-            std::stringstream ss;
-            ss << r.draw_int(0, BASE_SIZE / 2);
-            auto s = ss.str();
+            auto s = util::to_string(r.draw_int(0, BASE_SIZE / 2));
             Obj obj = t->create_object();
             obj.set<StringData>(m_col, s);
             m_keys.push_back(obj.get_key());
@@ -239,9 +234,7 @@ struct BenchmarkWithStringsManyDup : BenchmarkWithStringsTable {
         TableRef t = tr.get_table(name());
         Random r;
         for (size_t i = 0; i < BASE_SIZE; ++i) {
-            std::stringstream ss;
-            ss << r.draw_int(0, 100);
-            auto s = ss.str();
+            auto s = util::to_string(r.draw_int(0, 100));
             Obj obj = t->create_object();
             obj.set<StringData>(m_col, s);
             m_keys.push_back(obj.get_key());
@@ -1259,16 +1252,31 @@ struct BenchmarkQueryChainedOrStrings : BenchmarkWithStringsTableForIn {
     }
 };
 
-struct BenchmarkSort : BenchmarkWithStrings {
+struct BenchmarkSortStringDense : BenchmarkWithStrings {
     const char* name() const
     {
-        return "Sort";
+        return "SortStringDense";
     }
 
     void operator()(DBRef)
     {
         ConstTableRef table = m_table;
         TableView view = table->get_sorted_view(m_col);
+    }
+};
+
+struct BenchmarkSortStringSparse : BenchmarkWithStrings {
+    const char* name() const
+    {
+        return "SortStringSparse";
+    }
+
+    void operator()(DBRef)
+    {
+        // Filter the view so that we're sorting a single row per leaf
+        ConstTableRef table = m_table;
+        TableView view = table->where().equal(table->get_column_key("filter"), 0).find_all();
+        view.sort(m_col);
     }
 };
 
@@ -2263,7 +2271,8 @@ int benchmark_common_tasks_main()
     BENCH(IterateTableByIterator);
     BENCH(IterateTableByIteratorIndex);
 
-    BENCH(BenchmarkSort);
+    BENCH(BenchmarkSortStringDense);
+    BENCH(BenchmarkSortStringSparse);
     BENCH(BenchmarkSortInt);
     BENCH(BenchmarkSortIntList);
     BENCH(BenchmarkSortIntDictionary);
