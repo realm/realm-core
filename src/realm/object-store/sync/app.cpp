@@ -870,11 +870,7 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
 {
     std::string route;
 
-    if (!new_hostname && m_location_updated) {
-        // Skip if the app_metadata/location data has already been initialized and a new hostname is not provided
-        return completion(util::none); // early return
-    }
-    else {
+    {
         std::lock_guard<std::mutex> lock(*m_route_mutex);
         route = util::format("%1/location", new_hostname ? get_app_route(new_hostname) : get_app_route());
     }
@@ -883,6 +879,8 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
     req.method = HttpMethod::get;
     req.url = route;
     req.timeout_ms = m_request_timeout_ms;
+
+    log_debug("App: request location: %1", route);
 
     m_config.transport->send_request_to_server(req, [self = shared_from_this(),
                                                      completion = std::move(completion)](const Response& response) {
@@ -1101,7 +1099,8 @@ void App::refresh_access_token(const std::shared_ptr<SyncUser>& sync_user, bool 
         route = util::format("%1/auth/session", m_base_route);
     }
 
-    log_debug("App: refresh_access_token: email: %1", sync_user->user_profile().email());
+    log_debug("App: refresh_access_token: email: %1 %2", sync_user->user_profile().email(),
+              update_location ? "(updating location)" : "");
 
     Request request{HttpMethod::post, std::move(route), m_request_timeout_ms,
                     get_request_headers(sync_user, RequestTokenType::RefreshToken)};
