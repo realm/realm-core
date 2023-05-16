@@ -364,8 +364,7 @@ std::string ListPath::path_to_string(Transaction& remote, const InterningBuffer&
 
 RecoverLocalChangesetsHandler::RecoverLocalChangesetsHandler(Transaction& dest_wt,
                                                              Transaction& frozen_pre_local_state,
-                                                             util::Logger& logger,
-                                                             SubscriptionStore* sub_store)
+                                                             util::Logger& logger, SubscriptionStore* sub_store)
     : InstructionApplier(dest_wt)
     , m_frozen_pre_local_state{frozen_pre_local_state}
     , m_logger{logger}
