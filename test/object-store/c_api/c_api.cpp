@@ -4946,6 +4946,7 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         checked(realm_list_size(list.get(), &size));
         REQUIRE(size == 4);
     }
+    realm_release(realm);
 }
 
 TEST_CASE("C API: convert", "[c_api]") {
