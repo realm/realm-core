@@ -906,17 +906,27 @@ void SubscriptionStore::supercede_prior_to(Transaction& tr, int64_t version_id) 
     remove_query.remove();
 }
 
+bool SubscriptionStore::flush_changes()
+{
+    auto tr = m_db->start_write();
+    return flush_changes_impl(*tr, CommitMode::Commit);
+}
+
 bool SubscriptionStore::flush_changes(Transaction& tr)
+{
+    return flush_changes_impl(tr, CommitMode::NoCommit);
+}
+
+bool SubscriptionStore::flush_changes_impl(Transaction& tr, CommitMode commit_mode)
 {
     std::unique_lock<std::mutex> lk(m_cached_sub_sets_mutex);
     if (m_unpersisted_subscription_sets.empty()) {
         return false;
     }
 
-    bool commit_and_continue_as_read = false;
     if (tr.get_transact_stage() != DB::transact_Writing) {
         tr.promote_to_write();
-        commit_and_continue_as_read = true;
+        commit_mode = CommitMode::ContinueAsRead;
     }
 
     for (auto&& [version, sub_set] : m_unpersisted_subscription_sets) {
@@ -964,8 +974,15 @@ bool SubscriptionStore::flush_changes(Transaction& tr)
     }
     supercede_prior_to(tr, m_min_outstanding_version);
 
-    if (commit_and_continue_as_read) {
-        tr.commit_and_continue_as_read();
+    switch(commit_mode) {
+        case CommitMode::Commit:
+            tr.commit();
+            break;
+        case CommitMode::ContinueAsRead:
+            tr.commit_and_continue_as_read();
+            break;
+        case CommitMode::NoCommit:
+            break;
     }
 
     auto to_notify = std::move(m_unpersisted_subscription_sets);

@@ -384,6 +384,7 @@ public:
     //
     // Returns false if there were no changes to flush.
     bool flush_changes(Transaction& tr);
+    bool flush_changes();
 
 private:
     using std::enable_shared_from_this<SubscriptionStore>::weak_from_this;
@@ -421,6 +422,8 @@ protected:
                                         std::optional<TransactionRef> opt_tr);
     util::Optional<PendingSubscription> get_next_pending_version_from_db(int64_t last_query_version,
                                                                          DB::version_type after_client_version);
+    enum class CommitMode { NoCommit, ContinueAsRead, Commit };
+    bool flush_changes_impl(Transaction&, CommitMode mode);
 
     // Ensure the subscriptions table is properly initialized
     // If clear_table is true, the subscriptions table will be cleared before initialization
