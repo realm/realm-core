@@ -74,15 +74,12 @@ public:
 
     // If this list is at the outermost nesting level, use these functions to
     // get the leaf collections
-    CollectionBasePtr insert_collection(size_t ndx);
-    CollectionBasePtr insert_collection(StringData key);
-    CollectionBasePtr get_collection(size_t ndx) const;
+    void insert_collection(const PathElement& index, CollectionType = CollectionType::Dictionary) override;
+    CollectionBasePtr get_collection(const PathElement& index) const;
 
     // If this list is at an intermediate nesting level, use these functions to
     // get a CollectionList at next level
-    CollectionListPtr insert_collection_list(size_t ndx);
-    CollectionListPtr insert_collection_list(StringData key);
-    CollectionListPtr get_collection_list(size_t ndx) const;
+    CollectionListPtr get_collection_list(const PathElement&) const;
 
     void remove(size_t ndx);
     void remove(StringData key);
@@ -90,6 +87,10 @@ public:
     ref_type get_child_ref(size_t child_ndx) const noexcept final;
     void update_child_ref(size_t child_ndx, ref_type new_ref) final;
 
+    CollectionType get_collection_type() const noexcept override
+    {
+        return m_coll_type;
+    }
     void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
 private:
@@ -121,6 +122,8 @@ private:
         return update_if_needed_with_status() != UpdateStatus::Detached;
     }
     void get_all_keys(size_t levels, std::vector<ObjKey>&) const;
+
+    Index get_index(const PathElement&) const;
 };
 
 } // namespace realm

@@ -62,6 +62,17 @@ public:
         return size() == 0;
     }
     virtual void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const {}
+    /// Get collection type (set, list, dictionary)
+    virtual CollectionType get_collection_type() const noexcept = 0;
+
+    virtual void insert_collection(const PathElement&, CollectionType)
+    {
+        throw IllegalOperation("insert_collection is not legal on this collection type");
+    }
+    virtual void set_collection(const PathElement&, CollectionType)
+    {
+        throw IllegalOperation("set_collection is not legal on this collection type");
+    }
 };
 
 using CollectionPtr = std::shared_ptr<Collection>;
@@ -125,9 +136,6 @@ public:
     /// the internal state of the accessor if it has changed.
     virtual bool has_changed() const noexcept = 0;
 
-    /// Get collection type (set, list, dictionary)
-    virtual CollectionType get_collection_type() const noexcept = 0;
-
     /// Returns true if the accessor is in the attached state. By default, this
     /// checks if the owning object is still valid.
     virtual bool is_attached() const
@@ -158,6 +166,15 @@ public:
     virtual size_t translate_index(size_t ndx) const noexcept
     {
         return ndx;
+    }
+
+    virtual DictionaryPtr get_dictionary(const PathElement&) const
+    {
+        return nullptr;
+    }
+    virtual ListMixedPtr get_list(const PathElement&) const
+    {
+        return nullptr;
     }
 
     virtual void set_owner(const Obj& obj, ColKey) = 0;
@@ -498,8 +515,9 @@ protected:
     {
     }
 
-    CollectionBaseImpl(DummyParent& parent) noexcept
+    CollectionBaseImpl(CollectionParent& parent, CollectionParent::Index index) noexcept
         : m_obj_mem(parent.get_object())
+        , m_index(index)
         , m_parent(&parent)
         , m_alloc(&m_obj_mem.get_alloc())
     {
