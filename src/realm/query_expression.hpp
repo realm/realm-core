@@ -2387,6 +2387,11 @@ public:
             throw std::runtime_error(util::format(
                 "Query '%1' links to data in the wrong format for a geoWithin query", this->description(none)));
         }
+        if (!m_link_map.get_target_table()->is_embedded()) {
+            throw std::runtime_error(util::format(
+                "A GEOWITHIN query can only operate on a link to an embedded class but '%1' is at the top level",
+                m_link_map.get_target_table()->get_class_name()));
+        }
     }
 
     void set_cluster(const Cluster* cluster) override

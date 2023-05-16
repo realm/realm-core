@@ -116,6 +116,22 @@ TEST(Geospatial_Assignment)
     CHECK_THROW_CONTAINING_MESSAGE(obj.set(location_column_key, geo_sphere), err_msg);
 }
 
+TEST(Geospatial_invalid_format)
+{
+    Group g;
+    TableRef table = setup_with_points(g, {});
+    ColKey location_column_key = table->get_column_key("location");
+    TableRef location_table = g.get_table("Location");
+    CHECK(location_table);
+    location_table->set_table_type(Table::Type::TopLevel);
+    auto&& location = table->column<Link>(location_column_key);
+
+    Geospatial bounds{GeoBox{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}}};
+    CHECK_THROW_CONTAINING_MESSAGE(
+        location.geo_within(bounds),
+        "A GEOWITHIN query can only operate on a link to an embedded class but 'Location' is at the top level");
+}
+
 TEST(Query_GeoWithinBasics)
 {
     Group g;
