@@ -352,7 +352,7 @@ inline Property::Property(std::string name, PropertyType type, const NestedTypes
     , object_type(std::move(target_type))
     , nested_types(nested_types)
 {
-    REALM_ASSERT(is_collection(type));
+    REALM_ASSERT(is_collection(type) || is_mixed(type));
     REALM_ASSERT((type == PropertyType::Object) == (object_type.size() != 0));
 }
 

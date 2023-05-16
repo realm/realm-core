@@ -128,6 +128,9 @@ typedef enum realm_value_type {
     RLM_TYPE_OBJECT_ID,
     RLM_TYPE_LINK,
     RLM_TYPE_UUID,
+    RLM_TYPE_LIST,
+    RLM_TYPE_SET,
+    RLM_TYPE_DICTIONARY,
 } realm_value_type_e;
 
 typedef enum realm_schema_validation_mode {
@@ -1635,6 +1638,12 @@ RLM_API bool realm_set_value(realm_object_t*, realm_property_key_t, realm_value_
  */
 RLM_API realm_object_t* realm_set_embedded(realm_object_t*, realm_property_key_t);
 
+/**
+ * Create a collection in a given Mixed property.
+ *
+ */
+RLM_API bool realm_set_collection(realm_object_t*, realm_property_key_t, realm_collection_type_e);
+
 /** Return the object linked by the given property
  *
  * @return A non-NULL pointer if an object is found.
@@ -1775,6 +1784,44 @@ RLM_API bool realm_list_set(realm_list_t*, size_t index, realm_value_t value);
  * @return True if no exception occurred.
  */
 RLM_API bool realm_list_insert(realm_list_t*, size_t index, realm_value_t value);
+
+/**
+ * Insert a collection inside a list (only available for mixed properities)
+ *
+ * @param list valid ptr to a list where a nested collection needs to be added
+ * @param index position in the list where to add the collection
+ * @return RLM_API
+ */
+RLM_API bool realm_list_insert_collection(realm_list_t* list, size_t index, realm_collection_type_e);
+
+/**
+ * Set a collection inside a list (only available for mixed properities).
+ * If the list already contains a collection of the requested type, the
+ * operation is idempotent.
+ *
+ * @param list valid ptr to a list where a nested collection needs to be set
+ * @param index position in the list where to set the collection
+ * @return RLM_API
+ */
+RLM_API bool realm_list_set_collection(realm_list_t* list, size_t index, realm_collection_type_e);
+
+/**
+ * Returns a nested list if such collection exists, NULL otherwise.
+ *
+ * @param list pointer to the list that containes the nested list
+ * @param index index of collection in the list
+ * @return a pointer to the the nested list found at the index passed as argument
+ */
+RLM_API realm_list_t* realm_list_get_list(realm_list_t* list, size_t index);
+
+/**
+ * Returns a nested dictionary if such collection exists, NULL otherwise.
+ *
+ * @param list pointer to the list that containes the nested collection into
+ * @param index position of collection in the list
+ * @return a pointer to the the nested dictionary found at index passed as argument
+ */
+RLM_API realm_dictionary_t* realm_list_get_dictionary(realm_list_t* list, size_t index);
 
 /**
  * Move the element at @a from_index to @a to_index.
@@ -2252,6 +2299,23 @@ RLM_API bool realm_dictionary_insert(realm_dictionary_t*, realm_value_t key, rea
  * @return A non-NULL pointer if the object was created successfully.
  */
 RLM_API realm_object_t* realm_dictionary_insert_embedded(realm_dictionary_t*, realm_value_t key);
+
+/**
+ * Insert a nested collection
+ */
+RLM_API bool realm_dictionary_insert_collection(realm_dictionary_t*, realm_value_t key, realm_collection_type_e);
+
+/**
+ * Fetch a list from a dictionary.
+ * @return a valid list that needs to be deleted by the caller or nullptr in case of an error.
+ */
+RLM_API realm_list_t* realm_dictionary_get_list(realm_dictionary_t* dictionary, realm_value_t key);
+
+/**
+ * Fetch a dictioanry from a dictionary.
+ * @return a valid dictionary that needs to be deleted by the caller or nullptr in case of an error.
+ */
+RLM_API realm_dictionary_t* realm_dictionary_get_dictionary(realm_dictionary_t* dictionary, realm_value_t key);
 
 /**
  * Get object identified by key
