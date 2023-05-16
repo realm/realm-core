@@ -438,11 +438,14 @@ void Lst<Mixed>::set_collection(const PathElement& path_elem, CollectionType typ
     if (old_val != new_val) {
         m_tree->ensure_keys();
         set(ndx, Mixed(0, type));
-        int64_t key = generate_key(size());
-        while (m_tree->find_key(key) != realm::not_found) {
-            key++;
+        int64_t key = m_tree->get_key(ndx);
+        if (key == 0) {
+            key = generate_key(size());
+            while (m_tree->find_key(key) != realm::not_found) {
+                key++;
+            }
+            m_tree->set_key(ndx, key);
         }
-        m_tree->set_key(ndx, key);
         bump_content_version();
     }
 }
