@@ -86,7 +86,7 @@ bool advance(std::vector<NestedCollectionInfo>& levels)
             return false;
         }
     }
-    levels.emplace_back(levels.back().list->get_collection_list(realm::PathElement{levels.back().index}));
+    levels.emplace_back(levels.back().list->get_collection_list(levels.back().index));
 
     return true;
 }

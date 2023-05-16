@@ -269,12 +269,18 @@ void Collection::insert_collection(const PathElement& path, CollectionType type)
     m_coll_base->insert_collection(path, type);
 }
 
-List Collection::get_list(const PathElement& path)
+void Collection::set_collection(const PathElement& path, CollectionType type)
+{
+    verify_in_transaction();
+    m_coll_base->set_collection(path, type);
+}
+
+List Collection::get_list(const PathElement& path) const
 {
     return List{m_realm, m_coll_base->get_list(path)};
 }
 
-Dictionary Collection::get_dictionary(const PathElement& path)
+Dictionary Collection::get_dictionary(const PathElement& path) const
 {
     return Dictionary{m_realm, m_coll_base->get_dictionary(path)};
 }

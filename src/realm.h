@@ -1795,6 +1795,17 @@ RLM_API bool realm_list_insert(realm_list_t*, size_t index, realm_value_t value)
 RLM_API bool realm_list_insert_collection(realm_list_t* list, size_t index, realm_collection_type_e);
 
 /**
+ * Set a collection inside a list (only available for mixed properities).
+ * If the list already contains a collection of the requested type, the
+ * operation is idempotent.
+ *
+ * @param list valid ptr to a list where a nested collection needs to be set
+ * @param index position in the list where to set the collection
+ * @return RLM_API
+ */
+RLM_API bool realm_list_set_collection(realm_list_t* list, size_t index, realm_collection_type_e);
+
+/**
  * Returns a nested list if such collection exists, NULL otherwise.
  *
  * @param list pointer to the list that containes the nested list

@@ -91,6 +91,14 @@ RLM_API bool realm_list_insert_collection(realm_list_t* list, size_t index, real
     });
 }
 
+RLM_API bool realm_list_set_collection(realm_list_t* list, size_t index, realm_collection_type_e type)
+{
+    return wrap_err([&]() {
+        list->set_collection(index, *from_capi(type));
+        return true;
+    });
+}
+
 
 RLM_API realm_list_t* realm_list_get_list(realm_list_t* list, size_t index)
 {

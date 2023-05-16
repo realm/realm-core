@@ -116,8 +116,9 @@ public:
 
     // nested collections
     void insert_collection(const PathElement&, CollectionType);
-    List get_list(const PathElement&);
-    Dictionary get_dictionary(const PathElement&);
+    void set_collection(const PathElement&, CollectionType);
+    List get_list(const PathElement&) const;
+    Dictionary get_dictionary(const PathElement&) const;
 
 protected:
     std::shared_ptr<Realm> m_realm;
