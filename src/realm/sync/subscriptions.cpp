@@ -974,7 +974,7 @@ bool SubscriptionStore::flush_changes_impl(Transaction& tr, CommitMode commit_mo
     }
     supercede_prior_to(tr, m_min_outstanding_version);
 
-    switch(commit_mode) {
+    switch (commit_mode) {
         case CommitMode::Commit:
             tr.commit();
             break;
