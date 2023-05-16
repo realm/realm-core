@@ -29,15 +29,14 @@ static SectionedResults::SectionKeyFunc builtin_comparison(Results& results, Res
         case Results::SectionedResultsOperator::FirstLetter:
             if (results.get_type() == PropertyType::Object) {
                 auto col_key = results.get_table()->get_column_key(prop_name);
-                return [col_key](Mixed value, const SharedRealm& realm) {
-                    auto link = value.get_link();
-                    auto v = realm->read_group().get_object(link).get<StringData>(col_key);
+                return [col_key](Results& results, size_t i) {
+                    auto v = results.get<Obj>(i).get<StringData>(col_key);
                     return v.size() > 0 ? v.prefix(1) : "";
                 };
             }
             else {
-                return [](Mixed value, const SharedRealm&) {
-                    auto v = value.get_string();
+                return [](Results& results, size_t i) {
+                    auto v = results.get<StringData>(i);
                     return v.size() > 0 ? v.prefix(1) : "";
                 };
             }
@@ -423,7 +422,7 @@ void SectionedResults::calculate_sections()
     m_row_to_index_path.resize(size);
 
     for (size_t i = 0; i < size; ++i) {
-        Mixed key = m_callback(m_results.get_any(i), m_results.get_realm());
+        Mixed key = m_callback(m_results, i);
         // Disallow links as section keys. It would be uncommon to use them to begin with
         // and if the object acting as the key was deleted bad things would happen.
         if (key.is_type(type_Link, type_TypedLink)) {

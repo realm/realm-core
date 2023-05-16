@@ -437,8 +437,8 @@ TEST_CASE("Benchmark sectioned results", "[benchmark]") {
     realm->commit_transaction();
 
     size_t section_count = GENERATE(1, 10, 1000, 10000);
-    auto key_fn = [&](Mixed value, SharedRealm realm) -> Mixed {
-        return Object(realm, value.get_link()).obj().get<int64_t>(col) % int64_t(section_count);
+    auto key_fn = [&](Results& results, size_t i) -> Mixed {
+        return results.get<Obj>(i).get<int64_t>(col) % int64_t(section_count);
     };
 
     SECTION("create and get section count") {
