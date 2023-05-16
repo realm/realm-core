@@ -514,12 +514,12 @@ TEST(Sync_SubscriptionStoreNextPendingVersion)
     auto pending_version = store->get_next_pending_version(0, DB::version_type{});
     CHECK(pending_version);
     CHECK_EQUAL(pending_version->query_version, bootstrapping_set);
-    CHECK_NOT(pending_version->snapshot_version);
+    CHECK_EQUAL(pending_version->snapshot_version, std::numeric_limits<DB::version_type>::max());
 
     pending_version = store->get_next_pending_version(bootstrapping_set, DB::version_type{});
     CHECK(pending_set);
     CHECK_EQUAL(pending_version->query_version, pending_set);
-    CHECK_NOT(pending_version->snapshot_version);
+    CHECK_EQUAL(pending_version->snapshot_version, std::numeric_limits<DB::version_type>::max());
 
     pending_version = store->get_next_pending_version(pending_set, DB::version_type{});
     CHECK(!pending_version);
