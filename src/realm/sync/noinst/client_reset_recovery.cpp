@@ -364,10 +364,12 @@ std::string ListPath::path_to_string(Transaction& remote, const InterningBuffer&
 
 RecoverLocalChangesetsHandler::RecoverLocalChangesetsHandler(Transaction& dest_wt,
                                                              Transaction& frozen_pre_local_state,
-                                                             util::Logger& logger)
+                                                             util::Logger& logger,
+                                                             SubscriptionStore* sub_store)
     : InstructionApplier(dest_wt)
     , m_frozen_pre_local_state{frozen_pre_local_state}
     , m_logger{logger}
+    , m_sub_store(sub_store)
 {
 }
 
@@ -399,6 +401,9 @@ void RecoverLocalChangesetsHandler::process_changesets(const std::vector<ClientH
                 // List modifications may have happened on an object which we are only subscribed to
                 // for this commit so we need to apply them as we go.
                 copy_lists_with_unrecoverable_changes();
+                if (m_sub_store) {
+                    m_sub_store->flush_changes(m_transaction);
+                }
                 m_transaction.commit_and_continue_as_read();
             }
             auto pre_sub = pending_subscriptions[subscription_index++];

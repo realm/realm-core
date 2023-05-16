@@ -1952,6 +1952,7 @@ void Session::send_message()
         return;
     }
 
+    const auto reached_target_upload = (m_upload_target_version <= m_upload_progress.client_version);
     auto check_pending_flx_version = [&]() -> bool {
         if (!m_is_flx_sync_session) {
             return false;
@@ -1968,7 +1969,7 @@ void Session::send_message()
             return false;
         }
 
-        return m_upload_progress.client_version >= m_pending_flx_sub_set->snapshot_version;
+        return reached_target_upload || m_upload_progress.client_version >= m_pending_flx_sub_set->snapshot_version;
     };
 
     if (check_pending_flx_version()) {
@@ -1977,7 +1978,7 @@ void Session::send_message()
 
     REALM_ASSERT(m_upload_progress.client_version <= m_upload_target_version);
     REALM_ASSERT(m_upload_target_version <= m_last_version_available);
-    if (m_allow_upload && (m_upload_target_version > m_upload_progress.client_version)) {
+    if (m_allow_upload && (!reached_target_upload)) {
         return send_upload_message(); // Throws
     }
 }
@@ -2120,11 +2121,10 @@ void Session::send_upload_message()
             m_pending_flx_sub_set = get_flx_subscription_store()->get_next_pending_version(
                 m_last_sent_flx_query_version, m_upload_progress.client_version);
         }
-        if (m_pending_flx_sub_set && m_pending_flx_sub_set->snapshot_version &&
-            *m_pending_flx_sub_set->snapshot_version < m_upload_target_version) {
+        if (m_pending_flx_sub_set && m_pending_flx_sub_set->snapshot_version < m_upload_target_version) {
             logger.trace("Limiting UPLOAD message up to version %1 to send QUERY version %2",
                          m_pending_flx_sub_set->snapshot_version, m_pending_flx_sub_set->query_version);
-            target_upload_version = *m_pending_flx_sub_set->snapshot_version;
+            target_upload_version = m_pending_flx_sub_set->snapshot_version;
         }
     }
 
@@ -2401,7 +2401,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         REALM_ASSERT_EX(m_progress.upload.last_integrated_server_version == 0,
                         m_progress.upload.last_integrated_server_version);
         logger.trace("last_version_available  = %1", m_last_version_available); // Throws
-
+ 
         m_upload_target_version = m_last_version_available;
         m_upload_progress = m_progress.upload;
         m_download_progress = m_progress.download;

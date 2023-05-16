@@ -1697,6 +1697,7 @@ void SessionWrapper::on_download_completion()
     }
 
     if (m_flx_subscription_store && m_flx_pending_mark_version != SubscriptionSet::EmptyVersion) {
+        REALM_ASSERT_3(m_flx_pending_mark_version, ==, m_flx_active_version);
         m_sess->logger.debug("Marking query version %1 as complete after receiving MARK message",
                              m_flx_pending_mark_version);
         auto mutable_subs = m_flx_subscription_store->get_mutable_by_version(m_flx_pending_mark_version);

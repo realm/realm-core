@@ -1699,14 +1699,25 @@ TEST_CASE("flx: verify PBS/FLX websocket protocol number and prefixes", "[sync][
 }
 
 TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app]") {
-    FLXSyncTestHarness harness("flx_bad_query");
+    FLXSyncTestHarness harness("flx_persist");
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
 
-    {
+    SECTION("persist by waiting for download") {
         auto orig_realm = Realm::get_shared_realm(config);
         auto mut_subs = orig_realm->get_latest_subscription_set().make_mutable_copy();
         mut_subs.insert_or_assign(Query(orig_realm->read_group().get_table("class_TopLevel")));
         mut_subs.commit();
+        wait_for_download(*orig_realm);
+        orig_realm->close();
+    }
+
+    SECTION("persist by doing a user write") {
+        auto orig_realm = Realm::get_shared_realm(config);
+        auto mut_subs = orig_realm->get_latest_subscription_set().make_mutable_copy();
+        mut_subs.insert_or_assign(Query(orig_realm->read_group().get_table("class_TopLevel")));
+        mut_subs.commit();
+        orig_realm->begin_transaction();
+        orig_realm->commit_transaction();
         orig_realm->close();
     }
 

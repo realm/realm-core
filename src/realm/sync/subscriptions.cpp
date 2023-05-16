@@ -491,7 +491,7 @@ SubscriptionSet MutableSubscriptionSet::commit()
     }
     auto mgr = get_flx_subscription_store(); // Throws
     m_committed->finished = true;
-    mgr->store_mutable_subscription_set(*this);
+    mgr->cache_mutable_subscription_set(*this);
 
     return mgr->get_by_version(version());
 }
@@ -570,7 +570,8 @@ SubscriptionStoreRef SubscriptionStore::create(DBRef db, const std::shared_ptr<u
 SubscriptionStore::SubscriptionStore(DBRef db, const std::shared_ptr<util::Logger>& parent_logger,
                                      util::UniqueFunction<void(int64_t)> on_new_subscription_set)
     : m_db(std::move(db))
-    , m_logger(std::make_shared<util::PrefixLogger>("SubscriptionStore ", parent_logger))
+    , m_logger(std::make_shared<util::PrefixLogger>(
+          util::format("SubscriptionStore DB %1 ", StringData(m_db->get_path()).hash() & 0xffff), parent_logger))
     , m_on_new_subscription_set(std::move(on_new_subscription_set))
 {
     std::vector<SyncMetadataTable> internal_tables{
@@ -684,6 +685,8 @@ SubscriptionSet SubscriptionStore::get_active()
 SubscriptionStore::VersionInfo SubscriptionStore::get_version_info() const
 {
     std::unique_lock<std::mutex> lk(m_cached_sub_sets_mutex);
+    m_logger->trace("Getting version info: latest version: %1, active version: %2, awaiting mark version: %3",
+                    m_latest_version, m_active_version, m_awaiting_mark_version);
     return VersionInfo{m_latest_version, m_active_version, m_awaiting_mark_version};
 }
 
@@ -699,11 +702,8 @@ SubscriptionStore::get_next_pending_version(int64_t last_query_version, DB::vers
         if (version <= last_query_version) {
             continue;
         }
-        std::optional<DB::version_type> snapshot_version;
-        if (sub_set.snapshot_version() != s_empty_snapshot_version) {
-            snapshot_version = sub_set.snapshot_version();
-        }
-        if (snapshot_version && *snapshot_version >= after_client_version) {
+        if (sub_set.snapshot_version() != s_empty_snapshot_version &&
+            sub_set.snapshot_version() >= after_client_version) {
             continue;
         }
         if (sub_set.state() != SubscriptionSet::State::Pending &&
@@ -712,7 +712,7 @@ SubscriptionStore::get_next_pending_version(int64_t last_query_version, DB::vers
             continue;
         }
 
-        return PendingSubscription{version, snapshot_version};
+        return PendingSubscription{version, sub_set.snapshot_version()};
     }
 
     return util::none;
@@ -753,15 +753,9 @@ std::vector<SubscriptionSet> SubscriptionStore::get_pending_subscriptions()
     std::vector<SubscriptionSet> subscriptions_to_recover;
     auto active_sub = get_active();
     auto cur_query_version = active_sub.version();
-    DB::version_type db_version = 0;
-    if (active_sub.state() == SubscriptionSet::State::Complete) {
-        db_version = active_sub.snapshot_version();
-    }
-    REALM_ASSERT_EX(db_version != s_empty_snapshot_version, active_sub.state());
     // get a copy of the pending subscription sets since the active version
-    while (auto next_pending = get_next_pending_version(cur_query_version, db_version)) {
+    while (auto next_pending = get_next_pending_version(cur_query_version, 0)) {
         cur_query_version = next_pending->query_version;
-        db_version = *next_pending->snapshot_version;
         subscriptions_to_recover.push_back(get_by_version(cur_query_version));
     }
     return subscriptions_to_recover;
@@ -935,11 +929,10 @@ bool SubscriptionStore::flush_changes(Transaction& tr)
         if (state == SubscriptionSet::State::PendingFlush) {
             state = SubscriptionSet::State::Pending;
         }
-        if (snapshot_version == s_empty_snapshot_version) {
+        if (did_create) {
             snapshot_version = tr.get_version();
             obj.set(m_sub_set_snapshot_version, static_cast<int64_t>(tr.get_version()));
-        }
-        if (did_create) {
+
             auto obj_sub_list = obj.get_linklist(m_sub_set_subscriptions);
             obj_sub_list.clear();
             for (const auto& sub : sub_set) {
@@ -961,9 +954,11 @@ bool SubscriptionStore::flush_changes(Transaction& tr)
             obj.set(m_sub_set_error_str, sub_set.error_str());
         }
 
-        m_logger->trace(
-            "Flushing subscription set version: %1, old_state: %2, new_state: %3, snapshot_version: %4, json: \"%5\"",
-            version, sub_set.state(), state, snapshot_version, obj.to_string());
+        if (m_logger->would_log(util::Logger::Level::trace)) {
+            m_logger->trace("Flushing subscription set version: %1, old_state: %2, new_state: %3, snapshot_version: "
+                            "%4, json: \"%5\"",
+                            version, sub_set.state(), state, snapshot_version, obj.to_string());
+        }
         sub_set.m_state = state;
         sub_set.m_snapshot_version = snapshot_version;
     }
@@ -1026,7 +1021,7 @@ void SubscriptionStore::process_notifications_for(const SubscriptionSet& mut_sub
     }
 }
 
-void SubscriptionStore::store_mutable_subscription_set(const MutableSubscriptionSet& mut_sub_set)
+void SubscriptionStore::cache_mutable_subscription_set(const MutableSubscriptionSet& mut_sub_set)
 {
     std::unique_lock<std::mutex> lk(m_cached_sub_sets_mutex);
     REALM_ASSERT(m_mutable_subcription_outstanding);
@@ -1036,10 +1031,9 @@ void SubscriptionStore::store_mutable_subscription_set(const MutableSubscription
         REALM_ASSERT(mut_sub_set.version() >= m_active_version);
         m_min_outstanding_version = mut_sub_set.version();
         m_active_version = mut_sub_set.version();
-    }
-    if (mut_sub_set.state() == SubscriptionSet::State::AwaitingMark) {
-        REALM_ASSERT(mut_sub_set.version() >= m_active_version);
-        m_awaiting_mark_version = mut_sub_set.version();
+        m_awaiting_mark_version = mut_sub_set.state() == SubscriptionSet::State::Complete
+                                      ? SubscriptionSet::EmptyVersion
+                                      : mut_sub_set.version();
     }
 
     m_latest_version = std::max(m_latest_version, mut_sub_set.version());

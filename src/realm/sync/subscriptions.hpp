@@ -362,7 +362,7 @@ public:
 
     struct PendingSubscription {
         int64_t query_version;
-        std::optional<DB::version_type> snapshot_version;
+        DB::version_type snapshot_version;
     };
 
     util::Optional<PendingSubscription> get_next_pending_version(int64_t last_query_version,
@@ -379,6 +379,10 @@ public:
     // with the subscription store.
     void terminate();
 
+    // Applies any changes to mutable subscription sets to the supplied transaction - if the transaction
+    // is not a write transaction then it will be promoted to write and committed within this function.
+    //
+    // Returns false if there were no changes to flush.
     bool flush_changes(Transaction& tr);
 
 private:
@@ -388,7 +392,7 @@ private:
 protected:
     friend class MutableSubscriptionSet;
     friend struct OutstandingMutableGuard;
-    void store_mutable_subscription_set(const MutableSubscriptionSet& mut_sub_set);
+    void cache_mutable_subscription_set(const MutableSubscriptionSet& mut_sub_set);
     void release_outstanding_mutable_sub_set();
     void process_notifications_for(const SubscriptionSet& mut_sub_set);
 

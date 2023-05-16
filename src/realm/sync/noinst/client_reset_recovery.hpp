@@ -154,7 +154,7 @@ private:
 };
 
 struct RecoverLocalChangesetsHandler : public sync::InstructionApplier {
-    RecoverLocalChangesetsHandler(Transaction& dest_wt, Transaction& frozen_pre_local_state, util::Logger& logger);
+    RecoverLocalChangesetsHandler(Transaction& dest_wt, Transaction& frozen_pre_local_state, util::Logger& logger, sync::SubscriptionStore* sub_store);
     virtual ~RecoverLocalChangesetsHandler();
     void process_changesets(const std::vector<sync::ClientHistory::LocalChange>& changesets,
                             std::vector<sync::SubscriptionSet>&& pending_subs);
@@ -212,6 +212,8 @@ private:
     // Track any recovered operations on lists to make sure that they are allowed.
     // If not, the lists here will be copied verbatim from the local state to the remote.
     util::FlatMap<ListPath, ListTracker> m_lists;
+
+    sync::SubscriptionStore* m_sub_store;
 };
 
 } // namespace realm::_impl::client_reset
