@@ -672,7 +672,12 @@ SubscriptionSet SubscriptionStore::get_latest()
 SubscriptionSet SubscriptionStore::get_active()
 {
     std::unique_lock<std::mutex> lk(m_cached_sub_sets_mutex);
-    return get_by_version_impl(lk, m_active_version, std::nullopt);
+    auto version = m_active_version;
+    // If there is no active subscription set then return the zero'th subscription set instead.
+    if (version == SubscriptionSet::EmptyVersion) {
+        version = 0;
+    }
+    return get_by_version_impl(lk, version, std::nullopt);
 }
 
 
@@ -828,14 +833,6 @@ MutableSubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version
 SubscriptionSet SubscriptionStore::get_by_version_impl(std::unique_lock<std::mutex>&, int64_t version_id,
                                                        std::optional<TransactionRef> opt_tr)
 {
-    // Special case that if the version_id is the "empty" version ID then we
-    if (version_id == SubscriptionSet::EmptyVersion) {
-        if (m_latest_version != 0) {
-            throw std::logic_error("Cannot get a subscription set with the \"empty\" version unless the latest "
-                                   "subscription set version is zero");
-        }
-        version_id = 0;
-    }
     if (version_id < m_min_outstanding_version) {
         return SubscriptionSet(weak_from_this(), version_id, SubscriptionSet::SupersededTag{});
     }
