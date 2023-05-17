@@ -19,9 +19,11 @@
 #include "testsettings.hpp"
 #ifdef TEST_GEO
 
-#include "test.hpp"
-
 #include "s2/util/math/mathutil.h"
+// conflicting defines of CHECK from s2
+#undef CHECK
+
+#include "test.hpp"
 
 #include <realm/geospatial.hpp>
 #include <realm/group.hpp>
