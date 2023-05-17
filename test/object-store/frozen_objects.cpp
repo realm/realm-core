@@ -373,7 +373,11 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
                     // Snapshot should not be affected by the removed collection
                     REQUIRE(snapshot.size() == 5);
                 });
-                VERIFY_VALID_RESULTS(results, realm);
+                REQUIRE(results.is_valid());
+                REQUIRE(results.size() == 0);
+                auto frozen = results.freeze(realm);
+                REQUIRE(frozen.is_valid());
+                REQUIRE(frozen.size() == 0);
             }
         }
 

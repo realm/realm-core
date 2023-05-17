@@ -1091,14 +1091,15 @@ Results Results::import_copy_into_realm(std::shared_ptr<Realm> const& realm)
     validate_read();
 
     switch (m_mode) {
+        case Mode::Table:
+            return Results(realm, realm->import_copy_of(m_table));
         case Mode::Collection:
             if (std::shared_ptr<CollectionBase> collection = realm->import_copy_of(*m_collection)) {
                 return Results(realm, collection, m_descriptor_ordering);
             }
-            // If collection is gone, fallback to pure table.
-            [[fallthrough]];
-        case Mode::Table:
-            return Results(realm, realm->import_copy_of(m_table));
+            // If collection is gone, fallback to empty selection on table.
+            return Results(realm, TableView(realm->import_copy_of(m_table)));
+            break;
         case Mode::Query:
             return Results(realm, *realm->import_copy_of(m_query, PayloadPolicy::Copy), m_descriptor_ordering);
         case Mode::TableView: {
