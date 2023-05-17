@@ -91,7 +91,7 @@ public:
         bool any_is_null(IndexPair i) const
         {
             return std::any_of(m_columns.begin(), m_columns.end(), [=](auto&& col) {
-                return col.is_null.empty() ? false : col.is_null[i.index_in_view];
+                return !col.translated_keys.empty() && !col.translated_keys[i.index_in_view];
             });
         }
         void cache_first_column(IndexPairs& v);
@@ -104,7 +104,6 @@ public:
                 , ascending(a)
             {
             }
-            std::vector<bool> is_null;
             std::vector<ObjKey> translated_keys;
 
             const Table* table;
