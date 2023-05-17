@@ -7,7 +7,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* We could crash when removing backlinks in cases where forward links did not have a corresponding backlink due to corruption. We now silently ignore this inconsistency in release builds, allowing the app to continue. ([#6585](https://github.com/realm/realm-core/issues/6585), v6.0.0)
 
 ### Breaking changes
 * `platform` and `cpu_arch` fields in the `device_info` structure in App::Config can no longer be provided by the SDK's, they are inferred by the library ([PR #6612](https://github.com/realm/realm-core/pull/6612))

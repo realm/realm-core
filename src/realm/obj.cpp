@@ -2036,7 +2036,11 @@ bool Obj::remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state)
     if (old_link && old_link.get_obj_key()) {
         REALM_ASSERT(m_table->valid_column(col_key));
         ObjKey old_key = old_link.get_obj_key();
-        auto target_obj = m_table->get_parent_group()->get_object(old_link);
+        auto target_obj = m_table->get_parent_group()->try_get_object(old_link);
+        REALM_ASSERT_DEBUG(target_obj);
+        if (!target_obj) {
+            return false;
+        }
         TableRef target_table = target_obj.get_table();
         ColKey backlink_col_key;
         auto type = col_key.get_type();
