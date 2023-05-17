@@ -1921,7 +1921,6 @@ struct BenchmarkAssignGeoPoints : BenchmarkWithGeoPoints {
     void operator()(DBRef) override
     {
         assign_points(m_table);
-        m_tr->commit();
     }
 };
 
@@ -1931,20 +1930,17 @@ struct BenchmarkAssignGeoPointsFromNull : BenchmarkWithGeoPoints {
         return "AssignGeoPointsFromNull";
     }
 
-    void before_each(DBRef db) override
+    void before_all(DBRef group) override
     {
-        WriteTransaction tr(db);
-        auto table = tr.get_table(name());
-        table->clear();
-        add_records(table, false);
+        BenchmarkWithGeospatial::before_all(group);
+        WriteTransaction tr(group);
+        add_records(tr.get_table(name()), false);
         tr.commit();
-        BenchmarkWithGeoPoints::before_each(db);
     }
 
     void operator()(DBRef) override
     {
         assign_points(m_table);
-        m_tr->commit();
     }
 };
 
