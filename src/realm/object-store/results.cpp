@@ -116,14 +116,16 @@ bool Results::is_valid() const
         m_realm->verify_thread();
     }
 
-    if (m_collection)
-        return m_collection->is_attached();
-
     // Here we cannot just use if (m_table) as it combines a check if the
     // reference contains a value and if that value is valid.
     // First we check if a table is referenced ...
     if (m_table.unchecked_ptr() != nullptr)
         return bool(m_table); // ... and then we check if it is valid
+
+    if (m_collection)
+        // Since m_table was not set, this is a collection of primitives
+        // and the results validity depend directly on the collection
+        return m_collection->is_attached();
 
     return true;
 }
@@ -1089,10 +1091,14 @@ Results Results::import_copy_into_realm(std::shared_ptr<Realm> const& realm)
     validate_read();
 
     switch (m_mode) {
+        case Mode::Collection:
+            if (std::shared_ptr<CollectionBase> collection = realm->import_copy_of(*m_collection)) {
+                return Results(realm, collection, m_descriptor_ordering);
+            }
+            // If collection is gone, fallback to pure table.
+            [[fallthrough]];
         case Mode::Table:
             return Results(realm, realm->import_copy_of(m_table));
-        case Mode::Collection:
-            return Results(realm, realm->import_copy_of(*m_collection), m_descriptor_ordering);
         case Mode::Query:
             return Results(realm, *realm->import_copy_of(m_query, PayloadPolicy::Copy), m_descriptor_ordering);
         case Mode::TableView: {
