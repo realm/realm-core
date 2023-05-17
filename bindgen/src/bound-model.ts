@@ -341,7 +341,11 @@ export class Class extends NamedType {
   needsDeref = false;
   iterable?: Type;
 
-  get methods(): Readonly<Method[]> {
+  /**
+   * Get a new array containing the methods.
+   * For adding a method onto `this` instance, use `addMethod`.
+   */
+  get methods() {
     return Object.values(this._methods);
   }
 
@@ -403,7 +407,11 @@ export class Struct extends NamedType {
   cppName!: string;
   private _fields: { [name: string]: Field } = {};
 
-  get fields(): Readonly<Field[]> {
+  /**
+   * Get a new array containing the fields.
+   * For adding a field onto `this` instance, use `addField`.
+   */
+  get fields() {
     return Object.values(this._fields);
   }
 
