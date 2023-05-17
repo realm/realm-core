@@ -25,18 +25,24 @@
 
 using namespace realm;
 
-Spec::~Spec() noexcept {}
-
-void Spec::dump_interning_stats()
+// Uninitialized Spec (call init() to init)
+Spec::Spec(Allocator& alloc) noexcept
+    : m_top(alloc)
+    , m_types(alloc)
+    , m_names(alloc)
+    , m_attr(alloc)
+    , m_enumkeys(alloc)
+    , m_keys(alloc)
 {
-    for (auto col = 0; col < m_interners.size(); ++col) {
-        auto& e = m_interners[col];
-        if (e.strings.size()) {
-            std::cout << "Column " << col << " holding " << e.strings.size() << " unique strings in "
-                      << e.string_memory << " bytes" << std::endl;
-        }
-    }
+    m_types.set_parent(&m_top, 0);
+    m_names.set_parent(&m_top, 1);
+    m_attr.set_parent(&m_top, 2);
+    m_enumkeys.set_parent(&m_top, 4);
+    m_keys.set_parent(&m_top, 5);
 }
+
+
+Spec::~Spec() noexcept {}
 
 void Spec::detach() noexcept
 {
@@ -332,7 +338,7 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
         m_interners.resize(column_ndx + 1);
     }
     REALM_ASSERT(column_ndx <= m_interners.size());
-    m_interners.insert(m_interners.begin() + column_ndx, {});
+    m_interners.insert(m_interners.begin() + column_ndx, nullptr);
     update_internals();
 }
 
@@ -577,6 +583,296 @@ void Spec::verify() const
 #endif
 }
 
+// Code for pair compression integrated with interning:
+// ----------
+// Compression is done by first expanding 8-bit chars to 16-bit symbols.
+// these symbols are then pairwise compressed in multiple rounds, each
+// round potentially halving the storage requirement.
+template <>
+struct std::hash<std::vector<uint16_t>> {
+    std::size_t operator()(const std::vector<uint16_t>& c) const noexcept
+    {
+        auto seed = c.size();
+        for (auto& x : c) {
+            seed = (seed + 3) * (x + 7);
+        }
+        return seed;
+    }
+};
+
+struct encoding_entry {
+    uint16_t exp_a;
+    uint16_t exp_b;
+    uint16_t symbol = 0; // unused symbol 0.
+};
+
+int hash(uint16_t a, uint16_t b)
+{
+    // range of return value must match size of encoding table
+    uint32_t tmp = a + 3;
+    tmp *= b + 7;
+    return (tmp ^ (tmp >> 16)) & 0xFFFF;
+}
+
+#define INTERN_ONLY 0
+#define COMPRESS_BEFORE_INTERNING 1
+
+class Spec::string_interner {
+public:
+#if INTERN_ONLY
+    std::vector<std::string> strings;
+    std::unordered_map<std::string, int> string_map;
+#else
+    std::vector<std::vector<uint16_t>> symbols;
+    std::vector<encoding_entry> encoding_table;
+    std::vector<encoding_entry> decoding_table;
+#if COMPRESS_BEFORE_INTERNING
+    std::unordered_map<std::vector<uint16_t>, int> symbol_map;
+#else
+    std::vector<std::string> strings;
+    std::unordered_map<std::string, int> string_map;
+#endif
+#endif
+#if !INTERN_ONLY
+    bool separators[256];
+    uint16_t symbol_buffer[8192];
+    string_interner()
+    {
+        encoding_table.resize(65536);
+        for (int j = 0; j < 0x20; ++j)
+            separators[j] = true;
+        for (int j = 0x20; j < 0x100; ++j)
+            separators[j] = false;
+        separators['/'] = true;
+        separators[':'] = true;
+        separators['?'] = true;
+        separators['<'] = true;
+        separators['>'] = true;
+        separators['['] = true;
+        separators[']'] = true;
+        separators['{'] = true;
+        separators['}'] = true;
+    }
+    int compress_symbols(uint16_t symbols[], int size, int max_runs, int breakout_limit = 1)
+    {
+        bool table_full = decoding_table.size() >= 65536 - 256;
+        // std::cout << "Input: ";
+        // for (int i = 0; i < size; ++i)
+        //     std::cout << symbols[i] << " ";
+        // std::cout << std::endl;
+        for (int runs = 0; runs < max_runs; ++runs) {
+            uint16_t* to = symbols;
+            int p;
+            uint16_t* from = symbols;
+            for (p = 0; p < size - 1;) {
+                uint16_t a = from[0];
+                uint16_t b = from[1];
+                auto index = hash(a, b);
+                auto& e = encoding_table[index];
+                if (e.symbol && e.exp_a == a && e.exp_b == b) {
+                    // existing matching entry -> compress
+                    *to++ = e.symbol;
+                    p += 2;
+                }
+                else if (e.symbol || table_full) {
+                    // existing conflicting entry or at capacity -> don't compress
+                    *to++ = a;
+                    p++;
+                    // trying to stay aligned yields slightly worse results, so disable for now:
+                    // *to++ = from[1];
+                    // p++;
+                }
+                else {
+                    // no matching entry yet, create new one -> compress
+                    e.symbol = decoding_table.size() + 256;
+                    e.exp_a = a;
+                    e.exp_b = b;
+                    // std::cout << "             new symbol " << e.symbol << " -> " << e.exp_a << " " << e.exp_b
+                    //           << std::endl;
+                    decoding_table.push_back({a, b, e.symbol});
+                    table_full = decoding_table.size() >= 65536 - 256;
+                    *to++ = e.symbol;
+                    p += 2;
+                }
+                from = symbols + p;
+            }
+            // potentially move last unpaired symbol over
+            if (p < size) {
+                *to++ = *from++; // need to increment for early out check below
+            }
+            size = to - symbols;
+            // std::cout << " -- Round " << runs << " -> ";
+            // for (int i = 0; i < size; ++i)
+            //     std::cout << symbols[i] << " ";
+            // std::cout << std::endl;
+            if (size <= breakout_limit)
+                break; // early out, gonna use at least one chunk anyway
+            if (from == to)
+                break; // early out, no symbols were compressed on last run
+        }
+        return size;
+    }
+    void decompress_and_verify(uint16_t symbols[], int size, const char* first, const char* past)
+    {
+        uint16_t decompressed[8192];
+        uint16_t* from = symbols;
+        uint16_t* to = decompressed;
+
+        auto decompress = [&](uint16_t symbol, auto& recurse) -> void {
+            if (symbol < 256)
+                *to++ = symbol;
+            else {
+                auto& e = decoding_table[symbol - 256];
+                recurse(e.exp_a, recurse);
+                recurse(e.exp_b, recurse);
+            }
+        };
+
+        while (size--) {
+            decompress(*from++, decompress);
+        }
+        // walk back on any trailing zeroes:
+        while (to[-1] == 0 && to > decompressed) {
+            --to;
+        }
+        size = to - decompressed;
+        // std::cout << "reverse -> ";
+        // for (int i = 0; i < size; ++i) {
+        //     std::cout << decompressed[i] << " ";
+        // }
+        // std::cout << std::endl;
+        REALM_ASSERT(size == past - first);
+        uint16_t* checked = decompressed;
+        while (first < past) {
+            REALM_ASSERT((0xFF & *first++) == *checked++);
+        }
+    }
+    int compress(uint16_t symbols[], const char* first, const char* past)
+    {
+        // expand into 16 bit symbols:
+        int size = past - first;
+        REALM_ASSERT(size < 8180);
+        uint16_t* to = symbols;
+        int out_size = 0;
+        for (const char* p = first; p < past;) {
+            // form group from !seps followed by seps
+            uint16_t* group_start = to;
+            while (p < past && !separators[0xFFUL & *p])
+                *to++ = *p++ & 0xFF;
+            while (p < past && separators[0xFFUL & *p])
+                *to++ = *p++ & 0xFF;
+            int group_size = to - group_start;
+            // compress the group
+            group_size = compress_symbols(group_start, group_size, 2);
+            to = group_start + group_size;
+            out_size += group_size;
+        }
+        // compress all groups together
+        // size = out_size;
+        size = compress_symbols(symbols, out_size, 2, 4);
+        compressed_symbols += size;
+        return size;
+    }
+    int symbol_table_size()
+    {
+        return decoding_table.size();
+    }
+#endif
+    int handle(const StringData value)
+    {
+        const char* _first = value.data();
+        int size = value.size();
+        const char* _past = value.data() + size;
+        total_chars += size;
+#if INTERN_ONLY
+        std::string s(_first, _past);
+        auto it = string_map.find(s);
+        if (it == string_map.end()) {
+            auto id = strings.size();
+            strings.push_back(s);
+            string_map[s] = id;
+            unique_symbol_size += size;
+            return id;
+        }
+        else {
+            return it->second;
+        }
+#else
+#if COMPRESS_BEFORE_INTERNING
+        size = compress(symbol_buffer, _first, _past);
+        decompress_and_verify(symbol_buffer, size, _first, _past);
+
+        std::vector<uint16_t> symbol(size);
+        for (int j = 0; j < size; ++j)
+            symbol[j] = symbol_buffer[j];
+        auto it = symbol_map.find(symbol);
+        if (it == symbol_map.end()) {
+            auto id = symbols.size();
+            symbols.push_back(symbol);
+            symbol_map[symbol] = id;
+            unique_symbol_size += 2 * size;
+            return id;
+        }
+        else {
+            return it->second;
+        }
+#else // INTERN BEFORE COMPRESSING:
+        std::string s(_first, _past);
+        auto it = string_map.find(s);
+        if (it == string_map.end()) {
+            auto id = strings.size();
+            strings.push_back(s);
+            string_map[s] = id;
+            auto size = compress(symbol_buffer, _first, _past);
+            std::vector<uint16_t> symbol(size);
+            for (int j = 0; j < size; ++j)
+                symbol[j] = symbol_buffer[j];
+            symbols.push_back(symbol);
+            unique_symbol_size += 2 * size;
+            return id;
+        }
+        else {
+            return it->second;
+        }
+#endif
+#endif
+    }
+    size_t search(StringData value)
+    {
+        return npos;
+    }
+    int next_id = 0;
+    int next_prefix_id = -1;
+    int64_t total_chars = 0;
+    int64_t compressed_symbols = 0;
+    int64_t unique_symbol_size = 0;
+    size_t num_unique_values()
+    {
+#if INTERN_ONLY
+        return strings.size();
+#else
+        return symbols.size();
+#endif
+    }
+    void dump_interning_stats()
+    {
+        std::cout << " Interning " << total_chars << " bytes of input strings into " << num_unique_values()
+                  << " unique strings in " << unique_symbol_size << " bytes" << std::endl;
+    }
+};
+
+void Spec::dump_interning_stats()
+{
+    for (auto col = 0UL; col < m_interners.size(); ++col) {
+        auto& e = m_interners[col];
+        if (e) {
+            std::cout << "Column " << col;
+            e->dump_interning_stats();
+        }
+    }
+}
+
+
 size_t Spec::add_insert_enum_string(size_t column_ndx, StringData value)
 {
     // REALM_ASSERT(value.data());
@@ -586,18 +882,10 @@ size_t Spec::add_insert_enum_string(size_t column_ndx, StringData value)
     if (column_ndx >= m_interners.size()) {
         m_interners.resize(column_ndx + 1);
     }
-    REALM_ASSERT(column_ndx < m_interners.size());
-    Interner& interner = m_interners[column_ndx];
-    std::string s(value.data(), value.size());
-    auto it = interner.string_map.find(s);
-    if (it != interner.string_map.end()) {
-        return it->second;
+    if (!m_interners[column_ndx]) {
+        m_interners[column_ndx] = std::make_unique<string_interner>();
     }
-    interner.strings.push_back(s);
-    interner.string_memory += value.size();
-    size_t id = interner.strings.size();
-    interner.string_map[s] = id;
-    return id;
+    return m_interners[column_ndx]->handle(value);
 }
 
 size_t Spec::search_enum_string(size_t column_ndx, StringData value)
@@ -607,30 +895,27 @@ size_t Spec::search_enum_string(size_t column_ndx, StringData value)
         return 0;
     }
     REALM_ASSERT(column_ndx < m_interners.size());
-    Interner& interner = m_interners[column_ndx];
-    std::string s(value.data(), value.size());
-    auto it = interner.string_map.find(s);
-    if (it != interner.string_map.end()) {
-        return it->second;
-    }
-    return npos;
+    auto& interner = m_interners[column_ndx];
+    return interner->search(value);
 }
 
 size_t Spec::get_num_unique_values(size_t column_ndx) const
 {
     REALM_ASSERT(column_ndx < m_interners.size());
-    const Interner& interner = m_interners[column_ndx];
-    return interner.strings.size();
+    const auto& interner = m_interners[column_ndx];
+    return interner->num_unique_values();
 }
 
 StringData Spec::get_enum_string(size_t column_ndx, size_t id)
 {
-    if (!id) {
-        return {nullptr, 0};
-    }
-    REALM_ASSERT(column_ndx < m_interners.size());
-    Interner& interner = m_interners[column_ndx];
-    return interner.strings[id + 1];
+    // Returning as StringData is not really possible for a compressed string
+    return {nullptr, 0};
+    // if (!id) {
+    //     return {nullptr, 0};
+    // }
+    // REALM_ASSERT(column_ndx < m_interners.size());
+    // auto& interner = m_interners[column_ndx];
+    //  return interner->strings[id + 1];
 }
 
 bool Spec::is_null_enum_string(size_t column_ndx, size_t id)

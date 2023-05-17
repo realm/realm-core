@@ -104,12 +104,8 @@ private:
     size_t m_num_public_columns;
 
     // in-memory support for string interning (temporary)
-    struct Interner {
-        size_t string_memory = 0;
-        std::vector<std::string> strings;
-        std::unordered_map<std::string, size_t> string_map;
-    };
-    std::vector<Interner> m_interners;
+    class string_interner;
+    std::vector<std::unique_ptr<string_interner>> m_interners;
 
     Spec(Allocator&) noexcept; // Unattached
 
@@ -168,22 +164,6 @@ private:
 inline Allocator& Spec::get_alloc() const noexcept
 {
     return m_top.get_alloc();
-}
-
-// Uninitialized Spec (call init() to init)
-inline Spec::Spec(Allocator& alloc) noexcept
-    : m_top(alloc)
-    , m_types(alloc)
-    , m_names(alloc)
-    , m_attr(alloc)
-    , m_enumkeys(alloc)
-    , m_keys(alloc)
-{
-    m_types.set_parent(&m_top, 0);
-    m_names.set_parent(&m_top, 1);
-    m_attr.set_parent(&m_top, 2);
-    m_enumkeys.set_parent(&m_top, 4);
-    m_keys.set_parent(&m_top, 5);
 }
 
 inline bool Spec::init_from_parent() noexcept
