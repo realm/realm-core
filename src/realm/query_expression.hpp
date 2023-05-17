@@ -2427,7 +2427,8 @@ public:
                     });
                     if (found)
                         return start;
-                } break;
+                    break;
+                }
                 case ExpressionComparisonType::All: {
                     m_link_map.map_links(start, [&](ObjKey key) {
                         found = m_region.contains(

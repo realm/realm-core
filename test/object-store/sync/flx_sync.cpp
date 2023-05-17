@@ -1285,7 +1285,7 @@ TEST_CASE("flx: geospatial", "[sync][flx][app]") {
             auto subs = create_subscription(realm, "class_restaurant", "queryable_str_field", [](Query q, ColKey c) {
                 return q.equal(c, "synced");
             });
-            auto make_geowithin_filter = [&](const GeoPolygon& polygon) -> bson::BsonDocument {
+            auto make_polygon_filter = [&](const GeoPolygon& polygon) -> bson::BsonDocument {
                 bson::BsonArray inner{};
                 REALM_ASSERT_3(polygon.points.size(), ==, 1);
                 for (auto& point : polygon.points[0]) {
@@ -1297,6 +1297,44 @@ TEST_CASE("flx: geospatial", "[sync][flx][app]") {
                 bson::BsonDocument filter{
                     {"location", bson::BsonDocument{{"$geoWithin", bson::BsonDocument{{"$geometry", geo_bson}}}}}};
                 return filter;
+            };
+            auto make_circle_filter = [&](const GeoCenterSphere& circle) -> bson::BsonDocument {
+                bson::BsonArray coords{circle.center.longitude, circle.center.latitude};
+                bson::BsonArray inner;
+                inner.push_back(coords);
+                inner.push_back(circle.radius_radians);
+                bson::BsonDocument filter{
+                    {"location", bson::BsonDocument{{"$geoWithin", bson::BsonDocument{{"$centerSphere", inner}}}}}};
+                return filter;
+            };
+            auto run_query_on_server = [&](const bson::BsonDocument& filter,
+                                           std::optional<std::string> expected_error = {}) -> size_t {
+                auto remote_client = harness->app()->current_user()->mongo_client("BackingDB");
+                auto db = remote_client.db(harness->session().app_session().config.mongo_dbname);
+                auto restaurant_collection = db["restaurant"];
+                bool processed = false;
+                constexpr int64_t limit = 1000;
+                size_t matches = 0;
+                restaurant_collection.count(filter, limit, [&](uint64_t count, util::Optional<AppError> error) {
+                    processed = true;
+                    if (error) {
+                        if (!expected_error) {
+                            util::format(std::cout, "query error: %1\n", error->reason());
+                            FAIL(error);
+                        }
+                        else {
+                            std::string_view reason = error->reason();
+                            auto pos = reason.find(*expected_error);
+                            if (pos == std::string::npos) {
+                                util::format(std::cout, "mismatch error: '%1' and '%2'\n", reason, *expected_error);
+                                FAIL(reason);
+                            }
+                        }
+                    }
+                    matches = size_t(count);
+                });
+                REQUIRE(processed);
+                return matches;
             };
             auto sub_res = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
             CHECK(sub_res.is_ok());
@@ -1317,9 +1355,8 @@ TEST_CASE("flx: geospatial", "[sync][flx][app]") {
                                              {"coordinates", std::vector<std::any>{p.longitude, p.latitude}}}}}));
             };
             std::vector<GeoPoint> points = {
-                GeoPoint{-74.006, 40.712800000000001},
-                GeoPoint{12.568300000000001, 55.676099999999998},
-                GeoPoint{12.082599999999999, 55.628},
+                GeoPoint{-74.006, 40.712800000000001}, GeoPoint{12.568300000000001, 55.676099999999998},
+                GeoPoint{12.082599999999999, 55.628}, GeoPoint{-180.1, -90.1}, // invalid
             };
             for (auto& point : points) {
                 add_point(point);
@@ -1343,28 +1380,29 @@ TEST_CASE("flx: geospatial", "[sync][flx][app]") {
                 GeoPolygon bounds{
                     {GeoPoint{-80, 40.7128}, GeoPoint{20, 60}, GeoPoint{20, 20}, GeoPoint{-80, 40.7128}}};
                 Query query = table->column<Link>(location_col).geo_within(Geospatial(bounds));
-                size_t num_matches = query.find_all().size();
-                REQUIRE(num_matches == 2);
-
-                auto remote_client = harness->app()->current_user()->mongo_client("BackingDB");
-                auto db = remote_client.db(harness->session().app_session().config.mongo_dbname);
-                auto restaurant_collection = db["restaurant"];
+                size_t local_matches = query.find_all().size();
+                REQUIRE(local_matches == 2);
 
                 reset_utils::wait_for_object_to_persist_to_atlas(
                     harness->app()->current_user(), harness->session().app_session(), "restaurant", {{"_id", pk}});
 
-                bson::BsonDocument filter = make_geowithin_filter(bounds);
-                bool processed = false;
-                constexpr int64_t limit = 1000;
-                restaurant_collection.count(filter, limit, [&](uint64_t count, util::Optional<AppError> error) {
-                    if (error) {
-                        util::format(std::cout, "query error: %1\n", error->reason());
-                    }
-                    REQUIRE_FALSE(error);
-                    CHECK(count == num_matches);
-                    processed = true;
-                });
-                REQUIRE(processed);
+                bson::BsonDocument filter = make_polygon_filter(bounds);
+                size_t server_results = run_query_on_server(filter);
+                CHECK(server_results == local_matches);
+
+                GeoCenterSphere sphere = GeoCenterSphere::from_kms(10, GeoPoint{-180.1, -90.1});
+                CHECK_THROWS_WITH(table->column<Link>(location_col).geo_within(sphere).count(),
+                                  "Invalid region in GEOWITHIN query for parameter 'GeoSphere([-180.1, -90.1], "
+                                  "0.00156787)': 'Longitude/latitude is out of bounds, lng: -180.1 lat: -90.1'");
+                filter = make_circle_filter(sphere);
+                run_query_on_server(filter, "(BadValue) longitude/latitude is out of bounds");
+
+                sphere = GeoCenterSphere::from_kms(-1, GeoPoint{0, 0});
+                CHECK_THROWS_WITH(table->column<Link>(location_col).geo_within(sphere).count(),
+                                  "Invalid region in GEOWITHIN query for parameter 'GeoSphere([0, 0], "
+                                  "-0.000156787)': 'The radius of must be a non negative number'");
+                filter = make_circle_filter(sphere);
+                run_query_on_server(filter, "(BadValue) radius must be a non-negative number");
             }
         });
     }
