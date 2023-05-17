@@ -19,7 +19,7 @@
 import { BoundSpec } from "./bound-model";
 import { Formatter } from "./formatter";
 import { Outputter } from "./outputter";
-import { Spec } from "./spec";
+import { OptInSpec, Spec } from "./spec";
 
 export type TemplateContext = {
   rawSpec: Spec;

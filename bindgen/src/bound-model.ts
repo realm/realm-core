@@ -759,5 +759,24 @@ export function bindModel(spec: Spec, optInSpec?: OptInSpec): BoundSpec {
       .concat(Object.values(spec.mixedInfo.dataTypes).map(({ type }) => out.types[type])),
   };
 
+  // Mark methods and fields in the opt-in list as `isOptedInTo` which the consumer/SDK
+  // then can choose to handle accordingly.
+
+  for (const [optInClassName, optInRaw] of Object.entries(optInSpec?.classes ?? {})) {
+    const boundClass = out.types[optInClassName];
+    assert(boundClass instanceof Class);
+    for (const optInMethodName of optInRaw.methods) {
+      boundClass.getMethod(optInMethodName).isOptedInTo = true;
+    }
+  }
+
+  for (const [optInStructName, optInRaw] of Object.entries(optInSpec?.records ?? {})) {
+    const boundStruct = out.types[optInStructName];
+    assert(boundStruct instanceof Struct);
+    for (const optInFieldName of optInRaw.fields) {
+      boundStruct.getField(optInFieldName).isOptedInTo = true;
+    }
+  }
+
   return out;
 }
