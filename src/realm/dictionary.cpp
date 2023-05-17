@@ -703,8 +703,10 @@ void Dictionary::nullify(Mixed key)
 
 void Dictionary::remove_backlinks(CascadeState& state) const
 {
-    for (auto&& elem : *this) {
-        clear_backlink(elem.second, state);
+    if (size() > 0) {
+        m_values->for_all([&](Mixed val) {
+            clear_backlink(val, state);
+        });
     }
 }
 

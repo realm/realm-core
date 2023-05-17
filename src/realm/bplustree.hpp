@@ -526,6 +526,20 @@ public:
         m_root->bptree_traverse(func);
     }
 
+    template <typename Func>
+    void for_all(Func&& callback) const
+    {
+        m_root->bptree_traverse([&callback](BPlusTreeNode* node, size_t) {
+            LeafNode* leaf = static_cast<LeafNode*>(node);
+            size_t sz = leaf->size();
+            for (size_t i = 0; i < sz; i++) {
+                callback(leaf->get(i));
+            }
+            return IteratorControl::AdvanceToNext;
+        });
+    }
+
+
     void dump_values(std::ostream& o, int level) const
     {
         std::string indent(" ", level * 2);

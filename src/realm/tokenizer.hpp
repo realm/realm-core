@@ -60,6 +60,7 @@ public:
         return {m_buffer, m_size};
     }
     std::set<std::string> get_all_tokens();
+    std::pair<std::set<std::string>, std::set<std::string>> get_search_tokens();
     TokenInfoMap get_token_info();
 
     static std::unique_ptr<Tokenizer> get_instance();

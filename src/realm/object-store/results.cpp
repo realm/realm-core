@@ -116,14 +116,14 @@ bool Results::is_valid() const
         m_realm->verify_thread();
     }
 
+    if (m_collection)
+        return m_collection->is_attached();
+
     // Here we cannot just use if (m_table) as it combines a check if the
     // reference contains a value and if that value is valid.
     // First we check if a table is referenced ...
     if (m_table.unchecked_ptr() != nullptr)
-        return !!m_table; // ... and then we check if it is valid
-
-    if (m_collection)
-        return m_collection->is_attached();
+        return bool(m_table); // ... and then we check if it is valid
 
     return true;
 }
@@ -425,16 +425,21 @@ Mixed Results::get_any(size_t ndx)
     switch (m_mode) {
         case Mode::Empty:
             break;
-        case Mode::Table:
-            if (ndx < m_table->size())
-                return m_table_iterator.get(*m_table, ndx);
+        case Mode::Table: {
+            // Validity of m_table is checked in validate_read() above, so we
+            // can skip all the checks here (which requires not using the
+            // Mixed(Obj()) constructor)
+            auto table = m_table.unchecked_ptr();
+            if (ndx < table->size())
+                return ObjLink(table->get_key(), m_table_iterator.get(*table, ndx).get_key());
             break;
+        }
         case Mode::Collection:
             if (auto actual = actual_index(ndx); actual < m_collection->size())
                 return m_collection->get_any(actual);
             break;
         case Mode::Query:
-            REALM_UNREACHABLE();
+            REALM_UNREACHABLE(); // should always be in TV mode
         case Mode::TableView: {
             if (ndx >= m_table_view.size())
                 break;
@@ -937,7 +942,7 @@ Results Results::distinct(std::vector<std::string> const& keypaths) const
     return distinct({std::move(column_keys)});
 }
 
-SectionedResults Results::sectioned_results(SectionedResults::SectionKeyFunc section_key_func) REQUIRES(m_mutex)
+SectionedResults Results::sectioned_results(SectionedResults::SectionKeyFunc&& section_key_func) REQUIRES(m_mutex)
 {
     return SectionedResults(*this, std::move(section_key_func));
 }
@@ -945,7 +950,7 @@ SectionedResults Results::sectioned_results(SectionedResults::SectionKeyFunc sec
 SectionedResults Results::sectioned_results(SectionedResultsOperator op, util::Optional<StringData> prop_name)
     REQUIRES(m_mutex)
 {
-    return SectionedResults(*this, op, prop_name);
+    return SectionedResults(*this, op, prop_name.value_or(StringData()));
 }
 
 Results Results::snapshot() const&
@@ -1080,6 +1085,9 @@ Results Results::import_copy_into_realm(std::shared_ptr<Realm> const& realm)
     util::CheckedUniqueLock lock(m_mutex);
     if (m_mode == Mode::Empty)
         return *this;
+
+    validate_read();
+
     switch (m_mode) {
         case Mode::Table:
             return Results(realm, realm->import_copy_of(m_table));
