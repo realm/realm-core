@@ -273,13 +273,7 @@ std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo)
 // https://github.com/mongodb/mongo/blob/053ff9f355555cddddf3a476ffa9ddf899b1657d/src/mongo/db/geo/geoparser.cpp#L140
 static void erase_duplicate_points(std::vector<S2Point>* vertices)
 {
-    for (size_t i = 1; i < vertices->size(); ++i) {
-        if ((*vertices)[i - 1] == (*vertices)[i]) {
-            vertices->erase(vertices->begin() + i);
-            // We could have > 2 adjacent identical vertices, and must examine i again.
-            --i;
-        }
-    }
+    vertices->erase(std::unique(vertices->begin(), vertices->end()), vertices->end());
 }
 
 static Status is_ring_closed(const std::vector<S2Point>& ring, const std::vector<GeoPoint>& points)
