@@ -34,6 +34,32 @@ export type Spec = ReplaceFields<
   }
 >;
 
+/**
+ * @example
+ * // Spec/yaml file example:
+ * classes:
+ *   Obj:
+ *     methods:
+ *       - get_any
+ *       - get_any_by_name
+ *       - is_null
+ *
+ * records:
+ *   Property:
+ *     fields:
+ *       - name
+ *       - public_name
+ *       - type
+ */
+export type OptInSpec = {
+  classes: {
+    [cppName: string]: { methods: string[] };
+  };
+  records: {
+    [cppName: string]: { fields: string[] };
+  };
+};
+
 type AdditionalSpec = ReplaceFields<
   Spec,
   {

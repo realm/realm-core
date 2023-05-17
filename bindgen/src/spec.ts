@@ -28,6 +28,7 @@ import {
   FieldSpec,
   FunctionTypeSpec,
   MethodSpec,
+  OptInSpec,
   RecordSpec,
   AnySpec,
   ValueType,
@@ -104,6 +105,16 @@ export function parseSpec(filePath: string): AnySpec {
   } else {
     throw new InvalidSpecError(filePath, validate.errors || []);
   }
+}
+
+export function parseOptInList(filePath: string): OptInSpec {
+  const text = fs.readFileSync(filePath, { encoding: "utf8" });
+  const parsed = yaml.parse(text) as unknown;
+
+  return parsed as OptInSpec;
+
+  // TODO:
+  // Validate shape of spec
 }
 
 /**
