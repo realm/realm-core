@@ -1375,4 +1375,59 @@ TEST_IF(Upgrade_Database_22, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE
 #endif // TEST_READ_UPGRADE_MODE
 }
 
+
+TEST_IF(Upgrade_Database_23, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
+{
+    // We should test that we can convert backlink arrays bigger that node size to BPlusTrees
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_23.realm";
+
+    const size_t cnt = 10 * REALM_MAX_BPNODE_SIZE;
+
+#if TEST_READ_UPGRADE_MODE
+    CHECK_OR_RETURN(File::exists(path));
+
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    // Make a copy of the database so that we keep the original file intact and unmodified
+    File::copy(path, temp_copy);
+    auto hist = make_in_realm_history();
+    auto sg = DB::create(*hist, temp_copy);
+    auto rt = sg->start_write();
+
+    auto t = rt->get_table("table");
+    auto target = rt->get_table("target");
+    auto col_link = t->get_column_key("link");
+
+    auto target_obj = target->get_object_with_primary_key(1);
+    CHECK_EQUAL(target_obj.get_backlink_count(*t, col_link), cnt);
+    // This should cause an upgrade
+    auto o = t->create_object_with_primary_key(20000);
+    o.set(col_link, target_obj.get_key());
+
+    // Check that we can delete all source objects
+    for (auto& obj : *t) {
+        obj.remove();
+    }
+    CHECK_EQUAL(target_obj.get_backlink_count(*t, col_link), 0);
+
+    rt->verify();
+
+#else
+    // NOTE: This code must be executed from an old file-format-version 22
+    // core in order to create a file-format-version 10 test file!
+
+    Group g;
+    TableRef t = g.add_table_with_primary_key("table", type_Int, "id", false);
+    TableRef target = g.add_table_with_primary_key("target", type_Int, "id", false);
+    auto col_link = t->add_column(*target, "link");
+
+    auto target_key = target->create_object_with_primary_key(1).get_key();
+    for (int i = 0; i < cnt; i++) {
+        auto o = t->create_object_with_primary_key(i);
+        o.set(col_link, target_key);
+    }
+    g.write(path);
+#endif // TEST_READ_UPGRADE_MODE
+}
 #endif // TEST_GROUP
