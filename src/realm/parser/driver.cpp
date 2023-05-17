@@ -771,9 +771,15 @@ Query GeoWithinNode::visit(ParserDriver* drv)
                                                  get_data_type_name(right_type)));
         }
         Geospatial geo = drv->m_args.geospatial_for_argument(arg_no);
-        if (!geo.is_valid()) {
+
+        if (geo.get_type() == Geospatial::Type::Invalid) {
             throw InvalidQueryError(
                 util::format("The right hand side of 'geoWithin' must be a valid Geospatial value, got '%1'", geo));
+        }
+        Status geo_status = geo.is_valid();
+        if (!geo_status.is_ok()) {
+            throw InvalidQueryError(
+                util::format("The Geospatial query argument region is invalid: '%1'", geo_status.reason()));
         }
         return link_column->geo_within(geo);
     }
@@ -1383,7 +1389,7 @@ void GeospatialNode::add_loop_to_polygon(GeospatialNode* node)
 std::unique_ptr<Subexpr> GeospatialNode::visit(ParserDriver*, DataType)
 {
     std::unique_ptr<Subexpr> ret;
-    if (m_geo.is_valid()) {
+    if (m_geo.get_type() != Geospatial::Type::Invalid) {
         ret = std::make_unique<ConstantGeospatialValue>(m_geo);
     }
     else {

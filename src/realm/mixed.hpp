@@ -168,8 +168,6 @@ public:
     {
     }
 
-    ~Mixed() noexcept {}
-
     DataType get_type() const noexcept
     {
         REALM_ASSERT(m_type);
@@ -301,6 +299,7 @@ private:
         return _is_numeric(head) && _is_numeric(tail...);
     }
 };
+static_assert(std::is_trivially_destructible_v<Mixed>);
 
 class OwnedMixed : public Mixed {
 public:
