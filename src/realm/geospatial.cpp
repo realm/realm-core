@@ -72,8 +72,8 @@ std::string Geospatial::get_type_string() const noexcept
             return "Box";
         case Type::Polygon:
             return "Polygon";
-        case Type::CenterSphere:
-            return "CenterSphere";
+        case Type::Circle:
+            return "Circle";
         case Type::Invalid:
             return "Invalid";
     }
@@ -254,8 +254,8 @@ std::string Geospatial::to_string() const
                            }
                            return util::format("GeoPolygon(%1)", points);
                        },
-                       [](const GeoCenterSphere& sphere) {
-                           return util::format("GeoSphere(%1, %2)", point_str(sphere.center), sphere.radius_radians);
+                       [](const GeoCircle& circle) {
+                           return util::format("GeoCircle(%1, %2)", point_str(circle.center), circle.radius_radians);
                        },
                        [](const mpark::monostate&) {
                            return std::string("NULL");
@@ -461,17 +461,18 @@ GeoRegion::GeoRegion(const Geospatial& geo)
             return poly;
         }
 
-        std::unique_ptr<S2Region> operator()(const GeoCenterSphere& sphere) const
+        std::unique_ptr<S2Region> operator()(const GeoCircle& circle) const
         {
             S2Point center;
-            m_status_out = coord_to_point(sphere.center.longitude, sphere.center.latitude, &center);
+            m_status_out = coord_to_point(circle.center.longitude, circle.center.latitude, &center);
             if (!m_status_out.is_ok())
                 return nullptr;
-            if (sphere.radius_radians < 0 || std::isnan(sphere.radius_radians)) {
-                m_status_out = Status(ErrorCodes::InvalidQueryArg, "The radius of must be a non negative number");
+            if (circle.radius_radians < 0 || std::isnan(circle.radius_radians)) {
+                m_status_out =
+                    Status(ErrorCodes::InvalidQueryArg, "The radius of a circle must be a non-negative number");
                 return nullptr;
             }
-            auto radius = S1Angle::Radians(sphere.radius_radians);
+            auto radius = S1Angle::Radians(circle.radius_radians);
             return std::make_unique<S2Cap>(S2Cap::FromAxisAngle(center, radius));
         }
 

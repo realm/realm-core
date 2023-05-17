@@ -1298,7 +1298,7 @@ TEST_CASE("flx: geospatial", "[sync][flx][app]") {
                     {"location", bson::BsonDocument{{"$geoWithin", bson::BsonDocument{{"$geometry", geo_bson}}}}}};
                 return filter;
             };
-            auto make_circle_filter = [&](const GeoCenterSphere& circle) -> bson::BsonDocument {
+            auto make_circle_filter = [&](const GeoCircle& circle) -> bson::BsonDocument {
                 bson::BsonArray coords{circle.center.longitude, circle.center.latitude};
                 bson::BsonArray inner;
                 inner.push_back(coords);
@@ -1390,18 +1390,18 @@ TEST_CASE("flx: geospatial", "[sync][flx][app]") {
                 size_t server_results = run_query_on_server(filter);
                 CHECK(server_results == local_matches);
 
-                GeoCenterSphere sphere = GeoCenterSphere::from_kms(10, GeoPoint{-180.1, -90.1});
-                CHECK_THROWS_WITH(table->column<Link>(location_col).geo_within(sphere).count(),
-                                  "Invalid region in GEOWITHIN query for parameter 'GeoSphere([-180.1, -90.1], "
+                GeoCircle circle = GeoCircle::from_kms(10, GeoPoint{-180.1, -90.1});
+                CHECK_THROWS_WITH(table->column<Link>(location_col).geo_within(circle).count(),
+                                  "Invalid region in GEOWITHIN query for parameter 'GeoCircle([-180.1, -90.1], "
                                   "0.00156787)': 'Longitude/latitude is out of bounds, lng: -180.1 lat: -90.1'");
-                filter = make_circle_filter(sphere);
+                filter = make_circle_filter(circle);
                 run_query_on_server(filter, "(BadValue) longitude/latitude is out of bounds");
 
-                sphere = GeoCenterSphere::from_kms(-1, GeoPoint{0, 0});
-                CHECK_THROWS_WITH(table->column<Link>(location_col).geo_within(sphere).count(),
-                                  "Invalid region in GEOWITHIN query for parameter 'GeoSphere([0, 0], "
-                                  "-0.000156787)': 'The radius of must be a non negative number'");
-                filter = make_circle_filter(sphere);
+                circle = GeoCircle::from_kms(-1, GeoPoint{0, 0});
+                CHECK_THROWS_WITH(table->column<Link>(location_col).geo_within(circle).count(),
+                                  "Invalid region in GEOWITHIN query for parameter 'GeoCircle([0, 0], "
+                                  "-0.000156787)': 'The radius of a circle must be a non-negative number'");
+                filter = make_circle_filter(circle);
                 run_query_on_server(filter, "(BadValue) radius must be a non-negative number");
             }
         });

@@ -112,8 +112,8 @@ TEST(Geospatial_Assignment)
     Geospatial geo_box(GeoBox{GeoPoint{1.1, 2.2}, GeoPoint{3.3, 4.4}});
     std::string_view err_msg = "The only Geospatial type currently supported for storage is 'point'";
     CHECK_THROW_CONTAINING_MESSAGE(obj.set(location_column_key, geo_box), err_msg);
-    Geospatial geo_sphere(GeoCenterSphere{10, GeoPoint{1.1, 2.2}});
-    CHECK_THROW_CONTAINING_MESSAGE(obj.set(location_column_key, geo_sphere), err_msg);
+    Geospatial geo_circle(GeoCircle{10, GeoPoint{1.1, 2.2}});
+    CHECK_THROW_CONTAINING_MESSAGE(obj.set(location_column_key, geo_circle), err_msg);
 }
 
 TEST(Geospatial_invalid_format)
@@ -156,8 +156,8 @@ TEST(Query_GeoWithinBasics)
     p = {{{-3.0, -1.0}, {-2.0, -2.0}, {-1.0, -1.0}, {1.5, -1.0}, {-1.0, 1.5}, {-3.0, -1.0}}};
     CHECK_EQUAL(location.geo_within(p).count(), 2);
 
-    CHECK_EQUAL(location.geo_within(GeoCenterSphere::from_kms(150.0, GeoPoint{1.0, 0.5})).count(), 3);
-    CHECK_EQUAL(location.geo_within(GeoCenterSphere::from_kms(90.0, GeoPoint{-1.5, -1.5})).count(), 2);
+    CHECK_EQUAL(location.geo_within(GeoCircle::from_kms(150.0, GeoPoint{1.0, 0.5})).count(), 3);
+    CHECK_EQUAL(location.geo_within(GeoCircle::from_kms(90.0, GeoPoint{-1.5, -1.5})).count(), 2);
 
     CHECK_THROW_CONTAINING_MESSAGE(location.geo_within(Geospatial{GeoPoint{0.0, 0.0}}),
                                    "Invalid region in GEOWITHIN query for parameter 'GeoPoint([0, 0])': 'A point "
@@ -189,31 +189,31 @@ TEST(Geospatial_ListOfPrimitives)
     make_list_with_points(*++obj_it, {GeoPoint{1, 1}, GeoPoint{1, 1}, GeoPoint{1, 1}});
     // the fourth object has no elements in the list
 
-    using GCS = GeoCenterSphere;
+    using GC = GeoCircle;
     const double r = 0.00872665;
     util::Optional<ExpressionComparisonType> ect;
 
-    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {1, 1}}).count(), 2);
-    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {2, 2}}).count(), 2);
-    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {3, 3}}).count(), 1);
-    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {4, 4}}).count(), 0);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GC{r, {1, 1}}).count(), 2);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GC{r, {2, 2}}).count(), 2);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GC{r, {3, 3}}).count(), 1);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GC{r, {4, 4}}).count(), 0);
     ect = ExpressionComparisonType::Any;
-    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {1, 1}}).count(), 2);
-    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {2, 2}}).count(), 2);
-    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {3, 3}}).count(), 1);
-    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {4, 4}}).count(), 0);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GC{r, {1, 1}}).count(), 2);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GC{r, {2, 2}}).count(), 2);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GC{r, {3, 3}}).count(), 1);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GC{r, {4, 4}}).count(), 0);
 
     ect = ExpressionComparisonType::All;
-    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {1, 1}}).count(), 1);
-    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {2, 2}}).count(), 0);
-    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {3, 3}}).count(), 0);
-    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {4, 4}}).count(), 0);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GC{r, {1, 1}}).count(), 1);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GC{r, {2, 2}}).count(), 0);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GC{r, {3, 3}}).count(), 0);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GC{r, {4, 4}}).count(), 0);
 
     ect = ExpressionComparisonType::None;
-    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {1, 1}}).count(), 2); // 1, 3
-    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {2, 2}}).count(), 2); // 2, 3
-    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {3, 3}}).count(), 3); // 0, 2, 3
-    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {4, 4}}).count(), 4); // 0, 1, 2, 3
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GC{r, {1, 1}}).count(), 2); // 1, 3
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GC{r, {2, 2}}).count(), 2); // 2, 3
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GC{r, {3, 3}}).count(), 3); // 0, 2, 3
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GC{r, {4, 4}}).count(), 4); // 0, 1, 2, 3
 }
 
 TEST(Geospatial_MeridianQuery)
@@ -244,7 +244,7 @@ TEST(Geospatial_EquatorQuery)
     CHECK_EQUAL(num_results, 1);
 }
 
-TEST(Geospatial_CenterSphere)
+TEST(Geospatial_Circle)
 {
     Group g;
     std::vector<Geospatial> points = {GeoPoint{-118.2400013, 34.073893}, GeoPoint{-118.2400012, 34.073894},
@@ -252,9 +252,9 @@ TEST(Geospatial_CenterSphere)
     TableRef table = setup_with_points(g, points);
     ColKey location_column_key = table->get_column_key("location");
     ColKey id_col = table->get_primary_key_column();
-    Geospatial geo_sphere{GeoCenterSphere{0.44915760491198753, GeoPoint{-118.240013, 34.073893}}};
+    Geospatial geo_circle{GeoCircle{0.44915760491198753, GeoPoint{-118.240013, 34.073893}}};
 
-    Query query = table->column<Link>(location_column_key).geo_within(geo_sphere);
+    Query query = table->column<Link>(location_column_key).geo_within(geo_circle);
     CHECK_EQUAL(query.count(), 2);
     CHECK_EQUAL((query && table->column<Int>(id_col) == 0).count(), 1);
     CHECK_EQUAL((query && table->column<Int>(id_col) == 1).count(), 1);
@@ -269,7 +269,7 @@ TEST(Geospatial_GeoWithinShapes)
     ColKey location_column_key = table->get_column_key("location");
 
     std::vector<Geospatial> shapes = {
-        Geospatial{GeoCenterSphere{1, GeoPoint{0, 0}}},
+        Geospatial{GeoCircle{1, GeoPoint{0, 0}}},
         Geospatial{GeoBox{GeoPoint{-5, -5}, GeoPoint{5, 5}}},
         Geospatial{GeoPolygon{{{-5, -5}, {5, -5}, {5, 5}, {-5, 5}, {-5, -5}}}},
     };

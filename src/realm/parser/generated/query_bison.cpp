@@ -883,7 +883,7 @@ namespace yy {
                  { yyo << "<>"; }
         break;
 
-      case symbol_kind::SYM_GEOSPHERE: // "geosphere"
+      case symbol_kind::SYM_GEOCIRCLE: // "geocircle"
                  { yyo << "<>"; }
         break;
 
@@ -1760,8 +1760,8 @@ namespace yy {
                                             { yylhs.value.as < GeospatialNode* > () = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Box{}, *yystack_[3].value.as < std::optional<GeoPoint> > (), *yystack_[1].value.as < std::optional<GeoPoint> > ()); }
     break;
 
-  case 45: // geospatial: "geosphere" '(' geopoint ',' coordinate ')'
-                                                { yylhs.value.as < GeospatialNode* > () = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Sphere{}, *yystack_[3].value.as < std::optional<GeoPoint> > (), yystack_[1].value.as < double > ()); }
+  case 45: // geospatial: "geocircle" '(' geopoint ',' coordinate ')'
+                                                { yylhs.value.as < GeospatialNode* > () = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Circle{}, *yystack_[3].value.as < std::optional<GeoPoint> > (), yystack_[1].value.as < double > ()); }
     break;
 
   case 46: // geospatial: "geopolygon" '(' geopoly_content ')'
@@ -2717,7 +2717,7 @@ namespace yy {
   "\"null\"", "\"==\"", "\"!=\"", "\"<\"", "\">\"", "\">=\"", "\"<=\"",
   "\"[c]\"", "\"any\"", "\"all\"", "\"none\"", "\"@links\"", "\"@max\"",
   "\"@min\"", "\"@sun\"", "\"@average\"", "\"&&\"", "\"||\"", "\"!\"",
-  "\"geobox\"", "\"geopolygon\"", "\"geosphere\"", "\"identifier\"",
+  "\"geobox\"", "\"geopolygon\"", "\"geocircle\"", "\"identifier\"",
   "\"string\"", "\"base64\"", "\"infinity\"", "\"NaN\"", "\"natural0\"",
   "\"number\"", "\"float\"", "\"date\"", "\"UUID\"", "\"ObjectId\"",
   "\"link\"", "\"typed link\"", "\"argument\"", "\"beginswith\"",

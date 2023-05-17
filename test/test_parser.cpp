@@ -5671,8 +5671,8 @@ TEST(Parser_Geospatial)
 
     CHECK_QUERY("link geoWithin geoBox([0.2, 0.2], [0.7, 0.7])");
     CHECK_QUERY("link geoWithin geoBox([0.2, 0.2, 0.2], [0.7, 0.7, 0.7])");
-    CHECK_QUERY("link geoWithin geoSphere([0.3, 0.3], 1000.0)");
-    CHECK_QUERY("link geoWithin geoSphere([0.3, 0.3, 0.3], 1000.0)");
+    CHECK_QUERY("link geoWithin geoCircle([0.3, 0.3], 1000.0)");
+    CHECK_QUERY("link geoWithin geoCircle([0.3, 0.3, 0.3], 1000.0)");
     CHECK_QUERY("link geoWithin geoPolygon({[0.0, 0.0], [1.0, 0.0], [1, 1], [0, 1], [0.0, 0.0]})");
 
     CHECK_THROW_EX(verify_query_sub(test_context, table, "link GEOWITHIN $0", {}, 1), realm::LogicError,
@@ -5688,8 +5688,8 @@ TEST(Parser_Geospatial)
 
     verify_query(test_context, table, "link geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 1);
     verify_query(test_context, table, "link geoWithin geoBox([0.2, 0.2, 0.2], [0.7, 0.7, 0.7])", 1);
-    verify_query(test_context, table, "link geoWithin geoSphere([0.3, 0.3], 1000.0)", 4);
-    verify_query(test_context, table, "link geoWithin geoSphere([0.3, 0.3, 0.3], 1000.0)", 4);
+    verify_query(test_context, table, "link geoWithin geoCircle([0.3, 0.3], 1000.0)", 4);
+    verify_query(test_context, table, "link geoWithin geoCircle([0.3, 0.3, 0.3], 1000.0)", 4);
     verify_query(test_context, table,
                  "link geoWithin geoPolygon({[0.0, 0.0], [1.0, 0.0], [1, 1], [0, 1], [0.0, 0.0]})", 1);
     verify_query(test_context, table,
@@ -5699,11 +5699,11 @@ TEST(Parser_Geospatial)
     verify_query(test_context, table, "link == NULL", 1);
 
     Geospatial box{GeoBox{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}}};
-    Geospatial sphere{GeoCenterSphere{1000, GeoPoint{0.3, 0.3}}};
+    Geospatial circle{GeoCircle{1000, GeoPoint{0.3, 0.3}}};
     Geospatial polygon{GeoPolygon{{GeoPoint{0, 0}, GeoPoint{1, 0}, GeoPoint{1, 1}, GeoPoint{0, 1}, GeoPoint{0, 0}}}};
     Geospatial invalid;
     Geospatial point{GeoPoint{0, 0}};
-    std::vector<Mixed> args = {Mixed{&box},          Mixed{&sphere}, Mixed{&polygon}, Mixed{&invalid},
+    std::vector<Mixed> args = {Mixed{&box},          Mixed{&circle}, Mixed{&polygon}, Mixed{&invalid},
                                Mixed{realm::null()}, Mixed{1.2},     Mixed{1000},     Mixed{"string value"}};
     verify_query_sub(test_context, table, "link GEOWITHIN $0", args, 1);
     verify_query_sub(test_context, table, "link GEOWITHIN $1", args, 4);
