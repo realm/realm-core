@@ -134,10 +134,12 @@ bool S2Loop::IsValid(string* err) const {
         previous_index = ai + 1;
         if (crosses) {
             std::string msg = realm::util::format("Edges %1 and %2 cross. Edge locations in degrees: %3-%4 and %5-%6", i, ai, S2LatLng(vertex(i)), S2LatLng(vertex(i + 1)), S2LatLng(vertex(ai)), S2LatLng(vertex(ai + 1)));
-            s2_logger()->error(msg.c_str());
             // additional debugging information, reverse Lat/Lng order.
-          if (NULL != err) {
-                *err = msg;
+          if (err) {
+              *err = msg;
+          }
+          else {
+              s2_logger()->error(msg.c_str());
           }
           break;
         }

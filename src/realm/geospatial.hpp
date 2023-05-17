@@ -61,6 +61,10 @@ struct GeoPoint {
                (latitude == other.latitude || (std::isnan(latitude) && std::isnan(other.latitude))) &&
                ((!has_altitude() && !other.has_altitude()) || altitude == other.altitude);
     }
+    bool operator!=(const GeoPoint& other) const
+    {
+        return !(*this == other);
+    }
 
     bool is_valid() const
     {
@@ -206,10 +210,7 @@ public:
     template <class T>
     const T& get() const noexcept;
 
-    bool is_valid() const noexcept
-    {
-        return get_type() != Type::Invalid;
-    }
+    Status is_valid() const noexcept;
 
     bool is_within(const Geospatial& bounds) const noexcept;
     std::string to_string() const;
@@ -243,9 +244,11 @@ public:
     ~GeoRegion();
 
     bool contains(const GeoPoint& point) const noexcept;
+    Status get_conversion_status() const noexcept;
 
 private:
     std::unique_ptr<S2Region> m_region;
+    Status m_status;
 };
 
 template <>
