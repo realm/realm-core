@@ -214,11 +214,6 @@ RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t* co
     config->default_request_timeout_ms = ms;
 }
 
-RLM_API void realm_app_config_set_platform(realm_app_config_t* config, const char* platform) noexcept
-{
-    config->device_info.platform = std::string(platform);
-}
-
 RLM_API void realm_app_config_set_platform_version(realm_app_config_t* config, const char* platform_version) noexcept
 {
     config->device_info.platform_version = std::string(platform_version);
@@ -232,11 +227,6 @@ RLM_API void realm_app_config_set_sdk_version(realm_app_config_t* config, const 
 RLM_API void realm_app_config_set_sdk(realm_app_config_t* config, const char* sdk) noexcept
 {
     config->device_info.sdk = std::string(sdk);
-}
-
-RLM_API void realm_app_config_set_cpu_arch(realm_app_config_t* config, const char* cpu_arch) noexcept
-{
-    config->device_info.cpu_arch = std::string(cpu_arch);
 }
 
 RLM_API void realm_app_config_set_device_name(realm_app_config_t* config, const char* device_name) noexcept
@@ -258,6 +248,11 @@ RLM_API void realm_app_config_set_framework_version(realm_app_config_t* config,
                                                     const char* framework_version) noexcept
 {
     config->device_info.framework_version = std::string(framework_version);
+}
+
+RLM_API void realm_app_config_set_bundle_id(realm_app_config_t* config, const char* bundle_id) noexcept
+{
+    config->device_info.bundle_id = std::string(bundle_id);
 }
 
 RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credentials_t* app_credentials) noexcept

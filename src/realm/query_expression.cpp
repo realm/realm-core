@@ -145,24 +145,18 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction lm) const
                 values.init_from_parent();
 
                 // Iterate through values and insert all link values
-                values.traverse([&](BPlusTreeNode* node, size_t) {
-                    auto bplustree_leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
-                    auto sz = bplustree_leaf->size();
-                    for (size_t i = 0; i < sz; i++) {
-                        auto m = bplustree_leaf->get(i);
-                        if (m.is_type(type_TypedLink)) {
-                            auto link = m.get_link();
-                            REALM_ASSERT(link.get_table_key() == this->m_tables[column + 1]->get_key());
-                            auto k = link.get_obj_key();
-                            if (!k.is_unresolved()) {
-                                if (last)
-                                    lm(k);
-                                else
-                                    map_links(column + 1, k, lm);
-                            }
+                values.for_all([&](Mixed val) {
+                    if (val.is_type(type_TypedLink)) {
+                        auto link = val.get_link();
+                        REALM_ASSERT(link.get_table_key() == this->m_tables[column + 1]->get_key());
+                        auto k = link.get_obj_key();
+                        if (!k.is_unresolved()) {
+                            if (last)
+                                lm(k);
+                            else
+                                map_links(column + 1, k, lm);
                         }
                     }
-                    return IteratorControl::AdvanceToNext;
                 });
             }
         }
@@ -333,14 +327,9 @@ void ColumnDictionaryKeys::evaluate(size_t index, ValueBase& destination)
             destination.init(true, keys.size());
             size_t n = 0;
             // Iterate through BPlusTree and insert all keys
-            keys.traverse([&](BPlusTreeNode* node, size_t) {
-                auto bplustree_leaf = static_cast<BPlusTree<StringData>::LeafNode*>(node);
-                auto sz = bplustree_leaf->size();
-                for (size_t i = 0; i < sz; i++) {
-                    destination.set(n, bplustree_leaf->get(i));
-                    n++;
-                }
-                return IteratorControl::AdvanceToNext;
+            keys.for_all([&](StringData str) {
+                destination.set(n, str);
+                n++;
             });
         }
     }
@@ -477,14 +466,9 @@ void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
             destination.init(true, values.size());
             size_t n = 0;
             // Iterate through BPlusTreee and insert all values
-            values.traverse([&](BPlusTreeNode* node, size_t) {
-                auto bplustree_leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
-                auto sz = bplustree_leaf->size();
-                for (size_t i = 0; i < sz; i++) {
-                    destination.set(n, bplustree_leaf->get(i));
-                    n++;
-                }
-                return IteratorControl::AdvanceToNext;
+            values.for_all([&](Mixed val) {
+                destination.set(n, val);
+                n++;
             });
         }
     }

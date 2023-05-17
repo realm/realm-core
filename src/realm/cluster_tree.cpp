@@ -1205,16 +1205,10 @@ void ClusterTree::remove_all_links(CascadeState& state)
                         values.init_from_parent();
 
                         // Iterate through values and insert all link values
-                        values.traverse([&](BPlusTreeNode* node, size_t) {
-                            auto bplustree_leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
-                            auto sz = bplustree_leaf->size();
-                            for (size_t i = 0; i < sz; i++) {
-                                auto mix = bplustree_leaf->get(i);
-                                if (mix.is_type(type_TypedLink)) {
-                                    links.push_back(mix.get<ObjLink>());
-                                }
+                        values.for_all([&](Mixed val) {
+                            if (val.is_type(type_TypedLink)) {
+                                links.push_back(val.get<ObjLink>());
                             }
-                            return IteratorControl::AdvanceToNext;
                         });
 
                         if (links.size() > 0) {

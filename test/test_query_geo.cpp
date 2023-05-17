@@ -19,6 +19,10 @@
 #include "testsettings.hpp"
 #ifdef TEST_GEO
 
+#include "s2/util/math/mathutil.h"
+// conflicting defines of CHECK from s2
+#undef CHECK
+
 #include "test.hpp"
 
 #include <realm/geospatial.hpp>
@@ -32,6 +36,33 @@
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
+
+// From https://github.com/10gen/mongo/pull/11605
+// Test which verifies that the rounding functions used by s2 follow 'round to even' rounding
+// behavior.
+TEST(S2VerifyS2RoundingBehavior)
+{
+    const double roundDownToEven = 2.5;
+    CHECK_EQUAL(2, MathUtil::FastIntRound(roundDownToEven));
+    CHECK_EQUAL(2LL, MathUtil::FastInt64Round(roundDownToEven));
+
+    const double roundUpToEven = 3.5;
+    CHECK_EQUAL(4, MathUtil::FastIntRound(roundUpToEven));
+    CHECK_EQUAL(4LL, MathUtil::FastInt64Round(roundUpToEven));
+
+    const double roundDownToEvenNegative = -3.5;
+    CHECK_EQUAL(-4, MathUtil::FastIntRound(roundDownToEvenNegative));
+    CHECK_EQUAL(-4LL, MathUtil::FastInt64Round(roundDownToEvenNegative));
+
+    const double roundUpToEvenNegative = -2.5;
+    CHECK_EQUAL(-2, MathUtil::FastIntRound(roundUpToEvenNegative));
+    CHECK_EQUAL(-2LL, MathUtil::FastInt64Round(roundUpToEvenNegative));
+
+    const double point = 944920918.5;
+    CHECK_EQUAL(944920918, MathUtil::FastIntRound(point));
+    CHECK_EQUAL(944920918LL, MathUtil::FastInt64Round(point));
+}
+
 
 static TableRef setup_with_points(Group& g, const std::vector<Geospatial>& points)
 {

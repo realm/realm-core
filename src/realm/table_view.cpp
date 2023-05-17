@@ -76,9 +76,7 @@ TableView::TableView(TableView& src, Transaction* tr, PayloadPolicy policy_mode)
     }
 
     if (was_in_sync)
-        m_last_seen_versions = get_dependency_versions();
-    else
-        m_last_seen_versions.clear();
+        get_dependencies(m_last_seen_versions);
 
     // don't use methods which throw after this point...or m_table_view_key_values will leak
     if (policy_mode == PayloadPolicy::Copy && src.m_key_values.is_attached()) {
@@ -333,6 +331,7 @@ bool TableView::depends_on_deleted_object() const
 
 void TableView::get_dependencies(TableVersions& ret) const
 {
+    auto table = m_table ? m_table.unchecked_ptr() : nullptr;
     if (m_source_column_key && m_linked_obj) {
         // m_source_column_key is set when this TableView was created by Table::get_backlink_view().
         if (auto linked_table = m_linked_obj.get_table()) {
@@ -344,18 +343,18 @@ void TableView::get_dependencies(TableVersions& ret) const
     }
     else {
         // This TableView was created by Table::get_distinct_view() or get_sorted_view() on collections
-        ret.emplace_back(m_table->get_key(), m_table->get_content_version());
+        ret.emplace_back(table->get_key(), table->get_content_version());
     }
 
     // Finally add dependencies from sort/distinct
-    if (m_table) {
-        m_descriptor_ordering.get_versions(m_table->get_parent_group(), ret);
+    if (table) {
+        m_descriptor_ordering.get_versions(table->get_parent_group(), ret);
     }
 }
 
 bool TableView::is_in_sync() const
 {
-    return !m_table ? false : m_last_seen_versions == get_dependency_versions();
+    return m_table && !has_changed();
 }
 
 void TableView::sync_if_needed() const
@@ -495,7 +494,7 @@ void TableView::do_sync()
 
     do_sort(m_descriptor_ordering);
 
-    m_last_seen_versions = get_dependency_versions();
+    get_dependencies(m_last_seen_versions);
 }
 
 void TableView::do_sort(const DescriptorOrdering& ordering)

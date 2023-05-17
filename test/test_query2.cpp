@@ -5924,6 +5924,7 @@ TEST(Query_FullText)
     table->create_object().set(col, "Alle elsker John");
     table->create_object().set(col, "Johns ven kender John godt");
     table->create_object().set(col, "Ich wohne in Großarl");
+    table->create_object().set(col, "A short story about a dog running after two cats");
 
     auto tv = table->where().fulltext(col, "object").find_all();
     CHECK_EQUAL(2, tv.size());
@@ -5999,6 +6000,8 @@ TEST(Query_FullText)
     CHECK_EQUAL(2, tv.size());
     tv = table->where().fulltext(col, "Großarl").find_all();
     CHECK_EQUAL(1, tv.size());
+    tv = table->where().fulltext(col, "catssadasdsa").find_all();
+    CHECK_EQUAL(0, tv.size());
 
     table->clear();
     CHECK(table->get_search_index(col)->is_empty());
@@ -6134,8 +6137,8 @@ TEST(Query_FullTextMulti)
     CHECK_EQUAL(do_fulltext_find("-object"), Keys({3, 5, 7, 8, 9}));
     CHECK_EQUAL(do_fulltext_find("-object -objects"), Keys({5, 7, 8, 9}));
 
-    // Token should only appear once
-    CHECK_THROW_ANY(do_fulltext_find("C# c++"));
+    // Don't include and exclude same token
+    CHECK_THROW_ANY(do_fulltext_find("C# -c++")); // Will both end up as 'c'
     CHECK_THROW_ANY(do_fulltext_find("-object object"));
     CHECK_THROW_ANY(do_fulltext_find("object -object"));
     CHECK_THROW_ANY(do_fulltext_find("objects -object object"));
@@ -6146,10 +6149,8 @@ TEST(Query_FullTextMulti)
     CHECK_EQUAL(do_fulltext_find("object database management brown"), Keys({1}));
     CHECK_EQUAL(do_query_find(table, "text TEXT 'object database management brown'"), Keys({1}));
 
-    // tokenization of search terms treats all these as separate tokens, also with exclusion
-    // not {}, as is the same as 'object -oriented -database'
-    CHECK_EQUAL(do_fulltext_find("object-oriented -database"), Keys({6}));
-    // not {1}, as is same as 'object -oriented -table -oriented' but throws since duplicate
+    // non alphanum characters not allowed inside seach token
+    CHECK_THROW_ANY(do_fulltext_find("object-oriented -database"));
     CHECK_THROW_ANY(do_fulltext_find("object-oriented -table-oriented"));
 
     while (table->size() > 0) {
