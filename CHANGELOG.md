@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Prebuilt libraries for Apple platforms are now built with Xcode 14.
 
 ----------------------------------------------
 
