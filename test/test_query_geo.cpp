@@ -167,6 +167,55 @@ TEST(Query_GeoWithinBasics)
                                    "the right hand side of a GEOWITHIN query");
 }
 
+TEST(Geospatial_ListOfPrimitives)
+{
+    auto make_list_with_points = [](Obj obj, const std::vector<GeoPoint>& points) {
+        ColKey list_col = obj.get_table()->get_column_key("locations");
+        LnkLst list = obj.get_linklist(list_col);
+        for (const GeoPoint& point : points) {
+            Obj location = list.create_and_insert_linked_object(0);
+            Geospatial{point}.assign_to(location);
+        }
+    };
+    Group g;
+    std::vector<Geospatial> data = {GeoPoint{0, 0}, GeoPoint{0, 0}, GeoPoint{0, 0}, GeoPoint{0, 0}};
+    TableRef table = setup_with_points(g, data);
+    TableRef location_table = g.get_table("Location");
+    ColKey list_col = table->add_column_list(*location_table, "locations");
+    CHECK(table->size() == 4);
+    auto obj_it = table->begin();
+    make_list_with_points(*obj_it, {GeoPoint{1, 1}, GeoPoint{2, 2}});
+    make_list_with_points(*++obj_it, {GeoPoint{2, 2}, GeoPoint{3, 3}});
+    make_list_with_points(*++obj_it, {GeoPoint{1, 1}, GeoPoint{1, 1}, GeoPoint{1, 1}});
+    // the fourth object has no elements in the list
+
+    using GCS = GeoCenterSphere;
+    const double r = 0.00872665;
+    util::Optional<ExpressionComparisonType> ect;
+
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {1, 1}}).count(), 2);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {2, 2}}).count(), 2);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {3, 3}}).count(), 1);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {4, 4}}).count(), 0);
+    ect = ExpressionComparisonType::Any;
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {1, 1}}).count(), 2);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {2, 2}}).count(), 2);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {3, 3}}).count(), 1);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {4, 4}}).count(), 0);
+
+    ect = ExpressionComparisonType::All;
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {1, 1}}).count(), 1);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {2, 2}}).count(), 0);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {3, 3}}).count(), 0);
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {4, 4}}).count(), 0);
+
+    ect = ExpressionComparisonType::None;
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {1, 1}}).count(), 2); // 1, 3
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {2, 2}}).count(), 2); // 2, 3
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {3, 3}}).count(), 3); // 0, 2, 3
+    CHECK_EQUAL(table->column<Link>(list_col, ect).geo_within(GCS{r, {4, 4}}).count(), 4); // 0, 1, 2, 3
+}
+
 TEST(Geospatial_MeridianQuery)
 {
     // Check that geoWithin works across the meridian. We insert points

@@ -1166,7 +1166,6 @@ public:
 template <>
 class Subexpr2<Geospatial> : public Subexpr, public Overloads<Geospatial, Geospatial> {
 public:
-    // FIXME: Query geoWithin(const Geospatial& other);
     DataType get_type() const final
     {
         return type_Geospatial;
@@ -2355,10 +2354,11 @@ private:
 #if REALM_ENABLE_GEOSPATIAL
 class GeoWithinCompare : public Expression {
 public:
-    GeoWithinCompare(const LinkMap& lm, Geospatial bounds)
+    GeoWithinCompare(const LinkMap& lm, Geospatial bounds, util::Optional<ExpressionComparisonType> comp_type)
         : m_link_map(lm)
         , m_bounds(bounds)
         , m_region(m_bounds)
+        , m_comp_type(comp_type)
     {
         Status status = m_region.get_conversion_status();
         if (!status.is_ok()) {
@@ -2413,17 +2413,42 @@ public:
 
     size_t find_first(size_t start, size_t end) const override
     {
-        bool found = false;
         auto table = m_link_map.get_target_table();
 
         while (start < end) {
-            m_link_map.map_links(start, [&](ObjKey key) {
-                found = m_region.contains(
-                    Geospatial::from_obj(table->get_object(key), m_type_col, m_coords_col).get<GeoPoint>());
-                return found;
-            });
-            if (found)
-                return start;
+            bool found = false;
+
+            switch (m_comp_type.value_or(ExpressionComparisonType::Any)) {
+                case ExpressionComparisonType::Any: {
+                    m_link_map.map_links(start, [&](ObjKey key) {
+                        found = m_region.contains(
+                            Geospatial::from_obj(table->get_object(key), m_type_col, m_coords_col).get<GeoPoint>());
+                        return !found; // keep searching if not found, stop searching on first match
+                    });
+                    if (found)
+                        return start;
+                } break;
+                case ExpressionComparisonType::All: {
+                    m_link_map.map_links(start, [&](ObjKey key) {
+                        found = m_region.contains(
+                            Geospatial::from_obj(table->get_object(key), m_type_col, m_coords_col).get<GeoPoint>());
+                        return found; // keep searching until one the first non-match
+                    });
+                    if (found) // all matched
+                        return start;
+                    break;
+                }
+                case ExpressionComparisonType::None: {
+                    m_link_map.map_links(start, [&](ObjKey key) {
+                        found = m_region.contains(
+                            Geospatial::from_obj(table->get_object(key), m_type_col, m_coords_col).get<GeoPoint>());
+                        return !found; // keep searching until the first match
+                    });
+                    if (!found) // none matched
+                        return start;
+                    break;
+                }
+            }
             start++;
         }
 
@@ -2432,7 +2457,8 @@ public:
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        return state.describe_columns(m_link_map, ColKey()) + " GEOWITHIN " + util::serializer::print_value(m_bounds);
+        return state.describe_expression_type(m_comp_type) + state.describe_columns(m_link_map, ColKey()) +
+               " GEOWITHIN " + util::serializer::print_value(m_bounds);
     }
 
     std::unique_ptr<Expression> clone() const override
@@ -2446,6 +2472,7 @@ private:
     GeoRegion m_region;
     ColKey m_type_col;
     ColKey m_coords_col;
+    util::Optional<ExpressionComparisonType> m_comp_type;
 };
 #endif
 
@@ -2672,7 +2699,7 @@ public:
 #if REALM_ENABLE_GEOSPATIAL
     Query geo_within(Geospatial bounds) const
     {
-        return make_expression<GeoWithinCompare>(m_link_map, bounds);
+        return make_expression<GeoWithinCompare>(m_link_map, bounds, m_comparison_type);
     }
 #endif
 
