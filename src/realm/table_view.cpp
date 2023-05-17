@@ -438,8 +438,14 @@ void TableView::sort(ColKey column, bool ascending)
 // Sort according to multiple columns, user specified order on each column
 void TableView::sort(SortDescriptor order)
 {
+    REALM_ASSERT(is_in_sync());
     m_descriptor_ordering.append_sort(std::move(order), SortDescriptor::MergeMode::prepend);
     m_descriptor_ordering.collect_dependencies(m_table.unchecked_ptr());
+
+    // Adding the new sort descriptor marked us as no longer in sync, but do_sort()
+    // will bring us back into sync
+    m_last_seen_versions.clear();
+    get_dependencies(m_last_seen_versions);
 
     do_sort(m_descriptor_ordering);
 }
@@ -455,6 +461,7 @@ void TableView::do_sync()
     // - Table::get_backlink_view()
     // Here we sync with the respective source.
     m_last_seen_versions.clear();
+    get_dependencies(m_last_seen_versions);
 
     if (m_collection_source) {
         m_key_values.clear();
@@ -493,8 +500,6 @@ void TableView::do_sync()
     }
 
     do_sort(m_descriptor_ordering);
-
-    get_dependencies(m_last_seen_versions);
 }
 
 void TableView::do_sort(const DescriptorOrdering& ordering)
@@ -504,22 +509,15 @@ void TableView::do_sort(const DescriptorOrdering& ordering)
     size_t sz = size();
     if (sz == 0)
         return;
+    REALM_ASSERT(is_in_sync());
 
     // Gather the current rows into a container we can use std algorithms on
-    size_t detached_ref_count = 0;
     BaseDescriptor::IndexPairs index_pairs;
     index_pairs.reserve(sz);
-    // always put any detached refs at the end of the sort
-    // FIXME: reconsider if this is the right thing to do
-    // FIXME: consider specialized implementations in derived classes
-    // (handling detached refs is not required in linkviews)
     for (size_t t = 0; t < sz; t++) {
         ObjKey key = get_key(t);
-        if (m_table->is_valid(key)) {
-            index_pairs.emplace_back(key, t);
-        }
-        else
-            ++detached_ref_count;
+        REALM_ASSERT_DEBUG(m_table->is_valid(key));
+        index_pairs.emplace_back(key, t);
     }
 
     const int num_descriptors = int(ordering.size());
@@ -541,8 +539,6 @@ void TableView::do_sort(const DescriptorOrdering& ordering)
     for (auto& pair : index_pairs) {
         m_key_values.add(pair.key_for_object);
     }
-    for (size_t t = 0; t < detached_ref_count; ++t)
-        m_key_values.add(null_key);
 }
 
 bool TableView::is_in_table_order() const

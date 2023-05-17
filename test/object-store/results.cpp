@@ -3638,6 +3638,29 @@ TEST_CASE("results: snapshots") {
         REQUIRE_FALSE(snapshot.first()->is_valid());
         REQUIRE_FALSE(snapshot.last()->is_valid());
     }
+
+    SECTION("sorting a snapshot results in live Results") {
+        auto table = r->read_group().get_table("class_object");
+        write([=] {
+            table->create_object();
+        });
+
+        auto snapshot = Results(r, table).snapshot();
+        auto sorted = snapshot.sort({{"value", true}});
+        REQUIRE(snapshot.size() == 1);
+        REQUIRE(sorted.size() == 1);
+
+        write([=] {
+            table->clear();
+        });
+
+        REQUIRE(snapshot.size() == 1);
+        REQUIRE(sorted.size() == 0);
+
+        // Create a second sorted Results derived from the now-stale snapshot
+        sorted = snapshot.sort({{"value", true}});
+        REQUIRE(sorted.size() == 0);
+    }
 }
 
 TEST_CASE("results: distinct") {
