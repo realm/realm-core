@@ -69,7 +69,7 @@ const specOption = program
   .makeOptionMandatory();
 
 const optInOption = program
-  .createOption("-a, --opt-in <opt-in list>", "Path of the 'opt-in list' specification")
+  .createOption("--opt-in <opt-in list>", "Path of the 'opt-in list' specification")
   .argParser(parseExistingFilePath);
 
 const templateOption = program
@@ -98,12 +98,12 @@ program
       debug("Debugging enabled");
     }
     try {
-      const spec = parseSpecs(specPaths);
+      const rawSpec = parseSpecs(specPaths);
       let optInSpec: OptInSpec | undefined;
       if (optInPath) {
         optInSpec = parseOptInList(optInPath);
       }
-      generate({ spec, optInSpec, template: await template, outputPath });
+      generate({ rawSpec, optInSpec, template: await template, outputPath });
       process.exit(0);
     } catch (err) {
       printError(err);

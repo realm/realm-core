@@ -52,10 +52,10 @@ export type Spec = ReplaceFields<
  *       - type
  */
 export type OptInSpec = {
-  classes: {
+  classes?: {
     [cppName: string]: { methods: string[] };
   };
-  records: {
+  records?: {
     [cppName: string]: { fields: string[] };
   };
 };

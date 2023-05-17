@@ -16,13 +16,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+import { BoundSpec } from "./bound-model";
 import { Formatter } from "./formatter";
 import { Outputter } from "./outputter";
-import { OptInSpec, Spec } from "./spec";
+import { Spec } from "./spec";
 
 export type TemplateContext = {
-  spec: Spec;
-  optInSpec?: OptInSpec;
+  rawSpec: Spec;
+  spec: BoundSpec;
   /**
    * @param path The file path, relative to the output directory.
    * @param formatter An optional formatter to run after the template has returned.
