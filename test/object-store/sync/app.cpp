@@ -2561,6 +2561,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 if (request_count++ == 0) {
                     // First request should be a location request against the original URL
                     REQUIRE(request.url.find(original_host) != std::string::npos);
+                    REQUIRE(request.url.find("/location") != std::string::npos);
                     REQUIRE(request.redirect_count == 0);
                     redir_transport->simulated_response = {
                         static_cast<int>(sync::HTTPStatus::MovedPermanently),
@@ -2620,6 +2621,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 if (request_count++ == 0) {
                     // First request should be a location request against the original URL
                     REQUIRE(request.url.find(original_host) != std::string::npos);
+                    REQUIRE(request.url.find("/location") != std::string::npos);
                     REQUIRE(request.redirect_count == 0);
                 }
                 if (request.url.find("/location") != std::string::npos) {
