@@ -172,6 +172,10 @@ public:
     {
         return nullptr;
     }
+    virtual SetMixedPtr get_set(const PathElement&) const
+    {
+        return nullptr;
+    }
     virtual ListMixedPtr get_list(const PathElement&) const
     {
         return nullptr;

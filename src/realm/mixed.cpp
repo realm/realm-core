@@ -339,7 +339,7 @@ int Mixed::compare(const Mixed& b) const noexcept
             if (type == type_TypeOfValue && b.get_type() == type_TypeOfValue) {
                 return TypeOfValue(int_val).matches(TypeOfValue(b.int_val)) ? 0 : compare_generic(int_val, b.int_val);
             }
-            if ((type == type_List || type == type_Dictionary)) {
+            if ((type == type_List || type == type_Dictionary || type == type_Set)) {
                 return m_type == b.m_type ? 0 : m_type < b.m_type ? -1 : 1;
             }
             REALM_ASSERT_RELEASE(false && "Compare not supported for this column type");

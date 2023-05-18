@@ -24,6 +24,7 @@
 #include <realm/object-store/schema.hpp>
 
 #include <realm/object-store/list.hpp>
+#include <realm/object-store/set.hpp>
 #include <realm/object-store/dictionary.hpp>
 
 #include <realm/db.hpp>
@@ -34,7 +35,7 @@
 
 using namespace realm;
 
-TEST_CASE("nested-list-mixed", "[nested-colllections]") {
+TEST_CASE("nested-list-mixed", "[nested-collections]") {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -64,8 +65,26 @@ TEST_CASE("nested-list-mixed", "[nested-colllections]") {
         nested_list1.add(Mixed{6});
         nested_list1.add(Mixed{7});
         nested_list1.add(Mixed{"World"});
-        const char* json_doc_list = "{\"_key\":0,\"any_val\":[[5,10,\"Hello\"],[6,7,\"World\"],{}]}";
+        auto nested_dict = list_os.get_dictionary(2);
+        nested_dict.insert("Test", Mixed{"val"});
+        const char* json_doc_list = "{\"_key\":0,\"any_val\":[[5,10,\"Hello\"],[6,7,\"World\"],{\"Test\":\"val\"}]}";
         REQUIRE(list_os.get_impl().get_obj().to_string() == json_doc_list);
+        // add a set, this is doable, but it cannnot contain a nested collection in it.
+        list_os.insert_collection(3, CollectionType::Set);
+        auto nested_set = list_os.get_set(3);
+        nested_set.insert(Mixed{5});
+        nested_set.insert(Mixed{"Hello"});
+        const char* json_doc_list_with_set =
+            "{\"_key\":0,\"any_val\":[[5,10,\"Hello\"],[6,7,\"World\"],{\"Test\":\"val\"},[5,\"Hello\"]]}";
+        REQUIRE(list_os.get_impl().get_obj().to_string() == json_doc_list_with_set);
+    }
+
+    // Set
+    {
+        obj.set_collection(col, CollectionType::Set);
+        object_store::Set set{r, obj, col};
+        // this should fail, sets cannot have nested collections, thus can only be leaf collections
+        REQUIRE_THROWS(set.insert_collection(0, CollectionType::List));
     }
 
     // Dictionary.

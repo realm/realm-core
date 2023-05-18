@@ -348,7 +348,9 @@ public:
     void insert_collection(const PathElement&, CollectionType dict_or_list) override;
     void set_collection(const PathElement& path_element, CollectionType dict_or_list) override;
     DictionaryPtr get_dictionary(const PathElement& path_elem) const override;
+    SetMixedPtr get_set(const PathElement& path_elem) const override;
     ListMixedPtr get_list(const PathElement& path_elem) const override;
+
 
     // Overriding members of CollectionBase:
     size_t size() const final

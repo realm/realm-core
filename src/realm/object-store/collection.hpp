@@ -38,6 +38,7 @@ class ListNotifier;
 
 namespace object_store {
 class Dictionary;
+class Set;
 class Collection {
 public:
     Collection(PropertyType type) noexcept;
@@ -119,6 +120,7 @@ public:
     void set_collection(const PathElement&, CollectionType);
     List get_list(const PathElement&) const;
     Dictionary get_dictionary(const PathElement&) const;
+    Set get_set(const PathElement&) const;
 
 protected:
     std::shared_ptr<Realm> m_realm;

@@ -1100,6 +1100,12 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                     Dictionary dict(parent, 0);
                     dict.to_json(out, link_depth, output_mode, print_link);
                 }
+                else if (val.is_type(type_Set)) {
+                    auto parent = std::make_shared<DummyParent>(this->get_table(), val.get_ref());
+                    Set<Mixed> set(*this, ck);
+                    set.set_owner(parent, 0);
+                    set.to_json(out, link_depth, output_mode, print_link);
+                }
                 else if (val.is_type(type_List)) {
                     DummyParent parent(m_table, val.get_ref());
                     Lst<Mixed> list(parent, 0);
@@ -2049,6 +2055,9 @@ CollectionBasePtr Obj::get_collection_ptr(ColKey col_key) const
     auto val = get<Mixed>(col_key);
     if (val.is_type(type_List)) {
         return std::make_shared<Lst<Mixed>>(*this, col_key);
+    }
+    else if (val.is_type(type_Set)) {
+        return std::make_shared<Set<Mixed>>(*this, col_key);
     }
     REALM_ASSERT(val.is_type(type_Dictionary));
     return std::make_shared<Dictionary>(*this, col_key);

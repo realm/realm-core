@@ -64,7 +64,7 @@ public:
     Set(ColKey col_key)
         : Base(col_key)
     {
-        if (!col_key.is_set()) {
+        if (!(col_key.is_set() || col_key.get_type() == col_type_Mixed)) {
             throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a set");
         }
 
