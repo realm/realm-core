@@ -279,7 +279,7 @@ static bool is_valid_lat_lng(double lng, double lat)
     return abs(lng) <= 180 && abs(lat) <= 90;
 }
 
-static Status coord_to_point(double lng, double lat, S2Point* out)
+static Status coord_to_point(double lng, double lat, S2Point& out)
 {
     if (!is_valid_lat_lng(lng, lat))
         return Status(ErrorCodes::InvalidQueryArg,
@@ -288,13 +288,13 @@ static Status coord_to_point(double lng, double lat, S2Point* out)
     S2LatLng ll = S2LatLng::FromDegrees(lat, lng).Normalized();
     // This shouldn't happen since we should only have valid lng/lats.
     REALM_ASSERT_EX(ll.is_valid(), util::format("coords invalid after normalization, lng = %1, lat = %2", lng, lat));
-    *out = ll.ToPoint();
+    out = ll.ToPoint();
     return Status::OK();
 }
 
-static void erase_duplicate_points(std::vector<S2Point>* vertices)
+static void erase_duplicate_adjacent_points(std::vector<S2Point>& vertices)
 {
-    vertices->erase(std::unique(vertices->begin(), vertices->end()), vertices->end());
+    vertices.erase(std::unique(vertices.begin(), vertices.end()), vertices.end());
 }
 
 static Status is_ring_closed(const std::vector<S2Point>& ring, const std::vector<GeoPoint>& points)
@@ -314,6 +314,7 @@ static Status is_ring_closed(const std::vector<S2Point>& ring, const std::vector
 
 static Status parse_polygon_coordinates(const GeoPolygon& polygon, S2Polygon* out)
 {
+    REALM_ASSERT(out);
     std::vector<S2Loop*> rings;
     rings.reserve(polygon.points.size());
     Status status = Status::OK();
@@ -333,7 +334,7 @@ static Status parse_polygon_coordinates(const GeoPolygon& polygon, S2Polygon* ou
         points.reserve(polygon.points[i].size());
         for (auto&& p : polygon.points[i]) {
             S2Point s2p;
-            status = coord_to_point(p.longitude, p.latitude, &s2p);
+            status = coord_to_point(p.longitude, p.latitude, s2p);
             if (!status.is_ok()) {
                 return status;
             }
@@ -344,7 +345,7 @@ static Status parse_polygon_coordinates(const GeoPolygon& polygon, S2Polygon* ou
         if (!status.is_ok())
             return status;
 
-        erase_duplicate_points(&points);
+        erase_duplicate_adjacent_points(points);
         // Drop the duplicated last point.
         points.resize(points.size() - 1);
 
@@ -440,10 +441,10 @@ GeoRegion::GeoRegion(const Geospatial& geo)
         std::unique_ptr<S2Region> operator()(const GeoBox& box) const
         {
             S2Point s2_lo, s2_hi;
-            m_status_out = coord_to_point(box.lo.longitude, box.lo.latitude, &s2_lo);
+            m_status_out = coord_to_point(box.lo.longitude, box.lo.latitude, s2_lo);
             if (!m_status_out.is_ok())
                 return nullptr;
-            m_status_out = coord_to_point(box.hi.longitude, box.hi.latitude, &s2_hi);
+            m_status_out = coord_to_point(box.hi.longitude, box.hi.latitude, s2_hi);
             if (!m_status_out.is_ok())
                 return nullptr;
             auto ret = std::make_unique<S2LatLngRect>(S2LatLng(s2_lo), S2LatLng(s2_hi));
@@ -464,7 +465,7 @@ GeoRegion::GeoRegion(const Geospatial& geo)
         std::unique_ptr<S2Region> operator()(const GeoCircle& circle) const
         {
             S2Point center;
-            m_status_out = coord_to_point(circle.center.longitude, circle.center.latitude, &center);
+            m_status_out = coord_to_point(circle.center.longitude, circle.center.latitude, center);
             if (!m_status_out.is_ok())
                 return nullptr;
             if (circle.radius_radians < 0 || std::isnan(circle.radius_radians)) {
