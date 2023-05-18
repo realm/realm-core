@@ -134,19 +134,14 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction lm) const
                 values.init_from_parent();
 
                 // Iterate through values and insert all link values
-                values.traverse([&](BPlusTreeNode* node, size_t) {
-                    auto bplustree_leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
-                    auto sz = bplustree_leaf->size();
-                    for (size_t i = 0; i < sz; i++) {
-                        auto m = bplustree_leaf->get(i);
-                        if (m.is_type(type_TypedLink)) {
-                            auto link = m.get_link();
-                            REALM_ASSERT(link.get_table_key() == this->m_tables[column + 1]->get_key());
-                            if (!map_links(column + 1, link.get_obj_key(), lm))
-                                return IteratorControl::Stop;
-                        }
+                values.for_all([&](Mixed m) {
+                    if (m.is_type(type_TypedLink)) {
+                        auto link = m.get_link();
+                        REALM_ASSERT(link.get_table_key() == this->m_tables[column + 1]->get_key());
+                        if (!map_links(column + 1, link.get_obj_key(), lm))
+                            return false;
                     }
-                    return IteratorControl::AdvanceToNext;
+                    return true;
                 });
             }
         }
