@@ -40,9 +40,10 @@ TEST_CASE("nested-list-mixed", "[nested-collections]") {
     config.cache = false;
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
-    r->update_schema({
-        {"any", {{"any_val", PropertyType::Mixed | PropertyType::Nullable}}},
-    });
+    r->update_schema({{
+        "any",
+        {{"any_val", PropertyType::Mixed | PropertyType::Nullable}},
+    }});
 
     r->begin_transaction();
 
@@ -67,15 +68,19 @@ TEST_CASE("nested-list-mixed", "[nested-collections]") {
         nested_list1.add(Mixed{"World"});
         auto nested_dict = list_os.get_dictionary(2);
         nested_dict.insert("Test", Mixed{"val"});
-        const char* json_doc_list = "{\"_key\":0,\"any_val\":[[5,10,\"Hello\"],[6,7,\"World\"],{\"Test\":\"val\"}]}";
+        nested_dict.insert_collection("Set", CollectionType::Set);
+        auto nested_set_dict = nested_dict.get_set("Set");
+        nested_set_dict.insert(Mixed{10});
+        const char* json_doc_list =
+            "{\"_key\":0,\"any_val\":[[5,10,\"Hello\"],[6,7,\"World\"],{\"Set\":[10],\"Test\":\"val\"}]}";
         REQUIRE(list_os.get_impl().get_obj().to_string() == json_doc_list);
         // add a set, this is doable, but it cannnot contain a nested collection in it.
         list_os.insert_collection(3, CollectionType::Set);
         auto nested_set = list_os.get_set(3);
         nested_set.insert(Mixed{5});
         nested_set.insert(Mixed{"Hello"});
-        const char* json_doc_list_with_set =
-            "{\"_key\":0,\"any_val\":[[5,10,\"Hello\"],[6,7,\"World\"],{\"Test\":\"val\"},[5,\"Hello\"]]}";
+        const char* json_doc_list_with_set = "{\"_key\":0,\"any_val\":[[5,10,\"Hello\"],[6,7,\"World\"],{\"Set\":[10]"
+                                             ",\"Test\":\"val\"},[5,\"Hello\"]]}";
         REQUIRE(list_os.get_impl().get_obj().to_string() == json_doc_list_with_set);
     }
 
@@ -85,6 +90,28 @@ TEST_CASE("nested-list-mixed", "[nested-collections]") {
         object_store::Set set{r, obj, col};
         // this should fail, sets cannot have nested collections, thus can only be leaf collections
         REQUIRE_THROWS(set.insert_collection(0, CollectionType::List));
+
+        // create a set and try to add the previous set as Mixed that contains a link to an object.
+        auto col2 = table->add_column(type_Mixed, "any_val2");
+        obj.set_collection(col2, CollectionType::Set);
+        object_store::Set set2{r, obj, col2};
+        set2.insert_any(set.get_impl().get_obj());
+        // trying to get a collection from a SET is not allowed.
+        REQUIRE_THROWS(set2.get_set(0));
+
+        // try to extract the obj and construct the SET, this is technically doable if you know the index.
+        auto mixed = set2.get_any(0);
+        auto link = mixed.get_link();
+        auto hidden_obj = table->get_object(link.get_obj_key());
+        object_store::Set other_set{r, hidden_obj, col};
+        REQUIRE_THROWS(other_set.insert_collection(0, CollectionType::List));
+        other_set.insert_any(Mixed{42});
+
+        const char* json_doc =
+            "{\"_key\":0,\"any_val\":[42],\"any_val2\":[{ \"table\": \"class_any\", \"key\": 0 }]}";
+        REQUIRE(set.get_impl().get_obj().to_string() == json_doc);
+
+        table->remove_column(col2);
     }
 
     // Dictionary.
