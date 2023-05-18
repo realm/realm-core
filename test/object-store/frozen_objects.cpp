@@ -133,29 +133,63 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     auto int_dict_col = table->get_column_key("int_dict");
     auto linked_object_value_col = linked_table->get_column_key("value");
 
-    realm->begin_transaction();
-    for (int i = 0; i < 8; ++i) {
+    auto create_object = [&](int value, bool with_links = false) {
         Obj obj = table->create_object();
-        obj.set(value_col, (i + 2));
+        obj.set(value_col, value);
         std::shared_ptr<LnkLst> object_link_view = obj.get_linklist_ptr(object_link_col);
+
         auto int_list = List(realm, obj, int_list_col);
         object_store::Dictionary int_dict(realm, obj, int_dict_col);
+
         for (int j = 0; j < 5; ++j) {
-            auto child_obj = linked_table->create_object();
-            child_obj.set(linked_object_value_col, j + 10);
-            object_link_view->add(child_obj.get_key());
+            if (with_links) {
+                auto child_obj = linked_table->create_object();
+                child_obj.set(linked_object_value_col, j + 10);
+                object_link_view->add(child_obj.get_key());
+            }
             int_list.add(static_cast<Int>(j + 42));
             std::string key = "Key" + util::to_string(j);
-            int_dict.insert(key, i);
+            int_dict.insert(key, value);
         }
-    }
-    realm->commit_transaction();
+        return obj;
+    };
 
-    Results results(realm, table);
+    auto write = [&](const std::function<void()>& fn) {
+        realm->begin_transaction();
+        fn();
+        realm->commit_transaction();
+    };
+
+    write([&]() {
+        for (int i = 0; i < 8; ++i)
+            create_object(i + 2, true);
+    });
+
     auto frozen_realm = Realm::get_frozen_realm(config, realm->read_transaction_version());
-    Results frozen_results = results.freeze(frozen_realm);
+
+#define VERIFY_VALID_RESULTS(results, realm)                                                                         \
+    REQUIRE(results.is_valid());                                                                                     \
+    if (results.size() == 0) {                                                                                       \
+        REQUIRE_EXCEPTION(results.get_any(0), OutOfBounds,                                                           \
+                          "Requested index 0 calling get_any() on Results when empty");                              \
+    }                                                                                                                \
+    else {                                                                                                           \
+        REQUIRE_FALSE(results.get_any(0).is_null());                                                                 \
+    }                                                                                                                \
+    REQUIRE(results.freeze(realm).is_valid());
+
+#define VERIFY_INVALID_RESULTS(results, realm, exception, message)                                                   \
+    REQUIRE_EXCEPTION(results.freeze(realm), exception, message);                                                    \
+    REQUIRE_FALSE(results.is_valid());                                                                               \
+    REQUIRE_EXCEPTION(results.size(), exception, message);                                                           \
+    REQUIRE_EXCEPTION(results.get_any(0).is_null(), exception, message);
+
+#define VERIFY_STALE_RESULTS(results, realm)                                                                         \
+    VERIFY_INVALID_RESULTS(results, realm, StaleAccessor, "Access to invalidated Results objects")
 
     SECTION("is_frozen") {
+        Results results(realm, table);
+        Results frozen_results = results.freeze(frozen_realm);
         REQUIRE(!results.is_frozen());
         REQUIRE(frozen_results.is_frozen());
         JoiningThread thread([&] {
@@ -166,6 +200,8 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     }
 
     SECTION("add_notification throws") {
+        Results results(realm, table);
+        Results frozen_results = results.freeze(frozen_realm);
         REQUIRE_EXCEPTION(frozen_results.add_notification_callback([&](CollectionChangeSet) {}),
                           WrongTransactionState,
                           "Notifications are not available on frozen collections since they do not change.");
@@ -178,13 +214,12 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         JoiningThread thread([&] {
             REQUIRE(frozen_res.is_frozen());
             REQUIRE(frozen_res.size() == 0);
-            REQUIRE_EXCEPTION(frozen_res.get_any(0), OutOfBounds,
-                              "Requested index 0 calling get_any() on Results when empty");
+            VERIFY_VALID_RESULTS(frozen_res, frozen_realm);
         });
     }
 
     SECTION("Result constructor - Table") {
-        Results res = Results(frozen_realm, frozen_realm->read_group().get_table("class_object"));
+        Results results = Results(frozen_realm, frozen_realm->read_group().get_table("class_object"));
         Results frozen_res = results.freeze(frozen_realm);
         JoiningThread thread([&] {
             auto obj = frozen_res.get(0);
@@ -194,6 +229,9 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
             REQUIRE(Object(frozen_realm, obj).is_frozen());
             REQUIRE(frozen_res.get(0).get<int64_t>(value_col) == 2);
             REQUIRE(frozen_res.first()->get<int64_t>(value_col) == 2);
+
+            VERIFY_VALID_RESULTS(results, frozen_realm);
+            VERIFY_VALID_RESULTS(frozen_res, frozen_realm);
         });
     }
 
@@ -228,8 +266,15 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         JoiningThread thread1([&] {
             REQUIRE(frozen_res.is_frozen());
             REQUIRE(frozen_res.size() == 5);
-            REQUIRE(frozen_res.get<Int>(0) == 0);
+            REQUIRE(frozen_res.get<Int>(0) == 2);
         });
+
+        /* FIXME causes ThreadSanitizer error in Catch2?
+        write([&]() {
+            table->remove_object(table->get_object(0).get_key());
+        });
+        VERIFY_STALE_RESULTS(dict_results, realm);
+        */
     }
 
     SECTION("Result constructor - Query") {
@@ -247,6 +292,13 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
             REQUIRE(frozen_res.get(0).get<Int>(value_col) == 9);
             REQUIRE(frozen_res.first()->get<Int>(value_col) == 9);
         });
+
+        /* FIXME causes ThreadSanitizer error in Catch2?
+        write([&] {
+            realm->read_group().remove_table(table->get_name());
+        });
+        VERIFY_STALE_RESULTS(query_results, realm);
+        */
     }
 
     SECTION("Result constructor - TableView") {
@@ -268,6 +320,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     }
 
     SECTION("Result constructor - LinkList") {
+        Results results(realm, table);
         Obj obj = results.get(0);
         std::shared_ptr<LnkLst> link_list = obj.get_linklist_ptr(object_link_col);
         Results res = Results(realm, link_list);
@@ -288,6 +341,62 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         frozen_realm->close();
         realm->close();
         REQUIRE(DB::call_with_lock(config.path, [](auto) {}));
+    }
+
+    SECTION("Results after source remove") {
+        Results results;
+
+        SECTION("Results on collection") {
+            Obj obj;
+            write([&]() {
+                obj = create_object(42, true);
+            });
+            auto key = obj.get_key();
+
+            SECTION("Dictionary") {
+                results = Results(realm, obj.get_dictionary_ptr(int_dict_col));
+                write([&]() {
+                    table->remove_object(key);
+                });
+                // If Results is based on collection of primitives, the removal of
+                // the collection should invalidate Results.
+                VERIFY_STALE_RESULTS(results, realm);
+            }
+
+            SECTION("Links") {
+                results = Results(realm, obj.get_linklist_ptr(object_link_col));
+                auto snapshot = results.snapshot();
+                // If Results is based on collection of objects, the removal of
+                // the collection should not invalidate Results as the table still exists.
+                write([&]() {
+                    table->remove_object(key);
+                    // Snapshot should not be affected by the removed collection
+                    REQUIRE(snapshot.size() == 5);
+                });
+                REQUIRE(results.is_valid());
+                REQUIRE(results.size() == 0);
+                auto frozen = results.freeze(realm);
+                REQUIRE(frozen.is_valid());
+                REQUIRE(frozen.size() == 0);
+            }
+        }
+
+        SECTION("Results on table") {
+            results = Results(realm, table);
+            write([&]() {
+                realm->read_group().remove_table(table->get_key());
+            });
+            VERIFY_STALE_RESULTS(results, realm);
+        }
+
+        // FIXME? the test itself passes but crashes on teardown in notifier thread
+        //       with realm::NoSuchTable on Query constructor through import_copy_of
+        /* SECTION("Results on query") {
+            results = Results(realm, table->column<Int>(value_col) > 0, DescriptorOrdering());
+            do_remove = [&] {
+                realm->read_group().remove_table(table->get_key());
+            };
+        } */
     }
 }
 
@@ -410,9 +519,6 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
     }
     realm->commit_transaction();
     int notifications = 0;
-    // SharedRealm captured = realm->freeze(); // Realm::get_shared_realm(config);
-    // force readlock allocation NOW!
-    // captured->read_group();
     for (int j = 0; j < num_iterations; ++j) {
 
         // pick a random earlier transaction

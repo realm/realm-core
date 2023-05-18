@@ -34,39 +34,33 @@ namespace sync {
 //   7 Client takes the 'action' specified in the 'json_error' messages received
 //     from server. Client sends 'json_error' messages to the server.
 //
-//   8 Support for PBS->FLX client migration
-//     Websocket http errors are now sent as websocket close codes
+//   8 Websocket http errors are now sent as websocket close codes
 //     FLX sync BIND message can include JSON data in place of server path string
 //     Updated format for Sec-Websocket-Protocol strings
+//
+//   9 Support for PBS->FLX client migration
+//     Client reset updated to not provide the local schema when creating frozen
+//     realms - this informs the server to not send the schema before sending the
+//     migrate to FLX server action
 //
 //  XX Changes:
 //     - TBD
 //
 constexpr int get_current_protocol_version() noexcept
 {
-#ifdef REALM_SYNC_PROTOCOL_V8
-    return 8;
-#else
-    return 7;
-#endif // REALM_SYNC_PROTOCOL_V8
+    // Also update the current protocol version test in flx_sync.cpp when
+    // updating this value
+    return 9;
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
 {
-#ifdef REALM_SYNC_PROTOCOL_V8
     return "com.mongodb.realm-sync#";
-#else
-    return "com.mongodb.realm-sync/";
-#endif // REALM_SYNC_PROTOCOL_V8
 }
 
 constexpr std::string_view get_flx_websocket_protocol_prefix() noexcept
 {
-#ifdef REALM_SYNC_PROTOCOL_V8
     return "com.mongodb.realm-query-sync#";
-#else
-    return "com.mongodb.realm-query-sync/";
-#endif // REALM_SYNC_PROTOCOL_V8
 }
 
 enum class SyncServerMode { PBS, FLX };
@@ -96,6 +90,21 @@ inline bool is_ssl(ProtocolEnvelope protocol) noexcept
             return true;
     }
     return false;
+}
+
+inline std::string_view to_string(ProtocolEnvelope protocol) noexcept
+{
+    switch (protocol) {
+        case ProtocolEnvelope::realm:
+            return "realm://";
+        case ProtocolEnvelope::realms:
+            return "realms://";
+        case ProtocolEnvelope::ws:
+            return "ws://";
+        case ProtocolEnvelope::wss:
+            return "wss://";
+    }
+    return "";
 }
 
 

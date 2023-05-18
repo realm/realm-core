@@ -482,31 +482,20 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
     auto table = r->read_group().get_table("class_object");
     auto name_col = table->get_column_key("name_col");
-    auto int_col = table->get_column_key("int_col");
     auto array_string_col = table->get_column_key("array_string_col");
 
     r->begin_transaction();
-    auto o1 = table->create_object();
-    o1.set(name_col, "banana");
-    o1.set(int_col, 3);
-    auto o2 = table->create_object();
-    o2.set(name_col, "apricot");
-    o2.set(int_col, 2);
-    auto o3 = table->create_object();
-    o3.set(name_col, "apple");
-    o3.set(int_col, 1);
-    auto o4 = table->create_object();
-    o4.set(name_col, "orange");
-    o4.set(int_col, 2);
-    auto o5 = table->create_object();
-    o5.set(name_col, "apples");
-    o5.set(int_col, 3);
+    table->create_object().set_all("banana", 3);
+    table->create_object().set_all("apricot", 2);
+    table->create_object().set_all("apple", 1);
+    table->create_object().set_all("orange", 2);
+    auto o5 = table->create_object().set_all("apples", 3);
     r->commit_transaction();
 
     Results results(r, table);
     auto sorted = results.sort({{"name_col", true}});
     int algo_run_count = 0;
-    auto sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, SharedRealm realm) {
+    auto sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, const SharedRealm& realm) {
         algo_run_count++;
         auto obj = Object(realm, value.get_link());
         auto v = obj.get_column_value<StringData>("name_col");
@@ -783,22 +772,19 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
         REQUIRE(algo_run_count == 11);
 
-        REQUIRE(changes.sections_to_insert.count() == 3);
-        REQUIRE(changes.sections_to_delete.count() == 0);
+        REQUIRE(changes.sections_to_delete.empty());
         REQUIRE_INDICES(changes.sections_to_insert, 2, 3, 5);
 
-        REQUIRE(changes.insertions.size() == 4);
+        REQUIRE(changes.insertions.size() == 6);
         // Section 0 is 'A'
         REQUIRE_INDICES(changes.insertions[0], 0);
-        REQUIRE(changes.insertions[0].count() == 1);
+        REQUIRE(changes.insertions[1].empty());
         // Section 2 is 'C'
-        REQUIRE(changes.insertions[2].count() == 2);
         REQUIRE_INDICES(changes.insertions[2], 0, 1);
         // Section 3 is 'M'
-        REQUIRE(changes.insertions[3].count() == 1);
         REQUIRE_INDICES(changes.insertions[3], 0);
+        REQUIRE(changes.insertions[4].empty());
         // Section 5 is 'S'
-        REQUIRE(changes.insertions[5].count() == 2);
         REQUIRE_INDICES(changes.insertions[5], 0, 1);
         REQUIRE(changes.modifications.empty());
         REQUIRE(changes.deletions.empty());
@@ -809,10 +795,15 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         o4.set(name_col, "stocksss");
         r->commit_transaction();
         advance_and_notify(*r);
-        REQUIRE(changes.sections_to_insert.count() == 0);
-        REQUIRE(changes.sections_to_delete.count() == 0);
+        REQUIRE(changes.sections_to_insert.empty());
+        REQUIRE(changes.sections_to_delete.empty());
 
-        REQUIRE(changes.modifications.size() == 1);
+        REQUIRE(changes.modifications.size() == 6);
+        REQUIRE(changes.modifications[0].empty());
+        REQUIRE(changes.modifications[1].empty());
+        REQUIRE(changes.modifications[2].empty());
+        REQUIRE(changes.modifications[3].empty());
+        REQUIRE(changes.modifications[4].empty());
         REQUIRE_INDICES(changes.modifications[5], 1);
         REQUIRE(changes.insertions.empty());
         REQUIRE(changes.deletions.empty());
@@ -825,10 +816,12 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         table->remove_object(o3.get_key());
         r->commit_transaction();
         advance_and_notify(*r);
-        REQUIRE(changes.sections_to_insert.count() == 0);
+        REQUIRE(changes.sections_to_insert.empty());
         REQUIRE(changes.sections_to_delete.count() == 1);
 
-        REQUIRE(changes.deletions.size() == 1);
+        REQUIRE(changes.deletions.size() == 3);
+        REQUIRE(changes.deletions[0].empty());
+        REQUIRE(changes.deletions[1].empty());
         REQUIRE_INDICES(changes.deletions[2], 1);
         REQUIRE(changes.insertions.empty());
         REQUIRE(changes.modifications.empty());
@@ -842,15 +835,19 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         o4.set(name_col, "erie");
         r->commit_transaction();
         advance_and_notify(*r);
-        REQUIRE(changes.sections_to_insert.count() == 1);
-        REQUIRE(changes.sections_to_delete.count() == 1);
         REQUIRE_INDICES(changes.sections_to_delete, 4);
         REQUIRE_INDICES(changes.sections_to_insert, 3);
 
-        REQUIRE(changes.deletions.size() == 1);
-        REQUIRE(changes.insertions.size() == 2);
+        REQUIRE(changes.deletions.size() == 4);
+        REQUIRE(changes.insertions.size() == 5);
         REQUIRE(changes.modifications.empty());
+        REQUIRE(changes.deletions[0].empty());
+        REQUIRE(changes.deletions[1].empty());
+        REQUIRE(changes.deletions[2].empty());
         REQUIRE_INDICES(changes.deletions[3], 0);
+        REQUIRE(changes.insertions[0].empty());
+        REQUIRE(changes.insertions[1].empty());
+        REQUIRE(changes.insertions[2].empty());
         REQUIRE_INDICES(changes.insertions[3], 0, 1);
         REQUIRE_INDICES(changes.insertions[4], 0);
         REQUIRE(algo_run_count == 9);
@@ -864,7 +861,6 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         r->commit_transaction();
         advance_and_notify(*r);
         REQUIRE(changes.sections_to_insert.empty());
-        REQUIRE(changes.sections_to_delete.count() == 1);
         REQUIRE_INDICES(changes.sections_to_delete, 3);
 
         REQUIRE(changes.deletions.empty());
@@ -881,7 +877,6 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
         REQUIRE(algo_run_count == 0);
         REQUIRE(changes.sections_to_insert.empty());
-        REQUIRE(changes.sections_to_delete.count() == 4);
         REQUIRE_INDICES(changes.sections_to_delete, 0, 1, 2, 3);
 
         REQUIRE(changes.deletions.empty());
@@ -900,7 +895,6 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         r->commit_transaction();
         advance_and_notify(*r);
         REQUIRE(algo_run_count == 7);
-        REQUIRE(changes.sections_to_insert.count() == 5);
         REQUIRE(changes.sections_to_delete.empty());
         REQUIRE_INDICES(changes.sections_to_insert, 0, 1, 2, 3, 4);
 
@@ -917,7 +911,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         r->begin_transaction();
         o1.set(name_col, "banana");
         o2.set(name_col, "melon");
-        o3.set(name_col, "calender");
+        o3.set(name_col, "calendar");
         o4.set(name_col, "apricot");
         o5.set(name_col, "duck"); // stays the same
         o6.set(name_col, "duck");
@@ -925,14 +919,12 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         r->commit_transaction();
         advance_and_notify(*r);
         REQUIRE(algo_run_count == 7);
-        REQUIRE(changes.sections_to_insert.count() == 2);
-        REQUIRE(changes.sections_to_delete.count() == 2);
         REQUIRE_INDICES(changes.sections_to_insert, 2, 4);
         REQUIRE_INDICES(changes.sections_to_delete, 3, 4);
 
         REQUIRE(changes.deletions.size() == 2);
         REQUIRE(changes.insertions.size() == 5);
-        REQUIRE(changes.modifications.size() == 1);
+        REQUIRE(changes.modifications.size() == 3);
         REQUIRE_INDICES(changes.insertions[0], 0, 1);
         REQUIRE_INDICES(changes.insertions[1], 0);
         REQUIRE_INDICES(changes.insertions[2], 0);
@@ -942,6 +934,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE_INDICES(changes.deletions[0], 0, 1, 2);
         REQUIRE_INDICES(changes.deletions[1], 0);
 
+        REQUIRE(changes.modifications[0].empty());
+        REQUIRE(changes.modifications[1].empty());
         REQUIRE_INDICES(changes.modifications[2], 0);
 
         algo_run_count = 0;
@@ -957,21 +951,26 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
         REQUIRE(algo_run_count == 7);
         REQUIRE(changes.sections_to_insert.empty());
-        REQUIRE(changes.sections_to_delete.count() == 1);
         REQUIRE_INDICES(changes.sections_to_delete, 1);
 
-        REQUIRE(changes.deletions.size() == 3);
-        REQUIRE(changes.insertions.size() == 3);
-        REQUIRE(changes.modifications.size() == 1);
+        REQUIRE(changes.deletions.size() == 5);
+        REQUIRE(changes.insertions.size() == 4);
+        REQUIRE(changes.modifications.size() == 4);
 
         REQUIRE_INDICES(changes.insertions[0], 0, 1, 2);
         REQUIRE_INDICES(changes.insertions[1], 0);
+        REQUIRE(changes.insertions[2].empty());
         REQUIRE_INDICES(changes.insertions[3], 0);
 
         REQUIRE_INDICES(changes.deletions[0], 0, 1);
+        REQUIRE(changes.deletions[1].empty());
         REQUIRE_INDICES(changes.deletions[2], 0);
+        REQUIRE(changes.deletions[3].empty());
         REQUIRE_INDICES(changes.deletions[4], 0);
 
+        REQUIRE(changes.modifications[0].empty());
+        REQUIRE(changes.modifications[1].empty());
+        REQUIRE(changes.modifications[2].empty());
         REQUIRE_INDICES(changes.modifications[3], 0, 1);
 
         algo_run_count = 0;
@@ -986,14 +985,12 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         r->commit_transaction();
         advance_and_notify(*r);
         REQUIRE(algo_run_count == 7);
-        REQUIRE(changes.sections_to_insert.count() == 3);
-        REQUIRE(changes.sections_to_delete.count() == 2);
         REQUIRE_INDICES(changes.sections_to_insert, 2, 3, 4);
         REQUIRE_INDICES(changes.sections_to_delete, 2, 3);
 
         REQUIRE(changes.deletions.size() == 1);
         REQUIRE(changes.insertions.size() == 5);
-        REQUIRE(changes.modifications.size() == 1);
+        REQUIRE(changes.modifications.size() == 2);
 
         REQUIRE_INDICES(changes.insertions[0], 0);
         REQUIRE_INDICES(changes.insertions[1], 1);
@@ -1001,12 +998,13 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE_INDICES(changes.insertions[3], 0, 1);
         REQUIRE_INDICES(changes.insertions[4], 0);
 
+        REQUIRE(changes.modifications[0].empty());
         REQUIRE_INDICES(changes.modifications[1], 0);
 
         REQUIRE_INDICES(changes.deletions[0], 0, 1, 2);
     }
 
-    SECTION("notifications ascending / decsending") {
+    SECTION("notifications ascending / descending") {
         // Ascending
         SectionedResultsChangeSet changes;
         auto token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c) {
@@ -1041,17 +1039,16 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
 
         REQUIRE(algo_run_count == 4);
-        REQUIRE(changes.sections_to_insert.count() == 1);
-        REQUIRE(changes.sections_to_delete.count() == 1);
         REQUIRE_INDICES(changes.sections_to_insert, 1);
         REQUIRE_INDICES(changes.sections_to_delete, 0);
 
-        REQUIRE(changes.deletions.size() == 1);
+        REQUIRE(changes.deletions.size() == 2);
         REQUIRE(changes.insertions.size() == 2);
         REQUIRE(changes.modifications.empty());
 
         REQUIRE_INDICES(changes.insertions[0], 0, 1);
         REQUIRE_INDICES(changes.insertions[1], 0, 1);
+        REQUIRE(changes.deletions[0].empty());
         REQUIRE_INDICES(changes.deletions[1], 0, 1);
 
         // Descending
@@ -1091,8 +1088,6 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
 
         REQUIRE(algo_run_count == 4);
-        REQUIRE(changes.sections_to_insert.count() == 1);
-        REQUIRE(changes.sections_to_delete.count() == 1);
         REQUIRE_INDICES(changes.sections_to_insert, 0);
         REQUIRE_INDICES(changes.sections_to_delete, 1);
 
@@ -1106,7 +1101,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE_INDICES(changes.modifications[0], 1);
     }
 
-    SECTION("notifications ascending / decsending primitive") {
+    SECTION("notifications ascending / descending primitive") {
         // Ascending
         r->begin_transaction();
         auto o1 = table->create_object();
@@ -1146,17 +1141,16 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
 
         REQUIRE(algo_run_count == 4);
-        REQUIRE(changes.sections_to_insert.count() == 1);
-        REQUIRE(changes.sections_to_delete.count() == 1);
         REQUIRE_INDICES(changes.sections_to_insert, 1);
         REQUIRE_INDICES(changes.sections_to_delete, 0);
 
-        REQUIRE(changes.deletions.size() == 1);
+        REQUIRE(changes.deletions.size() == 2);
         REQUIRE(changes.insertions.size() == 2);
         REQUIRE(changes.modifications.empty());
 
         REQUIRE_INDICES(changes.insertions[0], 0, 1);
         REQUIRE_INDICES(changes.insertions[1], 0, 1);
+        REQUIRE(changes.deletions[0].empty());
         REQUIRE_INDICES(changes.deletions[1], 0, 1);
 
         // Descending
@@ -1196,8 +1190,6 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
 
         REQUIRE(algo_run_count == 4);
-        REQUIRE(changes.sections_to_insert.count() == 1);
-        REQUIRE(changes.sections_to_delete.count() == 1);
         REQUIRE_INDICES(changes.sections_to_insert, 0);
         REQUIRE_INDICES(changes.sections_to_delete, 1);
 
@@ -1245,7 +1237,6 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section1_notification_calls == 1);
         REQUIRE(section2_notification_calls == 0);
         REQUIRE(section1_changes.insertions.size() == 1);
-        REQUIRE(section1_changes.insertions[0].count() == 1);
         REQUIRE_INDICES(section1_changes.insertions[0], 0);
         REQUIRE(section1_changes.modifications.empty());
         REQUIRE(section1_changes.deletions.empty());
@@ -1257,8 +1248,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
         REQUIRE(section1_notification_calls == 1);
         REQUIRE(section2_notification_calls == 1);
-        REQUIRE(section2_changes.insertions.size() == 1);
-        REQUIRE(section2_changes.insertions[1].count() == 1);
+        REQUIRE(section2_changes.insertions.size() == 2);
+        REQUIRE(section2_changes.insertions[0].empty());
         REQUIRE_INDICES(section2_changes.insertions[1], 1);
         REQUIRE(section2_changes.modifications.empty());
         REQUIRE(section2_changes.deletions.empty());
@@ -1298,7 +1289,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
         REQUIRE(section1_notification_calls == 3);
         REQUIRE(section2_notification_calls == 2);
-        REQUIRE(section2_changes.deletions.size() == 1);
+        REQUIRE(section2_changes.deletions.size() == 2);
+        REQUIRE(section2_changes.deletions[0].empty());
         REQUIRE_INDICES(section2_changes.deletions[1], 1);
         REQUIRE(section2_changes.insertions.empty());
         REQUIRE(section2_changes.modifications.empty());
@@ -1758,7 +1750,8 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
         REQUIRE_INDICES(changes1.sections_to_insert, 0);
         REQUIRE(changes1.sections_to_delete.empty());
 
-        REQUIRE(changes2.insertions.size() == 1);
+        REQUIRE(changes2.insertions.size() == 2);
+        REQUIRE(changes2.insertions[0].empty());
         REQUIRE(!changes2.insertions[1].empty());
         REQUIRE(changes2.deletions.empty());
         REQUIRE(changes2.modifications.empty());

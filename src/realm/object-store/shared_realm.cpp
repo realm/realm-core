@@ -133,7 +133,8 @@ std::shared_ptr<Transaction> Realm::transaction_ref()
 
 std::shared_ptr<Transaction> Realm::duplicate() const
 {
-    return m_coordinator->begin_read(read_transaction_version(), is_frozen());
+    auto version = read_transaction_version(); // does the validity check first
+    return m_coordinator->begin_read(version, is_frozen());
 }
 
 std::shared_ptr<DB>& Realm::Internal::get_db(Realm& realm)
@@ -620,10 +621,16 @@ bool Realm::verify_notifications_available(bool throw_on_error) const
             throw WrongTransactionState("Cannot create asynchronous query for immutable Realms");
         return false;
     }
-    if (is_in_transaction()) {
-        if (throw_on_error)
-            throw WrongTransactionState("Cannot create asynchronous query while in a write transaction");
-        return false;
+    if (throw_on_error) {
+        if (m_transaction && m_transaction->get_commit_size() > 0)
+            throw WrongTransactionState(
+                "Cannot create asynchronous query after making changes in a write transaction.");
+    }
+    else {
+        // Don't create implicit notifiers inside write transactions even if
+        // we could as it wouldn't actually be used
+        if (is_in_transaction())
+            return false;
     }
 
     return true;
@@ -1310,7 +1317,7 @@ uint64_t Realm::get_schema_version(const Realm::Config& config)
 bool Realm::is_frozen() const
 {
     bool result = bool(m_frozen_version);
-    REALM_ASSERT_DEBUG((result && m_transaction) ? m_transaction->is_frozen() : true);
+    REALM_ASSERT_DEBUG(!result || !m_transaction || m_transaction->is_frozen());
     return result;
 }
 

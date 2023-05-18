@@ -79,7 +79,11 @@ struct SyncClientConfig {
     LoggerFactory logger_factory;
     util::Logger::Level log_level = util::Logger::Level::info;
     ReconnectMode reconnect_mode = ReconnectMode::normal; // For internal sync-client testing only!
+#if REALM_DISABLE_SYNC_MULTIPLEXING
     bool multiplex_sessions = false;
+#else
+    bool multiplex_sessions = true;
+#endif
 
     // The SyncSocket instance used by the Sync Client for event synchronization
     // and creating WebSockets. If not provided the default implementation will be used.
@@ -115,11 +119,11 @@ public:
     // The metadata and file management subsystems must also have already been configured.
     bool immediately_run_file_actions(const std::string& original_name) REQUIRES(!m_file_system_mutex);
 
-    // Use a single connection for all sync sessions for each host/port rather
+    // Enables/disables using a single connection for all sync sessions for each host/port/user rather
     // than one per session.
     // This must be called before any sync sessions are created, cannot be
     // disabled afterwards, and currently is incompatible with automatic failover.
-    void enable_session_multiplexing() REQUIRES(!m_mutex);
+    void set_session_multiplexing(bool allowed) REQUIRES(!m_mutex);
 
     // Destroys the sync manager, terminates all sessions created by it, and stops its SyncClient.
     ~SyncManager();
@@ -253,6 +257,12 @@ public:
     SyncManager();
     SyncManager(const SyncManager&) = delete;
     SyncManager& operator=(const SyncManager&) = delete;
+
+    struct OnlyForTesting {
+        friend class TestHelper;
+
+        static void voluntary_disconnect_all_connections(SyncManager&);
+    };
 
 protected:
     friend class SyncUser;

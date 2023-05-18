@@ -54,6 +54,14 @@ void cancel(Transaction& sg, BindingContext* binding_context);
 
 // Advance the read transaction version, with change information gathered in info
 void advance(Transaction& sg, TransactionChangeInfo& info, VersionID version = VersionID{});
+
+// Parse the transaction logs between initial_version and end_version,
+// populating `info` with the results. initial_version must be a version that
+// has not been pruned (i.e. greater than or equal to the oldest pinned live
+// version) and end_version must be less than or equal to the transaction's
+// version.
+void parse(Transaction& tr, TransactionChangeInfo& info, VersionID::version_type initial_version,
+           VersionID::version_type end_version);
 } // namespace transaction
 } // namespace _impl
 } // namespace realm

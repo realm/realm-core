@@ -339,7 +339,7 @@ public:
 
     // Remove rows that are duplicated with respect to the column set passed as argument.
     // distinct() will preserve the original order of the row pointers, also if the order is a result of sort()
-    // If two rows are indentical (for the given set of distinct-columns), then the last row is removed.
+    // If two rows are identical (for the given set of distinct-columns), then the last row is removed.
     // You can call sync_if_needed() to update the distinct view, just like you can for a sorted view.
     // Each time you call distinct() it will compound on the previous calls
     void distinct(ColKey column);

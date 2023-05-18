@@ -165,7 +165,7 @@ public:
         NULL_VAL,
         TRUE,
         FALSE,
-        ARG
+        ARG,
     };
 
     Type type;
@@ -194,6 +194,47 @@ public:
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
     util::Optional<ExpressionComparisonType> m_comp_type;
     std::string target_table;
+};
+
+class GeospatialNode : public ValueNode {
+public:
+    struct Box {};
+    struct Polygon {};
+    struct Loop {};
+    struct Sphere {};
+#if REALM_ENABLE_GEOSPATIAL
+    GeospatialNode(Box, GeoPoint& p1, GeoPoint& p2);
+    GeospatialNode(Sphere, GeoPoint& p, double radius);
+    GeospatialNode(Polygon, GeoPoint& p);
+    GeospatialNode(Loop, GeoPoint& p);
+    void add_point_to_loop(GeoPoint& p);
+    void add_loop_to_polygon(GeospatialNode*);
+    bool is_constant() final
+    {
+        return true;
+    }
+    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
+    std::vector<std::vector<GeoPoint>> m_points;
+    Geospatial m_geo;
+#else
+    template <typename... Ts>
+    GeospatialNode(Ts&&...)
+    {
+        throw realm::LogicError(ErrorCodes::NotSupported, "Support for Geospatial queries is not enabled");
+    }
+    template <typename Point>
+    void add_point_to_loop(Point&&)
+    {
+    }
+    template <typename Loop>
+    void add_loop_to_polygon(Loop&&)
+    {
+    }
+    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override
+    {
+        return {};
+    }
+#endif
 };
 
 class ListNode : public ValueNode {
@@ -437,6 +478,36 @@ public:
         values.emplace_back(right);
     }
     Query visit(ParserDriver*) override;
+};
+
+class GeoWithinNode : public CompareNode {
+public:
+#if REALM_ENABLE_GEOSPATIAL
+    PropertyNode* prop;
+    GeospatialNode* geo = nullptr;
+    std::string argument;
+    GeoWithinNode(PropertyNode* left, GeospatialNode* right)
+    {
+        prop = left;
+        geo = right;
+    }
+    GeoWithinNode(PropertyNode* left, std::string arg)
+    {
+        prop = left;
+        argument = arg;
+    }
+    Query visit(ParserDriver*) override;
+#else
+    template <typename... Ts>
+    GeoWithinNode(Ts&&...)
+    {
+        throw realm::LogicError(ErrorCodes::NotSupported, "Support for Geospatial queries is not enabled");
+    }
+    Query visit(ParserDriver*) override
+    {
+        return {};
+    }
+#endif
 };
 
 /******************************** Other Nodes ********************************/

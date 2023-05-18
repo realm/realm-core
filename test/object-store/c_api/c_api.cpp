@@ -343,16 +343,17 @@ private:
               nlohmann::json({{"device",
                                {{"appId", "app_id_123"},
                                 {"appVersion", "some_app_version"},
-                                {"platform", "some_platform_name"},
+                                {"platform", util::get_library_platform()},
                                 {"platformVersion", "some_platform_version"},
                                 {"sdk", "some_sdk_name"},
                                 {"sdkVersion", "some_sdk_version"},
-                                {"cpuArch", "some_cpu_arch"},
+                                {"cpuArch", util::get_library_cpu_arch()},
                                 {"deviceName", "some_device_name"},
                                 {"deviceVersion", "some_device_version"},
                                 {"frameworkName", "some_framework_name"},
                                 {"frameworkVersion", "some_framework_version"},
-                                {"coreVersion", REALM_VERSION_STRING}}}}));
+                                {"coreVersion", REALM_VERSION_STRING},
+                                {"bundleId", "some_bundle_id"}}}}));
 
         CHECK(request.timeout_ms == 60000);
 
@@ -632,9 +633,6 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_app_config_set_default_request_timeout(app_config.get(), 2500);
         CHECK(app_config->default_request_timeout_ms == 2500);
 
-        realm_app_config_set_platform(app_config.get(), "some_platform_name");
-        CHECK(app_config->device_info.platform == "some_platform_name");
-
         realm_app_config_set_platform_version(app_config.get(), "some_platform_version");
         CHECK(app_config->device_info.platform_version == "some_platform_version");
 
@@ -643,9 +641,6 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
         realm_app_config_set_sdk(app_config.get(), "some_sdk_name");
         CHECK(app_config->device_info.sdk == "some_sdk_name");
-
-        realm_app_config_set_cpu_arch(app_config.get(), "some_cpu_arch");
-        CHECK(app_config->device_info.cpu_arch == "some_cpu_arch");
 
         realm_app_config_set_device_name(app_config.get(), "some_device_name");
         CHECK(app_config->device_info.device_name == "some_device_name");
@@ -658,6 +653,9 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
         realm_app_config_set_framework_version(app_config.get(), "some_framework_version");
         CHECK(app_config->device_info.framework_version == "some_framework_version");
+
+        realm_app_config_set_bundle_id(app_config.get(), "some_bundle_id");
+        CHECK(app_config->device_info.bundle_id == "some_bundle_id");
 
         auto test_app = std::make_shared<app::App>(*app_config);
         auto credentials = app::AppCredentials::anonymous();
@@ -2546,6 +2544,51 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(valid);
                 }
 
+                SECTION("realm_results_is_valid delete objects") {
+                    write([&] {
+                        realm_object_delete(obj1.get());
+                        realm_object_delete(obj2.get());
+                        realm_results_delete_all(r.get());
+                    });
+                    bool valid;
+                    CHECK(checked(realm_results_is_valid(r.get(), &valid)));
+                    CHECK(valid);
+                }
+
+                SECTION("realm_results_is_valid delete collection") {
+                    auto strings = cptr_checked(realm_get_list(obj2.get(), bar_strings_key));
+                    CHECK(strings);
+                    CHECK(!realm_is_frozen(strings.get()));
+
+                    realm_value_t a = rlm_str_val("a");
+                    realm_value_t b = rlm_str_val("b");
+                    realm_value_t c = rlm_null();
+
+                    write([&] {
+                        CHECK(checked(realm_list_insert(strings.get(), 0, a)));
+                        CHECK(checked(realm_list_insert(strings.get(), 1, b)));
+                        CHECK(checked(realm_list_insert(strings.get(), 2, c)));
+                    });
+                    bool valid;
+                    auto results = cptr_checked(realm_list_to_results(strings.get()));
+                    CHECK(checked(realm_results_is_valid(results.get(), &valid)));
+                    CHECK(valid);
+
+                    write([&] {
+                        CHECK(checked(realm_object_delete(obj2.get())));
+                    });
+
+                    CHECK(checked(realm_results_is_valid(results.get(), &valid)));
+                    CHECK_FALSE(valid);
+                    size_t count;
+
+                    CHECK_FALSE(realm_results_count(results.get(), &count));
+                    CHECK_ERR(RLM_ERR_STALE_ACCESSOR);
+
+                    CHECK_FALSE(realm_results_resolve_in(results.get(), realm));
+                    CHECK_ERR(RLM_ERR_STALE_ACCESSOR);
+                }
+
                 SECTION("realm_results_count()") {
                     size_t count;
                     CHECK(checked(realm_results_count(r.get(), &count)));
@@ -2589,6 +2632,19 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(realm_results_find(r.get(), &value, &index, &found));
                     CHECK(index == realm::not_found);
                     CHECK(found == false);
+                }
+
+                SECTION("realm_results_get_query()") {
+                    auto q2 = cptr_checked(realm_query_parse(realm, class_foo.key, "int == 123", 0, nullptr));
+                    auto r2 = cptr_checked(realm_results_filter(r.get(), q2.get()));
+                    size_t count;
+                    CHECK(checked(realm_results_count(r2.get(), &count)));
+                    CHECK(count == 1);
+                    auto results_query = cptr_checked(realm_results_get_query(r2.get()));
+                    auto result = cptr_checked(realm_query_find_all(results_query.get()));
+                    size_t count1 = 0;
+                    CHECK(checked(realm_results_count(result.get(), &count1)));
+                    CHECK(count == count1);
                 }
 
                 SECTION("realm_results_get_object()") {

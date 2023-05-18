@@ -26,9 +26,9 @@
 
 namespace realm {
 
-class Dictionary final : public CollectionBaseImpl<CollectionBase, Dictionary> {
+class Dictionary final : public CollectionBaseImpl<CollectionBase> {
 public:
-    using Base = CollectionBaseImpl<CollectionBase, Dictionary>;
+    using Base = CollectionBaseImpl<CollectionBase>;
     class Iterator;
 
     Dictionary() {}
@@ -42,8 +42,6 @@ public:
         *this = other;
     }
     Dictionary& operator=(const Dictionary& other);
-
-    using Base::operator==;
 
     DataType get_key_data_type() const;
     DataType get_value_data_type() const;
