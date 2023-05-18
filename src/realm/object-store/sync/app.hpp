@@ -403,13 +403,17 @@ private:
     friend class OnlyForTesting;
 
     Config m_config;
-    mutable std::unique_ptr<std::mutex> m_route_mutex = std::make_unique<std::mutex>();
+
+    // mutable to allow locking for reads in const functions
+    // this is a shared pointer to support the App move constructor
+    mutable std::shared_ptr<std::mutex> m_route_mutex = std::make_shared<std::mutex>();
     std::string m_base_url;
     std::string m_base_route;
     std::string m_app_route;
     std::string m_auth_route;
-    uint64_t m_request_timeout_ms;
     bool m_location_updated = false;
+
+    uint64_t m_request_timeout_ms;
     std::shared_ptr<SyncManager> m_sync_manager;
     std::shared_ptr<util::Logger> m_logger_ptr;
 
