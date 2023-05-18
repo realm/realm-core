@@ -40,6 +40,8 @@ using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
+static std::set<std::string> g_bench_filter;
+
 namespace {
 // not smaller than 100.000 or the UID based benchmarks has to be modified!
 #define BASE_SIZE 200000
@@ -246,6 +248,60 @@ struct BenchmarkWithStringsManyDup : BenchmarkWithStringsTable {
     }
 };
 
+struct BenchmarkLongStringsManyDup : BenchmarkWithStringsTable {
+    void before_all(DBRef group)
+    {
+        const char* strings[] = {
+            "An object database (also object-oriented database management system) is a database management system in "
+            "which information is represented in the form of objects as used in object-oriented programming. Object "
+            "databases are different from relational databases which are table-oriented. Object-relational databases "
+            "are a hybrid of both approaches.",
+            "Object database management systems grew out of research during the early to mid-1970s into having "
+            "intrinsic database management support for graph-structured objects. The term 'object-oriented database "
+            "system' first appeared around 1985.[4] Notable research projects included Encore-Ob/Server (Brown "
+            "University), EXODUS (University of Wisconsin–Madison), IRIS (Hewlett-Packard), ODE (Bell Labs), ORION "
+            "(Microelectronics and Computer Technology Corporation or MCC), Vodak (GMD-IPSI), and Zeitgeist (Texas "
+            "Instruments). The ORION project had more published papers than any of the other efforts. Won Kim of MCC "
+            "compiled the best of those papers in a book published by The MIT Press.",
+            "Early commercial products included Gemstone (Servio Logic, name changed to GemStone Systems), Gbase "
+            "(Graphael), and Vbase (Ontologic). The early to mid-1990s saw additional commercial products enter the "
+            "market. These included ITASCA (Itasca Systems), Jasmine (Fujitsu, marketed by Computer Associates), "
+            "Matisse (Matisse Software), Objectivity/DB (Objectivity, Inc.), ObjectStore (Progress Software, "
+            "acquired from eXcelon which was originally Object Design), ONTOS (Ontos, Inc., name changed from "
+            "Ontologic), O2[6] (O2 Technology, merged with several companies, acquired by Informix, which was in "
+            "turn acquired by IBM), POET (now FastObjects from Versant which acquired Poet Software), Versant Object "
+            "Database (Versant Corporation), VOSS (Logic Arts) and JADE (Jade Software Corporation). Some of these "
+            "products remain on the market and have been joined by new open source and commercial products such as "
+            "InterSystems Caché.",
+            "As the usage of web-based technology increases with the implementation of Intranets and extranets, "
+            "companies have a vested interest in OODBMSs to display their complex data. Using a DBMS that has been "
+            "specifically designed to store data as objects gives an advantage to those companies that are geared "
+            "towards multimedia presentation or organizations that utilize computer-aided design (CAD).[3]",
+            "Object database management systems added the concept of persistence to object programming languages. "
+            "The early commercial products were integrated with various languages: GemStone (Smalltalk), Gbase "
+            "(LISP), Vbase (COP) and VOSS (Virtual Object Storage System for Smalltalk). For much of the 1990s, C++ "
+            "dominated the commercial object database management market. Vendors added Java in the late 1990s and "
+            "more recently, C#.",
+            "L’archive ouverte pluridisciplinaire HAL, est destinée au dépôt et à la diffusion de documents "
+            "scientifiques de niveau recherche, publiés ou non, émanant des établissements d’enseignement et de "
+            "recherche français ou étrangers, des laboratoires publics ou privés.",
+            "object object object object object duplicates",
+        };
+
+        BenchmarkWithStringsTable::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table(name());
+        Random r;
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
+            Obj obj = t->create_object();
+            obj.set<StringData>(m_col, strings[i % 7]);
+            m_keys.push_back(obj.get_key());
+        }
+        t->add_fulltext_index(m_col);
+        tr.commit();
+    }
+};
+
 struct BenchmarkFindAllStringFewDupes : BenchmarkWithStringsFewDup {
     const char* name() const
     {
@@ -269,6 +325,19 @@ struct BenchmarkFindAllStringManyDupes : BenchmarkWithStringsManyDup {
     {
         ConstTableRef table = m_table;
         TableView view = table->where().equal(m_col, StringData("10", 2)).find_all();
+    }
+};
+
+struct BenchmarkFindAllFulltextStringManyDupes : BenchmarkLongStringsManyDup {
+    const char* name() const
+    {
+        return "FindAllFulltextStringManyDupes";
+    }
+
+    void operator()(DBRef)
+    {
+        ConstTableRef table = m_table;
+        TableView view = table->where().fulltext(m_col, "object gemstone").find_all();
     }
 };
 
@@ -1909,7 +1978,11 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
     for (auto it = configs.begin(); it != configs.end(); ++it) {
         DBOptions::Durability level = it->first;
         const char* key = it->second;
+
         B benchmark;
+        if (!g_bench_filter.empty() && g_bench_filter.find(benchmark.name()) == g_bench_filter.end())
+            return;
+
         benchmark.m_durability = level;
         benchmark.m_encryption_key = key;
 
@@ -2017,6 +2090,7 @@ int benchmark_common_tasks_main()
     // queries / searching
     BENCH(BenchmarkFindAllStringFewDupes);
     BENCH(BenchmarkFindAllStringManyDupes);
+    BENCH(BenchmarkFindAllFulltextStringManyDupes);
     BENCH(BenchmarkFindFirstStringFewDupes);
     BENCH(BenchmarkFindFirstStringManyDupes);
     BENCH(BenchmarkCountStringManyDupes<false>);
@@ -2081,7 +2155,7 @@ int main(int argc, const char** argv)
     if (argc > 1) {
         std::string arg_path = argv[1];
         if (arg_path == "-h" || arg_path == "--help") {
-            std::cout << "Usage: " << argv[0] << " [-h|--help] [PATH]" << std::endl
+            std::cout << "Usage: " << argv[0] << " [-h|--help] [PATH] [NAMES]" << std::endl
                       << "Run the common tasks benchmark test application." << std::endl
                       << "Results are placed in the executable directory by default." << std::endl
                       << std::endl
@@ -2089,6 +2163,7 @@ int main(int argc, const char** argv)
                       << "  -h, --help      display this help" << std::endl
                       << "  PATH            alternate path to store the results files;" << std::endl
                       << "                  this path should end with a slash." << std::endl
+                      << "  NAMES           benchmark names to run (',' separated)" << std::endl
                       << std::endl;
             return 1;
         }
@@ -2096,5 +2171,17 @@ int main(int argc, const char** argv)
 
     if (!initialize_test_path(argc, argv))
         return 1;
+
+    if (argc > 2) {
+        std::string filter = argv[2];
+        for (size_t i = 0, j = 0, len = filter.size(); i <= len; ++i) {
+            if (i == len || filter[i] == ',') {
+                if (j < i)
+                    g_bench_filter.insert(filter.substr(j, i - j));
+                j = i + 1;
+            }
+        }
+    }
+
     return benchmark_common_tasks_main();
 }
