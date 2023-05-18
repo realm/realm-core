@@ -1815,6 +1815,15 @@ RLM_API bool realm_list_set_collection(realm_list_t* list, size_t index, realm_c
 RLM_API realm_list_t* realm_list_get_list(realm_list_t* list, size_t index);
 
 /**
+ * Returns a nested set if such collection exists and it is a leaf collection, NULL otherwise.
+ *
+ * @param list pointer to the list that containes the nested collection into
+ * @param index position of collection in the list
+ * @return a pointer to the the nested dictionary found at index passed as argument
+ */
+RLM_API realm_set_t* realm_list_get_set(realm_list_t* list, size_t index);
+
+/**
  * Returns a nested dictionary if such collection exists, NULL otherwise.
  *
  * @param list pointer to the list that containes the nested collection into
@@ -2310,6 +2319,12 @@ RLM_API bool realm_dictionary_insert_collection(realm_dictionary_t*, realm_value
  * @return a valid list that needs to be deleted by the caller or nullptr in case of an error.
  */
 RLM_API realm_list_t* realm_dictionary_get_list(realm_dictionary_t* dictionary, realm_value_t key);
+
+/**
+ * Fetch a set from a dictionary.
+ * @return a valid dictionary that needs to be deleted by the caller or nullptr in case of an error.
+ */
+RLM_API realm_set_t* realm_dictionary_get_set(realm_dictionary_t* dictionary, realm_value_t key);
 
 /**
  * Fetch a dictioanry from a dictionary.

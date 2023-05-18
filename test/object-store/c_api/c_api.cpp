@@ -4920,9 +4920,17 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         auto dict2 = cptr_checked(realm_dictionary_get_dictionary(dict.get(), rlm_str_val("Hi")));
         checked(realm_dictionary_insert(dict2.get(), rlm_str_val("Nested-Hello"), rlm_str_val("Nested-World"),
                                         nullptr, nullptr));
+        // dict -> set
+        realm_dictionary_insert_collection(dict.get(), rlm_str_val("Leaf-Set"), RLM_COLLECTION_TYPE_SET);
+        auto set = cptr_checked(realm_dictionary_get_set(dict.get(), rlm_str_val("Leaf-Set")));
+        bool inserted;
+        size_t index;
+        realm_set_insert(set.get(), rlm_str_val("Set-Hello"), &index, &inserted);
+        CHECK(index == 0);
+        CHECK(inserted);
         size_t size;
         checked(realm_dictionary_size(dict.get(), &size));
-        REQUIRE(size == 3);
+        REQUIRE(size == 4);
     }
 
     SECTION("list") {
@@ -4942,9 +4950,17 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         auto list2 = cptr_checked(realm_list_get_list(list.get(), 2));
         realm_list_insert(list2.get(), 0, rlm_str_val("Nested-Hello"));
         realm_list_insert(list2.get(), 1, rlm_str_val("Nested-World"));
+        // list -> set
+        realm_list_insert_collection(list.get(), 3, RLM_COLLECTION_TYPE_SET);
+        auto set = cptr_checked(realm_list_get_set(list.get(), 3));
+        bool inserted;
+        size_t index;
+        realm_set_insert(set.get(), rlm_str_val("Set-Hello"), &index, &inserted);
+        CHECK(index == 0);
+        CHECK(inserted);
         size_t size;
         checked(realm_list_size(list.get(), &size));
-        REQUIRE(size == 4);
+        REQUIRE(size == 5);
     }
     realm_release(realm);
 }

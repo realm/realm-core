@@ -107,6 +107,13 @@ RLM_API realm_list_t* realm_list_get_list(realm_list_t* list, size_t index)
     });
 }
 
+RLM_API realm_set_t* realm_list_get_set(realm_list_t* list, size_t index)
+{
+    return wrap_err([&]() {
+        return new realm_set_t{list->get_set(index)};
+    });
+}
+
 RLM_API realm_dictionary_t* realm_list_get_dictionary(realm_list_t* list, size_t index)
 {
     return wrap_err([&]() {
