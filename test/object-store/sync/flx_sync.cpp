@@ -1383,8 +1383,8 @@ TEST_CASE("flx: geospatial", "[sync][flx][app]") {
                 size_t local_matches = query.find_all().size();
                 REQUIRE(local_matches == 2);
 
-                reset_utils::wait_for_object_to_persist_to_atlas(
-                    harness->app()->current_user(), harness->session().app_session(), "restaurant", {{"_id", pk}});
+                reset_utils::wait_for_num_objects_in_atlas(
+                    harness->app()->current_user(), harness->session().app_session(), "restaurant", points.size());
 
                 bson::BsonDocument filter = make_polygon_filter(bounds);
                 size_t server_results = run_query_on_server(filter);
