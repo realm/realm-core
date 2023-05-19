@@ -41,14 +41,14 @@ class Geospatial;
 struct GeoPoint {
     GeoPoint() = delete;
     GeoPoint(double lon, double lat)
-    : longitude(lon)
-    , latitude(lat)
+        : longitude(lon)
+        , latitude(lat)
     {
     }
     GeoPoint(double lon, double lat, double alt)
-    : longitude(lon)
-    , latitude(lat)
-    , altitude(alt)
+        : longitude(lon)
+        , latitude(lat)
+        , altitude(alt)
     {
     }
 
@@ -59,8 +59,8 @@ struct GeoPoint {
     bool operator==(const GeoPoint& other) const
     {
         return (longitude == other.longitude || (std::isnan(longitude) && std::isnan(other.longitude))) &&
-        (latitude == other.latitude || (std::isnan(latitude) && std::isnan(other.latitude))) &&
-        ((!has_altitude() && !other.has_altitude()) || altitude == other.altitude);
+               (latitude == other.latitude || (std::isnan(latitude) && std::isnan(other.latitude))) &&
+               ((!has_altitude() && !other.has_altitude()) || altitude == other.altitude);
     }
     bool operator!=(const GeoPoint& other) const
     {
@@ -118,19 +118,19 @@ struct GeoBox {
 //   - Interior rings cannot intersect or overlap each other. Interior rings cannot share an edge.
 struct GeoPolygon {
     GeoPolygon(std::vector<GeoPoint>&& p)
-    : points({std::move(p)})
+        : points({std::move(p)})
     {
     }
     GeoPolygon(const std::vector<GeoPoint>& p)
-    : points({p})
+        : points({p})
     {
     }
     GeoPolygon(std::vector<std::vector<GeoPoint>>&& p)
-    : points(std::move(p))
+        : points(std::move(p))
     {
     }
     GeoPolygon(const std::vector<std::vector<GeoPoint>>& p)
-    : points(p)
+        : points(p)
     {
     }
     GeoPolygon(const GeoPolygon& other) = default;

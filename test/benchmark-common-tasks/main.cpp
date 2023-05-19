@@ -2100,7 +2100,9 @@ struct BenchmarkGeoPointsWithinPolygonRQL : BenchmarkWithGeoPoints {
 
     void operator()(DBRef) override
     {
-        m_table->query("location geoWithin geoPolygon({[-24.0, -24.0], [-34.0, 34.0], [44.0, 44.0], [-55.0, 55], [-24.0, -24.0]})")
+        m_table
+            ->query("location geoWithin geoPolygon({[-24.0, -24.0], [-34.0, 34.0], [44.0, 44.0], [-55.0, 55], "
+                    "[-24.0, -24.0]})")
             .count();
     }
 };
