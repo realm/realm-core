@@ -2418,22 +2418,14 @@ public:
 
         while (start < end) {
             bool found = false;
-            // TODO: the map_links short circuit is not working, it is being fixed in a separate PR
-            // and when that lands the logic below can be simplified by removing the following counters
-            size_t num_matches = 0;
-            size_t num_misses = 0;
             switch (m_comp_type.value_or(ExpressionComparisonType::Any)) {
                 case ExpressionComparisonType::Any: {
                     m_link_map.map_links(start, [&](ObjKey key) {
                         found = m_region.contains(
                             Geospatial::point_from_obj(table->get_object(key), m_type_col, m_coords_col));
-                        if (found)
-                            num_matches++;
-                        else
-                            num_misses++;
                         return !found; // keep searching if not found, stop searching on first match
                     });
-                    if (num_matches > 0)
+                    if (found)
                         return start;
                     break;
                 }
@@ -2441,13 +2433,9 @@ public:
                     m_link_map.map_links(start, [&](ObjKey key) {
                         found = m_region.contains(
                             Geospatial::point_from_obj(table->get_object(key), m_type_col, m_coords_col));
-                        if (found)
-                            num_matches++;
-                        else
-                            num_misses++;
                         return found; // keep searching until one the first non-match
                     });
-                    if (num_matches > 0 && num_misses == 0) // all matched
+                    if (found) // all matched
                         return start;
                     break;
                 }
@@ -2455,13 +2443,9 @@ public:
                     m_link_map.map_links(start, [&](ObjKey key) {
                         found = m_region.contains(
                             Geospatial::point_from_obj(table->get_object(key), m_type_col, m_coords_col));
-                        if (found)
-                            num_matches++;
-                        else
-                            num_misses++;
                         return !found; // keep searching until the first match
                     });
-                    if (num_matches == 0) // none matched
+                    if (!found) // none matched
                         return start;
                     break;
                 }
