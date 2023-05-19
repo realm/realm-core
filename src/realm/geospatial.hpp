@@ -174,7 +174,7 @@ public:
     GeoRegion(const Geospatial& geo);
     ~GeoRegion();
 
-    bool contains(const GeoPoint& point) const noexcept;
+    bool contains(const std::optional<GeoPoint>& point) const noexcept;
     Status get_conversion_status() const noexcept;
 
 private:
@@ -222,7 +222,7 @@ public:
     Geospatial(Geospatial&& other) = default;
     Geospatial& operator=(Geospatial&&) = default;
 
-    static Geospatial from_obj(const Obj& obj, ColKey type_col = {}, ColKey coords_col = {});
+    static std::optional<GeoPoint> point_from_obj(const Obj& obj, ColKey type_col = {}, ColKey coords_col = {});
     static Geospatial from_link(const Obj& obj);
     static bool is_geospatial(const TableRef table, ColKey link_col);
     void assign_to(Obj& link) const;
@@ -235,7 +235,7 @@ public:
 
     Status is_valid() const noexcept;
 
-    bool contains(const Geospatial& geometry) const noexcept;
+    bool contains(const GeoPoint& point) const noexcept;
 
     std::string to_string() const;
 

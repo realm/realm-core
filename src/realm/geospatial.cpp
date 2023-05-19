@@ -53,10 +53,11 @@
 
 namespace {
 
-static bool type_is_valid(std::string str_type)
+static bool type_is_valid(realm::StringData str_type)
 {
-    std::transform(str_type.begin(), str_type.end(), str_type.begin(), realm::toLowerAscii);
-    return str_type == "point";
+    return str_type.size() == 5 && (str_type[0] == 'P' || str_type[0] == 'p') &&
+           (str_type[1] == 'o' || str_type[1] == 'O') && (str_type[2] == 'i' || str_type[2] == 'I') &&
+           (str_type[3] == 'n' || str_type[3] == 'N') && (str_type[4] == 't' || str_type[4] == 'T');
 }
 
 } // anonymous namespace
@@ -108,7 +109,7 @@ bool Geospatial::is_geospatial(const TableRef table, ColKey link_col)
     return true;
 }
 
-Geospatial Geospatial::from_obj(const Obj& obj, ColKey type_col, ColKey coords_col)
+std::optional<GeoPoint> Geospatial::point_from_obj(const Obj& obj, ColKey type_col, ColKey coords_col)
 {
     if (!type_col) {
         type_col = obj.get_table()->get_column_key(StringData(c_geo_point_type_col_name));
@@ -125,16 +126,16 @@ Geospatial Geospatial::from_obj(const Obj& obj, ColKey type_col, ColKey coords_c
         REALM_ASSERT(coords_col.is_list());
     }
 
-    String geo_type = obj.get<String>(type_col);
-    if (!type_is_valid(geo_type)) {
+    if (!type_is_valid(obj.get<StringData>(type_col))) {
         throw IllegalOperation("The only Geospatial type currently supported is 'point'");
     }
 
     Lst<double> coords = obj.get_list<double>(coords_col);
-    if (coords.size() < 2) {
-        return Geospatial(); // invalid
+    const size_t coord_size = coords.size();
+    if (coord_size < 2) {
+        return {}; // invalid
     }
-    if (coords.size() > 2) {
+    if (coord_size > 2) {
         return GeoPoint{coords[0], coords[1], coords[2]};
     }
     return GeoPoint{coords[0], coords[1]};
@@ -188,28 +189,29 @@ void Geospatial::assign_to(Obj& link) const
     auto&& point = get<GeoPoint>();
     link.set(type_col, get_type_string());
     Lst<double> coords = link.get_list<double>(coords_col);
-    if (coords.size() >= 1) {
+    size_t existing_size = coords.size();
+    std::optional<double> altitude = point.get_altitude();
+    if (existing_size >= 1) {
         coords.set(0, point.longitude);
     }
     else {
         coords.add(point.longitude);
     }
-    if (coords.size() >= 2) {
+    if (existing_size >= 2) {
         coords.set(1, point.latitude);
     }
     else {
         coords.add(point.latitude);
     }
-    std::optional<double> altitude = point.get_altitude();
     if (altitude) {
-        if (coords.size() >= 3) {
+        if (existing_size >= 3) {
             coords.set(2, *altitude);
         }
         else {
             coords.add(*altitude);
         }
     }
-    else if (coords.size() >= 3) {
+    else if (existing_size >= 3) {
         coords.remove(2, coords.size());
     }
 }
@@ -227,11 +229,16 @@ Status Geospatial::is_valid() const noexcept
     switch (get_type()) {
         case Type::Polygon:
         case Type::Box:
-        case Type::CenterSphere:
+        case Type::Circle:
             return get_region().get_conversion_status();
         default:
             return Status::OK();
     }
+}
+
+bool Geospatial::contains(const GeoPoint& point) const noexcept
+{
+    return get_region().contains(point);
 }
 
 GeoRegion& Geospatial::get_region() const
@@ -507,12 +514,12 @@ GeoRegion::GeoRegion(const Geospatial& geo)
 
 GeoRegion::~GeoRegion() = default;
 
-bool GeoRegion::contains(const GeoPoint& geo_point) const noexcept
+bool GeoRegion::contains(const std::optional<GeoPoint>& geo_point) const noexcept
 {
-    if (!m_status.is_ok()) {
+    if (!m_status.is_ok() || !geo_point) {
         return false;
     }
-    auto point = S2LatLng::FromDegrees(geo_point.latitude, geo_point.longitude).ToPoint();
+    auto point = S2LatLng::FromDegrees(geo_point->latitude, geo_point->longitude).ToPoint();
     return m_region->VirtualContainsPoint(point);
 }
 

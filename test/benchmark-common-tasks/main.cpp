@@ -2054,28 +2054,28 @@ struct BenchmarkGeoPointsWithinBoxRQL : BenchmarkWithGeoPoints {
     }
 };
 
-struct BenchmarkGeoPointsWithinCenterSphere : BenchmarkWithGeoPoints {
+struct BenchmarkGeoPointsWithinCircle : BenchmarkWithGeoPoints {
     const char* name() const override
     {
-        return "GeoPointsWithinCenterSphere";
+        return "GeoPointsWithinCircle";
     }
 
     void operator()(DBRef) override
     {
-        auto geometry = GeoCenterSphere::from_kms(5000, {42.0, 42.0});
+        auto geometry = GeoCircle::from_kms(5000, {42.0, 42.0});
         m_table->column<Link>(m_col).geo_within(geometry).count();
     }
 };
 
-struct BenchmarkGeoPointsWithinCenterSphereRQL : BenchmarkWithGeoPoints {
+struct BenchmarkGeoPointsWithinCircleRQL : BenchmarkWithGeoPoints {
     const char* name() const override
     {
-        return "GeoPointsWithinCenterSphereRQL";
+        return "GeoPointsWithinCircleRQL";
     }
 
     void operator()(DBRef) override
     {
-        m_table->query("location geoWithin geoSphere([42.0, 42.0], 0.78393252)").count();
+        m_table->query("location geoWithin geoCircle([42.0, 42.0], 0.78393252)").count();
     }
 };
 
@@ -2343,8 +2343,8 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkFetchGeoPoints);
     BENCH(BenchmarkGeoPointsWithinBox);
     BENCH(BenchmarkGeoPointsWithinBoxRQL);
-    BENCH(BenchmarkGeoPointsWithinCenterSphere);
-    BENCH(BenchmarkGeoPointsWithinCenterSphereRQL);
+    BENCH(BenchmarkGeoPointsWithinCircle);
+    BENCH(BenchmarkGeoPointsWithinCircleRQL);
     BENCH(BenchmarkGeoPointsWithinPolygon);
     BENCH(BenchmarkGeoPointsWithinPolygonRQL);
 #endif
