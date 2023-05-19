@@ -5684,20 +5684,24 @@ TEST(Parser_Geospatial)
     CHECK_THROW_EX(verify_query_sub(test_context, table, "location GEOWITHIN $0", {}, 1), realm::LogicError,
                    CHECK(std::string(e.what()).find(error) != std::string::npos));
 #else
-    struct Restaurant
-    {
+    struct Restaurant {
         std::string name;
         GeoPoint location;
         ObjectId pk;
     };
-    std::vector<Restaurant> data = {{"one", GeoPoint{0, 0}}, {"two", GeoPoint{0.5, 0.5}}, {"three", GeoPoint{1, 1}}, {"four", GeoPoint{2, 2}},
-        {"Red Fish Blue Fish", GeoPoint{-123.37039, 48.42437}}, {"Foo", GeoPoint{-123.36253, 48.42566}}, {"Superbaba", GeoPoint{-123.3615, 48.4267}},
-        {"Sen Zushi", GeoPoint{-123.3579, 48.42398}}
-    };
+    std::vector<Restaurant> data = {{"one", GeoPoint{0, 0}},
+                                    {"two", GeoPoint{0.5, 0.5}},
+                                    {"three", GeoPoint{1, 1}},
+                                    {"four", GeoPoint{2, 2}},
+                                    {"Red Fish Blue Fish", GeoPoint{-123.37039, 48.42437}},
+                                    {"Foo", GeoPoint{-123.36253, 48.42566}},
+                                    {"Superbaba", GeoPoint{-123.3615, 48.4267}},
+                                    {"Sen Zushi", GeoPoint{-123.3579, 48.42398}}};
     for (size_t i = 0; i < data.size(); ++i) {
         Restaurant& r = data[i];
         r.pk = ObjectId::gen();
-        Obj obj = table->create_object_with_primary_key(r.pk).set(col_link, Geospatial(r.location)).set(name_col, r.name);
+        Obj obj =
+            table->create_object_with_primary_key(r.pk).set(col_link, Geospatial(r.location)).set(name_col, r.name);
         obj.set(self_col, obj.get_key());
         LnkLst lst = obj.get_linklist(list_col);
         for (auto it = table->begin(); it != table->end(); ++it) {
@@ -5749,18 +5753,19 @@ TEST(Parser_Geospatial)
         std::runtime_error,
         CHECK(std::string(e.what()).find("Query 'self_link GEOWITHIN GeoBox([0.2, 0.2], [0.7, 0.7])' links to data "
                                          "in the wrong format for a geoWithin query") != std::string::npos));
-    CHECK_THROW_EX(
-        verify_query(test_context, table, "location geoWithin NULL", 1), query_parser::SyntaxError,
-        CHECK(std::string(e.what()).find("Invalid predicate: 'location geoWithin NULL': syntax error, unexpected null") !=
-              std::string::npos));
-    CHECK_THROW_EX(
-        verify_query(test_context, table, "location geoWithin 1.2", 1), query_parser::SyntaxError,
-        CHECK(std::string(e.what()).find("Invalid predicate: 'location geoWithin 1.2': syntax error, unexpected float") !=
-              std::string::npos));
-    CHECK_THROW_EX(verify_query(test_context, table, "location geoWithin 'test string'", 1), query_parser::SyntaxError,
+    CHECK_THROW_EX(verify_query(test_context, table, "location geoWithin NULL", 1), query_parser::SyntaxError,
                    CHECK(std::string(e.what()).find(
-                             "Invalid predicate: 'location geoWithin 'test string'': syntax error, unexpected string") !=
+                             "Invalid predicate: 'location geoWithin NULL': syntax error, unexpected null") !=
                          std::string::npos));
+    CHECK_THROW_EX(verify_query(test_context, table, "location geoWithin 1.2", 1), query_parser::SyntaxError,
+                   CHECK(std::string(e.what()).find(
+                             "Invalid predicate: 'location geoWithin 1.2': syntax error, unexpected float") !=
+                         std::string::npos));
+    CHECK_THROW_EX(
+        verify_query(test_context, table, "location geoWithin 'test string'", 1), query_parser::SyntaxError,
+        CHECK(std::string(e.what()).find(
+                  "Invalid predicate: 'location geoWithin 'test string'': syntax error, unexpected string") !=
+              std::string::npos));
     CHECK_THROW_EX(
         verify_query_sub(test_context, table, "location GEOWITHIN $4", args, 1), query_parser::InvalidQueryError,
         CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
