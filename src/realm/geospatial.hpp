@@ -36,6 +36,7 @@ namespace realm {
 
 class Obj;
 class TableRef;
+class Geospatial;
 
 struct GeoPoint {
     GeoPoint() = delete;
@@ -168,6 +169,19 @@ struct GeoCircle {
     }
 };
 
+class GeoRegion {
+public:
+    GeoRegion(const Geospatial& geo);
+    ~GeoRegion();
+
+    bool contains(const std::optional<GeoPoint>& point) const noexcept;
+    Status get_conversion_status() const noexcept;
+
+private:
+    std::unique_ptr<S2Region> m_region;
+    Status m_status;
+};
+
 class Geospatial {
 public:
     enum class Type : uint8_t { Invalid, Point, Box, Polygon, Circle };
@@ -193,13 +207,22 @@ public:
     {
     }
 
-    Geospatial(const Geospatial&) = default;
-    Geospatial& operator=(const Geospatial&) = default;
+    Geospatial(const Geospatial& other)
+        : m_value(other.m_value)
+    {
+    }
+    Geospatial& operator=(const Geospatial& other)
+    {
+        if (this != &other) {
+            m_value = other.m_value;
+        }
+        return *this;
+    }
 
     Geospatial(Geospatial&& other) = default;
     Geospatial& operator=(Geospatial&&) = default;
 
-    static Geospatial from_obj(const Obj& obj, ColKey type_col = {}, ColKey coords_col = {});
+    static std::optional<GeoPoint> point_from_obj(const Obj& obj, ColKey type_col = {}, ColKey coords_col = {});
     static Geospatial from_link(const Obj& obj);
     static bool is_geospatial(const TableRef table, ColKey link_col);
     void assign_to(Obj& link) const;
@@ -212,7 +235,8 @@ public:
 
     Status is_valid() const noexcept;
 
-    bool is_within(const Geospatial& bounds) const noexcept;
+    bool contains(const GeoPoint& point) const noexcept;
+
     std::string to_string() const;
 
     bool operator==(const Geospatial& other) const
@@ -236,19 +260,9 @@ private:
     mpark::variant<mpark::monostate, GeoPoint, GeoBox, GeoPolygon, GeoCircle> m_value;
 
     friend class GeoRegion;
-};
 
-class GeoRegion {
-public:
-    GeoRegion(const Geospatial& geo);
-    ~GeoRegion();
-
-    bool contains(const GeoPoint& point) const noexcept;
-    Status get_conversion_status() const noexcept;
-
-private:
-    std::unique_ptr<S2Region> m_region;
-    Status m_status;
+    mutable std::unique_ptr<GeoRegion> m_region;
+    GeoRegion& get_region() const;
 };
 
 template <>
