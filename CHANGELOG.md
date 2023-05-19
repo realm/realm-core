@@ -25,6 +25,7 @@
 
 ### Internals
 * Upgraded to Catch from v3.0.1 to v3.3.2. ([#6623](https://github.com/realm/realm-core/issues/6623))
+* Added some geospatial benchmarks. ([#6622](https://github.com/realm/realm-core/issues/6622))
 
 ----------------------------------------------
 
