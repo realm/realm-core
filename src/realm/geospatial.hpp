@@ -150,11 +150,11 @@ struct GeoPolygon {
     std::vector<std::vector<GeoPoint>> points;
 };
 
-struct GeoCenterSphere {
+struct GeoCircle {
     double radius_radians = 0.0;
     GeoPoint center;
 
-    bool operator==(const GeoCenterSphere& other) const
+    bool operator==(const GeoCircle& other) const
     {
         return radius_radians == other.radius_radians && center == other.center;
     }
@@ -163,9 +163,9 @@ struct GeoCenterSphere {
     // src/mongo/db/geo/geoconstants.h
     constexpr static double c_radius_meters = 6378100.0;
 
-    static GeoCenterSphere from_kms(double km, GeoPoint&& p)
+    static GeoCircle from_kms(double km, GeoPoint&& p)
     {
-        return GeoCenterSphere{km * 1000 / c_radius_meters, p};
+        return GeoCircle{km * 1000 / c_radius_meters, p};
     }
 };
 
@@ -184,7 +184,7 @@ private:
 
 class Geospatial {
 public:
-    enum class Type : uint8_t { Invalid, Point, Box, Polygon, CenterSphere };
+    enum class Type : uint8_t { Invalid, Point, Box, Polygon, Circle };
 
     Geospatial()
         : m_value(mpark::monostate{})
@@ -202,8 +202,8 @@ public:
         : m_value(polygon)
     {
     }
-    Geospatial(GeoCenterSphere centerSphere)
-        : m_value(centerSphere)
+    Geospatial(GeoCircle circle)
+        : m_value(circle)
     {
     }
 
@@ -257,7 +257,7 @@ public:
 
 private:
     // Must be in the same order as the Type enum
-    mpark::variant<mpark::monostate, GeoPoint, GeoBox, GeoPolygon, GeoCenterSphere> m_value;
+    mpark::variant<mpark::monostate, GeoPoint, GeoBox, GeoPolygon, GeoCircle> m_value;
 
     friend class GeoRegion;
 
@@ -266,9 +266,9 @@ private:
 };
 
 template <>
-inline const GeoCenterSphere& Geospatial::get<GeoCenterSphere>() const noexcept
+inline const GeoCircle& Geospatial::get<GeoCircle>() const noexcept
 {
-    return mpark::get<GeoCenterSphere>(m_value);
+    return mpark::get<GeoCircle>(m_value);
 }
 
 template <>
