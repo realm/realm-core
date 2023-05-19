@@ -679,36 +679,35 @@ void App::log_in_with_credentials(
     }
 
     // If m_location_updated is false, location metadata will be updated before sending the request
-    do_request(
-        {HttpMethod::post, route, m_request_timeout_ms,
-         get_request_headers(linking_user, RequestTokenType::AccessToken), Bson(body).to_string()},
-        [completion = std::move(completion), credentials, linking_user,
-         self = shared_from_this()](const Response& response) mutable {
-            if (auto error = AppUtils::check_for_errors(response)) {
-                self->log_error("App: log_in_with_credentials failed: %1 message: %2", response.http_status_code,
-                                error->what());
-                return completion(nullptr, std::move(error));
-            }
+    do_request({HttpMethod::post, route, m_request_timeout_ms,
+                get_request_headers(linking_user, RequestTokenType::AccessToken), Bson(body).to_string()},
+               [completion = std::move(completion), credentials, linking_user,
+                self = shared_from_this()](const Response& response) mutable {
+                   if (auto error = AppUtils::check_for_errors(response)) {
+                       self->log_error("App: log_in_with_credentials failed: %1 message: %2",
+                                       response.http_status_code, error->what());
+                       return completion(nullptr, std::move(error));
+                   }
 
-            std::shared_ptr<realm::SyncUser> sync_user = linking_user;
-            try {
-                auto json = parse<BsonDocument>(response.body);
-                if (linking_user) {
-                    linking_user->update_access_token(get<std::string>(json, "access_token"));
-                }
-                else {
-                    sync_user = self->m_sync_manager->get_user(
-                        get<std::string>(json, "user_id"), get<std::string>(json, "refresh_token"),
-                        get<std::string>(json, "access_token"), credentials.provider_as_string(),
-                        get<std::string>(json, "device_id"));
-                }
-            }
-            catch (const AppError& e) {
-                return completion(nullptr, e);
-            }
+                   std::shared_ptr<realm::SyncUser> sync_user = linking_user;
+                   try {
+                       auto json = parse<BsonDocument>(response.body);
+                       if (linking_user) {
+                           linking_user->update_access_token(get<std::string>(json, "access_token"));
+                       }
+                       else {
+                           sync_user = self->m_sync_manager->get_user(
+                               get<std::string>(json, "user_id"), get<std::string>(json, "refresh_token"),
+                               get<std::string>(json, "access_token"), credentials.provider_as_string(),
+                               get<std::string>(json, "device_id"));
+                       }
+                   }
+                   catch (const AppError& e) {
+                       return completion(nullptr, e);
+                   }
 
-            self->get_profile(sync_user, std::move(completion));
-        });
+                   self->get_profile(sync_user, std::move(completion));
+               });
 }
 
 void App::log_in_with_credentials(
@@ -978,7 +977,8 @@ void App::update_metadata_and_resend(Request&& request, UniqueFunction<void(cons
 
 void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& completion)
 {
-    request.timeout_ms = default_timeout_ms;
+    // Make sure the timeout value is set to the configured request timeout value
+    request.timeout_ms = m_request_timeout_ms;
 
     // Refresh the location metadata every time an app is created (or when requested) to ensure the http
     // and websocket URL information is up to date.
