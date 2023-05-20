@@ -1,14 +1,12 @@
-# NEXT RELEASE
+# 13.12.0 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Improve performance of SectionedResults. With a single section it is now ~10% faster, and the runtime of sectioning no longer scales significantly with section count, giving >100% speedups when there are large numbers of sections ([PR #6606](https://github.com/realm/realm-core/pull/6606)).
 * Very slightly improve performance of runtime thread checking on the main thread on Apple platforms. ([PR #6606](https://github.com/realm/realm-core/pull/6606))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * We could crash when removing backlinks in cases where forward links did not have a corresponding backlink due to corruption. We now silently ignore this inconsistency in release builds, allowing the app to continue. ([#6585](https://github.com/realm/realm-core/issues/6585), v6.0.0)
-* If you freeze a Results based on a collection of objects, the result will be invalid if you delete the collection ([#6635](https://github.com/realm/realm-core/issues/6635), since V13.11.0)
+* If you freeze a Results based on a collection of objects, the result would be invalid if you delete the collection ([#6635](https://github.com/realm/realm-core/issues/6635), since V13.11.0)
 * Geospatial polygons now have built in normalization and validation in line with the MongoDB server side behaviour and the geoJSON standard. ([#6607](https://github.com/realm/realm-core/pull/6607), since v13.11.0)
 * Dictionary::get_any() would expose unresolved links rather than mapping them to null. In addition to allowing invalid objects to be read from Dictionaries, this resulted in queries on Dictionaries sometimes having incorrect results ([#6644](https://github.com/realm/realm-core/pull/6644)).
 
