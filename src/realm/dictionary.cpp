@@ -22,6 +22,7 @@
 #include <realm/array_ref.hpp>
 #include <realm/group.hpp>
 #include <realm/list.hpp>
+#include <realm/set.hpp>
 #include <realm/replication.hpp>
 
 #include <algorithm>
@@ -435,6 +436,15 @@ DictionaryPtr Dictionary::get_dictionary(const PathElement& path_elem) const
     auto weak = const_cast<Dictionary*>(this)->weak_from_this();
     auto shared = weak.expired() ? std::make_shared<Dictionary>(*this) : weak.lock();
     DictionaryPtr ret = std::make_shared<Dictionary>(m_col_key, get_level() + 1);
+    ret->set_owner(shared, path_elem.get_key());
+    return ret;
+}
+
+SetMixedPtr Dictionary::get_set(const PathElement& path_elem) const
+{
+    auto weak = const_cast<Dictionary*>(this)->weak_from_this();
+    auto shared = weak.expired() ? std::make_shared<Dictionary>(*this) : weak.lock();
+    auto ret = std::make_shared<Set<Mixed>>(m_obj_mem, m_col_key);
     ret->set_owner(shared, path_elem.get_key());
     return ret;
 }
@@ -1030,6 +1040,11 @@ void Dictionary::to_json(std::ostream& out, size_t link_depth, JSONOutputMode ou
             DummyParent parent(this->get_table(), val.get_ref());
             Lst<Mixed> list(parent, 0);
             list.to_json(out, link_depth, output_mode, fn);
+        }
+        else if (val.is_type(type_Set)) {
+            DummyParent parent(this->get_table(), val.get_ref());
+            Set<Mixed> set(parent, 0);
+            set.to_json(out, link_depth, output_mode, fn);
         }
         else {
             val.to_json(out, output_mode);

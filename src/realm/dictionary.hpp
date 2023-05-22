@@ -108,6 +108,7 @@ public:
 
     void insert_collection(const PathElement&, CollectionType dict_or_list) override;
     DictionaryPtr get_dictionary(const PathElement& path_elem) const override;
+    SetMixedPtr get_set(const PathElement&) const override;
     ListMixedPtr get_list(const PathElement& path_elem) const override;
 
     // throws std::out_of_range if key is not found

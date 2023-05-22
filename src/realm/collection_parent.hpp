@@ -40,6 +40,9 @@ class SetBase;
 class Dictionary;
 
 template <class T>
+class Set;
+
+template <class T>
 class Lst;
 
 using CollectionPtr = std::shared_ptr<Collection>;
@@ -49,6 +52,7 @@ using CollectionBasePtr = std::shared_ptr<CollectionBase>;
 using CollectionListPtr = std::shared_ptr<CollectionList>;
 using ListMixedPtr = std::shared_ptr<Lst<Mixed>>;
 using DictionaryPtr = std::shared_ptr<Dictionary>;
+using SetMixedPtr = std::shared_ptr<Set<Mixed>>;
 
 /// The status of an accessor after a call to `update_if_needed()`.
 enum class UpdateStatus {
