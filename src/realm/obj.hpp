@@ -73,8 +73,8 @@ public:
     // Get the path in a minimal format without including object accessors.
     // If you need to obtain additional information for each object in the path,
     // you should use get_fat_path() or traverse_path() instead (see below).
-    FullPath get_path() const noexcept final;
-    void add_index(Path& path, Index ndx) const noexcept final;
+    FullPath get_path() const final;
+    void add_index(Path& path, Index ndx) const final;
 
     bool update_if_needed() const final;
     TableRef get_table() const noexcept final

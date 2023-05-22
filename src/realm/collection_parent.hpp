@@ -134,21 +134,6 @@ struct PathElement {
         return m_type == Type::string;
     }
 
-    const size_t* get_if_ndx() const noexcept
-    {
-        if (is_ndx()) {
-            return reinterpret_cast<const size_t*>(&int_val);
-        }
-        return nullptr;
-    }
-    const std::string* get_if_key() const noexcept
-    {
-        if (is_key()) {
-            return &string_val;
-        }
-        return nullptr;
-    }
-
     size_t get_ndx() const noexcept
     {
         REALM_ASSERT(is_ndx());
@@ -186,26 +171,6 @@ struct PathElement {
     {
         return (m_type == Type::integer) ? int_val == i : false;
     }
-/*
-    template <class V>
-    auto visit(V&& v) const
-    {
-        using R = decltype(v(int_val));
-        switch (m_type) {
-            case Type::string:
-                return v(string_val);
-                break;
-            case Type::integer:
-                return v(int_val);
-                break;
-        }
-        if constexpr (!std::is_same_v<R, void>) {
-            return R{};
-        }
-    }
-    template <class T>
-    const T* get_if() const;
-*/
 };
 
 std::ostream& operator<<(std::ostream& ostr, const PathElement& elem);
@@ -230,9 +195,9 @@ public:
     }
     // Return the path to this object. The path is calculated from
     // the topmost Obj - which must be an Obj with a primary key.
-    virtual FullPath get_path() const noexcept = 0;
+    virtual FullPath get_path() const = 0;
     // Add a translation of Index to PathElement
-    virtual void add_index(Path& path, Index ndx) const noexcept = 0;
+    virtual void add_index(Path& path, Index ndx) const = 0;
     /// Get table of owning object
     virtual TableRef get_table() const noexcept = 0;
 

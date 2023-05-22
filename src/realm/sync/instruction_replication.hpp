@@ -138,7 +138,7 @@ private:
     // lookups.
     const Table* m_last_table = nullptr;
     ObjKey m_last_object;
-    StringData m_last_field_name;
+    std::string m_last_field_name;
     InternString m_last_class_name;
     util::Optional<Instruction::PrimaryKey> m_last_primary_key;
     InternString m_last_interned_field_name;

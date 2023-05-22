@@ -32,11 +32,11 @@ namespace realm {
 
 std::ostream& operator<<(std::ostream& ostr, const PathElement& elem)
 {
-    if (auto pndx = elem.get_if_ndx()) {
-        ostr << *pndx;
+    if (elem.is_ndx()) {
+        ostr << elem.get_ndx();
     }
-    else if (auto pkey = elem.get_if_key()) {
-        ostr << "'" << *pkey << "'";
+    else if (elem.is_key()) {
+        ostr << "'" << elem.get_key() << "'";
     }
 
     return ostr;

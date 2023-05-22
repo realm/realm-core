@@ -935,7 +935,7 @@ Obj::FatPath Obj::get_fat_path() const
     return result;
 }
 
-FullPath Obj::get_path() const noexcept
+FullPath Obj::get_path() const
 {
     FullPath result;
     if (m_table->is_embedded()) {
@@ -981,7 +981,7 @@ FullPath Obj::get_path() const noexcept
     return result;
 }
 
-void Obj::add_index(Path& path, Index index) const noexcept
+void Obj::add_index(Path& path, Index index) const
 {
     auto col_key = mpark::get<ColKey>(index);
     StringData col_name = get_table()->get_column_name(col_key);
