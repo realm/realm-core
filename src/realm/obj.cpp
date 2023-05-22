@@ -1101,9 +1101,8 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                     dict.to_json(out, link_depth, output_mode, print_link);
                 }
                 else if (val.is_type(type_Set)) {
-                    auto parent = std::make_shared<DummyParent>(this->get_table(), val.get_ref());
-                    Set<Mixed> set(*this, ck);
-                    set.set_owner(parent, 0);
+                    DummyParent parent(this->get_table(), val.get_ref());
+                    Set<Mixed> set(parent, 0);
                     set.to_json(out, link_depth, output_mode, print_link);
                 }
                 else if (val.is_type(type_List)) {

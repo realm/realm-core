@@ -629,9 +629,8 @@ void Lst<Mixed>::to_json(std::ostream& out, size_t link_depth, JSONOutputMode ou
             list.to_json(out, link_depth, output_mode, fn);
         }
         else if (val.is_type(type_Set)) {
-            auto parent = std::make_shared<DummyParent>(this->get_table(), val.get_ref());
-            Set<Mixed> set(m_obj_mem, m_col_key);
-            set.set_owner(parent, i);
+            DummyParent parent(this->get_table(), val.get_ref());
+            Set<Mixed> set(parent, 0);
             set.to_json(out, link_depth, output_mode, fn);
         }
         else {

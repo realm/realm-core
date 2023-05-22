@@ -70,6 +70,10 @@ public:
 
         check_column_type<value_type>(m_col_key);
     }
+    Set(CollectionParent& parent, CollectionParent::Index index)
+        : Base(parent, index)
+    {
+    }
     Set(const Set& other);
     Set(Set&& other) noexcept;
     Set& operator=(const Set& other);
