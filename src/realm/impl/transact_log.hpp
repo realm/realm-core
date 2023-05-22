@@ -938,6 +938,109 @@ void parse_transact_log(util::InputStream& is, Handler& handler)
     handler.parse_complete();
 }
 
+// A base class for transaction log parsers so that tests which want to test
+// just a single part of the transaction log handling don't have to implement
+// the entire interface
+class NoOpTransactionLogParser {
+public:
+    TableKey get_current_table() const
+    {
+        return m_current_table;
+    }
+
+    std::pair<ColKey, ObjKey> get_current_linkview() const
+    {
+        return {m_current_linkview_col, m_current_linkview_obj};
+    }
+
+private:
+    TableKey m_current_table;
+    ColKey m_current_linkview_col;
+    ObjKey m_current_linkview_obj;
+
+public:
+    void parse_complete() {}
+
+    bool select_table(TableKey t)
+    {
+        m_current_table = t;
+        return true;
+    }
+
+    bool select_collection(ColKey col_key, ObjKey obj_key)
+    {
+        m_current_linkview_col = col_key;
+        m_current_linkview_obj = obj_key;
+        return true;
+    }
+
+    // Default no-op implementations of all of the mutation instructions
+    bool insert_group_level_table(TableKey)
+    {
+        return false;
+    }
+    bool erase_class(TableKey)
+    {
+        return false;
+    }
+    bool rename_class(TableKey)
+    {
+        return false;
+    }
+    bool insert_column(ColKey)
+    {
+        return false;
+    }
+    bool erase_column(ColKey)
+    {
+        return false;
+    }
+    bool rename_column(ColKey)
+    {
+        return false;
+    }
+    bool set_link_type(ColKey)
+    {
+        return false;
+    }
+    bool create_object(ObjKey)
+    {
+        return false;
+    }
+    bool remove_object(ObjKey)
+    {
+        return false;
+    }
+    bool collection_set(size_t)
+    {
+        return false;
+    }
+    bool collection_clear(size_t)
+    {
+        return false;
+    }
+    bool collection_erase(size_t)
+    {
+        return false;
+    }
+    bool collection_insert(size_t)
+    {
+        return false;
+    }
+    bool collection_move(size_t, size_t)
+    {
+        return false;
+    }
+    bool modify_object(ColKey, ObjKey)
+    {
+        return false;
+    }
+    bool typed_link_change(ColKey, TableKey)
+    {
+        return true;
+    }
+};
+
 } // namespace _impl
 } // namespace realm
 
