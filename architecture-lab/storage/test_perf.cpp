@@ -949,7 +949,7 @@ int main(int argc, char* argv[])
                 auto ids = compressors[i]->symbols.size();
                 // assume 4 bytes overhead for each unique string:
                 uint64_t col_dict_entries = compressors[i]->symbols.size();
-                uint64_t col_dict_size = compressors[i]->unique_symbol_size + 16 * col_dict_entries;
+                uint64_t col_dict_size = 2 * compressors[i]->unique_symbol_size + 16 * col_dict_entries;
                 uint64_t col_symbol_size = compressors[i]->symbol_table_size() * sizeof(encoding_entry);
                 uint64_t col_total = col_dict_size + col_symbol_size;
                 uint64_t col_compressed = compressors[i]->compressed_symbols;
