@@ -1361,8 +1361,8 @@ GeospatialNode::GeospatialNode(GeospatialNode::Box, GeoPoint& p1, GeoPoint& p2)
 {
 }
 
-GeospatialNode::GeospatialNode(Sphere, GeoPoint& p, double radius)
-    : m_geo{Geospatial{GeoCenterSphere{radius, p}}}
+GeospatialNode::GeospatialNode(Circle, GeoPoint& p, double radius)
+    : m_geo{Geospatial{GeoCircle{radius, p}}}
 {
 }
 

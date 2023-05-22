@@ -2,20 +2,42 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* None.
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Access token refresh for websockets was not updating the location metadata ([#6630](https://github.com/realm/realm-core/issues/6630), since v13.9.3)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.12.0 Release notes
+
+### Enhancements
 * Improve performance of SectionedResults. With a single section it is now ~10% faster, and the runtime of sectioning no longer scales significantly with section count, giving >100% speedups when there are large numbers of sections ([PR #6606](https://github.com/realm/realm-core/pull/6606)).
 * Very slightly improve performance of runtime thread checking on the main thread on Apple platforms. ([PR #6606](https://github.com/realm/realm-core/pull/6606))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * We could crash when removing backlinks in cases where forward links did not have a corresponding backlink due to corruption. We now silently ignore this inconsistency in release builds, allowing the app to continue. ([#6585](https://github.com/realm/realm-core/issues/6585), v6.0.0)
-* If you freeze a Results based on a collection of objects, the result will be invalid if you delete the collection ([#6635](https://github.com/realm/realm-core/issues/6635), since V13.11.0)
+* If you freeze a Results based on a collection of objects, the result would be invalid if you delete the collection ([#6635](https://github.com/realm/realm-core/issues/6635), since V13.11.0)
 * Geospatial polygons now have built in normalization and validation in line with the MongoDB server side behaviour and the geoJSON standard. ([#6607](https://github.com/realm/realm-core/pull/6607), since v13.11.0)
-* Access token refresh for websockets was not updating the location metadata ([#6630](https://github.com/realm/realm-core/issues/6630), since v13.9.3)
+* Dictionary::get_any() would expose unresolved links rather than mapping them to null. In addition to allowing invalid objects to be read from Dictionaries, this resulted in queries on Dictionaries sometimes having incorrect results ([#6644](https://github.com/realm/realm-core/pull/6644)).
 
 ### Breaking changes
 * `platform` and `cpu_arch` fields in the `device_info` structure in App::Config can no longer be provided by the SDK's, they are inferred by the library ([PR #6612](https://github.com/realm/realm-core/pull/6612))
 * `bundle_id` is now a required field in the `device_info` structure in App::Config ([PR #6612](https://github.com/realm/realm-core/pull/6612))
 * The API for sectioned results change notifications has changed. Changes are now reported in a vector rather than a sparse map.
+* Renamed `GeoCenterSphere` to `GeoCircle` and in RQL `geoSphere` to `geoCircle`. The GeoPoints of query shapes are now validated before use and an exception will be thrown if invalid. Geospatial queries are no longer allowed on top-level tables. Fixed query results using ANY/ALL/NONE and matching on lists ([PR #6645](https://github.com/realm/realm-core/issues/6645))
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
@@ -24,6 +46,7 @@
 
 ### Internals
 * Upgraded to Catch from v3.0.1 to v3.3.2. ([#6623](https://github.com/realm/realm-core/issues/6623))
+* Added some geospatial benchmarks. ([#6622](https://github.com/realm/realm-core/issues/6622))
 
 ----------------------------------------------
 

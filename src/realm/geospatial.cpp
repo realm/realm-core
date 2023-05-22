@@ -53,10 +53,11 @@
 
 namespace {
 
-static bool type_is_valid(std::string str_type)
+static bool type_is_valid(realm::StringData str_type)
 {
-    std::transform(str_type.begin(), str_type.end(), str_type.begin(), realm::toLowerAscii);
-    return str_type == "point";
+    return str_type.size() == 5 && (str_type[0] == 'P' || str_type[0] == 'p') &&
+           (str_type[1] == 'o' || str_type[1] == 'O') && (str_type[2] == 'i' || str_type[2] == 'I') &&
+           (str_type[3] == 'n' || str_type[3] == 'N') && (str_type[4] == 't' || str_type[4] == 'T');
 }
 
 } // anonymous namespace
@@ -72,8 +73,8 @@ std::string Geospatial::get_type_string() const noexcept
             return "Box";
         case Type::Polygon:
             return "Polygon";
-        case Type::CenterSphere:
-            return "CenterSphere";
+        case Type::Circle:
+            return "Circle";
         case Type::Invalid:
             return "Invalid";
     }
@@ -108,7 +109,7 @@ bool Geospatial::is_geospatial(const TableRef table, ColKey link_col)
     return true;
 }
 
-Geospatial Geospatial::from_obj(const Obj& obj, ColKey type_col, ColKey coords_col)
+std::optional<GeoPoint> Geospatial::point_from_obj(const Obj& obj, ColKey type_col, ColKey coords_col)
 {
     if (!type_col) {
         type_col = obj.get_table()->get_column_key(StringData(c_geo_point_type_col_name));
@@ -125,16 +126,16 @@ Geospatial Geospatial::from_obj(const Obj& obj, ColKey type_col, ColKey coords_c
         REALM_ASSERT(coords_col.is_list());
     }
 
-    String geo_type = obj.get<String>(type_col);
-    if (!type_is_valid(geo_type)) {
+    if (!type_is_valid(obj.get<StringData>(type_col))) {
         throw IllegalOperation("The only Geospatial type currently supported is 'point'");
     }
 
     Lst<double> coords = obj.get_list<double>(coords_col);
-    if (coords.size() < 2) {
-        return Geospatial(); // invalid
+    const size_t coord_size = coords.size();
+    if (coord_size < 2) {
+        return {}; // invalid
     }
-    if (coords.size() > 2) {
+    if (coord_size > 2) {
         return GeoPoint{coords[0], coords[1], coords[2]};
     }
     return GeoPoint{coords[0], coords[1]};
@@ -188,28 +189,29 @@ void Geospatial::assign_to(Obj& link) const
     auto&& point = get<GeoPoint>();
     link.set(type_col, get_type_string());
     Lst<double> coords = link.get_list<double>(coords_col);
-    if (coords.size() >= 1) {
+    size_t existing_size = coords.size();
+    std::optional<double> altitude = point.get_altitude();
+    if (existing_size >= 1) {
         coords.set(0, point.longitude);
     }
     else {
         coords.add(point.longitude);
     }
-    if (coords.size() >= 2) {
+    if (existing_size >= 2) {
         coords.set(1, point.latitude);
     }
     else {
         coords.add(point.latitude);
     }
-    std::optional<double> altitude = point.get_altitude();
     if (altitude) {
-        if (coords.size() >= 3) {
+        if (existing_size >= 3) {
             coords.set(2, *altitude);
         }
         else {
             coords.add(*altitude);
         }
     }
-    else if (coords.size() >= 3) {
+    else if (existing_size >= 3) {
         coords.remove(2, coords.size());
     }
 }
@@ -224,11 +226,26 @@ static std::string point_str(const GeoPoint& point)
 
 Status Geospatial::is_valid() const noexcept
 {
-    if (get_type() == Type::Polygon) {
-        GeoRegion region(*this);
-        return region.get_conversion_status();
+    switch (get_type()) {
+        case Type::Polygon:
+        case Type::Box:
+        case Type::Circle:
+            return get_region().get_conversion_status();
+        default:
+            return Status::OK();
     }
-    return Status::OK();
+}
+
+bool Geospatial::contains(const GeoPoint& point) const noexcept
+{
+    return get_region().contains(point);
+}
+
+GeoRegion& Geospatial::get_region() const
+{
+    if (!m_region)
+        m_region = std::make_unique<GeoRegion>(*this);
+    return *m_region.get();
 }
 
 std::string Geospatial::to_string() const
@@ -254,8 +271,8 @@ std::string Geospatial::to_string() const
                            }
                            return util::format("GeoPolygon(%1)", points);
                        },
-                       [](const GeoCenterSphere& sphere) {
-                           return util::format("GeoSphere(%1, %2)", point_str(sphere.center), sphere.radius_radians);
+                       [](const GeoCircle& circle) {
+                           return util::format("GeoCircle(%1, %2)", point_str(circle.center), circle.radius_radians);
                        },
                        [](const mpark::monostate&) {
                            return std::string("NULL");
@@ -271,9 +288,30 @@ std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo)
 
 // The following validation follows the server:
 // https://github.com/mongodb/mongo/blob/053ff9f355555cddddf3a476ffa9ddf899b1657d/src/mongo/db/geo/geoparser.cpp#L140
-static void erase_duplicate_points(std::vector<S2Point>* vertices)
+
+
+// Technically lat/long bounds, not really tied to earth radius.
+static bool is_valid_lat_lng(double lng, double lat)
 {
-    vertices->erase(std::unique(vertices->begin(), vertices->end()), vertices->end());
+    return abs(lng) <= 180 && abs(lat) <= 90;
+}
+
+static Status coord_to_point(double lng, double lat, S2Point& out)
+{
+    if (!is_valid_lat_lng(lng, lat))
+        return Status(ErrorCodes::InvalidQueryArg,
+                      util::format("Longitude/latitude is out of bounds, lng: %1 lat: %2", lng, lat));
+    // Note that it's (lat, lng) for S2 but (lng, lat) for MongoDB.
+    S2LatLng ll = S2LatLng::FromDegrees(lat, lng).Normalized();
+    // This shouldn't happen since we should only have valid lng/lats.
+    REALM_ASSERT_EX(ll.is_valid(), util::format("coords invalid after normalization, lng = %1, lat = %2", lng, lat));
+    out = ll.ToPoint();
+    return Status::OK();
+}
+
+static void erase_duplicate_adjacent_points(std::vector<S2Point>& vertices)
+{
+    vertices.erase(std::unique(vertices.begin(), vertices.end()), vertices.end());
 }
 
 static Status is_ring_closed(const std::vector<S2Point>& ring, const std::vector<GeoPoint>& points)
@@ -293,6 +331,7 @@ static Status is_ring_closed(const std::vector<S2Point>& ring, const std::vector
 
 static Status parse_polygon_coordinates(const GeoPolygon& polygon, S2Polygon* out)
 {
+    REALM_ASSERT(out);
     std::vector<S2Loop*> rings;
     rings.reserve(polygon.points.size());
     Status status = Status::OK();
@@ -311,15 +350,19 @@ static Status parse_polygon_coordinates(const GeoPolygon& polygon, S2Polygon* ou
         std::vector<S2Point> points;
         points.reserve(polygon.points[i].size());
         for (auto&& p : polygon.points[i]) {
-            // FIXME rewrite without copying
-            points.push_back(S2LatLng::FromDegrees(p.latitude, p.longitude).ToPoint());
+            S2Point s2p;
+            status = coord_to_point(p.longitude, p.latitude, s2p);
+            if (!status.is_ok()) {
+                return status;
+            }
+            points.push_back(s2p);
         }
 
         status = is_ring_closed(points, polygon.points[i]);
         if (!status.is_ok())
             return status;
 
-        erase_duplicate_points(&points);
+        erase_duplicate_adjacent_points(points);
         // Drop the duplicated last point.
         points.resize(points.size() - 1);
 
@@ -414,8 +457,19 @@ GeoRegion::GeoRegion(const Geospatial& geo)
         Status& m_status_out;
         std::unique_ptr<S2Region> operator()(const GeoBox& box) const
         {
-            return std::make_unique<S2LatLngRect>(S2LatLng::FromDegrees(box.lo.latitude, box.lo.longitude),
-                                                  S2LatLng::FromDegrees(box.hi.latitude, box.hi.longitude));
+            S2Point s2_lo, s2_hi;
+            m_status_out = coord_to_point(box.lo.longitude, box.lo.latitude, s2_lo);
+            if (!m_status_out.is_ok())
+                return nullptr;
+            m_status_out = coord_to_point(box.hi.longitude, box.hi.latitude, s2_hi);
+            if (!m_status_out.is_ok())
+                return nullptr;
+            auto ret = std::make_unique<S2LatLngRect>(S2LatLng(s2_lo), S2LatLng(s2_hi));
+            if (!ret->is_valid()) {
+                m_status_out = Status(ErrorCodes::InvalidQueryArg, "Invalid rectangle");
+                return nullptr;
+            }
+            return ret;
         }
 
         std::unique_ptr<S2Region> operator()(const GeoPolygon& polygon) const
@@ -425,10 +479,18 @@ GeoRegion::GeoRegion(const Geospatial& geo)
             return poly;
         }
 
-        std::unique_ptr<S2Region> operator()(const GeoCenterSphere& sphere) const
+        std::unique_ptr<S2Region> operator()(const GeoCircle& circle) const
         {
-            auto center = S2LatLng::FromDegrees(sphere.center.latitude, sphere.center.longitude).ToPoint();
-            auto radius = S1Angle::Radians(sphere.radius_radians);
+            S2Point center;
+            m_status_out = coord_to_point(circle.center.longitude, circle.center.latitude, center);
+            if (!m_status_out.is_ok())
+                return nullptr;
+            if (circle.radius_radians < 0 || std::isnan(circle.radius_radians)) {
+                m_status_out =
+                    Status(ErrorCodes::InvalidQueryArg, "The radius of a circle must be a non-negative number");
+                return nullptr;
+            }
+            auto radius = S1Angle::Radians(circle.radius_radians);
             return std::make_unique<S2Cap>(S2Cap::FromAxisAngle(center, radius));
         }
 
@@ -452,12 +514,12 @@ GeoRegion::GeoRegion(const Geospatial& geo)
 
 GeoRegion::~GeoRegion() = default;
 
-bool GeoRegion::contains(const GeoPoint& geo_point) const noexcept
+bool GeoRegion::contains(const std::optional<GeoPoint>& geo_point) const noexcept
 {
-    if (!m_status.is_ok()) {
+    if (!m_status.is_ok() || !geo_point) {
         return false;
     }
-    auto point = S2LatLng::FromDegrees(geo_point.latitude, geo_point.longitude).ToPoint();
+    auto point = S2LatLng::FromDegrees(geo_point->latitude, geo_point->longitude).ToPoint();
     return m_region->VirtualContainsPoint(point);
 }
 
