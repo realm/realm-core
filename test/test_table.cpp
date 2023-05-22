@@ -4923,8 +4923,8 @@ TEST(Table_EmbeddedObjectCreateAndDestroyDictionary)
 
     auto obj_path = o2.get_path();
     CHECK_EQUAL(obj_path.path_from_top.size(), 2);
-    CHECK_EQUAL(obj_path.path_from_top[0].get_key(), "theGreatColumn");
-    CHECK_EQUAL(obj_path.path_from_top[1].get_key(), "one");
+    CHECK_EQUAL(obj_path.path_from_top[0], "theGreatColumn");
+    CHECK_EQUAL(obj_path.path_from_top[1], "one");
 
     Obj o3 = parent_dict.create_and_insert_linked_object("two");
     parent_dict.create_and_insert_linked_object("three");
@@ -4941,16 +4941,16 @@ TEST(Table_EmbeddedObjectCreateAndDestroyDictionary)
 
     obj_path = o2_dict.get_object("foo1").get_path();
     CHECK_EQUAL(obj_path.path_from_top.size(), 4);
-    CHECK_EQUAL(obj_path.path_from_top[0].get_key(), "theGreatColumn");
-    CHECK_EQUAL(obj_path.path_from_top[1].get_key(), "one");
-    CHECK_EQUAL(obj_path.path_from_top[2].get_key(), "theRecursiveBit");
-    CHECK_EQUAL(obj_path.path_from_top[3].get_key(), "foo1");
+    CHECK_EQUAL(obj_path.path_from_top[0], "theGreatColumn");
+    CHECK_EQUAL(obj_path.path_from_top[1], "one");
+    CHECK_EQUAL(obj_path.path_from_top[2], "theRecursiveBit");
+    CHECK_EQUAL(obj_path.path_from_top[3], "foo1");
 
     obj_path = o4_dict.get_object("foo4").get_path();
     CHECK_EQUAL(obj_path.path_from_top.size(), 3);
-    CHECK_EQUAL(obj_path.path_from_top[0].get_key(), "theLesserColumn");
-    CHECK_EQUAL(obj_path.path_from_top[1].get_key(), "theRecursiveBit");
-    CHECK_EQUAL(obj_path.path_from_top[2].get_key(), "foo4");
+    CHECK_EQUAL(obj_path.path_from_top[0], "theLesserColumn");
+    CHECK_EQUAL(obj_path.path_from_top[1], "theRecursiveBit");
+    CHECK_EQUAL(obj_path.path_from_top[2], "foo4");
 
     tr->commit_and_continue_as_read();
     tr->verify();

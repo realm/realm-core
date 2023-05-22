@@ -22,6 +22,12 @@ public:
         , m_ref(ref)
     {
     }
+    FullPath get_path() const noexcept final
+    {
+        return {};
+    }
+    void add_index(Path&, Index) const noexcept final {}
+
     TableRef get_table() const noexcept final
     {
         return m_obj.get_table();
@@ -399,6 +405,13 @@ template <class Interface>
 class CollectionBaseImpl : public Interface, protected ArrayParent {
 public:
     static_assert(std::is_base_of_v<CollectionBase, Interface>);
+
+    FullPath get_path() const
+    {
+        auto path = m_parent->get_path();
+        m_parent->add_index(path.path_from_top, m_index);
+        return path;
+    }
 
     // Overriding members of CollectionBase:
     ColKey get_col_key() const noexcept final

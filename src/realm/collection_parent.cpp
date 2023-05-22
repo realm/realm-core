@@ -20,6 +20,7 @@
 #include "realm/list.hpp"
 #include "realm/set.hpp"
 #include "realm/dictionary.hpp"
+#include "realm/util/overload.hpp"
 
 #include <random>
 #include <mutex>
@@ -28,6 +29,18 @@
 #include <mutex>
 
 namespace realm {
+
+std::ostream& operator<<(std::ostream& ostr, const PathElement& elem)
+{
+    if (elem.is_ndx()) {
+        ostr << elem.get_ndx();
+    }
+    else if (elem.is_key()) {
+        ostr << "'" << elem.get_key() << "'";
+    }
+
+    return ostr;
+}
 
 /***************************** CollectionParent ******************************/
 

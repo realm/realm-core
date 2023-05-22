@@ -168,6 +168,27 @@ bool CollectionList::update_if_needed() const
     return status == UpdateStatus::Updated;
 }
 
+auto CollectionList::get_path() const noexcept -> FullPath
+{
+    auto path = m_parent->get_path();
+    m_parent->add_index(path.path_from_top, m_index);
+    return path;
+}
+
+void CollectionList::add_index(Path& path, Index index) const noexcept
+{
+    if (m_coll_type == CollectionType::List) {
+        auto int_keys = static_cast<BPlusTree<Int>*>(m_keys.get());
+        auto ndx = int_keys->find_first(mpark::get<int64_t>(index));
+        REALM_ASSERT(ndx != realm::not_found);
+        path.emplace_back(ndx);
+    }
+    else {
+        path.emplace_back(mpark::get<std::string>(index));
+    }
+}
+
+
 ref_type CollectionList::get_child_ref(size_t) const noexcept
 {
     return m_parent->get_collection_ref(m_col_key, m_coll_type);

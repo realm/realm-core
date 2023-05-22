@@ -72,53 +72,112 @@ enum class UpdateStatus {
     NoChange,
 };
 
+struct PathElement {
+    union {
+        std::string string_val;
+        int64_t int_val;
+    };
+    enum Type { string, integer } m_type;
 
-class PathElement : private Mixed {
-public:
     PathElement(int ndx)
-        : Mixed(int64_t(ndx))
+        : int_val(ndx)
+        , m_type(Type::integer)
     {
         REALM_ASSERT(ndx >= 0);
     }
     PathElement(size_t ndx)
-        : Mixed(int64_t(ndx))
+        : int_val(int64_t(ndx))
+        , m_type(Type::integer)
     {
     }
-    PathElement(const char* key)
-        : Mixed(key)
+
+    PathElement(StringData str)
+        : string_val(str)
+        , m_type(Type::string)
     {
     }
-    PathElement(StringData key)
-        : Mixed(key)
+    PathElement(const char* str)
+        : string_val(str)
+        , m_type(Type::string)
     {
     }
+    PathElement(const PathElement& other)
+        : m_type(other.m_type)
+    {
+        if (other.m_type == Type::string) {
+            new (&string_val) std::string(other.string_val);
+        }
+        else {
+            int_val = other.int_val;
+        }
+    }
+
+    PathElement(PathElement&& other) noexcept
+        : m_type(other.m_type)
+    {
+        if (other.m_type == Type::string) {
+            new (&string_val) std::string(std::move(other.string_val));
+        }
+        else {
+            int_val = other.int_val;
+        }
+    }
+    ~PathElement()
+    {
+        if (m_type == Type::string) {
+            string_val.std::string::~string();
+        }
+    }
+
     bool is_ndx() const noexcept
     {
-        return is_type(type_Int);
+        return m_type == Type::integer;
     }
     bool is_key() const noexcept
     {
-        return is_type(type_String);
-    }
-
-    const size_t* get_if_ndx() const noexcept
-    {
-        return reinterpret_cast<const size_t*>(get_if<Int>());
-    }
-    const StringData* get_if_key() const noexcept
-    {
-        return get_if<String>();
+        return m_type == Type::string;
     }
 
     size_t get_ndx() const noexcept
     {
-        return size_t(get_int());
+        REALM_ASSERT(is_ndx());
+        return size_t(int_val);
     }
-    StringData get_key() const noexcept
+    const std::string& get_key() const noexcept
     {
-        return get_string();
+        REALM_ASSERT(is_key());
+        return string_val;
+    }
+
+    PathElement& operator=(const PathElement& other)
+    {
+        m_type = other.m_type;
+        if (other.m_type == Type::string) {
+            string_val = other.string_val;
+        }
+        else {
+            int_val = other.int_val;
+        }
+        return *this;
+    }
+    bool operator==(const PathElement& other) const
+    {
+        if (m_type == other.m_type) {
+            return (m_type == Type::string) ? string_val == other.string_val : int_val == other.int_val;
+        }
+        return false;
+    }
+    bool operator==(const char* str) const
+    {
+        return (m_type == Type::string) ? string_val == str : false;
+    }
+    bool operator==(int64_t i) const
+    {
+        return (m_type == Type::integer) ? int_val == i : false;
     }
 };
+
+std::ostream& operator<<(std::ostream& ostr, const PathElement& elem);
 
 using Path = std::vector<PathElement>;
 
@@ -133,10 +192,16 @@ class CollectionParent : public std::enable_shared_from_this<CollectionParent> {
 public:
     using Index = mpark::variant<ColKey, int64_t, std::string>;
 
+    // Return the nesting level of the parent
     size_t get_level() const noexcept
     {
         return m_level;
     }
+    // Return the path to this object. The path is calculated from
+    // the topmost Obj - which must be an Obj with a primary key.
+    virtual FullPath get_path() const = 0;
+    // Add a translation of Index to PathElement
+    virtual void add_index(Path& path, Index ndx) const = 0;
     /// Get table of owning object
     virtual TableRef get_table() const noexcept = 0;
 

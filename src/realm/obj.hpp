@@ -70,6 +70,12 @@ public:
 
     // Overriding members of CollectionParent:
     UpdateStatus update_if_needed_with_status() const noexcept final;
+    // Get the path in a minimal format without including object accessors.
+    // If you need to obtain additional information for each object in the path,
+    // you should use get_fat_path() or traverse_path() instead (see below).
+    FullPath get_path() const final;
+    void add_index(Path& path, Index ndx) const final;
+
     bool update_if_needed() const final;
     TableRef get_table() const noexcept final
     {
@@ -160,11 +166,6 @@ public:
     }
 
     std::string to_string() const;
-
-    // Get the path in a minimal format without including object accessors.
-    // If you need to obtain additional information for each object in the path,
-    // you should use get_fat_path() or traverse_path() instead (see below).
-    FullPath get_path() const;
 
     // Get the fat path to this object expressed as a vector of fat path elements.
     // each Fat path elements include a Obj allowing for low cost access to the
@@ -285,7 +286,7 @@ public:
     template <typename U>
     SetPtr<U> get_set_ptr(ColKey col_key) const;
     template <typename U>
-    std::shared_ptr<Lst<U>> get_set_ptr(const Path& path) const
+    std::shared_ptr<Set<U>> get_set_ptr(const Path& path) const
     {
         return std::dynamic_pointer_cast<Set<U>>(get_collection_ptr(path));
     }

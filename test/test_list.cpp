@@ -656,7 +656,9 @@ TEST(List_NestedListColumns)
 
     tr->promote_to_write();
     Obj obj = table->create_object();
-    auto int_lst = obj.get_list_ptr<Int>({"int_dict_list_list", "Foo", 0});
+    auto int_lst = obj.get_list_ptr<Int>({"int_list"});
+    CHECK_EQUAL(int_lst->size(), 0);
+    int_lst = obj.get_list_ptr<Int>({"int_dict_list_list", "Foo", 0});
     int_lst->add(7);
     int_lst = obj.get_list_ptr<Int>({"int_dict_list_list", "Bar", 0});
     int_lst->add(5);
@@ -701,7 +703,6 @@ TEST(List_NestedList_Insert)
 
     // Get collection by path
     auto int_lst = obj.get_list_ptr<Int>({"int_dict_list_list", "Foo", 0});
-
     CHECK_EQUAL(int_lst->get(0), 5);
 
     dict->insert_collection("Foo");
@@ -1223,4 +1224,96 @@ TEST(List_NestedDict_Unresolved)
     auto obj = target->create_object_with_primary_key("Adam");
     CHECK_EQUAL(obj.get_backlink_count(), 1);
     CHECK_EQUAL(foo_ll0->get("A"), Mixed(obj.get_link()));
+}
+
+TEST(List_NestedList_Path)
+{
+    Group g;
+    auto top_table = g.add_table_with_primary_key("top", type_String, "_id");
+    auto embedded_table = g.add_table("embedded", Table::Type::Embedded);
+    auto list_col =
+        top_table->add_column(*embedded_table, "embedded_list", {CollectionType::List, CollectionType::List});
+    auto dict_col =
+        top_table->add_column(*embedded_table, "embedded_dict", {CollectionType::Dictionary, CollectionType::List});
+    auto string_col = top_table->add_column_list(type_String, "strings");
+    top_table->add_column(type_Float, "floats", false, {CollectionType::Dictionary, CollectionType::List});
+    embedded_table->add_column(type_Int, "integers", false, {CollectionType::Dictionary, CollectionType::List});
+    auto col_any = top_table->add_column(type_Mixed, "Any");
+
+    Obj o = top_table->create_object_with_primary_key("Adam");
+
+    // First level list
+    {
+        auto list_string = o.get_list<String>(string_col);
+        auto path = list_string.get_path();
+        CHECK_EQUAL(path.path_from_top.size(), 1);
+        CHECK_EQUAL(path.path_from_top[0], "strings");
+    }
+
+    // List nested in Dictionary
+    {
+        auto list_float = o.get_list_ptr<Float>({"floats", "Foo"});
+        list_float->add(5.f);
+        auto path = list_float->get_path();
+        CHECK_EQUAL(path.path_from_top.size(), 2);
+        CHECK_EQUAL(path.path_from_top[0], "floats");
+        CHECK_EQUAL(path.path_from_top[1], "Foo");
+    }
+
+    // List nested in Dictionary contained in embedded object contained in list of list
+    {
+        auto list = o.get_collection_list(list_col);
+        list->insert_collection(0);
+        list->insert_collection(1);
+        list->insert_collection(2);
+        auto coll = list->get_collection(2);
+        auto ll = dynamic_cast<LnkLst*>(coll.get());
+        ll->create_and_insert_linked_object(0);
+        auto embedded_obj = ll->create_and_insert_linked_object(1);
+        auto list_int = embedded_obj.get_list_ptr<Int>({"integers", "Foo"});
+        list_int->add(5);
+        auto path = list_int->get_path();
+        CHECK_EQUAL(path.path_from_top.size(), 5);
+        CHECK_EQUAL(path.path_from_top[0], "embedded_list");
+        CHECK_EQUAL(path.path_from_top[1], 2);
+        CHECK_EQUAL(path.path_from_top[2], 1);
+        CHECK_EQUAL(path.path_from_top[3], "integers");
+        CHECK_EQUAL(path.path_from_top[4], "Foo");
+    }
+
+    // List nested in Dictionary contained in embedded object contained in Dictionary of list
+    {
+        auto list = o.get_collection_list(dict_col);
+        list->insert_collection("A");
+        list->insert_collection("B");
+        list->insert_collection("C");
+        auto coll = list->get_collection("C");
+        auto ll = dynamic_cast<LnkLst*>(coll.get());
+        ll->create_and_insert_linked_object(0);
+        auto embedded_obj = ll->create_and_insert_linked_object(1);
+        auto list_int = embedded_obj.get_list_ptr<Int>({"integers", "Foo"});
+        list_int->add(5);
+        auto path = list_int->get_path();
+        CHECK_EQUAL(path.path_from_top.size(), 5);
+        CHECK_EQUAL(path.path_from_top[0], "embedded_dict");
+        CHECK_EQUAL(path.path_from_top[1], "C");
+        CHECK_EQUAL(path.path_from_top[2], 1);
+        CHECK_EQUAL(path.path_from_top[3], "integers");
+        CHECK_EQUAL(path.path_from_top[4], "Foo");
+    }
+    // Collections contained in Mixed
+    {
+        o.set_collection(col_any, CollectionType::Dictionary);
+        auto dict = o.get_dictionary_ptr(col_any);
+        dict->insert_collection("List", CollectionType::List);
+        auto list = dict->get_list("List");
+        list->add(Mixed(5));
+        list->insert_collection(1, CollectionType::Dictionary);
+        auto dict2 = list->get_dictionary(1);
+        auto path = dict2->get_path();
+        CHECK_EQUAL(path.path_from_top.size(), 3);
+        CHECK_EQUAL(path.path_from_top[0], "Any");
+        CHECK_EQUAL(path.path_from_top[1], "List");
+        CHECK_EQUAL(path.path_from_top[2], 1);
+    }
 }
