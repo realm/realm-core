@@ -467,15 +467,15 @@ private:
     void update_metadata_and_resend(Request&& request, util::UniqueFunction<void(const Response&)>&& completion,
                                     const util::Optional<std::string>& new_hostname = util::none);
 
-    void basic_request(std::string&& route, std::string&& body,
-                       util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
     void post(std::string&& route, util::UniqueFunction<void(util::Optional<AppError>)>&& completion,
               const bson::BsonDocument& body);
 
     /// Performs a request to the Stitch server. This request does not contain authentication state.
     /// @param request The request to be performed
     /// @param completion Returns the response from the server
-    void do_request(Request&& request, util::UniqueFunction<void(const Response&)>&& completion);
+    /// @param update_location Force the location metadata to be updated prior to sending the request
+    void do_request(Request&& request, util::UniqueFunction<void(const Response&)>&& completion,
+                    bool update_location = false);
 
     /// Check to see if hte response is a redirect and handle, otherwise pass the response to compleetion
     /// @param request The request to be performed (in case it needs to be sent again)
