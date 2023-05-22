@@ -101,14 +101,19 @@ void ArrayBacklink::add(size_t ndx, ObjKey key)
 bool ArrayBacklink::remove(size_t ndx, ObjKey key)
 {
     uint64_t value = Array::get(ndx);
-    REALM_ASSERT(value != 0);
+    REALM_ASSERT_DEBUG(value != 0);
+    if (value == 0)
+        return true;
 
     // If there is only a single backlink, it can be stored as
     // a tagged value
     if ((value & 1) != 0) {
-        REALM_ASSERT_3(int64_t(value >> 1), ==, key.value);
-        set(ndx, 0);
-        return true;
+        REALM_ASSERT_DEBUG(int64_t(value >> 1) == key.value);
+        if (int64_t(value >> 1) == key.value) {
+            set(ndx, 0);
+            return true;
+        }
+        return false;
     }
 
     // if there is a list of backlinks we have to find
@@ -119,10 +124,12 @@ bool ArrayBacklink::remove(size_t ndx, ObjKey key)
 
     size_t last_ndx = backlink_list.size() - 1;
     size_t backlink_ndx = backlink_list.find_first(key.value);
-    REALM_ASSERT_3(backlink_ndx, !=, not_found);
-    if (backlink_ndx != last_ndx)
-        backlink_list.set(backlink_ndx, backlink_list.get(last_ndx));
-    backlink_list.truncate(last_ndx); // Throws
+    REALM_ASSERT_DEBUG(backlink_ndx != not_found);
+    if (backlink_ndx != not_found) {
+        if (backlink_ndx != last_ndx)
+            backlink_list.set(backlink_ndx, backlink_list.get(last_ndx));
+        backlink_list.truncate(last_ndx); // Throws
+    }
 
     // If there is only one backlink left we can inline it as tagged value
     if (last_ndx == 1) {

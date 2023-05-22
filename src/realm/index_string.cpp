@@ -44,6 +44,30 @@ void get_child(Array& parent, size_t child_ref_ndx, Array& child) noexcept
     child.set_parent(&parent, child_ref_ndx);
 }
 
+// This method reconstructs the string inserted in the search index based on a string
+// that matches so far and the last key (only works if complete strings are stored in the index)
+static StringData reconstruct_string(size_t offset, StringIndex::key_type key, StringData new_string)
+{
+    if (key == 0)
+        return StringData();
+
+    size_t rest_len = 4;
+    char* k = reinterpret_cast<char*>(&key);
+    if (k[0] == 'X')
+        rest_len = 3;
+    else if (k[1] == 'X')
+        rest_len = 2;
+    else if (k[2] == 'X')
+        rest_len = 1;
+    else if (k[3] == 'X')
+        rest_len = 0;
+
+    REALM_ASSERT(offset + rest_len <= new_string.size());
+
+    return StringData(new_string.data(), offset + rest_len);
+}
+
+
 } // anonymous namespace
 
 DataType ClusterColumn::get_data_type() const
@@ -229,12 +253,8 @@ int64_t IndexArray::index_string(Mixed value, InternalFindResult& result_ref, co
         if (ref & 1) {
             int64_t key_value = int64_t(ref >> 1);
 
-            if (column.is_fulltext()) {
-                result_ref.payload = key_value;
-                return first ? key_value : (get_count ? 1 : FindRes_single);
-            }
-
-            Mixed a = column.get_value(ObjKey(key_value));
+            Mixed a = column.is_fulltext() ? reconstruct_string(stringoffset, key, index_data)
+                                           : column.get_value(ObjKey(key_value));
             if (a == value) {
                 result_ref.payload = key_value;
                 return first ? key_value : get_count ? 1 : FindRes_single;
@@ -971,29 +991,6 @@ void StringIndex::node_insert(size_t ndx, size_t ref)
     m_array->insert(ndx + 1, ref);
 }
 
-// This method reconstructs the string inserted in the search index based on a string
-// that matches so far and the last key (only works if complete strings are stored in the index)
-static StringData reconstruct_string(size_t offset, StringIndex::key_type key, StringData new_string)
-{
-    if (key == 0)
-        return StringData();
-
-    size_t rest_len = 4;
-    char* k = reinterpret_cast<char*>(&key);
-    if (k[0] == 'X')
-        rest_len = 3;
-    else if (k[1] == 'X')
-        rest_len = 2;
-    else if (k[2] == 'X')
-        rest_len = 1;
-    else if (k[3] == 'X')
-        rest_len = 0;
-
-    REALM_ASSERT(offset + rest_len <= new_string.size());
-
-    return StringData(new_string.data(), offset + rest_len);
-}
-
 bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, StringData index_data, const Mixed& value,
                               bool noextend)
 {
@@ -1204,106 +1201,123 @@ void StringIndex::find_all_fulltext(std::vector<ObjKey>& result, StringData valu
 
     auto tokenizer = Tokenizer::get_instance();
     tokenizer->reset({value.data(), value.size()});
-    auto token_info = tokenizer->get_token_info();
-    if (token_info.empty()) {
-        throw InvalidArgument("Missing search token");
-    }
-    struct Token {
-        std::string_view token;
-        bool exclude;
-    };
-    std::list<Token> tokens;
-    auto exclude_start = tokens.begin();
-    // Order the tokens so that we handle words to match first
-    for (auto& info : token_info) {
-        auto start = std::get<0>(info.second.ranges[0]);
-        if (info.second.ranges.size() > 1) {
-            throw InvalidArgument("Search token should only appear once");
+    auto [includes, excludes] = tokenizer->get_search_tokens();
+    if (includes.empty()) {
+        if (excludes.empty()) {
+            throw InvalidArgument("Missing search token");
         }
-        bool exclude = start == 0 ? false : value[start - 1] == '-';
-        auto it = tokens.insert(exclude_start, {info.first, exclude});
-        if (exclude) {
-            exclude_start = it;
-        }
-    }
-    if (exclude_start == tokens.begin()) {
         result = m_target_column.get_all_keys();
     }
-    for (auto& token : tokens) {
-        FindRes res1 = find_all_no_copy(StringData{token.token}, res);
-        if (res1 == FindRes_not_found) {
-            if (!token.exclude) {
+    else {
+        for (auto& token : includes) {
+            FindRes res1 = find_all_no_copy(StringData{token}, res);
+            if (res1 == FindRes_not_found) {
                 result.clear();
-            }
-            return;
-        }
-        else if (res1 == FindRes_column) {
-            IntegerColumn indexes(m_array->get_alloc(), ref_type(res.payload));
-
-            if (result.empty()) {
-                for (size_t i = res.start_ndx; i < res.end_ndx; ++i) {
-                    result.emplace_back(indexes.get(i));
-                }
-            }
-            else {
-                auto r = result.begin();
-                size_t m = res.start_ndx;
-
-                // only keep intersection
-                while (r != result.end() && m < res.end_ndx) {
-                    auto key_val = indexes.get(m);
-                    if (r->value < key_val) {
-                        if (token.exclude) {
-                            ++r;
-                        }
-                        else {
-                            r = result.erase(r); // remove if match is not in new set
-                        }
-                    }
-                    else if (r->value > key_val) {
-                        ++m; // ignore new matches
-                    }
-                    else {
-                        if (token.exclude) {
-                            r = result.erase(r); // remove if match is found in new set
-                        }
-                        else {
-                            ++r;
-                        }
-                        ++m;
-                    }
-                }
-                if (!token.exclude && r != result.end()) {
-                    result.erase(r, result.end());
-                }
-            }
-
-            if (result.empty())
                 return;
-        }
-        else if (res1 == FindRes_single) {
-            // merge in single res
-            if (result.empty()) {
-                result.emplace_back(res.payload);
             }
-            else {
-                ObjKey key(res.payload);
-                auto pos = std::lower_bound(result.begin(), result.end(), key);
-                if (pos != result.end() && key == *pos) {
-                    if (token.exclude) {
-                        result.erase(pos);
-                    }
-                    else {
-                        result.clear();
-                        result.push_back(key);
+            else if (res1 == FindRes_column) {
+                IntegerColumn indexes(m_array->get_alloc(), ref_type(res.payload));
+
+                if (result.empty()) {
+                    for (size_t i = res.start_ndx; i < res.end_ndx; ++i) {
+                        result.emplace_back(indexes.get(i));
                     }
                 }
                 else {
-                    if (!token.exclude) {
+                    auto it = result.begin();
+                    auto keep = it;
+                    size_t m = res.start_ndx;
+
+                    // only keep intersection
+                    while (it != result.end() && m < res.end_ndx) {
+                        auto idx_val = indexes.get(m);
+                        if (it->value < idx_val) {
+                            it++; // don't keep if match is not in new set
+                        }
+                        else if (it->value > idx_val) {
+                            ++m; // ignore new matches
+                        }
+                        else {
+                            // Found both places - make sure it is kept
+                            if (keep < it)
+                                *keep = *it;
+                            ++keep;
+                            ++it;
+                            ++m;
+                        }
+                    }
+                    if (keep != result.end()) {
+                        result.erase(keep, result.end());
+                    }
+                }
+
+                if (result.empty())
+                    return;
+            }
+            else if (res1 == FindRes_single) {
+                // merge in single res
+                if (result.empty()) {
+                    result.emplace_back(res.payload);
+                }
+                else {
+                    ObjKey key(res.payload);
+                    auto pos = std::lower_bound(result.begin(), result.end(), key);
+                    if (pos != result.end() && key == *pos) {
+                        result.clear();
+                        result.push_back(key);
+                    }
+                    else {
                         result.clear();
                         return;
                     }
                 }
+            }
+        }
+    }
+
+    for (auto& token : excludes) {
+        if (result.empty())
+            return;
+
+        FindRes res1 = find_all_no_copy(StringData{token}, res);
+        if (res1 == FindRes_not_found) {
+            continue;
+        }
+        else if (res1 == FindRes_column) {
+            IntegerColumn indexes(m_array->get_alloc(), ref_type(res.payload));
+
+            auto it = result.begin();
+            auto keep = it;
+            size_t m = res.start_ndx;
+            auto idx_val = indexes.get(m);
+
+            while (it != result.end()) {
+                if (it->value < idx_val) {
+                    // Not found in excludes
+                    if (keep < it)
+                        *keep = *it;
+                    ++keep;
+                    ++it;
+                }
+                else {
+                    if (it->value == idx_val) {
+                        // found in excludes - don't keep
+                        ++it;
+                    }
+                    ++m;
+                    idx_val = m < res.end_ndx ? indexes.get(m) : std::numeric_limits<int64_t>::max();
+                }
+            }
+            if (keep != result.end()) {
+                result.erase(keep, result.end());
+            }
+        }
+        else if (res1 == FindRes_single) {
+            // exclude single res
+            ObjKey key(res.payload);
+            auto pos = std::lower_bound(result.begin(), result.end(), key);
+            if (pos != result.end() && key == *pos) {
+                result.erase(pos);
             }
         }
     }

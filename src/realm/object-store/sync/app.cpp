@@ -22,11 +22,16 @@
 #include <realm/sync/network/http.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/flat_map.hpp>
+#include <realm/util/platform_info.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/object-store/sync/app_utils.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
+
+#ifdef __EMSCRIPTEN__
+#include <realm/object-store/sync/impl/emscripten/network_transport.hpp>
+#endif
 
 #include <sstream>
 #include <string>
@@ -183,6 +188,29 @@ std::mutex s_apps_mutex;
 namespace realm {
 namespace app {
 
+App::Config::DeviceInfo::DeviceInfo()
+    : platform(util::get_library_platform())
+    , cpu_arch(util::get_library_cpu_arch())
+    , core_version(REALM_VERSION_STRING)
+{
+}
+
+App::Config::DeviceInfo::DeviceInfo(std::string a_platform_version, std::string an_sdk_version, std::string an_sdk,
+                                    std::string a_device_name, std::string a_device_version,
+                                    std::string a_framework_name, std::string a_framework_version,
+                                    std::string a_bundle_id)
+    : DeviceInfo()
+{
+    platform_version = a_platform_version;
+    sdk_version = an_sdk_version;
+    sdk = an_sdk;
+    device_name = a_device_name;
+    device_version = a_device_version;
+    framework_name = a_framework_name;
+    framework_version = a_framework_version;
+    bundle_id = a_bundle_id;
+}
+
 SharedApp App::get_shared_app(const Config& config, const SyncClientConfig& sync_client_config)
 {
     std::lock_guard<std::mutex> lock(s_apps_mutex);
@@ -240,22 +268,24 @@ App::App(const Config& config)
     , m_auth_route(m_app_route + auth_path)
     , m_request_timeout_ms(m_config.default_request_timeout_ms.value_or(default_timeout_ms))
 {
-    REALM_ASSERT(m_config.transport);
-
-    if (m_config.device_info.platform.empty()) {
-        throw InvalidArgument("You must specify the Platform in App::Config::device");
+#ifdef __EMSCRIPTEN__
+    if (!m_config.transport) {
+        m_config.transport = std::make_shared<_impl::EmscriptenNetworkTransport>();
     }
+#endif
+    REALM_ASSERT(m_config.transport);
+    REALM_ASSERT(!m_config.device_info.platform.empty());
 
     if (m_config.device_info.platform_version.empty()) {
-        throw InvalidArgument("You must specify the Platform Version in App::Config::device");
+        throw InvalidArgument("You must specify the Platform Version in App::Config::device_info");
     }
 
     if (m_config.device_info.sdk.empty()) {
-        throw InvalidArgument("You must specify the SDK Name in App::Config::device");
+        throw InvalidArgument("You must specify the SDK Name in App::Config::device_info");
     }
 
     if (m_config.device_info.sdk_version.empty()) {
-        throw InvalidArgument("You must specify the SDK Version in App::Config::device");
+        throw InvalidArgument("You must specify the SDK Version in App::Config::device_info");
     }
 
     // change the scheme in the base url to ws from http to satisfy the sync client
@@ -583,7 +613,7 @@ void App::attach_auth_options(BsonDocument& body)
 
     log_debug("App: version info: platform: %1  version: %2 - sdk: %3 - sdk version: %4 - core version: %5",
               m_config.device_info.platform, m_config.device_info.platform_version, m_config.device_info.sdk,
-              m_config.device_info.sdk_version, REALM_VERSION_STRING);
+              m_config.device_info.sdk_version, m_config.device_info.core_version);
     options["appId"] = m_config.app_id;
     options["platform"] = m_config.device_info.platform;
     options["platformVersion"] = m_config.device_info.platform_version;
@@ -594,7 +624,8 @@ void App::attach_auth_options(BsonDocument& body)
     options["deviceVersion"] = m_config.device_info.device_version;
     options["frameworkName"] = m_config.device_info.framework_name;
     options["frameworkVersion"] = m_config.device_info.framework_version;
-    options["coreVersion"] = REALM_VERSION_STRING;
+    options["coreVersion"] = m_config.device_info.core_version;
+    options["bundleId"] = m_config.device_info.bundle_id;
 
     body["options"] = BsonDocument({{"device", options}});
 }

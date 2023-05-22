@@ -2495,7 +2495,9 @@ TEST(Table_Nulls)
 // This triggers a severe bug in the Array::alloc() allocator in which its capacity-doubling
 // scheme forgets to test of the doubling has overflowed the maximum allowed size of an
 // array which is 2^24 - 1 bytes
-TEST(Table_AllocatorCapacityBug)
+// NONCONCURRENT because if run in parallel with other tests which request large amounts of
+// memory, there may be a std::bad_alloc on low memory machines
+NONCONCURRENT_TEST(Table_AllocatorCapacityBug)
 {
     std::unique_ptr<char[]> buf(new char[20000000]);
 

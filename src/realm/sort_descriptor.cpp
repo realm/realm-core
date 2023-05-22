@@ -190,9 +190,7 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_li
         m_columns.emplace_back(tables.back(), columns.back(), ascending[i]);
 
         auto& translated_keys = m_columns.back().translated_keys;
-        auto& is_null = m_columns.back().is_null;
         translated_keys.resize(translated_size);
-        is_null.resize(translated_size);
 
         for (const auto& index : indexes) {
             size_t index_in_view = index.index_in_view;
@@ -200,11 +198,11 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_li
             for (size_t j = 0; j + 1 < sz; ++j) {
                 const Obj obj = tables[j]->get_object(translated_key);
                 // type was checked when creating the ColumnsDescriptor
-                if (obj.is_null(columns[j])) {
-                    is_null[index_in_view] = true;
+                translated_key = obj.get<ObjKey>(columns[j]);
+                if (!translated_key || translated_key.is_unresolved()) {
+                    translated_key = null_key; // normalize unresolve to null
                     break;
                 }
-                translated_key = obj.get<ObjKey>(columns[j]);
             }
             translated_keys[index_in_view] = translated_key;
         }
@@ -298,9 +296,15 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
     // identical, then the rows are ordered according to the second column, and so forth. For the
     // first column, all the payload of the View is cached in IndexPair::cached_value.
     for (size_t t = 0; t < m_columns.size(); t++) {
+        ObjKey key_i = i.key_for_object;
+        ObjKey key_j = j.key_for_object;
+
         if (!m_columns[t].translated_keys.empty()) {
-            bool null_i = m_columns[t].is_null[i.index_in_view];
-            bool null_j = m_columns[t].is_null[j.index_in_view];
+            key_i = m_columns[t].translated_keys[i.index_in_view];
+            key_j = m_columns[t].translated_keys[j.index_in_view];
+
+            bool null_i = !key_i;
+            bool null_j = !key_j;
 
             if (null_i && null_j) {
                 continue;
@@ -319,13 +323,6 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
         else {
             if (m_cache[t - 1].empty()) {
                 m_cache[t - 1].resize(256);
-            }
-            ObjKey key_i = i.key_for_object;
-            ObjKey key_j = j.key_for_object;
-
-            if (!m_columns[t].translated_keys.empty()) {
-                key_i = m_columns[t].translated_keys[i.index_in_view];
-                key_j = m_columns[t].translated_keys[j.index_in_view];
             }
             ObjCache& cache_i = m_cache[t - 1][key_i.value & 0xFF];
             ObjCache& cache_j = m_cache[t - 1][key_j.value & 0xFF];
@@ -364,12 +361,10 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
         ObjKey key = index.key_for_object;
 
         if (!col.translated_keys.empty()) {
-            if (col.is_null[i]) {
+            key = col.translated_keys[v[i].index_in_view];
+            if (!key) {
                 index.cached_value = Mixed();
                 continue;
-            }
-            else {
-                key = col.translated_keys[v[i].index_in_view];
             }
         }
 

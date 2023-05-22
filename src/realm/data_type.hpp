@@ -21,6 +21,7 @@
 
 #include <stdint.h>
 #include <realm/util/to_string.hpp>
+#include <realm/util/features.h>
 
 namespace realm {
 
@@ -157,6 +158,7 @@ static constexpr DataType type_TypeOfValue = DataType{18};
 static constexpr DataType type_List = DataType{19};
 static constexpr DataType type_Set = DataType{20};
 static constexpr DataType type_Dictionary = DataType{21};
+static constexpr DataType type_Geospatial = DataType{22};
 
 constexpr inline DataType::operator util::Printable() const noexcept
 {
@@ -207,6 +209,9 @@ constexpr inline DataType::operator util::Printable() const noexcept
     }
     if (*this == type_Dictionary) {
         return "type_Dictionary";
+    }
+    if (*this == type_Geospatial) {
+        return "type_Geospatial";
     }
     return "type_UNKNOWN";
 }

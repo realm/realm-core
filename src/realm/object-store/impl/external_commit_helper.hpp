@@ -27,6 +27,8 @@
 #include <realm/object-store/impl/epoll/external_commit_helper.hpp>
 #elif defined(_WIN32)
 #include <realm/object-store/impl/windows/external_commit_helper.hpp>
+#elif defined(__EMSCRIPTEN__)
+#include <realm/object-store/impl/emscripten/external_commit_helper.hpp>
 #else
 #warning "The GenericExternalCommitHelper has been selected. Notifications won't be delivered properly"
 #include <realm/object-store/impl/generic/external_commit_helper.hpp>

@@ -883,12 +883,20 @@ static sync::Session::Config::ClientReset make_client_reset_config(RealmConfig s
 
     session_config.sync_config = std::make_shared<SyncConfig>(*session_config.sync_config); // deep copy
     session_config.scheduler = nullptr;
+    auto make_frozen_config = [](RealmConfig config) {
+        // Opening without using any explicit schema implies that we will use whatever is on disk without making any
+        // schema changes. Otherwise we may hit a schema error if we are in a client reset when opening a Realm that
+        // has additional tables in the schema config than the one on disk. This may happen in an async open.
+        config.schema.reset();
+        return config;
+    };
     if (session_config.sync_config->notify_after_client_reset) {
-        config.notify_after_client_reset = [config = session_config](VersionID previous_version, bool did_recover) {
+        config.notify_after_client_reset = [config = session_config, &make_frozen_config](VersionID previous_version,
+                                                                                          bool did_recover) {
             auto local_coordinator = RealmCoordinator::get_coordinator(config);
             REALM_ASSERT(local_coordinator);
             ThreadSafeReference active_after = local_coordinator->get_unbound_realm();
-            SharedRealm frozen_before = local_coordinator->get_realm(config, previous_version);
+            SharedRealm frozen_before = local_coordinator->get_realm(make_frozen_config(config), previous_version);
             REALM_ASSERT(frozen_before);
             REALM_ASSERT(frozen_before->is_frozen());
             config.sync_config->notify_after_client_reset(std::move(frozen_before), std::move(active_after),
@@ -896,8 +904,9 @@ static sync::Session::Config::ClientReset make_client_reset_config(RealmConfig s
         };
     }
     if (session_config.sync_config->notify_before_client_reset) {
-        config.notify_before_client_reset = [config = session_config](VersionID version) {
-            config.sync_config->notify_before_client_reset(Realm::get_frozen_realm(config, version));
+        config.notify_before_client_reset = [config = session_config, &make_frozen_config](VersionID version) {
+            config.sync_config->notify_before_client_reset(
+                Realm::get_frozen_realm(make_frozen_config(config), version));
         };
     }
 
@@ -1334,6 +1343,15 @@ sync::SaltedFileIdent SyncSession::get_file_ident() const
     sync::SyncProgress unused_progress;
     static_cast<sync::ClientReplication*>(repl)->get_history().get_status(unused_version, ret, unused_progress);
     return ret;
+}
+
+std::string SyncSession::get_appservices_connection_id() const
+{
+    util::CheckedLockGuard lk(m_state_mutex);
+    if (!m_session) {
+        return {};
+    }
+    return m_session->get_appservices_connection_id();
 }
 
 void SyncSession::update_configuration(SyncConfig new_config)

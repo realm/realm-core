@@ -190,17 +190,6 @@ public:
         return get_table()->get_column_name(get_col_key());
     }
 
-    bool operator==(const CollectionBase& other) const noexcept
-    {
-        return get_table() == other.get_table() && get_owner_key() == other.get_owner_key() &&
-               get_col_key() == other.get_col_key();
-    }
-
-    bool operator!=(const CollectionBase& other) const noexcept
-    {
-        return !(*this == other);
-    }
-
 protected:
     friend class Transaction;
     CollectionBase() noexcept = default;
@@ -476,6 +465,17 @@ public:
     using Interface::get_owner_key;
     using Interface::get_table;
     using Interface::get_target_table;
+
+    bool operator==(const CollectionBaseImpl& other) const noexcept
+    {
+        return get_table() == other.get_table() && get_owner_key() == other.get_owner_key() &&
+               get_col_key() == other.get_col_key();
+    }
+
+    bool operator!=(const CollectionBaseImpl& other) const noexcept
+    {
+        return !(*this == other);
+    }
 
 protected:
     Obj m_obj_mem;

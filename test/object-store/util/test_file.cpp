@@ -287,16 +287,12 @@ void set_app_config_defaults(app::App::Config& app_config,
 {
     if (!app_config.transport)
         app_config.transport = transport;
-    if (app_config.device_info.platform.empty())
-        app_config.device_info.platform = "Object Store Test Platform";
     if (app_config.device_info.platform_version.empty())
         app_config.device_info.platform_version = "Object Store Test Platform Version";
     if (app_config.device_info.sdk_version.empty())
         app_config.device_info.sdk_version = "SDK Version";
     if (app_config.device_info.sdk.empty())
         app_config.device_info.sdk = "SDK Name";
-    if (app_config.device_info.cpu_arch.empty())
-        app_config.device_info.cpu_arch = "CPU Arch";
     if (app_config.device_info.device_name.empty())
         app_config.device_info.device_name = "Device Name";
     if (app_config.device_info.device_version.empty())
@@ -305,6 +301,8 @@ void set_app_config_defaults(app::App::Config& app_config,
         app_config.device_info.framework_name = "Framework Name";
     if (app_config.device_info.framework_version.empty())
         app_config.device_info.framework_version = "Framework Version";
+    if (app_config.device_info.bundle_id.empty())
+        app_config.device_info.bundle_id = "Bundle Id";
     if (app_config.app_id.empty())
         app_config.app_id = "app_id";
     if (!app_config.local_app_version)
@@ -389,8 +387,11 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     if (config.override_sync_route) {
         m_app->sync_manager()->set_sync_route(m_sync_server.base_url() + "/realm-sync");
     }
-    // initialize sync client
-    m_app->sync_manager()->get_sync_client();
+
+    if (config.start_sync_client) {
+        // initialize sync client
+        m_app->sync_manager()->get_sync_client();
+    }
 }
 
 TestSyncManager::~TestSyncManager()

@@ -219,6 +219,7 @@ public:
         realm::util::Logger::Level log_level = realm::util::Logger::Level::TEST_LOGGING_LEVEL;
         bool override_sync_route = true;
         std::shared_ptr<realm::app::GenericNetworkTransport> transport;
+        bool start_sync_client = true;
     };
 
     TestSyncManager(realm::SyncManager::MetadataMode mode);

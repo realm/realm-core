@@ -30,6 +30,10 @@
 #include "realm/object-store/impl/realm_coordinator.hpp"
 #include "realm/object-store/schema.hpp"
 #include "realm/object-store/sync/generic_network_transport.hpp"
+#include <realm/object-store/sync/mongo_client.hpp>
+#include <realm/object-store/sync/mongo_database.hpp>
+#include <realm/object-store/sync/mongo_collection.hpp>
+#include <realm/object-store/util/bson/bson.hpp>
 #include "realm/object-store/sync/sync_session.hpp"
 #include "realm/object_id.hpp"
 #include "realm/query_expression.hpp"
@@ -1220,6 +1224,197 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
     }
 }
 
+#if REALM_ENABLE_GEOSPATIAL
+TEST_CASE("flx: geospatial", "[sync][flx][app]") {
+    static std::optional<FLXSyncTestHarness> harness;
+    if (!harness) {
+        Schema schema{
+            {"restaurant",
+             {
+                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                 {"queryable_str_field", PropertyType::String},
+                 {"location", PropertyType::Object | PropertyType::Nullable, "geoPointType"},
+                 {"array", PropertyType::Object | PropertyType::Array, "geoPointType"},
+             }},
+            {"geoPointType",
+             ObjectSchema::ObjectType::Embedded,
+             {
+                 {"type", PropertyType::String},
+                 {"coordinates", PropertyType::Double | PropertyType::Array},
+             }},
+        };
+        FLXSyncTestHarness::ServerSchema server_schema{schema, {"queryable_str_field"}};
+        harness.emplace("flx_geospatial", server_schema);
+    }
+
+    auto create_subscription = [](SharedRealm realm, StringData table_name, StringData column_name, auto make_query) {
+        auto table = realm->read_group().get_table(table_name);
+        auto queryable_field = table->get_column_key(column_name);
+        auto new_query = realm->get_active_subscription_set().make_mutable_copy();
+        new_query.insert_or_assign(make_query(Query(table), queryable_field));
+        return new_query.commit();
+    };
+
+    // TODO: when this test starts failing because the server implements the new
+    // syntax, then we should implement an actual geospatial FLX query test here
+    /*
+    auto check_failed_status = [](auto status) {
+        CHECK(!status.is_ok());
+        if (status.get_status().reason().find("Client provided query with bad syntax:") == std::string::npos ||
+            status.get_status().reason().find("\"restaurant\": syntax error") == std::string::npos) {
+            FAIL(status.get_status().reason());
+        }
+    };
+
+    SECTION("Server doesn't support GEOWITHIN yet") {
+        harness->do_with_new_realm([&](SharedRealm realm) {
+            auto subs = create_subscription(realm, "class_restaurant", "location", [](Query q, ColKey c) {
+                GeoBox area{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}};
+                return q.get_table()->column<Link>(c).geo_within(area);
+            });
+            auto sub_res = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
+            check_failed_status(sub_res);
+            CHECK(realm->get_active_subscription_set().version() == 0);
+            CHECK(realm->get_latest_subscription_set().version() == 1);
+        });
+    }
+     */
+
+    SECTION("non-geospatial FLX query syncs data which can be queried locally") {
+        harness->do_with_new_realm([&](SharedRealm realm) {
+            auto subs = create_subscription(realm, "class_restaurant", "queryable_str_field", [](Query q, ColKey c) {
+                return q.equal(c, "synced");
+            });
+            auto make_polygon_filter = [&](const GeoPolygon& polygon) -> bson::BsonDocument {
+                bson::BsonArray inner{};
+                REALM_ASSERT_3(polygon.points.size(), ==, 1);
+                for (auto& point : polygon.points[0]) {
+                    inner.push_back(bson::BsonArray{point.longitude, point.latitude});
+                }
+                bson::BsonArray coords;
+                coords.push_back(inner);
+                bson::BsonDocument geo_bson{{{"type", "Polygon"}, {"coordinates", coords}}};
+                bson::BsonDocument filter{
+                    {"location", bson::BsonDocument{{"$geoWithin", bson::BsonDocument{{"$geometry", geo_bson}}}}}};
+                return filter;
+            };
+            auto make_circle_filter = [&](const GeoCircle& circle) -> bson::BsonDocument {
+                bson::BsonArray coords{circle.center.longitude, circle.center.latitude};
+                bson::BsonArray inner;
+                inner.push_back(coords);
+                inner.push_back(circle.radius_radians);
+                bson::BsonDocument filter{
+                    {"location", bson::BsonDocument{{"$geoWithin", bson::BsonDocument{{"$centerSphere", inner}}}}}};
+                return filter;
+            };
+            auto run_query_on_server = [&](const bson::BsonDocument& filter,
+                                           std::optional<std::string> expected_error = {}) -> size_t {
+                auto remote_client = harness->app()->current_user()->mongo_client("BackingDB");
+                auto db = remote_client.db(harness->session().app_session().config.mongo_dbname);
+                auto restaurant_collection = db["restaurant"];
+                bool processed = false;
+                constexpr int64_t limit = 1000;
+                size_t matches = 0;
+                restaurant_collection.count(filter, limit, [&](uint64_t count, util::Optional<AppError> error) {
+                    processed = true;
+                    if (error) {
+                        if (!expected_error) {
+                            util::format(std::cout, "query error: %1\n", error->reason());
+                            FAIL(error);
+                        }
+                        else {
+                            std::string_view reason = error->reason();
+                            auto pos = reason.find(*expected_error);
+                            if (pos == std::string::npos) {
+                                util::format(std::cout, "mismatch error: '%1' and '%2'\n", reason, *expected_error);
+                                FAIL(reason);
+                            }
+                        }
+                    }
+                    matches = size_t(count);
+                });
+                REQUIRE(processed);
+                return matches;
+            };
+            auto sub_res = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
+            CHECK(sub_res.is_ok());
+            CHECK(realm->get_active_subscription_set().version() == 1);
+            CHECK(realm->get_latest_subscription_set().version() == 1);
+
+            realm->begin_transaction();
+
+            CppContext c(realm);
+            int64_t pk = 0;
+            auto add_point = [&](GeoPoint p) {
+                Object::create(
+                    c, realm, "restaurant",
+                    std::any(AnyDict{
+                        {"_id", ++pk},
+                        {"queryable_str_field", "synced"s},
+                        {"location", AnyDict{{"type", "Point"s},
+                                             {"coordinates", std::vector<std::any>{p.longitude, p.latitude}}}}}));
+            };
+            std::vector<GeoPoint> points = {
+                GeoPoint{-74.006, 40.712800000000001}, GeoPoint{12.568300000000001, 55.676099999999998},
+                GeoPoint{12.082599999999999, 55.628}, GeoPoint{-180.1, -90.1}, // invalid
+            };
+            for (auto& point : points) {
+                add_point(point);
+            }
+            realm->commit_transaction();
+            wait_for_upload(*realm);
+
+            {
+                auto table = realm->read_group().get_table("class_restaurant");
+                CHECK(table->size() == points.size());
+                Obj obj = table->get_object_with_primary_key(Mixed{1});
+                REQUIRE(obj);
+                Geospatial geo = obj.get<Geospatial>("location");
+                REQUIRE(geo.get_type_string() == "Point");
+                REQUIRE(geo.get_type() == Geospatial::Type::Point);
+                GeoPoint point = geo.get<GeoPoint>();
+                REQUIRE(point.longitude == points[0].longitude);
+                REQUIRE(point.latitude == points[0].latitude);
+                REQUIRE(!point.get_altitude());
+                ColKey location_col = table->get_column_key("location");
+                GeoPolygon bounds{
+                    {GeoPoint{-80, 40.7128}, GeoPoint{20, 60}, GeoPoint{20, 20}, GeoPoint{-80, 40.7128}}};
+                Query query = table->column<Link>(location_col).geo_within(Geospatial(bounds));
+                size_t local_matches = query.find_all().size();
+                REQUIRE(local_matches == 2);
+
+                reset_utils::wait_for_object_to_persist_to_atlas(
+                    harness->app()->current_user(), harness->session().app_session(), "restaurant", {{"_id", pk}});
+
+                bson::BsonDocument filter = make_polygon_filter(bounds);
+                size_t server_results = run_query_on_server(filter);
+                CHECK(server_results == local_matches);
+
+                GeoCircle circle = GeoCircle::from_kms(10, GeoPoint{-180.1, -90.1});
+                CHECK_THROWS_WITH(table->column<Link>(location_col).geo_within(circle).count(),
+                                  "Invalid region in GEOWITHIN query for parameter 'GeoCircle([-180.1, -90.1], "
+                                  "0.00156787)': 'Longitude/latitude is out of bounds, lng: -180.1 lat: -90.1'");
+                filter = make_circle_filter(circle);
+                run_query_on_server(filter, "(BadValue) longitude/latitude is out of bounds");
+
+                circle = GeoCircle::from_kms(-1, GeoPoint{0, 0});
+                CHECK_THROWS_WITH(table->column<Link>(location_col).geo_within(circle).count(),
+                                  "Invalid region in GEOWITHIN query for parameter 'GeoCircle([0, 0], "
+                                  "-0.000156787)': 'The radius of a circle must be a non-negative number'");
+                filter = make_circle_filter(circle);
+                run_query_on_server(filter, "(BadValue) radius must be a non-negative number");
+            }
+        });
+    }
+
+    // Add new sections before this
+    SECTION("teardown") {
+        harness->app()->sync_manager()->wait_for_sessions_to_terminate();
+        harness.reset();
+    }
+}
+#endif // REALM_ENABLE_GEOSPATIAL
+
 TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bootstrap_batching", {g_large_array_schema, {"queryable_int_field"}});
 
@@ -1591,7 +1786,7 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
 TEST_CASE("flx: verify PBS/FLX websocket protocol number and prefixes", "[sync][flx]") {
     // Update the expected value whenever the protocol version is updated - this ensures
     // that the current protocol version does not change unexpectedly.
-    REQUIRE(8 == sync::get_current_protocol_version());
+    REQUIRE(9 == sync::get_current_protocol_version());
     // This was updated in Protocol V8 to use '#' instead of '/' to support the Web SDK
     REQUIRE("com.mongodb.realm-sync#" == sync::get_pbs_websocket_protocol_prefix());
     REQUIRE("com.mongodb.realm-query-sync#" == sync::get_flx_websocket_protocol_prefix());

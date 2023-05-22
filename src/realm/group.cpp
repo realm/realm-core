@@ -905,6 +905,14 @@ Obj Group::get_object(ObjLink link)
     return ct->get(key);
 }
 
+Obj Group::try_get_object(ObjLink link) noexcept
+{
+    auto target_table = get_table(link.get_table_key());
+    ObjKey key = link.get_obj_key();
+    ClusterTree* ct = key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+    return ct->try_get_obj(key);
+}
+
 void Group::validate(ObjLink link) const
 {
     if (auto tk = link.get_table_key()) {

@@ -73,9 +73,14 @@ std::string LinkMap::description(util::serializer::SerialisationState& state) co
     return s;
 }
 
-void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
+bool LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction lm) const
 {
-    bool last = (column + 1 == m_link_column_keys.size());
+    if (!key || key.is_unresolved())
+        return true;
+    if (column == m_link_column_keys.size()) {
+        return lm(key);
+    }
+
     ColumnType type = m_link_types[column];
     ColKey column_key = m_link_column_keys[column];
     const Obj obj = m_tables[column]->get_object(key);
@@ -83,39 +88,24 @@ void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
         auto coll = obj.get_linkcollection_ptr(column_key);
         size_t sz = coll->size();
         for (size_t t = 0; t < sz; t++) {
-            if (ObjKey k = coll->get_key(t)) {
-                // Unresolved links are filtered out
-                if (last) {
-                    lm.consume(k);
-                }
-                else
-                    map_links(column + 1, k, lm);
-            }
+            if (!map_links(column + 1, coll->get_key(t), lm))
+                return false;
         }
     }
     else if (type == col_type_Link) {
-        if (ObjKey k = obj.get<ObjKey>(column_key)) {
-            if (!k.is_unresolved()) {
-                if (last)
-                    lm.consume(k);
-                else
-                    map_links(column + 1, k, lm);
-            }
-        }
+        return map_links(column + 1, obj.get<ObjKey>(column_key), lm);
     }
     else if (type == col_type_BackLink) {
         auto backlinks = obj.get_all_backlinks(column_key);
         for (auto k : backlinks) {
-            if (last) {
-                lm.consume(k);
-            }
-            else
-                map_links(column + 1, k, lm);
+            if (!map_links(column + 1, k, lm))
+                return false;
         }
     }
     else {
-        REALM_ASSERT(false);
+        REALM_TERMINATE("Invalid column type in LinkMap::map_links()");
     }
+    return true;
 }
 
 ref_type LinkMap::get_ref(const ArrayPayload* array_payload, ColumnType type, size_t row)
@@ -125,11 +115,10 @@ ref_type LinkMap::get_ref(const ArrayPayload* array_payload, ColumnType type, si
     return static_cast<const ArrayKey*>(array_payload)->get_as_ref(row);
 }
 
-void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
+void LinkMap::map_links(size_t column, size_t row, LinkMapFunction lm) const
 {
     REALM_ASSERT(m_leaf_ptr != nullptr);
 
-    bool last = (column + 1 == m_link_column_keys.size());
     ColumnType type = m_link_types[column];
     ColKey column_key = m_link_column_keys[column];
     if (type == col_type_Link && !column_key.is_set()) {
@@ -145,37 +134,20 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
                 values.init_from_parent();
 
                 // Iterate through values and insert all link values
-                values.traverse([&](BPlusTreeNode* node, size_t) {
-                    auto bplustree_leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
-                    auto sz = bplustree_leaf->size();
-                    for (size_t i = 0; i < sz; i++) {
-                        auto m = bplustree_leaf->get(i);
-                        if (m.is_type(type_TypedLink)) {
-                            auto link = m.get_link();
-                            REALM_ASSERT(link.get_table_key() == this->m_tables[column + 1]->get_key());
-                            auto k = link.get_obj_key();
-                            if (!k.is_unresolved()) {
-                                if (last)
-                                    lm.consume(k);
-                                else
-                                    map_links(column + 1, k, lm);
-                            }
-                        }
+                values.for_all([&](Mixed m) {
+                    if (m.is_type(type_TypedLink)) {
+                        auto link = m.get_link();
+                        REALM_ASSERT(link.get_table_key() == this->m_tables[column + 1]->get_key());
+                        if (!map_links(column + 1, link.get_obj_key(), lm))
+                            return false;
                     }
-                    return IteratorControl::AdvanceToNext;
+                    return true;
                 });
             }
         }
         else {
             REALM_ASSERT(!column_key.is_collection());
-            if (ObjKey k = static_cast<const ArrayKey*>(m_leaf_ptr)->get(row)) {
-                if (!k.is_unresolved()) {
-                    if (last)
-                        lm.consume(k);
-                    else
-                        map_links(column + 1, k, lm);
-                }
-            }
+            map_links(column + 1, static_cast<const ArrayKey*>(m_leaf_ptr)->get(row), lm);
         }
     }
     else if (type == col_type_LinkList || (type == col_type_Link && column_key.is_set())) {
@@ -184,16 +156,8 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
             links.init_from_ref(ref);
             size_t sz = links.size();
             for (size_t t = 0; t < sz; t++) {
-                ObjKey k = links.get(t);
-                if (!k.is_unresolved()) {
-                    if (last) {
-                        if (!lm.consume(k)) {
-                            return;
-                        }
-                    }
-                    else
-                        map_links(column + 1, k, lm);
-                }
+                if (!map_links(column + 1, links.get(t), lm))
+                    break;
             }
         }
     }
@@ -202,13 +166,8 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
         size_t sz = back_links->get_backlink_count(row);
         for (size_t t = 0; t < sz; t++) {
             ObjKey k = back_links->get_backlink(row, t);
-            if (last) {
-                bool continue2 = lm.consume(k);
-                if (!continue2)
-                    return;
-            }
-            else
-                map_links(column + 1, k, lm);
+            if (!map_links(column + 1, k, lm))
+                break;
         }
     }
     else {
@@ -334,14 +293,9 @@ void ColumnDictionaryKeys::evaluate(size_t index, ValueBase& destination)
             destination.init(true, keys.size());
             size_t n = 0;
             // Iterate through BPlusTree and insert all keys
-            keys.traverse([&](BPlusTreeNode* node, size_t) {
-                auto bplustree_leaf = static_cast<BPlusTree<StringData>::LeafNode*>(node);
-                auto sz = bplustree_leaf->size();
-                for (size_t i = 0; i < sz; i++) {
-                    destination.set(n, bplustree_leaf->get(i));
-                    n++;
-                }
-                return IteratorControl::AdvanceToNext;
+            keys.for_all([&](StringData str) {
+                destination.set(n, str);
+                n++;
             });
         }
     }
@@ -478,14 +432,9 @@ void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
             destination.init(true, values.size());
             size_t n = 0;
             // Iterate through BPlusTreee and insert all values
-            values.traverse([&](BPlusTreeNode* node, size_t) {
-                auto bplustree_leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
-                auto sz = bplustree_leaf->size();
-                for (size_t i = 0; i < sz; i++) {
-                    destination.set(n, bplustree_leaf->get(i));
-                    n++;
-                }
-                return IteratorControl::AdvanceToNext;
+            values.for_all([&](Mixed val) {
+                destination.set(n, val);
+                n++;
             });
         }
     }

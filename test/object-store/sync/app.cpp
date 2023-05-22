@@ -45,6 +45,7 @@
 #include <realm/util/base64.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/overload.hpp>
+#include <realm/util/platform_info.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/sync/network/websocket.hpp>
 
@@ -3612,16 +3613,17 @@ private:
               nlohmann::json({{"device",
                                {{"appId", "app_id"},
                                 {"appVersion", "A Local App Version"},
-                                {"platform", "Object Store Test Platform"},
+                                {"platform", util::get_library_platform()},
                                 {"platformVersion", "Object Store Test Platform Version"},
                                 {"sdk", "SDK Name"},
                                 {"sdkVersion", "SDK Version"},
-                                {"cpuArch", "CPU Arch"},
+                                {"cpuArch", util::get_library_cpu_arch()},
                                 {"deviceName", "Device Name"},
                                 {"deviceVersion", "Device Version"},
                                 {"frameworkName", "Framework Name"},
                                 {"frameworkVersion", "Framework Version"},
-                                {"coreVersion", REALM_VERSION_STRING}}}}));
+                                {"coreVersion", REALM_VERSION_STRING},
+                                {"bundleId", "Bundle Id"}}}}));
 
         CHECK(request.timeout_ms == 60000);
 
