@@ -583,6 +583,58 @@ void Spec::verify() const
 #endif
 }
 
+// Alternate unordered map
+struct trie_node {
+    uint64_t mask = 0;
+    // individual entries follows here - exact number equal to set bits in mask
+    uint64_t entries[1];
+    static trie_node* make(int n)
+    {
+        auto res = reinterpret_cast<trie_node*>(new uint64_t[1 + n]);
+        res->mask = 1ULL << (n & 0x3F);
+        return res;
+    }
+    void release()
+    {
+        int size = __builtin_popcountll(mask);
+        uint64_t* ptr = reinterpret_cast<uint64_t*>(this);
+        delete[] ptr;
+    }
+};
+
+uint64_t trie_search(trie_node* root, uint64_t key)
+{
+    if (!root)
+        return 0;
+    uint64_t mask = 1ULL << (key & 0x3F);
+    if (mask & root->mask == 0)
+        return 0;
+    uint64_t mask_below = root->mask & (mask - 1);
+    int idx = __builtin_popcountll(mask_below);
+    uint64_t res = root->entries[1 + idx];
+    if (res & 1)
+        return res >> 1;
+    trie_node* child = reinterpret_cast<trie_node*>(res);
+    return trie_search(child, key >> 6);
+}
+
+trie_node* trie_add(trie_node* root, uint64_t key, uint64_t value)
+{
+    if (!root) {
+        // new entry needed
+        root = reinterpret_cast<trie_node*>(new uint64_t[2]);
+        root->mask = 1ULL << (key & 0x3F);
+    }
+    // new or existing entry?
+    uint64_t mask = 1ULL << (key & 0x3F);
+    bool existing = mask & root->mask;
+    if (!existing) {
+        // not yet, make it so
+        int entries = __builtin_popcountll(root->mask);
+        uint64_t mask_below = root->mask & (mask - 1);
+        trie_node* new_root =
+    }
+}
 // Code for pair compression integrated with interning:
 // ----------
 // Compression is done by first expanding 8-bit chars to 16-bit symbols.
@@ -784,6 +836,7 @@ public:
         int size = value.size();
         const char* _past = value.data() + size;
         total_chars += size;
+        auto old_size = size;
 #if INTERN_ONLY
         std::string s(_first, _past);
         auto it = string_map.find(s);
@@ -801,7 +854,6 @@ public:
 #if COMPRESS_BEFORE_INTERNING
         size = compress(symbol_buffer, _first, _past);
         decompress_and_verify(symbol_buffer, size, _first, _past);
-
         std::vector<uint16_t> symbol(size);
         for (int j = 0; j < size; ++j)
             symbol[j] = symbol_buffer[j];
@@ -810,7 +862,10 @@ public:
             auto id = symbols.size();
             symbols.push_back(symbol);
             symbol_map[symbol] = id;
-            unique_symbol_size += 2 * size;
+            if (old_size < size * 2) // pretend storing uncompressed string if smaller
+                unique_symbol_size += old_size;
+            else
+                unique_symbol_size += 2 * size;
             return id;
         }
         else {
@@ -854,22 +909,37 @@ public:
         return symbols.size();
 #endif
     }
-    void dump_interning_stats()
+    void get_interning_stats(size_t& _total_chars, size_t& _unique, size_t& _dict_size)
     {
-        std::cout << " Interning " << total_chars << " bytes of input strings into " << num_unique_values()
-                  << " unique strings in " << unique_symbol_size << " bytes" << std::endl;
+        _total_chars = total_chars;
+        _unique = num_unique_values();
+        _dict_size = unique_symbol_size;
     }
 };
 
 void Spec::dump_interning_stats()
 {
+    size_t total_total_chars = 0;
+    size_t total_unique = 0;
+    size_t total_dict_size = 0;
     for (auto col = 0UL; col < m_interners.size(); ++col) {
         auto& e = m_interners[col];
         if (e) {
+            size_t total_chars;
+            size_t unique;
+            size_t dict_size;
+            e->get_interning_stats(total_chars, unique, dict_size);
             std::cout << "Column " << col;
-            e->dump_interning_stats();
+            std::cout << " Interning " << total_chars << " bytes of input strings into " << unique
+                      << " unique strings in " << dict_size << " bytes" << std::endl;
+            total_total_chars += total_chars;
+            total_unique += unique;
+            total_dict_size += dict_size;
         }
     }
+    std::cout << "Total: ";
+    std::cout << " Interning " << total_total_chars << " bytes of input strings into " << total_unique
+              << " unique strings in " << total_dict_size << " bytes" << std::endl;
 }
 
 
