@@ -68,6 +68,11 @@ const specOption = program
   .argParser((arg, previous: ReadonlyArray<string> = []) => [...previous, parseExistingFilePath(arg)])
   .makeOptionMandatory();
 
+/**
+ * If provided, methods and fields in the opt-in list that are accessed by
+ * the SDK's `generate()` function will have a property `isOptedInTo = true`,
+ * otherwise it will be set to `false`.
+ */
 const optInOption = program
   .createOption("--opt-in <opt-in list>", "Path of the 'opt-in list' specification")
   .argParser(parseExistingFilePath);
