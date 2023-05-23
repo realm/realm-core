@@ -114,6 +114,16 @@ struct encoding_entry {
     uint16_t symbol = 0; // unused symbol 0.
 };
 
+struct big_encoding_entry {
+    uint32_t exp_a;
+    uint32_t exp_b;
+};
+
+bool operator==(const big_encoding_entry& a, const big_encoding_entry& b)
+{
+    return a.exp_a == b.exp_a && a.exp_b == b.exp_b;
+}
+
 int hash(uint16_t a, uint16_t b)
 {
     // range of return value must match size of encoding table
@@ -121,6 +131,65 @@ int hash(uint16_t a, uint16_t b)
     tmp *= b + 7;
     return (tmp ^ (tmp >> 16)) & 0xFFFF;
 }
+
+int big_hash(uint32_t a, uint32_t b) {}
+template <>
+struct std::hash<big_encoding_entry> {
+    std::size_t operator()(const big_encoding_entry& c) const noexcept
+    {
+        uint64_t tmp = c.exp_a + 3;
+        tmp *= c.exp_b + 7;
+        return tmp ^ (tmp >> 32);
+    }
+};
+
+#define COMPRESS_ONLY 1
+#if COMPRESS_ONLY
+class string_compressor {
+public:
+    std::vector<big_encoding_entry> decoding_table;
+    std::vector<int> symbols; // dummy
+    std::unordered_map<big_encoding_entry, uint32_t> encoding_map;
+    uint32_t symbol_buffer[8192];
+    int64_t total_chars = 0;
+    int64_t compressed_symbols = 0;
+    int64_t unique_symbol_size = 0;
+
+    int handle(const char* _first, const char* _past)
+    {
+        size_t size = _past - _first;
+        if (!size)
+            return 0;
+        total_chars += size;
+        // expand to larger symbols:
+        for (int i = 0; i < size; ++i) {
+            symbol_buffer[i] = ((uint32_t)_first[i]) & 0xFF;
+        }
+        // compress iteratively:
+        while (size > 1) {
+            for (int i = 0; i < size - 1; i += 2) {
+                big_encoding_entry e{symbol_buffer[i], symbol_buffer[i + 1]};
+                auto it = encoding_map.find(e);
+                if (it == encoding_map.end()) {
+                    decoding_table.push_back(e);
+                    auto id = decoding_table.size() + 255;
+                    encoding_map[e] = id;
+                    symbol_buffer[i / 2] = id;
+                }
+                else {
+                    symbol_buffer[i / 2] = it->second;
+                }
+            }
+            size /= 2;
+        }
+        return symbol_buffer[0];
+    }
+    int symbol_table_size()
+    {
+        return decoding_table.size();
+    }
+};
+#else
 #define COMPRESS_BEFORE_INTERNING 1
 
 class string_compressor {
@@ -324,6 +393,7 @@ public:
     int64_t compressed_symbols = 0;
     int64_t unique_symbol_size = 0;
 };
+#endif
 
 // controls
 #define USE_UNALIGNED 0
