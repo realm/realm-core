@@ -288,8 +288,9 @@ class CApiUnitTestTransport : public app::GenericNetworkTransport {
     std::string m_provider_type;
 
 public:
-    CApiUnitTestTransport(const std::string& provider_type = "anon-user")
-        : m_provider_type(provider_type)
+    CApiUnitTestTransport(const std::string& provider_type = {}, uint64_t request_timeout = 60000)
+        : m_provider_type(provider_type.empty() ? "anon-user" : provider_type)
+        , request_timeout(request_timeout)
     {
         profile_0 = nlohmann::json({{"name", "profile_0_name"},
                                     {"first_name", "profile_0_first_name"},
@@ -300,6 +301,11 @@ public:
                                     {"birthday", "profile_0_birthday"},
                                     {"min_age", "profile_0_min_age"},
                                     {"max_age", "profile_0_max_age"}});
+    }
+
+    explicit CApiUnitTestTransport(const uint64_t request_timeout)
+        : CApiUnitTestTransport({}, request_timeout)
+    {
     }
 
     void set_provider_type(const std::string& provider_type)
@@ -316,6 +322,7 @@ public:
     const std::string identity_0_id = "eflkjf393flkj33fjf3";
     const std::string identity_1_id = "aewfjklewfwoifejjef";
     nlohmann::json profile_0;
+    uint64_t request_timeout;
 
 
 private:
@@ -355,7 +362,7 @@ private:
                                 {"coreVersion", REALM_VERSION_STRING},
                                 {"bundleId", "some_bundle_id"}}}}));
 
-        CHECK(request.timeout_ms == 60000);
+        CHECK(request.timeout_ms == request_timeout);
 
         std::string response = nlohmann::json({{"access_token", access_token},
                                                {"refresh_token", access_token},
@@ -614,7 +621,9 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
 #if REALM_ENABLE_AUTH_TESTS
     SECTION("realm_app_config_t") {
-        std::shared_ptr<app::GenericNetworkTransport> transport = std::make_shared<CApiUnitTestTransport>();
+        const uint64_t request_timeout = 2500;
+        std::shared_ptr<app::GenericNetworkTransport> transport =
+            std::make_shared<CApiUnitTestTransport>(request_timeout);
         auto http_transport = realm_http_transport(transport);
         auto app_config = cptr(realm_app_config_new("app_id_123", &http_transport));
         CHECK(app_config.get() != nullptr);
@@ -630,8 +639,8 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_app_config_set_local_app_version(app_config.get(), "some_app_version");
         CHECK(app_config->local_app_version == "some_app_version");
 
-        realm_app_config_set_default_request_timeout(app_config.get(), 2500);
-        CHECK(app_config->default_request_timeout_ms == 2500);
+        realm_app_config_set_default_request_timeout(app_config.get(), request_timeout);
+        CHECK(app_config->default_request_timeout_ms == request_timeout);
 
         realm_app_config_set_platform_version(app_config.get(), "some_platform_version");
         CHECK(app_config->device_info.platform_version == "some_platform_version");
