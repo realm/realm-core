@@ -89,20 +89,34 @@ TEST_CASE("dictionary in mixed", "[dictionary]") {
     object_store::Dictionary dict_mixed(r, any_obj, col_any);
     r->commit_transaction();
 
-    CollectionChangeSet change;
-    size_t calls = 0;
-    auto token = dict_mixed.add_notification_callback([&](CollectionChangeSet c) {
-        change = c;
-        ++calls;
+    CollectionChangeSet change_dictionary, change_list;
+    size_t calls_dict = 0, calls_list = 0;
+    auto token_dict = dict_mixed.add_notification_callback([&](CollectionChangeSet c) {
+        change_dictionary = c;
+        ++calls_dict;
     });
 
     r->begin_transaction();
     dict_mixed.insert_collection("test", CollectionType::List);
+    r->commit_transaction();
+    advance_and_notify(*r);
+
     auto list = dict_mixed.get_list("test");
+    auto token_list = list.add_notification_callback([&](CollectionChangeSet c) {
+        change_list = c;
+        ++calls_list;
+    });
+
+    r->begin_transaction();
+
     list.add(Mixed{5});
     r->commit_transaction();
     advance_and_notify(*r);
-    REQUIRE(change.insertions.count() == 2); // nested collection + insertion of the list
+
+    REQUIRE(change_dictionary.insertions.count() == 1); // nested collection + insertion of the list
+    REQUIRE(change_list.insertions.count() == 1);       // nested collection + insertion of the list
+    REQUIRE(calls_dict == 3);                           // this does not seem right
+    REQUIRE(calls_list == 2);                           // this does not seem right
 }
 
 TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,

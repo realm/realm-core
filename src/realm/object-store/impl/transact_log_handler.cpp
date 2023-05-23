@@ -331,6 +331,7 @@ class TransactLogObserver : public TransactLogValidationMixin {
     _impl::TransactionChangeInfo& m_info;
     _impl::CollectionChangeBuilder* m_active_collection = nullptr;
     ObjectChangeSet* m_active_table = nullptr;
+    std::vector<PathElement> m_path;
 
 public:
     TransactLogObserver(_impl::TransactionChangeInfo& info)
@@ -368,6 +369,7 @@ public:
         auto table = current_table();
         // FIXME: select collection needs to account for path?
         for (auto& c : m_info.collections) {
+
             if (c.table_key == table && c.obj_key == obj && c.col_key == col) {
                 m_active_collection = c.changes;
                 return true;
