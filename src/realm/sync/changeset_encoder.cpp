@@ -101,6 +101,8 @@ void ChangesetEncoder::append_value(const Instruction::Payload& payload)
         }
         case Type::Erased:
             [[fallthrough]];
+        case Type::List:
+            [[fallthrough]];
         case Type::Dictionary:
             [[fallthrough]];
         case Type::ObjectValue:

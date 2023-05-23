@@ -143,6 +143,8 @@ Instruction::Payload::Type State::read_payload_type()
             [[fallthrough]];
         case Type::Erased:
             [[fallthrough]];
+        case Type::List:
+            [[fallthrough]];
         case Type::Dictionary:
             [[fallthrough]];
         case Type::ObjectValue:
@@ -252,6 +254,8 @@ Instruction::Payload State::read_payload()
         }
 
         case Type::Null:
+            [[fallthrough]];
+        case Type::List:
             [[fallthrough]];
         case Type::Dictionary:
             [[fallthrough]];
