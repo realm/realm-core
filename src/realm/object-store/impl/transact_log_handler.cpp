@@ -366,7 +366,7 @@ public:
     {
         modify_object(col, obj);
         auto table = current_table();
-        // FIXME
+        // FIXME: select collection needs to account for path?
         for (auto& c : m_info.collections) {
             if (c.table_key == table && c.obj_key == obj && c.col_key == col) {
                 m_active_collection = c.changes;

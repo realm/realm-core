@@ -63,6 +63,48 @@ struct StringMaker<object_store::Dictionary> {
 
 namespace cf = realm::collection_fixtures;
 
+TEST_CASE("dictionary in mixed", "[dictionary]") {
+
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{
+        {"any_collection",
+         {{"any", PropertyType::Mixed | PropertyType::Nullable}}}, // to use for testing nested collection in mixed
+        {"object",
+         {{"value", PropertyType::Dictionary | PropertyType::Mixed | PropertyType::Nullable},
+          {"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
+        {"target",
+         {{"value", PropertyType::Int}, {"self_link", PropertyType::Object | PropertyType::Nullable, "target"}}},
+        {"source", {{"link", PropertyType::Object | PropertyType::Nullable, "object"}}}};
+
+    auto r = Realm::get_shared_realm(config);
+
+    auto table_any = r->read_group().get_table("class_any_collection");
+    r->begin_transaction();
+
+    Obj any_obj = table_any->create_object();
+    ColKey col_any = table_any->get_column_key("any");
+    any_obj.set_collection(col_any, CollectionType::Dictionary);
+    object_store::Dictionary dict_mixed(r, any_obj, col_any);
+    r->commit_transaction();
+
+    CollectionChangeSet change;
+    size_t calls = 0;
+    auto token = dict_mixed.add_notification_callback([&](CollectionChangeSet c) {
+        change = c;
+        ++calls;
+    });
+
+    r->begin_transaction();
+    dict_mixed.insert_collection("test", CollectionType::List);
+    auto list = dict_mixed.get_list("test");
+    list.add(Mixed{5});
+    r->commit_transaction();
+    advance_and_notify(*r);
+    REQUIRE(change.insertions.count() == 2); // nested collection + insertion of the list
+}
+
 TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,
                    cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID, cf::BoxedOptional<cf::Int>,
                    cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>, cf::BoxedOptional<cf::Double>,
