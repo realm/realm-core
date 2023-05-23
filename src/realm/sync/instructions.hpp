@@ -84,14 +84,14 @@ using PrimaryKey = mpark::variant<mpark::monostate, int64_t, GlobalKey, InternSt
 struct Path {
     using Element = mpark::variant<InternString, uint32_t>;
 
-    // FIXME: Use a "small_vector" type for this -- most paths are very short.
-    // Alternatively, we could use some kind of interning with copy-on-write,
-    // but that seems complicated.
-    std::vector<Element> m_path;
-
     size_t size() const noexcept
     {
         return m_path.size();
+    }
+
+    void reserve(size_t sz)
+    {
+        m_path.reserve(sz);
     }
 
     // If this path is referring to an element of an array (the last path
@@ -142,6 +142,11 @@ struct Path {
         m_path.push_back(element);
     }
 
+    void clear()
+    {
+        m_path.clear();
+    }
+
     friend bool operator==(const Path& lhs, const Path& rhs) noexcept
     {
         return lhs.m_path == rhs.m_path;
@@ -156,6 +161,12 @@ struct Path {
     {
         return m_path.end();
     }
+
+private:
+    // FIXME: Use a "small_vector" type for this -- most paths are very short.
+    // Alternatively, we could use some kind of interning with copy-on-write,
+    // but that seems complicated.
+    std::vector<Element> m_path;
 };
 
 struct Payload {

@@ -163,8 +163,8 @@ void ChangesetEncoder::append_value(const Instruction::PrimaryKey& pk)
 
 void ChangesetEncoder::append_value(const Instruction::Path& path)
 {
-    append_value(uint32_t(path.m_path.size()));
-    for (auto& element : path.m_path) {
+    append_value(uint32_t(path.size()));
+    for (auto& element : path) {
         // Integer path elements are encoded as their integer values.
         // String path elements are encoded as [-1, intern_string_id].
         if (auto index = mpark::get_if<uint32_t>(&element)) {

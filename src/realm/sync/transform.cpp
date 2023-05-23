@@ -160,15 +160,15 @@ struct TransformerImpl::Side {
         instr.table = adopt_string(other_side, other.table);
         instr.object = adopt_key(other_side, other.object);
         instr.field = adopt_string(other_side, other.field);
-        instr.path.m_path.clear();
-        instr.path.m_path.reserve(other.path.size());
-        for (auto& element : other.path.m_path) {
+        instr.path.clear();
+        instr.path.reserve(other.path.size());
+        for (auto& element : other.path) {
             auto push = util::overload{
                 [&](uint32_t index) {
-                    instr.path.m_path.push_back(index);
+                    instr.path.push_back(index);
                 },
                 [&](InternString str) {
-                    instr.path.m_path.push_back(adopt_string(other_side, str));
+                    instr.path.push_back(adopt_string(other_side, str));
                 },
             };
             mpark::visit(push, element);
