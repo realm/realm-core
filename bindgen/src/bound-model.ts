@@ -263,7 +263,11 @@ export type MethodCallSig = ({ self }: { self: string }, ...args: string[]) => s
 
 export abstract class Method {
   isConstructor = false;
-  /** Whether this method is opted in to by the consumer/SDK. */
+  /**
+   * Whether this method is opted in to by the consumer/SDK.
+   * For this to be true you must pass an opt-in list to the
+   * binding generator and call `BoundSpec.applyOptInList()`.
+   */
   isOptedInTo = false;
   abstract isStatic: boolean;
   constructor(
@@ -524,6 +528,29 @@ export class BoundSpec {
   opaqueTypes: Opaque[] = [];
   mixedInfo!: MixedInfo;
   types: Record<string, Type> = {};
+  optInSpec?: OptInSpec;
+
+  /**
+   * Marks methods and fields in the opt-in list as `isOptedInTo` which the
+   * consumer/SDK then can choose to handle accordingly.
+   */
+  applyOptInList() {
+    for (const [clsName, clsRaw] of Object.entries(this.optInSpec?.classes ?? {})) {
+      const boundClass = this.types[clsName];
+      assert(boundClass instanceof Class);
+      for (const methodName of clsRaw.methods) {
+        boundClass.getMethod(methodName).isOptedInTo = true;
+      }
+    }
+
+    for (const [structName, structRaw] of Object.entries(this.optInSpec?.records ?? {})) {
+      const boundStruct = this.types[structName];
+      assert(boundStruct instanceof Struct);
+      for (const fieldName of structRaw.fields) {
+        boundStruct.getField(fieldName).isOptedInTo = true;
+      }
+    }
+  }
 }
 
 type MixedInfo = {
@@ -537,6 +564,7 @@ export function bindModel(spec: Spec, optInSpec?: OptInSpec): BoundSpec {
   const rootClasses: Class[] = [];
 
   const out = new BoundSpec();
+  out.optInSpec = optInSpec;
 
   function addType<T extends Type>(name: string, type: T | (new (name: string) => T)) {
     assert(!(name in out.types));
@@ -720,25 +748,6 @@ export function bindModel(spec: Spec, optInSpec?: OptInSpec): BoundSpec {
       .map((t) => out.types[t])
       .concat(Object.values(spec.mixedInfo.dataTypes).map(({ type }) => out.types[type])),
   };
-
-  // Mark methods and fields in the opt-in list as `isOptedInTo` which the consumer/SDK
-  // then can choose to handle accordingly.
-
-  for (const [optInClassName, optInRaw] of Object.entries(optInSpec?.classes ?? {})) {
-    const boundClass = out.types[optInClassName];
-    assert(boundClass instanceof Class);
-    for (const optInMethodName of optInRaw.methods) {
-      boundClass.getMethod(optInMethodName).isOptedInTo = true;
-    }
-  }
-
-  for (const [optInStructName, optInRaw] of Object.entries(optInSpec?.records ?? {})) {
-    const boundStruct = out.types[optInStructName];
-    assert(boundStruct instanceof Struct);
-    for (const optInFieldName of optInRaw.fields) {
-      boundStruct.getField(optInFieldName).isOptedInTo = true;
-    }
-  }
 
   return out;
 }
