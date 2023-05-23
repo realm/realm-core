@@ -882,9 +882,11 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
     std::string route;
 
     {
-        std::lock_guard<std::mutex> lock(*m_route_mutex);
+        std::unique_lock<std::mutex> lock(*m_route_mutex);
+        // Skip if the app_metadata/location data has already been initialized and a new hostname is not provided
         if (!new_hostname && m_location_updated) {
-            // Skip if the app_metadata/location data has already been initialized and a new hostname is not provided
+            // Release the lock before calling the completion function
+            lock.unlock();
             return completion(util::none); // early return
         }
         else {
