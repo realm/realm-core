@@ -624,6 +624,7 @@ public:
     }
 
     Mixed get_arg_for_index(std::string);
+    double get_arg_for_coordinate(std::string);
 
     template <class T>
     Query simple_query(int op, ColKey col_key, T val, bool case_sensitive);

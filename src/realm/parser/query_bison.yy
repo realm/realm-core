@@ -251,6 +251,7 @@ subquery
 coordinate
     : FLOAT         { $$ = strtod($1.c_str(), nullptr); }
     | NATURAL0      { $$ = double(strtoll($1.c_str(), nullptr, 0)); }
+    | ARG           { $$ = drv.get_arg_for_coordinate($1); }
 
 geopoint
     : '[' coordinate ',' coordinate ']' { $$ = GeoPoint{$2, $4}; }

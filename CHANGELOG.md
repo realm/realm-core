@@ -6,6 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Allow numeric substitutions into a geospatial query. Example `location GEOWITHIN geoCircle([$0, $1], $2)`. ([#6662](https://github.com/realm/realm-core/issues/6662))
 * Access token refresh for websockets was not updating the location metadata ([#6630](https://github.com/realm/realm-core/issues/6630), since v13.9.3)
 
 ### Breaking changes
