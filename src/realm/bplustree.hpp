@@ -526,6 +526,27 @@ public:
         m_root->bptree_traverse(func);
     }
 
+    template <typename Func>
+    void for_all(Func&& callback) const
+    {
+        using Ret = std::invoke_result_t<Func, T>;
+        m_root->bptree_traverse([&callback](BPlusTreeNode* node, size_t) {
+            LeafNode* leaf = static_cast<LeafNode*>(node);
+            size_t sz = leaf->size();
+            for (size_t i = 0; i < sz; i++) {
+                if constexpr (std::is_same_v<Ret, void>) {
+                    callback(leaf->get(i));
+                }
+                else {
+                    if (!callback(leaf->get(i)))
+                        return IteratorControl::Stop;
+                }
+            }
+            return IteratorControl::AdvanceToNext;
+        });
+    }
+
+
     void dump_values(std::ostream& o, int level) const
     {
         std::string indent(" ", level * 2);

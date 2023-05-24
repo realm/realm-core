@@ -1,8 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This pre-commit hook prevents us from creating commits that contains ill-formatted files
 
-VIOLATING_FILES=$(git clang-format --diff | grep "\-\-\- a/" | sed 's!\-\-\- a/!!')
+VIOLATING_FILES=$(git clang-format --staged --diff | grep "\-\-\- a/" | sed 's!\-\-\- a/!!')
 
 if [ "${VIOLATING_FILES}" ]; then
   echo "Commit violates formatting rules"
@@ -10,6 +10,6 @@ if [ "${VIOLATING_FILES}" ]; then
 	for i in ${VIOLATING_FILES}; do
 	  echo "   " $i
   done
-  echo "run 'git clang-format'"
+  echo "run 'git clang-format --staged'"
   exit 1
 fi

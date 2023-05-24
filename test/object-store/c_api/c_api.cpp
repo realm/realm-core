@@ -288,8 +288,9 @@ class CApiUnitTestTransport : public app::GenericNetworkTransport {
     std::string m_provider_type;
 
 public:
-    CApiUnitTestTransport(const std::string& provider_type = "anon-user")
-        : m_provider_type(provider_type)
+    CApiUnitTestTransport(const std::string& provider_type = {}, uint64_t request_timeout = 60000)
+        : m_provider_type(provider_type.empty() ? "anon-user" : provider_type)
+        , request_timeout(request_timeout)
     {
         profile_0 = nlohmann::json({{"name", "profile_0_name"},
                                     {"first_name", "profile_0_first_name"},
@@ -300,6 +301,11 @@ public:
                                     {"birthday", "profile_0_birthday"},
                                     {"min_age", "profile_0_min_age"},
                                     {"max_age", "profile_0_max_age"}});
+    }
+
+    explicit CApiUnitTestTransport(const uint64_t request_timeout)
+        : CApiUnitTestTransport({}, request_timeout)
+    {
     }
 
     void set_provider_type(const std::string& provider_type)
@@ -316,6 +322,7 @@ public:
     const std::string identity_0_id = "eflkjf393flkj33fjf3";
     const std::string identity_1_id = "aewfjklewfwoifejjef";
     nlohmann::json profile_0;
+    uint64_t request_timeout;
 
 
 private:
@@ -343,18 +350,19 @@ private:
               nlohmann::json({{"device",
                                {{"appId", "app_id_123"},
                                 {"appVersion", "some_app_version"},
-                                {"platform", "some_platform_name"},
+                                {"platform", util::get_library_platform()},
                                 {"platformVersion", "some_platform_version"},
                                 {"sdk", "some_sdk_name"},
                                 {"sdkVersion", "some_sdk_version"},
-                                {"cpuArch", "some_cpu_arch"},
+                                {"cpuArch", util::get_library_cpu_arch()},
                                 {"deviceName", "some_device_name"},
                                 {"deviceVersion", "some_device_version"},
                                 {"frameworkName", "some_framework_name"},
                                 {"frameworkVersion", "some_framework_version"},
-                                {"coreVersion", REALM_VERSION_STRING}}}}));
+                                {"coreVersion", REALM_VERSION_STRING},
+                                {"bundleId", "some_bundle_id"}}}}));
 
-        CHECK(request.timeout_ms == 60000);
+        CHECK(request.timeout_ms == request_timeout);
 
         std::string response = nlohmann::json({{"access_token", access_token},
                                                {"refresh_token", access_token},
@@ -613,7 +621,9 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
 #if REALM_ENABLE_AUTH_TESTS
     SECTION("realm_app_config_t") {
-        std::shared_ptr<app::GenericNetworkTransport> transport = std::make_shared<CApiUnitTestTransport>();
+        const uint64_t request_timeout = 2500;
+        std::shared_ptr<app::GenericNetworkTransport> transport =
+            std::make_shared<CApiUnitTestTransport>(request_timeout);
         auto http_transport = realm_http_transport(transport);
         auto app_config = cptr(realm_app_config_new("app_id_123", &http_transport));
         CHECK(app_config.get() != nullptr);
@@ -629,11 +639,8 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_app_config_set_local_app_version(app_config.get(), "some_app_version");
         CHECK(app_config->local_app_version == "some_app_version");
 
-        realm_app_config_set_default_request_timeout(app_config.get(), 2500);
-        CHECK(app_config->default_request_timeout_ms == 2500);
-
-        realm_app_config_set_platform(app_config.get(), "some_platform_name");
-        CHECK(app_config->device_info.platform == "some_platform_name");
+        realm_app_config_set_default_request_timeout(app_config.get(), request_timeout);
+        CHECK(app_config->default_request_timeout_ms == request_timeout);
 
         realm_app_config_set_platform_version(app_config.get(), "some_platform_version");
         CHECK(app_config->device_info.platform_version == "some_platform_version");
@@ -643,9 +650,6 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
         realm_app_config_set_sdk(app_config.get(), "some_sdk_name");
         CHECK(app_config->device_info.sdk == "some_sdk_name");
-
-        realm_app_config_set_cpu_arch(app_config.get(), "some_cpu_arch");
-        CHECK(app_config->device_info.cpu_arch == "some_cpu_arch");
 
         realm_app_config_set_device_name(app_config.get(), "some_device_name");
         CHECK(app_config->device_info.device_name == "some_device_name");
@@ -658,6 +662,9 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
         realm_app_config_set_framework_version(app_config.get(), "some_framework_version");
         CHECK(app_config->device_info.framework_version == "some_framework_version");
+
+        realm_app_config_set_bundle_id(app_config.get(), "some_bundle_id");
+        CHECK(app_config->device_info.bundle_id == "some_bundle_id");
 
         auto test_app = std::make_shared<app::App>(*app_config);
         auto credentials = app::AppCredentials::anonymous();
@@ -2566,6 +2573,51 @@ TEST_CASE("C API", "[c_api]") {
                     bool valid;
                     CHECK(checked(realm_results_is_valid(r.get(), &valid)));
                     CHECK(valid);
+                }
+
+                SECTION("realm_results_is_valid delete objects") {
+                    write([&] {
+                        realm_object_delete(obj1.get());
+                        realm_object_delete(obj2.get());
+                        realm_results_delete_all(r.get());
+                    });
+                    bool valid;
+                    CHECK(checked(realm_results_is_valid(r.get(), &valid)));
+                    CHECK(valid);
+                }
+
+                SECTION("realm_results_is_valid delete collection") {
+                    auto strings = cptr_checked(realm_get_list(obj2.get(), bar_strings_key));
+                    CHECK(strings);
+                    CHECK(!realm_is_frozen(strings.get()));
+
+                    realm_value_t a = rlm_str_val("a");
+                    realm_value_t b = rlm_str_val("b");
+                    realm_value_t c = rlm_null();
+
+                    write([&] {
+                        CHECK(checked(realm_list_insert(strings.get(), 0, a)));
+                        CHECK(checked(realm_list_insert(strings.get(), 1, b)));
+                        CHECK(checked(realm_list_insert(strings.get(), 2, c)));
+                    });
+                    bool valid;
+                    auto results = cptr_checked(realm_list_to_results(strings.get()));
+                    CHECK(checked(realm_results_is_valid(results.get(), &valid)));
+                    CHECK(valid);
+
+                    write([&] {
+                        CHECK(checked(realm_object_delete(obj2.get())));
+                    });
+
+                    CHECK(checked(realm_results_is_valid(results.get(), &valid)));
+                    CHECK_FALSE(valid);
+                    size_t count;
+
+                    CHECK_FALSE(realm_results_count(results.get(), &count));
+                    CHECK_ERR(RLM_ERR_STALE_ACCESSOR);
+
+                    CHECK_FALSE(realm_results_resolve_in(results.get(), realm));
+                    CHECK_ERR(RLM_ERR_STALE_ACCESSOR);
                 }
 
                 SECTION("realm_results_count()") {
@@ -5595,6 +5647,7 @@ TEST_CASE("app: flx-sync compensating writes C API support", "[c_api][flx][sync]
     FLXSyncTestHarness harness("c_api_comp_writes");
     create_user_and_log_in(harness.app());
     SyncTestFile test_config(harness.app()->current_user(), harness.schema(), realm::SyncConfig::FLXSyncEnabled{});
+    test_config.sync_config = std::make_shared<realm_sync_config_t>(*test_config.sync_config);
     realm_sync_config_t* sync_config = static_cast<realm_sync_config_t*>(test_config.sync_config.get());
 
     struct TestState {

@@ -36,7 +36,6 @@
 
 #include <realm/db.hpp>
 #include <realm/group.hpp>
-#include <realm/query_engine.hpp>
 #include <realm/query_expression.hpp>
 
 #if REALM_ENABLE_SYNC

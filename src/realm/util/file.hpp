@@ -31,6 +31,7 @@
 #include <Windows.h>
 #else
 #include <dirent.h> // POSIX.1-2001
+#include <sys/stat.h>
 #endif
 
 #include <realm/utilities.hpp>

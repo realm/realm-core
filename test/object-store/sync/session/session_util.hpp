@@ -92,6 +92,11 @@ inline void spin_runloop(int count = 2)
     });
 }
 
+inline std::string conn_id_for_realm(const SharedRealm& realm)
+{
+    return SyncSession::OnlyForTesting::get_appservices_connection_id(*realm->sync_session());
+}
+
 // Convenience function for creating and configuring sync sessions for test use.
 // Many of the optional arguments can be used to pass information about the
 // session back out to the test, or configure the session more precisely.

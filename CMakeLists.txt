@@ -44,8 +44,6 @@ elseif(APPLE)
     set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 endif()
 
-# Sets/clears the {FLAG} variable if the compiler flag is supported or not
-# The compiler flag check is only performed once and the value is cached as the out variable name
 function(check_if_cxx_compiler_flag_supported flag out_var)
     if(flag MATCHES "^-Wno-")
         # Compilers ignore unknown -Wno-foo flags, so look for -Wfoo instead.
@@ -58,8 +56,8 @@ function(check_if_cxx_compiler_flag_supported flag out_var)
 endfunction()
 
 function(add_cxx_flag_if_supported flag)
-    check_if_cxx_compiler_flag_supported(${flag} HAVE${flag})
-    if(HAVE${flag})
+    check_if_cxx_compiler_flag_supported(${flag} HAVE_${flag})
+    if(HAVE_${flag})
         add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${flag}>)
     endif()
 endfunction()
@@ -87,6 +85,15 @@ function(append_source_file_compile_options)
                     set_source_files_properties(${SRC_} PROPERTIES COMPILE_OPTIONS "${OLD_OPTS};${FLAG_}")
                 endif()
             endforeach()
+        endif()
+    endforeach()
+endfunction()
+
+function(add_target_option_if_supported target option_scope)
+    foreach(option ${ARGN})
+        check_if_cxx_compiler_flag_supported(${option} HAVE_${option})
+        if(HAVE_${option})
+            target_compile_options(${target} ${option_scope} ${option})
         endif()
     endforeach()
 endfunction()
@@ -125,7 +132,7 @@ else()
     if(ANDROID)
         add_compile_options(-Wno-uninitialized)
     elseif(${CMAKE_CXX_COMPILER_ID} MATCHES ".*[Cc]lang")
-        # FIXME: Re-introduce -Wold-style-cast 
+        # FIXME: Re-introduce -Wold-style-cast
         add_compile_options(-Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation -Wthread-safety -Wthread-safety-negative -Wmissing-prototypes)
     endif()
 
@@ -162,8 +169,15 @@ if(ANDROID)
     # - `-fomit-frame-pointer` is inherited from NDK r10e.
     # - On some architectures char is unsigned by default. Make it signed
     # - Compile with -Oz in Release because on Android we favor code size over performance
-    # 
+    #
     add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes $<$<CONFIG:Release>:-Oz>)
+endif()
+
+if(EMSCRIPTEN AND NOT REALM_CORE_SUBMODULE_BUILD)
+    add_compile_options(-fwasm-exceptions)
+    add_link_options(-fwasm-exceptions -sALLOW_MEMORY_GROWTH=1)
+    set(CMAKE_EXECUTABLE_SUFFIX ".html")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --emrun")
 endif()
 
 set(CMAKE_DEBUG_POSTFIX "-dbg")
@@ -230,24 +244,20 @@ if(UNIX)
     check_symbol_exists(readdir64 "dirent.h" REALM_HAVE_READDIR64)
 endif()
 
-if (NOT APPLE)
-    set(REALM_INCLUDE_CERTS_DEFAULT ON)
-else()
-    set(REALM_INCLUDE_CERTS_DEFAULT OFF)
-endif()
-
 # Options (passed to CMake)
 option(REALM_ENABLE_SYNC "Enable synchronized realms." ON)
 option(REALM_BUILD_TEST_CLIENT "Build the test client" OFF)
 option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode." OFF)
 option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations." OFF)
-option(REALM_ENABLE_ENCRYPTION "Enable encryption." ON)
+if(NOT EMSCRIPTEN)
+    option(REALM_ENABLE_ENCRYPTION "Enable encryption." ON)
+endif()
 option(REALM_ENABLE_MEMDEBUG "Add additional memory checks" OFF)
 option(REALM_VALGRIND "Tell the test suite we are running with valgrind" OFF)
 option(REALM_METRICS "Enable various metric tracking" ON)
-option(REALM_INCLUDE_CERTS "Include a list of trust certificates in the build for SSL certificate verification" ${REALM_INCLUDE_CERTS_DEFAULT})
-option(REALM_ENABLE_SYNC_MULTIPLEXING "Enables sync session multi-plexing by default")
+option(REALM_SYNC_MULTIPLEXING "Enables/disables sync session multiplexing by default" ON)
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
+option(REALM_ENABLE_GEOSPATIAL "Enable geospatial types and queries." ON)
 
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -257,6 +267,9 @@ if(REALM_ENABLE_SYNC)
     option(REALM_FORCE_OPENSSL "Always use OpenSSL for SSL needs, regardless of target platform." OFF)
     if(CMAKE_SYSTEM_NAME MATCHES "^Windows|Linux|Android")
         set(REALM_NEEDS_OPENSSL TRUE)
+    endif()
+    if(REALM_NEEDS_OPENSSL OR REALM_FORCE_OPENSSL)
+        option(REALM_INCLUDE_CERTS "Include a list of trust certificates in the build for OpenSSL certificate verification" ON)
     endif()
 elseif(REALM_ENABLE_ENCRYPTION AND CMAKE_SYSTEM_NAME MATCHES "Linux|Android")
     set(REALM_NEEDS_OPENSSL TRUE)
@@ -282,7 +295,8 @@ endif()
 # Don't use find_library(ZLIB) on Apple platforms - it hardcodes the path per platform,
 # so for an iOS build it'll use the path from the Device plaform, which is an error on Simulator.
 # Just use -lz and let Xcode figure it out
-if(NOT APPLE AND NOT TARGET ZLIB::ZLIB)
+# Emscripten does provide Zlib, but it doesn't work with find_package and is handled specially
+if(NOT APPLE AND NOT EMSCRIPTEN AND NOT TARGET ZLIB::ZLIB)
     if(WIN32)
         realm_acquire_dependency(zlib ${DEP_WIN32_ZLIB_VERSION} ZLIB_CMAKE_INCLUDE_FILE)
         include(${ZLIB_CMAKE_INCLUDE_FILE})
