@@ -363,7 +363,7 @@ public:
         return true;
     }
 
-    bool select_collection(ColKey col, ObjKey obj, const std::vector<PathElement>&)
+    bool select_collection(ColKey col, ObjKey obj, const std::vector<PathElement>& path)
     {
         modify_object(col, obj);
         auto table = current_table();
