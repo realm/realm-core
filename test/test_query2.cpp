@@ -5619,7 +5619,8 @@ TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
     std::string bin2str_truncated = str2bin_lowered.substr(0, 10);
     tv = (origin->link(col_links).column<Mixed>(col_any).contains(bin2str_truncated, insensitive_match)).find_all();
     CHECK_EQUAL(tv.size(), 0);
-    tv = (origin->link(col_links).column<Mixed>(col_any).contains(BinaryData(bin2str_truncated), insensitive_match)).find_all();
+    tv = (origin->link(col_links).column<Mixed>(col_any).contains(BinaryData(bin2str_truncated), insensitive_match))
+             .find_all();
     CHECK_EQUAL(tv.size(), 1);
     tv = (origin->link(col_links).column<Mixed>(col_any).like("*ring*", insensitive_match)).find_all();
     CHECK_EQUAL(tv.size(), 10);

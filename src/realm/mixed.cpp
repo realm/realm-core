@@ -52,7 +52,7 @@ static const int sorting_rank[] = {
     6,  // type_UUID = 17
     8,  // type_TypeOfValue = 18
     9,  // type_List = 19
-    10,  // type_Set = 20
+    10, // type_Set = 20
     11, // type_Dictionary = 21
 
     // Observe! Changing these values breaks the file format for Set<Mixed>
