@@ -1280,7 +1280,7 @@ TEST_CASE("list") {
     }
 }
 
-TEST_CASE("nested List") {
+TEST_CASE("NICO - nested List") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);

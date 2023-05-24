@@ -47,7 +47,7 @@ private:
     struct ListInfo {
         BindingContext::ObserverState* observer;
         _impl::CollectionChangeBuilder builder;
-        ColKey col;
+        Path path;
     };
     std::vector<ListInfo> m_lists;
     VersionID m_version;
@@ -76,8 +76,10 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
     for (auto& observer : observers) {
         auto table = group.get_table(TableKey(observer.table_key));
         for (auto key : table->get_column_keys()) {
-            if (table->get_column_attr(key).test(col_attr_List))
-                m_lists.push_back({&observer, {}, key});
+            if (table->get_column_attr(key).test(col_attr_List)) {
+                auto obj = table->get_object(observer.obj_key);
+                m_lists.push_back({&observer, {}, obj.get_path().path_from_top});
+            }
         }
     }
 
@@ -85,7 +87,7 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
     for (auto& tbl : tables_needed)
         tables[tbl] = {};
     for (auto& list : m_lists)
-        collections.push_back({list.observer->table_key, list.observer->obj_key, list.col, &list.builder});
+        collections.push_back({list.observer->table_key, list.observer->obj_key, list.path, &list.builder});
 }
 
 void KVOAdapter::before(Transaction& sg)
@@ -121,7 +123,8 @@ void KVOAdapter::before(Transaction& sg)
             // We may have pre-emptively marked the column as modified if the
             // LinkList was selected but the actual changes made ended up being
             // a no-op
-            list.observer->changes.erase(list.col.value);
+            REALM_ASSERT(list.path[0].is_col_key()); // first element in path is always the col_key
+            list.observer->changes.erase(list.path[0].get_col_key().value);
             continue;
         }
         // If the containing row was deleted then changes will be empty
@@ -130,7 +133,8 @@ void KVOAdapter::before(Transaction& sg)
             continue;
         }
         // otherwise the column should have been marked as modified
-        auto it = list.observer->changes.find(list.col.value);
+        REALM_ASSERT(list.path[0].is_col_key()); // first element in path is always the col_key
+        auto it = list.observer->changes.find(list.path[0].get_col_key().value);
         REALM_ASSERT(it != list.observer->changes.end());
         auto& builder = list.builder;
         auto& changes = it->second;
@@ -367,10 +371,9 @@ public:
     {
         modify_object(col, obj);
         auto table = current_table();
-        // FIXME: select collection needs to account for path?
         for (auto& c : m_info.collections) {
 
-            if (c.table_key == table && c.obj_key == obj && c.col_key == col) {
+            if (c.table_key == table && c.obj_key == obj && c.path == path) {
                 m_active_collection = c.changes;
                 return true;
             }

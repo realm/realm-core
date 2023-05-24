@@ -21,6 +21,7 @@
 
 #include <realm/object-store/object_changeset.hpp>
 #include <realm/object-store/impl/collection_change_builder.hpp>
+#include <realm/collection_parent.hpp>
 
 #include <array>
 
@@ -43,7 +44,8 @@ class RealmCoordinator;
 struct CollectionChangeInfo {
     TableKey table_key;
     ObjKey obj_key;
-    ColKey col_key;
+    Path path;
+    // ColKey col_key;
     CollectionChangeBuilder* changes;
 };
 

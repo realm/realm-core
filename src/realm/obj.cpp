@@ -2070,9 +2070,8 @@ CollectionListPtr Obj::get_collection_list(ColKey col_key) const
 CollectionPtr Obj::get_collection_ptr(const Path& path) const
 {
     REALM_ASSERT(path.size() > 0);
-
     // First element in path must be column name
-    auto col_key = m_table->get_column_key(path[0].get_key());
+    auto col_key = path[0].is_col_key() ? path[0].get_col_key() : m_table->get_column_key(path[0].get_key());
     REALM_ASSERT(col_key);
     size_t nesting_levels = m_table->get_nesting_levels(col_key);
     CollectionListPtr list;
