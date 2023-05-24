@@ -35,6 +35,9 @@ std::ostream& operator<<(std::ostream& ostr, const PathElement& elem)
     if (elem.is_ndx()) {
         ostr << elem.get_ndx();
     }
+    else if (elem.is_col_key()) {
+        ostr << elem.get_col_key();
+    }
     else if (elem.is_key()) {
         ostr << "'" << elem.get_key() << "'";
     }
