@@ -263,7 +263,10 @@ inline bool operator<(const StringData& a, const StringData& b) noexcept
         // equal to empty strings.
         return true;
     }
-    return std::lexicographical_compare(a.m_data, a.m_data + a.m_size, b.m_data, b.m_data + b.m_size);
+    using uchar_p = const unsigned char*;
+    return std::lexicographical_compare(
+        reinterpret_cast<uchar_p>(a.m_data), reinterpret_cast<uchar_p>(a.m_data + a.m_size),
+        reinterpret_cast<uchar_p>(b.m_data), reinterpret_cast<uchar_p>(b.m_data + b.m_size));
 }
 
 inline bool operator>(const StringData& a, const StringData& b) noexcept

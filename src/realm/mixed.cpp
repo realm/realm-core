@@ -61,7 +61,7 @@ int compare_string(StringData a, StringData b)
 {
     if (a == b)
         return 0;
-    return utf8_compare(a, b) ? -1 : 1;
+    return a < b ? -1 : 1;
 }
 
 int compare_binary(BinaryData a, BinaryData b)
