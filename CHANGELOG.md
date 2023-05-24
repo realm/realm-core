@@ -20,6 +20,7 @@
 
 ### Internals
 * Simplify the implementation of query expression nodes which have a btree leaf cache.
+* Fix a lock order inversion hit by object store tests running on linux. The cycle required test-specific code and so is not applicable to non-tests.
 
 ----------------------------------------------
 
