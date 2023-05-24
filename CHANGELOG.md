@@ -20,6 +20,7 @@
 
 ### Internals
 * Simplify the implementation of query expression nodes which have a btree leaf cache.
+* Remove catch() clause to prevent truncating stack trace in AsyncOper::do_recycle_and_execute() ([PR #6667](https://github.com/realm/realm-core/pull/6667))
 
 ----------------------------------------------
 
