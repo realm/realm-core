@@ -83,7 +83,7 @@ if(REALM_ASAN)
         message(FATAL_ERROR
                 "The Address Sanitizer is not yet supported on Visual Studio builds")
     else()
-        list(APPEND REALM_SANITIZER_FLAGS -fsanitize=address)
+        list(APPEND REALM_SANITIZER_FLAGS -fsanitize=address -fno-sanitize-recover=all -fsanitize-address-use-after-scope)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O1 -g")
     endif()
 endif()
@@ -97,7 +97,7 @@ if(REALM_TSAN)
         message(FATAL_ERROR
                 "The Thread Sanitizer is not yet supported on Visual Studio builds")
     else()
-        list(APPEND REALM_SANITIZER_FLAGS -fsanitize=thread)
+        list(APPEND REALM_SANITIZER_FLAGS -fsanitize=thread -fno-sanitize-recover=all)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g -fPIE")
         # According to the clang docs, if -fsanitize=thread is specified then compiling
         # and linking with PIE is turned on automatically.
@@ -130,7 +130,7 @@ if(REALM_USAN)
         message(FATAL_ERROR
                 "The Undefined Sanitizer is not yet supported on Visual Studio builds")
     else()
-        list(APPEND REALM_SANITIZER_FLAGS -fsanitize=undefined)
+        list(APPEND REALM_SANITIZER_FLAGS -fsanitize=undefined -fno-sanitize-recover=all)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -O2 -g -fPIE -pie")
     endif()
 endif()

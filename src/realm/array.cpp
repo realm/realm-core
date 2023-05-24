@@ -1168,60 +1168,73 @@ void Array::update_width_cache_from_header() noexcept
 }
 
 // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to
-// exceed array length; in this case, remainder of res[8] will be left untouched.
+// exceed array length; in this case, remainder of res[8] will be be set to 0.
 template <size_t w>
 void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_size);
 
-    // To make Valgrind happy. Todo, I *think* it should work without, now, but if it reappears, add memset again.
-    // memset(res, 0, 8*8);
+    size_t i = 0;
 
-    if (REALM_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
-        // This method is *multiple* times faster than performing 8 times get<w>, even if unrolled. Apparently
-        // compilers
-        // can't figure out to optimize it.
-        uint64_t c;
-        size_t bytealign = ndx / (8 / no0(w));
-        if (w == 1) {
-            c = *reinterpret_cast<uint16_t*>(m_data + bytealign);
-            c >>= (ndx - bytealign * 8) * w;
-        }
-        else if (w == 2) {
-            c = *reinterpret_cast<uint32_t*>(m_data + bytealign);
-            c >>= (ndx - bytealign * 4) * w;
-        }
-        else if (w == 4) {
-            c = *reinterpret_cast<uint64_t*>(m_data + bytealign);
-            c >>= (ndx - bytealign * 2) * w;
-        }
-        uint64_t mask = (w == 64 ? ~0ULL : ((1ULL << (w == 64 ? 0 : w)) - 1ULL));
-        // The '?' is to avoid warnings about shifting too much
-        res[0] = (c >> 0 * (w > 4 ? 0 : w)) & mask;
-        res[1] = (c >> 1 * (w > 4 ? 0 : w)) & mask;
-        res[2] = (c >> 2 * (w > 4 ? 0 : w)) & mask;
-        res[3] = (c >> 3 * (w > 4 ? 0 : w)) & mask;
-        res[4] = (c >> 4 * (w > 4 ? 0 : w)) & mask;
-        res[5] = (c >> 5 * (w > 4 ? 0 : w)) & mask;
-        res[6] = (c >> 6 * (w > 4 ? 0 : w)) & mask;
-        res[7] = (c >> 7 * (w > 4 ? 0 : w)) & mask;
-    }
-    else {
-        size_t i = 0;
-        for (; i + ndx < m_size && i < 8; i++)
-            res[i] = get<w>(ndx + i);
+    // if constexpr to avoid producing spurious warnings resulting from
+    // instantiating for too large w
+    if constexpr (w > 0 && w <= 4) {
+        // Calling get<w>() in a loop results in one load per call to get, but
+        // for w < 8 we can do better than that
+        constexpr size_t elements_per_byte = 8 / w;
 
-        for (; i < 8; i++)
-            res[i] = 0;
+        // Round m_size down to byte granularity as the trailing bits in the last
+        // byte are uninitialized
+        size_t bytes_available = m_size / elements_per_byte;
+
+        // Round start and end to be byte-aligned. Start is rounded down and
+        // end is rounded up as we may read up to 7 unused bits at each end.
+        size_t start = ndx / elements_per_byte;
+        size_t end = std::min(bytes_available, (ndx + 8 + elements_per_byte - 1) / elements_per_byte);
+
+        if (end > start) {
+            // Loop in reverse order because data is stored in little endian order
+            uint64_t c = 0;
+            for (size_t i = end; i > start; --i) {
+                c <<= 8;
+                c += *reinterpret_cast<const uint8_t*>(m_data + i - 1);
+            }
+            // Trim off leading bits which aren't part of the requested range
+            c >>= (ndx - start * elements_per_byte) * w;
+
+            uint64_t mask = (1ULL << w) - 1ULL;
+            res[0] = (c >> 0 * w) & mask;
+            res[1] = (c >> 1 * w) & mask;
+            res[2] = (c >> 2 * w) & mask;
+            res[3] = (c >> 3 * w) & mask;
+            res[4] = (c >> 4 * w) & mask;
+            res[5] = (c >> 5 * w) & mask;
+            res[6] = (c >> 6 * w) & mask;
+            res[7] = (c >> 7 * w) & mask;
+
+            // Read the last few elements via get<w> if needed
+            i = std::min<size_t>(8, end * elements_per_byte - ndx);
+        }
     }
+
+    for (; i + ndx < m_size && i < 8; i++)
+        res[i] = get<w>(ndx + i);
+    for (; i < 8; i++)
+        res[i] = 0;
 
 #ifdef REALM_DEBUG
     for (int j = 0; j + ndx < m_size && j < 8; j++) {
         int64_t expected = get<w>(ndx + j);
-        if (res[j] != expected)
-            REALM_ASSERT(false);
+        REALM_ASSERT(res[j] == expected);
     }
 #endif
+}
+
+template <>
+void Array::get_chunk<0>(size_t ndx, int64_t res[8]) const noexcept
+{
+    REALM_ASSERT_3(ndx, <, m_size);
+    memset(res, 0, sizeof(int64_t) * 8);
 }
 
 

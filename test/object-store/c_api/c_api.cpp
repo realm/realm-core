@@ -5625,6 +5625,7 @@ TEST_CASE("app: flx-sync compensating writes C API support", "[c_api][flx][sync]
     FLXSyncTestHarness harness("c_api_comp_writes");
     create_user_and_log_in(harness.app());
     SyncTestFile test_config(harness.app()->current_user(), harness.schema(), realm::SyncConfig::FLXSyncEnabled{});
+    test_config.sync_config = std::make_shared<realm_sync_config_t>(*test_config.sync_config);
     realm_sync_config_t* sync_config = static_cast<realm_sync_config_t*>(test_config.sync_config.get());
 
     struct TestState {

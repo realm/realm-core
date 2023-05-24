@@ -243,7 +243,7 @@ class ValueBase {
 public:
     using ValueType = QueryValue;
 
-    static const size_t chunk_size = 8;
+    static constexpr size_t chunk_size = 8;
     bool m_from_list = false;
 
     ValueBase() = default;
@@ -3640,27 +3640,21 @@ public:
             // Not a Link column
             size_t colsize = leaf->size();
 
+            size_t rows = std::min(colsize - index, ValueBase::chunk_size);
+
             // Now load `ValueBase::chunk_size` rows from from the leaf into m_storage.
             if constexpr (std::is_same_v<U, int64_t>) {
                 // If it's an integer leaf, then it contains the method get_chunk() which copies
-                // these values in a super fast way (only feasible if more than chunk_size in column)
-                if (index + ValueBase::chunk_size <= colsize) {
-                    // If you want to modify 'chunk_size' then update Array::get_chunk()
-                    REALM_ASSERT_3(ValueBase::chunk_size, ==, 8);
+                // these values in a super fast way. If you want to modify 'chunk_size' then update Array::get_chunk()
+                REALM_ASSERT_3(ValueBase::chunk_size, ==, 8);
 
-                    auto leaf_2 = static_cast<const Array*>(leaf);
-                    int64_t res[ValueBase::chunk_size];
-                    leaf_2->get_chunk(index, res);
-
-                    destination.set(res, res + ValueBase::chunk_size);
-                    return;
-                }
+                int64_t res[ValueBase::chunk_size];
+                static_cast<const Array*>(leaf)->get_chunk(index, res);
+                destination.set(res, res + rows);
+                return;
             }
-            size_t rows = colsize - index;
-            if (rows > ValueBase::chunk_size)
-                rows = ValueBase::chunk_size;
-            destination.init(false, rows);
 
+            destination.init(false, rows);
             for (size_t t = 0; t < rows; t++) {
                 if (leaf->is_null(index + t)) {
                     destination.set_null(t);
