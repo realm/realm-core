@@ -1575,7 +1575,7 @@ ParserDriver::~ParserDriver()
     yylex_destroy(m_yyscanner);
 }
 
-Mixed ParserDriver::get_arg_for_index(std::string i)
+Mixed ParserDriver::get_arg_for_index(const std::string& i)
 {
     REALM_ASSERT(i[0] == '$');
     size_t arg_no = size_t(strtol(i.substr(1).c_str(), nullptr, 10));
@@ -1593,7 +1593,7 @@ Mixed ParserDriver::get_arg_for_index(std::string i)
     }
 }
 
-double ParserDriver::get_arg_for_coordinate(std::string str)
+double ParserDriver::get_arg_for_coordinate(const std::string& str)
 {
     REALM_ASSERT(str[0] == '$');
     size_t arg_no = size_t(strtol(str.substr(1).c_str(), nullptr, 10));
