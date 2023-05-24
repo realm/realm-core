@@ -2747,28 +2747,24 @@ inline void Service::AsyncOper::do_recycle_and_execute(bool orphaned, H& handler
     // the memory is available for a new post operation that might be initiated
     // during the execution of the handler.
     bool was_recycled = false;
-    try {
-        // We need to copy or move all arguments to be passed to the handler,
-        // such that there is no risk of references to the recycled operation
-        // object being passed to the handler (the passed arguments may be
-        // references to members of the recycled operation object). The easiest
-        // way to achive this, is by forwarding the reference arguments (passed
-        // to this function) to a helper function whose arguments have
-        // nonreference type (`Args...` rather than `Args&&...`).
-        //
-        // Note that the copying and moving of arguments may throw, and it is
-        // important that the operation is still recycled even if that
-        // happens. For that reason, copying and moving of arguments must not
-        // happen until we are in a scope (this scope) that catches and deals
-        // correctly with such exceptions.
-        do_recycle_and_execute_helper(orphaned, was_recycled, std::move(handler),
-                                      std::forward<Args>(args)...); // Throws
-    }
-    catch (...) {
-        if (!was_recycled)
-            do_recycle(orphaned);
-        throw;
-    }
+
+    // We need to copy or move all arguments to be passed to the handler,
+    // such that there is no risk of references to the recycled operation
+    // object being passed to the handler (the passed arguments may be
+    // references to members of the recycled operation object). The easiest
+    // way to achive this, is by forwarding the reference arguments (passed
+    // to this function) to a helper function whose arguments have
+    // nonreference type (`Args...` rather than `Args&&...`).
+    //
+    // Note that the copying and moving of arguments may throw, and it is
+    // important that the operation is still recycled even if that
+    // happens. For that reason, copying and moving of arguments must not
+    // happen until we are in a scope (this scope) that catches and deals
+    // correctly with such exceptions.
+    do_recycle_and_execute_helper(orphaned, was_recycled, std::move(handler),
+                                  std::forward<Args>(args)...); // Throws
+
+    // Removed catch to prevent truncating the stack trace on exception
 }
 
 template <class H, class... Args>
