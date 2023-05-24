@@ -2386,12 +2386,13 @@ TEST_CASE("C API", "[c_api]") {
                 realm_query_arg_t args[num_args] = { realm_query_arg_t{2, true, &list_arg[0]} };
                 realm_query_arg_t* arg_list = &args[0];
                 auto q_string_in_list = cptr_checked(realm_query_parse(realm, class_foo.key, "string IN $0", num_args, arg_list));
+                auto results = cptr_checked(realm_query_find_all(q_string_in_list.get()));
                     
                 char* s = foo;
                 s[0] = 'a';
                 size_t count;
 
-                CHECK(checked(realm_query_count(q_string_in_list.get(), &count)));
+                CHECK(checked(realm_results_count(results.get(), &count)));
                 CHECK(1 == count);
             }
 
