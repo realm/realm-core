@@ -347,7 +347,7 @@ export class Class extends NamedType {
 
   /**
    * Get a new array containing the methods.
-   * For adding a method onto `this` instance, use `addMethod`.
+   * For adding a method onto `this` instance, use `addMethod()`.
    */
   get methods() {
     return Object.values(this._methods);
@@ -395,7 +395,11 @@ export class Class extends NamedType {
 }
 
 export class Field {
-  /** Whether this field is opted in to by the consumer/SDK. */
+  /**
+   * Whether this field is opted in to by the consumer/SDK.
+   * For this to be true you must pass an opt-in list to the
+   * binding generator and call `BoundSpec.applyOptInList()`.
+   */
   isOptedInTo = false;
   constructor(
     public name: string,
@@ -413,7 +417,7 @@ export class Struct extends NamedType {
 
   /**
    * Get a new array containing the fields.
-   * For adding a field onto `this` instance, use `addField`.
+   * For adding a field onto `this` instance, use `addField()`.
    */
   get fields() {
     return Object.values(this._fields);
