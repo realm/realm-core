@@ -1607,11 +1607,11 @@ double ParserDriver::get_arg_for_coordinate(const std::string& str)
     auto type = m_args.type_for_argument(arg_no);
     switch (type) {
         case type_Int:
-            return m_args.long_for_argument(arg_no);
+            return double(m_args.long_for_argument(arg_no));
         case type_Double:
             return m_args.double_for_argument(arg_no);
         case type_Float:
-            return m_args.float_for_argument(arg_no);
+            return double(m_args.float_for_argument(arg_no));
         default:
             throw InvalidQueryError(util::format("Invalid parameter '%1' used in coordinate at argument '%2'",
                                                  get_data_type_name(type), str));
