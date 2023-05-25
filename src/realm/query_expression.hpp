@@ -1316,6 +1316,11 @@ public:
         m_comparison_type = type;
     }
 
+    void set_list_args(std::vector<std::shared_ptr<Subexpr>>& args_list)
+    {
+        m_args_list.swap(args_list);
+    }
+
     Mixed get_mixed() const override
     {
         return get(0);
@@ -1333,6 +1338,7 @@ public:
 
 protected:
     util::Optional<ExpressionComparisonType> m_comparison_type;
+    std::vector<std::shared_ptr<Subexpr>> m_args_list;
 };
 
 class ConstantMixedValue : public Value<Mixed> {

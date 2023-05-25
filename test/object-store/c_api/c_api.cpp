@@ -2383,17 +2383,28 @@ TEST_CASE("C API", "[c_api]") {
                 });
 
                 static const size_t num_args = 1;
-                realm_query_arg_t args[num_args] = { realm_query_arg_t{2, true, &list_arg[0]} };
-                realm_query_arg_t* arg_list = &args[0];
+                realm_query_arg_t args[num_args] = {realm_query_arg_t{1, false, &str}};
+                realm_query_arg_t* arg_list_simple = &args[0];
+
+                realm_query_arg_t args_in_list[num_args] = {realm_query_arg_t{2, true, &list_arg[0]}};
+                realm_query_arg_t* arg_list = &args_in_list[0];
+
+                auto q_string_single_param =
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "string == $0", num_args, arg_list_simple));
                 auto q_string_in_list = cptr_checked(realm_query_parse(realm, class_foo.key, "string IN $0", num_args, arg_list));
-                auto results = cptr_checked(realm_query_find_all(q_string_in_list.get()));
-                    
+
+                // changing the value for one of the parameters passed should not change the result of the query.
+                // essentially we must assure that core is copying all the arguments passed inside the list (like for
+                // normal query arguments), and after realm_query_parse completes any modification of the memory that
+                // was used to store the parameter does not impact in any way core.
                 char* s = foo;
                 s[0] = 'a';
-                size_t count;
+                size_t count, count_list;
 
-                CHECK(checked(realm_results_count(results.get(), &count)));
+                CHECK(checked(realm_query_count(q_string_single_param.get(), &count)));
                 CHECK(1 == count);
+                CHECK(checked(realm_query_count(q_string_in_list.get(), &count_list)));
+                CHECK(1 == count_list);
             }
 
             SECTION("decimal NaN") {
