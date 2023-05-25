@@ -2391,7 +2391,8 @@ TEST_CASE("C API", "[c_api]") {
 
                 auto q_string_single_param =
                     cptr_checked(realm_query_parse(realm, class_foo.key, "string == $0", num_args, arg_list_simple));
-                auto q_string_in_list = cptr_checked(realm_query_parse(realm, class_foo.key, "string IN $0", num_args, arg_list));
+                auto q_string_in_list =
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "string IN $0", num_args, arg_list));
 
                 // changing the value for one of the parameters passed should not change the result of the query.
                 // essentially we must assure that core is copying all the arguments passed inside the list (like for
