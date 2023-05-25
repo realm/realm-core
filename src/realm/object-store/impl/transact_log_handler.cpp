@@ -123,11 +123,11 @@ void KVOAdapter::before(Transaction& sg)
             // We may have pre-emptively marked the column as modified if the
             // LinkList was selected but the actual changes made ended up being
             // a no-op
-            if(!list.path.empty()) {
+            if (!list.path.empty()) {
                 REALM_ASSERT(list.path[0].is_col_key()); // first element in path is always the col_key
                 list.observer->changes.erase(list.path[0].get_col_key().value);
             }
-            
+
             continue;
         }
         // If the containing row was deleted then changes will be empty
