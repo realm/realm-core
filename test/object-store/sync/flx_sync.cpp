@@ -40,6 +40,7 @@
 #include "realm/sync/client_base.hpp"
 #include "realm/sync/config.hpp"
 #include "realm/sync/noinst/client_history_impl.hpp"
+#include <realm/sync/noinst/client_reset_operation.hpp>
 #include "realm/sync/noinst/pending_bootstrap_store.hpp"
 #include "realm/sync/noinst/server/access_token.hpp"
 #include "realm/sync/protocol.hpp"
@@ -810,6 +811,36 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 wait_for_download(*realm);
             })
             ->run();
+    }
+
+    SECTION("DiscardLocal: open realm after client reset failure") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+        auto&& [error_future, error_handler] = make_error_handler();
+        config_local.sync_config->error_handler = error_handler;
+
+        std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(config_local.path);
+        // create a non-empty directory that we'll fail to delete
+        util::make_dir(fresh_path);
+        util::File(util::File::resolve("file", fresh_path), util::File::mode_Write);
+
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        test_reset->run();
+
+        // Client reset fails due to sync client not being able to create the fresh realm.
+        auto sync_error = wait_for_future(std::move(error_future)).get();
+        CHECK(sync_error.get_system_error() == sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+
+        // Open the realm again. This should not crash.
+        {
+            auto config_copy = config_local;
+            auto&& [err_future, err_handler] = make_error_handler();
+            config_local.sync_config->error_handler = err_handler;
+
+            auto realm_post_reset = Realm::get_shared_realm(config_copy);
+            auto sync_error = wait_for_future(std::move(err_future)).get();
+            CHECK(sync_error.get_system_error() ==
+                  sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+        }
     }
 }
 

@@ -903,6 +903,8 @@ void SubscriptionStore::supercede_prior_to(TransactionRef tr, int64_t version_id
 
 void SubscriptionStore::supercede_all_except(MutableSubscriptionSet& mut_sub) const
 {
+    // 'mut_sub' can only supersede the other subscription sets if it is in Complete state.
+    REALM_ASSERT_EX(mut_sub.state() == SubscriptionSet::State::Complete, mut_sub.state());
     auto version_to_keep = mut_sub.version();
     supercede_prior_to(mut_sub.m_tr, version_to_keep);
 
