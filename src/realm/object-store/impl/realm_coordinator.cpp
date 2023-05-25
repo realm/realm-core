@@ -964,9 +964,7 @@ void RealmCoordinator::run_async_notifiers()
         // first collection with the same id. It is O(N^2), but typically the
         // number of collections observed will be very small.
         auto id = [](auto const& c) {
-            REALM_ASSERT(c.path[0].is_col_key());
-            auto col_key = c.path[0].get_key();
-            return std::tie(c.table_key, col_key, c.obj_key);
+            return std::tie(c.table_key, c.path, c.obj_key);
         };
         auto& collections = change_info.collections;
         for (size_t i = collections.size(); i > 0; --i) {

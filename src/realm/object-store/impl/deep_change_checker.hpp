@@ -45,7 +45,6 @@ struct CollectionChangeInfo {
     TableKey table_key;
     ObjKey obj_key;
     Path path;
-    // ColKey col_key;
     CollectionChangeBuilder* changes;
 };
 

@@ -997,7 +997,7 @@ private:
     TableKey m_current_table;
     ColKey m_current_linkview_col;
     ObjKey m_current_linkview_obj;
-    std::vector<PathElement> m_path;
+    Path m_path;
 
 public:
     void parse_complete() {}

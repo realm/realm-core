@@ -115,7 +115,7 @@ TEST_CASE("dictionary in mixed", "[dictionary]") {
 
     REQUIRE(change_dictionary.insertions.count() == 1); // nested collection + insertion of the list
     REQUIRE(change_list.insertions.count() == 1);       // nested collection + insertion of the list
-    REQUIRE(calls_dict == 3);                           // this does not seem right
+    REQUIRE(calls_dict == 2);                           // this does not seem right
     REQUIRE(calls_list == 2);                           // this does not seem right
 }
 
