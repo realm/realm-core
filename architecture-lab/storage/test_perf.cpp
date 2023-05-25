@@ -143,7 +143,7 @@ struct std::hash<big_encoding_entry> {
     }
 };
 
-#define COMPRESS_ONLY 1
+#define COMPRESS_ONLY 0
 #if COMPRESS_ONLY
 class string_compressor {
 public:
@@ -318,6 +318,7 @@ public:
         // expand into 16 bit symbols:
         int size = past - first;
         assert(size < 8180);
+        int size_limit = size / 8;
         uint16_t* to = symbols;
         int out_size = 0;
         for (const char* p = first; p < past;) {
@@ -335,7 +336,7 @@ public:
         }
         // compress all groups together
         // size = out_size;
-        size = compress_symbols(symbols, out_size, 2, 4);
+        size = compress_symbols(symbols, out_size, 4, size_limit);
         compressed_symbols += size;
         return size;
     }
@@ -396,7 +397,7 @@ public:
 #endif
 
 // controls
-#define USE_UNALIGNED 0
+#define USE_UNALIGNED 1
 #define USE_INTERPOLATION 0
 #define USE_LOCAL_DIR 1
 #define USE_SPARSE 1
