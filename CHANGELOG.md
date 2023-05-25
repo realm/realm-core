@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix some clang static analyzer warnings. None of them were actual bugs ([PR #6675](https://github.com/realm/realm-core/pull/6675)).
 
 ### Breaking changes
 * None.

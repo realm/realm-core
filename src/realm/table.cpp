@@ -560,6 +560,7 @@ void Table::remove_recursive(CascadeState& cascade_state)
     REALM_ASSERT(group);
     cascade_state.m_group = group;
 
+    std::vector<std::pair<TableKey, ObjKey>> to_delete;
     do {
         cascade_state.send_notifications();
 
@@ -572,14 +573,15 @@ void Table::remove_recursive(CascadeState& cascade_state)
         }
         cascade_state.m_to_be_nullified.clear();
 
-        auto to_delete = std::move(cascade_state.m_to_be_deleted);
-        for (auto obj : to_delete) {
-            auto table = group->get_table(obj.first);
+        to_delete.swap(cascade_state.m_to_be_deleted);
+        for (auto [table_key, obj_key] : to_delete) {
+            auto table = group->get_table(table_key);
             // This might add to the list of objects that should be deleted
-            REALM_ASSERT(!obj.second.is_unresolved());
-            table->m_clusters.erase(obj.second, cascade_state);
+            REALM_ASSERT(!obj_key.is_unresolved());
+            table->m_clusters.erase(obj_key, cascade_state);
         }
         nullify_links(cascade_state);
+        to_delete.clear();
     } while (!cascade_state.m_to_be_deleted.empty() || !cascade_state.m_to_be_nullified.empty());
 }
 
@@ -1679,7 +1681,7 @@ void copy_list<Timestamp>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocato
 
 void Table::create_columns()
 {
-    size_t cnt;
+    size_t cnt = 0;
     auto get_column_cnt = [&cnt](const Cluster* cluster) {
         cnt = cluster->nb_columns();
         return IteratorControl::Stop;

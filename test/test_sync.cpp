@@ -1736,7 +1736,7 @@ public:
         auto handler = [&](std::error_code ec, size_t nbytes) {
             this->read_completion_handler(ec, nbytes);
         };
-        m_socket.async_read_until(m_buffer, m_buf_size, '\n', m_read_ahead_buffer, handler);
+        m_socket.async_read_until(m_buffer, m_buf_size, '\n', m_read_ahead_buffer, std::move(handler));
     }
 
     void read_completion_handler(std::error_code ec, size_t nbytes)
@@ -1755,7 +1755,7 @@ public:
         auto handler = [&](std::error_code ec, size_t nbytes) {
             this->write_completion_handler(ec, nbytes);
         };
-        m_socket.async_write(m_request.data(), m_request.size(), handler);
+        m_socket.async_write(m_request.data(), m_request.size(), std::move(handler));
     }
 
 private:
