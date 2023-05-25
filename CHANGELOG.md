@@ -9,6 +9,7 @@
 * Access token refresh for websockets was not updating the location metadata ([#6630](https://github.com/realm/realm-core/issues/6630), since v13.9.3)
 * Fix several UBSan failures which did not appear to result in functional bugs ([#6649](https://github.com/realm/realm-core/pull/6649)).
 * Fix an out-of-bounds read in sectioned results when sectioned are removed by modifying all objects in that section to no longer appear in that section ([#6649](https://github.com/realm/realm-core/pull/6649), since v13.12.0)
+* Fix allocate arguments for list in queries. ([#6674](https://github.com/realm/realm-core/pull/6674), since v12.5.0)
 
 ### Breaking changes
 * None.

@@ -1252,7 +1252,8 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                 values->init(is_list, mixed_list.size());
                 size_t ndx = 0;
                 for (auto& expr : args_in_list) {
-                    values->set(ndx++, expr->get_mixed());
+                    if (expr)
+                        values->set(ndx++, expr->get_mixed());
                 }
                 if (!args_in_list.empty()) {
                     values->set_list_args(args_in_list);
@@ -1286,47 +1287,49 @@ std::vector<std::shared_ptr<Subexpr>> ConstantNode::clone_list_of_args(std::vect
     std::shared_ptr<Subexpr> ret;
 
     for (const auto& mixed : mixed_args) {
-        const auto& type = mixed.get_type();
+        if (!mixed.is_null()) {
+            const auto& type = mixed.get_type();
 
-        switch (type) {
-            case type_Int:
-                ret = std::make_unique<Value<int64_t>>(mixed.get_int());
-                break;
-            case type_String:
-                ret = std::make_unique<ConstantStringValue>(mixed.get_string());
-                break;
-            case type_Binary:
-                ret = std::make_unique<ConstantBinaryValue>(mixed.get_binary());
-                break;
-            case type_Bool:
-                ret = std::make_unique<Value<Bool>>(mixed.get_bool());
-                break;
-            case type_Float:
-                ret = std::make_unique<Value<float>>(mixed.get_float());
-                break;
-            case type_Double:
-                ret = std::make_unique<Value<double>>(mixed.get_double());
-                break;
-            case type_Timestamp:
-                ret = std::make_unique<Value<Timestamp>>(mixed.get_timestamp());
-                break;
-            case type_ObjectId:
-                ret = std::make_unique<Value<ObjectId>>(mixed.get_object_id());
-                break;
-            case type_Decimal:
-                ret = std::make_unique<Value<Decimal128>>(mixed.get_decimal());
-                break;
-            case type_UUID:
-                ret = std::make_unique<Value<UUID>>(mixed.get_uuid());
-                break;
-            case type_Link:
-                ret = std::make_unique<Value<ObjKey>>(mixed.get_link().get_obj_key());
-                break;
-            case type_TypedLink:
-                ret = std::make_unique<Value<ObjLink>>(mixed.get_link());
-                break;
-            default:
-                break;
+            switch (type) {
+                case type_Int:
+                    ret = std::make_unique<Value<int64_t>>(mixed.get_int());
+                    break;
+                case type_String:
+                    ret = std::make_unique<ConstantStringValue>(mixed.get_string());
+                    break;
+                case type_Binary:
+                    ret = std::make_unique<ConstantBinaryValue>(mixed.get_binary());
+                    break;
+                case type_Bool:
+                    ret = std::make_unique<Value<Bool>>(mixed.get_bool());
+                    break;
+                case type_Float:
+                    ret = std::make_unique<Value<float>>(mixed.get_float());
+                    break;
+                case type_Double:
+                    ret = std::make_unique<Value<double>>(mixed.get_double());
+                    break;
+                case type_Timestamp:
+                    ret = std::make_unique<Value<Timestamp>>(mixed.get_timestamp());
+                    break;
+                case type_ObjectId:
+                    ret = std::make_unique<Value<ObjectId>>(mixed.get_object_id());
+                    break;
+                case type_Decimal:
+                    ret = std::make_unique<Value<Decimal128>>(mixed.get_decimal());
+                    break;
+                case type_UUID:
+                    ret = std::make_unique<Value<UUID>>(mixed.get_uuid());
+                    break;
+                case type_Link:
+                    ret = std::make_unique<Value<ObjKey>>(mixed.get_link().get_obj_key());
+                    break;
+                case type_TypedLink:
+                    ret = std::make_unique<Value<ObjLink>>(mixed.get_link());
+                    break;
+                default:
+                    break;
+            }
         }
         args_in_list.push_back(std::move(ret));
     }
