@@ -104,8 +104,6 @@ struct CollectionChangeSet {
     // Per-column version of `modifications`
     std::unordered_map<int64_t, IndexSet> columns;
 
-    // TODO: should I add the path here in order to select the right active collections?
-
     bool empty() const noexcept
     {
         return deletions.empty() && insertions.empty() && modifications.empty() && modifications_new.empty() &&
