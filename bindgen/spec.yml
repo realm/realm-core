@@ -357,6 +357,17 @@ records:
         type: std::string
         default: ''
 
+    GeoPoint:
+      fields:
+        longitude: double
+        latitude: double
+        altitude: double
+
+    GeoCircle:
+      fields:
+        radius_radians: double
+        center: GeoPoint
+
   RealmConfig:
     fields:
       path: std::string
