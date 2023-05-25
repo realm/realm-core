@@ -666,6 +666,7 @@ TEST_IF(Upgrade_Database_23, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE
     auto hist = make_in_realm_history();
     auto sg = DB::create(*hist, temp_copy);
     auto rt = sg->start_write();
+    rt->verify();
 
     auto t = rt->get_table("table");
     auto target = rt->get_table("target");

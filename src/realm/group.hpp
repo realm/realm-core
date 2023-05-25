@@ -777,6 +777,8 @@ private:
     ///  23 Layout of Set and Dictionary changed.
     ///
     ///  24 Variable sized arrays for Decimal128.
+    ///     Nested collections
+    ///     Backlinks in BPlusTree
     ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in Group::open() and DB::do_open, the file

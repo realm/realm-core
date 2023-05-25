@@ -431,4 +431,23 @@ TEST(BPlusTree_LeafCache)
     tree.destroy();
 }
 
+TEST(BPlusTree_UpgradeFromArray)
+{
+    Array arr(Allocator::get_default());
+    arr.create(Node::type_Normal, false, 0, 0);
+
+    for (int i = 0; i < 65; i++) {
+        arr.add(i);
+    }
+
+    BPlusTree<Int> tree(Allocator::get_default());
+    tree.init_from_ref(arr.get_ref());
+    tree.split_if_needed();
+
+    tree.add(100);
+    tree.verify();
+
+    tree.destroy();
+}
+
 #endif // TEST_BPLUS_TREE
