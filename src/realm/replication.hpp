@@ -397,24 +397,24 @@ private:
     struct CollectionId {
         TableKey table_key;
         ObjKey object_key;
-        ColKey col_id;
+        std::vector<PathElement> path;
 
         CollectionId() = default;
         CollectionId(const CollectionBase& list)
             : table_key(list.get_table()->get_key())
             , object_key(list.get_owner_key())
-            , col_id(list.get_col_key())
+            , path(list.get_short_path())
         {
         }
-        CollectionId(TableKey t, ObjKey k, ColKey c)
+        CollectionId(TableKey t, ObjKey k, std::vector<PathElement>&& p)
             : table_key(t)
             , object_key(k)
-            , col_id(c)
+            , path(std::move(p))
         {
         }
         bool operator!=(const CollectionId& other)
         {
-            return object_key != other.object_key || table_key != other.table_key || col_id != other.col_id;
+            return object_key != other.object_key || table_key != other.table_key || path != other.path;
         }
     };
 

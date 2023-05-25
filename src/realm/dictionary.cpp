@@ -620,11 +620,6 @@ Dictionary::Iterator Dictionary::find(Mixed key) const noexcept
     return end();
 }
 
-FullPath Dictionary::get_path() const
-{
-    return Base::get_path();
-}
-
 void Dictionary::add_index(Path& path, Index index) const
 {
     path.emplace_back(mpark::get<std::string>(index));

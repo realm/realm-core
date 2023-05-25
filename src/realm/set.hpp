@@ -343,6 +343,16 @@ public:
         return CollectionType::Set;
     }
 
+    FullPath get_path() const noexcept final
+    {
+        return m_set.get_path();
+    }
+
+    Path get_short_path() const noexcept final
+    {
+        return m_set.get_short_path();
+    }
+
     // Overriding members of SetBase:
     SetBasePtr clone() const override
     {

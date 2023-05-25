@@ -471,7 +471,7 @@ void SyncReplication::add_int(const Table* table, ColKey col, ObjKey ndx, int_fa
         REALM_ASSERT(col != table->get_primary_key_column());
 
         Instruction::AddInteger instr;
-        populate_path_instr(instr, *table, ndx, table->get_column_name(col));
+        populate_path_instr(instr, *table, ndx, col);
         instr.value = value;
         emit(instr);
     }
@@ -511,7 +511,7 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed valu
         }
 
         Instruction::Update instr;
-        populate_path_instr(instr, *table, key, table->get_column_name(col));
+        populate_path_instr(instr, *table, key, col);
         instr.value = as_payload(*table, col, value);
         instr.is_default = (variant == _impl::instr_SetDefault);
         emit(instr);
@@ -675,7 +675,7 @@ void SyncReplication::nullify_link(const Table* table, ColKey col_ndx, ObjKey nd
 
     if (select_table(*table)) {
         Instruction::Update instr;
-        populate_path_instr(instr, *table, ndx, table->get_column_name(col_ndx));
+        populate_path_instr(instr, *table, ndx, col_ndx);
         REALM_ASSERT(!instr.is_array_update());
         instr.value = Instruction::Payload{realm::util::none};
         instr.is_default = false;
@@ -745,7 +745,7 @@ Instruction::PrimaryKey SyncReplication::primary_key_for_object(const Table& tab
 }
 
 void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const Table& table, ObjKey key,
-                                          StringData field_name)
+                                          ColKey col_key)
 {
     REALM_ASSERT(key);
 
@@ -756,25 +756,27 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
         auto path = obj.get_path();
         // Populate top object in the normal way.
         auto top_table = table.get_parent_group()->get_table(path.top_table);
-        // The first path entry will be the property name on the top object
-        REALM_ASSERT(path.path_from_top[0].is_key());
-        populate_path_instr(instr, *top_table, path.top_objkey, path.path_from_top[0].get_key());
+        // The first path entry will be the col_key on the top object
+        REALM_ASSERT(path.path_from_top[0].is_col_key());
+        ColKey ck = path.path_from_top[0].get_col_key();
+        populate_path_instr(instr, *top_table, path.top_objkey, ck);
 
         size_t sz = path.path_from_top.size();
         instr.path.m_path.reserve(sz - 1);
         for (size_t i = 1; i < sz; i++) {
-            auto& path_elem = path.path_from_top[i];
-            if (path_elem.is_ndx()) {
-                instr.path.push_back(uint32_t(path_elem.get_ndx()));
+            auto& elem = path.path_from_top[i];
+            if (elem.is_ndx()) {
+                instr.path.push_back(uint32_t(elem.get_ndx()));
             }
             else {
-                REALM_ASSERT(path_elem.is_key());
-                InternString interned_field_name = m_encoder.intern_string(path_elem.get_key().c_str());
+                REALM_ASSERT(elem.is_key());
+                InternString interned_field_name = m_encoder.intern_string(elem.get_key().c_str());
                 instr.path.push_back(interned_field_name);
             }
         }
 
         // The field in the embedded object is the last path component.
+        StringData field_name = table.get_column_name(col_key);
         InternString interned_field_in_embedded = m_encoder.intern_string(field_name);
         instr.path.push_back(interned_field_in_embedded);
         return;
@@ -784,7 +786,7 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
     REALM_ASSERT(should_emit);
 
     instr.table = m_last_class_name;
-
+    StringData field_name = table.get_column_name(col_key);
     if (m_last_object == key) {
         instr.object = *m_last_primary_key;
     }
@@ -809,7 +811,7 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
     ConstTableRef source_table = list.get_table();
     ObjKey source_obj = list.get_owner_key();
     ColKey source_field = list.get_col_key();
-    populate_path_instr(instr, *source_table, source_obj, source_table->get_column_name(source_field));
+    populate_path_instr(instr, *source_table, source_obj, source_field);
 }
 
 void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const CollectionBase& list,

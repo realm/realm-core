@@ -996,7 +996,12 @@ FullPath Obj::get_path() const
                 }
                 else {
                     result = obj.get_path();
-                    result.path_from_top.push_back(obj.get_table()->get_column_name(next_col_key));
+                    if (result.path_from_top.empty()) {
+                        result.path_from_top.push_back(next_col_key);
+                    }
+                    else {
+                        result.path_from_top.push_back(obj.get_table()->get_column_name(next_col_key));
+                    }
                 }
 
                 return IteratorControl::Stop; // early out
@@ -1011,11 +1016,21 @@ FullPath Obj::get_path() const
     return result;
 }
 
+Path Obj::get_short_path() const noexcept
+{
+    return {};
+}
+
 void Obj::add_index(Path& path, Index index) const
 {
     auto col_key = mpark::get<ColKey>(index);
-    StringData col_name = get_table()->get_column_name(col_key);
-    path.emplace_back(std::string(col_name));
+    if (path.empty()) {
+        path.emplace_back(col_key);
+    }
+    else {
+        StringData col_name = get_table()->get_column_name(col_key);
+        path.emplace_back(col_name);
+    }
 }
 
 void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
