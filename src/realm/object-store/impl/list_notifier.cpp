@@ -51,7 +51,6 @@ void ListNotifier::attach(CollectionBase const& src)
         auto obj = tr.get_table(src.get_table()->get_key())->get_object(src.get_owner_key());
         auto path = src.get_short_path();
         auto full = src.get_path().path_from_top;
-        // m_list = obj.get_collection_ptr(src.get_col_key());
         m_list = std::dynamic_pointer_cast<CollectionBase>(obj.get_collection_ptr(path));
     }
     catch (const KeyNotFound&) {
