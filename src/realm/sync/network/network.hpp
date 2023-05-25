@@ -24,11 +24,12 @@
 #include <realm/status.hpp>
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
+#include <realm/util/backtrace.hpp>
+#include <realm/util/basic_system_errors.hpp>
 #include <realm/util/bind_ptr.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/misc_ext_errors.hpp>
-#include <realm/util/basic_system_errors.hpp>
-#include <realm/util/backtrace.hpp>
+#include <realm/util/scope_exit.hpp>
 
 // Linux epoll
 #if defined(REALM_USE_EPOLL) && !REALM_ANDROID
@@ -2747,6 +2748,13 @@ inline void Service::AsyncOper::do_recycle_and_execute(bool orphaned, H& handler
     // the memory is available for a new post operation that might be initiated
     // during the execution of the handler.
     bool was_recycled = false;
+
+    // ScopeExit to ensure the AsyncOper object was reclaimed/deleted
+    auto at_exit = util::ScopeExit([this, &was_recycled, &orphaned]() noexcept {
+        if (!was_recycled) {
+            do_recycle(orphaned);
+        }
+    });
 
     // We need to copy or move all arguments to be passed to the handler,
     // such that there is no risk of references to the recycled operation
