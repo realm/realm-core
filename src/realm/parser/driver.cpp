@@ -1246,28 +1246,17 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             }
             else if (drv->m_args.is_argument_list(arg_no)) {
                 std::vector<Mixed> mixed_list = drv->m_args.list_for_argument(arg_no);
-                auto args_in_list = clone_list_of_args(mixed_list);
-                std::unique_ptr<Value<Mixed>> values = std::make_unique<Value<Mixed>>();
-                constexpr bool is_list = true;
-                values->init(is_list, mixed_list.size());
-                size_t ndx = 0;
-                for (auto& expr : args_in_list) {
-                    if (expr)
-                        values->set(ndx++, expr->get_mixed());
-                }
-                if (!args_in_list.empty()) {
-                    values->set_list_args(args_in_list);
-                }
+                auto args_in_list = copy_list_of_args(mixed_list);
                 if (m_comp_type) {
-                    values->set_comparison_type(*m_comp_type);
+                    args_in_list->set_comparison_type(*m_comp_type);
                 }
-                ret = std::move(values);
+                ret = std::move(args_in_list);
             }
             else {
                 auto type = drv->m_args.type_for_argument(arg_no);
                 explain_value_message =
                     util::format("argument %1 of type '%2'", explain_value_message, get_data_type_name(type));
-                ret = clone_arg(drv, type, arg_no, hint, explain_value_message);
+                ret = copy_arg(drv, type, arg_no, hint, explain_value_message);
             }
             break;
         }
@@ -1280,65 +1269,19 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
     return ret;
 }
 
-std::vector<std::shared_ptr<Subexpr>> ConstantNode::clone_list_of_args(std::vector<Mixed>& mixed_args)
+std::unique_ptr<ConstantMixedList> ConstantNode::copy_list_of_args(std::vector<Mixed>& mixed_args)
 {
-    std::vector<std::shared_ptr<Subexpr>> args_in_list;
-    args_in_list.reserve(mixed_args.size());
-    std::shared_ptr<Subexpr> ret;
-
+    std::unique_ptr<ConstantMixedList> args_in_list = std::make_unique<ConstantMixedList>(mixed_args.size());
+    size_t ndx = 0;
     for (const auto& mixed : mixed_args) {
-        if (!mixed.is_null()) {
-            const auto& type = mixed.get_type();
-
-            switch (type) {
-                case type_Int:
-                    ret = std::make_unique<Value<int64_t>>(mixed.get_int());
-                    break;
-                case type_String:
-                    ret = std::make_unique<ConstantStringValue>(mixed.get_string());
-                    break;
-                case type_Binary:
-                    ret = std::make_unique<ConstantBinaryValue>(mixed.get_binary());
-                    break;
-                case type_Bool:
-                    ret = std::make_unique<Value<Bool>>(mixed.get_bool());
-                    break;
-                case type_Float:
-                    ret = std::make_unique<Value<float>>(mixed.get_float());
-                    break;
-                case type_Double:
-                    ret = std::make_unique<Value<double>>(mixed.get_double());
-                    break;
-                case type_Timestamp:
-                    ret = std::make_unique<Value<Timestamp>>(mixed.get_timestamp());
-                    break;
-                case type_ObjectId:
-                    ret = std::make_unique<Value<ObjectId>>(mixed.get_object_id());
-                    break;
-                case type_Decimal:
-                    ret = std::make_unique<Value<Decimal128>>(mixed.get_decimal());
-                    break;
-                case type_UUID:
-                    ret = std::make_unique<Value<UUID>>(mixed.get_uuid());
-                    break;
-                case type_Link:
-                    ret = std::make_unique<Value<ObjKey>>(mixed.get_link().get_obj_key());
-                    break;
-                case type_TypedLink:
-                    ret = std::make_unique<Value<ObjLink>>(mixed.get_link());
-                    break;
-                default:
-                    break;
-            }
-        }
-        args_in_list.push_back(std::move(ret));
+        if (!mixed.is_null())
+            args_in_list->set(ndx++, mixed);
     }
-
     return args_in_list;
 }
 
-std::unique_ptr<Subexpr> ConstantNode::clone_arg(ParserDriver* drv, DataType type, size_t arg_no, DataType hint,
-                                                 std::string& err)
+std::unique_ptr<Subexpr> ConstantNode::copy_arg(ParserDriver* drv, DataType type, size_t arg_no, DataType hint,
+                                                std::string& err)
 {
     switch (type) {
         case type_Int:
