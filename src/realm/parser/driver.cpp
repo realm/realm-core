@@ -1246,7 +1246,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             }
             else if (drv->m_args.is_argument_list(arg_no)) {
                 std::vector<Mixed> mixed_list = drv->m_args.list_for_argument(arg_no);
-                ret = std::move(copy_list_of_args(mixed_list));
+                ret = copy_list_of_args(mixed_list);
             }
             else {
                 auto type = drv->m_args.type_for_argument(arg_no);
@@ -1272,7 +1272,7 @@ std::unique_ptr<ConstantMixedList> ConstantNode::copy_list_of_args(std::vector<M
     for (const auto& mixed : mixed_args) {
         args_in_list->set(ndx++, mixed);
     }
-    if(m_comp_type) {
+    if (m_comp_type) {
         args_in_list->set_comparison_type(*m_comp_type);
     }
     return args_in_list;
