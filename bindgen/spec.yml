@@ -125,6 +125,7 @@ mixedInfo:
     - LinkList
   extraCtors:
     - Obj
+    - Geospatial
 
 enums:
   SchemaMode:
@@ -357,16 +358,16 @@ records:
         type: std::string
         default: ''
 
-    GeoPoint:
-      fields:
-        longitude: double
-        latitude: double
-        altitude: double
+  GeoPoint:
+    fields:
+      longitude: double
+      latitude: double
 
-    GeoCircle:
-      fields:
-        radius_radians: double
-        center: GeoPoint
+  GeoCircle:
+    cppName: GeoCenterSphere
+    fields:
+      radius_radians: double
+      center: GeoPoint
 
   RealmConfig:
     fields:
@@ -751,6 +752,10 @@ classes:
     properties:
       get_seconds: int64_t
       get_nanoseconds: int32_t
+
+  Geospatial:
+    constructors:
+      make_from_circle: '(circle: GeoCircle)'
 
   ObjLink:
     properties:

@@ -38,7 +38,7 @@ class Obj;
 class TableRef;
 
 struct GeoPoint {
-    GeoPoint() = delete;
+    GeoPoint() {}  //TODO Need to see what's the best way and create a PR in core for this
     GeoPoint(double lon, double lat)
         : longitude(lon)
         , latitude(lat)
