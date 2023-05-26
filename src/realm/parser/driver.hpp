@@ -192,7 +192,6 @@ public:
         target_table = table_name.substr(1, table_name.size() - 2);
     }
 
-    // std::vector<std::shared_ptr<Subexpr>>
     std::unique_ptr<ConstantMixedList> copy_list_of_args(std::vector<Mixed>&);
     std::unique_ptr<Subexpr> copy_arg(ParserDriver*, DataType, size_t, DataType, std::string&);
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
