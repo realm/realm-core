@@ -629,7 +629,7 @@ private:
     // The set of sessions associated with this connection. A session becomes
     // associated with a connection when it is activated.
     std::map<session_ident_type, std::unique_ptr<Session>> m_sessions;
-    // Keep track of previously seen sessions to see if a stale message was
+    // Keep track of previously used sessions idents to see if a stale message was
     // received for a closed session
     std::vector<session_ident_type> m_session_history;
 

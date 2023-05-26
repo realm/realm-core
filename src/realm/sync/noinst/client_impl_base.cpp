@@ -327,11 +327,13 @@ void Connection::initiate_session_deactivation(Session* sess)
     REALM_ASSERT(sess);
     REALM_ASSERT(&sess->m_conn == this);
     REALM_ASSERT(m_num_active_sessions);
+    // Since the client may be waiting for m_num_active_sessions to reach 0
+    // in stop_and_wait() (on a separate thread), deactivate Session before
+    // decrementing the num active sessions value.
     sess->initiate_deactivation(); // Throws
     if (sess->m_state == Session::Deactivated) {
         finish_session_deactivation(sess);
     }
-    // Trigger the session deactivation before decrementing the active session count
     if (REALM_UNLIKELY(--m_num_active_sessions == 0)) {
         if (m_activated && m_state == ConnectionState::disconnected)
             m_on_idle->trigger();
@@ -2716,8 +2718,8 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
         // sent again the next time the client connects
         if (m_state == Active) {
             m_pending_compensating_write_errors.push_back(info);
-            return {};
         }
+        return {};
     }
 
     m_error_message_received = true;
