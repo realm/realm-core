@@ -23,7 +23,7 @@ import path from "path";
 
 import { debug, enableDebugging } from "./debug";
 import { generate } from "./generator";
-import { OptInSpec, InvalidSpecError, parseOptInList, parseSpecs } from "./spec";
+import { OptInSpec, InvalidSpecError, parseOptInSpec, parseSpecs } from "./spec";
 import { Template, importTemplate } from "./templates";
 
 type GenerateOptions = {
@@ -106,7 +106,7 @@ program
       const rawSpec = parseSpecs(specPaths);
       let optInSpec: OptInSpec | undefined;
       if (optInPath) {
-        optInSpec = parseOptInList(optInPath);
+        optInSpec = parseOptInSpec(optInPath);
       }
       generate({ rawSpec, optInSpec, template: await template, outputPath });
       process.exit(0);

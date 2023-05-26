@@ -69,6 +69,15 @@ const schemaFile = new URL("../generated/spec.schema.json", import.meta.url);
 const schemaJson = JSON.parse(fs.readFileSync(schemaFile, { encoding: "utf8" }));
 export const validate = ajv.compile<RelaxedSpec>(schemaJson);
 
+const optInSchemaFile = new URL("../generated/opt-in-spec.schema.json", import.meta.url);
+const optInSchemaJson = JSON.parse(fs.readFileSync(optInSchemaFile, { encoding: "utf8" }));
+export const validateOptInSpec = ajv.compile<OptInSpec>(optInSchemaJson);
+
+function parseYaml(filePath: string): unknown {
+  const text = fs.readFileSync(filePath, { encoding: "utf8" });
+  return yaml.parse(text);
+}
+
 export function parseSpecs(specs: ReadonlyArray<string>): Spec {
   const [base, ...extras] = specs;
   const spec = parseSpec(base);
@@ -97,8 +106,7 @@ export function parseSpecs(specs: ReadonlyArray<string>): Spec {
 }
 
 export function parseSpec(filePath: string): AnySpec {
-  const text = fs.readFileSync(filePath, { encoding: "utf8" });
-  const parsed = yaml.parse(text);
+  const parsed = parseYaml(filePath);
   const isValid = validate(parsed);
   if (isValid) {
     return normalizeSpec(parsed);
@@ -107,14 +115,13 @@ export function parseSpec(filePath: string): AnySpec {
   }
 }
 
-export function parseOptInList(filePath: string): OptInSpec {
-  const text = fs.readFileSync(filePath, { encoding: "utf8" });
-  const parsed = yaml.parse(text) as unknown;
-
-  return parsed as OptInSpec;
-
-  // TODO:
-  // Validate shape of spec
+export function parseOptInSpec(filePath: string): OptInSpec {
+  const parsed = parseYaml(filePath);
+  const isValid = validateOptInSpec(parsed);
+  if (isValid) {
+    return parsed;
+  }
+  throw new InvalidSpecError(filePath, validateOptInSpec.errors || []);
 }
 
 /**
