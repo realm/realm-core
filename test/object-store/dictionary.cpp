@@ -63,7 +63,7 @@ struct StringMaker<object_store::Dictionary> {
 
 namespace cf = realm::collection_fixtures;
 
-TEST_CASE("dictionary in mixed", "[dictionary]") {
+TEST_CASE("nested dictionary in mixed", "[dictionary]") {
 
     InMemoryTestFile config;
     config.cache = false;
@@ -115,8 +115,8 @@ TEST_CASE("dictionary in mixed", "[dictionary]") {
 
     REQUIRE(change_dictionary.insertions.count() == 1); // nested collection + insertion of the list
     REQUIRE(change_list.insertions.count() == 1);       // nested collection + insertion of the list
-    REQUIRE(calls_dict == 2);                           // this does not seem right
-    REQUIRE(calls_list == 2);                           // this does not seem right
+    REQUIRE(calls_dict == 2);                           // this is called twice now!
+    REQUIRE(calls_list == 2);                           // this is called twice now!
 }
 
 TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,
