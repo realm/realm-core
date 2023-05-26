@@ -1580,8 +1580,9 @@ void SessionWrapper::refresh(std::string signed_access_token)
 
 inline void SessionWrapper::abandon(util::bind_ptr<SessionWrapper> wrapper) noexcept
 {
-    if (wrapper->m_initiated) {
-        REALM_ASSERT(!wrapper->m_finalized);
+    // If the wrapper was already finalized by finalize_before_actualization() then
+    // nothing to do.
+    if (wrapper->m_initiated && !wrapper->m_finalized) {
         ClientImpl& client = wrapper->m_client;
         client.register_abandoned_session_wrapper(std::move(wrapper));
     }
