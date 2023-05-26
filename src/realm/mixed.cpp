@@ -46,9 +46,9 @@ static const int sorting_rank[19] = {
     7,  // type_Link = 12,
     -1, // type_LinkList = 13,
     -1,
-    4, // type_ObjectId = 15,
-    6, // type_TypedLink = 16
-    5, // type_UUID = 17
+    4,  // type_ObjectId = 15,
+    6,  // type_TypedLink = 16
+    5,  // type_UUID = 17
 
     // Observe! Changing these values breaks the file format for Set<Mixed>
 };
@@ -144,9 +144,9 @@ int compare_long_to_double(int64_t lhs, double rhs)
     // Large magnitude doubles (including +/- Inf) are strictly > or < all Longs.
     static const double kBoundOfLongRange = -static_cast<double>(LLONG_MIN); // positive 2**63
     if (rhs >= kBoundOfLongRange)
-        return -1; // Can't be represented in a Long.
+        return -1;                                                           // Can't be represented in a Long.
     if (rhs < -kBoundOfLongRange)
-        return 1; // Can be represented in a Long.
+        return 1;                                                            // Can be represented in a Long.
 
     // Remaining Doubles can have their integer component precisely represented as long longs.
     // If they have a fractional component, they must be strictly > or < lhs even after
@@ -621,6 +621,7 @@ size_t Mixed::hash() const
         case type_Mixed:
         case type_Link:
         case type_LinkList:
+        case type_EnumString:
             REALM_ASSERT_RELEASE(false && "Hash not supported for this column type");
             break;
     }
@@ -715,6 +716,7 @@ StringData Mixed::get_index_data(std::array<char, 16>& buffer) const noexcept
         case type_Mixed:
         case type_Link:
         case type_LinkList:
+        case type_EnumString:
             break;
     }
     REALM_ASSERT_RELEASE(false && "Index not supported for this column type");
@@ -784,6 +786,7 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
             case type_UUID:
                 out << util::serializer::print_value(m.uuid_val);
                 break;
+            case type_EnumString:
             case type_Mixed:
             case type_LinkList:
                 REALM_ASSERT(false);

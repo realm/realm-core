@@ -57,6 +57,7 @@ struct DataType {
         ObjectId = 15,
         TypedLink = 16,
         UUID = 17,
+        EnumString = 18,
     };
 
     constexpr explicit DataType(int t) noexcept
@@ -121,6 +122,7 @@ struct DataType {
             case Type::ObjectId:
             case Type::TypedLink:
             case Type::UUID:
+            case Type::EnumString:
                 return true;
         }
         return false;
@@ -143,6 +145,7 @@ static constexpr DataType type_LinkList = DataType{DataType::Type::LinkList};
 static constexpr DataType type_ObjectId = DataType{DataType::Type::ObjectId};
 static constexpr DataType type_TypedLink = DataType{DataType::Type::TypedLink};
 static constexpr DataType type_UUID = DataType{DataType::Type::UUID};
+static constexpr DataType type_EnumString = DataType{DataType::Type::EnumString};
 
 // Deprecated column types that must still be handled in migration code, but not
 // in every enum everywhere. Note that `DataType::is_valid()` returns false for
@@ -184,6 +187,8 @@ constexpr inline DataType::operator util::Printable() const noexcept
             return "type_TypedLink";
         case type_UUID:
             return "type_UUID";
+        case type_EnumString:
+            return "type_EnumString";
     }
     if (*this == type_OldTable) {
         return "type_OldTable";

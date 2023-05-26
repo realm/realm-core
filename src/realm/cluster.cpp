@@ -99,7 +99,7 @@ void ClusterNode::get(ObjKey k, ClusterNode::State& state) const
 MemRef Cluster::create_empty_cluster(Allocator& alloc)
 {
     Array arr(alloc);
-    arr.create(Array::type_HasRefs); // Throws
+    arr.create(Array::type_HasRefs);      // Throws
 
     arr.add(RefOrTagged::make_tagged(0)); // Compact form
     return arr.get_mem();
@@ -178,6 +178,9 @@ void Cluster::create()
                 break;
             case col_type_UUID:
                 do_create<ArrayUUIDNull>(col_key);
+                break;
+            case col_type_EnumString:
+                do_create<ArrayInteger>(col_key);
                 break;
             case col_type_Link:
                 do_create<ArrayKey>(col_key);
@@ -416,6 +419,9 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
             case col_type_UUID:
                 do_insert_row<ArrayUUIDNull>(ndx, col_key, init_value, nullable);
                 break;
+            case col_type_EnumString:
+                do_insert_row<ArrayInteger>(ndx, col_key, init_value, nullable);
+                break;
             case col_type_Link:
                 do_insert_key(ndx, col_key, init_value, ObjKey(k.value + get_offset()));
                 break;
@@ -642,6 +648,9 @@ void Cluster::insert_column(ColKey col_key)
             break;
         case col_type_BackLink:
             do_insert_column<ArrayBacklink>(col_key, nullable);
+            break;
+        case col_type_EnumString:
+            do_insert_column<ArrayInteger>(col_key, nullable);
             break;
         default:
             throw LogicError(LogicError::illegal_type);

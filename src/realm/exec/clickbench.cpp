@@ -42,7 +42,7 @@ static void create_table(TransactionRef tr)
     auto t = tr->add_table("Hits");
     t->add_column(type_Int, "WatchID");
     t->add_column(type_Int, "JavaEnable");
-    t->add_column(type_String, "Title", true);
+    t->add_column(type_EnumString, "Title", true);
     t->add_column(type_Int, "GoodEvent");
     t->add_column(type_Timestamp, "EventTime");
     t->add_column(type_Timestamp, "EventDate");
@@ -53,8 +53,8 @@ static void create_table(TransactionRef tr)
     t->add_column(type_Int, "CounterClass");
     t->add_column(type_Int, "OS");
     t->add_column(type_Int, "UserAgent");
-    t->add_column(type_String, "URL", true);
-    t->add_column(type_String, "Referer", true);
+    t->add_column(type_EnumString, "URL", true);
+    t->add_column(type_EnumString, "Referer", true);
     t->add_column(type_Int, "IsRefresh");
     t->add_column(type_Int, "RefererCategoryID");
     t->add_column(type_Int, "RefererRegionID");
@@ -65,21 +65,21 @@ static void create_table(TransactionRef tr)
     t->add_column(type_Int, "ResolutionDepth");
     t->add_column(type_Int, "FlashMajor");
     t->add_column(type_Int, "FlashMinor");
-    t->add_column(type_String, "FlashMinor2", true);
+    t->add_column(type_EnumString, "FlashMinor2", true);
     t->add_column(type_Int, "NetMajor");
     t->add_column(type_Int, "NetMinor");
     t->add_column(type_Int, "UserAgentMajor");
-    t->add_column(type_String, "UserAgentMinor", true);
+    t->add_column(type_EnumString, "UserAgentMinor", true);
     t->add_column(type_Int, "CookieEnable");
     t->add_column(type_Int, "JavascriptEnable");
     t->add_column(type_Int, "IsMobile");
     t->add_column(type_Int, "MobilePhone");
-    t->add_column(type_String, "MobilePhoneModel", true);
-    t->add_column(type_String, "Params", true);
+    t->add_column(type_EnumString, "MobilePhoneModel", true);
+    t->add_column(type_EnumString, "Params", true);
     t->add_column(type_Int, "IPNetworkID");
     t->add_column(type_Int, "TraficSourceID");
     t->add_column(type_Int, "SearchEngineID");
-    t->add_column(type_String, "SearchPhrase", true);
+    t->add_column(type_EnumString, "SearchPhrase", true);
     t->add_column(type_Int, "AdvEngineID");
     t->add_column(type_Int, "IsArtifical");
     t->add_column(type_Int, "WindowClientWidth");
@@ -90,20 +90,20 @@ static void create_table(TransactionRef tr)
     t->add_column(type_Int, "SilverlightVersion2");
     t->add_column(type_Int, "SilverlightVersion3");
     t->add_column(type_Int, "SilverlightVersion4");
-    t->add_column(type_String, "PageCharset", true);
+    t->add_column(type_EnumString, "PageCharset", true);
     t->add_column(type_Int, "CodeVersion");
     t->add_column(type_Int, "IsLink");
     t->add_column(type_Int, "IsDownload");
     t->add_column(type_Int, "IsNotBounce");
     t->add_column(type_Int, "FUniqID");
-    t->add_column(type_String, "OriginalURL", true);
+    t->add_column(type_EnumString, "OriginalURL", true);
     t->add_column(type_Int, "HID");
     t->add_column(type_Int, "IsOldCounter");
     t->add_column(type_Int, "IsEvent");
     t->add_column(type_Int, "IsParameter");
     t->add_column(type_Int, "DontCountHits");
     t->add_column(type_Int, "WithHash");
-    t->add_column(type_String, "HitColor", true);
+    t->add_column(type_EnumString, "HitColor", true);
     t->add_column(type_Timestamp, "LocalEventTime");
     t->add_column(type_Int, "Age");
     t->add_column(type_Int, "Sex");
@@ -114,10 +114,10 @@ static void create_table(TransactionRef tr)
     t->add_column(type_Int, "WindowName");
     t->add_column(type_Int, "OpenerName");
     t->add_column(type_Int, "HistoryLength");
-    t->add_column(type_String, "BrowserLanguage", true);
-    t->add_column(type_String, "BrowserCountry", true);
-    t->add_column(type_String, "SocialNetwork", true);
-    t->add_column(type_String, "SocialAction", true);
+    t->add_column(type_EnumString, "BrowserLanguage", true);
+    t->add_column(type_EnumString, "BrowserCountry", true);
+    t->add_column(type_EnumString, "SocialNetwork", true);
+    t->add_column(type_EnumString, "SocialAction", true);
     t->add_column(type_Int, "HTTPError");
     t->add_column(type_Int, "SendTiming");
     t->add_column(type_Int, "DNSTiming");
@@ -126,21 +126,21 @@ static void create_table(TransactionRef tr)
     t->add_column(type_Int, "ResponseEndTiming");
     t->add_column(type_Int, "FetchTiming");
     t->add_column(type_Int, "SocialSourceNetworkID");
-    t->add_column(type_String, "SocialSourcePage", true);
+    t->add_column(type_EnumString, "SocialSourcePage", true);
     t->add_column(type_Int, "ParamPrice");
-    t->add_column(type_String, "ParamOrderID", true);
-    t->add_column(type_String, "ParamCurrency", true);
+    t->add_column(type_EnumString, "ParamOrderID", true);
+    t->add_column(type_EnumString, "ParamCurrency", true);
     t->add_column(type_Int, "ParamCurrencyID");
-    t->add_column(type_String, "OpenstatServiceName", true);
-    t->add_column(type_String, "OpenstatCampaignID", true);
-    t->add_column(type_String, "OpenstatAdID", true);
-    t->add_column(type_String, "OpenstatSourceID", true);
-    t->add_column(type_String, "UTMSource", true);
-    t->add_column(type_String, "UTMMedium", true);
-    t->add_column(type_String, "UTMCampaign", true);
-    t->add_column(type_String, "UTMContent", true);
-    t->add_column(type_String, "UTMTerm", true);
-    t->add_column(type_String, "FromTag", true);
+    t->add_column(type_EnumString, "OpenstatServiceName", true);
+    t->add_column(type_EnumString, "OpenstatCampaignID", true);
+    t->add_column(type_EnumString, "OpenstatAdID", true);
+    t->add_column(type_EnumString, "OpenstatSourceID", true);
+    t->add_column(type_EnumString, "UTMSource", true);
+    t->add_column(type_EnumString, "UTMMedium", true);
+    t->add_column(type_EnumString, "UTMCampaign", true);
+    t->add_column(type_EnumString, "UTMContent", true);
+    t->add_column(type_EnumString, "UTMTerm", true);
+    t->add_column(type_EnumString, "FromTag", true);
     t->add_column(type_Int, "HasGCLID");
     t->add_column(type_Int, "RefererHash");
     t->add_column(type_Int, "URLHash");
@@ -236,6 +236,9 @@ void parse_file(const char* filename)
                 case col_type_String:
                     val.value = strlen(tok) ? Mixed(tok) : Mixed();
                     break;
+                case col_type_EnumString:
+                    val.value = strlen(tok) ? Mixed(tok) : Mixed();
+                    break;
                 case col_type_Timestamp:
                     val.value = Mixed(get_timestamp(tok));
                     break;
@@ -324,6 +327,9 @@ void dump_prop(const char* filename, const char* prop_name)
                 break;
             case col_type_String:
                 std::cout << o.get<String>(col) << std::endl;
+                break;
+            case col_type_EnumString:
+                REALM_ASSERT(false);
                 break;
             case col_type_Timestamp:
                 std::cout << o.get<Timestamp>(col) << std::endl;

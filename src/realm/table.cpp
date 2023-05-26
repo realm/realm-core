@@ -2952,8 +2952,26 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
     }
 
     REALM_ASSERT(key.value >= 0);
-
-    Obj obj = m_clusters.insert(key, values); // repl->set()
+    // translate strings in EnumString columns:
+    // - not optimal, as we need to create new set of FieldValues
+    FieldValues translated_values;
+    for (auto& v : values) {
+        if (v.col_key.get_type() == col_type_EnumString) {
+            if (v.value.is_null()) {
+                translated_values.insert(v.col_key, Mixed(0), v.is_default);
+            }
+            else {
+                // convert value
+                size_t id = m_spec.add_insert_enum_string(colkey2spec_ndx(v.col_key), v.value.get_string());
+                translated_values.insert(v.col_key, Mixed((int64_t)id), false);
+            }
+        }
+        else {
+            // copy over unchanged
+            translated_values.insert(v.col_key, v.value, v.is_default);
+        }
+    }
+    Obj obj = m_clusters.insert(key, translated_values); // repl->set()
 
     return obj;
 }
@@ -3835,6 +3853,7 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
             case type_Link:
             case type_TypedLink:
             case type_LinkList:
+            case type_EnumString:
                 // Can't have lists of these types
             case type_Mixed:
                 // These types are no longer supported at all
@@ -3893,6 +3912,7 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
             case type_Link:
                 // Always nullable, so can't convert
             case type_LinkList:
+            case type_EnumString:
                 // Never nullable, so can't convert
             case type_Mixed:
                 // These types are no longer supported at all

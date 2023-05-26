@@ -128,7 +128,7 @@ private:
         std::aligned_storage<sizeof(ArrayBigBlobs), alignof(ArrayBigBlobs)>::type m_big_blobs;
         std::aligned_storage<sizeof(Array), alignof(Array)>::type m_enum;
     };
-    enum class Type { small_strings, medium_strings, big_strings, enum_strings };
+    enum class Type { small_strings, medium_strings, big_strings };
 
     Type m_type = Type::small_strings;
 

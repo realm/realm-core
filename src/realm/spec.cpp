@@ -552,6 +552,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
             case col_type_BackLink:
             case col_type_ObjectId:
             case col_type_UUID:
+            case col_type_EnumString:
                 // All other column types are compared as before
                 if (m_types.get(col_ndx) != spec.m_types.get(col_ndx))
                     return false;
@@ -582,7 +583,7 @@ void Spec::verify() const
     REALM_ASSERT(m_attr.get_ref() == m_top.get_as_ref(2));
 #endif
 }
-
+/*
 // Alternate unordered map
 struct trie_node {
     uint64_t mask = 0;
@@ -635,6 +636,7 @@ trie_node* trie_add(trie_node* root, uint64_t key, uint64_t value)
         trie_node* new_root =
     }
 }
+*/
 // Code for pair compression integrated with interning:
 // ----------
 // Compression is done by first expanding 8-bit chars to 16-bit symbols.
@@ -705,6 +707,10 @@ public:
         separators['{'] = true;
         separators['}'] = true;
     }
+    // compress and array of symbols using pairwise compression, until
+    // 1. we've done 'max_runs' passes over the array OR
+    // 2. we've compressed the array down to the 'breakout_limit' OR
+    // 3. the last pass over the array did not achieve any compression
     int compress_symbols(uint16_t symbols[], int size, int max_runs, int breakout_limit = 1)
     {
         bool table_full = decoding_table.size() >= 65536 - 256;
@@ -730,7 +736,7 @@ public:
                     // existing conflicting entry or at capacity -> don't compress
                     *to++ = a;
                     p++;
-                    // trying to stay aligned yields slightly worse results, so disable for now:
+                    // trying to stay aligned yields slightly worse results, so don't:
                     // *to++ = from[1];
                     // p++;
                 }
@@ -758,7 +764,7 @@ public:
             //     std::cout << symbols[i] << " ";
             // std::cout << std::endl;
             if (size <= breakout_limit)
-                break; // early out, gonna use at least one chunk anyway
+                break; // early out, goal reached!
             if (from == to)
                 break; // early out, no symbols were compressed on last run
         }
@@ -784,6 +790,7 @@ public:
             decompress(*from++, decompress);
         }
         // walk back on any trailing zeroes:
+        // BUG: This may not handle a string wich includes a zero as last character
         while (to[-1] == 0 && to > decompressed) {
             --to;
         }
@@ -799,10 +806,13 @@ public:
             REALM_ASSERT((0xFF & *first++) == *checked++);
         }
     }
+    // compress a string into a sequence of 16-bit symbols.
+    // return the length of the sequencevalu
     int compress(uint16_t symbols[], const char* first, const char* past)
     {
         // expand into 16 bit symbols:
         int size = past - first;
+        int limit_size = size / 8;
         REALM_ASSERT(size < 8180);
         uint16_t* to = symbols;
         int out_size = 0;
@@ -821,7 +831,7 @@ public:
         }
         // compress all groups together
         // size = out_size;
-        size = compress_symbols(symbols, out_size, 2, 4);
+        size = compress_symbols(symbols, out_size, 4, limit_size);
         compressed_symbols += size;
         return size;
     }
@@ -853,7 +863,7 @@ public:
 #else
 #if COMPRESS_BEFORE_INTERNING
         size = compress(symbol_buffer, _first, _past);
-        decompress_and_verify(symbol_buffer, size, _first, _past);
+        // decompress_and_verify(symbol_buffer, size, _first, _past);
         std::vector<uint16_t> symbol(size);
         for (int j = 0; j < size; ++j)
             symbol[j] = symbol_buffer[j];

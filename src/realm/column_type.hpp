@@ -43,7 +43,8 @@ struct ColumnType {
         BackLink = 14,
         ObjectId = 15,
         TypedLink = 16,
-        UUID = 17
+        UUID = 17,
+        EnumString = 18,
     };
 
     constexpr explicit ColumnType(int64_t t) noexcept
@@ -102,6 +103,7 @@ struct ColumnType {
             case Type::ObjectId:
             case Type::TypedLink:
             case Type::UUID:
+            case Type::EnumString:
                 return true;
         }
         return false;
@@ -125,6 +127,7 @@ static constexpr ColumnType col_type_BackLink = ColumnType{ColumnType::Type::Bac
 static constexpr ColumnType col_type_ObjectId = ColumnType{ColumnType::Type::ObjectId};
 static constexpr ColumnType col_type_TypedLink = ColumnType{ColumnType::Type::TypedLink};
 static constexpr ColumnType col_type_UUID = ColumnType{ColumnType::Type::UUID};
+static constexpr ColumnType col_type_EnumString = ColumnType{ColumnType::Type::EnumString};
 
 // Deprecated column types that must still be handled in migration code, but not
 // in every enum everywhere. Note that `ColumnType::is_valid()` returns false
@@ -260,6 +263,8 @@ constexpr inline ColumnType::operator util::Printable() const noexcept
             return "col_type_TypedLink";
         case col_type_UUID:
             return "col_type_UUID";
+        case col_type_EnumString:
+            return "col_type_EnumString";
     }
     if (*this == col_type_OldTable) {
         return "col_type_OldTable";
