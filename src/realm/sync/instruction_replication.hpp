@@ -128,7 +128,7 @@ private:
 
     Instruction::PrimaryKey as_primary_key(Mixed);
     Instruction::PrimaryKey primary_key_for_object(const Table&, ObjKey key);
-    void populate_path_instr(Instruction::PathInstruction&, const Table&, ObjKey key, ColKey col_key);
+    void populate_path_instr(Instruction::PathInstruction&, const Table&, ObjKey key, Path path);
     void populate_path_instr(Instruction::PathInstruction&, const CollectionBase&);
     void populate_path_instr(Instruction::PathInstruction&, const CollectionBase&, uint32_t ndx);
 

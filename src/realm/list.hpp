@@ -350,6 +350,10 @@ public:
     DictionaryPtr get_dictionary(const PathElement& path_elem) const override;
     SetMixedPtr get_set(const PathElement& path_elem) const override;
     ListMixedPtr get_list(const PathElement& path_elem) const override;
+    int64_t get_key(size_t ndx)
+    {
+        return m_tree->get_key(ndx);
+    }
 
 
     // Overriding members of CollectionBase:

@@ -792,8 +792,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             ColKey col_key = ColKey(read_int<int64_t>()); // Throws
             ObjKey key = ObjKey(read_int<int64_t>());     // Throws
             size_t nesting_level = instr == instr_SelectCollectionByPath ? read_int<uint32_t>() : 0;
-            std::vector<PathElement> path;
-            path.push_back(size_t(col_key.value));
+            Path path;
+            path.push_back(col_key);
             for (size_t l = 0; l < nesting_level; l++) {
                 auto ndx = read_int<int64_t>();
                 if (ndx < 0) {

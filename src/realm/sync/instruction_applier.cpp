@@ -270,8 +270,10 @@ void InstructionApplier::visit_payload(const Instruction::Payload& payload, F&& 
     switch (payload.type) {
         case Type::ObjectValue:
             return visitor(Instruction::Payload::ObjectValue{});
+        case Type::List:
+            return visitor(Instruction::Payload::List{});
         case Type::Dictionary:
-            return bad_transaction_log("Nested dictionaries not supported yet");
+            return visitor(Instruction::Payload::Dictionary{});
         case Type::Erased:
             return visitor(Instruction::Payload::Erased{});
         case Type::GlobalKey:
@@ -338,6 +340,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
             auto data_type = DataType(col.get_type());
 
             auto visitor = [&](const mpark::variant<ObjLink, Mixed, Instruction::Payload::ObjectValue,
+                                                    Instruction::Payload::Dictionary, Instruction::Payload::List,
                                                     Instruction::Payload::Erased>& arg) {
                 if (const auto link_ptr = mpark::get_if<ObjLink>(&arg)) {
                     if (data_type == type_Mixed || data_type == type_TypedLink) {
@@ -383,6 +386,12 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                 }
                 else if (const auto erase_ptr = mpark::get_if<Instruction::Payload::Erased>(&arg)) {
                     m_applier->bad_transaction_log("Update: Dictionary erase at object field");
+                }
+                else if (mpark::get_if<Instruction::Payload::Dictionary>(&arg)) {
+                    obj.set_collection(col, CollectionType::Dictionary);
+                }
+                else if (mpark::get_if<Instruction::Payload::List>(&arg)) {
+                    obj.set_collection(col, CollectionType::List);
                 }
             };
 
@@ -453,6 +462,12 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                     // Embedded object creation is idempotent, and link lists cannot
                     // contain nulls, so this is a no-op.
                 },
+                [&](const Instruction::Payload::Dictionary&) {
+                    list.set_collection(size_t(index), CollectionType::Dictionary);
+                },
+                [&](const Instruction::Payload::List&) {
+                    list.set_collection(size_t(index), CollectionType::List);
+                },
                 [&](const Instruction::Payload::Erased&) {
                     m_applier->bad_transaction_log("Update: Dictionary erase of list element");
                 },
@@ -484,6 +499,12 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                 },
                 [&](const Instruction::Payload::ObjectValue&) {
                     dict.create_and_insert_linked_object(key);
+                },
+                [&](const Instruction::Payload::Dictionary&) {
+                    dict.insert_collection(key.get_string(), CollectionType::Dictionary);
+                },
+                [&](const Instruction::Payload::List&) {
+                    dict.insert_collection(key.get_string(), CollectionType::List);
                 },
             };
 
@@ -668,11 +689,12 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
         }
         Status on_list_index(LstBase& list, uint32_t index) override
         {
-            auto col = list.get_col_key();
-            auto data_type = DataType(col.get_type());
+            auto data_type = list.get_data_type();
             auto table = list.get_table();
             auto table_name = table->get_name();
-            auto field_name = table->get_column_name(col);
+            auto field_name = [&] {
+                return table->get_column_name(list.get_col_key());
+            };
 
             if (index > m_instr.prior_size) {
                 m_applier->bad_transaction_log("ArrayInsert: Invalid insertion index (index = %1, prior_size = %2)",
@@ -700,11 +722,11 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
                         auto& mixed_list = static_cast<Lst<Mixed>&>(list);
                         mixed_list.insert(index, link);
                     }
-                    else if (data_type == type_LinkList || data_type == type_Link) {
+                    else if (data_type == type_Link) {
                         REALM_ASSERT(dynamic_cast<Lst<ObjKey>*>(&list));
                         auto& link_list = static_cast<Lst<ObjKey>&>(list);
                         // Validate the target.
-                        auto target_table = table->get_link_target(col);
+                        auto target_table = table->get_link_target(list.get_col_key());
                         if (target_table->get_key() != link.get_table_key()) {
                             m_applier->bad_transaction_log(
                                 "ArrayInsert: Target table mismatch (expected '%1', got '%2')",
@@ -715,34 +737,37 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
                     }
                     else {
                         m_applier->bad_transaction_log(
-                            "ArrayInsert: Type mismatch in list at '%2.%1' (expected link type, was %3)", field_name,
-                            table_name, data_type);
+                            "ArrayInsert: Type mismatch in list at '%2.%1' (expected link type, was %3)",
+                            field_name(), table_name, data_type);
                     }
                 },
                 [&](Mixed value) {
-                    if (value.is_null()) {
-                        if (col.is_nullable()) {
+                    if (data_type == type_Mixed) {
+                        list.insert_any(index, value);
+                    }
+                    else if (value.is_null()) {
+                        if (list.get_col_key().is_nullable()) {
                             list.insert_null(index);
                         }
                         else {
                             m_applier->bad_transaction_log("ArrayInsert: NULL in non-nullable list '%2.%1'",
-                                                           field_name, table_name);
+                                                           field_name(), table_name);
                         }
                     }
                     else {
-                        if (data_type == type_Mixed || value.get_type() == data_type) {
+                        if (value.get_type() == data_type) {
                             list.insert_any(index, value);
                         }
                         else {
                             m_applier->bad_transaction_log(
-                                "ArrayInsert: Type mismatch in list at '%2.%1' (expected %3, got %4)", field_name,
+                                "ArrayInsert: Type mismatch in list at '%2.%1' (expected %3, got %4)", field_name(),
                                 table_name, data_type, value.get_type());
                         }
                     }
                 },
                 [&](const Instruction::Payload::ObjectValue&) {
-                    if (col.get_type() == col_type_LinkList || col.get_type() == col_type_Link) {
-                        auto target_table = list.get_table()->get_link_target(col);
+                    if (data_type == type_Link) {
+                        auto target_table = list.get_table()->get_link_target(list.get_col_key());
                         if (!target_table->is_embedded()) {
                             m_applier->bad_transaction_log(
                                 "ArrayInsert: Creation of embedded object of type '%1', which is not "
@@ -756,12 +781,19 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
                     }
                     else {
                         m_applier->bad_transaction_log(
-                            "ArrayInsert: Creation of embedded object in non-link list field '%2.%1'", field_name,
+                            "ArrayInsert: Creation of embedded object in non-link list field '%2.%1'", field_name(),
                             table_name);
                     }
                 },
                 [&](const Instruction::Payload::Dictionary&) {
-                    m_applier->bad_transaction_log("Dictionary payload for ArrayInsert");
+                    REALM_ASSERT(dynamic_cast<Lst<Mixed>*>(&list));
+                    auto& mixed_list = static_cast<Lst<Mixed>&>(list);
+                    mixed_list.insert_collection(size_t(index), CollectionType::Dictionary);
+                },
+                [&](const Instruction::Payload::List&) {
+                    REALM_ASSERT(dynamic_cast<Lst<Mixed>*>(&list));
+                    auto& mixed_list = static_cast<Lst<Mixed>&>(list);
+                    mixed_list.insert_collection(size_t(index), CollectionType::List);
                 },
                 [&](const Instruction::Payload::Erased&) {
                     m_applier->bad_transaction_log("Dictionary erase payload for ArrayInsert");
@@ -862,6 +894,24 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
         void on_set(SetBase& set) override
         {
             set.clear();
+        }
+        void on_property(Obj& obj, ColKey col_key) override
+        {
+            if (col_key.get_type() == col_type_Mixed) {
+                auto val = obj.get<Mixed>(col_key);
+                if (val.is_type(type_Dictionary)) {
+                    Dictionary dict(obj, col_key);
+                    dict.clear();
+                    return;
+                }
+                else if (val.is_type(type_List)) {
+                    Lst<Mixed> list(obj, col_key);
+                    list.clear();
+                    return;
+                }
+            }
+
+            PathResolver::on_property(obj, col_key);
         }
     };
     ClearResolver(this, instr).resolve();
@@ -1029,6 +1079,9 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
                 [&](const Instruction::Payload::Dictionary&) {
                     m_applier->bad_transaction_log("SetInsert: Sets of dictionaries are not supported.");
                 },
+                [&](const Instruction::Payload::List&) {
+                    m_applier->bad_transaction_log("SetInsert: Sets of lists are not supported.");
+                },
                 [&](const Instruction::Payload::Erased&) {
                     m_applier->bad_transaction_log("SetInsert: Dictionary erase payload in SetInsert");
                 },
@@ -1106,6 +1159,9 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
                 },
                 [&](const Instruction::Payload::ObjectValue&) {
                     m_applier->bad_transaction_log("SetErase: Sets of embedded objects are not supported.");
+                },
+                [&](const Instruction::Payload::List&) {
+                    m_applier->bad_transaction_log("SetErase: Sets of lists are not supported.");
                 },
                 [&](const Instruction::Payload::Dictionary&) {
                     m_applier->bad_transaction_log("SetErase: Sets of dictionaries are not supported.");
@@ -1366,6 +1422,25 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
         on_error(util::format("%1: Dictionary key is not a string on field '%2' in class '%3'", m_instr_name,
                               field_name, obj.get_table()->get_name()));
     }
+    else if (col.get_type() == col_type_Mixed) {
+        auto val = obj.get<Mixed>(col);
+        if (val.is_type(type_Dictionary)) {
+            if (auto pkey = mpark::get_if<InternString>(&*m_it_begin)) {
+                Dictionary dict(obj, col);
+                ++m_it_begin;
+                return resolve_dictionary_element(dict, *pkey);
+            }
+        }
+        if (val.is_type(type_List)) {
+            if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
+                Lst<Mixed> list(obj, col);
+                ++m_it_begin;
+                return resolve_list_element(list, *pindex);
+            }
+        }
+        on_error(util::format("%1: Not a list or dictionary on field '%2' in class '%3'", m_instr_name, field_name,
+                              obj.get_table()->get_name()));
+    }
     else if (col.get_type() == col_type_Link) {
         auto target = obj.get_table()->get_link_target(col);
         if (!target->is_embedded()) {
@@ -1434,6 +1509,26 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
         on_error(util::format("%1: Embedded object field reference is not a string", m_instr_name));
     }
     else {
+        if (list.get_data_type() == type_Mixed) {
+            auto& mixed_list = static_cast<Lst<Mixed>&>(list);
+            auto val = mixed_list.get(index);
+
+            if (val.is_type(type_Dictionary)) {
+                if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
+                    Dictionary d(mixed_list, mixed_list.get_key(index));
+                    ++m_it_begin;
+                    return resolve_dictionary_element(d, *pfield);
+                }
+            }
+            if (val.is_type(type_List)) {
+                if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
+                    Lst<Mixed> l(mixed_list, mixed_list.get_key(index));
+                    ++m_it_begin;
+                    return resolve_list_element(l, *pindex);
+                }
+            }
+        }
+
         on_error(util::format(
             "%1: Resolving path through unstructured list element on '%3.%2', which is a list of type '%4'",
             m_instr_name, field_name, list.get_table()->get_name(), col.get_type()));
@@ -1481,6 +1576,21 @@ InstructionApplier::PathResolver::resolve_dictionary_element(Dictionary& dict, I
         }
     }
     else {
+        auto val = dict.get(string_key);
+        if (val.is_type(type_Dictionary)) {
+            if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
+                Dictionary d(dict, string_key);
+                ++m_it_begin;
+                return resolve_dictionary_element(d, *pfield);
+            }
+        }
+        if (val.is_type(type_List)) {
+            if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
+                Lst<Mixed> l(dict, string_key);
+                ++m_it_begin;
+                return resolve_list_element(l, *pindex);
+            }
+        }
         on_error(
             util::format("%1: Resolving path through non link element on '%3.%2', which is a dictionary of type '%4'",
                          m_instr_name, field_name, table->get_name(), col.get_type()));
