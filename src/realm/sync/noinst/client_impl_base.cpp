@@ -303,6 +303,7 @@ void Connection::activate()
 
 void Connection::activate_session(std::unique_ptr<Session> sess)
 {
+    REALM_ASSERT(sess);
     REALM_ASSERT(&sess->m_conn == this);
     REALM_ASSERT(!m_force_closed);
     Session& sess_2 = *sess;
@@ -310,6 +311,8 @@ void Connection::activate_session(std::unique_ptr<Session> sess)
     auto p = m_sessions.emplace(ident, std::move(sess)); // Throws
     bool was_inserted = p.second;
     REALM_ASSERT(was_inserted);
+    // Save the session ident to the historical list of session idents
+    m_session_history.push_back(ident);
     sess_2.activate(); // Throws
     if (m_state == ConnectionState::connected) {
         bool fast_reconnect = false;
@@ -321,15 +324,17 @@ void Connection::activate_session(std::unique_ptr<Session> sess)
 
 void Connection::initiate_session_deactivation(Session* sess)
 {
+    REALM_ASSERT(sess);
     REALM_ASSERT(&sess->m_conn == this);
     REALM_ASSERT(m_num_active_sessions);
-    if (REALM_UNLIKELY(--m_num_active_sessions == 0)) {
-        if (m_activated && m_state == ConnectionState::disconnected)
-            m_on_idle->trigger();
-    }
     sess->initiate_deactivation(); // Throws
     if (sess->m_state == Session::Deactivated) {
         finish_session_deactivation(sess);
+    }
+    // Trigger the session deactivation before decrementing the active session count
+    if (REALM_UNLIKELY(--m_num_active_sessions == 0)) {
+        if (m_activated && m_state == ConnectionState::disconnected)
+            m_on_idle->trigger();
     }
 }
 
@@ -1375,6 +1380,16 @@ void Connection::receive_pong(milliseconds_type timestamp)
         m_client.m_roundtrip_time_handler(m_previous_ping_rtt); // Throws
 }
 
+bool Connection::check_session_history(session_ident_type session_ident)
+{
+    if (session_ident == 0) {
+        return false;
+    }
+
+    // Check the history to see if the message received was for a previous session
+    auto it = std::find(m_session_history.begin(), m_session_history.end(), session_ident);
+    return it != m_session_history.end();
+}
 
 void Connection::receive_error_message(const ProtocolErrorInfo& info, session_ident_type session_ident)
 {
@@ -1382,6 +1397,11 @@ void Connection::receive_error_message(const ProtocolErrorInfo& info, session_id
     if (session_ident != 0) {
         sess = get_session(session_ident);
         if (REALM_UNLIKELY(!sess)) {
+            if (check_session_history(session_ident)) {
+                logger.error("Received ERROR message for closed session, session_ident = %1",
+                             session_ident); // Throws
+                return;
+            }
             logger.error("Bad session identifier in ERROR message, session_ident = %1",
                          session_ident);                                 // Throws
             close_due_to_protocol_error(ClientError::bad_session_ident); // Throws
@@ -1432,14 +1452,21 @@ void Connection::receive_query_error_message(int raw_error_code, std::string_vie
         return close_due_to_protocol_error(ClientError::bad_protocol_from_server);
     }
 
-    auto session = get_session(session_ident);
-    if (!session) {
+    Session* sess = get_session(session_ident);
+    if (REALM_UNLIKELY(!sess)) {
+        if (check_session_history(session_ident)) {
+            logger.error("Received QUERY_ERROR message for closed session, session_ident = %1",
+                         session_ident); // Throws
+            return;
+        }
         logger.error("Bad session identifier in QUERY_ERROR mesage, session_ident = %1", session_ident); // throws
         return close_due_to_protocol_error(ClientError::bad_session_ident);                              // throws
     }
 
-    if (auto ec = session->receive_query_error_message(raw_error_code, message, query_version)) {
-        close_due_to_protocol_error(ec);
+    if (sess->m_state == Session::State::Active) {
+        if (auto ec = sess->receive_query_error_message(raw_error_code, message, query_version)) {
+            close_due_to_protocol_error(ec);
+        }
     }
 }
 
@@ -1448,15 +1475,21 @@ void Connection::receive_ident_message(session_ident_type session_ident, SaltedF
 {
     Session* sess = get_session(session_ident);
     if (REALM_UNLIKELY(!sess)) {
+        if (check_session_history(session_ident)) {
+            logger.error("Received IDENT message for closed session, session_ident = %1", session_ident); // Throws
+            return;
+        }
         logger.error("Bad session identifier in IDENT message, session_ident = %1",
                      session_ident);                                 // Throws
         close_due_to_protocol_error(ClientError::bad_session_ident); // Throws
         return;
     }
 
-    std::error_code ec = sess->receive_ident_message(client_file_ident); // Throws
-    if (ec)
-        close_due_to_protocol_error(ec); // Throws
+    if (sess->m_state == Session::State::Active) {
+        std::error_code ec = sess->receive_ident_message(client_file_ident); // Throws
+        if (ec)
+            close_due_to_protocol_error(ec); // Throws
+    }
 }
 
 void Connection::receive_download_message(session_ident_type session_ident, const SyncProgress& progress,
@@ -1466,28 +1499,40 @@ void Connection::receive_download_message(session_ident_type session_ident, cons
 {
     Session* sess = get_session(session_ident);
     if (REALM_UNLIKELY(!sess)) {
+        if (check_session_history(session_ident)) {
+            logger.error("Received DOWNLOAD message for closed session, session_ident = %1", session_ident); // Throws
+            return;
+        }
         logger.error("Bad session identifier in DOWNLOAD message, session_ident = %1",
                      session_ident);                                 // Throws
         close_due_to_protocol_error(ClientError::bad_session_ident); // Throws
         return;
     }
 
-    sess->receive_download_message(progress, downloadable_bytes, batch_state, query_version,
-                                   received_changesets); // Throws
+    if (sess->m_state == Session::State::Active) {
+        sess->receive_download_message(progress, downloadable_bytes, batch_state, query_version,
+                                       received_changesets); // Throws
+    }
 }
 
 void Connection::receive_mark_message(session_ident_type session_ident, request_ident_type request_ident)
 {
     Session* sess = get_session(session_ident);
     if (REALM_UNLIKELY(!sess)) {
-        logger.error("Bad session identifier (%1) in MARK message", session_ident); // Throws
+        if (check_session_history(session_ident)) {
+            logger.error("Received MARK message for closed session, session_ident = %1", session_ident); // Throws
+            return;
+        }
+        logger.error("Bad session identifier in MARK message, session_ident = %1", session_ident); // Throws
         close_due_to_protocol_error(ClientError::bad_session_ident);                // Throws
         return;
     }
 
-    std::error_code ec = sess->receive_mark_message(request_ident); // Throws
-    if (ec)
-        close_due_to_protocol_error(ec); // Throws
+    if (sess->m_state == Session::State::Active) {
+        std::error_code ec = sess->receive_mark_message(request_ident); // Throws
+        if (ec)
+            close_due_to_protocol_error(ec); // Throws
+    }
 }
 
 
@@ -1495,6 +1540,10 @@ void Connection::receive_unbound_message(session_ident_type session_ident)
 {
     Session* sess = get_session(session_ident);
     if (REALM_UNLIKELY(!sess)) {
+        if (check_session_history(session_ident)) {
+            logger.error("Received UNBOUND message for closed session, session_ident = %1", session_ident); // Throws
+            return;
+        }
         logger.error("Bad session identifier in UNBOUND message, session_ident = %1",
                      session_ident);                                 // Throws
         close_due_to_protocol_error(ClientError::bad_session_ident); // Throws
@@ -1518,14 +1567,21 @@ void Connection::receive_test_command_response(session_ident_type session_ident,
 {
     Session* sess = get_session(session_ident);
     if (REALM_UNLIKELY(!sess)) {
+        if (check_session_history(session_ident)) {
+            logger.error("Received TEST_COMMAND message for closed session, session_ident = %1",
+                         session_ident); // Throws
+            return;
+        }
         logger.error("Bad session identifier in TEST_COMMAND response message, session_ident = %1",
                      session_ident);                                 // Throws
         close_due_to_protocol_error(ClientError::bad_session_ident); // Throws
         return;
     }
 
-    if (auto ec = sess->receive_test_command_response(request_ident, body)) {
-        close_due_to_protocol_error(ec);
+    if (sess->m_state == Session::State::Active) {
+        if (auto ec = sess->receive_test_command_response(request_ident, body)) {
+            close_due_to_protocol_error(ec);
+        }
     }
 }
 
@@ -1736,12 +1792,6 @@ void Session::on_changesets_integrated(version_type client_version, const SyncPr
     if (m_ident_message_sent && !m_error_message_received && !m_suspended) {
         ensure_enlisted_to_send(); // Throws
     }
-}
-
-
-Session::~Session()
-{
-    //    REALM_ASSERT(m_state == Unactivated || m_state == Deactivated);
 }
 
 

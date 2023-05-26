@@ -535,6 +535,7 @@ private:
 
     OutputBuffer& get_output_buffer() noexcept;
     Session* get_session(session_ident_type) const noexcept;
+    bool check_session_history(session_ident_type session_ident);
     static bool was_voluntary(ConnectionTerminationReason) noexcept;
 
     static std::string make_logger_prefix(connection_ident_type);
@@ -628,6 +629,9 @@ private:
     // The set of sessions associated with this connection. A session becomes
     // associated with a connection when it is activated.
     std::map<session_ident_type, std::unique_ptr<Session>> m_sessions;
+    // Keep track of previously seen sessions to see if a stale message was
+    // received for a closed session
+    std::vector<session_ident_type> m_session_history;
 
     // A queue of sessions that have enlisted for an opportunity to send a
     // message to the server. Sessions will be served in the order that they
@@ -817,7 +821,7 @@ public:
     /// The specified transaction reporter (via the config object) is guaranteed
     /// to not be called before activation, and also not after initiation of
     /// deactivation.
-    Session(SessionWrapper&, ClientImpl::Connection&);
+    Session(util::bind_ptr<SessionWrapper>&& wrapper, ClientImpl::Connection&);
     ~Session();
 
     void force_close();
@@ -1105,14 +1109,16 @@ private:
     // the detection of download completion.
     request_ident_type m_last_triggering_download_mark = 0;
 
-    SessionWrapper& m_wrapper;
+    // Moved to a bind ptr so the SessionWrapper stays around while the Session
+    // is being deactivated and destroyed.
+    util::bind_ptr<SessionWrapper> m_wrapper;
 
     request_ident_type m_last_pending_test_command_ident = 0;
     std::list<PendingTestCommand> m_pending_test_commands;
 
     static std::string make_logger_prefix(session_ident_type);
 
-    Session(SessionWrapper& wrapper, Connection&, session_ident_type);
+    Session(util::bind_ptr<SessionWrapper>&& wrapper, Connection&, session_ident_type);
 
     bool do_recognize_sync_version(version_type) noexcept;
 
@@ -1390,24 +1396,6 @@ inline void ClientImpl::Session::request_download_completion_notification()
     REALM_ASSERT(m_suspended || !m_unbind_message_sent);
     if (m_ident_message_sent && !m_suspended)
         ensure_enlisted_to_send(); // Throws
-}
-
-inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn)
-    : Session{wrapper, conn, conn.get_client().get_next_session_ident()} // Throws
-{
-}
-
-inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, session_ident_type ident)
-    : logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(ident), conn.logger_ptr)} // Throws
-    , logger{*logger_ptr}
-    , m_conn{conn}
-    , m_ident{ident}
-    , m_is_flx_sync_session(conn.is_flx_sync_connection())
-    , m_fix_up_object_ids(get_client().m_fix_up_object_ids)
-    , m_wrapper{wrapper}
-{
-    if (get_client().m_disable_upload_activation_delay)
-        m_allow_upload = true;
 }
 
 inline bool ClientImpl::Session::do_recognize_sync_version(version_type version) noexcept
