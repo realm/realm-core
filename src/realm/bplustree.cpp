@@ -246,8 +246,8 @@ void BPlusTree<int64_t>::split_root()
             new_root->add_bp_node_ref(new_leaf.get_ref()); // Throws
         }
         new_root->append_tree_size(sz);
-        replace_root(std::move(new_root));
         leaf->destroy();
+        replace_root(std::move(new_root));
     }
     else {
         BPlusTreeInner* inner = static_cast<BPlusTreeInner*>(m_root.get());
