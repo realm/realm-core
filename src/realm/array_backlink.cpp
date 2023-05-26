@@ -259,5 +259,6 @@ bool ArrayBacklink::verify_backlink(size_t ndx, int64_t link)
 #else
     static_cast<void>(ndx);
     static_cast<void>(link);
+    return true;
 #endif
 }
