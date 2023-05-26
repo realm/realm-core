@@ -821,7 +821,7 @@ public:
     /// The specified transaction reporter (via the config object) is guaranteed
     /// to not be called before activation, and also not after initiation of
     /// deactivation.
-    Session(util::bind_ptr<SessionWrapper>&& wrapper, ClientImpl::Connection&);
+    Session(SessionWrapper&, ClientImpl::Connection&);
     ~Session();
 
     void force_close();
@@ -1109,16 +1109,14 @@ private:
     // the detection of download completion.
     request_ident_type m_last_triggering_download_mark = 0;
 
-    // Moved to a bind ptr so the SessionWrapper stays around while the Session
-    // is being deactivated and destroyed.
-    util::bind_ptr<SessionWrapper> m_wrapper;
+    SessionWrapper& m_wrapper;
 
     request_ident_type m_last_pending_test_command_ident = 0;
     std::list<PendingTestCommand> m_pending_test_commands;
 
     static std::string make_logger_prefix(session_ident_type);
 
-    Session(util::bind_ptr<SessionWrapper>&& wrapper, Connection&, session_ident_type);
+    Session(SessionWrapper& wrapper, Connection&, session_ident_type);
 
     bool do_recognize_sync_version(version_type) noexcept;
 
@@ -1396,6 +1394,24 @@ inline void ClientImpl::Session::request_download_completion_notification()
     REALM_ASSERT(m_suspended || !m_unbind_message_sent);
     if (m_ident_message_sent && !m_suspended)
         ensure_enlisted_to_send(); // Throws
+}
+
+inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn)
+    : Session{wrapper, conn, conn.get_client().get_next_session_ident()} // Throws
+{
+}
+
+inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, session_ident_type ident)
+    : logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(ident), conn.logger_ptr)} // Throws
+    , logger{*logger_ptr}
+    , m_conn{conn}
+    , m_ident{ident}
+    , m_is_flx_sync_session(conn.is_flx_sync_connection())
+    , m_fix_up_object_ids(get_client().m_fix_up_object_ids)
+    , m_wrapper{wrapper}
+{
+    if (get_client().m_disable_upload_activation_delay)
+        m_allow_upload = true;
 }
 
 inline bool ClientImpl::Session::do_recognize_sync_version(version_type version) noexcept

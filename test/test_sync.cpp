@@ -1468,7 +1468,8 @@ TEST(Sync_Randomized)
     for (size_t i = 1; i < num_clients; ++i) {
         ReadTransaction rt(client_shared_groups[i]);
         rt.get_group().verify();
-        CHECK(compare_groups(rt_0, rt));
+        // Logger is guaranteed to be defined
+        CHECK(compare_groups(rt_0, rt, *test_context.logger));
     }
 }
 

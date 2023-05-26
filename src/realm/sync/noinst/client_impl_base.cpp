@@ -1463,10 +1463,8 @@ void Connection::receive_query_error_message(int raw_error_code, std::string_vie
         return close_due_to_protocol_error(ClientError::bad_session_ident);                              // throws
     }
 
-    if (sess->m_state == Session::State::Active) {
-        if (auto ec = sess->receive_query_error_message(raw_error_code, message, query_version)) {
-            close_due_to_protocol_error(ec);
-        }
+    if (auto ec = sess->receive_query_error_message(raw_error_code, message, query_version)) {
+        close_due_to_protocol_error(ec);
     }
 }
 
@@ -1485,11 +1483,9 @@ void Connection::receive_ident_message(session_ident_type session_ident, SaltedF
         return;
     }
 
-    if (sess->m_state == Session::State::Active) {
-        std::error_code ec = sess->receive_ident_message(client_file_ident); // Throws
-        if (ec)
-            close_due_to_protocol_error(ec); // Throws
-    }
+    std::error_code ec = sess->receive_ident_message(client_file_ident); // Throws
+    if (ec)
+        close_due_to_protocol_error(ec); // Throws
 }
 
 void Connection::receive_download_message(session_ident_type session_ident, const SyncProgress& progress,
@@ -1509,10 +1505,8 @@ void Connection::receive_download_message(session_ident_type session_ident, cons
         return;
     }
 
-    if (sess->m_state == Session::State::Active) {
-        sess->receive_download_message(progress, downloadable_bytes, batch_state, query_version,
-                                       received_changesets); // Throws
-    }
+    sess->receive_download_message(progress, downloadable_bytes, batch_state, query_version,
+                                   received_changesets); // Throws
 }
 
 void Connection::receive_mark_message(session_ident_type session_ident, request_ident_type request_ident)
@@ -1528,11 +1522,9 @@ void Connection::receive_mark_message(session_ident_type session_ident, request_
         return;
     }
 
-    if (sess->m_state == Session::State::Active) {
-        std::error_code ec = sess->receive_mark_message(request_ident); // Throws
-        if (ec)
-            close_due_to_protocol_error(ec); // Throws
-    }
+    std::error_code ec = sess->receive_mark_message(request_ident); // Throws
+    if (ec)
+        close_due_to_protocol_error(ec); // Throws
 }
 
 
@@ -1578,10 +1570,8 @@ void Connection::receive_test_command_response(session_ident_type session_ident,
         return;
     }
 
-    if (sess->m_state == Session::State::Active) {
-        if (auto ec = sess->receive_test_command_response(request_ident, body)) {
-            close_due_to_protocol_error(ec);
-        }
+    if (auto ec = sess->receive_test_command_response(request_ident, body)) {
+        close_due_to_protocol_error(ec);
     }
 }
 
@@ -1792,6 +1782,12 @@ void Session::on_changesets_integrated(version_type client_version, const SyncPr
     if (m_ident_message_sent && !m_error_message_received && !m_suspended) {
         ensure_enlisted_to_send(); // Throws
     }
+}
+
+
+Session::~Session()
+{
+    //    REALM_ASSERT(m_state == Unactivated || m_state == Deactivated);
 }
 
 
@@ -2379,8 +2375,8 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
                  client_file_ident.salt); // Throws
 
     // Ignore the message if the deactivation process has been initiated,
-    // because in that case, the associated Realm must not be accessed any
-    // longer.
+    // because in that case, the associated Realm and SessionWrapper must
+    // not be accessed any longer.
     if (m_state != Active)
         return std::error_code{}; // Success
 
@@ -2503,8 +2499,8 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
                                        const ReceivedChangesets& received_changesets)
 {
     // Ignore the message if the deactivation process has been initiated,
-    // because in that case, the associated Realm must not be accessed any
-    // longer.
+    // because in that case, the associated Realm and SessionWrapper must
+    // not be accessed any longer.
     if (m_state != Active)
         return;
 
@@ -2611,8 +2607,8 @@ std::error_code Session::receive_mark_message(request_ident_type request_ident)
     logger.debug("Received: MARK(request_ident=%1)", request_ident); // Throws
 
     // Ignore the message if the deactivation process has been initiated,
-    // because in that case, the associated Realm must not be accessed any
-    // longer.
+    // because in that case, the associated Realm and SessionWrapper must
+    // not be accessed any longer.
     if (m_state != Active)
         return std::error_code{}; // Success
 
@@ -2671,7 +2667,12 @@ std::error_code Session::receive_unbound_message()
 std::error_code Session::receive_query_error_message(int error_code, std::string_view message, int64_t query_version)
 {
     logger.info("Received QUERY_ERROR \"%1\" (error_code=%2, query_version=%3)", message, error_code, query_version);
-    on_flx_sync_error(query_version, std::string_view(message.data(), message.size())); // throws
+    // Ignore the message if the deactivation process has been initiated,
+    // because in that case, the associated Realm and SessionWrapper must
+    // not be accessed any longer.
+    if (m_state == Active) {
+        on_flx_sync_error(query_version, std::string_view(message.data(), message.size())); // throws
+    }
     return {};
 }
 
@@ -2699,15 +2700,24 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
         return ClientError::bad_error_code;
     }
 
-    auto debug_action = call_debug_hook(SyncClientHookEvent::ErrorMessageReceived, info);
-    if (debug_action == SyncClientHookAction::EarlyReturn) {
-        return {};
+    // Can't process debug hook actions once the Session is undergoing deactivation, since
+    // the SessionWrapper may not be available
+    if (m_state == Active) {
+        auto debug_action = call_debug_hook(SyncClientHookEvent::ErrorMessageReceived, info);
+        if (debug_action == SyncClientHookAction::EarlyReturn) {
+            return {};
+        }
     }
+
     // For compensating write errors, we need to defer raising them to the SDK until after the server version
     // containing the compensating write has appeared in a download message.
     if (error_code == ProtocolError::compensating_write) {
-        m_pending_compensating_write_errors.push_back(info);
-        return {};
+        // If the client is not active, the compensating writes will not be processed now, but will be
+        // sent again the next time the client connects
+        if (m_state == Active) {
+            m_pending_compensating_write_errors.push_back(info);
+            return {};
+        }
     }
 
     m_error_message_received = true;
