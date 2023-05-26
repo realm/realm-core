@@ -69,6 +69,13 @@ const schemaFile = new URL("../generated/spec.schema.json", import.meta.url);
 const schemaJson = JSON.parse(fs.readFileSync(schemaFile, { encoding: "utf8" }));
 export const validate = ajv.compile<RelaxedSpec>(schemaJson);
 
+<<<<<<< HEAD
+=======
+const optInSchemaFile = new URL("../generated/opt-in-spec.schema.json", import.meta.url);
+const optInSchemaJson = JSON.parse(fs.readFileSync(optInSchemaFile, { encoding: "utf8" }));
+export const validateOptInSpec = ajv.compile<OptInSpec>(optInSchemaJson);
+
+>>>>>>> a70af8766 (Validate parsed yaml file.)
 function parseYaml(filePath: string): unknown {
   const text = fs.readFileSync(filePath, { encoding: "utf8" });
   return yaml.parse(text);
