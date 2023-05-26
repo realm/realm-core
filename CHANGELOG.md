@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix SessionWrapper use-after-free crash when tearing down sessions ([#6656](https://github.com/realm/realm-core/issues/6656), since v13.9.3)
 
 ### Breaking changes
 * None.
@@ -32,7 +32,6 @@
 * Fix several UBSan failures which did not appear to result in functional bugs ([#6649](https://github.com/realm/realm-core/pull/6649)).
 * Fix an out-of-bounds read in sectioned results when sectioned are removed by modifying all objects in that section to no longer appear in that section ([#6649](https://github.com/realm/realm-core/pull/6649), since v13.12.0)
 * Using both synchronous and asynchronous transactions on the same thread or scheduler could hit the assertion failure "!realm.is_in_transaction()" if one of the callbacks for an asynchronous transaction happened to be scheduled during a synchronous transaction ([#6659](https://github.com/realm/realm-core/issues/6659), since v11.8.0)
-* Fix SessionWrapper use-after-free crash when tearing down sessions ([#6656](https://github.com/realm/realm-core/issues/6656), since v13.9.3)
 
 ### Breaking changes
 * None.
