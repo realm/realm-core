@@ -6,9 +6,11 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Allow numeric substitutions into a geospatial query. Example `location GEOWITHIN geoCircle([$0, $1], $2)`. ([#6662](https://github.com/realm/realm-core/issues/6662))
 * Access token refresh for websockets was not updating the location metadata ([#6630](https://github.com/realm/realm-core/issues/6630), since v13.9.3)
 * Fix several UBSan failures which did not appear to result in functional bugs ([#6649](https://github.com/realm/realm-core/pull/6649)).
 * Fix an out-of-bounds read in sectioned results when sectioned are removed by modifying all objects in that section to no longer appear in that section ([#6649](https://github.com/realm/realm-core/pull/6649), since v13.12.0)
+* Using both synchronous and asynchronous transactions on the same thread or scheduler could hit the assertion failure "!realm.is_in_transaction()" if one of the callbacks for an asynchronous transaction happened to be scheduled during a synchronous transaction ([#6659](https://github.com/realm/realm-core/issues/6659), since v11.8.0)
 * Fix the query parser needs to copy list of arguments and own the memory. ([#6674](https://github.com/realm/realm-core/pull/6674), since v12.5.0)
 
 ### Breaking changes
@@ -21,6 +23,8 @@
 
 ### Internals
 * Simplify the implementation of query expression nodes which have a btree leaf cache.
+* Fix a lock order inversion hit by object store tests running on linux. The cycle required test-specific code and so is not applicable to non-tests.
+* Remove catch() clause to prevent truncating stack trace in AsyncOper::do_recycle_and_execute() ([PR #6667](https://github.com/realm/realm-core/pull/6667))
 
 ----------------------------------------------
 
