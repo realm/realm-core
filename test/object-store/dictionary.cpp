@@ -99,7 +99,12 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
     r->begin_transaction();
     dict_mixed.insert_collection("test", CollectionType::List);
     r->commit_transaction();
+
+    REQUIRE(calls_dict == 1);
     advance_and_notify(*r);
+
+    REQUIRE(change_dictionary.insertions.count() == 1);
+    REQUIRE(calls_dict == 2);
 
     auto list = dict_mixed.get_list("test");
     auto token_list = list.add_notification_callback([&](CollectionChangeSet c) {
@@ -108,15 +113,24 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
     });
 
     r->begin_transaction();
-
     list.add(Mixed{5});
+    list.add(Mixed{6});
+    r->commit_transaction();
+
+    REQUIRE(calls_list == 1);
+    advance_and_notify(*r);
+
+    REQUIRE(change_list.insertions.count() == 2);
+    REQUIRE(calls_list == 2);
+
+    r->begin_transaction();
+    list.add(Mixed{5});
+    list.add(Mixed{6});
     r->commit_transaction();
     advance_and_notify(*r);
 
-    REQUIRE(change_dictionary.insertions.count() == 1); // nested collection + insertion of the list
-    REQUIRE(change_list.insertions.count() == 1);       // nested collection + insertion of the list
-    REQUIRE(calls_dict == 2);                           // this is called twice now!
-    REQUIRE(calls_list == 2);                           // this is called twice now!
+    REQUIRE(change_list.insertions.count() == 2);
+    REQUIRE(calls_list == 3);
 }
 
 TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,
