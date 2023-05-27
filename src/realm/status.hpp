@@ -34,7 +34,7 @@ public:
     /*
      * This is the best way to construct a Status that represents a non-error condition.
      */
-    static inline Status OK();
+    static Status OK();
 
     /*
      * You can construct a Status from anything that can construct a std::string_view.
@@ -62,11 +62,11 @@ public:
     /*
      * Copying a Status is just copying an intrusive pointer - i.e. very cheap. Moving them is similarly cheap.
      */
-    inline Status(const Status& other);
-    inline Status& operator=(const Status& other);
+    Status(const Status& other) = default;
+    Status& operator=(const Status& other) = default;
 
-    inline Status(Status&& other) noexcept;
-    inline Status& operator=(Status&& other) noexcept;
+    Status(Status&& other) noexcept = default;
+    Status& operator=(Status&& other) noexcept = default;
 
     inline bool is_ok() const noexcept;
     inline const std::string& reason() const noexcept;
@@ -77,7 +77,7 @@ public:
      * This class is marked nodiscard so that we always handle errors. If there is a place where we need
      * to explicitly ignore an error, you can call this function, which does nothing, to satisfy the compiler.
      */
-    void ignore() const noexcept {}
+    constexpr void ignore() const noexcept {}
 
 private:
     friend struct SystemError;
@@ -86,7 +86,7 @@ private:
         m_error->m_std_error_code = code;
     }
 
-    Status() = default;
+    constexpr Status() = default;
 
     struct ErrorInfo {
         mutable std::atomic<uint32_t> m_refs;
@@ -148,28 +148,6 @@ inline Status Status::OK()
 {
     // Returns a status with m_error set to nullptr.
     return Status{};
-}
-
-inline Status::Status(const Status& other)
-    : m_error(other.m_error)
-{
-}
-
-inline Status& Status::operator=(const Status& other)
-{
-    m_error = other.m_error;
-    return *this;
-}
-
-inline Status::Status(Status&& other) noexcept
-    : m_error(std::move(other.m_error))
-{
-}
-
-inline Status& Status::operator=(Status&& other) noexcept
-{
-    m_error = std::move(other.m_error);
-    return *this;
 }
 
 inline bool Status::is_ok() const noexcept

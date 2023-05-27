@@ -366,7 +366,7 @@ inline void SessionWrapperStack::push(util::bind_ptr<SessionWrapper> w) noexcept
 
 inline util::bind_ptr<SessionWrapper> SessionWrapperStack::pop() noexcept
 {
-    util::bind_ptr<SessionWrapper> w{m_back, util::bind_ptr_base::adopt_tag{}};
+    util::bind_ptr<SessionWrapper> w{m_back, util::bind_ptr_adopt_tag{}};
     if (m_back) {
         m_back = m_back->m_next;
         w->m_next = nullptr;
@@ -378,7 +378,7 @@ inline util::bind_ptr<SessionWrapper> SessionWrapperStack::pop() noexcept
 inline void SessionWrapperStack::clear() noexcept
 {
     while (m_back) {
-        util::bind_ptr<SessionWrapper> w{m_back, util::bind_ptr_base::adopt_tag{}};
+        util::bind_ptr<SessionWrapper> w{m_back, util::bind_ptr_adopt_tag{}};
         m_back = w->m_next;
     }
 }
@@ -485,7 +485,7 @@ void ClientImpl::voluntary_disconnect_all_connections()
             }
         }
         catch (...) {
-            promise.set_error(exception_to_status());
+            promise.set_result(exception_to_status());
             return;
         }
         promise.emplace_value();
@@ -1833,12 +1833,12 @@ std::string SessionWrapper::get_appservices_connection_id()
     util::bind_ptr<SessionWrapper> self(this);
     get_client().post([self, promise = std::move(pf.promise)](Status status) mutable {
         if (!status.is_ok()) {
-            promise.set_error(status);
+            promise.set_result(status);
             return;
         }
 
         if (!self->m_sess) {
-            promise.set_error({ErrorCodes::RuntimeError, "session already finalized"});
+            promise.set_result({ErrorCodes::RuntimeError, "session already finalized"});
             return;
         }
 
@@ -2085,7 +2085,7 @@ void Session::abandon() noexcept
     REALM_ASSERT(m_impl);
     // Reabsorb the ownership assigned to the applications naked pointer by
     // Session constructor
-    util::bind_ptr<SessionWrapper> wrapper{m_impl, util::bind_ptr_base::adopt_tag{}};
+    util::bind_ptr<SessionWrapper> wrapper{m_impl, util::bind_ptr_adopt_tag{}};
     SessionWrapper::abandon(std::move(wrapper));
 }
 

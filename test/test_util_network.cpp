@@ -160,7 +160,7 @@ TEST(Network_RunUntilStopped)
         auto [promise, future] = util::make_promise_future<void>();
         service.post([promise = std::move(promise), func = std::move(func)](Status s) mutable {
             if (!s.is_ok()) {
-                promise.set_error(s);
+                promise.set_from(s);
                 return;
             }
             if (func) {
@@ -191,7 +191,7 @@ TEST(Network_RunUntilStopped)
         auto [promise, future] = util::make_promise_future<void>();
         timer.async_wait(std::chrono::milliseconds{250}, [promise = std::move(promise)](Status s) mutable {
             if (!s.is_ok()) {
-                promise.set_error(s);
+                promise.set_from(s);
                 return;
             }
             promise.emplace_value();

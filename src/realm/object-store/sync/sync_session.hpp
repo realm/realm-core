@@ -379,8 +379,7 @@ private:
 
     void download_fresh_realm(sync::ProtocolErrorInfo::Action server_requests_action)
         REQUIRES(!m_config_mutex, !m_state_mutex, !m_connection_state_mutex);
-    void handle_fresh_realm_downloaded(DBRef db, Status status,
-                                       sync::ProtocolErrorInfo::Action server_requests_action)
+    void handle_fresh_realm_downloaded(Expected<DBRef> db, sync::ProtocolErrorInfo::Action server_requests_action)
         REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     void handle_error(sync::SessionErrorInfo) REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     void handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status error_code, std::string_view context_message)

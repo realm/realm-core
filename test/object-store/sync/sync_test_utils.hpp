@@ -90,14 +90,14 @@ util::Future<T> wait_for_future(util::Future<T>&& input, std::chrono::millisecon
 {
     auto pf = util::make_promise_future<T>();
     auto shared_state = util::make_bind<TimedFutureState<T>>(std::move(pf.promise));
-    std::move(input).get_async([shared_state](StatusOrStatusWith<T> value) {
+    std::move(input).get_async([shared_state](Expected<T>&& value) noexcept {
         std::unique_lock lk(shared_state->mutex);
         // If the state has already expired, then just return without doing anything.
         if (std::exchange(shared_state->finished, true)) {
             return;
         }
 
-        shared_state->promise.set_from_status_with(std::move(value));
+        shared_state->promise.set_from(std::move(value));
         shared_state->cv.notify_one();
         lk.unlock();
     });

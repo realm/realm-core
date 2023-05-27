@@ -347,15 +347,15 @@ TEST(Sync_SubscriptionStoreNotifications)
 
     // This should return a non-OK Status with the error message we set on the subscription set.
     auto err_res = notification_futures[3].get_no_throw();
-    CHECK_NOT(err_res.is_ok());
-    CHECK_EQUAL(err_res.get_status().code(), ErrorCodes::SubscriptionFailed);
-    CHECK_EQUAL(err_res.get_status().reason(), error_msg);
+    CHECK_NOT(err_res.has_value());
+    CHECK_EQUAL(err_res.error().code(), ErrorCodes::SubscriptionFailed);
+    CHECK_EQUAL(err_res.error().reason(), error_msg);
 
     // Getting a ready future on a set that's already in the error state should also return immediately with an error.
     err_res = store->get_by_version(4).get_state_change_notification(SubscriptionSet::State::Complete).get_no_throw();
-    CHECK_NOT(err_res.is_ok());
-    CHECK_EQUAL(err_res.get_status().code(), ErrorCodes::SubscriptionFailed);
-    CHECK_EQUAL(err_res.get_status().reason(), error_msg);
+    CHECK_NOT(err_res.has_value());
+    CHECK_EQUAL(err_res.error().code(), ErrorCodes::SubscriptionFailed);
+    CHECK_EQUAL(err_res.error().reason(), error_msg);
 
     // When a higher version supercedes an older one - i.e. you send query sets for versions 5/6 and the server starts
     // bootstrapping version 6 - we expect the notifications for both versions to be fulfilled when the latest one
@@ -543,8 +543,8 @@ TEST(Sync_SubscriptionStoreNotifyAll)
 
     size_t hit_count = 0;
 
-    auto state_handler = [this, &hit_count, &status_abort](StatusWith<SubscriptionSet::State> state) {
-        CHECK(!state.is_ok());
+    auto state_handler = [this, &hit_count, &status_abort](Expected<SubscriptionSet::State>&& state) noexcept {
+        CHECK(!state.has_value());
         CHECK_EQUAL(state, status_abort);
         hit_count++;
     };
@@ -565,30 +565,21 @@ TEST(Sync_SubscriptionStoreNotifyAll)
         mut_sub_set1.insert_or_assign(query_a);
         auto sub_set1 = mut_sub_set1.commit();
 
-        sub_set1.get_state_change_notification(SubscriptionSet::State::Complete)
-            .get_async([&state_handler](StatusWith<SubscriptionSet::State> state) {
-                state_handler(state);
-            });
+        sub_set1.get_state_change_notification(SubscriptionSet::State::Complete).get_async(state_handler);
     }
     {
         auto mut_sub_set2 = store->get_latest().make_mutable_copy();
         mut_sub_set2.insert_or_assign(query_b);
         auto sub_set2 = mut_sub_set2.commit();
 
-        sub_set2.get_state_change_notification(SubscriptionSet::State::Complete)
-            .get_async([&state_handler](StatusWith<SubscriptionSet::State> state) {
-                state_handler(state);
-            });
+        sub_set2.get_state_change_notification(SubscriptionSet::State::Complete).get_async(state_handler);
     }
     {
         auto mut_sub_set3 = store->get_latest().make_mutable_copy();
         mut_sub_set3.insert_or_assign(query_a);
         auto sub_set3 = mut_sub_set3.commit();
 
-        sub_set3.get_state_change_notification(SubscriptionSet::State::Complete)
-            .get_async([&state_handler](StatusWith<SubscriptionSet::State> state) {
-                state_handler(state);
-            });
+        sub_set3.get_state_change_notification(SubscriptionSet::State::Complete).get_async(state_handler);
     }
 
     auto pending_subs = store->get_pending_subscriptions();
@@ -616,8 +607,8 @@ TEST(Sync_SubscriptionStoreTerminate)
 
     size_t hit_count = 0;
 
-    auto state_handler = [this, &hit_count](StatusWith<SubscriptionSet::State> state) {
-        CHECK(state.is_ok());
+    auto state_handler = [this, &hit_count](Expected<SubscriptionSet::State>&& state) noexcept {
+        CHECK(state.has_value());
         CHECK_EQUAL(state, SubscriptionSet::State::Superseded);
         hit_count++;
     };
@@ -638,30 +629,21 @@ TEST(Sync_SubscriptionStoreTerminate)
         mut_sub_set1.insert_or_assign(query_a);
         auto sub_set1 = mut_sub_set1.commit();
 
-        sub_set1.get_state_change_notification(SubscriptionSet::State::Complete)
-            .get_async([&state_handler](StatusWith<SubscriptionSet::State> state) {
-                state_handler(state);
-            });
+        sub_set1.get_state_change_notification(SubscriptionSet::State::Complete).get_async(state_handler);
     }
     {
         auto mut_sub_set2 = store->get_latest().make_mutable_copy();
         mut_sub_set2.insert_or_assign(query_b);
         auto sub_set2 = mut_sub_set2.commit();
 
-        sub_set2.get_state_change_notification(SubscriptionSet::State::Complete)
-            .get_async([&state_handler](StatusWith<SubscriptionSet::State> state) {
-                state_handler(state);
-            });
+        sub_set2.get_state_change_notification(SubscriptionSet::State::Complete).get_async(state_handler);
     }
     {
         auto mut_sub_set3 = store->get_latest().make_mutable_copy();
         mut_sub_set3.insert_or_assign(query_a);
         auto sub_set3 = mut_sub_set3.commit();
 
-        sub_set3.get_state_change_notification(SubscriptionSet::State::Complete)
-            .get_async([&state_handler](StatusWith<SubscriptionSet::State> state) {
-                state_handler(state);
-            });
+        sub_set3.get_state_change_notification(SubscriptionSet::State::Complete).get_async(state_handler);
     }
 
     CHECK_EQUAL(store->get_latest().version(), 3);

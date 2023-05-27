@@ -32,14 +32,10 @@
 namespace realm {
 namespace util {
 
-class bind_ptr_base {
-public:
-    struct adopt_tag {
-    };
-};
+struct bind_ptr_adopt_tag {};
 
 
-/// A generic intrusive smart pointer that binds itself explicitely to
+/// A generic intrusive smart pointer that binds itself explicitly to
 /// the target object.
 ///
 /// This class is agnostic towards what 'binding' means for the target
@@ -49,86 +45,83 @@ public:
 /// This smart pointer implementation assumes that the target object
 /// destructor never throws.
 template <class T>
-class bind_ptr : public bind_ptr_base {
+class bind_ptr {
 public:
-    constexpr bind_ptr() noexcept
-        : m_ptr(nullptr)
-    {
-    }
+    constexpr bind_ptr() noexcept = default;
     ~bind_ptr() noexcept
     {
         unbind();
     }
 
-    explicit bind_ptr(T* p) noexcept
+    constexpr explicit bind_ptr(T* p) noexcept
     {
         bind(p);
     }
     template <class U>
-    explicit bind_ptr(U* p) noexcept
+    constexpr explicit bind_ptr(U* p) noexcept
     {
         bind(p);
     }
 
-    bind_ptr(T* p, adopt_tag) noexcept
+    constexpr bind_ptr(T* p, bind_ptr_adopt_tag) noexcept
     {
         m_ptr = p;
     }
     template <class U>
-    bind_ptr(U* p, adopt_tag) noexcept
+    constexpr bind_ptr(U* p, bind_ptr_adopt_tag) noexcept
     {
         m_ptr = p;
     }
 
     // Copy construct
-    bind_ptr(const bind_ptr& p) noexcept
+    constexpr bind_ptr(const bind_ptr& p) noexcept
     {
         bind(p.m_ptr);
     }
     template <class U>
-    bind_ptr(const bind_ptr<U>& p) noexcept
+    constexpr bind_ptr(const bind_ptr<U>& p) noexcept
     {
         bind(p.m_ptr);
     }
 
     // Copy assign
-    bind_ptr& operator=(const bind_ptr& p) noexcept
+    constexpr bind_ptr& operator=(const bind_ptr& p) noexcept
     {
         bind_ptr(p).swap(*this);
         return *this;
     }
     template <class U>
-    bind_ptr& operator=(const bind_ptr<U>& p) noexcept
+    constexpr bind_ptr& operator=(const bind_ptr<U>& p) noexcept
     {
         bind_ptr(p).swap(*this);
         return *this;
     }
 
     // Move construct
-    bind_ptr(bind_ptr&& p) noexcept
+    constexpr bind_ptr(bind_ptr&& p) noexcept
         : m_ptr(p.release())
     {
     }
     template <class U>
-    bind_ptr(bind_ptr<U>&& p) noexcept
+    constexpr bind_ptr(bind_ptr<U>&& p) noexcept
         : m_ptr(p.release())
     {
     }
 
     // Move from std::unique_ptr
-    bind_ptr(std::unique_ptr<T>&& p) noexcept
+    constexpr bind_ptr(std::unique_ptr<T>&& p) noexcept
     {
         bind(p.release());
     }
 
     // Move assign
-    bind_ptr& operator=(bind_ptr&& p) noexcept
+    constexpr bind_ptr& operator=(bind_ptr&& p) noexcept
     {
         bind_ptr(std::move(p)).swap(*this);
         return *this;
     }
     template <class U>
-    bind_ptr& operator=(bind_ptr<U>&& p) noexcept
+    constexpr bind_ptr& operator=(bind_ptr<U>&& p) noexcept
     {
         bind_ptr(std::move(p)).swap(*this);
         return *this;
@@ -137,121 +130,112 @@ public:
     //@{
     // Comparison
     template <class U>
-    bool operator==(const bind_ptr<U>&) const noexcept;
+    constexpr bool operator==(const bind_ptr<U>&) const noexcept;
 
     template <class U>
-    bool operator==(U*) const noexcept;
+    constexpr bool operator==(U*) const noexcept;
 
     template <class U>
-    bool operator!=(const bind_ptr<U>&) const noexcept;
+    constexpr bool operator!=(const bind_ptr<U>&) const noexcept;
 
     template <class U>
-    bool operator!=(U*) const noexcept;
+    constexpr bool operator!=(U*) const noexcept;
 
     template <class U>
-    bool operator<(const bind_ptr<U>&) const noexcept;
+    constexpr bool operator<(const bind_ptr<U>&) const noexcept;
 
     template <class U>
-    bool operator<(U*) const noexcept;
+    constexpr bool operator<(U*) const noexcept;
 
     template <class U>
-    bool operator>(const bind_ptr<U>&) const noexcept;
+    constexpr bool operator>(const bind_ptr<U>&) const noexcept;
 
     template <class U>
-    bool operator>(U*) const noexcept;
+    constexpr bool operator>(U*) const noexcept;
 
     template <class U>
-    bool operator<=(const bind_ptr<U>&) const noexcept;
+    constexpr bool operator<=(const bind_ptr<U>&) const noexcept;
 
     template <class U>
-    bool operator<=(U*) const noexcept;
+    constexpr bool operator<=(U*) const noexcept;
 
     template <class U>
-    bool operator>=(const bind_ptr<U>&) const noexcept;
+    constexpr bool operator>=(const bind_ptr<U>&) const noexcept;
 
     template <class U>
-    bool operator>=(U*) const noexcept;
+    constexpr bool operator>=(U*) const noexcept;
     //@}
 
     // Dereference
-    T& operator*() const noexcept
+    constexpr T& operator*() const noexcept
     {
         return *m_ptr;
     }
-    T* operator->() const noexcept
+    constexpr T* operator->() const noexcept
     {
         return m_ptr;
     }
 
-    explicit operator bool() const noexcept
+    constexpr explicit operator bool() const noexcept
     {
         return m_ptr != 0;
     }
 
-    T* get() const noexcept
+    constexpr T* get() const noexcept
     {
         return m_ptr;
     }
-    void reset() noexcept
+    constexpr void reset() noexcept
     {
         bind_ptr().swap(*this);
     }
-    void reset(T* p) noexcept
+    constexpr void reset(T* p) noexcept
     {
         bind_ptr(p).swap(*this);
     }
     template <class U>
-    void reset(U* p) noexcept
+    constexpr void reset(U* p) noexcept
     {
         bind_ptr(p).swap(*this);
     }
 
-    void reset(T* p, adopt_tag) noexcept
+    constexpr void reset(T* p, bind_ptr_adopt_tag) noexcept
     {
-        bind_ptr(p, adopt_tag{}).swap(*this);
+        bind_ptr(p, bind_ptr_adopt_tag{}).swap(*this);
     }
 
     template <class U>
-    void reset(U* p, adopt_tag) noexcept
+    constexpr void reset(U* p, bind_ptr_adopt_tag) noexcept
     {
-        bind_ptr(p, adopt_tag{}).swap(*this);
+        bind_ptr(p, bind_ptr_adopt_tag{}).swap(*this);
     }
 
-    T* release() noexcept
+    constexpr T* release() noexcept
     {
         T* const p = m_ptr;
         m_ptr = nullptr;
         return p;
     }
 
-    void swap(bind_ptr& p) noexcept
+    constexpr void swap(bind_ptr& p) noexcept
     {
         std::swap(m_ptr, p.m_ptr);
     }
-    friend void swap(bind_ptr& a, bind_ptr& b) noexcept
+    constexpr friend void swap(bind_ptr& a, bind_ptr& b) noexcept
     {
         a.swap(b);
     }
 
-protected:
-    struct casting_move_tag {
-    };
-    template <class U>
-    bind_ptr(bind_ptr<U>* p, casting_move_tag) noexcept
-        : m_ptr(static_cast<T*>(p->release()))
-    {
-    }
-
 private:
-    T* m_ptr;
+    T* m_ptr = nullptr;
 
-    void bind(T* p) noexcept
+    constexpr void bind(T* p) noexcept
     {
         if (p)
             p->bind_ptr();
         m_ptr = p;
     }
-    void unbind() noexcept
+    constexpr void unbind() noexcept
     {
         if (m_ptr)
             m_ptr->unbind_ptr();
@@ -265,7 +249,7 @@ private:
 template <class T>
 bind_ptr(T*) -> bind_ptr<T>;
 template <class T>
-bind_ptr(T*, bind_ptr_base::adopt_tag) -> bind_ptr<T>;
+bind_ptr(T*, bind_ptr_adopt_tag) -> bind_ptr<T>;
 
 template <class T, typename... Args>
 bind_ptr<T> make_bind(Args&&... __args)
@@ -285,17 +269,17 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const
 //@{
 // Comparison
 template <class T, class U>
-bool operator==(T*, const bind_ptr<U>&) noexcept;
+constexpr bool operator==(T*, const bind_ptr<U>&) noexcept;
 template <class T, class U>
-bool operator!=(T*, const bind_ptr<U>&) noexcept;
+constexpr bool operator!=(T*, const bind_ptr<U>&) noexcept;
 template <class T, class U>
-bool operator<(T*, const bind_ptr<U>&) noexcept;
+constexpr bool operator<(T*, const bind_ptr<U>&) noexcept;
 template <class T, class U>
-bool operator>(T*, const bind_ptr<U>&) noexcept;
+constexpr bool operator>(T*, const bind_ptr<U>&) noexcept;
 template <class T, class U>
-bool operator<=(T*, const bind_ptr<U>&) noexcept;
+constexpr bool operator<=(T*, const bind_ptr<U>&) noexcept;
 template <class T, class U>
-bool operator>=(T*, const bind_ptr<U>&) noexcept;
+constexpr bool operator>=(T*, const bind_ptr<U>&) noexcept;
 //@}
 
 
@@ -389,120 +373,120 @@ private:
 
 template <class T>
 template <class U>
-bool bind_ptr<T>::operator==(const bind_ptr<U>& p) const noexcept
+constexpr bool bind_ptr<T>::operator==(const bind_ptr<U>& p) const noexcept
 {
     return m_ptr == p.m_ptr;
 }
 
 template <class T>
 template <class U>
-bool bind_ptr<T>::operator==(U* p) const noexcept
+constexpr bool bind_ptr<T>::operator==(U* p) const noexcept
 {
     return m_ptr == p;
 }
 
 template <class T>
 template <class U>
-bool bind_ptr<T>::operator!=(const bind_ptr<U>& p) const noexcept
+constexpr bool bind_ptr<T>::operator!=(const bind_ptr<U>& p) const noexcept
 {
     return m_ptr != p.m_ptr;
 }
 
 template <class T>
 template <class U>
-bool bind_ptr<T>::operator!=(U* p) const noexcept
+constexpr bool bind_ptr<T>::operator!=(U* p) const noexcept
 {
     return m_ptr != p;
 }
 
 template <class T>
 template <class U>
-bool bind_ptr<T>::operator<(const bind_ptr<U>& p) const noexcept
+constexpr bool bind_ptr<T>::operator<(const bind_ptr<U>& p) const noexcept
 {
     return m_ptr < p.m_ptr;
 }
 
 template <class T>
 template <class U>
-bool bind_ptr<T>::operator<(U* p) const noexcept
+constexpr bool bind_ptr<T>::operator<(U* p) const noexcept
 {
     return m_ptr < p;
 }
 
 template <class T>
 template <class U>
-bool bind_ptr<T>::operator>(const bind_ptr<U>& p) const noexcept
+constexpr bool bind_ptr<T>::operator>(const bind_ptr<U>& p) const noexcept
 {
     return m_ptr > p.m_ptr;
 }
 
 template <class T>
 template <class U>
-bool bind_ptr<T>::operator>(U* p) const noexcept
+constexpr bool bind_ptr<T>::operator>(U* p) const noexcept
 {
     return m_ptr > p;
 }
 
 template <class T>
 template <class U>
-bool bind_ptr<T>::operator<=(const bind_ptr<U>& p) const noexcept
+constexpr bool bind_ptr<T>::operator<=(const bind_ptr<U>& p) const noexcept
 {
     return m_ptr <= p.m_ptr;
 }
 
 template <class T>
 template <class U>
-bool bind_ptr<T>::operator<=(U* p) const noexcept
+constexpr bool bind_ptr<T>::operator<=(U* p) const noexcept
 {
     return m_ptr <= p;
 }
 
 template <class T>
 template <class U>
-bool bind_ptr<T>::operator>=(const bind_ptr<U>& p) const noexcept
+constexpr bool bind_ptr<T>::operator>=(const bind_ptr<U>& p) const noexcept
 {
     return m_ptr >= p.m_ptr;
 }
 
 template <class T>
 template <class U>
-bool bind_ptr<T>::operator>=(U* p) const noexcept
+constexpr bool bind_ptr<T>::operator>=(U* p) const noexcept
 {
     return m_ptr >= p;
 }
 
 template <class T, class U>
-bool operator==(T* a, const bind_ptr<U>& b) noexcept
+constexpr bool operator==(T* a, const bind_ptr<U>& b) noexcept
 {
     return b == a;
 }
 
 template <class T, class U>
-bool operator!=(T* a, const bind_ptr<U>& b) noexcept
+constexpr bool operator!=(T* a, const bind_ptr<U>& b) noexcept
 {
     return b != a;
 }
 
 template <class T, class U>
-bool operator<(T* a, const bind_ptr<U>& b) noexcept
+constexpr bool operator<(T* a, const bind_ptr<U>& b) noexcept
 {
     return b > a;
 }
 
 template <class T, class U>
-bool operator>(T* a, const bind_ptr<U>& b) noexcept
+constexpr bool operator>(T* a, const bind_ptr<U>& b) noexcept
 {
     return b < a;
 }
 
 template <class T, class U>
-bool operator<=(T* a, const bind_ptr<U>& b) noexcept
+constexpr bool operator<=(T* a, const bind_ptr<U>& b) noexcept
 {
     return b >= a;
 }
 
 template <class T, class U>
-bool operator>=(T* a, const bind_ptr<U>& b) noexcept
+constexpr bool operator>=(T* a, const bind_ptr<U>& b) noexcept
 {
     return b <= a;
 }

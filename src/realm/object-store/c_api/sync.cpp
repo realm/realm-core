@@ -506,11 +506,9 @@ realm_sync_on_subscription_set_state_change_async(const realm_flx_sync_subscript
             subscription_set->get_state_change_notification(static_cast<SubscriptionSet::State>(notify_when));
         std::move(future_state)
             .get_async([callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
-                           const StatusWith<SubscriptionSet::State>& state) -> void {
-                if (state.is_ok())
-                    callback(userdata.get(), static_cast<realm_flx_sync_subscription_set_state_e>(state.get_value()));
-                else
-                    callback(userdata.get(), realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_ERROR);
+                           Expected<SubscriptionSet::State>&& state) noexcept {
+                callback(userdata.get(), static_cast<realm_flx_sync_subscription_set_state_e>(
+                                             state.value_or(SubscriptionSet::State::Error)));
             });
         return true;
     });

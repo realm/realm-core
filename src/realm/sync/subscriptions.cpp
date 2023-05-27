@@ -473,12 +473,12 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
 void SubscriptionSet::get_state_change_notification(
     State notify_when, util::UniqueFunction<void(util::Optional<State>, util::Optional<Status>)> cb) const
 {
-    get_state_change_notification(notify_when).get_async([cb = std::move(cb)](StatusWith<State> result) {
-        if (result.is_ok()) {
-            cb(result.get_value(), {});
+    get_state_change_notification(notify_when).get_async([cb = std::move(cb)](Expected<State>&& result) noexcept {
+        if (result.has_value()) {
+            cb(*result, {});
         }
         else {
-            cb({}, result.get_status());
+            cb({}, result.error());
         }
     });
 }
@@ -514,7 +514,7 @@ void MutableSubscriptionSet::process_notifications()
 
     for (auto& req : to_finish) {
         if (new_state == State::Error && req.version == my_version) {
-            req.promise.set_error({ErrorCodes::SubscriptionFailed, std::string_view(error_str())});
+            req.promise.set_result({ErrorCodes::SubscriptionFailed, std::string_view(error_str())});
         }
         else if (req.version < my_version) {
             req.promise.emplace_value(State::Superseded);
@@ -821,7 +821,7 @@ void SubscriptionStore::notify_all_state_change_notifications(Status status)
     // Just complete/cancel the pending notifications - this function does not alter the
     // state of any pending subscriptions
     for (auto& req : to_finish) {
-        req.promise.set_error(status);
+        req.promise.set_result(status);
     }
 }
 

@@ -23,6 +23,7 @@
 
 #include <realm/keys.hpp>
 #include <realm/string_data.hpp>
+#include <realm/status_with.hpp>
 
 #include <climits>
 #include <cmath>
@@ -178,8 +179,7 @@ public:
     Status get_conversion_status() const noexcept;
 
 private:
-    std::unique_ptr<S2Region> m_region;
-    Status m_status;
+    Expected<std::unique_ptr<S2Region>> m_region;
 };
 
 class Geospatial {

@@ -72,14 +72,14 @@ TEST(Status)
 
 TEST(StatusWith)
 {
-    auto result = StatusWith<int>(5);
-    CHECK(result.is_ok());
-    CHECK_EQUAL(result.get_value(), 5);
+    auto result = Expected<int>(5);
+    CHECK(result.has_value());
+    CHECK_EQUAL(result.value(), 5);
 
     const char* err_status_reason = "runtime error 1";
-    result = StatusWith<int>(ErrorCodes::RuntimeError, err_status_reason);
-    CHECK_EQUAL(result.get_status().code(), ErrorCodes::RuntimeError);
-    CHECK(!result.is_ok());
+    result = Expected<int>(ErrorCodes::RuntimeError, err_status_reason);
+    CHECK_EQUAL(result.error().code(), ErrorCodes::RuntimeError);
+    CHECK(!result.has_value());
 }
 
 TEST(ErrorCodes)
@@ -96,6 +96,40 @@ TEST(ErrorCodes)
     }
     CHECK_EQUAL(ErrorCodes::from_string("InvalidDictionary"), ErrorCodes::UnknownError);
     CHECK_EQUAL(ErrorCodes::from_string("Zzzzz"), ErrorCodes::UnknownError);
+}
+
+struct MoveOnly {
+    MoveOnly() = default;
+    MoveOnly(MoveOnly&&) {}
+    MoveOnly& operator=(MoveOnly&&)
+    {
+        return *this;
+    }
+    MoveOnly(MoveOnly const&) = delete;
+    MoveOnly& operator=(MoveOnly const&) = delete;
+};
+
+TEST(Expected)
+{
+    Expected<int> a;
+    Expected<int> b = 1;
+    Expected<int> c = Status(ErrorCodes::RuntimeError, "error");
+    Expected<int> d(ErrorCodes::RuntimeError, "error");
+    Expected<int> e(1);
+    Expected<int> f(std::in_place, 1);
+    Expected<int> g = a;
+    g = b;
+    g = std::move(c);
+    g.map([](int a) {
+        return a;
+    });
+    g.map([](int) {}).map([] {});
+    Expected<int> h = 1.f;
+    Expected<int> i = Expected<float>(1.f);
+
+    Expected<MoveOnly> a1;
+    Expected<MoveOnly> a2 = std::move(a1);
+    a1 = std::move(a2);
 }
 
 } // namespace

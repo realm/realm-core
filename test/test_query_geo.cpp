@@ -307,7 +307,7 @@ TEST(Geospatial_PolygonValidation)
                                               GeoPoint{55.628, 12.0826}, GeoPoint{40.7128, -74.000}}}};
     Status status = poly_mismatch_loop.is_valid();
     CHECK(!status.is_ok());
-    CHECK_EQUAL(status.reason(), "Ring is not closed, first vertex 'GeoPoint([40.7128, -74.006])' does not equal "
+    CHECK_EQUAL(status.reason(), "Ring is not closed: first vertex 'GeoPoint([40.7128, -74.006])' does not equal "
                                  "last vertex 'GeoPoint([40.7128, -74])'");
 
     Geospatial poly_three_point{

@@ -34,6 +34,7 @@
 #include <realm/util/features.h>
 #include <realm/util/logger.hpp>
 #include <realm/util/safe_int_ops.hpp>
+#include <realm/status_with.hpp>
 
 
 #define TEST(name) TEST_IF(name, true)
@@ -803,6 +804,25 @@ void to_string(const std::optional<T>& value, std::string& str)
     std::ostringstream out;
     SetPrecision<T, std::is_floating_point<T>::value>::exec(out);
     util::stream_possible_optional(out, value);
+    str = out.str();
+}
+
+template <typename T>
+void to_string(const Expected<T>& e, std::string& str)
+{
+    std::ostringstream out;
+    SetPrecision<T, std::is_floating_point<T>::value>::exec(out);
+    if (e.has_value()) {
+        if constexpr (std::is_void_v<T>) {
+            out << "Expected(void)";
+        }
+        else {
+            out << "Expected(" << *e << ")";
+        }
+    }
+    else {
+        out << "Unexpected(" << e.error() << ")";
+    }
     str = out.str();
 }
 

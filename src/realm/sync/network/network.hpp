@@ -1954,7 +1954,7 @@ public:
         REALM_ASSERT(in_use());
         REALM_ASSERT(!m_service);
         // Note: Potential suicide when `self` goes out of scope
-        util::bind_ptr<TriggerExecOperBase> self{this, util::bind_ptr_base::adopt_tag{}};
+        util::bind_ptr<TriggerExecOperBase> self{this, util::bind_ptr_adopt_tag{}};
     }
     void orphan() noexcept override final
     {

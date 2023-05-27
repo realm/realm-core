@@ -290,23 +290,14 @@ std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo)
 // https://github.com/mongodb/mongo/blob/053ff9f355555cddddf3a476ffa9ddf899b1657d/src/mongo/db/geo/geoparser.cpp#L140
 
 
-// Technically lat/long bounds, not really tied to earth radius.
-static bool is_valid_lat_lng(double lng, double lat)
+static Expected<S2Point> coord_to_point(double lng, double lat)
 {
-    return abs(lng) <= 180 && abs(lat) <= 90;
-}
-
-static Status coord_to_point(double lng, double lat, S2Point& out)
-{
-    if (!is_valid_lat_lng(lng, lat))
-        return Status(ErrorCodes::InvalidQueryArg,
-                      util::format("Longitude/latitude is out of bounds, lng: %1 lat: %2", lng, lat));
     // Note that it's (lat, lng) for S2 but (lng, lat) for MongoDB.
     S2LatLng ll = S2LatLng::FromDegrees(lat, lng).Normalized();
-    // This shouldn't happen since we should only have valid lng/lats.
-    REALM_ASSERT_EX(ll.is_valid(), util::format("coords invalid after normalization, lng = %1, lat = %2", lng, lat));
-    out = ll.ToPoint();
-    return Status::OK();
+    if (!ll.is_valid())
+        return Status(ErrorCodes::InvalidQueryArg,
+                      util::format("Longitude/latitude is out of bounds, lng: %1 lat: %2", lng, lat));
+    return ll.ToPoint();
 }
 
 static void erase_duplicate_adjacent_points(std::vector<S2Point>& vertices)
@@ -320,21 +311,19 @@ static Status is_ring_closed(const std::vector<S2Point>& ring, const std::vector
         return Status(ErrorCodes::InvalidQueryArg, "Ring has no vertices");
     }
 
-    if (points[0] != points[points.size() - 1]) {
+    if (points[0] != points.back()) {
         return Status(ErrorCodes::InvalidQueryArg,
-                      util::format("Ring is not closed, first vertex '%1' does not equal last vertex '%2'", points[0],
-                                   points[points.size() - 1]));
+                      util::format("Ring is not closed: first vertex '%1' does not equal last vertex '%2'", points[0],
+                                   points.back()));
     }
 
     return Status::OK();
 }
 
-static Status parse_polygon_coordinates(const GeoPolygon& polygon, S2Polygon* out)
+static Expected<std::unique_ptr<S2Region>> parse_polygon_coordinates(const GeoPolygon& polygon)
 {
-    REALM_ASSERT(out);
     std::vector<S2Loop*> rings;
     rings.reserve(polygon.points.size());
-    Status status = Status::OK();
     std::string err;
 
     // if the polygon is successfully created s2 takes ownership
@@ -350,16 +339,14 @@ static Status parse_polygon_coordinates(const GeoPolygon& polygon, S2Polygon* ou
         std::vector<S2Point> points;
         points.reserve(polygon.points[i].size());
         for (auto&& p : polygon.points[i]) {
-            S2Point s2p;
-            status = coord_to_point(p.longitude, p.latitude, s2p);
-            if (!status.is_ok()) {
-                return status;
+            Expected<S2Point> s2p = coord_to_point(p.longitude, p.latitude);
+            if (!s2p.has_value()) {
+                return s2p.error();
             }
-            points.push_back(s2p);
+            points.push_back(*s2p);
         }
 
-        status = is_ring_closed(points, polygon.points[i]);
-        if (!status.is_ok())
+        if (auto status = is_ring_closed(points, polygon.points[i]); !status.is_ok())
             return status;
 
         erase_duplicate_adjacent_points(points);
@@ -377,7 +364,7 @@ static Status parse_polygon_coordinates(const GeoPolygon& polygon, S2Polygon* ou
         rings.push_back(new S2Loop(points));
         S2Loop* ring = rings.back();
 
-        // Check whether this ring is valid if vaildation hasn't been already done on 2dSphere index
+        // Check whether this ring is valid if validation hasn't been already done on 2dSphere index
         // insertion which is controlled by the 'skipValidation' flag.
         // 1. At least 3 vertices.
         // 2. All vertices must be unit length. Guaranteed by parsePoints().
@@ -413,10 +400,10 @@ static Status parse_polygon_coordinates(const GeoPolygon& polygon, S2Polygon* ou
     // Given all rings are valid / normalized and S2Polygon::IsValid() above returns true.
     // The polygon must be valid. See S2Polygon member function IsValid().
 
-    {
-        // Transfer ownership of the rings and clears ring vector.
-        out->Init(&rings);
-    }
+    // Transfer ownership of the rings and clears ring vector.
+    auto out = new S2Polygon;
+    std::unique_ptr<S2Region> region(out);
+    out->Init(&rings);
 
     // Check if every ring of this polygon shares at most one vertex with
     // its parent ring.
@@ -442,90 +429,74 @@ static Status parse_polygon_coordinates(const GeoPolygon& polygon, S2Polygon* ou
                           util::format("Polygon interior rings cannot be nested: %1", i));
         }
     }
-    return Status::OK();
+    return region;
 }
 
 GeoRegion::GeoRegion(const Geospatial& geo)
-    : m_status(Status::OK())
 {
     struct Visitor {
-        Visitor(Status& out)
-            : m_status_out(out)
+        Expected<std::unique_ptr<S2Region>> operator()(const GeoBox& box) const
         {
-            m_status_out = Status::OK();
-        }
-        Status& m_status_out;
-        std::unique_ptr<S2Region> operator()(const GeoBox& box) const
-        {
-            S2Point s2_lo, s2_hi;
-            m_status_out = coord_to_point(box.lo.longitude, box.lo.latitude, s2_lo);
-            if (!m_status_out.is_ok())
-                return nullptr;
-            m_status_out = coord_to_point(box.hi.longitude, box.hi.latitude, s2_hi);
-            if (!m_status_out.is_ok())
-                return nullptr;
-            auto ret = std::make_unique<S2LatLngRect>(S2LatLng(s2_lo), S2LatLng(s2_hi));
+            auto s2_lo = coord_to_point(box.lo.longitude, box.lo.latitude);
+            if (!s2_lo)
+                return s2_lo.error();
+            auto s2_hi = coord_to_point(box.hi.longitude, box.hi.latitude);
+            if (!s2_hi)
+                return s2_hi.error();
+            auto ret = std::make_unique<S2LatLngRect>(S2LatLng(*s2_lo), S2LatLng(*s2_hi));
             if (!ret->is_valid()) {
-                m_status_out = Status(ErrorCodes::InvalidQueryArg, "Invalid rectangle");
-                return nullptr;
+                return Status(ErrorCodes::InvalidQueryArg, "Invalid rectangle");
             }
             return ret;
         }
 
-        std::unique_ptr<S2Region> operator()(const GeoPolygon& polygon) const
+        Expected<std::unique_ptr<S2Region>> operator()(const GeoPolygon& polygon) const
         {
-            auto poly = std::make_unique<S2Polygon>();
-            m_status_out = parse_polygon_coordinates(polygon, poly.get());
-            return poly;
+            return parse_polygon_coordinates(polygon);
         }
 
-        std::unique_ptr<S2Region> operator()(const GeoCircle& circle) const
+        Expected<std::unique_ptr<S2Region>> operator()(const GeoCircle& circle) const
         {
-            S2Point center;
-            m_status_out = coord_to_point(circle.center.longitude, circle.center.latitude, center);
-            if (!m_status_out.is_ok())
-                return nullptr;
+            auto center = coord_to_point(circle.center.longitude, circle.center.latitude);
+            if (!center.has_value())
+                return center.error();
             if (circle.radius_radians < 0 || std::isnan(circle.radius_radians)) {
-                m_status_out =
-                    Status(ErrorCodes::InvalidQueryArg, "The radius of a circle must be a non-negative number");
-                return nullptr;
+                return Status(ErrorCodes::InvalidQueryArg, "The radius of a circle must be a non-negative number");
             }
             auto radius = S1Angle::Radians(circle.radius_radians);
-            return std::make_unique<S2Cap>(S2Cap::FromAxisAngle(center, radius));
+            return std::make_unique<S2Cap>(S2Cap::FromAxisAngle(*center, radius));
         }
 
-        std::unique_ptr<S2Region> operator()(const mpark::monostate&) const
+        Expected<std::unique_ptr<S2Region>> operator()(const mpark::monostate&) const
         {
-            m_status_out = Status(ErrorCodes::InvalidQueryArg,
-                                  "NULL cannot be used on the right hand side of a GEOWITHIN query");
-            return nullptr;
+            return Status(ErrorCodes::InvalidQueryArg,
+                          "NULL cannot be used on the right hand side of a GEOWITHIN query");
         }
 
-        std::unique_ptr<S2Region> operator()(const GeoPoint&) const
+        Expected<std::unique_ptr<S2Region>> operator()(const GeoPoint&) const
         {
-            m_status_out = Status(ErrorCodes::InvalidQueryArg,
-                                  "A point cannot be used on the right hand side of GEOWITHIN query");
-            return nullptr;
+            return Status(ErrorCodes::InvalidQueryArg,
+                          "A point cannot be used on the right hand side of GEOWITHIN query");
         }
     };
 
-    m_region = mpark::visit(Visitor(m_status), geo.m_value);
+    m_region = mpark::visit(Visitor(), geo.m_value);
 }
 
 GeoRegion::~GeoRegion() = default;
 
 bool GeoRegion::contains(const std::optional<GeoPoint>& geo_point) const noexcept
 {
-    if (!m_status.is_ok() || !geo_point) {
+    if (!m_region || !geo_point) {
         return false;
     }
     auto point = S2LatLng::FromDegrees(geo_point->latitude, geo_point->longitude).ToPoint();
-    return m_region->VirtualContainsPoint(point);
+    return (*m_region)->VirtualContainsPoint(point);
 }
 
 Status GeoRegion::get_conversion_status() const noexcept
 {
-    return m_status;
+    return m_region ? Status::OK() : m_region.error();
 }
 
 } // namespace realm
