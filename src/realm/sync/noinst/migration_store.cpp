@@ -304,7 +304,7 @@ Subscription MigrationStore::make_subscription(const std::string& object_class_n
     return Subscription{subscription_name, object_class_name, rql_query_string};
 }
 
-void MigrationStore::create_subscriptions(const SubscriptionStore& subs_store)
+void MigrationStore::create_subscriptions(SubscriptionStore& subs_store)
 {
     std::unique_lock lock{m_mutex};
     if (m_state != MigrationState::Migrated) {
@@ -315,7 +315,7 @@ void MigrationStore::create_subscriptions(const SubscriptionStore& subs_store)
     create_subscriptions(subs_store, *m_query_string);
 }
 
-void MigrationStore::create_subscriptions(const SubscriptionStore& subs_store, const std::string& rql_query_string)
+void MigrationStore::create_subscriptions(SubscriptionStore& subs_store, const std::string& rql_query_string)
 {
     if (rql_query_string.empty()) {
         return;
@@ -324,7 +324,7 @@ void MigrationStore::create_subscriptions(const SubscriptionStore& subs_store, c
     auto mut_sub = subs_store.get_latest().make_mutable_copy();
     auto sub_count = mut_sub.size();
 
-    auto tr = m_db->start_read();
+    auto tr = m_db->start_write();
     // List of tables covered by latest subscription set.
     auto tables = subs_store.get_tables_for_latest(*tr);
 
@@ -352,9 +352,11 @@ void MigrationStore::create_subscriptions(const SubscriptionStore& subs_store, c
 
     // Commit new subscription set.
     mut_sub.commit();
+    subs_store.flush_changes(*tr);
+    tr->commit();
 }
 
-void MigrationStore::create_sentinel_subscription_set(const SubscriptionStore& subs_store)
+void MigrationStore::create_sentinel_subscription_set(SubscriptionStore& subs_store)
 {
     std::lock_guard lock{m_mutex};
     if (m_state != MigrationState::Migrated) {
@@ -372,6 +374,7 @@ void MigrationStore::create_sentinel_subscription_set(const SubscriptionStore& s
     REALM_ASSERT(!migration_table->is_empty());
     auto migration_store_obj = migration_table->get_object(0);
     migration_store_obj.set(m_sentinel_query_version, *m_sentinel_subscription_set_version);
+    subs_store.flush_changes(*tr);
     tr->commit();
 }
 

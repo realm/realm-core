@@ -282,6 +282,11 @@ public:
             session.nonsync_transact_notify(version);
         }
 
+        static void flush_subscription_changes(SyncSession& session, Transaction& tr)
+        {
+            session.flush_subscription_changes(tr);
+        }
+
         static std::shared_ptr<DB> get_db(SyncSession& session)
         {
             return session.m_db;
@@ -396,6 +401,7 @@ private:
 
     void set_sync_transact_callback(std::function<TransactionCallback>&&) REQUIRES(!m_state_mutex);
     void nonsync_transact_notify(VersionID::version_type) REQUIRES(!m_state_mutex);
+    void flush_subscription_changes(Transaction&) REQUIRES(!m_state_mutex);
 
     void create_sync_session() REQUIRES(m_state_mutex, !m_config_mutex);
     void did_drop_external_reference()

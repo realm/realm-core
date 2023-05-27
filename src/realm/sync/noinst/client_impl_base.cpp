@@ -1952,6 +1952,7 @@ void Session::send_message()
         return;
     }
 
+    const auto reached_target_upload = (m_upload_target_version <= m_upload_progress.client_version);
     auto check_pending_flx_version = [&]() -> bool {
         if (!m_is_flx_sync_session) {
             return false;
@@ -1968,7 +1969,7 @@ void Session::send_message()
             return false;
         }
 
-        return m_upload_progress.client_version >= m_pending_flx_sub_set->snapshot_version;
+        return reached_target_upload || m_upload_progress.client_version >= m_pending_flx_sub_set->snapshot_version;
     };
 
     if (check_pending_flx_version()) {
@@ -1977,7 +1978,7 @@ void Session::send_message()
 
     REALM_ASSERT(m_upload_progress.client_version <= m_upload_target_version);
     REALM_ASSERT(m_upload_target_version <= m_last_version_available);
-    if (m_allow_upload && (m_upload_target_version > m_upload_progress.client_version)) {
+    if (m_allow_upload && (!reached_target_upload)) {
         return send_upload_message(); // Throws
     }
 }
@@ -2292,7 +2293,7 @@ void Session::send_json_error_message()
     error_body_json["message"] = message;
     protocol.make_json_error_message(out, session_ident, static_cast<int>(protocol_error),
                                      error_body_json.dump()); // Throws
-    m_conn.initiate_write_message(out, this); // Throws
+    m_conn.initiate_write_message(out, this);                 // Throws
 
     m_error_to_send = false;
     enlist_to_send(); // Throws
@@ -2400,7 +2401,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         REALM_ASSERT_EX(m_progress.upload.last_integrated_server_version == 0,
                         m_progress.upload.last_integrated_server_version);
         logger.trace("last_version_available  = %1", m_last_version_available); // Throws
-
+ 
         m_upload_target_version = m_last_version_available;
         m_upload_progress = m_progress.upload;
         m_download_progress = m_progress.download;
@@ -2689,8 +2690,8 @@ void Session::suspend(const SessionErrorInfo& info)
     // Notify the application of the suspension of the session if the session is
     // still in the Active state
     if (m_state == Active) {
-        m_conn.one_less_active_unsuspended_session();                      // Throws
-        on_suspended(info);                                                // Throws
+        m_conn.one_less_active_unsuspended_session(); // Throws
+        on_suspended(info);                           // Throws
     }
 
     if (info.try_again) {

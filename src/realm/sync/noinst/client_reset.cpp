@@ -567,8 +567,9 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         if (!sub_store) {
             return;
         }
-        auto mut_subs = sub_store->get_active().make_mutable_copy();
-        int64_t before_version = mut_subs.version();
+        auto before_sub = sub_store->get_active();
+        auto before_version = before_sub.version();
+        auto mut_subs = before_sub.make_mutable_copy();
         mut_subs.update_state(sync::SubscriptionSet::State::Complete);
         auto sub = std::move(mut_subs).commit();
         if (on_flx_version_complete) {
@@ -637,7 +638,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         // the way to the final state, but since separate commits are necessary, this is
         // unavoidable.
         wt_local = db_local->start_write();
-        RecoverLocalChangesetsHandler handler{*wt_local, *frozen_pre_local_state, logger};
+        RecoverLocalChangesetsHandler handler{*wt_local, *frozen_pre_local_state, logger, sub_store};
         handler.process_changesets(local_changes, std::move(pending_subscriptions)); // throws on error
         // The new file ident is set as part of the final commit. This is to ensure that if
         // there are any exceptions during recovery, or the process is killed for some
@@ -647,6 +648,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         // opened with only partially recovered state while having lost the history of any
         // offline modifications.
         history_local->set_client_file_ident_in_wt(wt_local->get_version(), client_file_ident);
+        sub_store->flush_changes(*wt_local);
         wt_local->commit_and_continue_as_read();
     }
     else {
@@ -654,7 +656,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
             // In PBS recovery, the strategy is to apply all local changes to the remote realm first,
             // and then transfer the modified state all at once to the local Realm. This creates a
             // nice side effect for notifications because only the minimal state change is made.
-            RecoverLocalChangesetsHandler handler{*wt_remote, *frozen_pre_local_state, logger};
+            RecoverLocalChangesetsHandler handler{*wt_remote, *frozen_pre_local_state, logger, sub_store};
             handler.process_changesets(local_changes, {}); // throws on error
             ClientReplication* client_repl = dynamic_cast<ClientReplication*>(wt_remote->get_replication());
             REALM_ASSERT_RELEASE(client_repl);
@@ -673,13 +675,16 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
 
         // Finally, the local Realm is committed. The changes to the remote Realm are discarded.
         wt_remote->rollback_and_continue_as_read();
-        wt_local->commit_and_continue_as_read();
 
         // If in FLX mode, make a copy of the active subscription set and mark it as
         // complete. This will cause all other subscription sets to become superceded.
         // In DiscardLocal mode, only the active subscription set is preserved, so we
         // are done.
         remake_active_subscription();
+        if (sub_store) {
+            sub_store->flush_changes(*wt_local);
+        }
+        wt_local->commit_and_continue_as_read();
     }
 
     if (did_recover_out) {

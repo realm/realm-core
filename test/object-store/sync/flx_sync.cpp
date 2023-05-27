@@ -145,7 +145,6 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
                                         {"non_queryable_field", "non queryable 2"s}}));
     });
 
-
     harness.do_with_new_realm([&](SharedRealm realm) {
         wait_for_download(*realm);
         {
@@ -1475,7 +1474,7 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
         DBOptions options;
         options.encryption_key = test_util::crypt_key();
         auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
-        auto sub_store = sync::SubscriptionStore::create(realm, [](int64_t) {});
+        auto sub_store = sync::SubscriptionStore::create(realm, util::Logger::get_default_logger(), [](int64_t) {});
         auto version_info = sub_store->get_version_info();
         REQUIRE(version_info.active == 0);
         REQUIRE(version_info.latest == 1);
@@ -1793,14 +1792,25 @@ TEST_CASE("flx: verify PBS/FLX websocket protocol number and prefixes", "[sync][
 }
 
 TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app]") {
-    FLXSyncTestHarness harness("flx_bad_query");
+    FLXSyncTestHarness harness("flx_persist");
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
 
-    {
+    SECTION("persist by waiting for download") {
         auto orig_realm = Realm::get_shared_realm(config);
         auto mut_subs = orig_realm->get_latest_subscription_set().make_mutable_copy();
         mut_subs.insert_or_assign(Query(orig_realm->read_group().get_table("class_TopLevel")));
         mut_subs.commit();
+        wait_for_download(*orig_realm);
+        orig_realm->close();
+    }
+
+    SECTION("persist by doing a user write") {
+        auto orig_realm = Realm::get_shared_realm(config);
+        auto mut_subs = orig_realm->get_latest_subscription_set().make_mutable_copy();
+        mut_subs.insert_or_assign(Query(orig_realm->read_group().get_table("class_TopLevel")));
+        mut_subs.commit();
+        orig_realm->begin_transaction();
+        orig_realm->commit_transaction();
         orig_realm->close();
     }
 
@@ -1954,7 +1964,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
         REQUIRE(top_level);
         REQUIRE(top_level->is_empty());
 
-        auto sub_store = sync::SubscriptionStore::create(realm, [](int64_t) {});
+        auto sub_store = sync::SubscriptionStore::create(realm, util::Logger::get_default_logger(), [](int64_t) {});
         auto version_info = sub_store->get_version_info();
         REQUIRE(version_info.latest == 1);
         REQUIRE(version_info.active == 0);
@@ -2483,10 +2493,8 @@ TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app]") {
 
             CppContext c(realm);
             realm->begin_transaction();
-            Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
-            Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", bar_obj_id}, {"location", "bar"s}}));
+            Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
+            Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", bar_obj_id}, {"location", "bar"s}}));
             realm->commit_transaction();
 
             wait_for_upload(*realm);

@@ -1215,9 +1215,11 @@ void SessionWrapper::on_flx_sync_error(int64_t version, std::string_view err_msg
     REALM_ASSERT(m_flx_latest_version != 0);
     REALM_ASSERT(m_flx_latest_version >= version);
 
-    auto mut_subs = get_flx_subscription_store()->get_mutable_by_version(version);
+    auto store = get_flx_subscription_store();
+    auto mut_subs = store->get_mutable_by_version(version);
     mut_subs.update_state(SubscriptionSet::State::Error, err_msg);
     mut_subs.commit();
+    store->flush_changes();
 }
 
 void SessionWrapper::on_flx_sync_version_complete(int64_t version)
@@ -1264,9 +1266,11 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
             break;
     }
 
-    auto mut_subs = get_flx_subscription_store()->get_mutable_by_version(new_version);
+    auto store = get_flx_subscription_store();
+    auto mut_subs = store->get_mutable_by_version(new_version);
     mut_subs.update_state(new_state);
     mut_subs.commit();
+    store->flush_changes();
 }
 
 SubscriptionStore* SessionWrapper::get_flx_subscription_store()
@@ -1689,11 +1693,13 @@ void SessionWrapper::on_download_completion()
     }
 
     if (m_flx_subscription_store && m_flx_pending_mark_version != SubscriptionSet::EmptyVersion) {
+        REALM_ASSERT_3(m_flx_pending_mark_version, ==, m_flx_active_version);
         m_sess->logger.debug("Marking query version %1 as complete after receiving MARK message",
                              m_flx_pending_mark_version);
         auto mutable_subs = m_flx_subscription_store->get_mutable_by_version(m_flx_pending_mark_version);
         mutable_subs.update_state(SubscriptionSet::State::Complete);
         mutable_subs.commit();
+        m_flx_subscription_store->flush_changes();
         m_flx_pending_mark_version = SubscriptionSet::EmptyVersion;
     }
 
