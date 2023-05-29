@@ -6,7 +6,8 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix the query parser needs to copy list of arguments and own the memory. ([#6674](https://github.com/realm/realm-core/pull/6674), since v12.5.0)
+
 
 ### Breaking changes
 * None.
