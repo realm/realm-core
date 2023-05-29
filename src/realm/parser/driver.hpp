@@ -191,6 +191,9 @@ public:
     {
         target_table = table_name.substr(1, table_name.size() - 2);
     }
+
+    std::unique_ptr<ConstantMixedList> copy_list_of_args(std::vector<Mixed>&);
+    std::unique_ptr<Subexpr> copy_arg(ParserDriver*, DataType, size_t, DataType, std::string&);
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
     util::Optional<ExpressionComparisonType> m_comp_type;
     std::string target_table;
@@ -623,7 +626,8 @@ public:
         parse_error = true;
     }
 
-    Mixed get_arg_for_index(std::string);
+    Mixed get_arg_for_index(const std::string&);
+    double get_arg_for_coordinate(const std::string&);
 
     template <class T>
     Query simple_query(int op, ColKey col_key, T val, bool case_sensitive);

@@ -5741,6 +5741,22 @@ TEST(Parser_Geospatial)
     verify_query_sub(test_context, table, "location GEOWITHIN $1", args, 4);
     verify_query_sub(test_context, table, "location GEOWITHIN $2", args, 1);
 
+    GeoCircle c = circle.get<GeoCircle>();
+    std::vector<Mixed> coord_args = {Mixed{c.center.longitude}, Mixed{c.center.latitude}, Mixed{c.radius_radians}};
+    verify_query_sub(test_context, table, "location GEOWITHIN geoCircle([$0, $1], $2)", coord_args, 4);
+    GeoPolygon p = polygon.get<GeoPolygon>();
+    coord_args = {Mixed{p.points[0][0].longitude}, Mixed{p.points[0][0].latitude},  Mixed{p.points[0][1].longitude},
+                  Mixed{p.points[0][1].latitude},  Mixed{p.points[0][2].longitude}, Mixed{p.points[0][2].latitude},
+                  Mixed{p.points[0][3].longitude}, Mixed{p.points[0][3].latitude},  Mixed{p.points[0][4].longitude},
+                  Mixed{p.points[0][4].latitude}};
+    verify_query_sub(test_context, table,
+                     "location GEOWITHIN geoPolygon({[$0, $1], [$2, $3], [$4, $5], [$6, $7], [$8, $9]})", coord_args,
+                     1);
+    GeoBox b = box.get<GeoBox>();
+    coord_args = {b.lo.longitude, b.lo.latitude, b.hi.longitude, b.hi.latitude};
+    verify_query_sub(test_context, table, "location GEOWITHIN geoBox([$0, $1], [$2, $3])", coord_args, 1);
+
+
     CHECK_THROW_EX(
         verify_query(test_context, table, "_id geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 1),
         query_parser::InvalidQueryError,
@@ -5786,6 +5802,19 @@ TEST(Parser_Geospatial)
                    query_parser::InvalidQueryError,
                    CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a valid "
                                                     "Geospatial value, got 'NULL'") != std::string::npos));
+    CHECK_THROW_EX(
+        verify_query_sub(test_context, table, "location GEOWITHIN geoCircle([$1, $2], $3)", args, 0),
+        query_parser::InvalidQueryError,
+        CHECK(std::string(e.what()).find("Invalid parameter 'geospatial' used in coordinate at argument '$1'") !=
+              std::string::npos));
+    CHECK_THROW_EX(
+        verify_query_sub(test_context, table, "location GEOWITHIN geoCircle([$4, $4], $4)", args, 0),
+        query_parser::InvalidQueryError,
+        CHECK(std::string(e.what()).find("NULL cannot be used in coordinate at argument '$4'") != std::string::npos));
+    CHECK_THROW_EX(verify_query_sub(test_context, table, "location GEOWITHIN geoCircle([$7, $7], $7)", args, 0),
+                   query_parser::InvalidQueryError,
+                   CHECK(std::string(e.what()).find(
+                             "Invalid parameter 'string' used in coordinate at argument '$7'") != std::string::npos));
 #endif
 }
 
