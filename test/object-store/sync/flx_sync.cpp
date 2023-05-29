@@ -283,6 +283,11 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
              {"list_of_ints_field", PropertyType::Int | PropertyType::Array},
              {"sum_of_list_field", PropertyType::Int},
          }},
+        {"TopLevel2",
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+         }},
     };
 
     // some of these tests make additive schema changes which is only allowed in dev mode
@@ -431,6 +436,56 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 CHECK(tv.get_object(1).get<Int>(int_col) == remote_added_int);
             })
             ->run();
+    }
+
+    SECTION("Recover: subscription and offline writes after client reset failure") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        auto&& [error_future, error_handler] = make_error_handler();
+        config_local.sync_config->error_handler = error_handler;
+
+        std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(config_local.path);
+        // create a non-empty directory that we'll fail to delete
+        util::make_dir(fresh_path);
+        util::File(util::File::resolve("file", fresh_path), util::File::mode_Write);
+
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        test_reset
+            ->make_local_changes([&](SharedRealm local_realm) {
+                auto mut_sub = local_realm->get_latest_subscription_set().make_mutable_copy();
+                auto table = local_realm->read_group().get_table("class_TopLevel2");
+                mut_sub.insert_or_assign(Query(table));
+                mut_sub.commit();
+
+                CppContext c(local_realm);
+                local_realm->begin_transaction();
+                Object::create(c, local_realm, "TopLevel2",
+                               std::any(AnyDict{{"_id"s, ObjectId::gen()}, {"queryable_str_field"s, "foo"s}}));
+                local_realm->commit_transaction();
+            })
+            ->on_post_reset([](SharedRealm local_realm) {
+                // Verify offline subscription was not removed.
+                auto subs = local_realm->get_latest_subscription_set();
+                auto table = local_realm->read_group().get_table("class_TopLevel2");
+                REQUIRE(subs.find(Query(table)));
+            })
+            ->run();
+
+        // Remove the folder preventing the completion of a client reset.
+        util::try_remove_dir_recursive(fresh_path);
+
+        auto config_copy = config_local;
+        config_local.sync_config->error_handler = nullptr;
+
+        // Attempt to open the realm again.
+        // This time the client reset succeesds and the offline subscription and writes are recovered.
+        auto realm = Realm::get_shared_realm(config_copy);
+        wait_for_download(*realm);
+        wait_for_upload(*realm);
+
+        auto table = realm->read_group().get_table("class_TopLevel2");
+        auto str_col = table->get_column_key("queryable_str_field");
+        REQUIRE(table->size() == 1);
+        REQUIRE(table->get_object(0).get<String>(str_col) == "foo");
     }
 
     SECTION("Recover: offline writes and subscriptions (multiple subscriptions)") {
