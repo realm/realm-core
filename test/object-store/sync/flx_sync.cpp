@@ -475,12 +475,14 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
 
         auto config_copy = config_local;
         config_local.sync_config->error_handler = nullptr;
+        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        config_copy.sync_config->notify_after_client_reset = reset_handler;
 
         // Attempt to open the realm again.
-        // This time the client reset succeesds and the offline subscription and writes are recovered.
+        // This time the client reset succeeds and the offline subscription and writes are recovered.
         auto realm = Realm::get_shared_realm(config_copy);
-        wait_for_download(*realm);
-        wait_for_upload(*realm);
+        ClientResyncMode mode = reset_future.get();
+        REQUIRE(mode == ClientResyncMode::Recover);
 
         auto table = realm->read_group().get_table("class_TopLevel2");
         auto str_col = table->get_column_key("queryable_str_field");
