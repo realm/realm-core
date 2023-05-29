@@ -531,8 +531,6 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
     m_keys.truncate(ndx);
 }
 
-Cluster::~Cluster() {}
-
 ColKey Cluster::get_col_key(size_t ndx_in_parent) const
 {
     ColKey::Idx col_ndx{unsigned(ndx_in_parent - 1)}; // <- leaf_index here. Opaque.

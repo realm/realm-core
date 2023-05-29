@@ -53,9 +53,9 @@ Obj::Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx)
     , m_key(key)
     , m_mem(mem)
     , m_row_ndx(row_ndx)
+    , m_storage_version(_get_alloc().get_storage_version())
     , m_valid(true)
 {
-    m_storage_version = get_alloc().get_storage_version();
 }
 
 GlobalKey Obj::get_object_id() const

@@ -97,7 +97,11 @@ public:
     {
         return *m_object_schema;
     }
-    Obj obj() const
+    Obj& obj()
+    {
+        return m_obj;
+    }
+    const Obj& obj() const
     {
         return m_obj;
     }

@@ -30,6 +30,7 @@ class Cluster;
 class ClusterTree {
 public:
     class Iterator;
+    class LeafCache;
     using TraverseFunction = util::FunctionRef<IteratorControl(const Cluster*)>;
     using UpdateFunction = util::FunctionRef<void(Cluster*)>;
     using ColIterateFunction = util::FunctionRef<IteratorControl(ColKey)>;
@@ -281,6 +282,16 @@ protected:
 
     ObjKey load_leaf(ObjKey key) const;
     size_t get_position();
+};
+
+class ClusterTree::LeafCache {
+public:
+    LeafCache(const Table& table);
+    Obj get(ObjKey);
+
+private:
+    const ClusterTree& m_tree;
+    Cluster m_leaf;
 };
 } // namespace realm
 

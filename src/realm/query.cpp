@@ -1909,28 +1909,27 @@ Query Query::operator!()
 
 void Query::get_outside_versions(TableVersions& versions) const
 {
-    if (m_table) {
-        if (m_table_keys.empty()) {
-            // Store primary table info
-            m_table_keys.push_back(m_table.unchecked_ptr()->get_key());
+    if (!m_table) {
+        return;
+    }
+    auto table = m_table.unchecked_ptr();
+    if (m_table_keys.empty()) {
+        // Store primary table info
+        m_table_keys.push_back(table->get_key());
 
-            if (ParentNode* root = root_node())
-                root->get_link_dependencies(m_table_keys);
-        }
-        versions.emplace_back(m_table.unchecked_ptr()->get_key(), m_table.unchecked_ptr()->get_content_version());
+        if (ParentNode* root = root_node())
+            root->get_link_dependencies(m_table_keys);
+    }
+    versions.emplace_back(table->get_key(), table->get_content_version());
 
-        if (Group* g = m_table.unchecked_ptr()->get_parent_group()) {
-            // update table versions for linked tables - first entry is primary table - skip it
-            auto end = m_table_keys.end();
-            auto it = m_table_keys.begin() + 1;
-            while (it != end) {
-                versions.emplace_back(*it, g->get_table(*it)->get_content_version());
-                ++it;
-            }
+    if (Group* g = table->get_parent_group()) {
+        // update table versions for linked tables - first entry is primary table - skip it
+        for (auto it = m_table_keys.begin() + 1, end = m_table_keys.end(); it != end; ++it) {
+            versions.emplace_back(*it, g->get_table(*it).unchecked_ptr()->get_content_version());
         }
-        if (m_view) {
-            m_view->get_dependencies(versions);
-        }
+    }
+    if (m_view) {
+        m_view->get_dependencies(versions);
     }
 }
 

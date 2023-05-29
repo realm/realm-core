@@ -425,27 +425,16 @@ public:
     ObjKey find_first_uuid(ColKey col_key, UUID value) const;
 
     //    TableView find_all_link(Key target_key);
-    TableView find_all_int(ColKey col_key, int64_t value);
     TableView find_all_int(ColKey col_key, int64_t value) const;
-    TableView find_all_bool(ColKey col_key, bool value);
     TableView find_all_bool(ColKey col_key, bool value) const;
-    TableView find_all_float(ColKey col_key, float value);
     TableView find_all_float(ColKey col_key, float value) const;
-    TableView find_all_double(ColKey col_key, double value);
     TableView find_all_double(ColKey col_key, double value) const;
-    TableView find_all_string(ColKey col_key, StringData value);
     TableView find_all_string(ColKey col_key, StringData value) const;
-    TableView find_all_binary(ColKey col_key, BinaryData value);
-    TableView find_all_binary(ColKey col_key, BinaryData value) const;
-    TableView find_all_null(ColKey col_key);
     TableView find_all_null(ColKey col_key) const;
 
     TableView find_all_fulltext(ColKey col_key, StringData value) const;
 
-    TableView get_sorted_view(ColKey col_key, bool ascending = true);
     TableView get_sorted_view(ColKey col_key, bool ascending = true) const;
-
-    TableView get_sorted_view(SortDescriptor order);
     TableView get_sorted_view(SortDescriptor order) const;
 
     // Report the current content version. This is a 64-bit value which is bumped whenever
@@ -515,7 +504,7 @@ public:
 
 private:
     template <class T>
-    TableView find_all(ColKey col_key, T value);
+    TableView find_all(ColKey col_key, T value) const;
     void build_column_mapping();
     ColKey generate_col_key(ColumnType ct, ColumnAttrMask attrs);
     void convert_column(ColKey from, ColKey to, bool throw_on_null);

@@ -321,7 +321,12 @@ public:
 
     bool has_changed() const
     {
-        return m_last_seen_versions != get_dependency_versions();
+        // Once evaluated, a frozen TableView will never change again
+        if (m_table->is_frozen())
+            return m_last_seen_versions.empty();
+        m_current_versions.clear();
+        get_dependencies(m_current_versions);
+        return m_last_seen_versions != m_current_versions;
     }
 
     // Sort m_key_values according to one column
@@ -414,6 +419,7 @@ protected:
     };
 
     mutable TableVersions m_last_seen_versions;
+    mutable TableVersions m_current_versions;
     KeyValues m_key_values;
 
 private:

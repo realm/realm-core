@@ -93,8 +93,6 @@ public:
     {
     }
 
-    ~Array() noexcept override {}
-
     /// Create a new integer array of the specified type and size, and filled
     /// with the specified value, and attach this accessor to it. This does not
     /// modify the parent reference information of this accessor.

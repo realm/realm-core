@@ -437,14 +437,28 @@ TEST_CASE("Benchmark sectioned results", "[benchmark]") {
     realm->commit_transaction();
 
     size_t section_count = GENERATE(1, 10, 1000, 10000);
-    auto key_fn = [&](Mixed value, const std::shared_ptr<Realm>&) -> Mixed {
-        return table->get_object(value.get_link().get_obj_key()).get<int64_t>(col) % int64_t(section_count);
+    auto key_fn = [&](Results& results, size_t i) -> Mixed {
+        return results.get<Obj>(i).get<int64_t>(col) % int64_t(section_count);
     };
 
-    BENCHMARK("create and get section count") {
-        auto size = Results(realm, table).sectioned_results(key_fn).size();
-        REQUIRE(size == section_count);
-    };
+    SECTION("create and get section count") {
+        BENCHMARK("table") {
+            auto size = Results(realm, table).sectioned_results(key_fn).size();
+            REQUIRE(size == section_count);
+        };
+        BENCHMARK("tableview") {
+            auto size = Results(realm, table).filter(table->where()).sectioned_results(key_fn).size();
+            REQUIRE(size == section_count);
+        };
+        BENCHMARK("sorted tableview") {
+            auto size = Results(realm, table)
+                            .sort({{"value", false}})
+                            .filter(table->where())
+                            .sectioned_results(key_fn)
+                            .size();
+            REQUIRE(size == section_count);
+        };
+    }
 
     BENCHMARK_ADVANCED("iterate directly")(Catch::Benchmark::Chronometer meter)
     {

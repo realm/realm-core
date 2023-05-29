@@ -50,14 +50,14 @@ void ColumnsDescriptor::collect_dependencies(const Table* table, std::vector<Tab
             const Table* t = table;
             for (size_t i = 0; i < sz - 1; i++) {
                 ColKey col = columns[i];
-                ConstTableRef target_table;
+                const Table* target_table = nullptr;
                 if (t->get_column_type(col) == type_Link) {
-                    target_table = t->get_link_target(col);
+                    target_table = t->get_link_target(col).unchecked_ptr();
                 }
                 if (!target_table)
                     return;
                 table_keys.push_back(target_table->get_key());
-                t = target_table.unchecked_ptr();
+                t = target_table;
             }
         }
     }
@@ -356,6 +356,7 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
 
     auto& col = m_columns[0];
     ColKey ck = col.col_key;
+    ClusterTree::LeafCache cache(*col.table);
     for (size_t i = 0; i < v.size(); i++) {
         IndexPair& index = v[i];
         ObjKey key = index.key_for_object;
@@ -368,7 +369,7 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
             }
         }
 
-        index.cached_value = col.table->get_object(key).get_any(ck);
+        index.cached_value = cache.get(key).get_any(ck);
     }
 }
 
@@ -535,6 +536,6 @@ void DescriptorOrdering::get_versions(const Group* group, TableVersions& version
 {
     for (auto table_key : m_dependencies) {
         REALM_ASSERT_DEBUG(group);
-        versions.emplace_back(table_key, group->get_table(table_key)->get_content_version());
+        versions.emplace_back(table_key, group->get_table(table_key).unchecked_ptr()->get_content_version());
     }
 }

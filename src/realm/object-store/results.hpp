@@ -294,8 +294,7 @@ public:
      *
      * @return A SectionedResults object using a user defined sectioning algorithm.
      */
-    SectionedResults sectioned_results(
-        util::UniqueFunction<Mixed(Mixed value, const std::shared_ptr<Realm>& realm)>&& section_key_func);
+    SectionedResults sectioned_results(util::UniqueFunction<Mixed(Results&, size_t)>&& section_key_func);
     enum class SectionedResultsOperator {
         FirstLetter // Section by the first letter of each string element. Note that col must be a string.
     };
