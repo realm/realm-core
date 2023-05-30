@@ -128,7 +128,7 @@ private:
 
     Instruction::PrimaryKey as_primary_key(Mixed);
     Instruction::PrimaryKey primary_key_for_object(const Table&, ObjKey key);
-    void populate_path_instr(Instruction::PathInstruction&, const Table&, ObjKey key, StringData field_name);
+    void populate_path_instr(Instruction::PathInstruction&, const Table&, ObjKey key, Path path);
     void populate_path_instr(Instruction::PathInstruction&, const CollectionBase&);
     void populate_path_instr(Instruction::PathInstruction&, const CollectionBase&, uint32_t ndx);
 
@@ -138,7 +138,7 @@ private:
     // lookups.
     const Table* m_last_table = nullptr;
     ObjKey m_last_object;
-    std::string m_last_field_name;
+    StringData m_last_field_name;
     InternString m_last_class_name;
     util::Optional<Instruction::PrimaryKey> m_last_primary_key;
     InternString m_last_interned_field_name;

@@ -72,39 +72,49 @@ enum class UpdateStatus {
     NoChange,
 };
 
+
+// Given an object as starting point, a collection can be identified by
+// a sequence of PathElements. The first element should always be a
+// column key. The next elements are either an index into a list or a key
+// to an entry in a dictionary
 struct PathElement {
     union {
         std::string string_val;
         int64_t int_val;
     };
-    enum Type { string, integer } m_type;
+    enum Type { column, key, index } m_type;
 
+    PathElement(ColKey col_key)
+        : int_val(col_key.value)
+        , m_type(Type::column)
+    {
+    }
     PathElement(int ndx)
         : int_val(ndx)
-        , m_type(Type::integer)
+        , m_type(Type::index)
     {
         REALM_ASSERT(ndx >= 0);
     }
     PathElement(size_t ndx)
         : int_val(int64_t(ndx))
-        , m_type(Type::integer)
+        , m_type(Type::index)
     {
     }
 
     PathElement(StringData str)
         : string_val(str)
-        , m_type(Type::string)
+        , m_type(Type::key)
     {
     }
     PathElement(const char* str)
         : string_val(str)
-        , m_type(Type::string)
+        , m_type(Type::key)
     {
     }
     PathElement(const PathElement& other)
         : m_type(other.m_type)
     {
-        if (other.m_type == Type::string) {
+        if (other.m_type == Type::key) {
             new (&string_val) std::string(other.string_val);
         }
         else {
@@ -115,7 +125,7 @@ struct PathElement {
     PathElement(PathElement&& other) noexcept
         : m_type(other.m_type)
     {
-        if (other.m_type == Type::string) {
+        if (other.m_type == Type::key) {
             new (&string_val) std::string(std::move(other.string_val));
         }
         else {
@@ -124,20 +134,29 @@ struct PathElement {
     }
     ~PathElement()
     {
-        if (m_type == Type::string) {
+        if (m_type == Type::key) {
             string_val.std::string::~string();
         }
     }
 
+    bool is_col_key() const noexcept
+    {
+        return m_type == Type::column;
+    }
     bool is_ndx() const noexcept
     {
-        return m_type == Type::integer;
+        return m_type == Type::index;
     }
     bool is_key() const noexcept
     {
-        return m_type == Type::string;
+        return m_type == Type::key;
     }
 
+    ColKey get_col_key() const noexcept
+    {
+        REALM_ASSERT(is_col_key());
+        return ColKey(int_val);
+    }
     size_t get_ndx() const noexcept
     {
         REALM_ASSERT(is_ndx());
@@ -152,7 +171,7 @@ struct PathElement {
     PathElement& operator=(const PathElement& other)
     {
         m_type = other.m_type;
-        if (other.m_type == Type::string) {
+        if (other.m_type == Type::key) {
             string_val = other.string_val;
         }
         else {
@@ -163,17 +182,21 @@ struct PathElement {
     bool operator==(const PathElement& other) const
     {
         if (m_type == other.m_type) {
-            return (m_type == Type::string) ? string_val == other.string_val : int_val == other.int_val;
+            return (m_type == Type::key) ? string_val == other.string_val : int_val == other.int_val;
         }
         return false;
     }
     bool operator==(const char* str) const
     {
-        return (m_type == Type::string) ? string_val == str : false;
+        return (m_type == Type::key) ? string_val == str : false;
     }
-    bool operator==(int64_t i) const
+    bool operator==(size_t i) const
     {
-        return (m_type == Type::integer) ? int_val == i : false;
+        return (m_type == Type::index) ? size_t(int_val) == i : false;
+    }
+    bool operator==(ColKey ck) const
+    {
+        return (m_type == Type::column) ? int_val == ck.value : false;
     }
 };
 
@@ -200,12 +223,15 @@ public:
     // Return the path to this object. The path is calculated from
     // the topmost Obj - which must be an Obj with a primary key.
     virtual FullPath get_path() const = 0;
+    // Return path from owning object
+    virtual Path get_short_path() const = 0;
     // Add a translation of Index to PathElement
     virtual void add_index(Path& path, Index ndx) const = 0;
     /// Get table of owning object
     virtual TableRef get_table() const noexcept = 0;
 
 protected:
+    friend class Collection;
     template <class>
     friend class CollectionBaseImpl;
     friend class CollectionList;

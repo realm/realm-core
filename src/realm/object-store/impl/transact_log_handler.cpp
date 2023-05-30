@@ -320,7 +320,7 @@ struct TransactLogValidator : public TransactLogValidationMixin {
     {
         return true;
     }
-    bool select_collection(ColKey, ObjKey)
+    bool select_collection(ColKey, ObjKey, const std::vector<PathElement>&)
     {
         return true;
     }
@@ -362,10 +362,11 @@ public:
         return true;
     }
 
-    bool select_collection(ColKey col, ObjKey obj)
+    bool select_collection(ColKey col, ObjKey obj, const std::vector<PathElement>&)
     {
         modify_object(col, obj);
         auto table = current_table();
+        // FIXME
         for (auto& c : m_info.collections) {
             if (c.table_key == table && c.obj_key == obj && c.col_key == col) {
                 m_active_collection = c.changes;

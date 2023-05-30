@@ -1236,7 +1236,8 @@ TEST(List_NestedList_Path)
     auto dict_col =
         top_table->add_column(*embedded_table, "embedded_dict", {CollectionType::Dictionary, CollectionType::List});
     auto string_col = top_table->add_column_list(type_String, "strings");
-    top_table->add_column(type_Float, "floats", false, {CollectionType::Dictionary, CollectionType::List});
+    auto float_col =
+        top_table->add_column(type_Float, "floats", false, {CollectionType::Dictionary, CollectionType::List});
     embedded_table->add_column(type_Int, "integers", false, {CollectionType::Dictionary, CollectionType::List});
     auto col_any = top_table->add_column(type_Mixed, "Any");
 
@@ -1247,7 +1248,7 @@ TEST(List_NestedList_Path)
         auto list_string = o.get_list<String>(string_col);
         auto path = list_string.get_path();
         CHECK_EQUAL(path.path_from_top.size(), 1);
-        CHECK_EQUAL(path.path_from_top[0], "strings");
+        CHECK_EQUAL(path.path_from_top[0], string_col);
     }
 
     // List nested in Dictionary
@@ -1256,7 +1257,7 @@ TEST(List_NestedList_Path)
         list_float->add(5.f);
         auto path = list_float->get_path();
         CHECK_EQUAL(path.path_from_top.size(), 2);
-        CHECK_EQUAL(path.path_from_top[0], "floats");
+        CHECK_EQUAL(path.path_from_top[0], float_col);
         CHECK_EQUAL(path.path_from_top[1], "Foo");
     }
 
@@ -1274,7 +1275,7 @@ TEST(List_NestedList_Path)
         list_int->add(5);
         auto path = list_int->get_path();
         CHECK_EQUAL(path.path_from_top.size(), 5);
-        CHECK_EQUAL(path.path_from_top[0], "embedded_list");
+        CHECK_EQUAL(path.path_from_top[0], list_col);
         CHECK_EQUAL(path.path_from_top[1], 2);
         CHECK_EQUAL(path.path_from_top[2], 1);
         CHECK_EQUAL(path.path_from_top[3], "integers");
@@ -1295,7 +1296,7 @@ TEST(List_NestedList_Path)
         list_int->add(5);
         auto path = list_int->get_path();
         CHECK_EQUAL(path.path_from_top.size(), 5);
-        CHECK_EQUAL(path.path_from_top[0], "embedded_dict");
+        CHECK_EQUAL(path.path_from_top[0], dict_col);
         CHECK_EQUAL(path.path_from_top[1], "C");
         CHECK_EQUAL(path.path_from_top[2], 1);
         CHECK_EQUAL(path.path_from_top[3], "integers");
@@ -1312,8 +1313,58 @@ TEST(List_NestedList_Path)
         auto dict2 = list->get_dictionary(1);
         auto path = dict2->get_path();
         CHECK_EQUAL(path.path_from_top.size(), 3);
-        CHECK_EQUAL(path.path_from_top[0], "Any");
+        CHECK_EQUAL(path.path_from_top[0], col_any);
         CHECK_EQUAL(path.path_from_top[1], "List");
         CHECK_EQUAL(path.path_from_top[2], 1);
     }
+}
+
+TEST(List_Nested_Replication)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(make_in_realm_history(), path);
+    auto tr = db->start_write();
+    auto table = tr->add_table("table");
+    auto col_any = table->add_column(type_Mixed, "something");
+
+    Obj obj = table->create_object();
+
+    obj.set_collection(col_any, CollectionType::Dictionary);
+    auto dict = obj.get_dictionary_ptr(col_any);
+    dict->insert_collection("level1", CollectionType::Dictionary);
+    auto dict2 = dict->get_dictionary("level1");
+    dict2->insert("Paul", "McCartney");
+    tr->commit_and_continue_as_read();
+
+    {
+        auto wt = db->start_write();
+        auto t = wt->get_table("table");
+        auto o = *t->begin();
+        auto d = o.get_collection_ptr({"something", "level1"});
+
+        dynamic_cast<Dictionary*>(d.get())->insert("John", "Lennon");
+        wt->commit();
+    }
+
+    struct Parser : _impl::NoOpTransactionLogParser {
+        TestContext& test_context;
+        Parser(TestContext& context)
+            : test_context(context)
+        {
+        }
+
+        bool collection_insert(size_t ndx)
+        {
+            auto collection_path = get_path();
+            CHECK(collection_path[1] == expected_path[1]);
+            CHECK(ndx == 0);
+            return true;
+        }
+
+        Path expected_path;
+    } parser(test_context);
+
+    parser.expected_path.push_back("");
+    parser.expected_path.push_back("level1");
+    tr->advance_read(&parser);
 }
