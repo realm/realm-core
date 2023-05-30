@@ -743,7 +743,9 @@ void ClientImpl::remove_connection(ClientImpl::Connection& conn) noexcept
 
 void SessionImpl::force_close()
 {
-    m_wrapper.force_close();
+    if (m_state == SessionImpl::Active) {
+        m_wrapper.force_close();
+    }
 }
 
 void SessionImpl::on_connection_state_changed(ConnectionState state,
@@ -1614,18 +1616,19 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
 
 void SessionWrapper::force_close()
 {
-    REALM_ASSERT(m_actualized);
-    REALM_ASSERT(m_sess);
-    REALM_ASSERT(!m_finalized);
-    m_force_closed = true;
+    if (!m_force_closed && !m_finalized) {
+        REALM_ASSERT(m_actualized);
+        REALM_ASSERT(m_sess);
+        m_force_closed = true;
 
-    ClientImpl::Connection& conn = m_sess->get_connection();
-    conn.initiate_session_deactivation(m_sess); // Throws
+        ClientImpl::Connection& conn = m_sess->get_connection();
+        conn.initiate_session_deactivation(m_sess); // Throws
 
-    // Delete the pending bootstrap store since it uses a reference to the logger in m_sess
-    m_flx_pending_bootstrap_store.reset();
-    m_sess = nullptr;
-    m_connection_state_change_listener = {};
+        // Delete the pending bootstrap store since it uses a reference to the logger in m_sess
+        m_flx_pending_bootstrap_store.reset();
+        m_sess = nullptr;
+        m_connection_state_change_listener = {};
+    }
 }
 
 // Must be called from event loop thread
