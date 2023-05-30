@@ -5734,6 +5734,7 @@ TEST(Query_Dictionary)
     CHECK_EQUAL(tv.size(), 5);
 }
 
+#if 0 // Reenable when we get support for indexes in collections
 TEST(Query_DictionaryTypedLinks)
 {
     Group g;
@@ -5764,14 +5765,14 @@ TEST(Query_DictionaryTypedLinks)
 
     // g.to_json(std::cout, 5);
 
-    auto cnt = (person->column<Dictionary>(col_data).key("Pet").property("Name") == StringData("Pluto")).count();
+    auto cnt = person->query("data.Pet.Name == 'Pluto'").count();
     CHECK_EQUAL(cnt, 1);
-    cnt = (person->column<Dictionary>(col_data).key("Pet").property("Name") == StringData("Marie")).count();
+    cnt = person->query("data.Pet.Name == 'Marie'").count();
     CHECK_EQUAL(cnt, 1);
-    cnt = (person->column<Dictionary>(col_data).key("Pet").property("Parent").property("Name") == StringData("Fido"))
-              .count();
+    cnt = person->query("data.Pet.Parent.Name == 'Fido'").count();
     CHECK_EQUAL(cnt, 1);
 }
+#endif
 
 TEST(Query_TypeOfValue)
 {
