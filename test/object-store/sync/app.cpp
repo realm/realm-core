@@ -45,6 +45,7 @@
 #include <realm/util/base64.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/overload.hpp>
+#include <realm/util/platform_info.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/sync/network/websocket.hpp>
 
@@ -321,14 +322,14 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     }
 
     SECTION("retry custom confirmation for invalid user fails") {
-        client.retry_custom_confirmation(
-            util::format("%1@%2.com", random_string(5), random_string(5)), [&](Optional<AppError> error) {
-                REQUIRE(error);
-                CHECK(error->reason() == "user not found");
-                CHECK(error->is_service_error());
-                CHECK(error->code() == ErrorCodes::UserNotFound);
-                processed = true;
-            });
+        client.retry_custom_confirmation(util::format("%1@%2.com", random_string(5), random_string(5)),
+                                         [&](Optional<AppError> error) {
+                                             REQUIRE(error);
+                                             CHECK(error->reason() == "user not found");
+                                             CHECK(error->is_service_error());
+                                             CHECK(error->code() == ErrorCodes::UserNotFound);
+                                             processed = true;
+                                         });
         CHECK(processed);
     }
 
@@ -2212,7 +2213,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 logger->trace("Received request[%1]: %2", request_count, request.url);
                 if (request_count == 0) {
                     // First request should be to location
-                    REQUIRE(request.url.find_first_of("/location") != std::string::npos);
+                    REQUIRE(request.url.find("/location") != std::string::npos);
                     if (request.url.find("https://") != std::string::npos) {
                         redirect_scheme = "https://";
                     }
@@ -2360,10 +2361,10 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         std::string websocket_url = "ws://some-websocket:9090";
         std::string original_url;
         redir_transport->request_hook = [&](const Request& request) {
-            logger->trace("Received request[%1]: %2", request_count, request.url);
+            logger->trace("request.url (%1): %2", request_count, request.url);
             if (request_count == 0) {
                 // First request should be to location
-                REQUIRE(request.url.find_first_of("/location") != std::string::npos);
+                REQUIRE(request.url.find("/location") != std::string::npos);
                 if (request.url.find("https://") != std::string::npos) {
                     original_scheme = "https://";
                 }
@@ -2379,7 +2380,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 logger->trace("original_url (%1): %2", request_count, original_url);
             }
             else if (request_count == 1) {
-                logger->trace("request.url (%1): %2", request_count, request.url);
                 REQUIRE(!request.redirect_count);
                 redir_transport->simulated_response = {
                     308,
@@ -2388,7 +2388,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     "Some body data"};
             }
             else if (request_count == 2) {
-                logger->trace("request.url (%1): %2", request_count, request.url);
                 REQUIRE(request.url.find("http://somehost:9090") != std::string::npos);
                 REQUIRE(request.url.find("location") != std::string::npos);
                 // app hostname will be updated via the metadata info
@@ -2401,7 +2400,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                                  original_url, websocket_url)};
             }
             else {
-                logger->trace("request.url (%1): %2", request_count, request.url);
                 REQUIRE(request.url.find(original_url) != std::string::npos);
                 redir_transport->simulated_response.reset();
             }
@@ -2506,10 +2504,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             };
             int request_count = 0;
             redir_transport->request_hook = [&](const Request& request) {
+                logger->trace("request.url (%1): %2", request_count, request.url);
                 if (request_count++ == 0) {
-                    logger->trace("request.url (%1): %2", request_count, request.url);
-                    // First request should be to location
-                    REQUIRE(request.url.find_first_of("/location") != std::string::npos);
+                    // First request should be a location request against the original URL
+                    REQUIRE(request.url.find(original_host) != std::string::npos);
+                    REQUIRE(request.url.find("/location") != std::string::npos);
                     REQUIRE(request.redirect_count == 0);
                     redir_transport->simulated_response = {
                         static_cast<int>(sync::HTTPStatus::PermanentRedirect),
@@ -2517,8 +2516,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                         {{"Location", redirect_url}, {"Content-Type", "application/json"}},
                         "Some body data"};
                 }
-                else if (request.url.find("location") != std::string::npos) {
-                    logger->trace("request.url (%1): %2", request_count, request.url);
+                else if (request.url.find("/location") != std::string::npos) {
                     redir_transport->simulated_response = {
                         static_cast<int>(sync::HTTPStatus::Ok),
                         0,
@@ -2529,7 +2527,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                             redirect_host, redirect_scheme, websocket_scheme)};
                 }
                 else {
-                    logger->trace("request.url (%1): %2", request_count, request.url);
                     redir_transport->simulated_response.reset();
                 }
             };
@@ -2560,10 +2557,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             };
             int request_count = 0;
             redir_transport->request_hook = [&](const Request& request) {
+                logger->trace("request.url (%1): %2", request_count, request.url);
                 if (request_count++ == 0) {
-                    logger->trace("request.url (%1): %2", request_count, request.url);
-                    // First request should be to location
-                    REQUIRE(request.url.find_first_of("/location") != std::string::npos);
+                    // First request should be a location request against the original URL
+                    REQUIRE(request.url.find(original_host) != std::string::npos);
+                    REQUIRE(request.url.find("/location") != std::string::npos);
                     REQUIRE(request.redirect_count == 0);
                     redir_transport->simulated_response = {
                         static_cast<int>(sync::HTTPStatus::MovedPermanently),
@@ -2571,8 +2569,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                         {{"Location", redirect_url}, {"Content-Type", "application/json"}},
                         "Some body data"};
                 }
-                else if (request.url.find("location") != std::string::npos) {
-                    logger->trace("request.url (%1): %2", request_count, request.url);
+                else if (request.url.find("/location") != std::string::npos) {
                     redir_transport->simulated_response = {
                         static_cast<int>(sync::HTTPStatus::Ok),
                         0,
@@ -2583,14 +2580,12 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                             redirect_host, redirect_scheme, websocket_scheme)};
                 }
                 else if (request.url.find("auth/session") != std::string::npos) {
-                    logger->trace("request.url (%1): %2", request_count, request.url);
                     redir_transport->simulated_response = {static_cast<int>(sync::HTTPStatus::Unauthorized),
                                                            0,
                                                            {{"Content-Type", "application/json"}},
                                                            ""};
                 }
                 else {
-                    logger->trace("request.url (%1): %2", request_count, request.url);
                     redir_transport->simulated_response.reset();
                 }
             };
@@ -2599,9 +2594,59 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             sync_session->resume();
             REQUIRE(wait_for_download(*r));
             std::unique_lock lk(logout_mutex);
-            REQUIRE(logout_cv.wait_for(lk, std::chrono::seconds(15), [&]() {
+            auto result = logout_cv.wait_for(lk, std::chrono::seconds(15), [&]() {
                 return logged_out;
-            }));
+            });
+            REQUIRE(result);
+            REQUIRE(!user1->is_logged_in());
+        }
+        SECTION("Too many websocket redirects logs out user") {
+            auto sync_manager = test_session.app()->sync_manager();
+            auto sync_session = sync_manager->get_existing_session(r->config().path);
+            sync_session->pause();
+
+            int connect_count = 0;
+            redir_provider->websocket_connect_func = [&connect_count](int& status_code, std::string& body) {
+                if (connect_count++ > 0)
+                    return false;
+
+                status_code = static_cast<int>(sync::HTTPStatus::MovedPermanently);
+                body = "";
+                return true;
+            };
+            int request_count = 0;
+            const int max_http_redirects = 20; // from app.cpp in object-store
+            redir_transport->request_hook = [&](const Request& request) {
+                logger->trace("request.url (%1): %2", request_count, request.url);
+                if (request_count++ == 0) {
+                    // First request should be a location request against the original URL
+                    REQUIRE(request.url.find(original_host) != std::string::npos);
+                    REQUIRE(request.url.find("/location") != std::string::npos);
+                    REQUIRE(request.redirect_count == 0);
+                }
+                if (request.url.find("/location") != std::string::npos) {
+                    // Keep returning the redirected response
+                    REQUIRE(request.redirect_count < max_http_redirects);
+                    redir_transport->simulated_response = {
+                        static_cast<int>(sync::HTTPStatus::MovedPermanently),
+                        0,
+                        {{"Location", redirect_url}, {"Content-Type", "application/json"}},
+                        "Some body data"};
+                }
+                else {
+                    // should not get any other types of requests during the test - the log out is local
+                    REQUIRE(false);
+                }
+            };
+
+            SyncManager::OnlyForTesting::voluntary_disconnect_all_connections(*sync_manager);
+            sync_session->resume();
+            REQUIRE(wait_for_download(*r));
+            std::unique_lock lk(logout_mutex);
+            auto result = logout_cv.wait_for(lk, std::chrono::seconds(15), [&]() {
+                return logged_out;
+            });
+            REQUIRE(result);
             REQUIRE(!user1->is_logged_in());
         }
     }
@@ -3598,16 +3643,17 @@ private:
               nlohmann::json({{"device",
                                {{"appId", "app_id"},
                                 {"appVersion", "A Local App Version"},
-                                {"platform", "Object Store Test Platform"},
+                                {"platform", util::get_library_platform()},
                                 {"platformVersion", "Object Store Test Platform Version"},
                                 {"sdk", "SDK Name"},
                                 {"sdkVersion", "SDK Version"},
-                                {"cpuArch", "CPU Arch"},
+                                {"cpuArch", util::get_library_cpu_arch()},
                                 {"deviceName", "Device Name"},
                                 {"deviceVersion", "Device Version"},
                                 {"frameworkName", "Framework Name"},
                                 {"frameworkVersion", "Framework Version"},
-                                {"coreVersion", REALM_VERSION_STRING}}}}));
+                                {"coreVersion", REALM_VERSION_STRING},
+                                {"bundleId", "Bundle Id"}}}}));
 
         CHECK(request.timeout_ms == 60000);
 
@@ -5177,4 +5223,56 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app]") {
     CHECK(cur_user == logged_in_user);
 
     mock_transport_worker.mark_complete();
+}
+
+TEST_CASE("app: shared instances", "[sync][app]") {
+    App::Config base_config;
+    set_app_config_defaults(base_config, instance_of<UnitTestTransport>);
+
+    SyncClientConfig sync_config;
+    sync_config.metadata_mode = SyncClientConfig::MetadataMode::NoMetadata;
+    sync_config.base_file_path = util::make_temp_dir() + random_string(10);
+    util::try_make_dir(sync_config.base_file_path);
+
+    auto config1 = base_config;
+    config1.app_id = "app1";
+
+    auto config2 = base_config;
+    config2.app_id = "app1";
+    config2.base_url = "https://realm.mongodb.com"; // equivalent to default_base_url
+
+    auto config3 = base_config;
+    config3.app_id = "app2";
+
+    auto config4 = base_config;
+    config4.app_id = "app2";
+    config4.base_url = "http://localhost:9090";
+
+    // should all point to same underlying app
+    auto app1_1 = App::get_shared_app(config1, sync_config);
+    auto app1_2 = App::get_shared_app(config1, sync_config);
+    auto app1_3 = App::get_cached_app(config1.app_id, config1.base_url);
+    auto app1_4 = App::get_shared_app(config2, sync_config);
+    auto app1_5 = App::get_cached_app(config1.app_id);
+
+    CHECK(app1_1 == app1_2);
+    CHECK(app1_1 == app1_3);
+    CHECK(app1_1 == app1_4);
+    CHECK(app1_1 == app1_5);
+
+    // config3 and config4 should point to different apps
+    auto app2_1 = App::get_shared_app(config3, sync_config);
+    auto app2_2 = App::get_cached_app(config3.app_id, config3.base_url);
+    auto app2_3 = App::get_shared_app(config4, sync_config);
+    auto app2_4 = App::get_cached_app(config3.app_id);
+    auto app2_5 = App::get_cached_app(config4.app_id, "https://some.different.url");
+
+    CHECK(app2_1 == app2_2);
+    CHECK(app2_1 != app2_3);
+    CHECK(app2_4 != nullptr);
+    CHECK(app2_5 == nullptr);
+
+    CHECK(app1_1 != app2_1);
+    CHECK(app1_1 != app2_3);
+    CHECK(app1_1 != app2_4);
 }

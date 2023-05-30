@@ -192,7 +192,7 @@ bool SyncManager::run_file_action(SyncFileActionMetadata& md)
                 // We successfully copied the Realm file to the recovery directory.
                 bool did_remove = m_file_manager->remove_realm(original_name);
                 // if the copy succeeded but not the delete, then running BackupThenDelete
-                // a second time would fail, so change this action to just delete the originall file.
+                // a second time would fail, so change this action to just delete the original file.
                 if (did_remove) {
                     return true;
                 }
@@ -662,8 +662,12 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string
 std::shared_ptr<SyncSession> SyncManager::get_session(std::shared_ptr<DB> db, const RealmConfig& config)
 {
     auto& client = get_sync_client(); // Throws
+#ifndef __EMSCRIPTEN__
     auto path = db->get_path();
     REALM_ASSERT_EX(path == config.path, path, config.path);
+#else
+    auto path = config.path;
+#endif
     REALM_ASSERT(config.sync_config);
 
     util::CheckedUniqueLock lock(m_session_mutex);
@@ -747,16 +751,16 @@ void SyncManager::unregister_session(const std::string& path)
     lock.unlock();
 }
 
-void SyncManager::enable_session_multiplexing()
+void SyncManager::set_session_multiplexing(bool allowed)
 {
     util::CheckedLockGuard lock(m_mutex);
-    if (m_config.multiplex_sessions)
+    if (m_config.multiplex_sessions == allowed)
         return; // Already enabled, we can ignore
 
     if (m_sync_client)
         throw std::logic_error("Cannot enable session multiplexing after creating the sync client");
 
-    m_config.multiplex_sessions = true;
+    m_config.multiplex_sessions = allowed;
 }
 
 SyncClient& SyncManager::get_sync_client() const

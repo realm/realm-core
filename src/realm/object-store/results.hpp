@@ -63,7 +63,7 @@ public:
     Results& operator=(const Results&);
 
     // Get the Realm
-    std::shared_ptr<Realm> get_realm() const
+    const std::shared_ptr<Realm>& get_realm() const
     {
         return m_realm;
     }
@@ -78,7 +78,7 @@ public:
     // Returned query will not be valid if the current mode is Empty
     Query get_query() const REQUIRES(!m_mutex);
 
-    // Get ordering for thr query associated with the result
+    // Get ordering for the query associated with the result
     const DescriptorOrdering& get_ordering() const;
 
     // Get the Collection this Results is derived from, if any
@@ -289,13 +289,13 @@ public:
      * Creates a SectionedResults object by using a user defined sectioning algorithm to project the key for each
      * section.
      *
-     * @param section_key_func The callback to be itterated on each value in the underlying Results.
+     * @param section_key_func The callback to be iterated on each value in the underlying Results.
      * This callback must return a value which defines the section key
      *
-     * @return A SectionedResults object using a user defined sectioning algoritm.
+     * @return A SectionedResults object using a user defined sectioning algorithm.
      */
-    SectionedResults
-    sectioned_results(util::UniqueFunction<Mixed(Mixed value, std::shared_ptr<Realm> realm)> section_key_func);
+    SectionedResults sectioned_results(
+        util::UniqueFunction<Mixed(Mixed value, const std::shared_ptr<Realm>& realm)>&& section_key_func);
     enum class SectionedResultsOperator {
         FirstLetter // Section by the first letter of each string element. Note that col must be a string.
     };

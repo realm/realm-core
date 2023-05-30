@@ -21,11 +21,17 @@
 
 #include <realm/sync/network/http.hpp>
 #include <realm/util/base64.hpp>
+#include <realm/util/flat_map.hpp>
+#include <realm/util/platform_info.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/object-store/sync/app_utils.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
+
+#ifdef __EMSCRIPTEN__
+#include <realm/object-store/sync/impl/emscripten/network_transport.hpp>
+#endif
 
 #include <sstream>
 #include <string>
@@ -174,7 +180,7 @@ const static uint64_t default_timeout_ms = 60000;
 const static std::string username_password_provider_key = "local-userpass";
 const static std::string user_api_key_provider_key_path = "api_keys";
 const static int max_http_redirects = 20;
-static std::unordered_map<std::string, std::shared_ptr<App>> s_apps_cache;
+static util::FlatMap<std::string, util::FlatMap<std::string, SharedApp>> s_apps_cache; // app_id -> base_url -> app
 std::mutex s_apps_mutex;
 
 } // anonymous namespace
@@ -182,10 +188,33 @@ std::mutex s_apps_mutex;
 namespace realm {
 namespace app {
 
+App::Config::DeviceInfo::DeviceInfo()
+    : platform(util::get_library_platform())
+    , cpu_arch(util::get_library_cpu_arch())
+    , core_version(REALM_VERSION_STRING)
+{
+}
+
+App::Config::DeviceInfo::DeviceInfo(std::string a_platform_version, std::string an_sdk_version, std::string an_sdk,
+                                    std::string a_device_name, std::string a_device_version,
+                                    std::string a_framework_name, std::string a_framework_version,
+                                    std::string a_bundle_id)
+    : DeviceInfo()
+{
+    platform_version = a_platform_version;
+    sdk_version = an_sdk_version;
+    sdk = an_sdk;
+    device_name = a_device_name;
+    device_version = a_device_version;
+    framework_name = a_framework_name;
+    framework_version = a_framework_version;
+    bundle_id = a_bundle_id;
+}
+
 SharedApp App::get_shared_app(const Config& config, const SyncClientConfig& sync_client_config)
 {
     std::lock_guard<std::mutex> lock(s_apps_mutex);
-    auto& app = s_apps_cache[config.app_id];
+    auto& app = s_apps_cache[config.app_id][config.base_url.value_or(default_base_url)];
     if (!app) {
         app = std::make_shared<App>(config);
         app->configure(sync_client_config);
@@ -200,11 +229,16 @@ SharedApp App::get_uncached_app(const Config& config, const SyncClientConfig& sy
     return app;
 }
 
-std::shared_ptr<App> App::get_cached_app(const std::string& app_id)
+SharedApp App::get_cached_app(const std::string& app_id, const std::optional<std::string>& base_url)
 {
     std::lock_guard<std::mutex> lock(s_apps_mutex);
     if (auto it = s_apps_cache.find(app_id); it != s_apps_cache.end()) {
-        return it->second;
+        const auto& apps_by_url = it->second;
+
+        auto app_it = base_url ? apps_by_url.find(*base_url) : apps_by_url.begin();
+        if (app_it != apps_by_url.end()) {
+            return app_it->second;
+        }
     }
 
     return nullptr;
@@ -219,8 +253,10 @@ void App::clear_cached_apps()
 void App::close_all_sync_sessions()
 {
     std::lock_guard<std::mutex> lock(s_apps_mutex);
-    for (auto& app : s_apps_cache) {
-        app.second->sync_manager()->close_all_sessions();
+    for (auto& apps_by_url : s_apps_cache) {
+        for (auto& app : apps_by_url.second) {
+            app.second->sync_manager()->close_all_sessions();
+        }
     }
 }
 
@@ -232,22 +268,24 @@ App::App(const Config& config)
     , m_auth_route(m_app_route + auth_path)
     , m_request_timeout_ms(m_config.default_request_timeout_ms.value_or(default_timeout_ms))
 {
-    REALM_ASSERT(m_config.transport);
-
-    if (m_config.device_info.platform.empty()) {
-        throw InvalidArgument("You must specify the Platform in App::Config::device");
+#ifdef __EMSCRIPTEN__
+    if (!m_config.transport) {
+        m_config.transport = std::make_shared<_impl::EmscriptenNetworkTransport>();
     }
+#endif
+    REALM_ASSERT(m_config.transport);
+    REALM_ASSERT(!m_config.device_info.platform.empty());
 
     if (m_config.device_info.platform_version.empty()) {
-        throw InvalidArgument("You must specify the Platform Version in App::Config::device");
+        throw InvalidArgument("You must specify the Platform Version in App::Config::device_info");
     }
 
     if (m_config.device_info.sdk.empty()) {
-        throw InvalidArgument("You must specify the SDK Name in App::Config::device");
+        throw InvalidArgument("You must specify the SDK Name in App::Config::device_info");
     }
 
     if (m_config.device_info.sdk_version.empty()) {
-        throw InvalidArgument("You must specify the SDK Version in App::Config::device");
+        throw InvalidArgument("You must specify the SDK Version in App::Config::device_info");
     }
 
     // change the scheme in the base url to ws from http to satisfy the sync client
@@ -263,8 +301,14 @@ void App::configure(const SyncClientConfig& sync_client_config)
     auto sync_route = make_sync_route(m_app_route);
     m_sync_manager->configure(shared_from_this(), sync_route, sync_client_config);
     if (auto metadata = m_sync_manager->app_metadata()) {
-        // If there is app metadata stored, then update the hostname/syncroute using that info
+        // If there is app metadata stored, then set up the initial hostname/syncroute
+        // using that info - it will be updated upon first request to the server
         update_hostname(metadata);
+    }
+    {
+        std::lock_guard<std::mutex> lock(*m_route_mutex);
+        // Always update the location after the app is configured/re-configured
+        m_location_updated = false;
     }
 }
 
@@ -299,7 +343,7 @@ void App::log_error(const char* message, Params&&... params)
 
 std::string App::make_sync_route(const std::string& http_app_route)
 {
-    // change the scheme in the base url to ws from http to satisfy the sync client
+    // change the scheme in the base url from http to ws to satisfy the sync client URL
     auto sync_route = http_app_route + sync_path;
     size_t uri_scheme_start = sync_route.find("http");
     if (uri_scheme_start == 0)
@@ -575,7 +619,7 @@ void App::attach_auth_options(BsonDocument& body)
 
     log_debug("App: version info: platform: %1  version: %2 - sdk: %3 - sdk version: %4 - core version: %5",
               m_config.device_info.platform, m_config.device_info.platform_version, m_config.device_info.sdk,
-              m_config.device_info.sdk_version, REALM_VERSION_STRING);
+              m_config.device_info.sdk_version, m_config.device_info.core_version);
     options["appId"] = m_config.app_id;
     options["platform"] = m_config.device_info.platform;
     options["platformVersion"] = m_config.device_info.platform_version;
@@ -586,7 +630,8 @@ void App::attach_auth_options(BsonDocument& body)
     options["deviceVersion"] = m_config.device_info.device_version;
     options["frameworkName"] = m_config.device_info.framework_name;
     options["frameworkVersion"] = m_config.device_info.framework_version;
-    options["coreVersion"] = REALM_VERSION_STRING;
+    options["coreVersion"] = m_config.device_info.core_version;
+    options["bundleId"] = m_config.device_info.bundle_id;
 
     body["options"] = BsonDocument({{"device", options}});
 }
@@ -620,35 +665,45 @@ void App::log_in_with_credentials(
     BsonDocument body = credentials.serialize_as_bson();
     attach_auth_options(body);
 
-    do_request({HttpMethod::post, route, m_request_timeout_ms,
-                get_request_headers(linking_user, RequestTokenType::AccessToken), Bson(body).to_string()},
-               [completion = std::move(completion), credentials, linking_user,
-                self = shared_from_this()](const Response& response) mutable {
-                   if (auto error = AppUtils::check_for_errors(response)) {
-                       self->log_error("App: log_in_with_credentials failed: %1 message: %2",
-                                       response.http_status_code, error->what());
-                       return completion(nullptr, std::move(error));
-                   }
+    // To ensure the location metadata is always kept up to date, requery the location info before
+    // logging in the user. Since some SDK network transports (e.g. for JS) automatically handle
+    // redirects, the location is not updated when a redirect response from the server is received.
+    // This is especially necessary when the deployment model is changed, where the redirect response
+    // provides information about the new location of the server and a location info update is
+    // triggered. If the App never receives a redirect response from the server (because it was
+    // automatically handled) after the deployment model was changed and the user was logged out,
+    // the HTTP and websocket URL values will never be updated with the new server location.
+    do_request(
+        {HttpMethod::post, route, m_request_timeout_ms,
+         get_request_headers(linking_user, RequestTokenType::AccessToken), Bson(body).to_string()},
+        [completion = std::move(completion), credentials, linking_user,
+         self = shared_from_this()](const Response& response) mutable {
+            if (auto error = AppUtils::check_for_errors(response)) {
+                self->log_error("App: log_in_with_credentials failed: %1 message: %2", response.http_status_code,
+                                error->what());
+                return completion(nullptr, std::move(error));
+            }
 
-                   std::shared_ptr<realm::SyncUser> sync_user = linking_user;
-                   try {
-                       auto json = parse<BsonDocument>(response.body);
-                       if (linking_user) {
-                           linking_user->update_access_token(get<std::string>(json, "access_token"));
-                       }
-                       else {
-                           sync_user = self->m_sync_manager->get_user(
-                               get<std::string>(json, "user_id"), get<std::string>(json, "refresh_token"),
-                               get<std::string>(json, "access_token"), credentials.provider_as_string(),
-                               get<std::string>(json, "device_id"));
-                       }
-                   }
-                   catch (const AppError& e) {
-                       return completion(nullptr, e);
-                   }
+            std::shared_ptr<realm::SyncUser> sync_user = linking_user;
+            try {
+                auto json = parse<BsonDocument>(response.body);
+                if (linking_user) {
+                    linking_user->update_access_token(get<std::string>(json, "access_token"));
+                }
+                else {
+                    sync_user = self->m_sync_manager->get_user(
+                        get<std::string>(json, "user_id"), get<std::string>(json, "refresh_token"),
+                        get<std::string>(json, "access_token"), credentials.provider_as_string(),
+                        get<std::string>(json, "device_id"));
+                }
+            }
+            catch (const AppError& e) {
+                return completion(nullptr, e);
+            }
 
-                   self->get_profile(sync_user, std::move(completion));
-               });
+            self->get_profile(sync_user, std::move(completion));
+        },
+        false);
 }
 
 void App::log_in_with_credentials(
@@ -826,19 +881,24 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
 {
     std::string route;
 
-    if (!new_hostname && m_location_updated) {
+    {
+        std::unique_lock<std::mutex> lock(*m_route_mutex);
         // Skip if the app_metadata/location data has already been initialized and a new hostname is not provided
-        return completion(util::none); // early return
+        if (!new_hostname && m_location_updated) {
+            // Release the lock before calling the completion function
+            lock.unlock();
+            return completion(util::none); // early return
+        }
+        else {
+            route = util::format("%1/location", new_hostname ? get_app_route(new_hostname) : get_app_route());
+        }
     }
-    else {
-        std::lock_guard<std::mutex> lock(*m_route_mutex);
-        route = util::format("%1/location", new_hostname ? get_app_route(new_hostname) : get_app_route());
-    }
-
     Request req;
     req.method = HttpMethod::get;
     req.url = route;
     req.timeout_ms = m_request_timeout_ms;
+
+    log_debug("App: request location: %1", route);
 
     m_config.transport->send_request_to_server(req, [self = shared_from_this(),
                                                      completion = std::move(completion)](const Response& response) {
@@ -863,7 +923,10 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
                 // No metadata in use, update the hostname and sync route directly
                 self->update_hostname(hostname, ws_hostname);
             }
-            self->m_location_updated = true;
+            {
+                std::lock_guard<std::mutex> lock(*self->m_route_mutex);
+                self->m_location_updated = true;
+            }
         }
         catch (const AppError&) {
             // Pass the response back to completion
@@ -911,23 +974,34 @@ void App::update_metadata_and_resend(Request&& request, UniqueFunction<void(cons
         new_hostname);
 }
 
-void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& completion)
+void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& completion, bool update_location)
 {
-    request.timeout_ms = default_timeout_ms;
+    // Make sure the timeout value is set to the configured request timeout value
+    request.timeout_ms = m_request_timeout_ms;
 
-    // Refresh the location metadata every time an app is created to ensure the http and
-    // websocket URL information is up to date.
-    if (m_location_updated) {
-        m_config.transport->send_request_to_server(
-            std::move(request), [self = shared_from_this(), completion = std::move(completion)](
-                                    Request&& request, const Response& response) mutable {
-                self->handle_possible_redirect_response(std::move(request), response, std::move(completion));
-            });
-        return; // early return
+    // Refresh the location metadata every time an app is created (or when requested) to ensure the http
+    // and websocket URL information is up to date.
+    {
+        std::unique_lock<std::mutex> lock(*m_route_mutex);
+        if (update_location) {
+            // Force the location to be updated before sending the request.
+            m_location_updated = false;
+        }
+        if (!m_location_updated) {
+            lock.unlock();
+            // Location metadata has not yet been received after the App was created, update the location
+            // info and then send the request
+            update_metadata_and_resend(std::move(request), std::move(completion));
+            return; // early return
+        }
     }
 
-    // if we do not have metadata yet, update the metadata and resend the request
-    update_metadata_and_resend(std::move(request), std::move(completion));
+    // location info has already been received after App was created
+    m_config.transport->send_request_to_server(
+        std::move(request), [self = shared_from_this(), completion = std::move(completion)](
+                                Request&& request, const Response& response) mutable {
+            self->handle_possible_redirect_response(std::move(request), response, std::move(completion));
+        });
 }
 
 void App::handle_possible_redirect_response(Request&& request, const Response& response,
@@ -1057,33 +1131,29 @@ void App::refresh_access_token(const std::shared_ptr<SyncUser>& sync_user, bool 
         route = util::format("%1/auth/session", m_base_route);
     }
 
-    log_debug("App: refresh_access_token: email: %1", sync_user->user_profile().email());
+    log_debug("App: refresh_access_token: email: %1 %2", sync_user->user_profile().email(),
+              update_location ? "(updating location)" : "");
 
-    Request request{HttpMethod::post, std::move(route), m_request_timeout_ms,
-                    get_request_headers(sync_user, RequestTokenType::RefreshToken)};
-    auto handler = [completion = std::move(completion), sync_user](const Response& response) {
-        if (auto error = AppUtils::check_for_errors(response)) {
-            return completion(std::move(error));
-        }
+    // If update_location is set, force the location info to be updated before sending the request
+    do_request(
+        {HttpMethod::post, std::move(route), m_request_timeout_ms,
+         get_request_headers(sync_user, RequestTokenType::RefreshToken)},
+        [completion = std::move(completion), sync_user](const Response& response) {
+            if (auto error = AppUtils::check_for_errors(response)) {
+                return completion(std::move(error));
+            }
 
-        try {
-            auto json = parse<BsonDocument>(response.body);
-            sync_user->update_access_token(get<std::string>(json, "access_token"));
-        }
-        catch (AppError& err) {
-            return completion(std::move(err));
-        }
+            try {
+                auto json = parse<BsonDocument>(response.body);
+                sync_user->update_access_token(get<std::string>(json, "access_token"));
+            }
+            catch (AppError& err) {
+                return completion(std::move(err));
+            }
 
-        return completion(util::none);
-    };
-
-    if (update_location) {
-        // If update_location, update the location metadata before sending the request
-        update_metadata_and_resend(std::move(request), std::move(handler));
-    }
-    else {
-        do_request(std::move(request), std::move(handler));
-    }
+            return completion(util::none);
+        },
+        update_location);
 }
 
 std::string App::function_call_url_path() const

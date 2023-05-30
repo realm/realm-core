@@ -31,6 +31,8 @@
 #elif REALM_PLATFORM_APPLE
 #include <realm/util/cf_ptr.hpp>
 #include <CoreFoundation/CoreFoundation.h>
+#elif defined(__EMSCRIPTEN__)
+// TODO: implement event loop for Emscripten
 #else
 #error "No EventLoop implementation selected, tests will fail"
 #endif
@@ -79,6 +81,9 @@ struct EventLoop::Impl {
     // Schedule execution of the given function on the event loop.
     void perform(util::UniqueFunction<void()>);
 
+    // Run the event loop until all currently pending work has been run.
+    void run_pending();
+
     ~Impl();
 
 private:
@@ -120,6 +125,11 @@ void EventLoop::run_until(util::FunctionRef<bool()> predicate)
 void EventLoop::perform(util::UniqueFunction<void()> function)
 {
     return m_impl->perform(std::move(function));
+}
+
+void EventLoop::run_pending()
+{
+    return m_impl->run_pending();
 }
 
 #if REALM_USE_UV
@@ -202,6 +212,11 @@ void EventLoop::Impl::perform(util::UniqueFunction<void()> f)
     uv_async_send(&m_perform_work);
 }
 
+void EventLoop::Impl::run_pending()
+{
+    uv_run(m_loop, UV_RUN_NOWAIT);
+}
+
 #elif REALM_PLATFORM_APPLE
 
 bool EventLoop::has_implementation()
@@ -252,6 +267,12 @@ void EventLoop::Impl::perform(util::UniqueFunction<void()> func)
     CFRunLoopWakeUp(m_loop.get());
 }
 
+void EventLoop::Impl::run_pending()
+{
+    while (CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true) == kCFRunLoopRunHandledSource)
+        ;
+}
+
 #else
 
 bool EventLoop::has_implementation()
@@ -268,6 +289,10 @@ void EventLoop::Impl::run_until(util::FunctionRef<bool()>)
     printf("WARNING: there is no event loop implementation and nothing is happening.\n");
 }
 void EventLoop::Impl::perform(util::UniqueFunction<void()>)
+{
+    printf("WARNING: there is no event loop implementation and nothing is happening.\n");
+}
+void EventLoop::Impl::run_pending()
 {
     printf("WARNING: there is no event loop implementation and nothing is happening.\n");
 }

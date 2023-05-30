@@ -30,7 +30,11 @@ if(REALM_ENABLE_SYNC)
     )
 endif()
 
-add_library(RealmFFI SHARED ${REALM_FFI_SOURCES})
+if(NOT EMSCRIPTEN)
+    add_library(RealmFFI SHARED ${REALM_FFI_SOURCES})
+else()
+    add_executable(RealmFFI ${REALM_FFI_SOURCES})
+endif()
 add_library(RealmFFIStatic STATIC ${REALM_FFI_SOURCES})
 
 target_compile_definitions(RealmFFI PRIVATE -DRealm_EXPORTS)
@@ -47,11 +51,6 @@ endif()
 if (ANDROID)
     target_link_libraries(RealmFFI PUBLIC android log)
 endif()
-
-# TODO: Including the pegtl header is only necessary because the Query Parser
-# throws raw pegtl exceptions on failure.
-target_include_directories(RealmFFI PRIVATE ${PEGTL_INCLUDE_DIR})
-target_include_directories(RealmFFIStatic PRIVATE ${PEGTL_INCLUDE_DIR})
 
 target_include_directories(RealmFFIStatic INTERFACE
     $<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/src>

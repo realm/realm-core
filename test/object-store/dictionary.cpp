@@ -33,9 +33,6 @@
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 
-#include <realm.hpp>
-#include <realm/query_expression.hpp>
-
 using namespace realm;
 using namespace realm::util;
 

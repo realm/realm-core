@@ -133,7 +133,8 @@ std::shared_ptr<Transaction> Realm::transaction_ref()
 
 std::shared_ptr<Transaction> Realm::duplicate() const
 {
-    return m_coordinator->begin_read(read_transaction_version(), is_frozen());
+    auto version = read_transaction_version(); // does the validity check first
+    return m_coordinator->begin_read(version, is_frozen());
 }
 
 std::shared_ptr<DB>& Realm::Internal::get_db(Realm& realm)
@@ -786,6 +787,12 @@ void Realm::run_writes()
     if (m_transaction->is_synchronizing()) {
         // Wait for the synchronization complete callback before we run more
         // writes as we can't add commits while in that state
+        return;
+    }
+    if (is_in_transaction()) {
+        // This is scheduled asynchronously after acquiring the write lock, so
+        // in that time a synchronous transaction may have been started. If so,
+        // we'll be re-invoked when that transaction ends.
         return;
     }
 

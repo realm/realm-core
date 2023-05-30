@@ -1565,7 +1565,9 @@ TEST(Array_get_sum)
     c.destroy();
 }
 
-TEST(Array_count)
+// NONCONCURRENT because if run in parallel with other tests which request large amounts of
+// memory, there may be a std::bad_alloc on low memory machines
+NONCONCURRENT_TEST(Array_count)
 {
     struct TestArray : public Array {
         explicit TestArray(Allocator& allocator)

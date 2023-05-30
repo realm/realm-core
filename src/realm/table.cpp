@@ -31,7 +31,6 @@
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/index_string.hpp>
 #include <realm/query_conditions_tpl.hpp>
-#include <realm/query_engine.hpp>
 #include <realm/replication.hpp>
 #include <realm/table_view.hpp>
 #include <realm/util/features.h>
@@ -313,6 +312,12 @@ const char* get_data_type_name(DataType type) noexcept
         default:
             if (type == type_TypeOfValue)
                 return "@type";
+#if REALM_ENABLE_GEOSPATIAL
+            else if (type == type_Geospatial)
+                return "geospatial";
+#endif
+            else if (type == ColumnTypeTraits<null>::id)
+                return "null";
     }
     return "unknown";
 }
@@ -559,9 +564,11 @@ void Table::remove_recursive(CascadeState& cascade_state)
         cascade_state.send_notifications();
 
         for (auto& l : cascade_state.m_to_be_nullified) {
-            group->get_table(l.origin_table)
-                ->get_object(l.origin_key)
-                .nullify_link(l.origin_col_key, l.old_target_link);
+            Obj obj = group->get_table(l.origin_table)->try_get_object(l.origin_key);
+            REALM_ASSERT_DEBUG(obj);
+            if (obj) {
+                std::move(obj).nullify_link(l.origin_col_key, l.old_target_link);
+            }
         }
         cascade_state.m_to_be_nullified.clear();
 
