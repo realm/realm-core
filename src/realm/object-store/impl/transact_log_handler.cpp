@@ -76,7 +76,8 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
     for (auto& observer : observers) {
         auto table = group.get_table(TableKey(observer.table_key));
         for (auto key : table->get_column_keys()) {
-            if (key.is_list()) {
+            if (table->get_column_attr(key).test(col_attr_List)) {
+                auto obj = table->get_object(observer.obj_key);
                 m_lists.push_back({&observer, {}, {key}});
             }
         }
