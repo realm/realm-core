@@ -935,12 +935,14 @@ classes:
       get_parent_object_key: ObjKey
       get_parent_table_key: TableKey
       get_object_schema: const ObjectSchema&
-      size: count_t
       is_valid: bool
       is_frozen: bool
     methods:
+      size: () const -> count_t # method rather than property for compat with Results
       get_any: '(ndx: count_t) const -> Mixed'
-      find_any: '(value: Mixed) const -> count_t'
+      index_of: # renaming for compat with Results. TODO decide which name to use for both.
+        sig: '(value: Mixed) const -> count_t'
+        cppName: find_any
       verify_attached: () const
       verify_in_transaction: () const
       as_results: () const -> Results
@@ -956,7 +958,9 @@ classes:
     constructors:
       make: '(r: SharedRealm, parent: const Obj&, col: ColKey)'
     methods:
-      get: '(ndx: count_t) const -> Obj'
+      get:
+        - sig: '(index: count_t) const -> Obj'
+          suffix: 'obj'
       move: '(source_ndx: count_t, dest_ndx: count_t)'
       remove: '(ndx: count_t)'
       remove_all: '()'
@@ -992,7 +996,9 @@ classes:
     constructors:
       make: '(r: SharedRealm, parent: const Obj&, col: ColKey)'
     methods:
-      get: '(ndx: count_t) const -> Obj'
+      get:
+        - sig: '(index: count_t) const -> Obj'
+          suffix: 'obj'
       insert_any: '(val: Mixed) -> std::pair<count_t, bool>'
       remove_any: '(val: Mixed) -> std::pair<count_t, bool>'
       remove_all: '()'
@@ -1041,6 +1047,7 @@ classes:
       get:
         - sig: '(key: StringData) const -> Obj'
           cppName: get<Obj> # TODO can't distinguish null from missing
+          suffix: obj
       get_pair: '(ndx: count_t) const -> std::pair<StringData, Mixed>'
       contains: '(key: StringData) -> bool'
       freeze: '(frozen_realm: SharedRealm const&) const -> Dictionary'
