@@ -25,10 +25,10 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/sectioned_results.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 
 #include <realm/db.hpp>
-#include <realm/query_engine.hpp>
 #include <realm/query_expression.hpp>
 
 using namespace realm;
@@ -417,5 +417,100 @@ TEST_CASE("aggregates") {
     };
     BENCHMARK("int dictionary") {
         return object_store::Dictionary(realm, int_dict).sum();
+    };
+}
+
+TEST_CASE("Benchmark sectioned results", "[benchmark]") {
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
+
+    auto realm = Realm::get_shared_realm(config);
+    auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
+    auto table = realm->read_group().get_table("class_object");
+    auto col = table->get_column_key("value");
+
+    realm->begin_transaction();
+    for (int64_t i = 0; i < 100'000; ++i) {
+        table->create_object().set_all(i);
+    }
+    realm->commit_transaction();
+
+    size_t section_count = GENERATE(1, 10, 1000, 10000);
+    auto key_fn = [&](Mixed value, const std::shared_ptr<Realm>&) -> Mixed {
+        return table->get_object(value.get_link().get_obj_key()).get<int64_t>(col) % int64_t(section_count);
+    };
+
+    BENCHMARK("create and get section count") {
+        auto size = Results(realm, table).sectioned_results(key_fn).size();
+        REQUIRE(size == section_count);
+    };
+
+    BENCHMARK_ADVANCED("iterate directly")(Catch::Benchmark::Chronometer meter)
+    {
+        auto results = Results(realm, table).sectioned_results(key_fn);
+        static_cast<void>(results.size()); // evaluate sections
+        meter.measure([&] {
+            for (size_t i = 0, size = results.size(); i < size; ++i) {
+                auto section = results[i];
+                for (size_t j = 0, size = section.size(); j < size; ++j) {
+                    static_cast<void>(section[j]);
+                }
+            }
+        });
+    };
+
+    BENCHMARK_ADVANCED("iterate over a snapshot")(Catch::Benchmark::Chronometer meter)
+    {
+        auto results = Results(realm, table).sectioned_results(key_fn);
+        static_cast<void>(results.size()); // evaluate sections
+        meter.measure([&] {
+            auto snapshot = results.snapshot();
+            for (size_t i = 0, size = snapshot.size(); i < size; ++i) {
+                auto section = snapshot[i];
+                for (size_t j = 0, size = section.size(); j < size; ++j) {
+                    static_cast<void>(section[j]);
+                }
+            }
+        });
+    };
+
+    BENCHMARK_ADVANCED("change notification")(Catch::Benchmark::Chronometer meter)
+    {
+        auto results = Results(realm, table).sectioned_results(key_fn);
+        auto token = results.add_notification_callback([](auto&&) {});
+        coordinator.on_change();
+        realm->notify();
+
+        auto col = table->get_column_key("value");
+        meter.measure([&] {
+            realm->begin_transaction();
+            for (auto& obj : *table) {
+                obj.set(col, obj.get<int64_t>(col));
+            }
+            realm->commit_transaction();
+            coordinator.on_change();
+            realm->notify();
+        });
+    };
+
+    BENCHMARK_ADVANCED("single section change notification")(Catch::Benchmark::Chronometer meter)
+    {
+        auto results = Results(realm, table).sectioned_results(key_fn);
+        auto section = results[section_count > 5 ? 5 : 0];
+        auto token = section.add_notification_callback([](auto&&) {});
+        coordinator.on_change();
+        realm->notify();
+
+        auto col = table->get_column_key("value");
+        meter.measure([&] {
+            realm->begin_transaction();
+            for (auto& obj : *table) {
+                obj.set(col, obj.get<int64_t>(col));
+            }
+            realm->commit_transaction();
+            coordinator.on_change();
+            realm->notify();
+        });
     };
 }

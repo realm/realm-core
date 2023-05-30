@@ -345,32 +345,48 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
 
     SECTION("Results after source remove") {
         Results results;
-        std::function<void()> do_remove;
 
         SECTION("Results on collection") {
             Obj obj;
             write([&]() {
                 obj = create_object(42, true);
             });
+            auto key = obj.get_key();
 
             SECTION("Dictionary") {
                 results = Results(realm, obj.get_dictionary_ptr(int_dict_col));
+                write([&]() {
+                    table->remove_object(key);
+                });
+                // If Results is based on collection of primitives, the removal of
+                // the collection should invalidate Results.
+                VERIFY_STALE_RESULTS(results, realm);
             }
 
             SECTION("Links") {
                 results = Results(realm, obj.get_linklist_ptr(object_link_col));
+                auto snapshot = results.snapshot();
+                // If Results is based on collection of objects, the removal of
+                // the collection should not invalidate Results as the table still exists.
+                write([&]() {
+                    table->remove_object(key);
+                    // Snapshot should not be affected by the removed collection
+                    REQUIRE(snapshot.size() == 5);
+                });
+                REQUIRE(results.is_valid());
+                REQUIRE(results.size() == 0);
+                auto frozen = results.freeze(realm);
+                REQUIRE(frozen.is_valid());
+                REQUIRE(frozen.size() == 0);
             }
-
-            do_remove = [&, key = obj.get_key()] {
-                table->remove_object(key);
-            };
         }
 
         SECTION("Results on table") {
             results = Results(realm, table);
-            do_remove = [&] {
+            write([&]() {
                 realm->read_group().remove_table(table->get_key());
-            };
+            });
+            VERIFY_STALE_RESULTS(results, realm);
         }
 
         // FIXME? the test itself passes but crashes on teardown in notifier thread
@@ -381,10 +397,6 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
                 realm->read_group().remove_table(table->get_key());
             };
         } */
-
-        VERIFY_VALID_RESULTS(results, realm);
-        write(do_remove);
-        VERIFY_STALE_RESULTS(results, realm);
     }
 }
 

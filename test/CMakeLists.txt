@@ -121,6 +121,12 @@ set(FUZZY_TEST_SOURCES fuzz_group.cpp)
 
 set(CORE_TESTS ${CORE_TEST_SOURCES} ${LARGE_TEST_SOURCES} ${FUZZY_TEST_SOURCES})
 
+set_source_files_properties(test_query_geo.cpp PROPERTIES
+    INCLUDE_DIRECTORIES "${RealmCore_SOURCE_DIR}/src/external"
+    # the only flag not supported with pragma diagnostic disable in src file by gcc until 13.
+    COMPILE_FLAGS "$<$<CXX_COMPILER_ID:GNU>: -Wno-unknown-pragmas>"
+)
+
 # FIXME: Benchmarks
 
 if (MSVC)

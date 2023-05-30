@@ -128,6 +128,29 @@ bool RunLoopScheduler::can_invoke() const noexcept
     return false;
 }
 
+class MainRunLoopScheduler : public RunLoopScheduler {
+public:
+    MainRunLoopScheduler()
+        : RunLoopScheduler(CFRunLoopGetMain())
+    {
+    }
+
+    bool is_on_thread() const noexcept override
+    {
+        return pthread_main_np();
+    }
+
+    bool is_same_as(const Scheduler* other) const noexcept override
+    {
+        return typeid(*other) == typeid(MainRunLoopScheduler);
+    }
+
+    bool can_invoke() const noexcept override
+    {
+        return true;
+    }
+};
+
 class DispatchQueueScheduler : public util::Scheduler {
 public:
     DispatchQueueScheduler(dispatch_queue_t queue);
