@@ -39,7 +39,7 @@ class TableRef;
 class Geospatial;
 
 struct GeoPoint {
-    GeoPoint() = delete;
+    GeoPoint() {}
     GeoPoint(double lon, double lat)
         : longitude(lon)
         , latitude(lat)
