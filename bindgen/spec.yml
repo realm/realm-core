@@ -950,7 +950,7 @@ classes:
       sort:
         - '(order: SortDescriptor) const -> Results'
         - sig: '(keyPaths: std::vector<std::pair<std::string, bool>> const&) const -> Results'
-          suffix: 'by_name'
+          suffix: 'by_names'
       add_notification_callback: '(cb: (changes: const CollectionChangeSet&), keyPaths: util::Optional<KeyPathArray>) -> NotificationToken'
 
   List:
