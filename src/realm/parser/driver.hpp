@@ -532,7 +532,7 @@ public:
 class DescriptorNode : public ParserNode {
 public:
     enum Type { SORT, DISTINCT, LIMIT };
-    std::vector<std::vector<std::string>> columns;
+    std::vector<std::vector<PathElem>> columns;
     std::vector<bool> ascending;
     size_t limit = size_t(-1);
     Type type;
@@ -554,9 +554,7 @@ public:
     void add(PathNode* path)
     {
         auto& vec = columns.emplace_back();
-        for (PathElem& e : path->path_elems) {
-            vec.push_back(e.id);
-        }
+        vec = std::move(path->path_elems);
     }
     void add(PathNode* path, bool direction)
     {
