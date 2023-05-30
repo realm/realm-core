@@ -366,10 +366,11 @@ public:
         return true;
     }
 
-    bool select_collection(ColKey col, ObjKey obj, const std::vector<PathElement>& path)
+    bool select_collection(ColKey col, ObjKey obj, const Path& path)
     {
         modify_object(col, obj);
         auto table = current_table();
+        // FIXME
         for (auto& c : m_info.collections) {
 
             if (c.table_key == table && c.obj_key == obj && c.path == path) {

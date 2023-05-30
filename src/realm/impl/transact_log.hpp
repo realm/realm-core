@@ -328,7 +328,7 @@ private:
 
     template <class T>
     static char* encode_int(char*, T value);
-    template <typename... L>
+
     void encode_string(StringData string);
 
     friend class TransactLogParser;
@@ -521,16 +521,6 @@ char* TransactLogEncoder::encode_int(char* ptr, T value)
     }
     *reinterpret_cast<uchar*>(ptr) = uchar(negative ? (1U << (bits_per_byte - 1)) | unsigned(value) : value);
     return ++ptr;
-}
-
-template <typename... L>
-void TransactLogEncoder::encode_string(StringData string)
-{
-    size_t max_required_bytes = max_enc_bytes_per_int + string.size();
-    char* ptr = reserve(max_required_bytes); // Throws
-    ptr = encode(ptr, size_t(string.size()));
-    ptr = std::copy(string.data(), string.data() + string.size(), ptr);
-    advance(ptr);
 }
 
 template <class T>
@@ -802,8 +792,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             ColKey col_key = ColKey(read_int<int64_t>()); // Throws
             ObjKey key = ObjKey(read_int<int64_t>());     // Throws
             size_t nesting_level = instr == instr_SelectCollectionByPath ? read_int<uint32_t>() : 0;
-            std::vector<PathElement> path;
-            path.push_back(ColKey{col_key.value});
+            Path path;
+            path.push_back(col_key);
             for (size_t l = 0; l < nesting_level; l++) {
                 auto ndx = read_int<int64_t>();
                 if (ndx < 0) {

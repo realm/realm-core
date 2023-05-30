@@ -49,6 +49,14 @@ bool TransactLogEncoder::select_collection(ColKey col_key, ObjKey key, const std
     return true;
 }
 
+void TransactLogEncoder::encode_string(StringData string)
+{
+    size_t max_required_bytes = max_enc_bytes_per_int + string.size();
+    char* ptr = reserve(max_required_bytes); // Throws
+    ptr = encode(ptr, size_t(string.size()));
+    ptr = std::copy(string.data(), string.data() + string.size(), ptr);
+    advance(ptr);
+}
 
 REALM_NORETURN
 void TransactLogParser::parser_error() const

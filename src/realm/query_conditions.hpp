@@ -987,25 +987,6 @@ struct GreaterEqual : public HackClass {
     static const int condition = -1;
 };
 
-
-// CompareLess is a temporary hack to have a generalized way to compare any realm types. Todo, enable correct <
-// operator of StringData (currently gives circular header dependency with utf8.hpp)
-template <class T>
-struct CompareLess {
-    static bool compare(T v1, T v2, bool = false, bool = false)
-    {
-        return v1 < v2;
-    }
-};
-template <>
-struct CompareLess<StringData> {
-    static bool compare(StringData v1, StringData v2, bool = false, bool = false)
-    {
-        bool ret = utf8_compare(v1.data(), v2.data());
-        return ret;
-    }
-};
-
 } // namespace realm
 
 #endif // REALM_QUERY_CONDITIONS_HPP

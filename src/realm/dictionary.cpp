@@ -496,19 +496,22 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     if (key.get_type() != m_key_type) {
         throw InvalidArgument(ErrorCodes::InvalidDictionaryKey, "Dictionary::insert: Invalid key type");
     }
-    if (value.is_null()) {
-        if (!m_col_key.is_nullable()) {
-            throw InvalidArgument(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Value cannot be null");
-        }
-    }
-    else {
-        if (m_col_key.get_type() == col_type_Link && value.get_type() == type_TypedLink) {
-            if (my_table->get_opposite_table_key(m_col_key) != value.get<ObjLink>().get_table_key()) {
-                throw InvalidArgument(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Wrong object type");
+    if (m_col_key) {
+        if (value.is_null()) {
+            if (!m_col_key.is_nullable()) {
+                throw InvalidArgument(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Value cannot be null");
             }
         }
-        else if (m_col_key.get_type() != col_type_Mixed && value.get_type() != DataType(m_col_key.get_type())) {
-            throw InvalidArgument(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Wrong value type");
+        else {
+            if (m_col_key.get_type() == col_type_Link && value.get_type() == type_TypedLink) {
+                if (my_table->get_opposite_table_key(m_col_key) != value.get<ObjLink>().get_table_key()) {
+                    throw InvalidArgument(ErrorCodes::InvalidDictionaryValue,
+                                          "Dictionary::insert: Wrong object type");
+                }
+            }
+            else if (m_col_key.get_type() != col_type_Mixed && value.get_type() != DataType(m_col_key.get_type())) {
+                throw InvalidArgument(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Wrong value type");
+            }
         }
     }
 

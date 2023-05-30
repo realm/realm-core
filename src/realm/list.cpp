@@ -452,6 +452,7 @@ void Lst<Mixed>::set_collection(const PathElement& path_elem, CollectionType typ
 
 DictionaryPtr Lst<Mixed>::get_dictionary(const PathElement& path_elem) const
 {
+    update();
     auto weak = const_cast<Lst<Mixed>*>(this)->weak_from_this();
     auto shared = weak.expired() ? std::make_shared<Lst<Mixed>>(*this) : weak.lock();
     DictionaryPtr ret = std::make_shared<Dictionary>(m_col_key, get_level() + 1);
@@ -461,6 +462,7 @@ DictionaryPtr Lst<Mixed>::get_dictionary(const PathElement& path_elem) const
 
 SetMixedPtr Lst<Mixed>::get_set(const PathElement& path_elem) const
 {
+    update();
     auto weak = const_cast<Lst<Mixed>*>(this)->weak_from_this();
     auto shared = weak.expired() ? std::make_shared<Lst<Mixed>>(*this) : weak.lock();
     auto ret = std::make_shared<Set<Mixed>>(m_obj_mem, m_col_key);
@@ -470,6 +472,7 @@ SetMixedPtr Lst<Mixed>::get_set(const PathElement& path_elem) const
 
 std::shared_ptr<Lst<Mixed>> Lst<Mixed>::get_list(const PathElement& path_elem) const
 {
+    update();
     auto weak = const_cast<Lst<Mixed>*>(this)->weak_from_this();
     auto shared = weak.expired() ? std::make_shared<Lst<Mixed>>(*this) : weak.lock();
     std::shared_ptr<Lst<Mixed>> ret = std::make_shared<Lst<Mixed>>(m_col_key, get_level() + 1);

@@ -71,6 +71,11 @@ enum class UpdateStatus {
     /// current state.
     NoChange,
 };
+
+// Given an object as starting point, a collection can be identified by
+// a sequence of PathElements. The first element should always be a
+// column key. The next elements are either an index into a list or a key
+// to an entry in a dictionary
 struct PathElement {
     union {
         std::string string_val;

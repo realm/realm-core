@@ -83,7 +83,10 @@ public:
     {
         throw IllegalOperation("set_collection is not legal on this collection type");
     }
+    // Returns the path to the collection. Uniquely identifies the collection within the Group.
     virtual FullPath get_path() const = 0;
+    // Returns the path from the owning object. Starting with the column key. Identifies
+    // the collection within the object
     virtual Path get_short_path() const = 0;
 };
 
