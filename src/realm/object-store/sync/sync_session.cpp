@@ -577,16 +577,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
             return;
         }
         lock.unlock();
-        if (auto local_subs_store = get_flx_subscription_store()) {
-            // In DiscardLocal mode, only the active subscription set is preserved
-            // this means that we have to remove all other subscriptions including later
-            // versioned ones.
-            auto mut_sub = local_subs_store->get_active().make_mutable_copy();
-            local_subs_store->supercede_all_except(mut_sub);
-            mut_sub.update_state(sync::SubscriptionSet::State::Error,
-                                 util::make_optional<std::string_view>(status.reason()));
-            std::move(mut_sub).commit();
-        }
+
         const bool try_again = false;
         sync::SessionErrorInfo synthetic(
             make_error_code(sync::Client::Error::auto_client_reset_failure),
