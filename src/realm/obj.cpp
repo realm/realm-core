@@ -621,28 +621,6 @@ Mixed Obj::get_any(ColKey col_key) const
     return {};
 }
 
-Mixed Obj::get_any(std::vector<std::string>::iterator path_start, std::vector<std::string>::iterator path_end) const
-{
-    if (auto col = get_table()->get_column_key(*path_start)) {
-        auto val = get_any(col);
-        ++path_start;
-        if (path_start == path_end)
-            return val;
-        if (val.is_type(type_Link, type_TypedLink)) {
-            Obj obj;
-            if (val.get_type() == type_Link) {
-                obj = get_target_table(col)->get_object(val.get<ObjKey>());
-            }
-            else {
-                auto obj_link = val.get<ObjLink>();
-                obj = get_target_table(obj_link)->get_object(obj_link.get_obj_key());
-            }
-            return obj.get_any(path_start, path_end);
-        }
-    }
-    return {};
-}
-
 Mixed Obj::get_primary_key() const
 {
     auto col = m_table->get_primary_key_column();
