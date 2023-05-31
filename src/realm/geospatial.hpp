@@ -39,7 +39,7 @@ class TableRef;
 class Geospatial;
 
 struct GeoPoint {
-    GeoPoint() {}
+    GeoPoint() = default;
     GeoPoint(double lon, double lat)
         : longitude(lon)
         , latitude(lat)
@@ -117,7 +117,7 @@ struct GeoBox {
 //   - Any interior ring must be entirely contained by the outer ring.
 //   - Interior rings cannot intersect or overlap each other. Interior rings cannot share an edge.
 struct GeoPolygon {
-    GeoPolygon() {}
+    GeoPolygon() = default;
     GeoPolygon(std::vector<GeoPoint>&& p)
         : points({std::move(p)})
     {
