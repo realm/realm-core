@@ -260,6 +260,8 @@ def doCheckInDocker(Map options = [:]) {
                 environment << 'UNITTEST_ENCRYPT_ALL=1'
             }
 
+            // We don't enable this by default, because using a toolchain with its own sysroot
+            // prevents CMake from finding system libraries like curl which we use in sync tests.
             if (options.useToolchain) {
                 cmakeDefinitions += " -DCMAKE_TOOLCHAIN_FILE=\"${env.WORKSPACE}/tools/cmake/x86_64-linux-gnu.toolchain.cmake\""
             }
