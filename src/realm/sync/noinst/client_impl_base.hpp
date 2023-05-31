@@ -1021,7 +1021,7 @@ private:
     // message. See struct SyncProgress for a description. The values stored in
     // `m_progress` either are persisted, or are about to be.
     //
-    // Initialized by way of ClientReplication::get_status() at session
+    // Initialized by way of ClientHistory::get_status() at session
     // activation time.
     //
     // `m_progress.upload.client_version` is the client-side sync version

@@ -34,6 +34,51 @@ class Group;
 
 enum class DescriptorType { Sort, Distinct, Limit };
 
+// A key wrapper to be used for sorting,
+// In addition to column key, it supports index into collection.
+// TODO: Implement sorting by indexed elements of an array. They should be similar to dictionary keys.
+class ExtendedColumnKey {
+public:
+    ExtendedColumnKey(ColKey col)
+        : m_colkey(col)
+    {
+    }
+    ExtendedColumnKey(ColKey col, Mixed index)
+        : m_colkey(col)
+        , m_index(index)
+    {
+        m_index.use_buffer(m_buffer);
+    }
+    ExtendedColumnKey(const ExtendedColumnKey& other)
+        : m_colkey(other.m_colkey)
+        , m_index(other.m_index)
+    {
+        m_index.use_buffer(m_buffer);
+    }
+    ExtendedColumnKey& operator=(const ExtendedColumnKey& rhs)
+    {
+        m_colkey = rhs.m_colkey;
+        m_index = rhs.m_index;
+        m_index.use_buffer(m_buffer);
+        return *this;
+    }
+
+    ColKey get_col_key() const
+    {
+        return m_colkey;
+    }
+    ConstTableRef get_target_table(const Table* table) const;
+    std::string get_description(const Table* table) const;
+    bool is_collection() const;
+    ObjKey get_link_target(const Obj& obj) const;
+    Mixed get_value(const Obj& obj) const;
+
+private:
+    ColKey m_colkey;
+    Mixed m_index;
+    std::string m_buffer;
+};
+
 struct LinkPathPart {
     // Constructor for forward links
     LinkPathPart(ColKey col_key)
@@ -74,7 +119,7 @@ public:
     };
     class Sorter {
     public:
-        Sorter(std::vector<std::vector<ColKey>> const& columns, std::vector<bool> const& ascending,
+        Sorter(std::vector<std::vector<ExtendedColumnKey>> const& columns, std::vector<bool> const& ascending,
                Table const& root_table, const IndexPairs& indexes);
         Sorter()
         {
@@ -98,7 +143,7 @@ public:
 
     private:
         struct SortColumn {
-            SortColumn(const Table* t, ColKey c, bool a)
+            SortColumn(const Table* t, ExtendedColumnKey c, bool a)
                 : table(t)
                 , col_key(c)
                 , ascending(a)
@@ -107,7 +152,7 @@ public:
             std::vector<ObjKey> translated_keys;
 
             const Table* table;
-            ColKey col_key;
+            ExtendedColumnKey col_key;
             bool ascending;
         };
         std::vector<SortColumn> m_columns;
@@ -146,7 +191,7 @@ public:
     // supported), and the final is any column type that can be sorted on.
     // `column_keys` must be non-empty, and each vector within it must also
     // be non-empty.
-    ColumnsDescriptor(std::vector<std::vector<ColKey>> column_keys);
+    ColumnsDescriptor(std::vector<std::vector<ExtendedColumnKey>> column_keys);
 
     // returns whether this descriptor is valid and can be used for sort or distinct
     bool is_valid() const noexcept override
@@ -156,13 +201,13 @@ public:
     void collect_dependencies(const Table* table, std::vector<TableKey>& table_keys) const override;
 
 protected:
-    std::vector<std::vector<ColKey>> m_column_keys;
+    std::vector<std::vector<ExtendedColumnKey>> m_column_keys;
 };
 
 class DistinctDescriptor : public ColumnsDescriptor {
 public:
     DistinctDescriptor() = default;
-    DistinctDescriptor(std::vector<std::vector<ColKey>> column_keys)
+    DistinctDescriptor(std::vector<std::vector<ExtendedColumnKey>> column_keys)
         : ColumnsDescriptor(std::move(column_keys))
     {
     }
@@ -187,7 +232,7 @@ public:
     // See ColumnsDescriptor for restrictions on `column_keys`.
     // The sort order can be specified by using `ascending` which must either be
     // empty or have one entry for each column index chain.
-    SortDescriptor(std::vector<std::vector<ColKey>> column_indices, std::vector<bool> ascending = {});
+    SortDescriptor(std::vector<std::vector<ExtendedColumnKey>> column_indices, std::vector<bool> ascending = {});
     SortDescriptor() = default;
     ~SortDescriptor() = default;
     std::unique_ptr<BaseDescriptor> clone() const override;
