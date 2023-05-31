@@ -1361,7 +1361,7 @@ TEST(List_Nested_Replication)
             return true;
         }
 
-        Path expected_path;
+        StablePath expected_path;
     } parser(test_context);
 
     parser.expected_path.push_back("");

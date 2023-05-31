@@ -68,15 +68,7 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
-    config.schema = Schema{
-        {"any_collection",
-         {{"any", PropertyType::Mixed | PropertyType::Nullable}}}, // to use for testing nested collection in mixed
-        {"object",
-         {{"value", PropertyType::Dictionary | PropertyType::Mixed | PropertyType::Nullable},
-          {"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
-        {"target",
-         {{"value", PropertyType::Int}, {"self_link", PropertyType::Object | PropertyType::Nullable, "target"}}},
-        {"source", {{"link", PropertyType::Object | PropertyType::Nullable, "object"}}}};
+    config.schema = Schema{{"any_collection", {{"any", PropertyType::Mixed | PropertyType::Nullable}}}};
 
     auto r = Realm::get_shared_realm(config);
 
@@ -131,6 +123,23 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
 
     REQUIRE(change_list.insertions.count() == 2);
     REQUIRE(calls_list == 3);
+
+    // for keys in dictionary insertion in front of the previous key should not matter.
+    CollectionChangeSet change_list_after_insert;
+    r->begin_transaction();
+    dict_mixed.insert_collection("A", CollectionType::List);
+    r->commit_transaction();
+
+    auto new_list = dict_mixed.get_list("A");
+    auto token_new_list = new_list.add_notification_callback([&](CollectionChangeSet c) {
+        change_list_after_insert = c;
+    });
+    r->begin_transaction();
+    new_list.add(Mixed{42});
+    r->commit_transaction();
+    advance_and_notify(*r);
+
+    REQUIRE_INDICES(change_list_after_insert.insertions, 0);
 }
 
 TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,

@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <realm/impl/transact_log.hpp>
+#include <realm/util/overload.hpp>
 
 namespace realm::_impl {
 
@@ -28,19 +29,24 @@ bool TransactLogEncoder::select_table(TableKey key)
     return true;
 }
 
-bool TransactLogEncoder::select_collection(ColKey col_key, ObjKey key, const std::vector<PathElement>& path)
+bool TransactLogEncoder::select_collection(ColKey col_key, ObjKey key, const StablePath& path)
 {
     auto path_size = path.size();
     if (path_size > 1) {
         append_simple_instr(instr_SelectCollectionByPath, col_key, key.value, path_size - 1);
+
         for (size_t n = 1; n < path_size; n++) {
-            if (path[n].is_ndx()) {
-                append_simple_instr(path[n].get_ndx());
-            }
-            else if (path[n].is_key()) {
-                append_simple_instr(-1);
-                encode_string(StringData(path[n].get_key().c_str()));
-            }
+            mpark::visit(realm::util::overload{[&](ColKey) {
+
+                                               },
+                                               [&](int64_t ndx) {
+                                                   append_simple_instr(ndx);
+                                               },
+                                               [&](const std::string& key) {
+                                                   append_simple_instr(-1);
+                                                   encode_string(StringData(key.c_str()));
+                                               }},
+                         path[n]);
         }
     }
     else {

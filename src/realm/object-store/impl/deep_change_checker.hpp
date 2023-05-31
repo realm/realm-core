@@ -44,7 +44,7 @@ class RealmCoordinator;
 struct CollectionChangeInfo {
     TableKey table_key;
     ObjKey obj_key;
-    Path path;
+    StablePath path;
     CollectionChangeBuilder* changes;
 };
 

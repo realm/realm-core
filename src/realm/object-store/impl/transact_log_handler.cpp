@@ -87,7 +87,7 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
         tables[tbl] = {};
     for (auto& list : m_lists)
         collections.push_back(
-            {list.observer->table_key, list.observer->obj_key, Path{PathElement{list.col_key}}, &list.builder});
+            {list.observer->table_key, list.observer->obj_key, StablePath{{list.col_key}}, &list.builder});
 }
 
 void KVOAdapter::before(Transaction& sg)
@@ -322,7 +322,7 @@ struct TransactLogValidator : public TransactLogValidationMixin {
     {
         return true;
     }
-    bool select_collection(ColKey, ObjKey, const std::vector<PathElement>&)
+    bool select_collection(ColKey, ObjKey, const StablePath&)
     {
         return true;
     }
@@ -365,7 +365,7 @@ public:
         return true;
     }
 
-    bool select_collection(ColKey col, ObjKey obj, const Path& path)
+    bool select_collection(ColKey col, ObjKey obj, const StablePath& path)
     {
         modify_object(col, obj);
         auto table = current_table();

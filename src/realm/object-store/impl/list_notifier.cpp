@@ -50,7 +50,7 @@ void ListNotifier::attach(CollectionBase const& src)
     try {
         auto obj = tr.get_table(src.get_table()->get_key())->get_object(src.get_owner_key());
         auto path = src.get_short_path();
-        m_list = std::dynamic_pointer_cast<CollectionBase>(obj.get_collection_ptr(path));
+        m_list = std::static_pointer_cast<CollectionBase>(obj.get_collection_ptr(path));
     }
     catch (const KeyNotFound&) {
         m_list = nullptr;
@@ -63,7 +63,7 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
         return false; // origin row was deleted after the notification was added
 
     info.collections.push_back(
-        {m_list->get_table()->get_key(), m_list->get_owner_key(), m_list->get_short_path(), &m_change});
+        {m_list->get_table()->get_key(), m_list->get_owner_key(), m_list->get_stable_path(), &m_change});
 
     m_info = &info;
 
