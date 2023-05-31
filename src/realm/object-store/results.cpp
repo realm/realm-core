@@ -116,14 +116,16 @@ bool Results::is_valid() const
         m_realm->verify_thread();
     }
 
-    if (m_collection)
-        return m_collection->is_attached();
-
     // Here we cannot just use if (m_table) as it combines a check if the
     // reference contains a value and if that value is valid.
     // First we check if a table is referenced ...
     if (m_table.unchecked_ptr() != nullptr)
         return bool(m_table); // ... and then we check if it is valid
+
+    if (m_collection)
+        // Since m_table was not set, this is a collection of primitives
+        // and the results validity depend directly on the collection
+        return m_collection->is_attached();
 
     return true;
 }
@@ -803,7 +805,8 @@ TableView Results::get_tableview()
     REALM_COMPILER_HINT_UNREACHABLE();
 }
 
-static std::vector<ColKey> parse_keypath(StringData keypath, Schema const& schema, const ObjectSchema* object_schema)
+static std::vector<ExtendedColumnKey> parse_keypath(StringData keypath, Schema const& schema,
+                                                    const ObjectSchema* object_schema)
 {
     auto check = [&](bool condition, const char* fmt, auto... args) {
         if (!condition) {
@@ -819,17 +822,30 @@ static std::vector<ColKey> parse_keypath(StringData keypath, Schema const& schem
     const char* end = keypath.data() + keypath.size();
     check(begin != end, "missing property name");
 
-    std::vector<ColKey> indices;
+    std::vector<ExtendedColumnKey> indices;
     while (begin != end) {
         auto sep = std::find(begin, end, '.');
         check(sep != begin && sep + 1 != end, "missing property name");
         StringData key(begin, sep - begin);
+        std::string index;
+        auto begin_key = std::find(begin, sep, '[');
+        if (begin_key != sep) {
+            auto end_key = std::find(begin_key, sep, ']');
+            check(end_key != sep, "missing ']'");
+            index = std::string(begin_key + 1, end_key);
+            key = StringData(begin, begin_key - begin);
+        }
         begin = sep + (sep != end);
 
         auto prop = object_schema->property_for_public_name(key);
         check(prop, "property '%1.%2' does not exist", object_schema->name, key);
-        check(is_sortable_type(prop->type), "property '%1.%2' is of unsupported type '%3'", object_schema->name, key,
-              string_for_property_type(prop->type));
+        if (is_dictionary(prop->type)) {
+            check(index.length(), "missing dictionary key");
+        }
+        else {
+            check(is_sortable_type(prop->type), "property '%1.%2' is of unsupported type '%3'", object_schema->name,
+                  key, string_for_property_type(prop->type));
+        }
         if (prop->type == PropertyType::Object)
             check(begin != end, "property '%1.%2' of type 'object' cannot be the final property in the key path",
                   object_schema->name, key);
@@ -837,7 +853,12 @@ static std::vector<ColKey> parse_keypath(StringData keypath, Schema const& schem
             check(begin == end, "property '%1.%2' of type '%3' may only be the final property in the key path",
                   object_schema->name, key, prop->type_string());
 
-        indices.push_back(ColKey(prop->column_key));
+        if (index.length()) {
+            indices.emplace_back(ColKey(prop->column_key), index);
+        }
+        else {
+            indices.emplace_back(ColKey(prop->column_key));
+        }
         if (prop->type == PropertyType::Object)
             object_schema = &*schema.find(prop->object_type);
     }
@@ -860,7 +881,7 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
         return sort({{{}}, {keypaths[0].second}});
     }
 
-    std::vector<std::vector<ColKey>> column_keys;
+    std::vector<std::vector<ExtendedColumnKey>> column_keys;
     std::vector<bool> ascending;
     column_keys.reserve(keypaths.size());
     ascending.reserve(keypaths.size());
@@ -935,7 +956,7 @@ Results Results::distinct(std::vector<std::string> const& keypaths) const
         return distinct(DistinctDescriptor({{ColKey()}}));
     }
 
-    std::vector<std::vector<ColKey>> column_keys;
+    std::vector<std::vector<ExtendedColumnKey>> column_keys;
     column_keys.reserve(keypaths.size());
     for (auto& keypath : keypaths)
         column_keys.push_back(parse_keypath(keypath, m_realm->schema(), &get_object_schema()));
@@ -1092,7 +1113,12 @@ Results Results::import_copy_into_realm(std::shared_ptr<Realm> const& realm)
         case Mode::Table:
             return Results(realm, realm->import_copy_of(m_table));
         case Mode::Collection:
-            return Results(realm, realm->import_copy_of(*m_collection), m_descriptor_ordering);
+            if (std::shared_ptr<CollectionBase> collection = realm->import_copy_of(*m_collection)) {
+                return Results(realm, collection, m_descriptor_ordering);
+            }
+            // If collection is gone, fallback to empty selection on table.
+            return Results(realm, TableView(realm->import_copy_of(m_table)));
+            break;
         case Mode::Query:
             return Results(realm, *realm->import_copy_of(m_query, PayloadPolicy::Copy), m_descriptor_ordering);
         case Mode::TableView: {

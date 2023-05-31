@@ -32,7 +32,6 @@
 #include <realm/object-store/util/scheduler.hpp>
 
 #include <realm/db.hpp>
-#include <realm/query_engine.hpp>
 #include <realm/query_expression.hpp>
 
 #include <memory>

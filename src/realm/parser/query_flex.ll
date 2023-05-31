@@ -65,7 +65,7 @@ blank   [ \t\r]
 (?i:subquery)               return yy::parser::make_SUBQUERY();
 (?i:geobox)                 return yy::parser::make_GEOBOX();
 (?i:geopolygon)             return yy::parser::make_GEOPOLYGON();
-(?i:geosphere)              return yy::parser::make_GEOSPHERE();
+(?i:geocircle)              return yy::parser::make_GEOCIRCLE();
 ("@size"|"@count")          return yy::parser::make_SIZE(yytext);
 "@max"                      return yy::parser::make_MAX    ();
 "@min"                      return yy::parser::make_MIN    ();

@@ -789,6 +789,12 @@ void Realm::run_writes()
         // writes as we can't add commits while in that state
         return;
     }
+    if (is_in_transaction()) {
+        // This is scheduled asynchronously after acquiring the write lock, so
+        // in that time a synchronous transaction may have been started. If so,
+        // we'll be re-invoked when that transaction ends.
+        return;
+    }
 
     CountGuard running_writes(m_is_running_async_writes);
     int run_limit = 20; // max number of commits without full sync to disk

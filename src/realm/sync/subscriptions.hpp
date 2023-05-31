@@ -330,10 +330,6 @@ public:
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
     SubscriptionSet get_by_version(int64_t version_id) const;
 
-    // Fulfill all previous subscriptions by superceding them. This does not
-    // affect the mutable subscription identified by the parameter.
-    void supercede_all_except(MutableSubscriptionSet& mut_sub) const;
-
     // Returns true if there have been commits to the DB since the given version
     bool would_refresh(DB::version_type version) const noexcept;
 

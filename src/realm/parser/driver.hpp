@@ -191,6 +191,9 @@ public:
     {
         target_table = table_name.substr(1, table_name.size() - 2);
     }
+
+    std::unique_ptr<ConstantMixedList> copy_list_of_args(std::vector<Mixed>&);
+    std::unique_ptr<Subexpr> copy_arg(ParserDriver*, DataType, size_t, DataType, std::string&);
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
     util::Optional<ExpressionComparisonType> m_comp_type;
     std::string target_table;
@@ -201,10 +204,10 @@ public:
     struct Box {};
     struct Polygon {};
     struct Loop {};
-    struct Sphere {};
+    struct Circle {};
 #if REALM_ENABLE_GEOSPATIAL
     GeospatialNode(Box, GeoPoint& p1, GeoPoint& p2);
-    GeospatialNode(Sphere, GeoPoint& p, double radius);
+    GeospatialNode(Circle, GeoPoint& p, double radius);
     GeospatialNode(Polygon, GeoPoint& p);
     GeospatialNode(Loop, GeoPoint& p);
     void add_point_to_loop(GeoPoint& p);
@@ -529,7 +532,7 @@ public:
 class DescriptorNode : public ParserNode {
 public:
     enum Type { SORT, DISTINCT, LIMIT };
-    std::vector<std::vector<std::string>> columns;
+    std::vector<std::vector<PathElem>> columns;
     std::vector<bool> ascending;
     size_t limit = size_t(-1);
     Type type;
@@ -551,9 +554,7 @@ public:
     void add(PathNode* path)
     {
         auto& vec = columns.emplace_back();
-        for (PathElem& e : path->path_elems) {
-            vec.push_back(e.id);
-        }
+        vec = std::move(path->path_elems);
     }
     void add(PathNode* path, bool direction)
     {
@@ -623,7 +624,8 @@ public:
         parse_error = true;
     }
 
-    Mixed get_arg_for_index(std::string);
+    Mixed get_arg_for_index(const std::string&);
+    double get_arg_for_coordinate(const std::string&);
 
     template <class T>
     Query simple_query(int op, ColKey col_key, T val, bool case_sensitive);

@@ -301,8 +301,14 @@ void App::configure(const SyncClientConfig& sync_client_config)
     auto sync_route = make_sync_route(m_app_route);
     m_sync_manager->configure(shared_from_this(), sync_route, sync_client_config);
     if (auto metadata = m_sync_manager->app_metadata()) {
-        // If there is app metadata stored, then update the hostname/syncroute using that info
+        // If there is app metadata stored, then set up the initial hostname/syncroute
+        // using that info - it will be updated upon first request to the server
         update_hostname(metadata);
+    }
+    {
+        std::lock_guard<std::mutex> lock(*m_route_mutex);
+        // Always update the location after the app is configured/re-configured
+        m_location_updated = false;
     }
 }
 
@@ -337,7 +343,7 @@ void App::log_error(const char* message, Params&&... params)
 
 std::string App::make_sync_route(const std::string& http_app_route)
 {
-    // change the scheme in the base url to ws from http to satisfy the sync client
+    // change the scheme in the base url from http to ws to satisfy the sync client URL
     auto sync_route = http_app_route + sync_path;
     size_t uri_scheme_start = sync_route.find("http");
     if (uri_scheme_start == 0)
@@ -659,35 +665,45 @@ void App::log_in_with_credentials(
     BsonDocument body = credentials.serialize_as_bson();
     attach_auth_options(body);
 
-    do_request({HttpMethod::post, route, m_request_timeout_ms,
-                get_request_headers(linking_user, RequestTokenType::AccessToken), Bson(body).to_string()},
-               [completion = std::move(completion), credentials, linking_user,
-                self = shared_from_this()](const Response& response) mutable {
-                   if (auto error = AppUtils::check_for_errors(response)) {
-                       self->log_error("App: log_in_with_credentials failed: %1 message: %2",
-                                       response.http_status_code, error->what());
-                       return completion(nullptr, std::move(error));
-                   }
+    // To ensure the location metadata is always kept up to date, requery the location info before
+    // logging in the user. Since some SDK network transports (e.g. for JS) automatically handle
+    // redirects, the location is not updated when a redirect response from the server is received.
+    // This is especially necessary when the deployment model is changed, where the redirect response
+    // provides information about the new location of the server and a location info update is
+    // triggered. If the App never receives a redirect response from the server (because it was
+    // automatically handled) after the deployment model was changed and the user was logged out,
+    // the HTTP and websocket URL values will never be updated with the new server location.
+    do_request(
+        {HttpMethod::post, route, m_request_timeout_ms,
+         get_request_headers(linking_user, RequestTokenType::AccessToken), Bson(body).to_string()},
+        [completion = std::move(completion), credentials, linking_user,
+         self = shared_from_this()](const Response& response) mutable {
+            if (auto error = AppUtils::check_for_errors(response)) {
+                self->log_error("App: log_in_with_credentials failed: %1 message: %2", response.http_status_code,
+                                error->what());
+                return completion(nullptr, std::move(error));
+            }
 
-                   std::shared_ptr<realm::SyncUser> sync_user = linking_user;
-                   try {
-                       auto json = parse<BsonDocument>(response.body);
-                       if (linking_user) {
-                           linking_user->update_access_token(get<std::string>(json, "access_token"));
-                       }
-                       else {
-                           sync_user = self->m_sync_manager->get_user(
-                               get<std::string>(json, "user_id"), get<std::string>(json, "refresh_token"),
-                               get<std::string>(json, "access_token"), credentials.provider_as_string(),
-                               get<std::string>(json, "device_id"));
-                       }
-                   }
-                   catch (const AppError& e) {
-                       return completion(nullptr, e);
-                   }
+            std::shared_ptr<realm::SyncUser> sync_user = linking_user;
+            try {
+                auto json = parse<BsonDocument>(response.body);
+                if (linking_user) {
+                    linking_user->update_access_token(get<std::string>(json, "access_token"));
+                }
+                else {
+                    sync_user = self->m_sync_manager->get_user(
+                        get<std::string>(json, "user_id"), get<std::string>(json, "refresh_token"),
+                        get<std::string>(json, "access_token"), credentials.provider_as_string(),
+                        get<std::string>(json, "device_id"));
+                }
+            }
+            catch (const AppError& e) {
+                return completion(nullptr, e);
+            }
 
-                   self->get_profile(sync_user, std::move(completion));
-               });
+            self->get_profile(sync_user, std::move(completion));
+        },
+        false);
 }
 
 void App::log_in_with_credentials(
@@ -865,19 +881,24 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
 {
     std::string route;
 
-    if (!new_hostname && m_location_updated) {
+    {
+        std::unique_lock<std::mutex> lock(*m_route_mutex);
         // Skip if the app_metadata/location data has already been initialized and a new hostname is not provided
-        return completion(util::none); // early return
+        if (!new_hostname && m_location_updated) {
+            // Release the lock before calling the completion function
+            lock.unlock();
+            return completion(util::none); // early return
+        }
+        else {
+            route = util::format("%1/location", new_hostname ? get_app_route(new_hostname) : get_app_route());
+        }
     }
-    else {
-        std::lock_guard<std::mutex> lock(*m_route_mutex);
-        route = util::format("%1/location", new_hostname ? get_app_route(new_hostname) : get_app_route());
-    }
-
     Request req;
     req.method = HttpMethod::get;
     req.url = route;
     req.timeout_ms = m_request_timeout_ms;
+
+    log_debug("App: request location: %1", route);
 
     m_config.transport->send_request_to_server(req, [self = shared_from_this(),
                                                      completion = std::move(completion)](const Response& response) {
@@ -902,7 +923,10 @@ void App::init_app_metadata(UniqueFunction<void(const Optional<Response>&)>&& co
                 // No metadata in use, update the hostname and sync route directly
                 self->update_hostname(hostname, ws_hostname);
             }
-            self->m_location_updated = true;
+            {
+                std::lock_guard<std::mutex> lock(*self->m_route_mutex);
+                self->m_location_updated = true;
+            }
         }
         catch (const AppError&) {
             // Pass the response back to completion
@@ -950,23 +974,34 @@ void App::update_metadata_and_resend(Request&& request, UniqueFunction<void(cons
         new_hostname);
 }
 
-void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& completion)
+void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& completion, bool update_location)
 {
-    request.timeout_ms = default_timeout_ms;
+    // Make sure the timeout value is set to the configured request timeout value
+    request.timeout_ms = m_request_timeout_ms;
 
-    // Refresh the location metadata every time an app is created to ensure the http and
-    // websocket URL information is up to date.
-    if (m_location_updated) {
-        m_config.transport->send_request_to_server(
-            std::move(request), [self = shared_from_this(), completion = std::move(completion)](
-                                    Request&& request, const Response& response) mutable {
-                self->handle_possible_redirect_response(std::move(request), response, std::move(completion));
-            });
-        return; // early return
+    // Refresh the location metadata every time an app is created (or when requested) to ensure the http
+    // and websocket URL information is up to date.
+    {
+        std::unique_lock<std::mutex> lock(*m_route_mutex);
+        if (update_location) {
+            // Force the location to be updated before sending the request.
+            m_location_updated = false;
+        }
+        if (!m_location_updated) {
+            lock.unlock();
+            // Location metadata has not yet been received after the App was created, update the location
+            // info and then send the request
+            update_metadata_and_resend(std::move(request), std::move(completion));
+            return; // early return
+        }
     }
 
-    // if we do not have metadata yet, update the metadata and resend the request
-    update_metadata_and_resend(std::move(request), std::move(completion));
+    // location info has already been received after App was created
+    m_config.transport->send_request_to_server(
+        std::move(request), [self = shared_from_this(), completion = std::move(completion)](
+                                Request&& request, const Response& response) mutable {
+            self->handle_possible_redirect_response(std::move(request), response, std::move(completion));
+        });
 }
 
 void App::handle_possible_redirect_response(Request&& request, const Response& response,
@@ -1096,33 +1131,29 @@ void App::refresh_access_token(const std::shared_ptr<SyncUser>& sync_user, bool 
         route = util::format("%1/auth/session", m_base_route);
     }
 
-    log_debug("App: refresh_access_token: email: %1", sync_user->user_profile().email());
+    log_debug("App: refresh_access_token: email: %1 %2", sync_user->user_profile().email(),
+              update_location ? "(updating location)" : "");
 
-    Request request{HttpMethod::post, std::move(route), m_request_timeout_ms,
-                    get_request_headers(sync_user, RequestTokenType::RefreshToken)};
-    auto handler = [completion = std::move(completion), sync_user](const Response& response) {
-        if (auto error = AppUtils::check_for_errors(response)) {
-            return completion(std::move(error));
-        }
+    // If update_location is set, force the location info to be updated before sending the request
+    do_request(
+        {HttpMethod::post, std::move(route), m_request_timeout_ms,
+         get_request_headers(sync_user, RequestTokenType::RefreshToken)},
+        [completion = std::move(completion), sync_user](const Response& response) {
+            if (auto error = AppUtils::check_for_errors(response)) {
+                return completion(std::move(error));
+            }
 
-        try {
-            auto json = parse<BsonDocument>(response.body);
-            sync_user->update_access_token(get<std::string>(json, "access_token"));
-        }
-        catch (AppError& err) {
-            return completion(std::move(err));
-        }
+            try {
+                auto json = parse<BsonDocument>(response.body);
+                sync_user->update_access_token(get<std::string>(json, "access_token"));
+            }
+            catch (AppError& err) {
+                return completion(std::move(err));
+            }
 
-        return completion(util::none);
-    };
-
-    if (update_location) {
-        // If update_location, update the location metadata before sending the request
-        update_metadata_and_resend(std::move(request), std::move(handler));
-    }
-    else {
-        do_request(std::move(request), std::move(handler));
-    }
+            return completion(util::none);
+        },
+        update_location);
 }
 
 std::string App::function_call_url_path() const
