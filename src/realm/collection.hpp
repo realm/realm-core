@@ -30,6 +30,10 @@ public:
     {
         return {};
     }
+    StablePath get_stable_path() const noexcept final
+    {
+        return {};
+    }
     void add_index(Path&, Index) const noexcept final {}
 
     TableRef get_table() const noexcept final
@@ -88,6 +92,8 @@ public:
     // Returns the path from the owning object. Starting with the column key. Identifies
     // the collection within the object
     virtual Path get_short_path() const = 0;
+    // Return a path based on keys instead of indices
+    virtual StablePath get_stable_path() const = 0;
 };
 
 using CollectionPtr = std::shared_ptr<Collection>;
@@ -426,6 +432,13 @@ public:
     {
         Path ret = m_parent->get_short_path();
         m_parent->add_index(ret, m_index);
+        return ret;
+    }
+
+    StablePath get_stable_path() const override
+    {
+        auto ret = m_parent->get_stable_path();
+        ret.push_back(m_index);
         return ret;
     }
 

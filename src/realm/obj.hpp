@@ -75,6 +75,7 @@ public:
     // you should use get_fat_path() or traverse_path() instead (see below).
     FullPath get_path() const final;
     Path get_short_path() const noexcept final;
+    StablePath get_stable_path() const noexcept final;
     void add_index(Path& path, Index ndx) const final;
 
     bool update_if_needed() const final;

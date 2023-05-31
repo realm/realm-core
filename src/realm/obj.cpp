@@ -1021,6 +1021,11 @@ Path Obj::get_short_path() const noexcept
     return {};
 }
 
+StablePath Obj::get_stable_path() const noexcept
+{
+    return {};
+}
+
 void Obj::add_index(Path& path, Index index) const
 {
     auto col_key = mpark::get<ColKey>(index);
