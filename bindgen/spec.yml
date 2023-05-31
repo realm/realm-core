@@ -369,6 +369,15 @@ records:
       radius_radians: double
       center: GeoPoint
 
+  GeoBox:
+    fields:
+      lo: GeoPoint
+      hi: GeoPoint
+
+  GeoPolygon:
+    fields:
+      points: std::vector<std::vector<GeoPoint>>
+
   RealmConfig:
     fields:
       path: std::string
@@ -756,6 +765,8 @@ classes:
   Geospatial:
     constructors:
       make_from_circle: '(circle: GeoCircle)'
+      make_from_box: '(box: GeoBox)'
+      make_from_polygon: '(polygon: GeoPolygon)'
 
   ObjLink:
     properties:
