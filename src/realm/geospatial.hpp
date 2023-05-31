@@ -117,6 +117,7 @@ struct GeoBox {
 //   - Any interior ring must be entirely contained by the outer ring.
 //   - Interior rings cannot intersect or overlap each other. Interior rings cannot share an edge.
 struct GeoPolygon {
+    GeoPolygon() {}
     GeoPolygon(std::vector<GeoPoint>&& p)
         : points({std::move(p)})
     {
