@@ -168,6 +168,9 @@ if [[ ! -x baas_dep_binaries/jq ]]; then
     cd -
 fi
 
+# Fix incompatible github path that was changed in a BAAS dependency
+git config --global url."git@github.com:".insteadOf "https://github.com/"
+
 if [[ -z "$BAAS_VERSION" ]]; then
     BAAS_VERSION=$($CURL -LsS "https://realm.mongodb.com/api/private/v1.0/version" | jq -r '.backend.git_hash')
 fi
