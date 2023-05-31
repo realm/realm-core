@@ -211,9 +211,12 @@ struct FullPath {
     Path path_from_top;
 };
 
+using StableIndex = mpark::variant<ColKey, int64_t, std::string>;
+using StablePath = std::vector<StableIndex>;
+
 class CollectionParent : public std::enable_shared_from_this<CollectionParent> {
 public:
-    using Index = mpark::variant<ColKey, int64_t, std::string>;
+    using Index = StableIndex;
 
     // Return the nesting level of the parent
     size_t get_level() const noexcept
@@ -225,6 +228,8 @@ public:
     virtual FullPath get_path() const = 0;
     // Return path from owning object
     virtual Path get_short_path() const = 0;
+    // Return path from owning object
+    virtual StablePath get_stable_path() const = 0;
     // Add a translation of Index to PathElement
     virtual void add_index(Path& path, Index ndx) const = 0;
     /// Get table of owning object
