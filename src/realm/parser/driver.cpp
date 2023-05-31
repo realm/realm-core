@@ -1024,7 +1024,7 @@ std::unique_ptr<Subexpr> AggrNode::aggregate(Subexpr* subexpr)
     return agg;
 }
 
-void ConstantNode::decode_b64(util::UniqueFunction<void(StringData)> callback)
+void ConstantNode::decode_b64(util::FunctionRef<void(StringData)> callback)
 {
     const size_t encoded_size = text.size() - 5;
     size_t buffer_size = util::base64_decoded_size(encoded_size);

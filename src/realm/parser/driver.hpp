@@ -198,7 +198,7 @@ public:
     std::string target_table;
 
 private:
-    void decode_b64(util::UniqueFunction<void(StringData)>);
+    void decode_b64(util::FunctionRef<void(StringData)>);
 };
 
 class GeospatialNode : public ValueNode {
