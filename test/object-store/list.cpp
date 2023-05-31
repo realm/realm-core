@@ -1355,6 +1355,16 @@ TEST_CASE("nested List") {
                 lst1.add(Mixed(47));
             });
         }
+
+        SECTION("modifying the list sends a change notifications - even when index changes") {
+            auto token = require_change();
+            write([&] {
+                obj.get_collection_ptr(col_any)->insert_collection(0, CollectionType::List);
+                lst0.add(Mixed(8));
+            });
+            REQUIRE_INDICES(change.insertions, 0);
+            REQUIRE(!change.collection_was_cleared);
+        }
     }
 }
 
