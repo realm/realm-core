@@ -2087,7 +2087,7 @@ struct BenchmarkGeoPointsWithinPolygon : BenchmarkWithGeoPoints {
 
     void operator()(DBRef) override
     {
-        GeoPolygon geometry{{{-24, -24}, {-34, 34}, {44, 44}, {-55, 55}, {-24, -24}}};
+        GeoPolygon geometry{{{{-24, -24}, {-34, 34}, {44, 44}, {-55, 55}, {-24, -24}}}};
         m_table->column<Link>(m_col).geo_within(geometry).count();
     }
 };
