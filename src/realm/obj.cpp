@@ -850,6 +850,34 @@ size_t Obj::get_backlink_cnt(ColKey backlink_col) const
     return backlinks.get_backlink_count(m_row_ndx);
 }
 
+void Obj::verify_backlink(const Table& origin, ColKey origin_col_key, ObjKey origin_key) const
+{
+#ifdef REALM_DEBUG
+    ColKey backlink_col_key;
+    auto type = origin_col_key.get_type();
+    if (type == col_type_TypedLink || type == col_type_Mixed || origin_col_key.is_dictionary()) {
+        backlink_col_key = get_table()->find_backlink_column(origin_col_key, origin.get_key());
+    }
+    else {
+        backlink_col_key = origin.get_opposite_column(origin_col_key);
+    }
+
+    Allocator& alloc = get_alloc();
+    Array fields(alloc);
+    fields.init_from_mem(m_mem);
+
+    ArrayBacklink backlinks(alloc);
+    backlinks.set_parent(&fields, backlink_col_key.get_index().val + 1);
+    backlinks.init_from_parent();
+
+    REALM_ASSERT(backlinks.verify_backlink(m_row_ndx, origin_key.value));
+#else
+    static_cast<void>(origin);
+    static_cast<void>(origin_col_key);
+    static_cast<void>(origin_key);
+#endif
+}
+
 void Obj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
 {
     struct BacklinkTraverser : public LinkTranslator {
