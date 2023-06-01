@@ -222,7 +222,6 @@ public:
     /// this function returns the number of unique values currently
     /// stored. Otherwise it returns zero. This function is mainly intended for
     /// debugging purposes.
-    size_t get_num_unique_values(ColKey col_key) const;
     void dump_interning_stats();
 
     template <class T>
@@ -717,6 +716,13 @@ private:
     void erase_from_search_indexes(ObjKey key);
     void update_indexes(ObjKey key, const FieldValues& values);
     void clear_indexes();
+    // Interning/Enumeration and compression
+    size_t add_insert_enum_string(ColKey col_key, StringData value);
+    size_t search_enum_string(ColKey col_key, StringData value);
+    size_t get_num_unique_values(ColKey col_key) const;
+    std::unique_ptr<std::string> get_enum_string(ColKey col_key, size_t id);
+    bool is_null_enum_string(ColKey col_key, size_t id);
+
 
     // Migration support
     void migrate_column_info();
@@ -836,6 +842,10 @@ private:
     Type m_table_type = Type::TopLevel;
     uint64_t m_in_file_version_at_transaction_boundary = 0;
     AtomicLifeCycleCookie m_cookie;
+    // in-memory support for string interning (temporary)
+    class string_interner;
+    std::vector<std::unique_ptr<string_interner>> m_interners;
+
 
     static constexpr int top_position_for_spec = 0;
     static constexpr int top_position_for_columns = 1;

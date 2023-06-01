@@ -152,15 +152,9 @@ void Cluster::create()
             case col_type_Double:
                 do_create<ArrayDoubleNull>(col_key);
                 break;
-            case col_type_String: {
-                if (m_tree_top.is_string_enum_type(col_ndx)) {
-                    do_create<ArrayInteger>(col_key);
-                }
-                else {
-                    do_create<ArrayString>(col_key);
-                }
+            case col_type_String:
+                do_create<ArrayString>(col_key);
                 break;
-            }
             case col_type_Binary:
                 do_create<ArrayBinary>(col_key);
                 break;
@@ -490,13 +484,9 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
             case col_type_Double:
                 do_move<ArrayDouble>(ndx, col_key, new_leaf);
                 break;
-            case col_type_String: {
-                if (m_tree_top.is_string_enum_type(col_key.get_index()))
-                    do_move<ArrayInteger>(ndx, col_key, new_leaf);
-                else
-                    do_move<ArrayString>(ndx, col_key, new_leaf);
+            case col_type_String:
+                do_move<ArrayString>(ndx, col_key, new_leaf);
                 break;
-            }
             case col_type_Binary:
                 do_move<ArrayBinary>(ndx, col_key, new_leaf);
                 break;

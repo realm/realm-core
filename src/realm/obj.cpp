@@ -284,6 +284,16 @@ T Obj::get(ColKey col_key) const
     return _get<T>(col_key.get_index());
 }
 
+template <>
+std::unique_ptr<std::string> Obj::get(ColKey col_key) const
+{
+    m_table->check_column(col_key);
+    ColumnType type = col_key.get_type();
+    REALM_ASSERT(type == col_type_EnumString);
+    int64_t id = _get<Int>(col_key.get_index());
+    return m_table->get_enum_string(col_key, id);
+}
+
 template <class T>
 T Obj::_get(ColKey::Idx col_ndx) const
 {
@@ -395,18 +405,7 @@ StringData Obj::_get<StringData>(ColKey::Idx col_ndx) const
     }
 
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
-    auto spec_ndx = m_table->leaf_ndx2spec_ndx(col_ndx);
-    auto& spec = get_spec();
-    if (spec.is_string_enum_type(spec_ndx)) {
-        ArrayString values(get_alloc());
-        values.set_spec(const_cast<Spec*>(&spec), spec_ndx);
-        values.init_from_ref(ref);
-
-        return values.get(m_row_ndx);
-    }
-    else {
-        return ArrayString::get(alloc.translate(ref), m_row_ndx, alloc);
-    }
+    return ArrayString::get(alloc.translate(ref), m_row_ndx, alloc);
 }
 
 template <>
@@ -785,7 +784,7 @@ void Obj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
                 Mixed index = traverser.result();
                 obj.traverse_path(v, ps, path_length + 1);
                 v(obj, next_col_key, index);
-                return IteratorControl::Stop; // early out
+                return IteratorControl::Stop;      // early out
             }
             return IteratorControl::AdvanceToNext; // try next column
         });

@@ -294,7 +294,15 @@ void import(const char* filename)
     while (auto buf = mbx.receive()) {
         // t->create_objects(buf);
         for (auto& val : buf->values) {
-            t->create_object(ObjKey(), val);
+            Obj o = t->create_object(ObjKey(), val);
+            // verify
+            for (auto& e : val) {
+                if (e.col_key.get_type() == col_type_EnumString) {
+                    auto got_string = o.get<std::unique_ptr<std::string>>(e.col_key);
+                    if (got_string)
+                        REALM_ASSERT(*got_string == e.value.get_string());
+                }
+            }
         }
         resp.send(buf);
         if (buf_cnt++ > bufs_per_commit) {
