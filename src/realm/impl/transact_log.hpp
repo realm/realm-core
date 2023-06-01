@@ -796,12 +796,12 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             path.push_back(col_key);
             for (size_t l = 0; l < nesting_level; l++) {
                 auto ndx = read_int<int64_t>();
-                if (ndx < 0) {
+                if (ndx == 0) {
                     auto key = read_string(m_string_buffer);
                     path.emplace_back(key);
                 }
                 else {
-                    path.emplace_back(int64_t(ndx));
+                    path.emplace_back(ndx);
                 }
             }
             if (!handler.select_collection(col_key, key, path)) // Throws
@@ -862,8 +862,8 @@ T TransactLogParser::read_int()
 {
     T value = 0;
     int part = 0;
-    const int max_bytes = (std::numeric_limits<T>::digits + 1 + 6) / 7;
-    for (int i = 0; i != max_bytes; ++i) {
+    const int max_bytes = (std::numeric_limits<T>::digits + 7) / 7;
+    for (int i = 0; i <= max_bytes; ++i) {
         char c;
         if (!read_char(c))
             parser_error(); // Input ended early

@@ -1328,7 +1328,6 @@ TEST_CASE("nested List") {
             return token;
         };
 
-
         auto require_no_change = [&] {
             bool first = true;
             auto token = lst0.add_notification_callback([&, first](CollectionChangeSet) mutable {
@@ -1339,7 +1338,6 @@ TEST_CASE("nested List") {
             return token;
         };
 
-
         SECTION("modifying the list sends a change notifications") {
             auto token = require_change();
             write([&] {
@@ -1349,7 +1347,7 @@ TEST_CASE("nested List") {
             REQUIRE(!change.collection_was_cleared);
         }
 
-        SECTION("modifying aanother list does not send notifications") {
+        SECTION("modifying another list does not send notifications") {
             auto token = require_no_change();
             write([&] {
                 lst1.add(Mixed(47));
