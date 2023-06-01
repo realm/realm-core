@@ -38,7 +38,6 @@ class Obj;
 class TableRef;
 
 struct GeoPoint {
-
     double longitude = get_nan();
     double latitude = get_nan();
     double altitude = get_nan();
