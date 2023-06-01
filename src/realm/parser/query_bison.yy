@@ -324,8 +324,8 @@ constant
                                     tmp->add_table($3);
                                     $$ = tmp;
                                 }
-    | BINARY STRING ')'     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BINARY_STR, $2); }
-    | BINARY BASE64 ')'     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BINARY_BASE64, $2); }
+    | BINARY '(' STRING ')'     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BINARY_STR, $3); }
+    | BINARY '(' BASE64 ')'     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BINARY_BASE64, $3); }
 
 primary_key
     : NATURAL0                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, $1); }
@@ -397,6 +397,7 @@ id
     | DESCENDING                { $$ = $1; }
     | IN                        { $$ = $1; }
     | TEXT                      { $$ = $1; }
+    | BINARY                    { $$ = $1; }
 %%
 
 void
