@@ -290,21 +290,21 @@ TEST(Geospatial_PolygonValidation)
                                       GeoPoint{55.6280, 12.0826}};
     TableRef table = setup_with_points(g, points);
     ColKey location_column_key = table->get_column_key("location");
-    Geospatial geo_poly{GeoPolygon{{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683}, GeoPoint{55.628, 12.0826},
-                                    GeoPoint{40.7128, -74.006}}}}};
+    Geospatial geo_poly{GeoPolygon{{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683},
+                                     GeoPoint{55.628, 12.0826}, GeoPoint{40.7128, -74.006}}}}};
     CHECK(geo_poly.is_valid().is_ok());
     Query query = table->column<Link>(location_column_key).geo_within(geo_poly);
     CHECK_EQUAL(query.count(), 1);
 
     // same as above because the normalized polygon inverts when covering more than a hemisphere
     Geospatial geo_poly_reversed{GeoPolygon{{{GeoPoint{40.7128, -74.006}, GeoPoint{55.628, 12.0826},
-                                             GeoPoint{55.6761, 12.5683}, GeoPoint{40.7128, -74.006}}}}};
+                                              GeoPoint{55.6761, 12.5683}, GeoPoint{40.7128, -74.006}}}}};
     CHECK(geo_poly_reversed.is_valid().is_ok());
     query = table->column<Link>(location_column_key).geo_within(geo_poly_reversed);
     CHECK_EQUAL(query.count(), 1);
 
     Geospatial poly_mismatch_loop{GeoPolygon{{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683},
-                                              GeoPoint{55.628, 12.0826}, GeoPoint{40.7128, -74.000}}}}};
+                                               GeoPoint{55.628, 12.0826}, GeoPoint{40.7128, -74.000}}}}};
     Status status = poly_mismatch_loop.is_valid();
     CHECK(!status.is_ok());
     CHECK_EQUAL(status.reason(), "Ring is not closed, first vertex 'GeoPoint([40.7128, -74.006])' does not equal "
@@ -351,8 +351,8 @@ TEST(Geospatial_PolygonValidation)
     CHECK(!status.is_ok());
     CHECK_EQUAL(status.reason(), "Polygon has no rings.");
 
-    Geospatial poly_duplicates{
-        GeoPolygon{{{GeoPoint{0, 0}, GeoPoint{0, 1}, GeoPoint{0, 1}, GeoPoint{0, 1}, GeoPoint{1, 1}, GeoPoint{0, 0}}}}};
+    Geospatial poly_duplicates{GeoPolygon{
+        {{GeoPoint{0, 0}, GeoPoint{0, 1}, GeoPoint{0, 1}, GeoPoint{0, 1}, GeoPoint{1, 1}, GeoPoint{0, 0}}}}};
     status = poly_duplicates.is_valid();
     CHECK(status.is_ok()); // adjacent duplicates are removed
 

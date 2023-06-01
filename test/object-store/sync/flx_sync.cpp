@@ -1465,8 +1465,8 @@ TEST_CASE("flx: geospatial", "[sync][flx][app]") {
                 REQUIRE(point.latitude == points[0].latitude);
                 REQUIRE(!point.get_altitude());
                 ColKey location_col = table->get_column_key("location");
-                GeoPolygon bounds{{
-                    {GeoPoint{-80, 40.7128}, GeoPoint{20, 60}, GeoPoint{20, 20}, GeoPoint{-80, 40.7128}}}};
+                GeoPolygon bounds{
+                    {{GeoPoint{-80, 40.7128}, GeoPoint{20, 60}, GeoPoint{20, 20}, GeoPoint{-80, 40.7128}}}};
                 Query query = table->column<Link>(location_col).geo_within(Geospatial(bounds));
                 size_t local_matches = query.find_all().size();
                 REQUIRE(local_matches == 2);
