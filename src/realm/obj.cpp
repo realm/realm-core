@@ -2197,21 +2197,17 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
         if (collection->get_collection_type() == CollectionType::List) {
             auto list_of_mixed = dynamic_cast<Lst<Mixed>*>(collection.get());
             size_t ndx = list_of_mixed->find_key(mpark::get<int64_t>(index));
-            path_elem = ndx;
+            PathElement path_elem{ndx};
             ref = list_of_mixed->get(ndx);
-        }
-        else {
-            std::string key = mpark::get<std::string>(index);
-            path_elem = StringData(key);
-            ref = dynamic_cast<Dictionary*>(collection.get())->get(key);
-        }
-        if (ref.is_type(type_List)) {
             collection = collection->get_list(path_elem);
         }
-        else if (ref.is_type(type_Dictionary)) {
+        else {
+            const std::string& key = mpark::get<std::string>(index);
+            PathElement path_elem{StringData(key)};
+            ref = dynamic_cast<Dictionary*>(collection.get())->get(key);
             collection = collection->get_dictionary(path_elem);
         }
-        else {
+        if (!(ref.is_type(type_List) || ref.is_type(type_Dictionary))) {
             throw InvalidArgument("Wrong path");
         }
         level++;
