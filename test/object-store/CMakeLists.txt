@@ -120,9 +120,12 @@ if(REALM_TEST_LOGGING)
     )
 
     if(REALM_TEST_LOGGING_LEVEL)
+        message(STATUS "Test logging level: ${REALM_TEST_LOGGING_LEVEL}")
         target_compile_definitions(ObjectStoreTests PRIVATE
             TEST_LOGGING_LEVEL=${REALM_TEST_LOGGING_LEVEL}
         )
+    else()
+        message(STATUS "Test logging enabled")
     endif()
 endif()
 

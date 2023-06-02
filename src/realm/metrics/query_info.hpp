@@ -21,7 +21,6 @@
 
 #include <memory>
 #include <string>
-#include <sstream>
 
 #include <realm/array.hpp>
 #include <realm/util/features.h>
