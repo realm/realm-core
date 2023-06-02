@@ -408,7 +408,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     // Frozen Realms never modify the schema on disk and we just need to verify
     // that the requested schema is a subset of what actually exists
     if (m_frozen_version) {
-        ObjectStore::verify_valid_external_changes(schema.compare(actual_schema, m_config.schema_mode, true));
+        ObjectStore::verify_compatible_for_immutable_and_readonly(actual_schema.compare(schema, m_config.schema_mode, true));
         set_schema(actual_schema, std::move(schema));
         return;
     }

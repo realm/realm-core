@@ -2,11 +2,11 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* It is now allowed to open old frozen versions with a schema that contains additional classes, but not additional properties. ([PR 6693](https://github.com/realm/realm-core/issues/6693))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Properties in the frozen _before_ Realm instance in the client reset callbacks may have had properties reordered which could lead to exceptions if accessed. ([PR 6693](https://github.com/realm/realm-core/issues/6693), since v13.11.0)
 
 ### Breaking changes
 * None.
