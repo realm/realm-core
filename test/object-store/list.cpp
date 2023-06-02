@@ -1299,10 +1299,13 @@ TEST_CASE("nested List") {
 
     Obj obj = table->create_object_with_primary_key(47);
     obj.set_collection(col_any, CollectionType::List);
-    obj.get_collection_ptr(col_any)->insert_collection(0, CollectionType::List);
-    obj.get_collection_ptr(col_any)->insert_collection(1, CollectionType::List);
-    auto l0 = obj.get_list_ptr<Mixed>(Path{"any", 0});
-    auto l1 = obj.get_list_ptr<Mixed>(Path{"any", 1});
+    auto top_list = obj.get_list<Mixed>(col_any);
+    top_list.insert(0, "Hello");
+    top_list.insert_collection(1, CollectionType::List);
+    top_list.insert(2, "Godbye");
+    top_list.insert_collection(3, CollectionType::List);
+    auto l0 = obj.get_list_ptr<Mixed>(Path{"any", 1});
+    auto l1 = obj.get_list_ptr<Mixed>(Path{"any", 3});
 
     r->commit_transaction();
 
@@ -1358,6 +1361,23 @@ TEST_CASE("nested List") {
             auto token = require_change();
             write([&] {
                 obj.get_collection_ptr(col_any)->insert_collection(0, CollectionType::List);
+                lst0.add(Mixed(8));
+            });
+            REQUIRE_INDICES(change.insertions, 0);
+            REQUIRE(!change.collection_was_cleared);
+        }
+
+        SECTION("a notifier can be attached in a different transaction") {
+            {
+                r2->begin_transaction();
+                auto t = r2->read_group().get_table("class_table");
+                auto l = t->get_object_with_primary_key(47).get_list<Mixed>("any");
+                l.remove(0);
+                r2->commit_transaction();
+            }
+
+            auto token = require_change();
+            write([&] {
                 lst0.add(Mixed(8));
             });
             REQUIRE_INDICES(change.insertions, 0);

@@ -2154,6 +2154,9 @@ CollectionPtr Obj::get_collection_ptr(const Path& path) const
         else if (ref.is_type(type_Dictionary)) {
             collection = collection->get_dictionary(path_elem);
         }
+        else {
+            throw InvalidArgument("Wrong path");
+        }
         level++;
     }
 
