@@ -1150,7 +1150,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             }
             break;
         }
-        case Type::BASE64: {
+        case Type::STRING_BASE64: {
             decode_b64([&](StringData decoded) {
                 ret = std::make_unique<ConstantStringValue>(decoded);
             });

@@ -156,7 +156,7 @@ public:
         NAN_VAL,
         FLOAT,
         STRING,
-        BASE64,
+        STRING_BASE64,
         BINARY_STR,
         BINARY_BASE64,
         TIMESTAMP,

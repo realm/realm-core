@@ -217,15 +217,10 @@ void MixedNode<EqualIns>::init(bool will_query_ranges)
             index->find_all(m_index_matches, val_as_string, case_insensitive);
             // It is unfortunate but necessary to check the type due to Binary and String
             // having the same StringIndex hash values
-            for (auto it = m_index_matches.begin(); it != m_index_matches.end();) {
-                Mixed to_check = m_table->get_object(*it).get_any(m_condition_column_key);
-                if (!Mixed::types_are_comparable(to_check, m_value)) {
-                    it = m_index_matches.erase(it);
-                }
-                else {
-                    ++it;
-                }
-            }
+            m_index_matches.erase(std::remove_if(m_index_matches.begin(), m_index_matches.end(), [this](const ObjKey& obj_key) {
+                Mixed to_check = m_table->get_object(obj_key).get_any(m_condition_column_key);
+                return (!Mixed::types_are_comparable(to_check, m_value));
+            }), m_index_matches.end());
             m_index_evaluator->init(&m_index_matches);
         }
         else {

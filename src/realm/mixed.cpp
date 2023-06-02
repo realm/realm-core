@@ -432,7 +432,7 @@ StringData Mixed::export_to_type() const noexcept
     if (is_type(type_String)) {
         return string_val;
     }
-    else if (is_type(type_Binary)) {
+    if (is_type(type_Binary)) {
         return StringData(binary_val.data(), binary_val.size());
     }
     return {};
@@ -445,7 +445,7 @@ BinaryData Mixed::export_to_type() const noexcept
     if (is_type(type_String)) {
         return BinaryData(string_val.data(), string_val.size());
     }
-    else if (is_type(type_Binary)) {
+    if (is_type(type_Binary)) {
         return binary_val;
     }
     return {};
