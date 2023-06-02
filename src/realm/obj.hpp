@@ -307,6 +307,7 @@ public:
     CollectionBasePtr get_collection_ptr(ColKey col_key) const;
     CollectionBasePtr get_collection_ptr(StringData col_name) const;
     CollectionPtr get_collection_ptr(const Path& path) const;
+    CollectionPtr get_collection_by_stable_path(const StablePath& path) const;
     LinkCollectionPtr get_linkcollection_ptr(ColKey col_key) const;
 
     // Get a collection to hold other collections

@@ -2163,6 +2163,63 @@ CollectionPtr Obj::get_collection_ptr(const Path& path) const
     return collection;
 }
 
+CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
+{
+    // First element in path is column key
+    auto col_key = mpark::get<ColKey>(path[0]);
+    size_t nesting_levels = m_table->get_nesting_levels(col_key);
+    CollectionListPtr list;
+    size_t level = 0;
+    while (nesting_levels > 0) {
+        if (!list) {
+            list = get_collection_list(col_key);
+        }
+        else {
+            list = list->get_collection_list_by_index(path[level]);
+        }
+        level++;
+        nesting_levels--;
+    }
+    CollectionBasePtr collection;
+    if (list) {
+        collection = list->get_collection_by_index(path[level]);
+    }
+    else {
+        collection = get_collection_ptr(col_key);
+    }
+
+    level++;
+
+    while (level < path.size()) {
+        auto& index = path[level];
+        Mixed ref;
+        PathElement path_elem;
+        if (collection->get_collection_type() == CollectionType::List) {
+            auto list_of_mixed = dynamic_cast<Lst<Mixed>*>(collection.get());
+            size_t ndx = list_of_mixed->find_key(mpark::get<int64_t>(index));
+            path_elem = ndx;
+            ref = list_of_mixed->get(ndx);
+        }
+        else {
+            std::string key = mpark::get<std::string>(index);
+            path_elem = StringData(key);
+            ref = dynamic_cast<Dictionary*>(collection.get())->get(key);
+        }
+        if (ref.is_type(type_List)) {
+            collection = collection->get_list(path_elem);
+        }
+        else if (ref.is_type(type_Dictionary)) {
+            collection = collection->get_dictionary(path_elem);
+        }
+        else {
+            throw InvalidArgument("Wrong path");
+        }
+        level++;
+    }
+
+    return collection;
+}
+
 CollectionBasePtr Obj::get_collection_ptr(ColKey col_key) const
 {
     if (col_key.is_collection()) {

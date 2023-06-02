@@ -83,6 +83,11 @@ struct PathElement {
     };
     enum Type { column, key, index } m_type;
 
+    PathElement()
+        : int_val(-1)
+        , m_type(Type::column)
+    {
+    }
     PathElement(ColKey col_key)
         : int_val(col_key.value)
         , m_type(Type::column)

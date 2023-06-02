@@ -82,10 +82,12 @@ public:
     // get the leaf collections
     void insert_collection(const PathElement& index, CollectionType = CollectionType::Dictionary) override;
     CollectionBasePtr get_collection(const PathElement& index) const;
+    CollectionBasePtr get_collection_by_index(Index) const;
 
     // If this list is at an intermediate nesting level, use these functions to
     // get a CollectionList at next level
     CollectionListPtr get_collection_list(const PathElement&) const;
+    CollectionListPtr get_collection_list_by_index(Index) const;
 
     void remove(size_t ndx);
     void remove(StringData key);

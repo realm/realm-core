@@ -354,7 +354,11 @@ public:
     {
         return m_tree->get_key(ndx);
     }
-
+    size_t find_key(int64_t key)
+    {
+        update();
+        return m_tree->find_key(key);
+    }
 
     // Overriding members of CollectionBase:
     size_t size() const final
@@ -492,6 +496,7 @@ public:
 
     Path get_short_path() const override
     {
+        update();
         return Base::get_short_path();
     }
 
