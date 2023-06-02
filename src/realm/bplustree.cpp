@@ -19,6 +19,7 @@
 #include <realm/bplustree.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/array_unsigned.hpp>
+#include <realm/array_integer.hpp>
 
 using namespace realm;
 
@@ -130,6 +131,8 @@ public:
     }
     void ensure_offsets();
 
+    std::unique_ptr<BPlusTreeInner> split_root();
+
 private:
     ArrayUnsigned m_offsets;
     size_t m_my_offset;
@@ -219,6 +222,37 @@ size_t BPlusTreeLeaf::bptree_erase(size_t ndx, EraseFunc func)
 bool BPlusTreeLeaf::bptree_traverse(TraverseFunc func)
 {
     return func(this, 0) == IteratorControl::Stop;
+}
+
+template <>
+void BPlusTree<int64_t>::split_root()
+{
+    if (m_root->is_leaf()) {
+        auto sz = m_root->get_node_size();
+
+        LeafNode* leaf = static_cast<LeafNode*>(m_root.get());
+        auto new_root = std::make_unique<BPlusTreeInner>(this);
+
+        new_root->create(REALM_MAX_BPNODE_SIZE);
+
+        size_t ndx = 0;
+        while (ndx < sz) {
+            LeafNode new_leaf(this);
+            new_leaf.create();
+            size_t to_move = std::min(size_t(REALM_MAX_BPNODE_SIZE), sz - ndx);
+            for (size_t i = 0; i < to_move; i++, ndx++) {
+                new_leaf.insert(i, leaf->get(ndx));
+            }
+            new_root->add_bp_node_ref(new_leaf.get_ref()); // Throws
+        }
+        new_root->append_tree_size(sz);
+        leaf->destroy();
+        replace_root(std::move(new_root));
+    }
+    else {
+        BPlusTreeInner* inner = static_cast<BPlusTreeInner*>(m_root.get());
+        replace_root(inner->split_root());
+    }
 }
 
 /****************************** BPlusTreeInner *******************************/
@@ -514,6 +548,36 @@ void BPlusTreeInner::ensure_offsets()
     }
 }
 
+std::unique_ptr<BPlusTreeInner> BPlusTreeInner::split_root()
+{
+    auto new_root = std::make_unique<BPlusTreeInner>(m_tree);
+    auto sz = get_node_size();
+    size_t elems_per_child = get_elems_per_child();
+    new_root->create(REALM_MAX_BPNODE_SIZE * elems_per_child);
+    size_t ndx = 0;
+    size_t tree_size = get_tree_size();
+    size_t accumulated_size = 0;
+    while (ndx < sz) {
+        BPlusTreeInner new_inner(m_tree);
+        size_t to_move = std::min(size_t(REALM_MAX_BPNODE_SIZE), sz - ndx);
+        new_inner.create(elems_per_child);
+        for (size_t i = 0; i < to_move; i++, ndx++) {
+            new_inner.add_bp_node_ref(get_bp_node_ref(ndx));
+        }
+        size_t this_size = to_move * elems_per_child;
+        if (accumulated_size + this_size > tree_size) {
+            this_size = tree_size - accumulated_size;
+        }
+        accumulated_size += this_size;
+        new_inner.append_tree_size(this_size);
+        new_root->add_bp_node_ref(new_inner.get_ref()); // Throws
+    }
+    REALM_ASSERT(accumulated_size == tree_size);
+    new_root->append_tree_size(tree_size);
+    destroy();
+    return new_root;
+}
+
 inline BPlusTreeLeaf* BPlusTreeInner::cache_leaf(MemRef mem, size_t ndx, size_t offset)
 {
     BPlusTreeLeaf* leaf = m_tree->cache_leaf(mem);
@@ -768,4 +832,15 @@ std::unique_ptr<BPlusTreeNode> BPlusTreeBase::create_root_from_ref(ref_type ref)
         new_root->init_from_ref(ref);
         return new_root;
     }
+}
+
+size_t BPlusTreeBase::size_from_header(const char* header)
+{
+    auto node_size = Array::get_size_from_header(header);
+    if (Array::get_is_inner_bptree_node_from_header(header)) {
+        auto data = Array::get_data_from_header(header);
+        auto width = Array::get_width_from_header(header);
+        node_size = size_t(get_direct(data, width, node_size - 1)) >> 1;
+    }
+    return node_size;
 }

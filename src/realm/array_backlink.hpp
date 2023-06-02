@@ -84,6 +84,7 @@ public:
         Array::truncate_and_destroy_children(0);
     }
     void verify() const;
+    bool verify_backlink(size_t ndx, int64_t link);
 };
 }
 

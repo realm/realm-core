@@ -59,7 +59,7 @@ void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
     else {
         // There is more than one backlink - Iterate through them all
         ref_type ref = to_ref(value);
-        Array backlink_list(m_alloc);
+        BPlusTree<int64_t> backlink_list(m_alloc);
         backlink_list.init_from_ref(ref);
 
         size_t sz = backlink_list.size();
@@ -83,16 +83,17 @@ void ArrayBacklink::add(size_t ndx, ObjKey key)
     // When increasing the size of the backlink list from 1 to 2, we need to
     // convert from the single non-ref column value representation, to a B+-tree
     // representation.
-    Array backlink_list(m_alloc);
+    BPlusTree<int64_t> backlink_list(m_alloc);
     if ((value & 1) != 0) {
         // Create new column to hold backlinks
-        backlink_list.create(Array::type_Normal);
+        backlink_list.create();
         set_as_ref(ndx, backlink_list.get_ref());
         backlink_list.add(value >> 1);
     }
     else {
         backlink_list.init_from_ref(to_ref(value));
         backlink_list.set_parent(this, ndx);
+        backlink_list.split_if_needed();
     }
     backlink_list.add(key.value); // Throws
 }
@@ -118,9 +119,10 @@ bool ArrayBacklink::remove(size_t ndx, ObjKey key)
 
     // if there is a list of backlinks we have to find
     // the right one and remove it.
-    Array backlink_list(m_alloc);
+    BPlusTree<int64_t> backlink_list(m_alloc);
     backlink_list.init_from_ref(ref_type(value));
     backlink_list.set_parent(this, ndx);
+    backlink_list.split_if_needed();
 
     size_t last_ndx = backlink_list.size() - 1;
     size_t backlink_ndx = backlink_list.find_first(key.value);
@@ -128,7 +130,7 @@ bool ArrayBacklink::remove(size_t ndx, ObjKey key)
     if (backlink_ndx != not_found) {
         if (backlink_ndx != last_ndx)
             backlink_list.set(backlink_ndx, backlink_list.get(last_ndx));
-        backlink_list.truncate(last_ndx); // Throws
+        backlink_list.erase(last_ndx); // Throws
     }
 
     // If there is only one backlink left we can inline it as tagged value
@@ -146,7 +148,7 @@ void ArrayBacklink::erase(size_t ndx)
 {
     uint64_t value = Array::get(ndx);
     if (value && (value & 1) == 0) {
-        Array::destroy(ref_type(value), m_alloc);
+        Array::destroy_deep(ref_type(value), m_alloc);
     }
     Array::erase(ndx);
 }
@@ -166,7 +168,7 @@ size_t ArrayBacklink::get_backlink_count(size_t ndx) const
 
     // return size of list
     MemRef mem(ref_type(value), m_alloc);
-    return Array::get_size_from_header(mem.get_addr());
+    return BPlusTree<int64_t>::size_from_header(mem.get_addr());
 }
 
 ObjKey ArrayBacklink::get_backlink(size_t ndx, size_t index) const
@@ -181,7 +183,7 @@ ObjKey ArrayBacklink::get_backlink(size_t ndx, size_t index) const
         return ObjKey(int64_t(value >> 1));
     }
 
-    Array backlink_list(m_alloc);
+    BPlusTree<int64_t> backlink_list(m_alloc);
     backlink_list.init_from_ref(ref_type(value));
 
     REALM_ASSERT(index < backlink_list.size());
@@ -234,5 +236,29 @@ void ArrayBacklink::verify() const
             }
         }
     }
+#endif
+}
+
+bool ArrayBacklink::verify_backlink(size_t ndx, int64_t link)
+{
+#ifdef REALM_DEBUG
+    uint64_t value = Array::get(ndx);
+    if (value == 0)
+        return false;
+
+    // If there is only a single backlink, it can be stored as
+    // a tagged value
+    if ((value & 1) != 0) {
+        return int64_t(value >> 1) == link;
+    }
+
+    BPlusTree<int64_t> backlink_list(m_alloc);
+    backlink_list.init_from_ref(ref_type(value));
+
+    return backlink_list.find_first(link) != realm::not_found;
+#else
+    static_cast<void>(ndx);
+    static_cast<void>(link);
+    return true;
 #endif
 }
