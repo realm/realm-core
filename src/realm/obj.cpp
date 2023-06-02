@@ -2190,6 +2190,15 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
 
     level++;
 
+    auto fetch_collection = [&](Mixed ref, const PathElement& path_elem) -> CollectionBasePtr {
+        if (ref.is_type(type_List))
+            return collection->get_list(path_elem);
+        else if (ref.is_type(type_Dictionary))
+            return collection->get_dictionary(path_elem);
+        else
+            throw InvalidArgument("Wrong path");
+    };
+
     while (level < path.size()) {
         auto& index = path[level];
         Mixed ref;
@@ -2199,16 +2208,13 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
             size_t ndx = list_of_mixed->find_key(mpark::get<int64_t>(index));
             PathElement path_elem{ndx};
             ref = list_of_mixed->get(ndx);
-            collection = collection->get_list(path_elem);
+            collection = fetch_collection(ref, path_elem);
         }
         else {
             const std::string& key = mpark::get<std::string>(index);
             PathElement path_elem{StringData(key)};
             ref = dynamic_cast<Dictionary*>(collection.get())->get(key);
-            collection = collection->get_dictionary(path_elem);
-        }
-        if (!(ref.is_type(type_List) || ref.is_type(type_Dictionary))) {
-            throw InvalidArgument("Wrong path");
+            collection = fetch_collection(ref, path_elem);
         }
         level++;
     }

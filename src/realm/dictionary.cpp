@@ -457,8 +457,6 @@ std::shared_ptr<Lst<Mixed>> Dictionary::get_list(const PathElement& path_elem) c
     auto weak = const_cast<Dictionary*>(this)->weak_from_this();
     auto shared = weak.expired() ? std::make_shared<Dictionary>(*this) : weak.lock();
     std::shared_ptr<Lst<Mixed>> ret = std::make_shared<Lst<Mixed>>(m_col_key, get_level() + 1);
-    // something like this is needed
-    // ret->set_owner(shared, m_tree->get_key(path_elem.get_ndx()));
     ret->set_owner(shared, path_elem.get_key());
     return ret;
 }
