@@ -403,13 +403,17 @@ private:
     friend class OnlyForTesting;
 
     Config m_config;
-    mutable std::unique_ptr<std::mutex> m_route_mutex = std::make_unique<std::mutex>();
+
+    // mutable to allow locking for reads in const functions
+    // this is a shared pointer to support the App move constructor
+    mutable std::shared_ptr<std::mutex> m_route_mutex = std::make_shared<std::mutex>();
     std::string m_base_url;
     std::string m_base_route;
     std::string m_app_route;
     std::string m_auth_route;
-    uint64_t m_request_timeout_ms;
     bool m_location_updated = false;
+
+    uint64_t m_request_timeout_ms;
     std::shared_ptr<SyncManager> m_sync_manager;
     std::shared_ptr<util::Logger> m_logger_ptr;
 
@@ -463,15 +467,15 @@ private:
     void update_metadata_and_resend(Request&& request, util::UniqueFunction<void(const Response&)>&& completion,
                                     const util::Optional<std::string>& new_hostname = util::none);
 
-    void basic_request(std::string&& route, std::string&& body,
-                       util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
     void post(std::string&& route, util::UniqueFunction<void(util::Optional<AppError>)>&& completion,
               const bson::BsonDocument& body);
 
     /// Performs a request to the Stitch server. This request does not contain authentication state.
     /// @param request The request to be performed
     /// @param completion Returns the response from the server
-    void do_request(Request&& request, util::UniqueFunction<void(const Response&)>&& completion);
+    /// @param update_location Force the location metadata to be updated prior to sending the request
+    void do_request(Request&& request, util::UniqueFunction<void(const Response&)>&& completion,
+                    bool update_location = false);
 
     /// Check to see if hte response is a redirect and handle, otherwise pass the response to compleetion
     /// @param request The request to be performed (in case it needs to be sent again)

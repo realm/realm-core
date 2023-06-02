@@ -1246,103 +1246,13 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             }
             else if (drv->m_args.is_argument_list(arg_no)) {
                 std::vector<Mixed> mixed_list = drv->m_args.list_for_argument(arg_no);
-                std::unique_ptr<Value<Mixed>> values = std::make_unique<Value<Mixed>>();
-                constexpr bool is_list = true;
-                values->init(is_list, mixed_list.size());
-                size_t ndx = 0;
-                for (auto& val : mixed_list) {
-                    values->set(ndx++, val);
-                }
-                if (m_comp_type) {
-                    values->set_comparison_type(*m_comp_type);
-                }
-                ret = std::move(values);
+                ret = copy_list_of_args(mixed_list);
             }
             else {
                 auto type = drv->m_args.type_for_argument(arg_no);
                 explain_value_message =
                     util::format("argument %1 of type '%2'", explain_value_message, get_data_type_name(type));
-                switch (type) {
-                    case type_Int:
-                        ret = std::make_unique<Value<int64_t>>(drv->m_args.long_for_argument(arg_no));
-                        break;
-                    case type_String:
-                        ret = std::make_unique<ConstantStringValue>(drv->m_args.string_for_argument(arg_no));
-                        break;
-                    case type_Binary:
-                        ret = std::make_unique<ConstantBinaryValue>(drv->m_args.binary_for_argument(arg_no));
-                        break;
-                    case type_Bool:
-                        ret = std::make_unique<Value<Bool>>(drv->m_args.bool_for_argument(arg_no));
-                        break;
-                    case type_Float:
-                        ret = std::make_unique<Value<float>>(drv->m_args.float_for_argument(arg_no));
-                        break;
-                    case type_Double: {
-                        // In realm-js all number type arguments are returned as double. If we don't cast to the
-                        // expected type, we would in many cases miss the option to use the optimized query node
-                        // instead of the general Compare class.
-                        double val = drv->m_args.double_for_argument(arg_no);
-                        switch (hint) {
-                            case type_Int:
-                            case type_Bool: {
-                                int64_t int_val = int64_t(val);
-                                // Only return an integer if it precisely represents val
-                                if (double(int_val) == val)
-                                    ret = std::make_unique<Value<int64_t>>(int_val);
-                                else
-                                    ret = std::make_unique<Value<double>>(val);
-                                break;
-                            }
-                            case type_Float:
-                                ret = std::make_unique<Value<float>>(float(val));
-                                break;
-                            default:
-                                ret = std::make_unique<Value<double>>(val);
-                                break;
-                        }
-                        break;
-                    }
-                    case type_Timestamp: {
-                        try {
-                            ret = std::make_unique<Value<Timestamp>>(drv->m_args.timestamp_for_argument(arg_no));
-                        }
-                        catch (const std::exception&) {
-                            ret = std::make_unique<Value<ObjectId>>(drv->m_args.objectid_for_argument(arg_no));
-                        }
-                        break;
-                    }
-                    case type_ObjectId: {
-                        try {
-                            ret = std::make_unique<Value<ObjectId>>(drv->m_args.objectid_for_argument(arg_no));
-                        }
-                        catch (const std::exception&) {
-                            ret = std::make_unique<Value<Timestamp>>(drv->m_args.timestamp_for_argument(arg_no));
-                        }
-                        break;
-                    }
-                    case type_Decimal:
-                        ret = std::make_unique<Value<Decimal128>>(drv->m_args.decimal128_for_argument(arg_no));
-                        break;
-                    case type_UUID:
-                        ret = std::make_unique<Value<UUID>>(drv->m_args.uuid_for_argument(arg_no));
-                        break;
-                    case type_Link:
-                        ret = std::make_unique<Value<ObjKey>>(drv->m_args.object_index_for_argument(arg_no));
-                        break;
-                    case type_TypedLink:
-                        if (hint == type_Mixed || hint == type_Link || hint == type_TypedLink) {
-                            ret = std::make_unique<Value<ObjLink>>(drv->m_args.objlink_for_argument(arg_no));
-                            break;
-                        }
-                        explain_value_message =
-                            util::format("%1 which links to %2", explain_value_message,
-                                         print_pretty_objlink(drv->m_args.objlink_for_argument(arg_no),
-                                                              drv->m_base_table->get_parent_group()));
-                        break;
-                    default:
-                        break;
-                }
+                ret = copy_arg(drv, type, arg_no, hint, explain_value_message);
             }
             break;
         }
@@ -1353,6 +1263,92 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                          get_data_type_name(hint), explain_value_message));
     }
     return ret;
+}
+
+std::unique_ptr<ConstantMixedList> ConstantNode::copy_list_of_args(std::vector<Mixed>& mixed_args)
+{
+    std::unique_ptr<ConstantMixedList> args_in_list = std::make_unique<ConstantMixedList>(mixed_args.size());
+    size_t ndx = 0;
+    for (const auto& mixed : mixed_args) {
+        args_in_list->set(ndx++, mixed);
+    }
+    if (m_comp_type) {
+        args_in_list->set_comparison_type(*m_comp_type);
+    }
+    return args_in_list;
+}
+
+std::unique_ptr<Subexpr> ConstantNode::copy_arg(ParserDriver* drv, DataType type, size_t arg_no, DataType hint,
+                                                std::string& err)
+{
+    switch (type) {
+        case type_Int:
+            return std::make_unique<Value<int64_t>>(drv->m_args.long_for_argument(arg_no));
+        case type_String:
+            return std::make_unique<ConstantStringValue>(drv->m_args.string_for_argument(arg_no));
+        case type_Binary:
+            return std::make_unique<ConstantBinaryValue>(drv->m_args.binary_for_argument(arg_no));
+        case type_Bool:
+            return std::make_unique<Value<Bool>>(drv->m_args.bool_for_argument(arg_no));
+        case type_Float:
+            return std::make_unique<Value<float>>(drv->m_args.float_for_argument(arg_no));
+        case type_Double: {
+            // In realm-js all number type arguments are returned as double. If we don't cast to the
+            // expected type, we would in many cases miss the option to use the optimized query node
+            // instead of the general Compare class.
+            double val = drv->m_args.double_for_argument(arg_no);
+            switch (hint) {
+                case type_Int:
+                case type_Bool: {
+                    int64_t int_val = int64_t(val);
+                    // Only return an integer if it precisely represents val
+                    if (double(int_val) == val)
+                        return std::make_unique<Value<int64_t>>(int_val);
+                    else
+                        return std::make_unique<Value<double>>(val);
+                }
+                case type_Float:
+                    return std::make_unique<Value<float>>(float(val));
+                default:
+                    return std::make_unique<Value<double>>(val);
+            }
+            break;
+        }
+        case type_Timestamp: {
+            try {
+                return std::make_unique<Value<Timestamp>>(drv->m_args.timestamp_for_argument(arg_no));
+            }
+            catch (const std::exception&) {
+                return std::make_unique<Value<ObjectId>>(drv->m_args.objectid_for_argument(arg_no));
+            }
+        }
+        case type_ObjectId: {
+            try {
+                return std::make_unique<Value<ObjectId>>(drv->m_args.objectid_for_argument(arg_no));
+            }
+            catch (const std::exception&) {
+                return std::make_unique<Value<Timestamp>>(drv->m_args.timestamp_for_argument(arg_no));
+            }
+            break;
+        }
+        case type_Decimal:
+            return std::make_unique<Value<Decimal128>>(drv->m_args.decimal128_for_argument(arg_no));
+        case type_UUID:
+            return std::make_unique<Value<UUID>>(drv->m_args.uuid_for_argument(arg_no));
+        case type_Link:
+            return std::make_unique<Value<ObjKey>>(drv->m_args.object_index_for_argument(arg_no));
+        case type_TypedLink:
+            if (hint == type_Mixed || hint == type_Link || hint == type_TypedLink) {
+                return std::make_unique<Value<ObjLink>>(drv->m_args.objlink_for_argument(arg_no));
+            }
+            err = util::format("%1 which links to %2", err,
+                               print_pretty_objlink(drv->m_args.objlink_for_argument(arg_no),
+                                                    drv->m_base_table->get_parent_group()));
+            break;
+        default:
+            break;
+    }
+    return nullptr;
 }
 
 #if REALM_ENABLE_GEOSPATIAL
@@ -1508,20 +1504,19 @@ std::unique_ptr<DescriptorOrdering> DescriptorOrderingNode::visit(ParserDriver* 
         }
         else {
             bool is_distinct = cur_ordering->get_type() == DescriptorNode::DISTINCT;
-            std::vector<std::vector<ColKey>> property_columns;
+            std::vector<std::vector<ExtendedColumnKey>> property_columns;
             for (auto& col_names : cur_ordering->columns) {
-                std::vector<ColKey> columns;
+                std::vector<ExtendedColumnKey> columns;
                 LinkChain link_chain(target);
                 for (size_t ndx_in_path = 0; ndx_in_path < col_names.size(); ++ndx_in_path) {
-                    std::string path_elem = drv->translate(link_chain, col_names[ndx_in_path]);
-                    ColKey col_key = link_chain.get_current_table()->get_column_key(path_elem);
+                    std::string prop_name = drv->translate(link_chain, col_names[ndx_in_path].id);
+                    ColKey col_key = link_chain.get_current_table()->get_column_key(prop_name);
                     if (!col_key) {
-                        throw InvalidQueryError(
-                            util::format("No property '%1' found on object type '%2' specified in '%3' clause",
-                                         col_names[ndx_in_path], link_chain.get_current_table()->get_class_name(),
-                                         is_distinct ? "distinct" : "sort"));
+                        throw InvalidQueryError(util::format(
+                            "No property '%1' found on object type '%2' specified in '%3' clause", prop_name,
+                            link_chain.get_current_table()->get_class_name(), is_distinct ? "distinct" : "sort"));
                     }
-                    columns.push_back(col_key);
+                    columns.emplace_back(col_key, col_names[ndx_in_path].index);
                     if (ndx_in_path < col_names.size() - 1) {
                         link_chain.link(col_key);
                     }
@@ -1575,7 +1570,7 @@ ParserDriver::~ParserDriver()
     yylex_destroy(m_yyscanner);
 }
 
-Mixed ParserDriver::get_arg_for_index(std::string i)
+Mixed ParserDriver::get_arg_for_index(const std::string& i)
 {
     REALM_ASSERT(i[0] == '$');
     size_t arg_no = size_t(strtol(i.substr(1).c_str(), nullptr, 10));
@@ -1586,12 +1581,35 @@ Mixed ParserDriver::get_arg_for_index(std::string i)
     switch (type) {
         case type_Int:
             return int64_t(m_args.long_for_argument(arg_no));
-            break;
         case type_String:
             return m_args.string_for_argument(arg_no);
-            break;
         default:
             throw InvalidQueryError("Invalid index type");
+    }
+}
+
+double ParserDriver::get_arg_for_coordinate(const std::string& str)
+{
+    REALM_ASSERT(str[0] == '$');
+    size_t arg_no = size_t(strtol(str.substr(1).c_str(), nullptr, 10));
+    if (m_args.is_argument_null(arg_no)) {
+        throw InvalidQueryError(util::format("NULL cannot be used in coordinate at argument '%1'", str));
+    }
+    if (m_args.is_argument_list(arg_no)) {
+        throw InvalidQueryError(util::format("A list cannot be used in a coordinate at argument '%1'", str));
+    }
+
+    auto type = m_args.type_for_argument(arg_no);
+    switch (type) {
+        case type_Int:
+            return double(m_args.long_for_argument(arg_no));
+        case type_Double:
+            return m_args.double_for_argument(arg_no);
+        case type_Float:
+            return double(m_args.float_for_argument(arg_no));
+        default:
+            throw InvalidQueryError(util::format("Invalid parameter '%1' used in coordinate at argument '%2'",
+                                                 get_data_type_name(type), str));
     }
 }
 

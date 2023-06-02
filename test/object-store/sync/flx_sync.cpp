@@ -40,6 +40,7 @@
 #include "realm/sync/client_base.hpp"
 #include "realm/sync/config.hpp"
 #include "realm/sync/noinst/client_history_impl.hpp"
+#include <realm/sync/noinst/client_reset_operation.hpp>
 #include "realm/sync/noinst/pending_bootstrap_store.hpp"
 #include "realm/sync/noinst/server/access_token.hpp"
 #include "realm/sync/protocol.hpp"
@@ -282,6 +283,11 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
              {"list_of_ints_field", PropertyType::Int | PropertyType::Array},
              {"sum_of_list_field", PropertyType::Int},
          }},
+        {"TopLevel2",
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+         }},
     };
 
     // some of these tests make additive schema changes which is only allowed in dev mode
@@ -430,6 +436,58 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 CHECK(tv.get_object(1).get<Int>(int_col) == remote_added_int);
             })
             ->run();
+    }
+
+    SECTION("Recover: subscription and offline writes after client reset failure") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        auto&& [error_future, error_handler] = make_error_handler();
+        config_local.sync_config->error_handler = error_handler;
+
+        std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(config_local.path);
+        // create a non-empty directory that we'll fail to delete
+        util::make_dir(fresh_path);
+        util::File(util::File::resolve("file", fresh_path), util::File::mode_Write);
+
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        test_reset
+            ->make_local_changes([&](SharedRealm local_realm) {
+                auto mut_sub = local_realm->get_latest_subscription_set().make_mutable_copy();
+                auto table = local_realm->read_group().get_table("class_TopLevel2");
+                mut_sub.insert_or_assign(Query(table));
+                mut_sub.commit();
+
+                CppContext c(local_realm);
+                local_realm->begin_transaction();
+                Object::create(c, local_realm, "TopLevel2",
+                               std::any(AnyDict{{"_id"s, ObjectId::gen()}, {"queryable_str_field"s, "foo"s}}));
+                local_realm->commit_transaction();
+            })
+            ->on_post_reset([](SharedRealm local_realm) {
+                // Verify offline subscription was not removed.
+                auto subs = local_realm->get_latest_subscription_set();
+                auto table = local_realm->read_group().get_table("class_TopLevel2");
+                REQUIRE(subs.find(Query(table)));
+            })
+            ->run();
+
+        // Remove the folder preventing the completion of a client reset.
+        util::try_remove_dir_recursive(fresh_path);
+
+        auto config_copy = config_local;
+        config_local.sync_config->error_handler = nullptr;
+        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        config_copy.sync_config->notify_after_client_reset = reset_handler;
+
+        // Attempt to open the realm again.
+        // This time the client reset succeeds and the offline subscription and writes are recovered.
+        auto realm = Realm::get_shared_realm(config_copy);
+        ClientResyncMode mode = reset_future.get();
+        REQUIRE(mode == ClientResyncMode::Recover);
+
+        auto table = realm->read_group().get_table("class_TopLevel2");
+        auto str_col = table->get_column_key("queryable_str_field");
+        REQUIRE(table->size() == 1);
+        REQUIRE(table->get_object(0).get<String>(str_col) == "foo");
     }
 
     SECTION("Recover: offline writes and subscriptions (multiple subscriptions)") {
@@ -810,6 +868,36 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 wait_for_download(*realm);
             })
             ->run();
+    }
+
+    SECTION("DiscardLocal: open realm after client reset failure") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+        auto&& [error_future, error_handler] = make_error_handler();
+        config_local.sync_config->error_handler = error_handler;
+
+        std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(config_local.path);
+        // create a non-empty directory that we'll fail to delete
+        util::make_dir(fresh_path);
+        util::File(util::File::resolve("file", fresh_path), util::File::mode_Write);
+
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        test_reset->run();
+
+        // Client reset fails due to sync client not being able to create the fresh realm.
+        auto sync_error = wait_for_future(std::move(error_future)).get();
+        CHECK(sync_error.get_system_error() == sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+
+        // Open the realm again. This should not crash.
+        {
+            auto config_copy = config_local;
+            auto&& [err_future, err_handler] = make_error_handler();
+            config_local.sync_config->error_handler = err_handler;
+
+            auto realm_post_reset = Realm::get_shared_realm(config_copy);
+            auto sync_error = wait_for_future(std::move(err_future)).get();
+            CHECK(sync_error.get_system_error() ==
+                  sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+        }
     }
 }
 
@@ -1383,8 +1471,8 @@ TEST_CASE("flx: geospatial", "[sync][flx][app]") {
                 size_t local_matches = query.find_all().size();
                 REQUIRE(local_matches == 2);
 
-                reset_utils::wait_for_object_to_persist_to_atlas(
-                    harness->app()->current_user(), harness->session().app_session(), "restaurant", {{"_id", pk}});
+                reset_utils::wait_for_num_objects_in_atlas(
+                    harness->app()->current_user(), harness->session().app_session(), "restaurant", points.size());
 
                 bson::BsonDocument filter = make_polygon_filter(bounds);
                 size_t server_results = run_query_on_server(filter);

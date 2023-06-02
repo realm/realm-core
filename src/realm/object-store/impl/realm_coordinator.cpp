@@ -644,24 +644,26 @@ void RealmCoordinator::unregister_realm(Realm* realm)
     }
 }
 
-// Thread-safety analsys doesn't reasonably handle calling functions on different
+// Thread-safety analysis doesn't reasonably handle calling functions on different
 // instances of this type
 void RealmCoordinator::clear_cache() NO_THREAD_SAFETY_ANALYSIS
 {
-    std::vector<std::shared_ptr<Realm>> realms_to_close;
     std::vector<std::shared_ptr<RealmCoordinator>> coordinators;
     {
         std::lock_guard<std::mutex> lock(s_coordinator_mutex);
-
         for (auto& weak_coordinator : s_coordinators_per_path) {
-            auto coordinator = weak_coordinator.second.lock();
-            if (!coordinator) {
-                continue;
+            if (auto coordinator = weak_coordinator.second.lock()) {
+                coordinators.push_back(coordinator);
             }
-            coordinators.push_back(coordinator);
+        }
+        s_coordinators_per_path.clear();
+    }
 
-            coordinator->m_notifier = nullptr;
+    for (auto& coordinator : coordinators) {
+        coordinator->m_notifier = nullptr;
 
+        std::vector<std::shared_ptr<Realm>> realms_to_close;
+        {
             // Gather a list of all of the realms which will be removed
             util::CheckedLockGuard lock(coordinator->m_realm_mutex);
             for (auto& weak_realm_notifier : coordinator->m_weak_realm_notifiers) {
@@ -671,14 +673,11 @@ void RealmCoordinator::clear_cache() NO_THREAD_SAFETY_ANALYSIS
             }
         }
 
-        s_coordinators_per_path.clear();
+        // Close all of the previously cached Realms. This can't be done while
+        // locks are held as it may try to re-lock them.
+        for (auto& realm : realms_to_close)
+            realm->close();
     }
-    coordinators.clear();
-
-    // Close all of the previously cached Realms. This can't be done while
-    // s_coordinator_mutex is held as it may try to re-lock it.
-    for (auto& realm : realms_to_close)
-        realm->close();
 }
 
 void RealmCoordinator::clear_all_caches()

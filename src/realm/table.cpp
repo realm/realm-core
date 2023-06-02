@@ -31,7 +31,6 @@
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/index_string.hpp>
 #include <realm/query_conditions_tpl.hpp>
-#include <realm/query_engine.hpp>
 #include <realm/replication.hpp>
 #include <realm/table_view.hpp>
 #include <realm/util/features.h>

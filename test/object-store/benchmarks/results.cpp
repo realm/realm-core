@@ -29,7 +29,6 @@
 #include <realm/object-store/impl/realm_coordinator.hpp>
 
 #include <realm/db.hpp>
-#include <realm/query_engine.hpp>
 #include <realm/query_expression.hpp>
 
 using namespace realm;

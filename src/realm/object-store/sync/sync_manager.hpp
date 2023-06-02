@@ -174,7 +174,7 @@ public:
     // makes it possible to guarantee that all sessions have, in fact, been closed.
     void wait_for_sessions_to_terminate() REQUIRES(!m_mutex);
 
-    // If the metadata manager is configured, perform an update. Returns `true` iff the code was run.
+    // If the metadata manager is configured, perform an update. Returns `true` if the code was run.
     bool perform_metadata_update(util::FunctionRef<void(SyncMetadataManager&)> update_function) const
         REQUIRES(!m_file_system_mutex);
 
