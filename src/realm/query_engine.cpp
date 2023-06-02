@@ -189,7 +189,7 @@ size_t MixedNode<Equal>::find_first_local(size_t start, size_t end)
         return m_index_evaluator->do_search_index(m_cluster, start, end);
     }
     else {
-        return m_leaf_ptr->find_first(m_value, start, end);
+        return m_leaf->find_first(m_value, start, end);
     }
 
     return not_found;
@@ -252,7 +252,7 @@ size_t MixedNode<EqualIns>::find_first_local(size_t start, size_t end)
     EqualIns cond;
     if (m_value.is_type(type_String, type_Binary)) {
         for (size_t i = start; i < end; i++) {
-            QueryValue val(m_leaf_ptr->get(i));
+            QueryValue val(m_leaf->get(i));
             if (!Mixed::types_are_comparable(m_value, val)) {
                 continue;
             }
@@ -263,7 +263,7 @@ size_t MixedNode<EqualIns>::find_first_local(size_t start, size_t end)
     }
     else {
         for (size_t i = start; i < end; i++) {
-            QueryValue val(m_leaf_ptr->get(i));
+            QueryValue val(m_leaf->get(i));
             if (cond(val, m_value))
                 return i;
         }
@@ -418,13 +418,13 @@ bool StringNode<Equal>::do_consume_condition(ParentNode& node)
 size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
 {
     if (m_needles.empty()) {
-        return m_leaf_ptr->find_first(m_value, start, end);
+        return m_leaf->find_first(m_value, start, end);
     }
     else {
         if (end == npos)
-            end = m_leaf_ptr->size();
+            end = m_leaf->size();
         REALM_ASSERT_3(start, <=, end);
-        return find_first_haystack<20>(*m_leaf_ptr, m_needles, start, end);
+        return find_first_haystack<20>(*m_leaf, m_needles, start, end);
     }
 }
 
@@ -828,7 +828,7 @@ size_t LinksToNode<Equal>::find_first_local(size_t start, size_t end)
 
         BPlusTree<ObjKey> links(m_table.unchecked_ptr()->get_alloc());
         for (size_t i = start; i < end; i++) {
-            if (ref_type ref = LinkMap::get_ref(m_leaf_ptr, m_column_type, i)) {
+            if (ref_type ref = get_ref(i)) {
                 links.init_from_ref(ref);
                 for (auto& key : m_target_keys) {
                     if (key) {
@@ -839,9 +839,9 @@ size_t LinksToNode<Equal>::find_first_local(size_t start, size_t end)
             }
         }
     }
-    else if (m_column_type == col_type_Link) {
+    else if (m_list) {
         for (auto& key : m_target_keys) {
-            auto pos = static_cast<const ArrayKey*>(m_leaf_ptr)->find_first(key, start, end);
+            auto pos = m_list->find_first(key, start, end);
             if (pos != realm::npos) {
                 return pos;
             }
@@ -861,7 +861,7 @@ size_t LinksToNode<NotEqual>::find_first_local(size_t start, size_t end)
     if (m_column_type == col_type_LinkList || m_condition_column_key.is_set()) {
         BPlusTree<ObjKey> links(m_table.unchecked_ptr()->get_alloc());
         for (size_t i = start; i < end; i++) {
-            if (ref_type ref = LinkMap::get_ref(m_leaf_ptr, m_column_type, i)) {
+            if (ref_type ref = get_ref(i)) {
                 links.init_from_ref(ref);
                 auto sz = links.size();
                 for (size_t j = 0; j < sz; j++) {
@@ -872,10 +872,9 @@ size_t LinksToNode<NotEqual>::find_first_local(size_t start, size_t end)
             }
         }
     }
-    else if (m_column_type == col_type_Link) {
-        auto leaf = static_cast<const ArrayKey*>(m_leaf_ptr);
+    else if (m_list) {
         for (size_t i = start; i < end; i++) {
-            if (leaf->get(i) != key) {
+            if (m_list->get(i) != key) {
                 return i;
             }
         }

@@ -175,10 +175,17 @@ auto CollectionList::get_path() const noexcept -> FullPath
     return path;
 }
 
-auto CollectionList::get_short_path() const noexcept -> Path
+Path CollectionList::get_short_path() const noexcept
 {
     auto path = m_parent->get_short_path();
     m_parent->add_index(path, m_index);
+    return path;
+}
+
+StablePath CollectionList::get_stable_path() const noexcept
+{
+    auto path = m_parent->get_stable_path();
+    path.push_back(m_index);
     return path;
 }
 

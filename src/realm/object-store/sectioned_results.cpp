@@ -131,15 +131,17 @@ public:
             }
             size_t old_section = i - 1;
             size_t new_section = it->second;
-            auto old_indexes = indexes_old.as_indexes();
-            auto new_indexes = m_new_modifications[new_section].as_indexes();
 
             // Extract the intersection of the two sets
             IndexSet still_present;
-            std::set_intersection(old_indexes.begin(), old_indexes.end(), new_indexes.begin(), new_indexes.end(),
-                                  IndexSetAdder{&still_present});
-            m_new_modifications[new_section].remove(still_present);
-            m_change.modifications[old_section].remove(still_present);
+            if (new_section < m_new_modifications.size()) {
+                auto old_indexes = indexes_old.as_indexes();
+                auto new_indexes = m_new_modifications[new_section].as_indexes();
+                std::set_intersection(old_indexes.begin(), old_indexes.end(), new_indexes.begin(), new_indexes.end(),
+                                      IndexSetAdder{&still_present});
+                m_new_modifications[new_section].remove(still_present);
+                m_change.modifications[old_section].remove(still_present);
+            }
 
             // Anything in old modifications but not new gets added to deletions
             add(m_change.modifications[old_section], m_change.deletions, old_section);

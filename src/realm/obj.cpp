@@ -621,28 +621,6 @@ Mixed Obj::get_any(ColKey col_key) const
     return {};
 }
 
-Mixed Obj::get_any(std::vector<std::string>::iterator path_start, std::vector<std::string>::iterator path_end) const
-{
-    if (auto col = get_table()->get_column_key(*path_start)) {
-        auto val = get_any(col);
-        ++path_start;
-        if (path_start == path_end)
-            return val;
-        if (val.is_type(type_Link, type_TypedLink)) {
-            Obj obj;
-            if (val.get_type() == type_Link) {
-                obj = get_target_table(col)->get_object(val.get<ObjKey>());
-            }
-            else {
-                auto obj_link = val.get<ObjLink>();
-                obj = get_target_table(obj_link)->get_object(obj_link.get_obj_key());
-            }
-            return obj.get_any(path_start, path_end);
-        }
-    }
-    return {};
-}
-
 Mixed Obj::get_primary_key() const
 {
     auto col = m_table->get_primary_key_column();
@@ -872,6 +850,34 @@ size_t Obj::get_backlink_cnt(ColKey backlink_col) const
     return backlinks.get_backlink_count(m_row_ndx);
 }
 
+void Obj::verify_backlink(const Table& origin, ColKey origin_col_key, ObjKey origin_key) const
+{
+#ifdef REALM_DEBUG
+    ColKey backlink_col_key;
+    auto type = origin_col_key.get_type();
+    if (type == col_type_TypedLink || type == col_type_Mixed || origin_col_key.is_dictionary()) {
+        backlink_col_key = get_table()->find_backlink_column(origin_col_key, origin.get_key());
+    }
+    else {
+        backlink_col_key = origin.get_opposite_column(origin_col_key);
+    }
+
+    Allocator& alloc = get_alloc();
+    Array fields(alloc);
+    fields.init_from_mem(m_mem);
+
+    ArrayBacklink backlinks(alloc);
+    backlinks.set_parent(&fields, backlink_col_key.get_index().val + 1);
+    backlinks.init_from_parent();
+
+    REALM_ASSERT(backlinks.verify_backlink(m_row_ndx, origin_key.value));
+#else
+    static_cast<void>(origin);
+    static_cast<void>(origin_col_key);
+    static_cast<void>(origin_key);
+#endif
+}
+
 void Obj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
 {
     struct BacklinkTraverser : public LinkTranslator {
@@ -1017,6 +1023,11 @@ FullPath Obj::get_path() const
 }
 
 Path Obj::get_short_path() const noexcept
+{
+    return {};
+}
+
+StablePath Obj::get_stable_path() const noexcept
 {
     return {};
 }

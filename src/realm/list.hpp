@@ -494,6 +494,12 @@ public:
     {
         return Base::get_short_path();
     }
+
+    StablePath get_stable_path() const override
+    {
+        return Base::get_stable_path();
+    }
+
     void add_index(Path& path, Index ndx) const final;
     TableRef get_table() const noexcept override
     {
@@ -737,6 +743,11 @@ public:
     Path get_short_path() const noexcept final
     {
         return m_list.get_short_path();
+    }
+
+    StablePath get_stable_path() const noexcept final
+    {
+        return m_list.get_stable_path();
     }
 
     // Overriding members of LstBase:

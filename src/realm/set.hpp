@@ -353,6 +353,11 @@ public:
         return m_set.get_short_path();
     }
 
+    StablePath get_stable_path() const noexcept final
+    {
+        return m_set.get_stable_path();
+    }
+
     // Overriding members of SetBase:
     SetBasePtr clone() const override
     {

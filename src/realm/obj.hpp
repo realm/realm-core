@@ -75,6 +75,7 @@ public:
     // you should use get_fat_path() or traverse_path() instead (see below).
     FullPath get_path() const final;
     Path get_short_path() const noexcept final;
+    StablePath get_stable_path() const noexcept final;
     void add_index(Path& path, Index ndx) const final;
 
     bool update_if_needed() const final;
@@ -127,7 +128,6 @@ public:
     {
         return get_any(get_column_key(col_name));
     }
-    Mixed get_any(std::vector<std::string>::iterator path_start, std::vector<std::string>::iterator path_end) const;
     Mixed get_primary_key() const;
 
     template <typename U>
@@ -150,6 +150,7 @@ public:
     size_t get_backlink_count(const Table& origin, ColKey origin_col_key) const;
     ObjKey get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const;
     TableView get_backlink_view(TableRef src_table, ColKey src_col_key);
+    void verify_backlink(const Table& origin, ColKey origin_col_key, ObjKey origin_key) const;
 
     // To be used by the query system when a single object should
     // be tested. Will allow a function to be called in the context

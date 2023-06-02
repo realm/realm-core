@@ -35,28 +35,27 @@
 #endif
 
 #include <realm/aggregate_ops.hpp>
+#include <realm/binary_data.hpp>
+#include <realm/column_type_traits.hpp>
+#include <realm/handover_defs.hpp>
 #include <realm/obj_list.hpp>
 #include <realm/table_ref.hpp>
-#include <realm/binary_data.hpp>
-#include <realm/timestamp.hpp>
-#include <realm/handover_defs.hpp>
-#include <realm/util/serializer.hpp>
 #include <realm/util/bind_ptr.hpp>
-#include <realm/column_type_traits.hpp>
+#include <realm/util/serializer.hpp>
 
 namespace realm {
 
 
 // Pre-declarations
-class ParentNode;
-class Table;
-class TableView;
-class TableView;
 class Array;
 class Expression;
 class Group;
-class Transaction;
 class LinkMap;
+class ParentNode;
+class Table;
+class TableView;
+class Timestamp;
+class Transaction;
 
 namespace metrics {
 class QueryInfo;

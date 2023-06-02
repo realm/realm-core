@@ -164,6 +164,8 @@ public:
         return m_size;
     }
 
+    static size_t size_from_header(const char* header);
+
     bool is_empty() const
     {
         return m_size == 0;
@@ -188,16 +190,12 @@ public:
 
     bool init_from_parent()
     {
-        ref_type ref = m_parent->get_child_ref(m_ndx_in_parent);
-        if (!ref) {
-            return false;
+        ;
+        if (ref_type ref = m_parent->get_child_ref(m_ndx_in_parent)) {
+            init_from_ref(ref);
+            return true;
         }
-        auto new_root = create_root_from_ref(ref);
-        new_root->bp_set_parent(m_parent, m_ndx_in_parent);
-        m_root = std::move(new_root);
-        invalidate_leaf_cache();
-        m_size = m_root->get_tree_size();
-        return true;
+        return false;
     }
 
     void set_parent(ArrayParent* parent, size_t ndx_in_parent)
@@ -568,6 +566,13 @@ public:
         m_root->bptree_traverse(func);
     }
 
+    void split_if_needed()
+    {
+        while (m_root->get_node_size() > REALM_MAX_BPNODE_SIZE) {
+            split_root();
+        }
+    }
+
 protected:
     LeafNode m_leaf_cache;
 
@@ -606,6 +611,8 @@ protected:
 
     template <class R>
     friend R bptree_sum(const BPlusTree<T>& tree);
+
+    void split_root();
 };
 
 template <class T>

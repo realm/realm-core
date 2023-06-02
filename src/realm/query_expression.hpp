@@ -152,6 +152,8 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/util/optional.hpp>
 #include <realm/util/serializer.hpp>
 
+#include <external/mpark/variant.hpp>
+
 #include <numeric>
 #include <algorithm>
 
@@ -241,7 +243,7 @@ class ValueBase {
 public:
     using ValueType = QueryValue;
 
-    static const size_t chunk_size = 8;
+    static constexpr size_t chunk_size = 8;
     bool m_from_list = false;
 
     ValueBase() = default;
@@ -646,8 +648,7 @@ private:
 
 class Expression {
 public:
-    Expression() {}
-    virtual ~Expression() {}
+    virtual ~Expression() = default;
 
     virtual double init()
     {
@@ -672,7 +673,7 @@ std::unique_ptr<Expression> make_expression(Args&&... args)
 
 class Subexpr {
 public:
-    virtual ~Subexpr() {}
+    virtual ~Subexpr() = default;
 
     virtual std::unique_ptr<Subexpr> clone() const = 0;
 
@@ -1534,28 +1535,26 @@ public:
     void set_cluster(const Cluster* cluster)
     {
         Allocator& alloc = get_base_table()->get_alloc();
-        m_array_ptr = nullptr;
+        ArrayPayload* array_ptr;
         switch (m_link_types[0]) {
             case col_type_Link:
                 if (m_link_column_keys[0].is_dictionary()) {
-                    m_array_ptr = LeafPtr(new (&m_storage.m_dict) ArrayInteger(alloc));
+                    array_ptr = &m_leaf.emplace<ArrayInteger>(alloc);
                 }
                 else {
-                    m_array_ptr = LeafPtr(new (&m_storage.m_list) ArrayKey(alloc));
+                    array_ptr = &m_leaf.emplace<ArrayKey>(alloc);
                 }
                 break;
             case col_type_LinkList:
-                m_array_ptr = LeafPtr(new (&m_storage.m_linklist) ArrayList(alloc));
+                array_ptr = &m_leaf.emplace<ArrayList>(alloc);
                 break;
             case col_type_BackLink:
-                m_array_ptr = LeafPtr(new (&m_storage.m_backlink) ArrayBacklink(alloc));
+                array_ptr = &m_leaf.emplace<ArrayBacklink>(alloc);
                 break;
             default:
-                break;
+                REALM_UNREACHABLE();
         }
-        // m_tables[0]->report_invalid_key(m_link_column_keys[0]);
-        cluster->init_leaf(m_link_column_keys[0], m_array_ptr.get());
-        m_leaf_ptr = m_array_ptr.get();
+        cluster->init_leaf(m_link_column_keys[0], array_ptr);
     }
 
     void collect_dependencies(std::vector<TableKey>& tables) const;
@@ -1629,8 +1628,6 @@ public:
         return !m_link_column_keys.empty();
     }
 
-    static ref_type get_ref(const ArrayPayload* array_payload, ColumnType type, size_t ndx);
-
 private:
     bool map_links(size_t column, ObjKey key, LinkMapFunction lm) const;
     void map_links(size_t column, size_t row, LinkMapFunction lm) const;
@@ -1647,17 +1644,8 @@ private:
     std::vector<ColumnType> m_link_types;
     std::vector<ConstTableRef> m_tables;
     bool m_only_unary_links = true;
-    // Leaf cache
-    using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
-    union Storage {
-        typename std::aligned_storage<sizeof(ArrayKey), alignof(ArrayKey)>::type m_list;
-        typename std::aligned_storage<sizeof(ArrayInteger), alignof(ArrayKey)>::type m_dict;
-        typename std::aligned_storage<sizeof(ArrayList), alignof(ArrayList)>::type m_linklist;
-        typename std::aligned_storage<sizeof(ArrayList), alignof(ArrayList)>::type m_backlink;
-    };
-    Storage m_storage;
-    LeafPtr m_array_ptr;
-    const ArrayPayload* m_leaf_ptr = nullptr;
+
+    mpark::variant<mpark::monostate, ArrayKey, ArrayInteger, ArrayList, ArrayBacklink> m_leaf;
 
     template <class>
     friend Query compare(const Subexpr2<Link>&, const Obj&);
@@ -1838,23 +1826,19 @@ public:
 
     void set_cluster(const Cluster* cluster) override
     {
-        m_array_ptr = nullptr;
-        m_leaf_ptr = nullptr;
         if (links_exist()) {
             m_link_map.set_cluster(cluster);
         }
         else {
-            // Create new Leaf
-            m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_link_map.get_base_table()->get_alloc()));
-            cluster->init_leaf(m_column_key, m_array_ptr.get());
-            m_leaf_ptr = m_array_ptr.get();
+            m_leaf.emplace(m_link_map.get_base_table()->get_alloc());
+            cluster->init_leaf(m_column_key, &*m_leaf);
         }
     }
 
     void evaluate(size_t index, ValueBase& destination) override
     {
         if (links_exist()) {
-            REALM_ASSERT(m_leaf_ptr == nullptr);
+            REALM_ASSERT(!m_leaf);
 
             if (m_link_map.only_unary_links()) {
                 REALM_ASSERT(destination.size() == 1);
@@ -1899,14 +1883,14 @@ public:
         }
         else {
             // Not a link column
-            REALM_ASSERT(m_leaf_ptr != nullptr);
+            REALM_ASSERT(m_leaf);
             REALM_ASSERT(destination.size() == 1);
             REALM_ASSERT(!destination.m_from_list);
-            if (m_leaf_ptr->is_null(index)) {
+            if (m_leaf->is_null(index)) {
                 destination.set_null(0);
             }
             else {
-                destination.set(0, m_leaf_ptr->get(index));
+                destination.set(0, m_leaf->get(index));
             }
         }
     }
@@ -1936,13 +1920,8 @@ private:
     using ObjPropertyExpr<T>::m_link_map;
     using ObjPropertyExpr<T>::m_column_key;
 
-    // Leaf cache
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
-    using LeafPtr = std::unique_ptr<LeafType, PlacementDelete>;
-    LeafCacheStorage m_leaf_cache_storage;
-    LeafPtr m_array_ptr;
-    LeafType* m_leaf_ptr = nullptr;
+    std::optional<LeafType> m_leaf;
 };
 
 template <>
@@ -2195,7 +2174,7 @@ public:
         return not_found;
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         return state.describe_columns(m_link_map, ColKey()) + (has_links ? " != NULL" : " == NULL");
     }
@@ -2258,7 +2237,7 @@ public:
         destination = Value<int64_t>(count);
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         return state.describe_columns(m_link_map, ColKey()) + util::serializer::value_separator + "@count";
     }
@@ -2335,7 +2314,7 @@ public:
         destination = Value<int64_t>(count);
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         std::string s;
         if (m_link_map.links_exist()) {
@@ -2456,7 +2435,7 @@ public:
         return not_found;
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         return state.describe_expression_type(m_comp_type) + state.describe_columns(m_link_map, ColKey()) +
                " GEOWITHIN " + util::serializer::print_value(m_bounds);
@@ -2638,7 +2617,7 @@ public:
         destination = Value<ObjKey>(m_key);
     }
 
-    virtual std::string description(util::serializer::SerialisationState&) const override
+    std::string description(util::serializer::SerialisationState&) const override
     {
         return util::serializer::print_value(m_key);
     }
@@ -2846,13 +2825,8 @@ public:
 
     mutable ColKey m_column_key;
     LinkMap m_link_map;
-    // Leaf cache
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayInteger), alignof(Array)>::type;
-    using LeafPtr = std::unique_ptr<ArrayInteger, PlacementDelete>;
-    LeafCacheStorage m_leaf_cache_storage;
-    LeafPtr m_array_ptr;
-    ArrayInteger* m_leaf_ptr = nullptr;
-    util::Optional<ExpressionComparisonType> m_comparison_type;
+    std::optional<ArrayInteger> m_leaf;
+    std::optional<ExpressionComparisonType> m_comparison_type;
 };
 
 template <typename>
@@ -3092,9 +3066,6 @@ public:
 // Returns the keys
 class ColumnDictionaryKeys;
 
-// Returns the values of a given key
-class ColumnDictionaryKey;
-
 // Returns the values
 template <>
 class Columns<Dictionary> : public ColumnsCollection<Mixed> {
@@ -3106,12 +3077,18 @@ public:
         m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(column);
     }
 
+    // Change the node to handle a specific key value only
+    Columns<Dictionary>& key(const Mixed& key_value)
+    {
+        init_key(key_value);
+        return *this;
+    }
+
     DataType get_key_type() const
     {
         return m_key_type;
     }
 
-    ColumnDictionaryKey key(const Mixed& key_value);
     ColumnDictionaryKeys keys();
 
     SizeOperator<int64_t> size() override;
@@ -3123,6 +3100,15 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override;
 
+    std::string description(util::serializer::SerialisationState& state) const override
+    {
+        std::string key_string;
+        if (m_key) {
+            key_string = "['" + *m_key + "']";
+        }
+        return ColumnListBase::description(state) + key_string;
+    }
+
     std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<Columns<Dictionary>>(*this);
@@ -3131,52 +3117,13 @@ public:
     Columns(Columns const& other)
         : ColumnsCollection<Mixed>(other)
         , m_key_type(other.m_key_type)
+        , m_key(other.m_key)
     {
     }
 
 protected:
     DataType m_key_type;
-};
-
-class ColumnDictionaryKey : public Columns<Dictionary> {
-public:
-    ColumnDictionaryKey(Mixed key_value, const Columns<Dictionary>& dict)
-        : Columns<Dictionary>(dict)
-    {
-        init_key(key_value);
-    }
-
-    ColumnDictionaryKey& property(const std::string& prop)
-    {
-        m_prop_list.push_back(prop);
-        return *this;
-    }
-
-    void evaluate(size_t index, ValueBase& destination) override;
-
-    std::string description(util::serializer::SerialisationState& state) const override
-    {
-        std::ostringstream ostr;
-        ostr << m_key;
-        return ColumnListBase::description(state) + '[' + ostr.str() + ']';
-    }
-
-    std::unique_ptr<Subexpr> clone() const override
-    {
-        return std::unique_ptr<Subexpr>(new ColumnDictionaryKey(*this));
-    }
-
-    ColumnDictionaryKey(ColumnDictionaryKey const& other)
-        : Columns<Dictionary>(other)
-        , m_prop_list(other.m_prop_list)
-    {
-        init_key(other.m_key);
-    }
-
-private:
-    Mixed m_key;
-    std::string m_buffer;
-    std::vector<std::string> m_prop_list;
+    util::Optional<std::string> m_key;
 
     void init_key(Mixed key_value);
 };
@@ -3239,15 +3186,8 @@ private:
     DataType m_key_type;
     ColKey m_column_key;
     LinkMap m_link_map;
-    util::Optional<ExpressionComparisonType> m_comparison_type;
-
-
-    // Leaf cache
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayInteger), alignof(Array)>::type;
-    using LeafPtr = std::unique_ptr<ArrayInteger, PlacementDelete>;
-    LeafCacheStorage m_leaf_cache_storage;
-    LeafPtr m_array_ptr;
-    ArrayInteger* m_leaf_ptr = nullptr;
+    std::optional<ExpressionComparisonType> m_comparison_type;
+    std::optional<ArrayInteger> m_leaf;
 };
 
 template <typename T>
@@ -3461,7 +3401,7 @@ public:
                 }
             }
             else {
-                if (auto ref = m_columns_collection.m_leaf_ptr->get(index)) {
+                if (auto ref = m_columns_collection.m_leaf->get(index)) {
                     Allocator& alloc = m_columns_collection.get_base_table()->get_alloc();
                     Dictionary dict(alloc, m_columns_collection.m_column_key, to_ref(ref));
                     destination.set(0, do_dictionary_agg(dict));
@@ -3505,7 +3445,7 @@ public:
         }
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         return m_columns_collection.description(state) + util::serializer::value_separator + Operation::description();
     }
@@ -3623,22 +3563,17 @@ public:
 
     void set_cluster(const Cluster* cluster) override
     {
-        m_array_ptr = nullptr;
-        m_leaf_ptr = nullptr;
         if (links_exist()) {
             m_link_map.set_cluster(cluster);
+            m_leaf = mpark::monostate();
         }
         else if (requires_null_column && is_nullable()) {
-            // Create new Leaf
-            m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) NullableLeafType(this->get_base_table()->get_alloc()));
-            cluster->init_leaf(m_column_key, m_array_ptr.get());
-            m_leaf_ptr = m_array_ptr.get();
+            auto& leaf = m_leaf.template emplace<NullableLeafType>(this->get_base_table()->get_alloc());
+            cluster->init_leaf(m_column_key, &leaf);
         }
         else {
-            // Create new Leaf
-            m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(this->get_base_table()->get_alloc()));
-            cluster->init_leaf(m_column_key, m_array_ptr.get());
-            m_leaf_ptr = m_array_ptr.get();
+            auto& leaf = m_leaf.template emplace<LeafType>(this->get_base_table()->get_alloc());
+            cluster->init_leaf(m_column_key, &leaf);
         }
     }
 
@@ -3648,7 +3583,7 @@ public:
         using U = typename LeafType2::value_type;
 
         if (links_exist()) {
-            REALM_ASSERT(m_leaf_ptr == nullptr);
+            REALM_ASSERT(mpark::holds_alternative<mpark::monostate>(m_leaf));
             if (m_link_map.only_unary_links()) {
                 destination.init(false, 1);
                 destination.set_null(0);
@@ -3673,32 +3608,26 @@ public:
             }
         }
         else {
-            REALM_ASSERT(m_leaf_ptr != nullptr);
-            auto leaf = static_cast<const LeafType2*>(m_leaf_ptr);
+            auto leaf = mpark::get_if<LeafType2>(&m_leaf);
+            REALM_ASSERT(leaf);
             // Not a Link column
             size_t colsize = leaf->size();
+
+            size_t rows = std::min(colsize - index, ValueBase::chunk_size);
 
             // Now load `ValueBase::chunk_size` rows from from the leaf into m_storage.
             if constexpr (std::is_same_v<U, int64_t>) {
                 // If it's an integer leaf, then it contains the method get_chunk() which copies
-                // these values in a super fast way (only feasible if more than chunk_size in column)
-                if (index + ValueBase::chunk_size <= colsize) {
-                    // If you want to modify 'chunk_size' then update Array::get_chunk()
-                    REALM_ASSERT_3(ValueBase::chunk_size, ==, 8);
+                // these values in a super fast way. If you want to modify 'chunk_size' then update Array::get_chunk()
+                REALM_ASSERT_3(ValueBase::chunk_size, ==, 8);
 
-                    auto leaf_2 = static_cast<const Array*>(leaf);
-                    int64_t res[ValueBase::chunk_size];
-                    leaf_2->get_chunk(index, res);
-
-                    destination.set(res, res + ValueBase::chunk_size);
-                    return;
-                }
+                int64_t res[ValueBase::chunk_size];
+                static_cast<const Array*>(leaf)->get_chunk(index, res);
+                destination.set(res, res + rows);
+                return;
             }
-            size_t rows = colsize - index;
-            if (rows > ValueBase::chunk_size)
-                rows = ValueBase::chunk_size;
-            destination.init(false, rows);
 
+            destination.init(false, rows);
             for (size_t t = 0; t < rows; t++) {
                 if (leaf->is_null(index + t)) {
                     destination.set_null(t);
@@ -3710,7 +3639,7 @@ public:
         }
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         return state.describe_expression_type(this->m_comparison_type) +
                state.describe_columns(m_link_map, m_column_key);
@@ -3743,14 +3672,10 @@ public:
 private:
     using ObjPropertyExpr<T>::m_link_map;
     using ObjPropertyExpr<T>::m_column_key;
-
-    // Leaf cache
-    using LeafCacheStorage =
-        typename std::aligned_storage<std::max(sizeof(LeafType), sizeof(NullableLeafType)), alignof(LeafType)>::type;
-    using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
-    LeafCacheStorage m_leaf_cache_storage;
-    LeafPtr m_array_ptr;
-    const ArrayPayload* m_leaf_ptr = nullptr;
+    using LeafStorage =
+        std::conditional_t<requires_null_column, mpark::variant<mpark::monostate, LeafType, NullableLeafType>,
+                           mpark::variant<mpark::monostate, LeafType>>;
+    LeafStorage m_leaf;
 };
 
 template <typename T, typename Operation>
@@ -3806,7 +3731,7 @@ public:
         REALM_ASSERT(false);
     }
 
-    virtual std::string description(util::serializer::SerialisationState&) const override
+    std::string description(util::serializer::SerialisationState&) const override
     {
         return ""; // by itself there are no conditions, see SubColumnAggregate
     }
@@ -3935,7 +3860,7 @@ public:
         }
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         util::serializer::SerialisationState empty_state(state.group);
         return state.describe_columns(m_link_map, ColKey()) + util::serializer::value_separator +
@@ -3995,7 +3920,7 @@ public:
         destination = Value<int64_t>(count);
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_link_map.get_base_table() != nullptr);
         std::string target = state.describe_columns(m_link_map, ColKey());

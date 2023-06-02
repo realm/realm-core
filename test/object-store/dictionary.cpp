@@ -33,9 +33,6 @@
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 
-#include <realm.hpp>
-#include <realm/query_expression.hpp>
-
 using namespace realm;
 using namespace realm::util;
 
@@ -1488,5 +1485,173 @@ TEST_CASE("callback with empty keypatharray") {
         write([&] {
             dict.get<Obj>(key).set(col_target_value, 2);
         });
+    }
+}
+
+TEST_CASE("dictionary sort by keyPath value", "[dictionary]") {
+    InMemoryTestFile config;
+    config.schema = Schema{
+        {"DictionaryObject",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"s1", PropertyType::Int},
+             {"intDictionary", PropertyType::Dictionary | PropertyType::Int | PropertyType::Nullable},
+         }},
+    };
+
+    auto r = Realm::get_shared_realm(config);
+    CppContext ctx(r);
+
+    r->begin_transaction();
+
+    auto table = r->read_group().get_table("class_DictionaryObject");
+    auto col_id = table->get_column_key("_id");
+    auto col_s1 = table->get_column_key("s1");
+    auto col_dict = table->get_column_key("intDictionary");
+
+    const ObjectSchema& dict_obj_schema = *r->schema().find("DictionaryObject");
+
+    Object::create(ctx, r, dict_obj_schema,
+                   Any{AnyDict{{"_id", INT64_C(0)},
+                               {"s1", INT64_C(10)},
+                               {"intDictionary", AnyDict{{"a", INT64_C(0)}, {"b", INT64_C(1)}, {"c", INT64_C(2)}}}}});
+
+    Object::create(ctx, r, dict_obj_schema,
+                   Any{AnyDict{{"_id", INT64_C(2)},
+                               {"s1", INT64_C(10)},
+                               {"intDictionary", AnyDict{{"a", INT64_C(3)}, {"b", INT64_C(4)}, {"c", INT64_C(5)}}}}});
+
+    Object::create(ctx, r, dict_obj_schema,
+                   Any{AnyDict{{"_id", INT64_C(3)},
+                               {"s1", INT64_C(20)},
+                               {"intDictionary", AnyDict{{"a", INT64_C(2)}, {"b", INT64_C(6)}, {"c", INT64_C(7)}}}}});
+
+    Results all_values(r, table->where());
+
+    SECTION("sort by dict field 'a' using path ascending") {
+
+        ExtendedColumnKey child_col_a(col_dict, "a");
+
+        auto sorted = all_values.sort(std::vector<std::pair<std::string, bool>>{{"intDictionary[a]", true}});
+        REQUIRE(sorted.size() == 3);
+        REQUIRE(sorted.get(0).get<Int>(col_id) == 0);
+        REQUIRE(sorted.get(1).get<Int>(col_id) == 3);
+        REQUIRE(sorted.get(2).get<Int>(col_id) == 2);
+    }
+
+    SECTION("sort by dict field 'a' using ColKey ascending") {
+
+        ExtendedColumnKey child_col_a(col_dict, "a");
+
+        auto sorted =
+            all_values.sort({std::vector<std::vector<ExtendedColumnKey>>{{child_col_a}}, std::vector<bool>{true}});
+        REQUIRE(sorted.size() == 3);
+        REQUIRE(sorted.get(0).get<Int>(col_id) == 0);
+        REQUIRE(sorted.get(1).get<Int>(col_id) == 3);
+        REQUIRE(sorted.get(2).get<Int>(col_id) == 2);
+    }
+
+    SECTION("sort by dict field 'a' using ColKey descending") {
+        ExtendedColumnKey child_col_a(col_dict, "a");
+
+        auto sorted =
+            all_values.sort({std::vector<std::vector<ExtendedColumnKey>>{{child_col_a}}, std::vector<bool>{false}});
+        REQUIRE(sorted.size() == 3);
+        REQUIRE(sorted.get(0).get<Int>(col_id) == 2);
+        REQUIRE(sorted.get(1).get<Int>(col_id) == 3);
+        REQUIRE(sorted.get(2).get<Int>(col_id) == 0);
+    }
+
+    SECTION("sort by dict using multiple ColKey descending") {
+        ExtendedColumnKey child_col_a(col_dict, "a");
+
+        auto sorted = all_values.sort(
+            {std::vector<std::vector<ExtendedColumnKey>>{{col_s1}, {child_col_a}}, std::vector<bool>{true, false}});
+        REQUIRE(sorted.size() == 3);
+        REQUIRE(sorted.get(0).get<Int>(col_id) == 2);
+        REQUIRE(sorted.get(1).get<Int>(col_id) == 0);
+        REQUIRE(sorted.get(2).get<Int>(col_id) == 3);
+    }
+
+    SECTION("sort by dict using multiple ColKey ascending") {
+        ExtendedColumnKey child_col_a(col_dict, "a");
+
+        auto sorted = all_values.sort(
+            {std::vector<std::vector<ExtendedColumnKey>>{{col_s1}, {child_col_a}}, std::vector<bool>{true, true}});
+        REQUIRE(sorted.size() == 3);
+        REQUIRE(sorted.get(0).get<Int>(col_id) == 0);
+        REQUIRE(sorted.get(1).get<Int>(col_id) == 2);
+        REQUIRE(sorted.get(2).get<Int>(col_id) == 3);
+    }
+
+    r->commit_transaction();
+}
+
+TEST_CASE("dictionary sort by linked object value", "[dictionary]") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{
+        {"object",
+         {{"value", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"},
+          {"id", PropertyType::Int}}},
+        {"target", {{"value", PropertyType::Int}}},
+    };
+
+    auto r = Realm::get_shared_realm(config);
+
+    auto table = r->read_group().get_table("class_object");
+    auto target = r->read_group().get_table("class_target");
+    ColKey id_value = table->get_column_key("id");
+    ColKey col_value = target->get_column_key("value");
+
+    r->begin_transaction();
+    Obj obj1 = table->create_object().set(id_value, 100);
+    Obj obj2 = table->create_object().set(id_value, 200);
+    Obj target_obj1 = target->create_object().set(col_value, 100);
+    Obj target_obj2 = target->create_object().set(col_value, 200);
+
+    ColKey col = table->get_column_key("value");
+
+    CppContext ctx(r);
+
+    object_store::Dictionary dict1(r, obj1, col);
+    dict1.insert("key_a", Mixed{ObjLink(target->get_key(), target_obj1.get_key())});
+
+    object_store::Dictionary dict2(r, obj2, col);
+    dict2.insert("key_a", Mixed{ObjLink(target->get_key(), target_obj2.get_key())});
+    r->commit_transaction();
+
+    SECTION("sort by dict field 'a' using ColKey ascending") {
+        Results all_values(r, table->where());
+
+        ExtendedColumnKey child_col_a(col, "key_a");
+
+        auto sorted = all_values.sort(
+            {std::vector<std::vector<ExtendedColumnKey>>{{child_col_a, col_value}}, std::vector<bool>{true}});
+        REQUIRE(sorted.size() == 2);
+        REQUIRE(sorted.get(0).get<Int>(id_value) == 100);
+        REQUIRE(sorted.get(1).get<Int>(id_value) == 200);
+    }
+
+    SECTION("sort by dict field 'a' using path") {
+        Results all_values(r, table->where());
+
+        auto sorted = all_values.sort(std::vector<std::pair<std::string, bool>>{{"value[key_a].value", true}});
+        REQUIRE(sorted.size() == 2);
+        REQUIRE(sorted.get(0).get<Int>(id_value) == 100);
+        REQUIRE(sorted.get(1).get<Int>(id_value) == 200);
+    }
+
+    SECTION("sort by dict field 'a' using ColKey descending") {
+        Results all_values(r, table->where());
+
+        ExtendedColumnKey child_col_a(col, "key_a");
+
+        auto sorted = all_values.sort(
+            {std::vector<std::vector<ExtendedColumnKey>>{{child_col_a, col_value}}, std::vector<bool>{false}});
+        REQUIRE(sorted.size() == 2);
+        REQUIRE(sorted.get(0).get<Int>(id_value) == 200);
+        REQUIRE(sorted.get(1).get<Int>(id_value) == 100);
     }
 }

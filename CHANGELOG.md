@@ -8,7 +8,8 @@
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Align dictionaries to Lists and Sets when they get cleared. ([#6205](https://github.com/realm/realm-core/issues/6205), since v10.4.0)
 * Fixed equality queries on a Mixed property with an index possibly returning the wrong result if values of different types happened to have the same StringIndex hash. ([6407](https://github.com/realm/realm-core/issues/6407) since v11.0.0-beta.5).
-
+* If you have more than 8388606 links pointing to one specific object, the program will crash. ([#6577](https://github.com/realm/realm-core/issues/6577), since v6.0.0)
+ 
 ### Breaking changes
 * Support for upgrading from Realm files produced by RealmCore v5.23.9 or earlier is no longer supported.
 * Remove `set_string_compare_method`, only one sort method is now supported which was previously called `STRING_COMPARE_CORE`.
@@ -18,6 +19,56 @@
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
 
 ----------------------------------------------
+# 13.14.0 Release notes
+
+### Enhancements
+* Support sort/distinct based on values from a dictionary e.g. `TRUEPREDICATE SORT(meta['age'])` (PR [#5311](https://github.com/realm/realm-core/pull/5311))
+
+### Fixed
+* Fix the query parser needs to copy list of arguments and own the memory. ([#6674](https://github.com/realm/realm-core/pull/6674), since v12.5.0)
+* Fixed a potential crash when opening the realm after failing to download a fresh FLX realm during an automatic client reset ([#6494](https://github.com/realm/realm-core/issues/6494), since v12.3.0)
+
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Added CMake toolchains for cross-targeting Linux x86_64, armv7, and aarch64. (PR [#6559](https://github.com/realm/realm-core/pull/6559))
+
+----------------------------------------------
+
+# 13.13.0 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Allow numeric substitutions into a geospatial query. Example `location GEOWITHIN geoCircle([$0, $1], $2)`. ([#6662](https://github.com/realm/realm-core/issues/6662))
+* Access token refresh for websockets was not updating the location metadata ([#6630](https://github.com/realm/realm-core/issues/6630), since v13.9.3)
+* Fix several UBSan failures which did not appear to result in functional bugs ([#6649](https://github.com/realm/realm-core/pull/6649)).
+* Fix an out-of-bounds read in sectioned results when sectioned are removed by modifying all objects in that section to no longer appear in that section ([#6649](https://github.com/realm/realm-core/pull/6649), since v13.12.0)
+* Using both synchronous and asynchronous transactions on the same thread or scheduler could hit the assertion failure "!realm.is_in_transaction()" if one of the callbacks for an asynchronous transaction happened to be scheduled during a synchronous transaction ([#6659](https://github.com/realm/realm-core/issues/6659), since v11.8.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Simplify the implementation of query expression nodes which have a btree leaf cache.
+* Fix a lock order inversion hit by object store tests running on linux. The cycle required test-specific code and so is not applicable to non-tests.
+* Remove catch() clause to prevent truncating stack trace in AsyncOper::do_recycle_and_execute() ([PR #6667](https://github.com/realm/realm-core/pull/6667))
+
+----------------------------------------------
+
 # 13.12.0 Release notes
 
 ### Enhancements

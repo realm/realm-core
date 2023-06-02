@@ -291,8 +291,9 @@ class CApiUnitTestTransport : public app::GenericNetworkTransport {
     std::string m_provider_type;
 
 public:
-    CApiUnitTestTransport(const std::string& provider_type = "anon-user")
-        : m_provider_type(provider_type)
+    CApiUnitTestTransport(const std::string& provider_type = {}, uint64_t request_timeout = 60000)
+        : m_provider_type(provider_type.empty() ? "anon-user" : provider_type)
+        , request_timeout(request_timeout)
     {
         profile_0 = nlohmann::json({{"name", "profile_0_name"},
                                     {"first_name", "profile_0_first_name"},
@@ -303,6 +304,11 @@ public:
                                     {"birthday", "profile_0_birthday"},
                                     {"min_age", "profile_0_min_age"},
                                     {"max_age", "profile_0_max_age"}});
+    }
+
+    explicit CApiUnitTestTransport(const uint64_t request_timeout)
+        : CApiUnitTestTransport({}, request_timeout)
+    {
     }
 
     void set_provider_type(const std::string& provider_type)
@@ -319,6 +325,7 @@ public:
     const std::string identity_0_id = "eflkjf393flkj33fjf3";
     const std::string identity_1_id = "aewfjklewfwoifejjef";
     nlohmann::json profile_0;
+    uint64_t request_timeout;
 
 
 private:
@@ -358,7 +365,7 @@ private:
                                 {"coreVersion", REALM_VERSION_STRING},
                                 {"bundleId", "some_bundle_id"}}}}));
 
-        CHECK(request.timeout_ms == 60000);
+        CHECK(request.timeout_ms == request_timeout);
 
         std::string response = nlohmann::json({{"access_token", access_token},
                                                {"refresh_token", access_token},
@@ -617,7 +624,9 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
 #if REALM_ENABLE_AUTH_TESTS
     SECTION("realm_app_config_t") {
-        std::shared_ptr<app::GenericNetworkTransport> transport = std::make_shared<CApiUnitTestTransport>();
+        const uint64_t request_timeout = 2500;
+        std::shared_ptr<app::GenericNetworkTransport> transport =
+            std::make_shared<CApiUnitTestTransport>(request_timeout);
         auto http_transport = realm_http_transport(transport);
         auto app_config = cptr(realm_app_config_new("app_id_123", &http_transport));
         CHECK(app_config.get() != nullptr);
@@ -633,8 +642,8 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_app_config_set_local_app_version(app_config.get(), "some_app_version");
         CHECK(app_config->local_app_version == "some_app_version");
 
-        realm_app_config_set_default_request_timeout(app_config.get(), 2500);
-        CHECK(app_config->default_request_timeout_ms == 2500);
+        realm_app_config_set_default_request_timeout(app_config.get(), request_timeout);
+        CHECK(app_config->default_request_timeout_ms == request_timeout);
 
         realm_app_config_set_platform_version(app_config.get(), "some_platform_version");
         CHECK(app_config->device_info.platform_version == "some_platform_version");
@@ -2365,6 +2374,41 @@ TEST_CASE("C API", "[c_api]") {
                 // Invalid number of arguments
                 CHECK(!realm_query_parse(realm, class_foo.key, "string == $0", 0, nullptr));
                 CHECK_ERR_CAT(RLM_ERR_INDEX_OUT_OF_BOUNDS, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
+            }
+
+            SECTION("string in list") {
+                char foo[] = "foo";
+                realm_value_t str = rlm_str_val(foo);
+                realm_value_t list_arg[2] = {str, rlm_str_val("bar")};
+
+                write([&]() {
+                    CHECK(realm_set_value(obj1.get(), foo_properties["string"], rlm_str_val("foo"), false));
+                });
+
+                static const size_t num_args = 1;
+                realm_query_arg_t args[num_args] = {realm_query_arg_t{1, false, &str}};
+                realm_query_arg_t* arg_list_simple = &args[0];
+
+                realm_query_arg_t args_in_list[num_args] = {realm_query_arg_t{2, true, &list_arg[0]}};
+                realm_query_arg_t* arg_list = &args_in_list[0];
+
+                auto q_string_single_param =
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "string == $0", num_args, arg_list_simple));
+                auto q_string_in_list =
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "string IN $0", num_args, arg_list));
+
+                // changing the value for one of the parameters passed should not change the result of the query.
+                // essentially we must assure that core is copying all the arguments passed inside the list (like for
+                // normal query arguments), and after realm_query_parse completes any modification of the memory that
+                // was used to store the parameter does not impact in any way core.
+                char* s = foo;
+                s[0] = 'a';
+                size_t count, count_list;
+
+                CHECK(checked(realm_query_count(q_string_single_param.get(), &count)));
+                CHECK(1 == count);
+                CHECK(checked(realm_query_count(q_string_in_list.get(), &count_list)));
+                CHECK(1 == count_list);
             }
 
             SECTION("decimal NaN") {
@@ -5724,6 +5768,7 @@ TEST_CASE("app: flx-sync compensating writes C API support", "[c_api][flx][sync]
     FLXSyncTestHarness harness("c_api_comp_writes");
     create_user_and_log_in(harness.app());
     SyncTestFile test_config(harness.app()->current_user(), harness.schema(), realm::SyncConfig::FLXSyncEnabled{});
+    test_config.sync_config = std::make_shared<realm_sync_config_t>(*test_config.sync_config);
     realm_sync_config_t* sync_config = static_cast<realm_sync_config_t*>(test_config.sync_config.get());
 
     struct TestState {
