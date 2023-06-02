@@ -5,6 +5,7 @@
 * None.
 
 ### Fixed
+* Geospatial polygons no longer enfoce that rings be closed. If the first point is not equal to the last, then the ring is automatically closed instead of throwing an error. This is in line with MongoDB behaviour. ([PR 6694](https://github.com/realm/realm-core/issues/6694), since v13.12.0)
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
 

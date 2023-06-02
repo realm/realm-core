@@ -303,16 +303,16 @@ TEST(Geospatial_PolygonValidation)
     query = table->column<Link>(location_column_key).geo_within(geo_poly_reversed);
     CHECK_EQUAL(query.count(), 1);
 
-    Geospatial poly_mismatch_loop{GeoPolygon{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683},
-                                              GeoPoint{55.628, 12.0826}, GeoPoint{40.7128, -74.000}}}};
-    Status status = poly_mismatch_loop.is_valid();
-    CHECK(!status.is_ok());
-    CHECK_EQUAL(status.reason(), "Ring is not closed, first vertex 'GeoPoint([40.7128, -74.006])' does not equal "
-                                 "last vertex 'GeoPoint([40.7128, -74])'");
+    // Same polygon as above, but without closing the loop. Expect the loop to be automatically closed.
+    Geospatial poly_mismatch_loop{
+        GeoPolygon{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683}, GeoPoint{55.628, 12.0826}}}};
+    CHECK(poly_mismatch_loop.is_valid().is_ok());
+    query = table->column<Link>(location_column_key).geo_within(poly_mismatch_loop);
+    CHECK_EQUAL(query.count(), 1);
 
     Geospatial poly_three_point{
         GeoPolygon{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683}, GeoPoint{40.7128, -74.006}}}};
-    status = poly_three_point.is_valid();
+    Status status = poly_three_point.is_valid();
     CHECK(!status.is_ok());
     CHECK_EQUAL(status.reason(), "Ring 0 must have at least 3 different vertices, 2 unique vertices were provided");
 
@@ -350,6 +350,11 @@ TEST(Geospatial_PolygonValidation)
     status = empty_poly.is_valid();
     CHECK(!status.is_ok());
     CHECK_EQUAL(status.reason(), "Polygon has no rings.");
+
+    Geospatial one_point_poly{GeoPolygon{std::vector<std::vector<GeoPoint>>{{GeoPoint{55.629568, 12.098421}}}}};
+    status = one_point_poly.is_valid();
+    CHECK(!status.is_ok());
+    CHECK_EQUAL(status.reason(), "Ring with 1 vertex ('GeoPoint([55.6296, 12.0984])') is not valid");
 
     Geospatial poly_duplicates{
         GeoPolygon{{GeoPoint{0, 0}, GeoPoint{0, 1}, GeoPoint{0, 1}, GeoPoint{0, 1}, GeoPoint{1, 1}, GeoPoint{0, 0}}}};

@@ -314,16 +314,23 @@ static void erase_duplicate_adjacent_points(std::vector<S2Point>& vertices)
     vertices.erase(std::unique(vertices.begin(), vertices.end()), vertices.end());
 }
 
-static Status is_ring_closed(const std::vector<S2Point>& ring, const std::vector<GeoPoint>& points)
+static Status close_ring(std::vector<S2Point>& ring, const std::vector<GeoPoint>& points)
 {
     if (ring.empty()) {
         return Status(ErrorCodes::InvalidQueryArg, "Ring has no vertices");
     }
+    if (ring.size() == 1) {
+        return Status(ErrorCodes::InvalidQueryArg, util::format("Ring with 1 vertex ('%1') is not valid", points[0]));
+    }
 
-    if (points[0] != points[points.size() - 1]) {
-        return Status(ErrorCodes::InvalidQueryArg,
-                      util::format("Ring is not closed, first vertex '%1' does not equal last vertex '%2'", points[0],
-                                   points[points.size() - 1]));
+    // According to the geoJSON spec, a polygon is a closed ring when the first vertex
+    // is equal to the last vertex. We expect this and drop the last point because S2
+    // automatically connects the first to the last.
+    // As a convienence, we do not enforce the geoJSON rules that the first must be
+    // equal to the last. This is also in line with what MongoDB does, even though
+    // their docs say otherwise.
+    if (points[0] == points[points.size() - 1]) {
+        ring.resize(ring.size() - 1);
     }
 
     return Status::OK();
@@ -358,13 +365,11 @@ static Status parse_polygon_coordinates(const GeoPolygon& polygon, S2Polygon* ou
             points.push_back(s2p);
         }
 
-        status = is_ring_closed(points, polygon.points[i]);
+        status = close_ring(points, polygon.points[i]);
         if (!status.is_ok())
             return status;
 
         erase_duplicate_adjacent_points(points);
-        // Drop the duplicated last point.
-        points.resize(points.size() - 1);
 
         // At least 3 vertices.
         if (points.size() < 3) {

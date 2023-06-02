@@ -1313,7 +1313,7 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
 }
 
 #if REALM_ENABLE_GEOSPATIAL
-TEST_CASE("flx: geospatial", "[sync][flx][app]") {
+TEST_CASE("flx: geospatial", "[sync][flx][app][geospatial]") {
     static std::optional<FLXSyncTestHarness> harness;
     if (!harness) {
         Schema schema{
@@ -1474,9 +1474,20 @@ TEST_CASE("flx: geospatial", "[sync][flx][app]") {
                 reset_utils::wait_for_num_objects_in_atlas(
                     harness->app()->current_user(), harness->session().app_session(), "restaurant", points.size());
 
+                // closed polygon, results are computed using geodesic lines
                 bson::BsonDocument filter = make_polygon_filter(bounds);
                 size_t server_results = run_query_on_server(filter);
                 CHECK(server_results == local_matches);
+                // same as above but with an open loop, checks that the loop is
+                // automatically closed by both MongoDB and by Realm.
+                GeoPolygon open_bounds = bounds;
+                open_bounds.points[0].erase(open_bounds.points[0].end() - 1);
+                CHECK(open_bounds.points[0].size() == 3);
+                CHECK(open_bounds.points[0][0] != open_bounds.points[0][2]);
+                filter = make_polygon_filter(bounds);
+                server_results = run_query_on_server(filter);
+                local_matches = table->column<Link>(location_col).geo_within(open_bounds).count();
+                CHECK(local_matches == server_results);
 
                 GeoCircle circle = GeoCircle::from_kms(10, GeoPoint{-180.1, -90.1});
                 CHECK_THROWS_WITH(table->column<Link>(location_col).geo_within(circle).count(),
