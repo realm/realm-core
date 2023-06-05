@@ -427,7 +427,7 @@ void CollectionList::to_json(std::ostream& out, size_t link_depth, JSONOutputMod
     bool is_leaf = m_level == get_table()->get_nesting_levels(m_col_key);
     bool is_dictionary = m_coll_type == CollectionType::Dictionary;
     auto sz = size();
-    auto string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
+    auto string_keys = dynamic_cast<BPlusTree<String>*>(m_keys.get());
 
     bool print_close = false;
     if (output_mode == output_mode_xjson_plus && is_dictionary) {
@@ -439,6 +439,7 @@ void CollectionList::to_json(std::ostream& out, size_t link_depth, JSONOutputMod
         if (i > 0)
             out << ",";
         if (is_dictionary) {
+            REALM_ASSERT(string_keys);
             out << Mixed(string_keys->get(i)) << ":";
         }
         if (is_leaf) {
