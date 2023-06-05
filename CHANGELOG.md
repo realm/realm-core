@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix SessionWrapper use-after-free crash when tearing down sessions when using session multiplexing ([#6656](https://github.com/realm/realm-core/issues/6656), since v13.9.3)
 
 ### Breaking changes
 * None.
@@ -29,7 +29,6 @@
 ### Fixed
 * Fix the query parser needs to copy list of arguments and own the memory. ([#6674](https://github.com/realm/realm-core/pull/6674), since v12.5.0)
 * Fixed a potential crash when opening the realm after failing to download a fresh FLX realm during an automatic client reset ([#6494](https://github.com/realm/realm-core/issues/6494), since v12.3.0)
-* Fix SessionWrapper use-after-free crash when tearing down sessions ([#6656](https://github.com/realm/realm-core/issues/6656), since v13.9.3)
 
 ### Breaking changes
 * None.
