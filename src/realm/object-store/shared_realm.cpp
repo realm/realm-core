@@ -406,7 +406,9 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     Schema actual_schema = get_full_schema();
 
     // Frozen Realms never modify the schema on disk and we just need to verify
-    // that the requested schema is a subset of what actually exists
+    // that the requested schema is compatible with what actually exists on disk
+    // at that frozen version. Adding new tables is allowed as those can be backed
+    // by empty Results, breaking changes are not allowed.
     if (m_frozen_version) {
         ObjectStore::verify_compatible_for_immutable_and_readonly(
             actual_schema.compare(schema, m_config.schema_mode, true));

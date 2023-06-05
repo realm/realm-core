@@ -900,7 +900,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
         }
     }
 
-    SECTION("DiscardLocal: schema indexes match in before and after states") {
+    SECTION("Recover: schema indexes match in before and after states") {
         {
             config_local.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError) {
                 // ignore spurious failures on this instance
@@ -942,6 +942,19 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                         Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
                     REQUIRE(after);
                     REQUIRE(after->schema() == Schema(local_schema));
+                    // the above check is sufficent unless operator==() is changed to not care about ordering
+                    // so future proof that by explicitly checking the order of properties here as well
+                    REQUIRE(after->schema().size() == frozen_before->schema().size());
+                    auto after_it = after->schema().find("TopLevel");
+                    auto before_it = frozen_before->schema().find("TopLevel");
+                    REQUIRE(after_it != after->schema().end());
+                    REQUIRE(before_it != frozen_before->schema().end());
+                    REQUIRE(after_it->name == before_it->name);
+                    REQUIRE(after_it->persisted_properties.size() == before_it->persisted_properties.size());
+                    REQUIRE(after_it->persisted_properties[1].name == "queryable_int_field");
+                    REQUIRE(after_it->persisted_properties[2].name == "queryable_str_field");
+                    REQUIRE(before_it->persisted_properties[1].name == "queryable_int_field");
+                    REQUIRE(before_it->persisted_properties[2].name == "queryable_str_field");
                     REQUIRE(did_recover);
                     promise->emplace_value();
                 };
