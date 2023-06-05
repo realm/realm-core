@@ -1,4 +1,4 @@
-// swift-tools-version:5.5
+// swift-tools-version:5.6
 
 import PackageDescription
 import Foundation
@@ -348,21 +348,12 @@ let bidExcludes: [String] = [
     "wcstod64.c",
 ]
 
-#if swift(>=5.7)
 let platforms: [SupportedPlatform] = [
     .macOS(.v10_13),
     .iOS(.v11),
     .tvOS(.v11),
     .watchOS(.v4)
 ]
-#else
-let platforms: [SupportedPlatform] = [
-    .macOS(.v10_10),
-    .iOS(.v11),
-    .tvOS(.v9),
-    .watchOS(.v2)
-]
-#endif
 
 let package = Package(
     name: "RealmDatabase",
