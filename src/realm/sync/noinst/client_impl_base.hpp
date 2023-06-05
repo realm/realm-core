@@ -535,7 +535,7 @@ private:
 
     OutputBuffer& get_output_buffer() noexcept;
     Session* get_session(session_ident_type) const noexcept;
-    bool check_session_history(session_ident_type session_ident);
+    Session* find_and_validate_session(session_ident_type session_ident, std::string_view message) noexcept;
     static bool was_voluntary(ConnectionTerminationReason) noexcept;
 
     static std::string make_logger_prefix(connection_ident_type);

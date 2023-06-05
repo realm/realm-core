@@ -1616,8 +1616,10 @@ inline void SessionWrapper::abandon(util::bind_ptr<SessionWrapper> wrapper) noex
 void SessionWrapper::actualize(ServerEndpoint endpoint)
 {
     REALM_ASSERT(!m_actualized);
-    REALM_ASSERT(!m_finalized);
     REALM_ASSERT(!m_sess);
+    // Cannot be actualized if it's already been finalized or force closed
+    REALM_ASSERT(!m_finalized);
+    REALM_ASSERT(!m_force_closed);
     m_db->claim_sync_agent();
     auto sync_mode = endpoint.server_mode;
 
@@ -1980,7 +1982,7 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
     , m_ssl_verify_callback{std::move(ssl_verify_callback)}               // DEPRECATED
     , m_proxy_config{std::move(proxy_config)}                             // DEPRECATED
     , m_reconnect_info{reconnect_info}
-    , m_session_history{20}
+    , m_session_history{}
     , m_ident{ident}
     , m_server_endpoint{std::move(endpoint)}
     , m_authorization_header_name{authorization_header_name} // DEPRECATED
