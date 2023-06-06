@@ -2751,8 +2751,7 @@ typedef enum realm_auth_provider {
     RLM_AUTH_PROVIDER_CUSTOM,
     RLM_AUTH_PROVIDER_EMAIL_PASSWORD,
     RLM_AUTH_PROVIDER_FUNCTION,
-    RLM_AUTH_PROVIDER_USER_API_KEY,
-    RLM_AUTH_PROVIDER_SERVER_API_KEY,
+    RLM_AUTH_PROVIDER_API_KEY,
 } realm_auth_provider_e;
 
 typedef struct realm_app_user_apikey {
@@ -2828,8 +2827,7 @@ RLM_API realm_app_credentials_t* realm_app_credentials_new_apple(const char* id_
 RLM_API realm_app_credentials_t* realm_app_credentials_new_jwt(const char* jwt_token) RLM_API_NOEXCEPT;
 RLM_API realm_app_credentials_t* realm_app_credentials_new_email_password(const char* email,
                                                                           realm_string_t password) RLM_API_NOEXCEPT;
-RLM_API realm_app_credentials_t* realm_app_credentials_new_user_api_key(const char* api_key) RLM_API_NOEXCEPT;
-RLM_API realm_app_credentials_t* realm_app_credentials_new_server_api_key(const char* api_key) RLM_API_NOEXCEPT;
+RLM_API realm_app_credentials_t* realm_app_credentials_new_api_key(const char* api_key) RLM_API_NOEXCEPT;
 
 /**
  * Create Custom Function authentication app credentials.

@@ -9,7 +9,7 @@
 * None.
 
 ### Breaking changes
-* None.
+* A new provider called `IdentityProviderAPIKey` replaces both `IdentityProviderUserAPIKey` and `IdentityProviderServerAPIKey` since those two did the same thing. If SDKs wish to keep the old behaviour without requiring users to make code changes, they can adapt both their existing server and user API key providers to use the new core type. ([#5914](https://github.com/realm/realm-core/issues/5914))
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
