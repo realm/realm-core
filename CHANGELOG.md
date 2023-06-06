@@ -23,6 +23,7 @@
 * Refactored version resolution for the `build-apple-device.sh` script. ([#7263](https://github.com/realm/realm-core/pull/7263))
 * Remove SyncUser::binding_context() and related things, which were not actually used by any SDKs.
 * (bindgen) Upgrade `eslint-config-prettier` & `eslint-plugin-prettier` and add a missing peer dependency on `prettier`.
+* The minimum CMake version has changed from 3.15 to 3.22.1. ([#6537](https://github.com/realm/realm-core/issues/6537))
 
 ----------------------------------------------
 
