@@ -2190,31 +2190,29 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
 
     level++;
 
-    auto fetch_collection = [&](Mixed ref, const PathElement& path_elem) -> CollectionBasePtr {
-        if (ref.is_type(type_List))
-            return collection->get_list(path_elem);
-        else if (ref.is_type(type_Dictionary))
-            return collection->get_dictionary(path_elem);
-        else
-            throw InvalidArgument("Wrong path");
-    };
-
     while (level < path.size()) {
         auto& index = path[level];
-        Mixed ref;
-        PathElement path_elem;
-        if (collection->get_collection_type() == CollectionType::List) {
-            auto list_of_mixed = dynamic_cast<Lst<Mixed>*>(collection.get());
-            size_t ndx = list_of_mixed->find_key(mpark::get<int64_t>(index));
-            PathElement path_elem{ndx};
-            ref = list_of_mixed->get(ndx);
-            collection = fetch_collection(ref, path_elem);
+        auto get_ref = [&]() -> std::pair<Mixed, PathElement> {
+            if (collection->get_collection_type() == CollectionType::List) {
+                auto list_of_mixed = dynamic_cast<Lst<Mixed>*>(collection.get());
+                size_t ndx = list_of_mixed->find_key(mpark::get<int64_t>(index));
+                return {list_of_mixed->get(ndx), PathElement(ndx)};
+            }
+            else {
+                std::string key = mpark::get<std::string>(index);
+                auto ref = dynamic_cast<Dictionary*>(collection.get())->get(key);
+                return {ref, StringData(key)};
+            }
+        };
+        auto [ref, path_elem] = get_ref();
+        if (ref.is_type(type_List)) {
+            collection = collection->get_list(path_elem);
+        }
+        else if (ref.is_type(type_Dictionary)) {
+            collection = collection->get_dictionary(path_elem);
         }
         else {
-            const std::string& key = mpark::get<std::string>(index);
-            PathElement path_elem{StringData(key)};
-            ref = dynamic_cast<Dictionary*>(collection.get())->get(key);
-            collection = fetch_collection(ref, path_elem);
+            return nullptr;
         }
         level++;
     }

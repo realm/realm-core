@@ -172,17 +172,8 @@ struct PathElement {
         return string_val;
     }
 
-    PathElement& operator=(const PathElement& other)
-    {
-        m_type = other.m_type;
-        if (other.m_type == Type::key) {
-            string_val = other.string_val;
-        }
-        else {
-            int_val = other.int_val;
-        }
-        return *this;
-    }
+    PathElement& operator=(const PathElement& other) = delete;
+
     bool operator==(const PathElement& other) const
     {
         if (m_type == other.m_type) {

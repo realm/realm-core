@@ -47,12 +47,11 @@ void ListNotifier::reattach()
 void ListNotifier::attach(CollectionBase const& src)
 {
     auto& tr = transaction();
-    try {
-        auto obj = tr.get_table(src.get_table()->get_key())->get_object(src.get_owner_key());
+    if (auto obj = tr.get_table(src.get_table()->get_key())->try_get_object(src.get_owner_key())) {
         auto path = src.get_stable_path();
         m_list = std::static_pointer_cast<CollectionBase>(obj.get_collection_by_stable_path(path));
     }
-    catch (const KeyNotFound&) {
+    else {
         m_list = nullptr;
     }
 }
