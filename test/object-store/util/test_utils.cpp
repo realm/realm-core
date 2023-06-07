@@ -129,7 +129,7 @@ std::string encode_fake_jwt(const std::string& in, util::Optional<int64_t> exp, 
     using namespace std::chrono_literals;
     if (!exp) {
         std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
-        exp = std::chrono::system_clock::to_time_t(now + 30min);
+        exp = std::chrono::system_clock::to_time_t(now + 60min);
     }
     if (!iat) {
         std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
