@@ -64,13 +64,18 @@ static bool type_is_valid(realm::StringData str_type)
 
 namespace realm {
 
+GeoPolygon GeoBox::to_polygon() const
+{
+    // We rely on the inversion rule here to ignore ordering of points.
+    // ie: A polygon that encompases more than a hemisphere is inverted.
+    return GeoPolygon{{{lo, GeoPoint{lo.longitude, hi.latitude}, hi, GeoPoint{hi.longitude, lo.latitude}, lo}}};
+}
+
 std::string Geospatial::get_type_string() const noexcept
 {
     switch (get_type()) {
         case Type::Point:
             return "Point";
-        case Type::Box:
-            return "Box";
         case Type::Polygon:
             return "Polygon";
         case Type::Circle:
@@ -228,7 +233,6 @@ Status Geospatial::is_valid() const noexcept
 {
     switch (get_type()) {
         case Type::Polygon:
-        case Type::Box:
         case Type::Circle:
             return get_region().get_conversion_status();
         default:
@@ -253,9 +257,6 @@ std::string Geospatial::to_string() const
     return mpark::visit(
         util::overload{[](const GeoPoint& point) {
                            return util::format("GeoPoint(%1)", point_str(point));
-                       },
-                       [](const GeoBox& box) {
-                           return util::format("GeoBox(%1, %2)", point_str(box.lo), point_str(box.hi));
                        },
                        [](const GeoPolygon& poly) {
                            std::string points = "";
@@ -455,22 +456,6 @@ GeoRegion::GeoRegion(const Geospatial& geo)
             m_status_out = Status::OK();
         }
         Status& m_status_out;
-        std::unique_ptr<S2Region> operator()(const GeoBox& box) const
-        {
-            S2Point s2_lo, s2_hi;
-            m_status_out = coord_to_point(box.lo.longitude, box.lo.latitude, s2_lo);
-            if (!m_status_out.is_ok())
-                return nullptr;
-            m_status_out = coord_to_point(box.hi.longitude, box.hi.latitude, s2_hi);
-            if (!m_status_out.is_ok())
-                return nullptr;
-            auto ret = std::make_unique<S2LatLngRect>(S2LatLng(s2_lo), S2LatLng(s2_hi));
-            if (!ret->is_valid()) {
-                m_status_out = Status(ErrorCodes::InvalidQueryArg, "Invalid rectangle");
-                return nullptr;
-            }
-            return ret;
-        }
 
         std::unique_ptr<S2Region> operator()(const GeoPolygon& polygon) const
         {

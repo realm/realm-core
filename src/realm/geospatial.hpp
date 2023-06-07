@@ -80,20 +80,6 @@ struct GeoPoint {
     }
 };
 
-// Construct a rectangle from minimum and maximum latitudes and longitudes.
-// If lo.lng() > hi.lng(), the rectangle spans the 180 degree longitude
-// line. Both points must be normalized, with lo.lat() <= hi.lat().
-// The rectangle contains all the points p such that 'lo' <= p <= 'hi',
-// where '<=' is defined in the obvious way.
-struct GeoBox {
-    GeoPoint lo;
-    GeoPoint hi;
-    bool operator==(const GeoBox& other) const
-    {
-        return lo == other.lo && hi == other.hi;
-    }
-};
-
 // A simple spherical polygon. It consists of a single
 // chain of vertices where the first vertex is implicitly connected to the
 // last. Chain of vertices is defined to have a CCW orientation, i.e. the interior
@@ -109,6 +95,20 @@ struct GeoPolygon {
         return points == other.points;
     }
     std::vector<std::vector<GeoPoint>> points;
+};
+
+// This is a shortcut for creating a polygon with a "rectangular" shape. It is just
+// syntatic sugar for making a viewport like region such as a device screen. The
+// ordering of points does not matter. Results are undefined if the intended region
+// wraps a pole.
+struct GeoBox {
+    GeoPoint lo;
+    GeoPoint hi;
+    bool operator==(const GeoBox& other) const
+    {
+        return lo == other.lo && hi == other.hi;
+    }
+    GeoPolygon to_polygon() const;
 };
 
 struct GeoCircle {
@@ -145,7 +145,7 @@ private:
 
 class Geospatial {
 public:
-    enum class Type : uint8_t { Invalid, Point, Box, Polygon, Circle };
+    enum class Type : uint8_t { Invalid, Point, Polygon, Circle };
 
     Geospatial()
         : m_value(mpark::monostate{})
@@ -156,7 +156,7 @@ public:
     {
     }
     Geospatial(GeoBox box)
-        : m_value(box)
+        : m_value(box.to_polygon())
     {
     }
     Geospatial(GeoPolygon polygon)
@@ -218,7 +218,7 @@ public:
 
 private:
     // Must be in the same order as the Type enum
-    mpark::variant<mpark::monostate, GeoPoint, GeoBox, GeoPolygon, GeoCircle> m_value;
+    mpark::variant<mpark::monostate, GeoPoint, GeoPolygon, GeoCircle> m_value;
 
     friend class GeoRegion;
 
@@ -230,12 +230,6 @@ template <>
 inline const GeoCircle& Geospatial::get<GeoCircle>() const noexcept
 {
     return mpark::get<GeoCircle>(m_value);
-}
-
-template <>
-inline const GeoBox& Geospatial::get<GeoBox>() const noexcept
-{
-    return mpark::get<GeoBox>(m_value);
 }
 
 template <>
