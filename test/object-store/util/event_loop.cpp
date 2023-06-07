@@ -26,7 +26,7 @@
 #include <stdexcept>
 #include <vector>
 
-#if REALM_USE_UV
+#if TEST_SCHEDULER_UV
 #include <uv.h>
 #elif REALM_PLATFORM_APPLE
 #include <realm/util/cf_ptr.hpp>
@@ -87,7 +87,7 @@ struct EventLoop::Impl {
     ~Impl();
 
 private:
-#if REALM_USE_UV
+#if TEST_SCHEDULER_UV
     Impl(uv_loop_t* loop);
 
     std::vector<util::UniqueFunction<void()>> m_pending_work;
@@ -132,7 +132,7 @@ void EventLoop::run_pending()
     return m_impl->run_pending();
 }
 
-#if REALM_USE_UV
+#if TEST_SCHEDULER_UV
 
 bool EventLoop::has_implementation()
 {
