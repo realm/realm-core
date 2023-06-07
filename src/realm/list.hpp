@@ -354,7 +354,11 @@ public:
     {
         return m_tree->get_key(ndx);
     }
-
+    size_t find_key(int64_t key)
+    {
+        update();
+        return m_tree->find_key(key);
+    }
 
     // Overriding members of CollectionBase:
     size_t size() const final
@@ -492,6 +496,7 @@ public:
 
     Path get_short_path() const override
     {
+        update();
         return Base::get_short_path();
     }
 
@@ -535,10 +540,16 @@ private:
         size_t find_key(int64_t key) const noexcept
         {
             size_t ret = realm::npos;
-            auto func = [&](BPlusTreeNode* node, size_t) {
+            auto func = [&](BPlusTreeNode* node, size_t offset) {
                 LeafNode* leaf = static_cast<LeafNode*>(node);
-                ret = leaf->find_key(key);
-                return ret == realm::not_found ? IteratorControl::AdvanceToNext : IteratorControl::Stop;
+                auto pos = leaf->find_key(key);
+                if (pos != realm::not_found) {
+                    ret = pos + offset;
+                    return IteratorControl::Stop;
+                }
+                else {
+                    return IteratorControl::AdvanceToNext;
+                }
             };
 
             m_root->bptree_traverse(func);

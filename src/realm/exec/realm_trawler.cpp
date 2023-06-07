@@ -26,6 +26,7 @@
 #include <realm/data_type.hpp>
 #include <realm/table.hpp>
 #include <realm/impl/transact_log.hpp>
+#include <realm/collection_parent.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -1011,7 +1012,7 @@ public:
         return true;
     }
 
-    bool select_collection(realm::ColKey col_key, realm::ObjKey key)
+    bool select_collection(realm::ColKey col_key, realm::ObjKey key, const StablePath&)
     {
         std::cout << "Select collection: " << m_table->get_column_name(col_key) << " on " << key << std::endl;
         return true;

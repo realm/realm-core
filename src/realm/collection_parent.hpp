@@ -72,7 +72,6 @@ enum class UpdateStatus {
     NoChange,
 };
 
-
 // Given an object as starting point, a collection can be identified by
 // a sequence of PathElements. The first element should always be a
 // column key. The next elements are either an index into a list or a key
@@ -84,6 +83,11 @@ struct PathElement {
     };
     enum Type { column, key, index } m_type;
 
+    PathElement()
+        : int_val(-1)
+        , m_type(Type::column)
+    {
+    }
     PathElement(ColKey col_key)
         : int_val(col_key.value)
         , m_type(Type::column)
@@ -168,17 +172,8 @@ struct PathElement {
         return string_val;
     }
 
-    PathElement& operator=(const PathElement& other)
-    {
-        m_type = other.m_type;
-        if (other.m_type == Type::key) {
-            string_val = other.string_val;
-        }
-        else {
-            int_val = other.int_val;
-        }
-        return *this;
-    }
+    PathElement& operator=(const PathElement& other) = delete;
+
     bool operator==(const PathElement& other) const
     {
         if (m_type == other.m_type) {

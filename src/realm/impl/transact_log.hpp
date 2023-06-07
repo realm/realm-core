@@ -134,7 +134,7 @@ public:
     {
         return true;
     }
-    bool select_collection(ColKey, ObjKey, const std::vector<PathElement>&)
+    bool select_collection(ColKey, ObjKey, const StablePath&)
     {
         return true;
     }
@@ -248,7 +248,7 @@ public:
     bool set_link_type(ColKey col_key);
 
     // Must have collection selected:
-    bool select_collection(ColKey col_key, ObjKey key, const std::vector<PathElement>& path);
+    bool select_collection(ColKey col_key, ObjKey key, const StablePath& path);
     bool collection_set(size_t collection_ndx);
     bool collection_insert(size_t ndx);
     bool collection_move(size_t from_ndx, size_t to_ndx);
@@ -792,16 +792,16 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             ColKey col_key = ColKey(read_int<int64_t>()); // Throws
             ObjKey key = ObjKey(read_int<int64_t>());     // Throws
             size_t nesting_level = instr == instr_SelectCollectionByPath ? read_int<uint32_t>() : 0;
-            Path path;
+            StablePath path;
             path.push_back(col_key);
             for (size_t l = 0; l < nesting_level; l++) {
                 auto ndx = read_int<int64_t>();
-                if (ndx < 0) {
+                if (ndx == 0) {
                     auto key = read_string(m_string_buffer);
                     path.emplace_back(key);
                 }
                 else {
-                    path.emplace_back(size_t(ndx));
+                    path.emplace_back(ndx);
                 }
             }
             if (!handler.select_collection(col_key, key, path)) // Throws
@@ -862,8 +862,8 @@ T TransactLogParser::read_int()
 {
     T value = 0;
     int part = 0;
-    const int max_bytes = (std::numeric_limits<T>::digits + 1 + 6) / 7;
-    for (int i = 0; i != max_bytes; ++i) {
+    const int max_bytes = (std::numeric_limits<T>::digits + 7) / 7;
+    for (int i = 0; i <= max_bytes; ++i) {
         char c;
         if (!read_char(c))
             parser_error(); // Input ended early
@@ -978,7 +978,7 @@ public:
         return {m_current_linkview_col, m_current_linkview_obj};
     }
 
-    const std::vector<PathElement>& get_path() const
+    const StablePath& get_path() const
     {
         return m_path;
     }
@@ -987,7 +987,7 @@ private:
     TableKey m_current_table;
     ColKey m_current_linkview_col;
     ObjKey m_current_linkview_obj;
-    std::vector<PathElement> m_path;
+    StablePath m_path;
 
 public:
     void parse_complete() {}
@@ -998,7 +998,7 @@ public:
         return true;
     }
 
-    bool select_collection(ColKey col_key, ObjKey obj_key, const std::vector<PathElement>& path)
+    bool select_collection(ColKey col_key, ObjKey obj_key, const StablePath& path)
     {
         m_current_linkview_col = col_key;
         m_current_linkview_obj = obj_key;

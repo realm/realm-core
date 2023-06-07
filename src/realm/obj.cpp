@@ -2081,9 +2081,8 @@ CollectionListPtr Obj::get_collection_list(ColKey col_key) const
 CollectionPtr Obj::get_collection_ptr(const Path& path) const
 {
     REALM_ASSERT(path.size() > 0);
-
     // First element in path must be column name
-    auto col_key = m_table->get_column_key(path[0].get_key());
+    auto col_key = path[0].is_col_key() ? path[0].get_col_key() : m_table->get_column_key(path[0].get_key());
     REALM_ASSERT(col_key);
     size_t nesting_levels = m_table->get_nesting_levels(col_key);
     CollectionListPtr list;
@@ -2154,6 +2153,66 @@ CollectionPtr Obj::get_collection_ptr(const Path& path) const
         }
         else if (ref.is_type(type_Dictionary)) {
             collection = collection->get_dictionary(path_elem);
+        }
+        else {
+            throw InvalidArgument("Wrong path");
+        }
+        level++;
+    }
+
+    return collection;
+}
+
+CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
+{
+    // First element in path is column key
+    auto col_key = mpark::get<ColKey>(path[0]);
+    size_t nesting_levels = m_table->get_nesting_levels(col_key);
+    CollectionListPtr list;
+    size_t level = 0;
+    while (nesting_levels > 0) {
+        if (!list) {
+            list = get_collection_list(col_key);
+        }
+        else {
+            list = list->get_collection_list_by_index(path[level]);
+        }
+        level++;
+        nesting_levels--;
+    }
+    CollectionBasePtr collection;
+    if (list) {
+        collection = list->get_collection_by_index(path[level]);
+    }
+    else {
+        collection = get_collection_ptr(col_key);
+    }
+
+    level++;
+
+    while (level < path.size()) {
+        auto& index = path[level];
+        auto get_ref = [&]() -> std::pair<Mixed, PathElement> {
+            if (collection->get_collection_type() == CollectionType::List) {
+                auto list_of_mixed = dynamic_cast<Lst<Mixed>*>(collection.get());
+                size_t ndx = list_of_mixed->find_key(mpark::get<int64_t>(index));
+                return {list_of_mixed->get(ndx), PathElement(ndx)};
+            }
+            else {
+                std::string key = mpark::get<std::string>(index);
+                auto ref = dynamic_cast<Dictionary*>(collection.get())->get(key);
+                return {ref, StringData(key)};
+            }
+        };
+        auto [ref, path_elem] = get_ref();
+        if (ref.is_type(type_List)) {
+            collection = collection->get_list(path_elem);
+        }
+        else if (ref.is_type(type_Dictionary)) {
+            collection = collection->get_dictionary(path_elem);
+        }
+        else {
+            return nullptr;
         }
         level++;
     }

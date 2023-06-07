@@ -2120,7 +2120,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 CHECK(o == o1 || o == o0);
                 return true;
             }
-            bool select_collection(ColKey col, ObjKey o, const std::vector<PathElement>&)
+            bool select_collection(ColKey col, ObjKey o, const StablePath&)
             {
                 CHECK(col == link_list_col);
                 CHECK(o == okey);
