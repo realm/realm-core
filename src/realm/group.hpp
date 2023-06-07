@@ -326,6 +326,7 @@ public:
     void rename_table(StringData name, StringData new_name, bool require_unique_name = true);
 
     Obj get_object(ObjLink link);
+    Obj try_get_object(ObjLink link) noexcept;
     void validate(ObjLink link) const;
 
     //@}
@@ -1326,7 +1327,9 @@ public:
     {
         // Nullify immediately if we don't need to send cascade notifications
         if (!notification_handler()) {
-            src_table.get_object(origin_key).nullify_link(src_col_key, target_link);
+            if (Obj obj = src_table.try_get_object(origin_key)) {
+                std::move(obj).nullify_link(src_col_key, target_link);
+            }
             return;
         }
 

@@ -5534,7 +5534,7 @@ TEST(Table_EmbeddedObjectCreateAndDestroyDictionary)
     CHECK(table->size() == 6);
     parent_dict.create_and_insert_linked_object("one"); // implicitly remove entry for 02
     CHECK(!o2.is_valid());
-    CHECK(table->size() == 4);
+    CHECK_EQUAL(table->size(), 4);
     parent_dict.clear();
     CHECK(table->size() == 0);
     parent_dict.create_and_insert_linked_object("four");

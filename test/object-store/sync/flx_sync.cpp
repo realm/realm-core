@@ -30,6 +30,10 @@
 #include "realm/object-store/impl/realm_coordinator.hpp"
 #include "realm/object-store/schema.hpp"
 #include "realm/object-store/sync/generic_network_transport.hpp"
+#include <realm/object-store/sync/mongo_client.hpp>
+#include <realm/object-store/sync/mongo_database.hpp>
+#include <realm/object-store/sync/mongo_collection.hpp>
+#include <realm/object-store/util/bson/bson.hpp>
 #include "realm/object-store/sync/sync_session.hpp"
 #include "realm/object_id.hpp"
 #include "realm/query_expression.hpp"
@@ -1281,35 +1285,124 @@ TEST_CASE("flx: geospatial", "[sync][flx][app]") {
             auto subs = create_subscription(realm, "class_restaurant", "queryable_str_field", [](Query q, ColKey c) {
                 return q.equal(c, "synced");
             });
+            auto make_polygon_filter = [&](const GeoPolygon& polygon) -> bson::BsonDocument {
+                bson::BsonArray inner{};
+                REALM_ASSERT_3(polygon.points.size(), ==, 1);
+                for (auto& point : polygon.points[0]) {
+                    inner.push_back(bson::BsonArray{point.longitude, point.latitude});
+                }
+                bson::BsonArray coords;
+                coords.push_back(inner);
+                bson::BsonDocument geo_bson{{{"type", "Polygon"}, {"coordinates", coords}}};
+                bson::BsonDocument filter{
+                    {"location", bson::BsonDocument{{"$geoWithin", bson::BsonDocument{{"$geometry", geo_bson}}}}}};
+                return filter;
+            };
+            auto make_circle_filter = [&](const GeoCircle& circle) -> bson::BsonDocument {
+                bson::BsonArray coords{circle.center.longitude, circle.center.latitude};
+                bson::BsonArray inner;
+                inner.push_back(coords);
+                inner.push_back(circle.radius_radians);
+                bson::BsonDocument filter{
+                    {"location", bson::BsonDocument{{"$geoWithin", bson::BsonDocument{{"$centerSphere", inner}}}}}};
+                return filter;
+            };
+            auto run_query_on_server = [&](const bson::BsonDocument& filter,
+                                           std::optional<std::string> expected_error = {}) -> size_t {
+                auto remote_client = harness->app()->current_user()->mongo_client("BackingDB");
+                auto db = remote_client.db(harness->session().app_session().config.mongo_dbname);
+                auto restaurant_collection = db["restaurant"];
+                bool processed = false;
+                constexpr int64_t limit = 1000;
+                size_t matches = 0;
+                restaurant_collection.count(filter, limit, [&](uint64_t count, util::Optional<AppError> error) {
+                    processed = true;
+                    if (error) {
+                        if (!expected_error) {
+                            util::format(std::cout, "query error: %1\n", error->reason());
+                            FAIL(error);
+                        }
+                        else {
+                            std::string_view reason = error->reason();
+                            auto pos = reason.find(*expected_error);
+                            if (pos == std::string::npos) {
+                                util::format(std::cout, "mismatch error: '%1' and '%2'\n", reason, *expected_error);
+                                FAIL(reason);
+                            }
+                        }
+                    }
+                    matches = size_t(count);
+                });
+                REQUIRE(processed);
+                return matches;
+            };
             auto sub_res = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
             CHECK(sub_res.is_ok());
             CHECK(realm->get_active_subscription_set().version() == 1);
             CHECK(realm->get_latest_subscription_set().version() == 1);
 
             realm->begin_transaction();
+
             CppContext c(realm);
-            Object::create(
-                c, realm, "restaurant",
-                std::any(AnyDict{{"_id", INT64_C(1)},
-                                 {"queryable_str_field", "synced"s},
-                                 {"location", AnyDict{{"type", "Point"s},
-                                                      {"coordinates", std::vector<std::any>{1.1, 2.2, 3.3}}}}}));
+            int64_t pk = 0;
+            auto add_point = [&](GeoPoint p) {
+                Object::create(
+                    c, realm, "restaurant",
+                    std::any(AnyDict{
+                        {"_id", ++pk},
+                        {"queryable_str_field", "synced"s},
+                        {"location", AnyDict{{"type", "Point"s},
+                                             {"coordinates", std::vector<std::any>{p.longitude, p.latitude}}}}}));
+            };
+            std::vector<GeoPoint> points = {
+                GeoPoint{-74.006, 40.712800000000001}, GeoPoint{12.568300000000001, 55.676099999999998},
+                GeoPoint{12.082599999999999, 55.628}, GeoPoint{-180.1, -90.1}, // invalid
+            };
+            for (auto& point : points) {
+                add_point(point);
+            }
             realm->commit_transaction();
             wait_for_upload(*realm);
 
             {
                 auto table = realm->read_group().get_table("class_restaurant");
-                CHECK(table->size() == 1);
+                CHECK(table->size() == points.size());
                 Obj obj = table->get_object_with_primary_key(Mixed{1});
                 REQUIRE(obj);
                 Geospatial geo = obj.get<Geospatial>("location");
                 REQUIRE(geo.get_type_string() == "Point");
                 REQUIRE(geo.get_type() == Geospatial::Type::Point);
                 GeoPoint point = geo.get<GeoPoint>();
-                REQUIRE(point.longitude == 1.1);
-                REQUIRE(point.latitude == 2.2);
-                REQUIRE(point.get_altitude());
-                REQUIRE(*point.get_altitude() == 3.3);
+                REQUIRE(point.longitude == points[0].longitude);
+                REQUIRE(point.latitude == points[0].latitude);
+                REQUIRE(!point.get_altitude());
+                ColKey location_col = table->get_column_key("location");
+                GeoPolygon bounds{
+                    {GeoPoint{-80, 40.7128}, GeoPoint{20, 60}, GeoPoint{20, 20}, GeoPoint{-80, 40.7128}}};
+                Query query = table->column<Link>(location_col).geo_within(Geospatial(bounds));
+                size_t local_matches = query.find_all().size();
+                REQUIRE(local_matches == 2);
+
+                reset_utils::wait_for_num_objects_in_atlas(
+                    harness->app()->current_user(), harness->session().app_session(), "restaurant", points.size());
+
+                bson::BsonDocument filter = make_polygon_filter(bounds);
+                size_t server_results = run_query_on_server(filter);
+                CHECK(server_results == local_matches);
+
+                GeoCircle circle = GeoCircle::from_kms(10, GeoPoint{-180.1, -90.1});
+                CHECK_THROWS_WITH(table->column<Link>(location_col).geo_within(circle).count(),
+                                  "Invalid region in GEOWITHIN query for parameter 'GeoCircle([-180.1, -90.1], "
+                                  "0.00156787)': 'Longitude/latitude is out of bounds, lng: -180.1 lat: -90.1'");
+                filter = make_circle_filter(circle);
+                run_query_on_server(filter, "(BadValue) longitude/latitude is out of bounds");
+
+                circle = GeoCircle::from_kms(-1, GeoPoint{0, 0});
+                CHECK_THROWS_WITH(table->column<Link>(location_col).geo_within(circle).count(),
+                                  "Invalid region in GEOWITHIN query for parameter 'GeoCircle([0, 0], "
+                                  "-0.000156787)': 'The radius of a circle must be a non-negative number'");
+                filter = make_circle_filter(circle);
+                run_query_on_server(filter, "(BadValue) radius must be a non-negative number");
             }
         });
     }
