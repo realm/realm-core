@@ -1,6 +1,7 @@
 # yaml-language-server: $schema=generated/spec.schema.json
 
 headers:
+  - "realm_helpers.h"
   - "realm/sync/config.hpp"
   - "realm/sync/subscriptions.hpp"
   - "realm/object-store/shared_realm.hpp"
@@ -455,6 +456,7 @@ records:
       query_string: std::string
 
   ObjectChangeSet:
+    cppName: Helpers::ObjectChangeSet
     fields:
       is_deleted: bool
       changed_columns: std::vector<ColKey>
@@ -539,9 +541,9 @@ records:
        type: std::error_code
        cppName: get_system_error()
      is_fatal: bool
-     simple_message: StringData
-     logURL: StringData
-     user_info: std::unordered_map<StringData, StringData>
+     simple_message: std::string_view
+     logURL: std::string_view
+     user_info: std::unordered_map<std::string, std::string>
      is_unrecognized_by_client:
        type: bool
        default: false
@@ -605,7 +607,6 @@ records:
 
 opaqueTypes:
   - Schema
-  - Group
   - AuditInterface
 
 classes:
@@ -629,15 +630,15 @@ classes:
       make_network_transport: '(runRequest: (request: const Request&, callback: util::UniqueFunction<(response: Response&&)>&&) off_thread) -> SharedGenericNetworkTransport'
       delete_data_for_object: '(realm: SharedRealm, object_type: StringData)'
       is_empty_realm: '(realm: SharedRealm) -> bool'
-      base64_decode: '(input: StringData) -> BinaryData'
+      base64_decode: '(input: StringData) -> OwnedBinaryData'
       make_logger_factory: '(log: (level: LoggerLevel, message: const std::string&) off_thread) -> LoggerFactory'
       make_logger:  '(log: (level: LoggerLevel, message: const std::string&) off_thread) -> SharedLogger'
       simulate_sync_error: '(session: SyncSession&, code: const int&, message: const std::string&, type: const std::string&, is_fatal: bool)'
-      consume_thread_safe_reference_to_shared_realm: '(tsr: ThreadSafeReference) -> SharedRealm'
+      consume_thread_safe_reference_to_shared_realm: '(tsr: ThreadSafeReference&) -> SharedRealm'
       file_exists: '(path: StringData) -> bool'
       erase_subscription: '(subs: MutableSyncSubscriptionSet&, sub_to_remove: const SyncSubscription&) -> bool'
       # This is added due to DescriptorOrdering not being exposed
-      get_results_description: '(results: const Results&) -> StringData'
+      get_results_description: '(results: const Results&) -> std::string'
       feed_buffer: '(ws: WatchStream&, buffer: BinaryData)'
       # Converts char* and length to a combined string_view argument to callback.
       # TODO: Consider making preverify_ok a bool.
@@ -708,29 +709,6 @@ classes:
   Transaction:
     sharedPtrWrapped: TransactionRef
 
-  ObjectStore:
-    staticMethods:
-      get_schema_version: '(group: Group) -> SchemaVersion'
-      set_schema_version: '(group: Group, version: SchemaVersion)'
-      #    verify_no_migration_required: '(changes: std::vector<SchemaChange>)'
-      #needs_migration: '(changes: std::vector<SchemaChange>) -> bool'
-      #verify_valid_additive_changes:
-      #  - '(changes: std::vector<SchemaChange>) -> bool'
-      #  - suffix: and_update_indexes
-      #    sig: '(changes: std::vector<SchemaChange>, update_indexes: bool) -> bool'
-      #verify_valid_external_changes: '(changes: std::vector<SchemaChange>)'
-      #verify_compatible_for_immutable_and_readonly: '(changes: std::vector<SchemaChange>)'
-      #verify_no_changes_required: '(changes: std::vector<SchemaChange>)'
-
-      # apply_schema_changes: '(group: Transaction&, schema_version: SchemaVersion, target_schema: Schema&, target_schema_version: SchemaVersion, mode: SchemaMode, changes: std::vector<SchemaChange>, migration_function: () -> void)'
-      # apply_additive_changes: '(group: Group&, changes: std::vector<SchemaChanges>, update_indexes: bool)'
-      # table_for_object_type
-      # table_for_Schema_type
-
-      schema_from_group: '(group: Group) -> std::vector<ObjectSchema>'
-
-      # some more...
-
   # TODO should this be nullable or always non-null?
   Timestamp:
     constructors:
@@ -752,7 +730,7 @@ classes:
   Query:
     properties:
       get_table: ConstTableRef
-      get_description: StringData
+      get_description: std::string
     methods:
       count: () const -> count_t
 
@@ -782,9 +760,9 @@ classes:
       get_type: PropertyType
     methods:
       size: () -> count_t
-      index_of:
-        - sig: '(value: Mixed) const -> count_t'
-        - sig: '(obj: Obj) const -> count_t'
+      index_of: # TODO should these be const?
+        - sig: '(value: Mixed) -> count_t'
+        - sig: '(obj: Obj) -> count_t'
           suffix: 'obj'
       get: # NOTE: this is actually a template with a defaulted template param.
         - sig: '(index: count_t) -> Obj'
@@ -798,7 +776,7 @@ classes:
           suffix: by_names
       limit: '(max_count: count_t) const -> Results'
       snapshot: '() const -> Results'
-      freeze: '(frozen_realm: SharedRealm) const -> Results'
+      freeze: '(frozen_realm: SharedRealm) -> Results' # TODO const
       max: '(column: ColKey) -> util::Optional<Mixed>'
       min: '(column: ColKey) -> util::Optional<Mixed>'
       average: '(column: ColKey) -> util::Optional<Mixed>'
@@ -853,7 +831,6 @@ classes:
       cancel_transaction: ()
       freeze: () -> SharedRealm
       last_seen_transaction_version: () -> uint64_t
-      read_group: () -> Group&
       duplicate: () -> TransactionRef
 
       update_schema: '(schema: std::vector<ObjectSchema>, version: SchemaVersion, migration_function: Nullable<std::function<(old_realm: SharedRealm, new_realm: SharedRealm, new_schema_handle: IgnoreArgument<Schema&>) -> void>>, initialization_function: Nullable<std::function<(realm: SharedRealm) -> void>>, in_transaction: bool) -> void'
@@ -1078,7 +1055,6 @@ classes:
   SyncUser:
     sharedPtrWrapped: SharedSyncUser
     properties:
-      all_sessions: std::vector<SharedSyncSession>
       is_logged_in: bool
       identity: const std::string&
       provider_type: const std::string&
@@ -1095,6 +1071,7 @@ classes:
       subscribers_count: count_t
     methods:
       log_out: ()
+      all_sessions: () -> std::vector<SharedSyncSession>
       session_for_on_disk_path: '(path: StringData) -> Nullable<SharedSyncSession>'
       subscribe: '(observer: (user: IgnoreArgument<const SyncUser&>)) -> SyncUserSubscriptionToken'
       unsubscribe: '(token: SyncUserSubscriptionToken)'
@@ -1217,7 +1194,7 @@ classes:
       set_timeouts: '(timeouts: SyncClientTimeouts)'
       reconnect: ()
       wait_for_sessions_to_terminate: ()
-      path_for_realm: '(config: SyncConfig, custom_file_name: util::Optional<std::string>) -> StringData'
+      path_for_realm: '(config: SyncConfig, custom_file_name: util::Optional<std::string>) -> std::string'
       get_existing_active_session: '(path: const std::string&) -> SharedSyncSession'
 
   ThreadSafeReference: {}
@@ -1234,7 +1211,7 @@ classes:
     properties:
       state: SyncSessionState
       connection_state: SyncSessionConnectionState
-      path: std::string
+      path: const std::string&
       user: SharedSyncUser
       config: SyncConfig
       full_realm_url: util::Optional<std::string>

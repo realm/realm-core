@@ -194,7 +194,7 @@ std::shared_ptr<SyncSession> Realm::sync_session() const
     return m_coordinator ? m_coordinator->sync_session() : nullptr;
 }
 
-sync::SubscriptionSet Realm::get_latest_subscription_set()
+sync::SubscriptionSet Realm::get_latest_subscription_set() const
 {
     if (!m_config.sync_config || !m_config.sync_config->flx_sync_requested) {
         throw IllegalOperation("Flexible sync is not enabled");
@@ -205,7 +205,7 @@ sync::SubscriptionSet Realm::get_latest_subscription_set()
     return flx_sub_store->get_latest();
 }
 
-sync::SubscriptionSet Realm::get_active_subscription_set()
+sync::SubscriptionSet Realm::get_active_subscription_set() const
 {
     if (!m_config.sync_config || !m_config.sync_config->flx_sync_requested) {
         throw IllegalOperation("Flexible sync is not enabled");

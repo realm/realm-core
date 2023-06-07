@@ -157,11 +157,14 @@ inline constexpr SchemaSubsetMode SchemaSubsetMode::AllProperties = {false, true
 inline constexpr SchemaSubsetMode SchemaSubsetMode::Complete = {true, true};
 
 
-class Schema : private std::vector<ObjectSchema> {
+class Schema {
 private:
     using base = std::vector<ObjectSchema>;
 
 public:
+    using iterator = base::iterator;
+    using const_iterator = base::const_iterator;
+
     Schema() noexcept;
     ~Schema();
     // Create a schema from a vector of ObjectSchema
@@ -201,18 +204,43 @@ public:
         return !(a == b);
     }
 
-    using base::begin;
-    using base::const_iterator;
-    using base::empty;
-    using base::end;
-    using base::iterator;
-    using base::size;
+    operator const base&() const
+    {
+        return m_classes;
+    }
+
+    size_t size() const
+    {
+        return m_classes.size();
+    }
+    bool empty() const
+    {
+        return m_classes.empty();
+    }
+    iterator begin()
+    {
+        return m_classes.begin();
+    }
+    const_iterator begin() const
+    {
+        return m_classes.begin();
+    }
+    iterator end()
+    {
+        return m_classes.begin();
+    }
+    const_iterator end() const
+    {
+        return m_classes.begin();
+    }
 
 private:
     template <typename T, typename U, typename Func>
     static void zip_matching(T&& a, U&& b, Func&& func);
     // sort all the classes by name in order to speed up find(StringData name)
     void sort_schema();
+
+    base m_classes;
 };
 
 namespace schema_change {

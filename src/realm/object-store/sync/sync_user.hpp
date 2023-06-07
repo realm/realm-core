@@ -172,6 +172,7 @@ struct SyncUserIdentity {
     // the associated provider type of the identity
     std::string provider_type;
 
+    SyncUserIdentity() = default;
     SyncUserIdentity(const std::string& id, const std::string& provider_type);
 
     bool operator==(const SyncUserIdentity& other) const

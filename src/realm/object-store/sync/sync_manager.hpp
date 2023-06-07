@@ -166,7 +166,7 @@ public:
     // Returns `true` if the SyncManager still contains any existing sessions not yet fully cleaned up.
     // This will return true as long as there is an external reference to a session object, no matter
     // the state of that session.
-    bool has_existing_sessions() REQUIRES(!m_session_mutex);
+    bool has_existing_sessions() const REQUIRES(!m_session_mutex);
 
     // Blocking call that only return once all sessions have been terminated.
     // Due to the async nature of the SyncClient, even with `SyncSessionStopPolicy::Immediate`, a
@@ -325,7 +325,7 @@ private:
 
     // Internal method returning `true` if the SyncManager still contains sessions not yet fully closed.
     // Callers of this method should hold the `m_session_mutex` themselves.
-    bool do_has_existing_sessions() REQUIRES(m_session_mutex);
+    bool do_has_existing_sessions() const REQUIRES(m_session_mutex);
 
     std::string m_sync_route GUARDED_BY(m_mutex);
 

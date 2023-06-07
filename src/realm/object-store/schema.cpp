@@ -49,7 +49,7 @@ Schema::Schema(std::initializer_list<ObjectSchema> types)
 }
 
 Schema::Schema(base types) noexcept
-    : base(std::move(types))
+    : m_classes(std::move(types))
 {
     sort_schema();
 }
@@ -201,12 +201,12 @@ void Schema::validate(SchemaValidationMode validation_mode) const
 
     // As the types are added sorted by name, we can detect duplicates by just looking at the following element.
     auto find_next_duplicate = [&](const_iterator start) {
-        return std::adjacent_find(start, cend(), [](ObjectSchema const& lft, ObjectSchema const& rgt) {
+        return std::adjacent_find(start, m_classes.end(), [](ObjectSchema const& lft, ObjectSchema const& rgt) {
             return lft.name == rgt.name;
         });
     };
 
-    for (auto it = find_next_duplicate(cbegin()); it != cend(); it = find_next_duplicate(++it)) {
+    for (auto it = find_next_duplicate(m_classes.begin()); it != m_classes.end(); it = find_next_duplicate(++it)) {
         exceptions.push_back(
             ObjectSchemaValidationException("Type '%1' appears more than once in the schema.", it->name));
     }
@@ -296,8 +296,8 @@ void Schema::zip_matching(T&& a, U&& b, Func&& func)
 {
     size_t i = 0, j = 0;
     while (i < a.size() && j < b.size()) {
-        auto& object_schema = a[i];
-        auto& matching_schema = b[j];
+        auto& object_schema = a.m_classes[i];
+        auto& matching_schema = b.m_classes[j];
         int cmp = object_schema.name.compare(matching_schema.name);
         if (cmp == 0) {
             func(&object_schema, &matching_schema);
@@ -314,9 +314,9 @@ void Schema::zip_matching(T&& a, U&& b, Func&& func)
         }
     }
     for (; i < a.size(); ++i)
-        func(&a[i], nullptr);
+        func(&a.m_classes[i], nullptr);
     for (; j < b.size(); ++j)
-        func(nullptr, &b[j]);
+        func(nullptr, &b.m_classes[j]);
 }
 
 std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMode mode,
@@ -381,9 +381,9 @@ void Schema::copy_keys_from(realm::Schema const& other, SchemaSubsetMode subset_
     });
 
     if (!other_classes.empty()) {
-        reserve(size() + other_classes.size());
+        m_classes.reserve(size() + other_classes.size());
         for (auto other : other_classes)
-            push_back(*other);
+            m_classes.push_back(*other);
         sort_schema();
     }
 }
