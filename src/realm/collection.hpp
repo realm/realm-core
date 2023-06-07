@@ -590,7 +590,7 @@ protected:
         try {
             return m_parent->get_collection_ref(m_index, Interface::s_collection_type);
         }
-        catch (const KeyNotFound&) {
+        catch (...) {
             return ref_type(0);
         }
     }
