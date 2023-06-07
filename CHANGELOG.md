@@ -27,7 +27,7 @@
 * Support sort/distinct based on values from a dictionary e.g. `TRUEPREDICATE SORT(meta['age'])` (PR [#5311](https://github.com/realm/realm-core/pull/5311))
 
 ### Fixed
-* Fix the query parser needs to copy list of arguments and own the memory. ([#6674](https://github.com/realm/realm-core/pull/6674), since v12.5.0)
+* Fix the query parser, it needs to copy a list of arguments and own the memory. This will prevent errors like getting a different result from a query, if the list is modified after its creation and before the execution of the query itself. In the worst case scenario, if the memory is freed before the query is executed, this could lead to crashes, especially for string and binary data types. ([#6674](https://github.com/realm/realm-core/pull/6674), since v12.5.0)
 * Fixed a potential crash when opening the realm after failing to download a fresh FLX realm during an automatic client reset ([#6494](https://github.com/realm/realm-core/issues/6494), since v12.3.0)
 
 ### Breaking changes
