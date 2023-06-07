@@ -367,7 +367,6 @@ records:
         default: std::numeric_limits<double>::quiet_NaN()
 
   GeoCircle:
-    cppName: GeoCenterSphere
     fields:
       radius_radians: double
       center: GeoPoint
