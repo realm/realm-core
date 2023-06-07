@@ -164,10 +164,7 @@ if(NOT APPLE AND NOT EMSCRIPTEN AND NOT WINDOWS_STORE)
         set(libuv_target uv_a)
     endif()
     target_link_libraries(ObjectStoreTests ${libuv_target})
-    # FIXME: ObjectStore itself shouldn't care about this, but we need to refactor scheduler.cpp to make it happen
-    target_compile_definitions(ObjectStore PUBLIC REALM_HAVE_UV=1)
-    get_property(libuv_include_dir TARGET ${libuv_target} PROPERTY INCLUDE_DIRECTORIES)
-    target_include_directories(ObjectStore PRIVATE ${libuv_include_dir})
+    target_compile_definitions(ObjectStoreTests PRIVATE TEST_SCHEDULER_UV=1)
 endif()
 
 add_subdirectory(notifications-fuzzer)
