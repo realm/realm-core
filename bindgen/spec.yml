@@ -577,11 +577,9 @@ records:
   DeviceInfo:
     cppName: app::App::Config::DeviceInfo
     fields:
-      platform: std::string
       platform_version: std::string
       sdk_version: std::string
       sdk: std::string
-      cpu_arch: std::string
       device_name: std::string
       device_version: std::string
       framework_name: std::string

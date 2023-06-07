@@ -19,7 +19,7 @@
 #include <realm/query.hpp>
 
 #include <realm/array.hpp>
-#include <realm/column_fwd.hpp>
+#include <realm/array_integer_tpl.hpp>
 #include <realm/transaction.hpp>
 #include <realm/dictionary.hpp>
 #include <realm/query_conditions_tpl.hpp>
@@ -27,7 +27,6 @@
 #include <realm/query_expression.hpp>
 #include <realm/table_view.hpp>
 #include <realm/set.hpp>
-#include <realm/array_integer_tpl.hpp>
 
 #include <algorithm>
 
@@ -1056,6 +1055,20 @@ size_t Query::find_best_node(ParentNode* pn) const
 void Query::aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start, size_t end,
                                ArrayPayload* source_column) const
 {
+    // Number of matches to find in best condition loop before breaking out to probe other conditions. Too low value
+    // gives too many constant time overheads everywhere in the query engine. Too high value makes it adapt less
+    // rapidly to changes in match frequencies.
+    constexpr size_t findlocals = 64;
+
+    // Average match distance in linear searches where further increase in distance no longer increases query speed
+    // (because time spent on handling each match becomes insignificant compared to time spent on the search).
+    constexpr size_t bestdist = 512;
+
+    // Minimum number of matches required in a certain condition before it can be used to compute statistics. Too high
+    // value can spent too much time in a bad node (with high match frequency). Too low value gives inaccurate
+    // statistics.
+    constexpr size_t probe_matches = 4;
+
     while (start < end) {
         // Executes start...end range of a query and will stay inside the condition loop of the node it was called
         // on. Can be called on any node; yields same result, but different performance. Returns prematurely if

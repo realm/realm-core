@@ -201,10 +201,10 @@ public:
     struct Box {};
     struct Polygon {};
     struct Loop {};
-    struct Sphere {};
+    struct Circle {};
 #if REALM_ENABLE_GEOSPATIAL
     GeospatialNode(Box, GeoPoint& p1, GeoPoint& p2);
-    GeospatialNode(Sphere, GeoPoint& p, double radius);
+    GeospatialNode(Circle, GeoPoint& p, double radius);
     GeospatialNode(Polygon, GeoPoint& p);
     GeospatialNode(Loop, GeoPoint& p);
     void add_point_to_loop(GeoPoint& p);
@@ -623,7 +623,8 @@ public:
         parse_error = true;
     }
 
-    Mixed get_arg_for_index(std::string);
+    Mixed get_arg_for_index(const std::string&);
+    double get_arg_for_coordinate(const std::string&);
 
     template <class T>
     Query simple_query(int op, ColKey col_key, T val, bool case_sensitive);
