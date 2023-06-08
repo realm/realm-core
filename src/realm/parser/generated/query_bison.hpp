@@ -72,17 +72,6 @@
     class DescriptorNode;
     class PropertyNode;
     class SubqueryNode;
-    struct PathElem {
-        std::string id;
-        Mixed index;
-        std::string buffer;
-        PathElem() {}
-        PathElem(const PathElem& other);
-        PathElem& operator=(const PathElem& other);
-        PathElem(std::string s) : id(s) {}
-        PathElem(std::string s, Mixed i) : id(s), index(i) { index.use_buffer(buffer); }
-    };
-
   }
   using namespace realm::query_parser;
 
@@ -474,47 +463,44 @@ namespace yy {
       // list_content
       char dummy7[sizeof (ListNode*)];
 
-      // path_elem
-      char dummy8[sizeof (PathElem)];
-
       // path
-      char dummy9[sizeof (PathNode*)];
+      char dummy8[sizeof (PathNode*)];
 
       // post_op
-      char dummy10[sizeof (PostOpNode*)];
+      char dummy9[sizeof (PostOpNode*)];
 
       // prop
       // simple_prop
-      char dummy11[sizeof (PropertyNode*)];
+      char dummy10[sizeof (PropertyNode*)];
 
       // query
       // compare
-      char dummy12[sizeof (QueryNode*)];
+      char dummy11[sizeof (QueryNode*)];
 
       // subquery
-      char dummy13[sizeof (SubqueryNode*)];
+      char dummy12[sizeof (SubqueryNode*)];
 
       // boolexpr
-      char dummy14[sizeof (TrueOrFalseNode*)];
+      char dummy13[sizeof (TrueOrFalseNode*)];
 
       // value
-      char dummy15[sizeof (ValueNode*)];
+      char dummy14[sizeof (ValueNode*)];
 
       // direction
-      char dummy16[sizeof (bool)];
+      char dummy15[sizeof (bool)];
 
       // coordinate
-      char dummy17[sizeof (double)];
+      char dummy16[sizeof (double)];
 
       // comp_type
       // aggr_op
       // equality
       // relational
       // stringop
-      char dummy18[sizeof (int)];
+      char dummy17[sizeof (int)];
 
       // geopoint
-      char dummy19[sizeof (std::optional<GeoPoint>)];
+      char dummy18[sizeof (std::optional<GeoPoint>)];
 
       // "identifier"
       // "string"
@@ -548,7 +534,7 @@ namespace yy {
       // "@type"
       // "key or value"
       // id
-      char dummy20[sizeof (std::string)];
+      char dummy19[sizeof (std::string)];
     };
 
     /// The size of the largest semantic type.
@@ -779,8 +765,7 @@ namespace yy {
         SYM_relational = 105,                    // relational
         SYM_stringop = 106,                      // stringop
         SYM_path = 107,                          // path
-        SYM_path_elem = 108,                     // path_elem
-        SYM_id = 109                             // id
+        SYM_id = 108                             // id
       };
     };
 
@@ -850,10 +835,6 @@ namespace yy {
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.move< ListNode* > (std::move (that.value));
-        break;
-
-      case symbol_kind::SYM_path_elem: // path_elem
-        value.move< PathElem > (std::move (that.value));
         break;
 
       case symbol_kind::SYM_path: // path
@@ -1041,18 +1022,6 @@ namespace yy {
       {}
 #else
       basic_symbol (typename Base::kind_type t, const ListNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, PathElem&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const PathElem& v)
         : Base (t)
         , value (v)
       {}
@@ -1281,10 +1250,6 @@ switch (yykind)
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.template destroy< ListNode* > ();
-        break;
-
-      case symbol_kind::SYM_path_elem: // path_elem
-        value.template destroy< PathElem > ();
         break;
 
       case symbol_kind::SYM_path: // path
@@ -2528,7 +2493,7 @@ switch (yykind)
     // YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
     // Performed when YYTABLE does not specify something else to do.  Zero
     // means the default is an error.
-    static const unsigned char yydefact_[];
+    static const signed char yydefact_[];
 
     // YYPGOTO[NTERM-NUM].
     static const short yypgoto_[];
@@ -2783,9 +2748,9 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 555,     ///< Last index in yytable_.
-      yynnts_ = 37,  ///< Number of nonterminal symbols.
-      yyfinal_ = 66 ///< Termination state number.
+      yylast_ = 554,     ///< Last index in yytable_.
+      yynnts_ = 36,  ///< Number of nonterminal symbols.
+      yyfinal_ = 65 ///< Termination state number.
     };
 
 
@@ -2892,10 +2857,6 @@ switch (yykind)
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.copy< ListNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_path_elem: // path_elem
-        value.copy< PathElem > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_path: // path
@@ -3049,10 +3010,6 @@ switch (yykind)
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.move< ListNode* > (YY_MOVE (s.value));
-        break;
-
-      case symbol_kind::SYM_path_elem: // path_elem
-        value.move< PathElem > (YY_MOVE (s.value));
         break;
 
       case symbol_kind::SYM_path: // path
