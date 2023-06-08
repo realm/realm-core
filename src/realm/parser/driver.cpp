@@ -435,37 +435,54 @@ Query EqualityNode::visit(ParserDriver* drv)
     auto left_type = left->get_type();
     auto right_type = right->get_type();
 
-    auto handle_typed_link = [drv](std::unique_ptr<Subexpr>& list, std::unique_ptr<Subexpr>& value, DataType& type) {
+    auto handle_typed_links = [drv](std::unique_ptr<Subexpr>& list, std::unique_ptr<Subexpr>& expr, DataType& type) {
         if (auto link_column = dynamic_cast<const Columns<Link>*>(list.get())) {
-            if (value->get_mixed().is_null()) {
-                type = ColumnTypeTraits<realm::null>::id;
-                value = std::make_unique<Value<realm::null>>();
-            }
-            else {
-                auto left_dest_table_key = link_column->link_map().get_target_table()->get_key();
-                auto right_table_key = value->get_mixed().get_link().get_table_key();
-                auto right_obj_key = value->get_mixed().get_link().get_obj_key();
-                if (left_dest_table_key == right_table_key) {
-                    value = std::make_unique<Value<ObjKey>>(right_obj_key);
-                    type = type_Link;
+            // Change all TypedLink values to ObjKey values
+            auto value = dynamic_cast<ValueBase*>(expr.get());
+            auto left_dest_table_key = link_column->link_map().get_target_table()->get_key();
+            auto sz = value->size();
+            for (size_t i = 0; i < sz; i++) {
+                auto val = value->get(i);
+                if (val.is_null()) {
+                    if (sz == 1) {
+                        type = ColumnTypeTraits<realm::null>::id;
+                        expr = std::make_unique<Value<realm::null>>();
+                    }
                 }
                 else {
-                    const Group* g = drv->m_base_table->get_parent_group();
-                    throw InvalidQueryArgError(util::format(
-                        "The relationship '%1' which links to type '%2' cannot be compared to an argument of type %3",
-                        link_column->link_map().description(drv->m_serializer_state),
-                        link_column->link_map().get_target_table()->get_class_name(),
-                        print_pretty_objlink(value->get_mixed().get_link(), g)));
+                    if (val.is_type(type_TypedLink)) {
+                        auto right_table_key = val.get_link().get_table_key();
+                        auto right_obj_key = val.get_link().get_obj_key();
+                        if (left_dest_table_key == right_table_key) {
+                            if (sz == 1) {
+                                expr = std::make_unique<Value<ObjKey>>(right_obj_key);
+                                type = type_Link;
+                            }
+                            else {
+                                REALM_ASSERT(type == type_Mixed);
+                                value->set(i, right_obj_key);
+                            }
+                        }
+                        else {
+                            const Group* g = drv->m_base_table->get_parent_group();
+                            throw InvalidQueryArgError(
+                                util::format("The relationship '%1' which links to type '%2' cannot be compared to "
+                                             "an argument of type %3",
+                                             link_column->link_map().description(drv->m_serializer_state),
+                                             link_column->link_map().get_target_table()->get_class_name(),
+                                             print_pretty_objlink(value->get(0).get_link(), g)));
+                        }
+                    }
                 }
             }
         }
     };
 
-    if (left_type == type_Link && right_type == type_TypedLink && right->has_single_value()) {
-        handle_typed_link(left, right, right_type);
+    if (left_type == type_Link && right->has_constant_evaluation()) {
+        handle_typed_links(left, right, right_type);
     }
-    if (right_type == type_Link && left_type == type_TypedLink && left->has_single_value()) {
-        handle_typed_link(right, left, left_type);
+    if (right_type == type_Link && left->has_constant_evaluation()) {
+        handle_typed_links(right, left, left_type);
     }
 
     if (left_type.is_valid() && right_type.is_valid() && !Mixed::data_types_are_comparable(left_type, right_type)) {
@@ -1783,11 +1800,20 @@ std::unique_ptr<Subexpr> LinkChain::column(const std::string& col)
         }
     }
 
+    auto col_type{col_key.get_type()};
+    if (col_type == col_type_LinkList) {
+        col_type = col_type_Link;
+    }
+    if (col_type == col_type_Link) {
+        add(col_key);
+        return create_subexpr<Link>(col_key);
+    }
+
     if (col_key.is_dictionary()) {
         return create_subexpr<Dictionary>(col_key);
     }
     else if (col_key.is_set()) {
-        switch (col_key.get_type()) {
+        switch (col_type) {
             case col_type_Int:
                 return create_subexpr<Set<Int>>(col_key);
             case col_type_Bool:
@@ -1810,15 +1836,12 @@ std::unique_ptr<Subexpr> LinkChain::column(const std::string& col)
                 return create_subexpr<Set<ObjectId>>(col_key);
             case col_type_Mixed:
                 return create_subexpr<Set<Mixed>>(col_key);
-            case col_type_Link:
-                add(col_key);
-                return create_subexpr<Link>(col_key);
             default:
                 break;
         }
     }
     else if (col_key.is_list()) {
-        switch (col_key.get_type()) {
+        switch (col_type) {
             case col_type_Int:
                 return create_subexpr<Lst<Int>>(col_key);
             case col_type_Bool:
@@ -1841,9 +1864,6 @@ std::unique_ptr<Subexpr> LinkChain::column(const std::string& col)
                 return create_subexpr<Lst<ObjectId>>(col_key);
             case col_type_Mixed:
                 return create_subexpr<Lst<Mixed>>(col_key);
-            case col_type_LinkList:
-                add(col_key);
-                return create_subexpr<Link>(col_key);
             default:
                 break;
         }
@@ -1854,7 +1874,7 @@ std::unique_ptr<Subexpr> LinkChain::column(const std::string& col)
                                                  expression_cmp_type_to_str(m_comparison_type)));
         }
 
-        switch (col_key.get_type()) {
+        switch (col_type) {
             case col_type_Int:
                 return create_subexpr<Int>(col_key);
             case col_type_Bool:
@@ -1877,9 +1897,6 @@ std::unique_ptr<Subexpr> LinkChain::column(const std::string& col)
                 return create_subexpr<ObjectId>(col_key);
             case col_type_Mixed:
                 return create_subexpr<Mixed>(col_key);
-            case col_type_Link:
-                add(col_key);
-                return create_subexpr<Link>(col_key);
             default:
                 break;
         }

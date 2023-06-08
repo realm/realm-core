@@ -2351,20 +2351,20 @@ public:
     {
         m_dT = 50.0;
         m_condition_column_key = origin_column_key;
-        m_column_type = origin_column_key.get_type();
-        REALM_ASSERT(m_column_type == col_type_Link || m_column_type == col_type_LinkList);
+        auto column_type = origin_column_key.get_type();
+        REALM_ASSERT(column_type == col_type_Link || column_type == col_type_LinkList);
         REALM_ASSERT(!m_target_keys.empty());
     }
 
     void cluster_changed() override
     {
-        if (m_column_type == col_type_Link) {
-            m_list.emplace(m_table.unchecked_ptr()->get_alloc());
-            m_leaf = &*m_list;
-        }
-        else if (m_column_type == col_type_LinkList) {
+        if (m_condition_column_key.is_collection()) {
             m_linklist.emplace(m_table.unchecked_ptr()->get_alloc());
             m_leaf = &*m_linklist;
+        }
+        else {
+            m_list.emplace(m_table.unchecked_ptr()->get_alloc());
+            m_leaf = &*m_list;
         }
         m_cluster->init_leaf(this->m_condition_column_key, m_leaf);
     }
@@ -2381,7 +2381,6 @@ public:
 
 protected:
     std::vector<ObjKey> m_target_keys;
-    ColumnType m_column_type;
     std::optional<ArrayKey> m_list;
     std::optional<ArrayList> m_linklist;
     ArrayPayload* m_leaf = nullptr;
@@ -2389,7 +2388,6 @@ protected:
     LinksToNodeBase(const LinksToNodeBase& source)
         : ParentNode(source)
         , m_target_keys(source.m_target_keys)
-        , m_column_type(source.m_column_type)
     {
     }
 
