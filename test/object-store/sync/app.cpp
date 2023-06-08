@@ -4484,18 +4484,12 @@ TEST_CASE("app: auth providers", "[sync][app]") {
         CHECK(credentials.serialize_as_bson() == bson::BsonDocument{{"name", "mongo"}});
     }
 
-    SECTION("auth providers user api key") {
-        auto credentials = AppCredentials::user_api_key("a key");
-        CHECK(credentials.provider() == AuthProvider::USER_API_KEY);
-        CHECK(credentials.provider_as_string() == IdentityProviderUserAPIKey);
+    SECTION("auth providers api key") {
+        auto credentials = AppCredentials::api_key("a key");
+        CHECK(credentials.provider() == AuthProvider::API_KEY);
+        CHECK(credentials.provider_as_string() == IdentityProviderAPIKey);
         CHECK(credentials.serialize_as_bson() == bson::BsonDocument{{"provider", "api-key"}, {"key", "a key"}});
-    }
-
-    SECTION("auth providers server api key") {
-        auto credentials = AppCredentials::server_api_key("a key");
-        CHECK(credentials.provider() == AuthProvider::SERVER_API_KEY);
-        CHECK(credentials.provider_as_string() == IdentityProviderServerAPIKey);
-        CHECK(credentials.serialize_as_bson() == bson::BsonDocument{{"provider", "api-key"}, {"key", "a key"}});
+        CHECK(enum_from_provider_type(provider_type_from_enum(AuthProvider::API_KEY)) == AuthProvider::API_KEY);
     }
 }
 
