@@ -796,6 +796,24 @@ Query& Query::equal(ColKey column_key, Mixed value, bool case_sensitive)
     else
         return add_condition<EqualIns>(column_key, value);
 }
+Query& Query::equal(ColKey column_key, const std::vector<Mixed>& values, bool case_sensitive)
+{
+    REALM_ASSERT(!values.empty());
+
+    auto add_query_condition = [&](auto mixed) -> Query& {
+        if (case_sensitive)
+            return add_condition<Equal>(column_key, mixed);
+        else
+            return add_condition<EqualIns>(column_key, mixed);
+    };
+
+    auto& query = add_query_condition(values[0]);
+
+    for (size_t i = 1; i < values.size(); ++i) {
+        query = add_query_condition(values[i]);
+    }
+    return query;
+}
 Query& Query::not_equal(ColKey column_key, Mixed value, bool case_sensitive)
 {
     if (case_sensitive)

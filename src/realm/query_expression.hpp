@@ -744,6 +744,11 @@ public:
         return {};
     }
 
+    virtual std::vector<Mixed> get_all_mixed() const
+    {
+        return {};
+    }
+
     virtual util::Optional<ExpressionComparisonType> get_comparison_type() const
     {
         return util::none;
@@ -1319,6 +1324,18 @@ public:
     Mixed get_mixed() const override
     {
         return get(0);
+    }
+
+    std::vector<Mixed> get_all_mixed() const override
+    {
+        REALM_ASSERT(has_multiple_values());
+        const auto sz = size();
+        std::vector<Mixed> all;
+        all.reserve(sz);
+        for (size_t i = 0; i < sz; ++i) {
+            all.push_back(get(i));
+        }
+        return all;
     }
 
     void evaluate(size_t, ValueBase& destination) override

@@ -544,16 +544,13 @@ Query EqualityNode::visit(ParserDriver* drv)
         }
     }
     else if (left_type == type_Link && right->has_multiple_values()) {
-
         auto link_column = dynamic_cast<const Columns<Link>*>(left.get());
-        // auto obj_link_column = dynamic_cast<const Columns<ObjLink>*>(right.get());
-        Mixed val = right->get_mixed();
+        auto vals = right->get_all_mixed();
         if (link_column && link_column->link_map().get_nb_hops() == 1 &&
             link_column->get_comparison_type().value_or(ExpressionComparisonType::Any) ==
                 ExpressionComparisonType::Any) {
-            // We can use equal/not_equal and get a LinksToNode based query
             if (op == CompareNode::IN) {
-                return drv->m_base_table->where().equal(link_column->link_map().get_first_column_key(), val);
+                return drv->m_base_table->where().equal(link_column->link_map().get_first_column_key(), vals);
             }
         }
     }

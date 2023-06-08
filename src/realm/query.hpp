@@ -189,6 +189,7 @@ public:
     Query& ends_with(ColKey column_key, Mixed value, bool case_sensitive = true);
     Query& contains(ColKey column_key, Mixed value, bool case_sensitive = true);
     Query& like(ColKey column_key, Mixed value, bool case_sensitive = true);
+    Query& equal(ColKey column_key, const std::vector<Mixed>& value, bool case_sensitive = true);
 
     // Conditions: size
     Query& size_equal(ColKey column_key, int64_t value);
