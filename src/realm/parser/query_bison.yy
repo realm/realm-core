@@ -34,17 +34,6 @@
     class DescriptorNode;
     class PropertyNode;
     class SubqueryNode;
-    struct PathElem {
-        std::string id;
-        Mixed index;
-        std::string buffer;
-        PathElem() {}
-        PathElem(const PathElem& other);
-        PathElem& operator=(const PathElem& other);
-        PathElem(std::string s) : id(s) {}
-        PathElem(std::string s, Mixed i) : id(s), index(i) { index.use_buffer(buffer); }
-    };
-
   }
   using namespace realm::query_parser;
 
@@ -157,7 +146,6 @@ using namespace realm::query_parser;
 %type  <DescriptorOrderingNode*> post_query
 %type  <DescriptorNode*> sort sort_param distinct distinct_param limit
 %type  <std::string> id
-%type  <PathElem> path_elem
 %type  <PropertyNode*> simple_prop
 
 %destructor { } <int>
@@ -170,7 +158,6 @@ using namespace realm::query_parser;
              if (auto alt = $$->get_altitude())
                yyo << "', '" << *alt; 
              yyo << "']"; }}  <std::optional<GeoPoint>>;
-%printer { yyo << $$.id; } <PathElem>;
 %printer { yyo << $$; } <*>;
 %printer { yyo << "<>"; } <>;
 
@@ -370,14 +357,11 @@ stringop
     | LIKE                      { $$ = CompareNode::LIKE; }
 
 path
-    : path_elem                 { $$ = drv.m_parse_nodes.create<PathNode>($1); }
-    | path '.' path_elem        { $1->add_element($3); $$ = $1; }
-
-path_elem
-    : id                        { $$ = PathElem{$1}; }
-    | id '[' NATURAL0 ']'       { $$ = PathElem{$1, int64_t(strtoll($3.c_str(), nullptr, 0))}; }
-    | id '[' STRING ']'         { $$ = PathElem{$1, $3.substr(1, $3.size() - 2)}; }
-    | id '[' ARG ']'            { $$ = PathElem{$1, drv.get_arg_for_index($3)}; }
+    : id                        { $$ = drv.m_parse_nodes.create<PathNode>($1); }
+    | path '.' id               { $1->add_element($3); $$ = $1; }
+    | path '[' NATURAL0 ']'     { $1->add_element(size_t(strtoll($3.c_str(), nullptr, 0))); $$ = $1; }
+    | path '[' STRING ']'       { $1->add_element($3.substr(1, $3.size() - 2)); $$ = $1; }
+    | path '[' ARG ']'          { $1->add_element(drv.get_arg_for_index($3)); $$ = $1; }
 
 id  
     : ID                        { $$ = $1; }
