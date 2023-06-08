@@ -104,13 +104,17 @@ struct PathElement {
         , m_type(Type::index)
     {
     }
-
     PathElement(StringData str)
         : string_val(str)
         , m_type(Type::key)
     {
     }
     PathElement(const char* str)
+        : string_val(str)
+        , m_type(Type::key)
+    {
+    }
+    PathElement(const std::string& str)
         : string_val(str)
         , m_type(Type::key)
     {

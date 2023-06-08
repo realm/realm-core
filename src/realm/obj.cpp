@@ -2201,7 +2201,7 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
             else {
                 std::string key = mpark::get<std::string>(index);
                 auto ref = dynamic_cast<Dictionary*>(collection.get())->get(key);
-                return {ref, StringData(key)};
+                return {ref, key};
             }
         };
         auto [ref, path_elem] = get_ref();
