@@ -1402,7 +1402,7 @@ void SessionWrapper::nonsync_transact_notify(version_type new_version)
     // Thread safety required
     REALM_ASSERT(m_initiated);
 
-    if (!m_finalized) {
+    if (REALM_LIKELY(m_sess)) {
         util::bind_ptr<SessionWrapper> self{this};
         m_client.post([self = std::move(self), new_version](Status status) {
             if (status == ErrorCodes::OperationAborted)
@@ -1426,7 +1426,7 @@ void SessionWrapper::cancel_reconnect_delay()
     // Thread safety required
     REALM_ASSERT(m_initiated);
 
-    if (!m_finalized) {
+    if (REALM_LIKELY(m_sess)) {
         util::bind_ptr<SessionWrapper> self{this};
         m_client.post([self = std::move(self)](Status status) {
             if (status == ErrorCodes::OperationAborted)
@@ -1450,7 +1450,12 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
 {
     REALM_ASSERT(upload_completion || download_completion);
     REALM_ASSERT(m_initiated);
-    REALM_ASSERT(!m_finalized);
+
+    if (REALM_UNLIKELY(!m_sess)) {
+        // Already finalized
+        handler(util::error::operation_aborted); // Throws
+        return;
+    }
 
     util::bind_ptr<SessionWrapper> self{this};
     m_client.post([self = std::move(self), handler = std::move(handler), upload_completion,
@@ -1498,6 +1503,10 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
     std::int_fast64_t target_mark;
     {
         std::lock_guard lock{m_client.m_mutex};
+        if (REALM_UNLIKELY(!m_sess || m_client.m_stopped)) {
+            // Session is already finalized or client is stopped
+            return false;
+        }
         target_mark = ++m_target_upload_mark;
     }
 
@@ -1542,6 +1551,10 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
     std::int_fast64_t target_mark;
     {
         std::lock_guard lock{m_client.m_mutex};
+        if (REALM_UNLIKELY(!m_sess || m_client.m_stopped)) {
+            // Session is already finalized or client is stopped
+            return false;
+        }
         target_mark = ++m_target_download_mark;
     }
 
