@@ -888,11 +888,18 @@ static sync::Session::Config::ClientReset make_client_reset_config(RealmConfig s
                                                           did_recover);
         };
     }
-    if (session_config.sync_config->notify_before_client_reset) {
-        config.notify_before_client_reset = [config = session_config](VersionID version) {
-            config.sync_config->notify_before_client_reset(Realm::get_frozen_realm(config, version));
-        };
-    }
+    bool notify_user_before = bool(session_config.sync_config->notify_before_client_reset);
+    config.notify_before_client_reset = [notify_user_before, config = session_config]() -> VersionID {
+        auto frozen = Realm::get_shared_realm(config)->freeze();
+        REALM_ASSERT_EX(frozen, config.path);
+        REALM_ASSERT(frozen->is_frozen());
+        util::Optional<VersionID> version = frozen->current_transaction_version();
+        REALM_ASSERT(version);
+        if (notify_user_before) {
+            config.sync_config->notify_before_client_reset(frozen);
+        }
+        return *version;
+    };
 
     return config;
 }

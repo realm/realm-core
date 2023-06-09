@@ -75,14 +75,14 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident, syn
         clean_up_state();
     });
 
-    if (m_notify_before) {
-        m_notify_before(latest_version);
-    }
+    REALM_ASSERT(m_notify_before);
+
+    VersionID frozen_before_state_version = m_notify_before();
 
     // If m_notify_after is set, pin the previous state to keep it around.
     TransactionRef previous_state;
     if (m_notify_after) {
-        previous_state = m_db->start_frozen();
+        previous_state = m_db->start_frozen(frozen_before_state_version);
     }
     bool did_recover_out = false;
     local_version_ids = client_reset::perform_client_reset_diff(

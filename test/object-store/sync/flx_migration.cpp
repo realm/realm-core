@@ -824,12 +824,13 @@ TEST_CASE("Async open + client reset", "[flx][migration][baas]") {
     auto server_app_config = minimal_app_config(base_url, "server_migrate_rollback", mig_schema);
     TestAppSession session(create_app(server_app_config));
     SyncTestFile config(session.app(), partition, server_app_config.schema);
-    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+    config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     config.sync_config->notify_before_client_reset = [&](SharedRealm before) {
         logger_ptr->debug("notify_before_client_reset");
         REQUIRE(before);
+        REQUIRE(before->is_frozen());
         auto table = before->read_group().get_table("class_Object");
-        CHECK(!table);
+        CHECK(table);
         ++num_before_reset_notifications;
     };
     config.sync_config->notify_after_client_reset = [&](SharedRealm before, ThreadSafeReference after_ref,
@@ -865,10 +866,10 @@ TEST_CASE("Async open + client reset", "[flx][migration][baas]") {
         return std::pair(std::move(realm_ref), error);
     };
 
-    // Migrate to FLX
-    trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
-
-    {
+    SECTION("no initial state") {
+        // Migrate to FLX
+        trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
+        shared_object.persisted_properties.push_back({"oid_field", PropertyType::ObjectId | PropertyType::Nullable});
         config.schema = {shared_object, ObjectSchema("LocallyAdded",
                                                      {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                                       {"string_field", PropertyType::String | PropertyType::Nullable},
@@ -888,6 +889,43 @@ TEST_CASE("Async open + client reset", "[flx][migration][baas]") {
         auto locally_added_table = realm->read_group().get_table("class_LocallyAdded");
         REQUIRE(locally_added_table);
         REQUIRE(locally_added_table->size() == 0);
+    }
+
+    SECTION("initial state") {
+        {
+            config.schema = {shared_object};
+            auto realm = Realm::get_shared_realm(config);
+            realm->begin_transaction();
+            auto table = realm->read_group().get_table("class_Object");
+            table->create_object_with_primary_key(ObjectId::gen());
+            realm->commit_transaction();
+            wait_for_upload(*realm);
+        }
+        trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
+        {
+            shared_object.persisted_properties.push_back(
+                {"oid_field", PropertyType::ObjectId | PropertyType::Nullable});
+            config.schema = {
+                shared_object,
+                ObjectSchema("LocallyAdded", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                              {"string_field", PropertyType::String | PropertyType::Nullable},
+                                              {"realm_id", PropertyType::String | PropertyType::Nullable}})};
+
+            auto [ref, error] = async_open_realm(config);
+            REQUIRE(ref);
+            REQUIRE_FALSE(error);
+
+            auto realm = Realm::get_shared_realm(std::move(ref));
+
+            auto table = realm->read_group().get_table("class_Object");
+            REQUIRE(table->size() == 1);
+            REQUIRE(num_before_reset_notifications == 1);
+            REQUIRE(num_after_reset_notifications == 1);
+
+            auto locally_added_table = realm->read_group().get_table("class_LocallyAdded");
+            REQUIRE(locally_added_table);
+            REQUIRE(locally_added_table->size() == 0);
+        }
     }
 }
 

@@ -917,6 +917,8 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
             // reorder a property such that it does not match the on disk property order
             std::vector<ObjectSchema> local_schema = schema;
             std::swap(local_schema[0].persisted_properties[1], local_schema[0].persisted_properties[2]);
+            local_schema[0].persisted_properties.push_back(
+                {"queryable_oid_field", PropertyType::ObjectId | PropertyType::Nullable});
             config_copy.schema = local_schema;
             config_copy.sync_config->client_resync_mode = ClientResyncMode::Recover;
             auto [promise, future] = util::make_promise_future<void>();
