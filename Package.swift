@@ -1,9 +1,9 @@
-// swift-tools-version:5.6
+// swift-tools-version:5.5
 
 import PackageDescription
 import Foundation
 
-let versionStr = "13.14.0"
+let versionStr = "13.15.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""

@@ -273,7 +273,7 @@ static auto make_client_reset_handler()
 }
 
 TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
-    Schema schema{
+    std::vector<ObjectSchema> schema{
         {"TopLevel",
          {
              {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
@@ -897,6 +897,72 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             auto sync_error = wait_for_future(std::move(err_future)).get();
             CHECK(sync_error.get_system_error() ==
                   sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+        }
+    }
+
+    SECTION("Recover: schema indexes match in before and after states") {
+        {
+            config_local.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError) {
+                // ignore spurious failures on this instance
+            };
+            SharedRealm realm = Realm::get_shared_realm(config_local);
+            subscribe_to_and_add_objects(realm, 1);
+            auto subs = realm->get_latest_subscription_set();
+            auto result = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+            CHECK(result == sync::SubscriptionSet::State::Complete);
+            reset_utils::trigger_client_reset(harness.session().app_session(), realm);
+            realm->close();
+        }
+        {
+            Realm::Config config_copy = config_local;
+            config_copy.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError err) {
+                FAIL(err);
+            };
+            // reorder a property such that it does not match the on disk property order
+            std::vector<ObjectSchema> local_schema = schema;
+            std::swap(local_schema[0].persisted_properties[1], local_schema[0].persisted_properties[2]);
+            config_copy.schema = local_schema;
+            config_copy.sync_config->client_resync_mode = ClientResyncMode::Recover;
+            auto [promise, future] = util::make_promise_future<void>();
+            auto shared_promise = std::make_shared<decltype(promise)>(std::move(promise));
+            config_copy.sync_config->notify_before_client_reset = [&](SharedRealm frozen_before) {
+                ++before_reset_count;
+                REQUIRE(frozen_before->schema().size() > 0);
+                REQUIRE(frozen_before->schema_version() != ObjectStore::NotVersioned);
+                REQUIRE(frozen_before->schema() == Schema(local_schema));
+            };
+            config_copy.sync_config->notify_after_client_reset =
+                [&, promise = std::move(shared_promise)](SharedRealm frozen_before, ThreadSafeReference after_ref,
+                                                         bool did_recover) {
+                    ++after_reset_count;
+                    REQUIRE(frozen_before->schema().size() > 0);
+                    REQUIRE(frozen_before->schema_version() != ObjectStore::NotVersioned);
+                    REQUIRE(frozen_before->schema() == Schema(local_schema));
+                    SharedRealm after =
+                        Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
+                    REQUIRE(after);
+                    REQUIRE(after->schema() == Schema(local_schema));
+                    // the above check is sufficent unless operator==() is changed to not care about ordering
+                    // so future proof that by explicitly checking the order of properties here as well
+                    REQUIRE(after->schema().size() == frozen_before->schema().size());
+                    auto after_it = after->schema().find("TopLevel");
+                    auto before_it = frozen_before->schema().find("TopLevel");
+                    REQUIRE(after_it != after->schema().end());
+                    REQUIRE(before_it != frozen_before->schema().end());
+                    REQUIRE(after_it->name == before_it->name);
+                    REQUIRE(after_it->persisted_properties.size() == before_it->persisted_properties.size());
+                    REQUIRE(after_it->persisted_properties[1].name == "queryable_int_field");
+                    REQUIRE(after_it->persisted_properties[2].name == "queryable_str_field");
+                    REQUIRE(before_it->persisted_properties[1].name == "queryable_int_field");
+                    REQUIRE(before_it->persisted_properties[2].name == "queryable_str_field");
+                    REQUIRE(did_recover);
+                    promise->emplace_value();
+                };
+
+            SharedRealm realm = Realm::get_shared_realm(config_copy);
+            future.get();
+            CHECK(before_reset_count == 1);
+            CHECK(after_reset_count == 1);
         }
     }
 }
