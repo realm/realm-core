@@ -470,7 +470,7 @@ Query EqualityNode::visit(ParserDriver* drv)
                                              "an argument of type %3",
                                              link_column->link_map().description(drv->m_serializer_state),
                                              link_column->link_map().get_target_table()->get_class_name(),
-                                             print_pretty_objlink(value->get(0).get_link(), g)));
+                                             print_pretty_objlink(value->get(i).get_link(), g)));
                         }
                     }
                 }
@@ -1801,10 +1801,7 @@ std::unique_ptr<Subexpr> LinkChain::column(const std::string& col)
     }
 
     auto col_type{col_key.get_type()};
-    if (col_type == col_type_LinkList) {
-        col_type = col_type_Link;
-    }
-    if (col_type == col_type_Link) {
+    if (Table::is_link_type(col_type)) {
         add(col_key);
         return create_subexpr<Link>(col_key);
     }
