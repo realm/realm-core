@@ -5786,11 +5786,10 @@ TEST(Parser_Geospatial)
     verify_query_sub(test_context, table,
                      "location GEOWITHIN geoPolygon({[$0, $1], [$2, $3], [$4, $5], [$6, $7], [$8, $9]})", coord_args,
                      1);
-    GeoPolygon b = box.get<GeoPolygon>();
+    GeoPolygon b = box.get<GeoBox>().to_polygon();
     coord_args = {b.points[0][0].longitude, b.points[0][0].latitude, b.points[0][2].longitude,
                   b.points[0][2].latitude};
     verify_query_sub(test_context, table, "location GEOWITHIN geoBox([$0, $1], [$2, $3])", coord_args, 1);
-
 
     CHECK_THROW_EX(
         verify_query(test_context, table, "_id geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 1),

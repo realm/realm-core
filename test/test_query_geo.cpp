@@ -29,6 +29,7 @@
 #include <realm/group.hpp>
 #include <realm/table.hpp>
 #include <realm/query_expression.hpp>
+#include <realm/table_view.hpp>
 
 #include <ostream>
 #include <sstream>
@@ -150,6 +151,13 @@ TEST(Query_GeoWithinBasics)
 
     CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}}).count(), 1);
     CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{-2, -1.5}, GeoPoint{0.7, 0.5}}).count(), 2);
+    CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{0, 0}, GeoPoint{0.5, 0.5}}).count(), 0);
+    CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{0, 0}, GeoPoint{0.5, 1}}).count(), 1);
+    CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{0, -0.5}, GeoPoint{0.5, 1}}).count(), 0);
+    CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{-2, -1.5}, GeoPoint{0.7, 0.5}}).count(), 2);
+    CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{-2, -1}, GeoPoint{1, 0.5}}).count(), 2);
+    CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{-2, -2}, GeoPoint{1, 1}}).count(), 4);
+    CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{-2, -2}, GeoPoint{0.5, 1}}).count(), 4);
 
     GeoPolygon p{{{GeoPoint{-0.5, -0.5}, GeoPoint{1.0, 2.5}, GeoPoint{2.5, -0.5}, GeoPoint{-0.5, -0.5}}}};
     CHECK_EQUAL(location.geo_within(p).count(), 3);

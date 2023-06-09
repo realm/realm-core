@@ -76,6 +76,8 @@ std::string Geospatial::get_type_string() const noexcept
     switch (get_type()) {
         case Type::Point:
             return "Point";
+        case Type::Box:
+            return "Box";
         case Type::Polygon:
             return "Polygon";
         case Type::Circle:
@@ -229,10 +231,26 @@ static std::string point_str(const GeoPoint& point)
     return util::format("[%1, %2]", point.longitude, point.latitude);
 }
 
+static std::string polygon_str(const GeoPolygon& poly) {
+    std::string points = "";
+    for (size_t i = 0; i < poly.points.size(); ++i) {
+        if (i != 0) {
+            points += ", ";
+        }
+        points += "{";
+        for (size_t j = 0; j < poly.points[i].size(); ++j) {
+            points += util::format("%1%2", j == 0 ? "" : ", ", point_str(poly.points[i][j]));
+        }
+        points += "}";
+    }
+    return util::format("GeoPolygon(%1)", points);
+}
+
 Status Geospatial::is_valid() const noexcept
 {
     switch (get_type()) {
         case Type::Polygon:
+        case Type::Box:
         case Type::Circle:
             return get_region().get_conversion_status();
         default:
@@ -258,19 +276,11 @@ std::string Geospatial::to_string() const
         util::overload{[](const GeoPoint& point) {
                            return util::format("GeoPoint(%1)", point_str(point));
                        },
+                       [](const GeoBox& box) {
+                           return polygon_str(box.to_polygon());
+                       },
                        [](const GeoPolygon& poly) {
-                           std::string points = "";
-                           for (size_t i = 0; i < poly.points.size(); ++i) {
-                               if (i != 0) {
-                                   points += ", ";
-                               }
-                               points += "{";
-                               for (size_t j = 0; j < poly.points[i].size(); ++j) {
-                                   points += util::format("%1%2", j == 0 ? "" : ", ", point_str(poly.points[i][j]));
-                               }
-                               points += "}";
-                           }
-                           return util::format("GeoPolygon(%1)", points);
+                           return polygon_str(poly);
                        },
                        [](const GeoCircle& circle) {
                            return util::format("GeoCircle(%1, %2)", point_str(circle.center), circle.radius_radians);
@@ -456,6 +466,14 @@ GeoRegion::GeoRegion(const Geospatial& geo)
             m_status_out = Status::OK();
         }
         Status& m_status_out;
+
+        std::unique_ptr<S2Region> operator()(const GeoBox& box) const
+        {
+            GeoPolygon polygon = box.to_polygon();
+            auto poly = std::make_unique<S2Polygon>();
+            m_status_out = parse_polygon_coordinates(polygon, poly.get());
+            return poly;
+        }
 
         std::unique_ptr<S2Region> operator()(const GeoPolygon& polygon) const
         {

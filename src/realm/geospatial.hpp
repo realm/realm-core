@@ -145,7 +145,7 @@ private:
 
 class Geospatial {
 public:
-    enum class Type : uint8_t { Invalid, Point, Polygon, Circle };
+    enum class Type : uint8_t { Invalid, Point, Box, Polygon, Circle };
 
     Geospatial()
         : m_value(mpark::monostate{})
@@ -156,7 +156,7 @@ public:
     {
     }
     Geospatial(GeoBox box)
-        : m_value(box.to_polygon())
+        : m_value(box)
     {
     }
     Geospatial(GeoPolygon polygon)
@@ -218,7 +218,7 @@ public:
 
 private:
     // Must be in the same order as the Type enum
-    mpark::variant<mpark::monostate, GeoPoint, GeoPolygon, GeoCircle> m_value;
+    mpark::variant<mpark::monostate, GeoPoint, GeoBox, GeoPolygon, GeoCircle> m_value;
 
     friend class GeoRegion;
 
@@ -230,6 +230,12 @@ template <>
 inline const GeoCircle& Geospatial::get<GeoCircle>() const noexcept
 {
     return mpark::get<GeoCircle>(m_value);
+}
+
+template <>
+inline const GeoBox& Geospatial::get<GeoBox>() const noexcept
+{
+    return mpark::get<GeoBox>(m_value);
 }
 
 template <>
