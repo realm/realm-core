@@ -2408,6 +2408,37 @@ TEST_CASE("C API", "[c_api]") {
                 CHECK(1 == count_list);
             }
 
+            SECTION("link in list") {
+                auto link = rlm_link_val(class_bar.key, realm_object_get_key(obj2.get()));
+                realm_value_t link_value = link;
+                write([&]() {
+                    CHECK(realm_set_value(obj1.get(), foo_properties["link"], link_value, false));
+                });
+
+                static const size_t num_args = 1;
+                realm_query_arg_t args[num_args] = {realm_query_arg_t{1, false, &link_value}};
+                realm_query_arg_t* arg = &args[0];
+
+                realm_value_t list_arg[num_args] = {link_value};
+                realm_query_arg_t args_in_list[num_args] = {realm_query_arg_t{num_args, true, &list_arg[0]}};
+                realm_query_arg_t* arg_list = &args_in_list[0];
+
+                auto q_link_single_param =
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "link == $0", num_args, arg));
+                auto q_link_in_list =
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "link IN $0", num_args, arg_list));
+
+                size_t count, count_list;
+
+                // change the link
+                link = rlm_null();
+
+                CHECK(checked(realm_query_count(q_link_single_param.get(), &count)));
+                CHECK(1 == count);
+                CHECK(checked(realm_query_count(q_link_in_list.get(), &count_list)));
+                CHECK(1 == count_list);
+            }
+
             SECTION("decimal NaN") {
                 realm_value_t decimal = rlm_decimal_nan();
 

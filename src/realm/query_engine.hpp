@@ -2372,11 +2372,21 @@ public:
     std::string describe(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_condition_column_key);
-        if (m_target_keys.size() > 1)
-            throw SerializationError("Serializing a query which links to multiple objects is currently unsupported.");
-        ObjLink link(m_table->get_opposite_table(m_condition_column_key)->get_key(), m_target_keys[0]);
+        std::string links = m_target_keys.size() > 1 ? "{" : "";
+        Group* g = m_table->get_parent_group();
+        auto target_table_key = m_table->get_opposite_table(m_condition_column_key)->get_key();
+        int cnt = 0;
+        for (auto key : m_target_keys) {
+            if (cnt++) {
+                links += ",";
+            }
+            links += util::serializer::print_value(ObjLink(target_table_key, key), g);
+        }
+        if (m_target_keys.size() > 1) {
+            links += "}";
+        }
         return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + describe_condition() + " " +
-               util::serializer::print_value(link, m_table->get_parent_group());
+               links;
     }
 
 protected:

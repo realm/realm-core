@@ -441,40 +441,50 @@ Query EqualityNode::visit(ParserDriver* drv)
             auto value = dynamic_cast<ValueBase*>(expr.get());
             auto left_dest_table_key = link_column->link_map().get_target_table()->get_key();
             auto sz = value->size();
+            auto obj_keys = std::make_unique<Value<ObjKey>>();
+            obj_keys->init(expr->has_multiple_values(), sz);
+            obj_keys->set_comparison_type(expr->get_comparison_type());
             for (size_t i = 0; i < sz; i++) {
                 auto val = value->get(i);
                 if (val.is_null()) {
                     if (sz == 1) {
                         type = ColumnTypeTraits<realm::null>::id;
                         expr = std::make_unique<Value<realm::null>>();
+                        return;
                     }
                 }
                 else {
-                    if (val.is_type(type_TypedLink)) {
-                        auto right_table_key = val.get_link().get_table_key();
-                        auto right_obj_key = val.get_link().get_obj_key();
-                        if (left_dest_table_key == right_table_key) {
-                            if (sz == 1) {
-                                expr = std::make_unique<Value<ObjKey>>(right_obj_key);
-                                type = type_Link;
-                            }
-                            else {
-                                REALM_ASSERT(type == type_Mixed);
-                                value->set(i, right_obj_key);
-                            }
-                        }
-                        else {
-                            const Group* g = drv->m_base_table->get_parent_group();
-                            throw InvalidQueryArgError(
-                                util::format("The relationship '%1' which links to type '%2' cannot be compared to "
-                                             "an argument of type %3",
-                                             link_column->link_map().description(drv->m_serializer_state),
-                                             link_column->link_map().get_target_table()->get_class_name(),
-                                             print_pretty_objlink(value->get(i).get_link(), g)));
-                        }
+                    TableKey right_table_key;
+                    ObjKey right_obj_key;
+                    if (val.is_type(type_Link)) {
+                        right_table_key = left_dest_table_key;
+                        right_obj_key = val.get<ObjKey>();
+                    }
+                    else if (val.is_type(type_TypedLink)) {
+                        right_table_key = val.get_link().get_table_key();
+                        right_obj_key = val.get_link().get_obj_key();
+                    }
+                    else {
+                        throw InvalidQueryError(util::format("Unsupported comparison between type '%1' and type '%2'",
+                                                             get_data_type_name(type_Link),
+                                                             get_data_type_name(val.get_type())));
+                    }
+                    if (left_dest_table_key == right_table_key) {
+                        obj_keys->set(i, right_obj_key);
+                    }
+                    else {
+                        const Group* g = drv->m_base_table->get_parent_group();
+                        throw InvalidQueryArgError(
+                            util::format("The relationship '%1' which links to type '%2' cannot be compared to "
+                                         "an argument of type %3",
+                                         link_column->link_map().description(drv->m_serializer_state),
+                                         link_column->link_map().get_target_table()->get_class_name(),
+                                         print_pretty_objlink(ObjLink(right_table_key, right_obj_key), g)));
                     }
                 }
             }
+            expr = std::move(obj_keys);
+            type = type_Link;
         }
     };
 
@@ -505,9 +515,32 @@ Query EqualityNode::visit(ParserDriver* drv)
         }
     }
 
-    const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
-    if (right->has_single_value() && (left_type == right_type || left_type == type_Mixed)) {
+    if (left_type == type_Link && left_type == right_type && right->has_constant_evaluation()) {
+        if (auto link_column = dynamic_cast<const Columns<Link>*>(left.get())) {
+            if (link_column->link_map().get_nb_hops() == 1 &&
+                link_column->get_comparison_type().value_or(ExpressionComparisonType::Any) ==
+                    ExpressionComparisonType::Any) {
+                REALM_ASSERT(dynamic_cast<const Value<ObjKey>*>(right.get()));
+                auto link_values = static_cast<const Value<ObjKey>*>(right.get());
+                // We can use a LinksToNode based query
+                std::vector<ObjKey> values;
+                for (auto val : *link_values) {
+                    values.emplace_back(val.get<ObjKey>());
+                }
+                if (op == CompareNode::EQUAL) {
+                    return drv->m_base_table->where().links_to(link_column->link_map().get_first_column_key(),
+                                                               values);
+                }
+                else if (op == CompareNode::NOT_EQUAL) {
+                    return drv->m_base_table->where().not_links_to(link_column->link_map().get_first_column_key(),
+                                                                   values);
+                }
+            }
+        }
+    }
+    else if (right->has_single_value() && (left_type == right_type || left_type == type_Mixed)) {
         Mixed val = right->get_mixed();
+        const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
         if (prop && !prop->links_exist()) {
             auto col_key = prop->column_key();
             if (val.is_null()) {
@@ -547,17 +580,12 @@ Query EqualityNode::visit(ParserDriver* drv)
             }
         }
         else if (left_type == type_Link) {
+            REALM_ASSERT(false);
             auto link_column = dynamic_cast<const Columns<Link>*>(left.get());
+            REALM_ASSERT(link_column);
             if (link_column && link_column->link_map().get_nb_hops() == 1 &&
                 link_column->get_comparison_type().value_or(ExpressionComparisonType::Any) ==
                     ExpressionComparisonType::Any) {
-                // We can use equal/not_equal and get a LinksToNode based query
-                if (op == CompareNode::EQUAL) {
-                    return drv->m_base_table->where().equal(link_column->link_map().get_first_column_key(), val);
-                }
-                else if (op == CompareNode::NOT_EQUAL) {
-                    return drv->m_base_table->where().not_equal(link_column->link_map().get_first_column_key(), val);
-                }
             }
         }
     }
