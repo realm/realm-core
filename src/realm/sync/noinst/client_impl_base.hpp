@@ -631,7 +631,7 @@ private:
     std::map<session_ident_type, std::unique_ptr<Session>> m_sessions;
     // Keep track of previously used sessions idents to see if a stale message was
     // received for a closed session
-    std::vector<session_ident_type> m_session_history;
+    std::unordered_set<session_ident_type> m_session_history;
 
     // A queue of sessions that have enlisted for an opportunity to send a
     // message to the server. Sessions will be served in the order that they
