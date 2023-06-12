@@ -2374,7 +2374,7 @@ TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "values.len == 2", 0), message);
-    CHECK_EQUAL(message, "Property 'table.values' is not an object reference");
+    CHECK_EQUAL(message, "Property 'table.values' has no property 'len'");
 }
 
 TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>, Nullable<Bool>, Prop<Float>,
@@ -2460,7 +2460,7 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
     }
     else {
         CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "values.length == 2", 0), message);
-        CHECK_EQUAL(message, "Property 'table.values' is not an object reference");
+        CHECK_EQUAL(message, "Property 'table.values' has no property 'length'");
     }
 }
 
@@ -3689,6 +3689,10 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
         items->add_search_index(item_name_col);
         t->add_search_index(id_col);
     }
+
+    verify_query(test_context, t, "items[FIRST].name == 'milk'", 2);
+    verify_query(test_context, t, "items[LAST].name == 'cereal'", 3);
+    verify_query(test_context, t, "items[1].name == 'oranges'", 1);
 
     // any is implied over list properties
     verify_query(test_context, t, "items.price == 5.5", 2);
@@ -4978,7 +4982,7 @@ TEST(Parser_Dictionary)
     verify_query(test_context, foo, "dict.@values > 50", 50);
     verify_query(test_context, foo, "dict['Value'] > 50", expected);
     verify_query_sub(test_context, foo, "dict[$0] > 50", args, num_args, expected);
-    verify_query(test_context, foo, "dict['Value'] > 50", expected);
+    verify_query(test_context, foo, "dict.Value > 50", expected);
     verify_query(test_context, foo, "ANY dict.@keys == 'Foo'", 20);
     verify_query(test_context, foo, "NONE dict.@keys == 'Value'", 23);
     verify_query(test_context, foo, "dict.@keys == {'Bar'}", 20);
@@ -5013,9 +5017,6 @@ TEST(Parser_Dictionary)
 
     dict.insert("Value", 4.5);
     std::string message;
-
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, origin, "link.dict.Value > 50", 3), message);
-    CHECK_EQUAL(message, "Property 'foo.dict' is not an object reference");
 
     // aggregates still work with mixed types
     verify_query(test_context, foo, "dict.@max == 100", 2);

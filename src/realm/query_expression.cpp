@@ -33,12 +33,12 @@ void LinkMap::set_base_table(ConstTableRef table)
     m_only_unary_links = true;
 
     for (size_t i = 0; i < m_link_column_keys.size(); i++) {
-        ColKey link_column_key = m_link_column_keys[i];
+        ColKey link_column_key = m_link_column_keys[i].get_col_key();
         // Link column can be either LinkList or single Link
         ColumnType type = link_column_key.get_type();
         REALM_ASSERT(Table::is_link_type(type) || type == col_type_BackLink);
-        if (type == col_type_LinkList || type == col_type_BackLink ||
-            (type == col_type_Link && link_column_key.is_collection())) {
+        if (!m_link_column_keys[i].has_index() && (type == col_type_LinkList || type == col_type_BackLink ||
+                                                   (type == col_type_Link && link_column_key.is_collection()))) {
             m_only_unary_links = false;
         }
 
@@ -64,7 +64,7 @@ std::string LinkMap::description(util::serializer::SerialisationState& state) co
     std::string s;
     for (size_t i = 0; i < m_link_column_keys.size(); ++i) {
         if (i < m_tables.size() && m_tables[i]) {
-            s += state.get_column_name(m_tables[i], m_link_column_keys[i]);
+            s += m_link_column_keys[i].get_description(m_tables[i], state);
             if (i != m_link_column_keys.size() - 1) {
                 s += util::serializer::value_separator;
             }
@@ -82,7 +82,7 @@ bool LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction lm) const
     }
 
     ColumnType type = m_link_types[column];
-    ColKey column_key = m_link_column_keys[column];
+    ColKey column_key = m_link_column_keys[column].get_col_key();
     const Obj obj = m_tables[column]->get_object(key);
     if (column_key.is_collection()) {
         auto coll = obj.get_linkcollection_ptr(column_key);
@@ -111,7 +111,7 @@ bool LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction lm) const
 void LinkMap::map_links(size_t column, size_t row, LinkMapFunction lm) const
 {
     ColumnType type = m_link_types[column];
-    ColKey column_key = m_link_column_keys[column];
+    ColKey column_key = m_link_column_keys[column].get_col_key();
     if (type == col_type_Link && !column_key.is_set()) {
         if (column_key.is_dictionary()) {
             auto& leaf = mpark::get<ArrayInteger>(m_leaf);
@@ -174,14 +174,14 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction lm) const
     }
 }
 
-std::vector<ObjKey> LinkMap::get_origin_ndxs(ObjKey key, size_t column) const
+std::vector<ObjKey> LinkMap::get_origin_objkeys(ObjKey key, size_t column) const
 {
     if (column == m_link_types.size()) {
         return {key};
     }
-    std::vector<ObjKey> keys = get_origin_ndxs(key, column + 1);
+    std::vector<ObjKey> keys = get_origin_objkeys(key, column + 1);
     std::vector<ObjKey> ret;
-    auto origin_col = m_link_column_keys[column];
+    auto origin_col = m_link_column_keys[column].get_col_key();
     auto origin = m_tables[column];
     auto link_type = m_link_types[column];
     if (link_type == col_type_BackLink) {

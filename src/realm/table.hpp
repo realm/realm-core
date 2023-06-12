@@ -34,7 +34,7 @@
 #include <realm/spec.hpp>
 #include <realm/query.hpp>
 #include <realm/cluster_tree.hpp>
-#include <realm/keys.hpp>
+#include <realm/path.hpp>
 #include <realm/global_key.hpp>
 
 // Only set this to one when testing the code paths that exercise object ID
@@ -1015,7 +1015,7 @@ public:
 
     ColKey get_current_col() const
     {
-        return m_link_cols.back();
+        return m_link_cols.back().get_col_key();
     }
 
     LinkChain& link(ColKey link_column)
@@ -1024,15 +1024,12 @@ public:
         return *this;
     }
 
-    LinkChain& link(std::string col_name)
+    bool link(std::string col_name)
     {
-        auto ck = m_current_table->get_column_key(col_name);
-        if (!ck) {
-            throw LogicError(ErrorCodes::InvalidProperty,
-                             util::format("'%1' has no property '%2'", m_current_table->get_class_name(), col_name));
+        if (auto ck = m_current_table->get_column_key(col_name)) {
+            return add(ck);
         }
-        add(ck);
-        return *this;
+        return false;
     }
 
     LinkChain& backlink(const Table& origin, ColKey origin_col_key)
@@ -1104,12 +1101,12 @@ private:
     friend class Table;
     friend class query_parser::ParserDriver;
 
-    std::vector<ColKey> m_link_cols;
+    std::vector<ExtendedColumnKey> m_link_cols;
     ConstTableRef m_current_table;
     ConstTableRef m_base_table;
     util::Optional<ExpressionComparisonType> m_comparison_type;
 
-    void add(ColKey ck);
+    bool add(ColKey ck);
 
     template <class T>
     std::unique_ptr<Subexpr> create_subexpr(ColKey col_key)

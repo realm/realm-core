@@ -171,6 +171,7 @@ set(REALM_INSTALL_HEADERS
     obj_list.hpp
     object_id.hpp
     owned_data.hpp
+    path.hpp
     query.hpp
     query_conditions.hpp
     query_engine.hpp
