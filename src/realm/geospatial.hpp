@@ -39,19 +39,6 @@ class TableRef;
 class Geospatial;
 
 struct GeoPoint {
-    GeoPoint() = delete;
-    GeoPoint(double lon, double lat)
-        : longitude(lon)
-        , latitude(lat)
-    {
-    }
-    GeoPoint(double lon, double lat, double alt)
-        : longitude(lon)
-        , latitude(lat)
-        , altitude(alt)
-    {
-    }
-
     double longitude = get_nan();
     double latitude = get_nan();
     double altitude = get_nan();
@@ -117,32 +104,6 @@ struct GeoBox {
 //   - Any interior ring must be entirely contained by the outer ring.
 //   - Interior rings cannot intersect or overlap each other. Interior rings cannot share an edge.
 struct GeoPolygon {
-    GeoPolygon(std::vector<GeoPoint>&& p)
-        : points({std::move(p)})
-    {
-    }
-    GeoPolygon(const std::vector<GeoPoint>& p)
-        : points({p})
-    {
-    }
-    GeoPolygon(std::vector<std::vector<GeoPoint>>&& p)
-        : points(std::move(p))
-    {
-    }
-    GeoPolygon(const std::vector<std::vector<GeoPoint>>& p)
-        : points(p)
-    {
-    }
-    GeoPolygon(const GeoPolygon& other) = default;
-    GeoPolygon(GeoPolygon&& other) = default;
-    GeoPolygon& operator=(const GeoPolygon& other) = default;
-    GeoPolygon& operator=(GeoPolygon&& other) = default;
-    GeoPolygon& operator=(std::initializer_list<std::vector<GeoPoint>>&& p)
-    {
-        points = std::move(p);
-        return *this;
-    }
-
     bool operator==(const GeoPolygon& other) const
     {
         return points == other.points;

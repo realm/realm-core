@@ -5040,6 +5040,7 @@ TEST(Parser_DictionaryObjects)
 
     Obj adam = persons->create_object_with_primary_key("adam");
     Obj bernie = persons->create_object_with_primary_key("bernie");
+    Obj charlie = persons->create_object_with_primary_key("charlie");
 
     Obj astro = dogs->create_object_with_primary_key("astro", {{col_age, 4}});
     Obj pluto = dogs->create_object_with_primary_key("pluto", {{col_age, 5}});
@@ -5055,17 +5056,24 @@ TEST(Parser_DictionaryObjects)
     bernie_pets.insert("dog1", astro);
     bernie_pets.insert("dog2", snoopy);
 
+    auto charlie_pets = charlie.get_dictionary(col_dict);
+    charlie_pets.insert("dog1", pluto);
+
     adam.set(col_friend, bernie.get_key());
     bernie.set(col_friend, adam.get_key());
 
     auto q = persons->link(col_dict).column<Int>(col_age) > 4;
-    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.count(), 2);
     q = persons->link(col_friend).link(col_dict).column<Int>(col_age) > 4;
     CHECK_EQUAL(q.count(), 1);
 
-    verify_query(test_context, persons, "pets.@values.age > 4", 1);
-    verify_query(test_context, persons, "pets.@values == obj('dog', 'pluto')", 1);
-    verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'pluto'), obj('dog', 'astro') }", 2);
+    verify_query(test_context, persons, "pets.@values.age > 4", 2);
+    verify_query(test_context, persons, "pets.@values == obj('dog', 'pluto')", 2);
+    verify_query(test_context, persons, "pets.@values != obj('dog', 'pluto')", 2);
+    verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'lady'), obj('dog', 'astro') }", 2);
+    // It is not legal to compare a list with NULL as a list cannot contain NULLs
+    CHECK_THROW_ANY(verify_query(test_context, persons,
+                                 "pets.@values == ANY { obj('dog', 'lady'), obj('dog', 'astro'), NULL }", 2));
 }
 
 TEST(Parser_DictionarySorting)
@@ -5765,7 +5773,8 @@ TEST(Parser_Geospatial)
 
     Geospatial box{GeoBox{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}}};
     Geospatial circle{GeoCircle{1, GeoPoint{0.3, 0.3}}};
-    Geospatial polygon{GeoPolygon{{GeoPoint{0, 0}, GeoPoint{1, 0}, GeoPoint{1, 1}, GeoPoint{0, 1}, GeoPoint{0, 0}}}};
+    Geospatial polygon{
+        GeoPolygon{{{GeoPoint{0, 0}, GeoPoint{1, 0}, GeoPoint{1, 1}, GeoPoint{0, 1}, GeoPoint{0, 0}}}}};
     Geospatial invalid;
     Geospatial point{GeoPoint{0, 0}};
     std::vector<Mixed> args = {Mixed{&box},          Mixed{&circle}, Mixed{&polygon}, Mixed{&invalid},

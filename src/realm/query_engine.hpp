@@ -2351,20 +2351,20 @@ public:
     {
         m_dT = 50.0;
         m_condition_column_key = origin_column_key;
-        m_column_type = origin_column_key.get_type();
-        REALM_ASSERT(m_column_type == col_type_Link || m_column_type == col_type_LinkList);
+        auto column_type = origin_column_key.get_type();
+        REALM_ASSERT(column_type == col_type_Link || column_type == col_type_LinkList);
         REALM_ASSERT(!m_target_keys.empty());
     }
 
     void cluster_changed() override
     {
-        if (m_column_type == col_type_Link) {
-            m_list.emplace(m_table.unchecked_ptr()->get_alloc());
-            m_leaf = &*m_list;
-        }
-        else if (m_column_type == col_type_LinkList) {
+        if (m_condition_column_key.is_collection()) {
             m_linklist.emplace(m_table.unchecked_ptr()->get_alloc());
             m_leaf = &*m_linklist;
+        }
+        else {
+            m_list.emplace(m_table.unchecked_ptr()->get_alloc());
+            m_leaf = &*m_list;
         }
         m_cluster->init_leaf(this->m_condition_column_key, m_leaf);
     }
@@ -2372,16 +2372,25 @@ public:
     std::string describe(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_condition_column_key);
-        if (m_target_keys.size() > 1)
-            throw SerializationError("Serializing a query which links to multiple objects is currently unsupported.");
-        ObjLink link(m_table->get_opposite_table(m_condition_column_key)->get_key(), m_target_keys[0]);
+        std::string links = m_target_keys.size() > 1 ? "{" : "";
+        Group* g = m_table->get_parent_group();
+        auto target_table_key = m_table->get_opposite_table(m_condition_column_key)->get_key();
+        int cnt = 0;
+        for (auto key : m_target_keys) {
+            if (cnt++) {
+                links += ",";
+            }
+            links += util::serializer::print_value(ObjLink(target_table_key, key), g);
+        }
+        if (m_target_keys.size() > 1) {
+            links += "}";
+        }
         return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + describe_condition() + " " +
-               util::serializer::print_value(link, m_table->get_parent_group());
+               links;
     }
 
 protected:
     std::vector<ObjKey> m_target_keys;
-    ColumnType m_column_type;
     std::optional<ArrayKey> m_list;
     std::optional<ArrayList> m_linklist;
     ArrayPayload* m_leaf = nullptr;
@@ -2389,7 +2398,6 @@ protected:
     LinksToNodeBase(const LinksToNodeBase& source)
         : ParentNode(source)
         , m_target_keys(source.m_target_keys)
-        , m_column_type(source.m_column_type)
     {
     }
 
