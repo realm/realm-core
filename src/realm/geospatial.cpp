@@ -231,7 +231,8 @@ static std::string point_str(const GeoPoint& point)
     return util::format("[%1, %2]", point.longitude, point.latitude);
 }
 
-static std::string polygon_str(const GeoPolygon& poly) {
+static std::string polygon_str(const GeoPolygon& poly)
+{
     std::string points = "";
     for (size_t i = 0; i < poly.points.size(); ++i) {
         if (i != 0) {
@@ -272,23 +273,23 @@ GeoRegion& Geospatial::get_region() const
 
 std::string Geospatial::to_string() const
 {
-    return mpark::visit(
-        util::overload{[](const GeoPoint& point) {
-                           return util::format("GeoPoint(%1)", point_str(point));
-                       },
-                       [](const GeoBox& box) {
-                           return polygon_str(box.to_polygon());
-                       },
-                       [](const GeoPolygon& poly) {
-                           return polygon_str(poly);
-                       },
-                       [](const GeoCircle& circle) {
-                           return util::format("GeoCircle(%1, %2)", point_str(circle.center), circle.radius_radians);
-                       },
-                       [](const mpark::monostate&) {
-                           return std::string("NULL");
-                       }},
-        m_value);
+    return mpark::visit(util::overload{[](const GeoPoint& point) {
+                                           return util::format("GeoPoint(%1)", point_str(point));
+                                       },
+                                       [](const GeoBox& box) {
+                                           return polygon_str(box.to_polygon());
+                                       },
+                                       [](const GeoPolygon& poly) {
+                                           return polygon_str(poly);
+                                       },
+                                       [](const GeoCircle& circle) {
+                                           return util::format("GeoCircle(%1, %2)", point_str(circle.center),
+                                                               circle.radius_radians);
+                                       },
+                                       [](const mpark::monostate&) {
+                                           return std::string("NULL");
+                                       }},
+                        m_value);
 }
 
 std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo)
