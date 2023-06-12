@@ -249,7 +249,11 @@ void CollectionList::insert_collection(const PathElement& index, CollectionType)
 CollectionBasePtr CollectionList::get_collection(const PathElement& path_element) const
 {
     REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) == m_level);
-    Index index = get_index(path_element);
+    return get_collection_by_index(get_index(path_element));
+}
+
+CollectionBasePtr CollectionList::get_collection_by_index(Index index) const
+{
     CollectionBasePtr coll = CollectionParent::get_collection_ptr(m_col_key);
     coll->set_owner(const_cast<CollectionList*>(this)->shared_from_this(), index);
     return coll;
@@ -289,9 +293,15 @@ CollectionListPtr CollectionList::get_collection_list(const PathElement& path_el
 {
     REALM_ASSERT(get_table()->get_nesting_levels(m_col_key) > m_level);
     Index index = get_index(path_element);
+    return get_collection_list_by_index(get_index(path_element));
+}
+
+CollectionListPtr CollectionList::get_collection_list_by_index(Index index) const
+{
     auto coll_type = get_table()->get_nested_column_type(m_col_key, m_level);
     return CollectionList::create(const_cast<CollectionList*>(this)->shared_from_this(), m_col_key, index, coll_type);
 }
+
 
 void CollectionList::remove(size_t ndx)
 {
@@ -427,7 +437,10 @@ void CollectionList::to_json(std::ostream& out, size_t link_depth, JSONOutputMod
     bool is_leaf = m_level == get_table()->get_nesting_levels(m_col_key);
     bool is_dictionary = m_coll_type == CollectionType::Dictionary;
     auto sz = size();
-    auto string_keys = dynamic_cast<BPlusTree<String>*>(m_keys.get());
+    BPlusTree<String>* string_keys = nullptr;
+    if (is_dictionary) {
+        string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
+    }
 
     bool print_close = false;
     if (output_mode == output_mode_xjson_plus && is_dictionary) {

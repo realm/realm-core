@@ -233,10 +233,8 @@ void ArrayMixed::move(ArrayMixed& dst, size_t ndx)
             Array keys(Array::get_alloc());
             keys.set_parent(const_cast<ArrayMixed*>(this), payload_idx_key);
             keys.init_from_ref(ref);
-            i = ndx;
-            while (i < sz) {
-                dst.set_key(i, keys.get(i));
-                i++;
+            for (size_t j = 0, i = ndx; i < sz; i++, j++) {
+                dst.set_key(j, keys.get(i));
             }
             keys.truncate(ndx);
         }

@@ -269,7 +269,7 @@ public:
         return {};
     }
 
-    // KVO hooks which will be called before and after modying a property from
+    // KVO hooks which will be called before and after modifying a property from
     // within Object::create().
     void will_change(Object const&, Property const&) {}
     void did_change() {}

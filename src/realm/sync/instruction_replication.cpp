@@ -678,13 +678,13 @@ void SyncReplication::dictionary_clear(const CollectionBase& dict)
     }
 }
 
-void SyncReplication::nullify_link(const Table* table, ColKey col_ndx, ObjKey ndx)
+void SyncReplication::nullify_link(const Table* table, ColKey col_key, ObjKey ndx)
 {
-    Replication::nullify_link(table, col_ndx, ndx);
+    Replication::nullify_link(table, col_key, ndx);
 
     if (select_table(*table)) {
         Instruction::Update instr;
-        populate_path_instr(instr, *table, ndx, {PathElement(col_ndx)});
+        populate_path_instr(instr, *table, ndx, {col_key});
         REALM_ASSERT(!instr.is_array_update());
         instr.value = Instruction::Payload{realm::util::none};
         instr.is_default = false;
