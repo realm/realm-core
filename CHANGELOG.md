@@ -17,6 +17,27 @@
 -----------
 
 ### Internals
+* None.
+
+----------------------------------------------
+
+# 13.15.0 Release notes
+
+### Enhancements
+* It is now allowed to open old frozen versions with a schema that contains additional classes, but not additional properties. ([PR 6693](https://github.com/realm/realm-core/issues/6693))
+
+### Fixed
+* Properties in the frozen _before_ Realm instance in the client reset callbacks may have had properties reordered which could lead to exceptions if accessed. ([PR 6693](https://github.com/realm/realm-core/issues/6693), since v13.11.0)
+
+### Breaking changes
+* A new provider called `IdentityProviderAPIKey` replaces both `IdentityProviderUserAPIKey` and `IdentityProviderServerAPIKey` since those two did the same thing. If SDKs wish to keep the old behaviour without requiring users to make code changes, they can adapt both their existing server and user API key providers to use the new core type. ([#5914](https://github.com/realm/realm-core/issues/5914))
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
 * Prebuilt libraries for Apple platforms are now built with Xcode 14.
 
 ----------------------------------------------
