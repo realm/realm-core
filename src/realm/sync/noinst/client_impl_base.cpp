@@ -391,6 +391,7 @@ void ClientImpl::Connection::finish_session_deactivation(Session* sess)
     REALM_ASSERT(sess->m_state == Session::Deactivated);
     auto ident = sess->m_ident;
     m_sessions.erase(ident);
+    m_session_history.erase(ident);
 }
 
 void Connection::force_close()
