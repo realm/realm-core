@@ -1589,7 +1589,7 @@ TEST_CASE("flx: geospatial", "[sync][flx][app]") {
                     constexpr size_t expected_results = 2;
                     for (auto& geo : valid_box_variations) {
                         size_t local_matches = run_query_locally(geo);
-                        size_t server_matches = run_query_on_server(make_polygon_filter(geo.get<GeoPolygon>()));
+                        size_t server_matches = run_query_on_server(make_polygon_filter(geo.get<GeoBox>().to_polygon()));
                         CHECK(local_matches == expected_results);
                         CHECK(server_matches == expected_results);
                     }
@@ -1603,7 +1603,7 @@ TEST_CASE("flx: geospatial", "[sync][flx][app]") {
                     for (auto& geo : invalid_boxes) {
                         REQUIRE_THROWS_CONTAINING(run_query_locally(geo),
                                                   "Invalid region in GEOWITHIN query for parameter 'GeoPolygon");
-                        run_query_on_server(make_polygon_filter(geo.get<GeoPolygon>()),
+                        run_query_on_server(make_polygon_filter(geo.get<GeoBox>().to_polygon()),
                                             "(BadValue) Loop must have at least 3 different vertices");
                     }
                 }
