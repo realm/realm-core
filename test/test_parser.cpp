@@ -5071,6 +5071,9 @@ TEST(Parser_DictionaryObjects)
     verify_query(test_context, persons, "pets.@values == obj('dog', 'pluto')", 2);
     verify_query(test_context, persons, "pets.@values != obj('dog', 'pluto')", 2);
     verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'lady'), obj('dog', 'astro') }", 2);
+    // It is not legal to compare a list with NULL as a list cannot contain NULLs
+    CHECK_THROW_ANY(verify_query(test_context, persons,
+                                 "pets.@values == ANY { obj('dog', 'lady'), obj('dog', 'astro'), NULL }", 2));
 }
 
 TEST(Parser_DictionarySorting)

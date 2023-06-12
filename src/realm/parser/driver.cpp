@@ -446,12 +446,9 @@ Query EqualityNode::visit(ParserDriver* drv)
             obj_keys->set_comparison_type(expr->get_comparison_type());
             for (size_t i = 0; i < sz; i++) {
                 auto val = value->get(i);
-                if (val.is_null()) {
-                    if (sz == 1) {
-                        type = ColumnTypeTraits<realm::null>::id;
-                        expr = std::make_unique<Value<realm::null>>();
-                        return;
-                    }
+                if (val.is_null() && !list->has_multiple_values()) {
+                    // It is allowed to compare a single link to NULL
+                    // i'th entry is already NULL, so nothing to do
                 }
                 else {
                     TableKey right_table_key;
@@ -465,9 +462,10 @@ Query EqualityNode::visit(ParserDriver* drv)
                         right_obj_key = val.get_link().get_obj_key();
                     }
                     else {
-                        throw InvalidQueryError(util::format("Unsupported comparison between type '%1' and type '%2'",
-                                                             get_data_type_name(type_Link),
-                                                             get_data_type_name(val.get_type())));
+                        const char* target_type = val.is_null() ? "NULL" : get_data_type_name(val.get_type());
+                        throw InvalidQueryError(
+                            util::format("Unsupported comparison between '%1' and type '%2'",
+                                         link_column->link_map().description(drv->m_serializer_state), target_type));
                     }
                     if (left_dest_table_key == right_table_key) {
                         obj_keys->set(i, right_obj_key);
@@ -524,8 +522,9 @@ Query EqualityNode::visit(ParserDriver* drv)
                 auto link_values = static_cast<const Value<ObjKey>*>(right.get());
                 // We can use a LinksToNode based query
                 std::vector<ObjKey> values;
+                values.reserve(link_values->size());
                 for (auto val : *link_values) {
-                    values.emplace_back(val.get<ObjKey>());
+                    values.emplace_back(val.is_null() ? ObjKey() : val.get<ObjKey>());
                 }
                 if (op == CompareNode::EQUAL) {
                     return drv->m_base_table->where().links_to(link_column->link_map().get_first_column_key(),
@@ -577,15 +576,6 @@ Query EqualityNode::visit(ParserDriver* drv)
                     return drv->simple_query(op, col_key, val, case_sensitive);
                 default:
                     break;
-            }
-        }
-        else if (left_type == type_Link) {
-            REALM_ASSERT(false);
-            auto link_column = dynamic_cast<const Columns<Link>*>(left.get());
-            REALM_ASSERT(link_column);
-            if (link_column && link_column->link_map().get_nb_hops() == 1 &&
-                link_column->get_comparison_type().value_or(ExpressionComparisonType::Any) ==
-                    ExpressionComparisonType::Any) {
             }
         }
     }
