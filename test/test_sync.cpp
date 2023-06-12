@@ -3729,7 +3729,8 @@ TEST(Sync_UploadDownloadProgress_6)
     server.stop();
     server_thread.join();
 
-    // The check is that we reach this point without deadlocking.
+    // The check is that we reach this point without deadlocking or throwing an assert while tearing
+    // down the active session
 }
 
 // This test has a single client starting to connect to the server with one session.
@@ -3780,7 +3781,8 @@ TEST(Sync_UploadDownloadProgress_7)
     server.stop();
     server_thread.join();
 
-    // The check is that we reach this point without deadlocking.
+    // The check is that we reach this point without deadlocking or throwing an assert while tearing
+    // down the session that is in the process of being created.
 }
 
 // Commenting out test for now and will be fixed in a later PR
