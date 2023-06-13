@@ -431,9 +431,9 @@ private:
             msg = HeaderLineParser(std::string_view(uncompressed_body_buffer.get(), uncompressed_body_size));
         }
 
-        logger.trace("Download message compression: is_body_compressed = %1, "
-                     "compressed_body_size=%2, uncompressed_body_size=%3",
-                     is_body_compressed, compressed_body_size, uncompressed_body_size);
+        logger.debug("Download message compression: session_ident=%1, is_body_compressed=%2, "
+                     "compressed_body_size=%3, uncompressed_body_size=%4",
+                     session_ident, is_body_compressed, compressed_body_size, uncompressed_body_size);
 
         ReceivedChangesets received_changesets;
 
@@ -456,10 +456,10 @@ private:
                                     "Server version in downloaded changeset cannot be zero");
             }
             auto changeset_data = msg.read_sized_data<BinaryData>(changeset_size);
-            logger.debug("Received: DOWNLOAD CHANGESET(server_version=%1, "
-                         "client_version=%2, origin_timestamp=%3, origin_file_ident=%4, "
-                         "original_changeset_size=%5, changeset_size=%6)",
-                         cur_changeset.remote_version, cur_changeset.last_integrated_local_version,
+            logger.debug("Received: DOWNLOAD CHANGESET(session_ident=%1, server_version=%2, "
+                         "client_version=%3, origin_timestamp=%4, origin_file_ident=%5, "
+                         "original_changeset_size=%6, changeset_size=%7)",
+                         session_ident, cur_changeset.remote_version, cur_changeset.last_integrated_local_version,
                          cur_changeset.origin_timestamp, cur_changeset.origin_file_ident,
                          cur_changeset.original_changeset_size, changeset_size); // Throws
             if (logger.would_log(util::Logger::Level::trace)) {
