@@ -33,7 +33,16 @@ namespace realm {
 std::ostream& operator<<(std::ostream& ostr, const PathElement& elem)
 {
     if (elem.is_ndx()) {
-        ostr << elem.get_ndx();
+        size_t ndx = elem.get_ndx();
+        if (ndx == 0) {
+            ostr << "FIRST";
+        }
+        else if (ndx == size_t(-1)) {
+            ostr << "LAST";
+        }
+        else {
+            ostr << elem.get_ndx();
+        }
     }
     else if (elem.is_col_key()) {
         ostr << elem.get_col_key();

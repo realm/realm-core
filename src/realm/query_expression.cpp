@@ -221,10 +221,9 @@ ColumnDictionaryKeys Columns<Dictionary>::keys()
     return ColumnDictionaryKeys(*this);
 }
 
-void Columns<Dictionary>::init_key(Mixed key_value)
+void Columns<Dictionary>::init_key(const PathElement& key_value)
 {
-    REALM_ASSERT(key_value.is_type(type_String));
-    m_key = key_value.get_string();
+    m_key = key_value.get_key();
 }
 
 void ColumnDictionaryKeys::set_cluster(const Cluster* cluster)

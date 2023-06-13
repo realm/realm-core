@@ -849,8 +849,9 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
     std::unique_ptr<Subexpr> subexpr{drv->column(m_link_chain, path)};
 
     if (!path->at_end()) {
-        if (path->is_identifier()) {
-            auto trailing = path->next_identifier();
+        const PathElement& path_element = *(path->current_path_elem++);
+        if (path_element.is_key()) {
+            auto trailing = path_element.get_key();
             if (auto dict = dynamic_cast<Columns<Dictionary>*>(subexpr.get())) {
                 if (trailing == "@values") {
                 }
@@ -858,7 +859,7 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
                     subexpr = std::make_unique<ColumnDictionaryKeys>(*dict);
                 }
                 else {
-                    dict->key(trailing);
+                    dict->key(path_element);
                 }
             }
             else {
@@ -879,9 +880,22 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
             }
         }
         else {
-            throw InvalidQueryError("Index not supported");
+            // This must be an integer index
+            auto ok = false;
+            if (auto coll = dynamic_cast<ColumnListBase*>(subexpr.get())) {
+                ok = coll->index(path_element);
+            }
+            if (!ok) {
+                throw InvalidQueryError(util::format("Property '%1.%2' does not support index '%3'",
+                                                     m_link_chain.get_current_table()->get_class_name(), identifier,
+                                                     path_element));
+            }
         }
     }
+    /*
+        if (!path->path_elems.back().index.is_null()) {
+        }
+    */
     if (post_op) {
         return post_op->visit(drv, subexpr.get());
     }

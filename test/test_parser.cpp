@@ -2392,7 +2392,7 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
     auto col_link = t->add_column(*t, "link");
 
     auto obj1 = t->create_object();
-    std::vector<type> values = gen.values_from_int<type>({0, 9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
+    std::vector<type> values = gen.values_from_int<type>({2, 9, 4, 0, 7, 4, 1, 8, 11, 3, 4, 5, 22});
     obj1.set_list_values(col, values);
     t->create_object();             // empty list
     auto obj3 = t->create_object(); // {1}
@@ -2403,10 +2403,12 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
     obj4.get_list<type>(col).add(value_1);
     auto obj5 = t->create_object(); // {null} or {0}
     obj5.get_list<type>(col).add(TEST_TYPE::default_value());
-
     for (auto it = t->begin(); it != t->end(); ++it) {
         it->set<ObjKey>(col_link, it->get_key()); // self links
     }
+    auto value_first = gen.convert_for_test<underlying_type>(2);
+    auto value_4 = gen.convert_for_test<underlying_type>(7);
+    auto value_last = gen.convert_for_test<underlying_type>(22);
 
     // repeat the same tests but over links, the tests are only the same because the links are self cycles
     std::vector<std::string> column_prefix = {"", "link.", "link.link."};
@@ -2419,8 +2421,8 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
         verify_query(test_context, t, util::format("%1values.@count == 13", path), 1); // obj1
         verify_query(test_context, t, util::format("%1values == NULL", path), (is_nullable ? 1 : 0)); // obj5
 
-        std::any args[] = {value_1};
-        size_t num_args = 1;
+        std::any args[] = {value_1, value_first, value_4, value_last};
+        size_t num_args = 4;
         size_t num_matching_value_1 = 3;                       // obj1, obj3, obj4
         size_t num_not_matching_value_1 = 2;                   // obj1, obj5
         size_t num_all_matching_value_1 = 3;                   // obj2, obj3, obj4
@@ -2435,6 +2437,9 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
             num_none_matching_value_1 = is_nullable ? 2 : 1;
             num_none_not_matching_value_1 = is_nullable ? 3 : 4;
         }
+        verify_query_sub(test_context, t, util::format("%1values[first] == $1", path), args, num_args, 1);
+        verify_query_sub(test_context, t, util::format("%1values[4] == $2", path), args, num_args, 1);
+        verify_query_sub(test_context, t, util::format("%1values[last] == $3", path), args, num_args, 1);
         verify_query_sub(test_context, t, util::format("%1values == $0", path), args, num_args, num_matching_value_1);
         verify_query_sub(test_context, t, util::format("%1values != $0", path), args, num_args,
                          num_not_matching_value_1);
@@ -4977,8 +4982,9 @@ TEST(Parser_Dictionary)
 
     verify_query(test_context, foo, "dict.@values > 50", 50);
     verify_query(test_context, foo, "dict['Value'] > 50", expected);
-    verify_query_sub(test_context, foo, "dict[$0] > 50", args, num_args, expected);
     verify_query(test_context, foo, "dict.Value > 50", expected);
+    verify_query_sub(test_context, foo, "dict[$0] > 50", args, num_args, expected);
+    verify_query(test_context, foo, "dict['Value'] > 50", expected);
     verify_query(test_context, foo, "ANY dict.@keys == 'Foo'", 20);
     verify_query(test_context, foo, "NONE dict.@keys == 'Value'", 23);
     verify_query(test_context, foo, "dict.@keys == {'Bar'}", 20);
@@ -4991,8 +4997,12 @@ TEST(Parser_Dictionary)
     verify_query(test_context, foo, "ALL dict.@type == 'int'", 100);  // all dictionaries have ints
     verify_query(test_context, foo, "NONE dict.@type == 'int'", 0);   // each object has Bar:i
     verify_query(test_context, foo, "ANY dict.@type == 'string'", 0); // no strings present
+    // Dictionaries are not ordered
+    CHECK_THROW_ANY(verify_query(test_context, foo, "dict[FIRST] > 50", expected));
+    CHECK_THROW_ANY(verify_query(test_context, foo, "dict[LAST] > 50", expected));
 
     verify_query(test_context, origin, "link.dict['Value'] > 50", 3);
+    verify_query(test_context, origin, "link.dict.Value > 50", 3);
     verify_query(test_context, origin, "links.dict['Value'] > 50", 5);
     verify_query(test_context, origin, "links.dict > 50", 6);
     verify_query(test_context, origin, "links.dict['Value'] == NULL", 10);
@@ -5216,6 +5226,8 @@ TEST_TYPES(Parser_Set, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128
         verify_query(test_context, table, "set.@min == value", 1); // 3
         verify_query(test_context, table, "set.@avg == value", 1); // 3
         verify_query(test_context, table, "set.@sum == value", 1); // 3
+        // Sets not indexable
+        CHECK_THROW_ANY(verify_query(test_context, table, "set[1] == 3", 2));
     }
     else {
         CHECK_THROW_ANY(verify_query(test_context, table, "set.@min > 100", 1));

@@ -2823,6 +2823,8 @@ public:
     virtual std::unique_ptr<Subexpr> sum_of() = 0;
     virtual std::unique_ptr<Subexpr> avg_of() = 0;
 
+    virtual bool index(const PathElement&) = 0;
+
     mutable ColKey m_column_key;
     LinkMap m_link_map;
     std::optional<ArrayInteger> m_leaf;
@@ -2849,6 +2851,7 @@ public:
         : Subexpr2<T>(other)
         , ColumnListBase(other)
         , m_is_nullable_storage(this->m_column_key.get_attrs().test(col_attr_Nullable))
+        , m_index(other.m_index)
     {
     }
 
@@ -2899,7 +2902,12 @@ public:
 
     std::string description(util::serializer::SerialisationState& state) const override
     {
-        return ColumnListBase::description(state);
+        std::string index_string;
+        if (m_index) {
+            PathElement p(*m_index);
+            index_string = "[" + util::to_string(p) + "]";
+        }
+        return ColumnListBase::description(state) + index_string;
     }
 
     util::Optional<ExpressionComparisonType> get_comparison_type() const final
@@ -2990,7 +2998,14 @@ public:
     {
         return std::unique_ptr<Subexpr>(new ColumnsCollection(*this));
     }
+
+    bool index(const PathElement& ndx) override
+    {
+        m_index = ndx.get_ndx();
+        return true;
+    }
     const bool m_is_nullable_storage;
+    std::optional<size_t> m_index;
 
 private:
     template <typename StorageType>
@@ -3007,9 +3022,20 @@ private:
             if (list_ref) {
                 BPlusTree<StorageType> list(alloc);
                 list.init_from_ref(list_ref);
-                size_t s = list.size();
-                for (size_t j = 0; j < s; j++) {
-                    values.push_back(list.get(j));
+                if (size_t s = list.size()) {
+                    if (m_index) {
+                        if (*m_index < s) {
+                            values.push_back(list.get(*m_index));
+                        }
+                        else if (*m_index == size_t(-1)) {
+                            values.push_back(list.get(s - 1));
+                        }
+                    }
+                    else {
+                        for (size_t j = 0; j < s; j++) {
+                            values.push_back(list.get(j));
+                        }
+                    }
                 }
             }
         }
@@ -3037,6 +3063,10 @@ public:
     std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<Columns<Set<T>>>(*this);
+    }
+    bool index(const PathElement&) override
+    {
+        return false;
     }
 };
 
@@ -3074,11 +3104,23 @@ public:
             util::Optional<ExpressionComparisonType> type = util::none)
         : ColumnsCollection<Mixed>(column, table, std::move(links), type)
     {
-        m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(column);
+        m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(m_column_key);
+    }
+
+    Columns(const Path& path, ConstTableRef table, std::vector<ColKey> links = {},
+            util::Optional<ExpressionComparisonType> type = util::none)
+        : ColumnsCollection<Mixed>(path[0].get_col_key(), table, std::move(links), type)
+    {
+        if (path.size() == 1) {
+            m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(m_column_key);
+        }
+        if (path.size() == 2) {
+            init_key(path[1]);
+        }
     }
 
     // Change the node to handle a specific key value only
-    Columns<Dictionary>& key(const Mixed& key_value)
+    Columns<Dictionary>& key(const PathElement& key_value)
     {
         init_key(key_value);
         return *this;
@@ -3114,6 +3156,11 @@ public:
         return make_subexpr<Columns<Dictionary>>(*this);
     }
 
+    bool index(const PathElement&) override
+    {
+        return false;
+    }
+
     Columns(Columns const& other)
         : ColumnsCollection<Mixed>(other)
         , m_key_type(other.m_key_type)
@@ -3122,10 +3169,10 @@ public:
     }
 
 protected:
-    DataType m_key_type;
+    DataType m_key_type = type_String;
     util::Optional<std::string> m_key;
 
-    void init_key(Mixed key_value);
+    void init_key(const PathElement& key_value);
 };
 
 // Returns the keys

@@ -284,17 +284,9 @@ public:
     {
         return current_path_elem == path_elems.end();
     }
-    bool is_identifier() const
-    {
-        return current_path_elem->is_key();
-    }
     const std::string& next_identifier()
     {
         return (current_path_elem++)->get_key();
-    }
-    size_t next_index()
-    {
-        return (current_path_elem++)->get_ndx();
     }
     const std::string& last_identifier()
     {
