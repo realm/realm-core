@@ -446,11 +446,8 @@ Query EqualityNode::visit(ParserDriver* drv)
             obj_keys->set_comparison_type(expr->get_comparison_type());
             for (size_t i = 0; i < sz; i++) {
                 auto val = value->get(i);
-                if (val.is_null() && !list->has_multiple_values()) {
-                    // It is allowed to compare a single link to NULL
-                    // i'th entry is already NULL, so nothing to do
-                }
-                else {
+                // i'th entry is already NULL
+                if (!val.is_null()) {
                     TableKey right_table_key;
                     ObjKey right_obj_key;
                     if (val.is_type(type_Link)) {
@@ -462,7 +459,7 @@ Query EqualityNode::visit(ParserDriver* drv)
                         right_obj_key = val.get_link().get_obj_key();
                     }
                     else {
-                        const char* target_type = val.is_null() ? "NULL" : get_data_type_name(val.get_type());
+                        const char* target_type = get_data_type_name(val.get_type());
                         throw InvalidQueryError(
                             util::format("Unsupported comparison between '%1' and type '%2'",
                                          link_column->link_map().description(drv->m_serializer_state), target_type));
