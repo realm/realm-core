@@ -25,17 +25,7 @@ add_custom_command(
         # (Right now there are no imports)
 )
 
-set(OPT_IN_SCHEMA_FILE ${CMAKE_CURRENT_SOURCE_DIR}/generated/opt-in-spec.schema.json)
-add_custom_command(
-    OUTPUT ${OPT_IN_SCHEMA_FILE}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMAND ${NPX} typescript-json-schema ${CMAKE_CURRENT_SOURCE_DIR}/tsconfig.json OptInSpec --include ${CMAKE_CURRENT_SOURCE_DIR}/src/spec/model.ts --out ${OPT_IN_SCHEMA_FILE} --required --noExtraProps
-    VERBATIM
-    MAIN_DEPENDENCY src/spec/model.ts
-    DEPENDS
-)
-
-add_custom_target(BindgenSpecJsonSchema DEPENDS ${SCHEMA_FILE} ${OPT_IN_SCHEMA_FILE})
+add_custom_target(BindgenSpecJsonSchema DEPENDS ${SCHEMA_FILE})
 
 # Stash these variables as properties so they can be read from the bindgen() function.
 # Using the BindgenSpecJsonSchema target for scoping, not because it actually has anything to do with that.
