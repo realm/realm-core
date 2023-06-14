@@ -320,6 +320,19 @@ struct SessionErrorInfo : public ProtocolErrorInfo {
 
 enum class ConnectionState { disconnected, connecting, connected };
 
+inline std::ostream& operator<<(std::ostream& os, ConnectionState state)
+{
+    switch (state) {
+        case ConnectionState::disconnected:
+            return os << "Disconnected";
+        case ConnectionState::connecting:
+            return os << "Connecting";
+        case ConnectionState::connected:
+            return os << "Connected";
+    }
+    REALM_TERMINATE("Invalid ConnectionState value");
+}
+
 } // namespace realm::sync
 
 #endif // REALM_SYNC_CLIENT_BASE_HPP

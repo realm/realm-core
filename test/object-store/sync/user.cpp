@@ -35,7 +35,7 @@ using File = realm::util::File;
 static const std::string base_path = util::make_temp_dir() + "realm_objectstore_sync_user/";
 static const std::string dummy_device_id = "123400000000000000000000";
 
-TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
+TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync][local]") {
     TestSyncManager init_sync_manager;
     auto sync_manager = init_sync_manager.app()->sync_manager();
     const std::string identity = "sync_test_identity";
@@ -89,7 +89,7 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
     }
 }
 
-TEST_CASE("sync_user: update state and tokens", "[sync]") {
+TEST_CASE("sync_user: update state and tokens", "[sync][local]") {
     TestSyncManager init_sync_manager;
     auto sync_manager = init_sync_manager.app()->sync_manager();
     const std::string identity = "sync_test_identity";
@@ -118,7 +118,7 @@ TEST_CASE("sync_user: update state and tokens", "[sync]") {
     sync_manager->remove_user(identity);
 }
 
-TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]") {
+TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync][local]") {
     TestSyncManager init_sync_manager(SyncManager::MetadataMode::NoMetadata);
     auto sync_manager = init_sync_manager.app()->sync_manager();
     const std::string identity = "sync_test_identity";
@@ -153,7 +153,7 @@ TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]"
     }
 }
 
-TEST_CASE("sync_user: logout", "[sync]") {
+TEST_CASE("sync_user: logout", "[sync][local]") {
     TestSyncManager init_sync_manager(SyncManager::MetadataMode::NoMetadata);
     auto sync_manager = init_sync_manager.app()->sync_manager();
     const std::string identity = "sync_test_identity";
@@ -169,7 +169,7 @@ TEST_CASE("sync_user: logout", "[sync]") {
     }
 }
 
-TEST_CASE("sync_user: user persistence", "[sync]") {
+TEST_CASE("sync_user: user persistence", "[sync][local]") {
     TestSyncManager tsm(SyncManager::MetadataMode::NoEncryption);
     auto sync_manager = tsm.app()->sync_manager();
     auto file_manager = SyncFileManager(tsm.base_file_path(), tsm.app()->config().app_id);
