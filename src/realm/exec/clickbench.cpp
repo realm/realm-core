@@ -163,8 +163,8 @@ static int strtoi(const char* p, char** endp)
 inline int64_t epoch_days_fast(int y, int m, int d)
 {
     const uint32_t year_base = 4800; /* Before min year, multiple of 400. */
-    const uint32_t m_adj = m - 3;    /* March-based month. */
-    const uint32_t carry = m_adj > m ? 1 : 0;
+    const int32_t m_adj = m - 3;     /* March-based month. */
+    const uint32_t carry = (m_adj > m) ? 1 : 0;
     const uint32_t adjust = carry ? 12 : 0;
     const uint32_t y_adj = y + year_base - carry;
     const uint32_t month_days = ((m_adj + adjust) * 62719 + 769) / 2048;
@@ -298,9 +298,9 @@ void import(const char* filename)
             // verify
             for (auto& e : val) {
                 if (e.col_key.get_type() == col_type_EnumString) {
-                    auto got_string = o.get<std::unique_ptr<std::string>>(e.col_key);
+                    auto got_string = o.get<StringData>(e.col_key);
                     if (got_string)
-                        REALM_ASSERT(*got_string == e.value.get_string());
+                        REALM_ASSERT(got_string == e.value.get_string());
                 }
             }
         }

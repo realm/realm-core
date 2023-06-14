@@ -4123,6 +4123,8 @@ int hash(uint16_t a, uint16_t b)
 #define INTERN_ONLY 0
 #define COMPRESS_BEFORE_INTERNING 1
 
+thread_local std::unique_ptr<std::string> tls_held_string;
+
 class Table::string_interner {
 public:
 #if INTERN_ONLY
@@ -4222,7 +4224,7 @@ public:
         }
         return size;
     }
-    std::unique_ptr<std::string> decompress(uint64_t id)
+    StringData decompress(uint64_t id)
     {
         if (id == 0) {
             REALM_ASSERT(null_used);
@@ -4258,7 +4260,8 @@ public:
         for (unsigned i = 0; i < size; ++i) {
             retval->push_back(decompressed[i] & 0xFF);
         }
-        return retval;
+        tls_held_string = std::move(retval);
+        return {tls_held_string->data(), size};
     }
     void decompress_and_verify(uint16_t symbols[], int size, const char* first, const char* past)
     {
@@ -4419,9 +4422,9 @@ public:
     size_t num_unique_values()
     {
 #if INTERN_ONLY
-        return strings.size() + null_used ? 1 : 0;
+        return strings.size() + (null_used ? 1 : 0);
 #else
-        return symbols.size() + null_used ? 1 : 0;
+        return symbols.size() + (null_used ? 1 : 0);
 #endif
     }
     void get_interning_stats(size_t& _total_chars, size_t& _unique, size_t& _dict_size)
@@ -4486,7 +4489,7 @@ size_t Table::get_num_unique_values(ColKey col_key) const
     return interner->num_unique_values();
 }
 
-std::unique_ptr<std::string> Table::get_enum_string(ColKey col_key, size_t id)
+StringData Table::get_enum_string(ColKey col_key, size_t id)
 {
     if (!id)
         return nullptr;

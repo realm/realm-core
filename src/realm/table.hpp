@@ -720,7 +720,7 @@ private:
     size_t add_insert_enum_string(ColKey col_key, StringData value);
     size_t search_enum_string(ColKey col_key, StringData value);
     size_t get_num_unique_values(ColKey col_key) const;
-    std::unique_ptr<std::string> get_enum_string(ColKey col_key, size_t id);
+    StringData get_enum_string(ColKey col_key, size_t id);
     bool is_null_enum_string(ColKey col_key, size_t id);
 
 

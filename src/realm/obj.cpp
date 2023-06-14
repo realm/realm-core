@@ -285,13 +285,15 @@ T Obj::get(ColKey col_key) const
 }
 
 template <>
-std::unique_ptr<std::string> Obj::get(ColKey col_key) const
+StringData Obj::get(ColKey col_key) const
 {
     m_table->check_column(col_key);
     ColumnType type = col_key.get_type();
-    REALM_ASSERT(type == col_type_EnumString);
-    int64_t id = _get<Int>(col_key.get_index());
-    return m_table->get_enum_string(col_key, id);
+    if (type == col_type_EnumString) {
+        int64_t id = _get<Int>(col_key.get_index());
+        return m_table->get_enum_string(col_key, id);
+    }
+    return _get<StringData>(col_key.get_index());
 }
 
 template <class T>
