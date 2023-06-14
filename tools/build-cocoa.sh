@@ -53,6 +53,7 @@ if [[ -n $BUILD ]]; then
         -D REALM_ENABLE_GEOSPATIAL=OFF \
         -D CPACK_SYSTEM_NAME=macosx \
         -D CPACK_PACKAGE_DIRECTORY=.. \
+        -D CMAKE_OSX_ARCHITECTURES='x86_64;arm64' \
         ${CMAKE_FLAGS} \
         -G Xcode ..
 

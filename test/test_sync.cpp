@@ -1468,7 +1468,8 @@ TEST(Sync_Randomized)
     for (size_t i = 1; i < num_clients; ++i) {
         ReadTransaction rt(client_shared_groups[i]);
         rt.get_group().verify();
-        CHECK(compare_groups(rt_0, rt));
+        // Logger is guaranteed to be defined
+        CHECK(compare_groups(rt_0, rt, *test_context.logger));
     }
 }
 
@@ -3696,6 +3697,7 @@ TEST(Sync_UploadDownloadProgress_6)
     session_config.signed_user_token = g_signed_test_user_token;
 
     std::mutex mutex;
+    std::condition_variable session_cv;
     auto session = std::make_unique<Session>(client, db, nullptr, nullptr, std::move(session_config));
 
     auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
@@ -3709,20 +3711,78 @@ TEST(Sync_UploadDownloadProgress_6)
         CHECK_EQUAL(snapshot_version, 1);
         std::lock_guard lock{mutex};
         session.reset();
+        session_cv.notify_one();
     };
 
     session->set_progress_handler(progress_handler);
 
     {
-        std::lock_guard lock{mutex};
+        std::unique_lock lock{mutex};
         session->bind();
+        // Wait until the progress handler is called on the session before tearing down the client
+        session_cv.wait_for(lock, std::chrono::seconds(30), [&session]() {
+            return !bool(session);
+        });
     }
 
     client.shutdown_and_wait();
     server.stop();
     server_thread.join();
 
-    // The check is that we reach this point without deadlocking.
+    // The check is that we reach this point without deadlocking or throwing an assert while tearing
+    // down the active session
+}
+
+// This test has a single client starting to connect to the server with one session.
+// The client is torn down immediately after bind is called on the session.
+// The session will still be active and has an unactualized session wrapper when the
+// client is torn down, which leads to both calls to finalize_before_actualization() and
+// and finalize().
+TEST(Sync_UploadDownloadProgress_7)
+{
+    TEST_DIR(server_dir);
+    TEST_CLIENT_DB(db);
+
+    Server::Config server_config;
+    server_config.logger = std::make_shared<util::PrefixLogger>("Server: ", test_context.logger);
+    server_config.listen_address = "localhost";
+    server_config.listen_port = "";
+    server_config.tcp_no_delay = true;
+
+    util::Optional<PKey> public_key = PKey::load_public(test_server_key_path());
+    Server server(server_dir, std::move(public_key), server_config);
+    server.start();
+
+    auto server_port = server.listen_endpoint().port();
+
+    ThreadWrapper server_thread;
+    server_thread.start([&] {
+        server.run();
+    });
+
+    Client::Config client_config;
+    client_config.logger = std::make_shared<util::PrefixLogger>("Client: ", test_context.logger);
+    auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(client_config.logger, "");
+    client_config.socket_provider = socket_provider;
+    client_config.reconnect_mode = ReconnectMode::testing;
+    client_config.one_connection_per_session = false;
+    Client client(client_config);
+
+    Session::Config session_config;
+    session_config.server_address = "localhost";
+    session_config.server_port = server_port;
+    session_config.realm_identifier = "/test";
+    session_config.signed_user_token = g_signed_test_user_token;
+
+    auto session = std::make_unique<Session>(client, db, nullptr, nullptr, std::move(session_config));
+    session->bind();
+
+    client.shutdown_and_wait();
+    server.stop();
+    server_thread.join();
+
+    // The check is that we reach this point without deadlocking or throwing an assert while tearing
+    // down the session that is in the process of being created.
 }
 
 // Commenting out test for now and will be fixed in a later PR

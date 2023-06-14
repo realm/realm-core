@@ -73,7 +73,8 @@ static void error(emscripten_fetch_t* fetch)
         emscripten_fetch_close(fetch);
     });
     std::unique_ptr<FetchState> state(reinterpret_cast<FetchState*>(fetch->userData));
-    state->completion_block({0, 0, {}, {}, {}});
+    state->completion_block(
+        {fetch->status, 0, {}, std::string(fetch->data, size_t(fetch->numBytes)), ErrorCodes::HTTPError});
 }
 
 void EmscriptenNetworkTransport::send_request_to_server(

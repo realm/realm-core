@@ -844,11 +844,19 @@ TEST_CASE("SharedRealm: schema_subset_mode") {
     SECTION("obtaining a frozen realm with an incompatible schema throws") {
         config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
         auto old_realm = Realm::get_shared_realm(config);
+        {
+            auto tr = db->start_write();
+            auto table = tr->get_table("class_object");
+            table->create_object();
+            tr->commit();
+        }
         old_realm->read_group();
 
         {
             auto tr = db->start_write();
-            tr->add_table("class_object 2")->add_column(type_Int, "value");
+            auto table = tr->add_table("class_object 2");
+            ColKey val_col = table->add_column(type_Int, "value");
+            table->create_object().set(val_col, 1);
             tr->commit();
         }
 
@@ -862,10 +870,46 @@ TEST_CASE("SharedRealm: schema_subset_mode") {
         REQUIRE(old_realm->freeze()->schema().size() == 1);
         REQUIRE(new_realm->freeze()->schema().size() == 2);
         REQUIRE(Realm::get_frozen_realm(config, new_realm->read_transaction_version())->schema().size() == 2);
-        // Fails because the requested version doesn't have the "object 2" table
-        // required by the config
+        // An additive change is allowed, the unknown table is empty
+        REQUIRE(Realm::get_frozen_realm(config, old_realm->read_transaction_version())->schema().size() == 2);
+
+        config.schema = Schema{{"object", {{"value", PropertyType::String}}}}; // int -> string
+        // Fails because the schema has an invalid breaking change
+        REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, new_realm->read_transaction_version()),
+                          InvalidReadOnlySchemaChangeException);
         REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, old_realm->read_transaction_version()),
-                          InvalidExternalSchemaChangeException);
+                          InvalidReadOnlySchemaChangeException);
+        config.schema = Schema{
+            {"object", {{"value", PropertyType::Int}}},
+            {"object 2", {{"value", PropertyType::String}}}, // int -> string
+        };
+        // fails due to invalid change on object 2 type
+        REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, new_realm->read_transaction_version()),
+                          InvalidReadOnlySchemaChangeException);
+        // opening the old state does not fail because the schema is an additive change
+        auto frozen_old = Realm::get_frozen_realm(config, old_realm->read_transaction_version());
+        REQUIRE(frozen_old->schema().size() == 2);
+        {
+            TableRef table = frozen_old->read_group().get_table("class_object");
+            Results results(frozen_old, table);
+            REQUIRE(results.is_frozen());
+            REQUIRE(results.size() == 1);
+        }
+        {
+            TableRef table = frozen_old->read_group().get_table("class_object 2");
+            REQUIRE(!table);
+            Results results(frozen_old, table);
+            REQUIRE(results.is_frozen());
+            REQUIRE(results.size() == 0);
+        }
+        config.schema = Schema{
+            {"object", {{"value", PropertyType::Int}, {"value 2", PropertyType::String}}}, // add property
+        };
+        // fails due to additional property on object
+        REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, old_realm->read_transaction_version()),
+                          InvalidReadOnlySchemaChangeException);
+        REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, new_realm->read_transaction_version()),
+                          InvalidReadOnlySchemaChangeException);
     }
 }
 

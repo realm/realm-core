@@ -34,6 +34,18 @@ bool operator==(Schema const& a, Schema const& b) noexcept
 {
     return static_cast<Schema::base const&>(a) == static_cast<Schema::base const&>(b);
 }
+
+std::ostream& operator<<(std::ostream& os, const Schema& schema)
+{
+    for (auto& o : schema) {
+        os << o.name << ":\n";
+        for (auto& p : o.persisted_properties) {
+            os << util::format("\t%1<%2>\n", p.name, string_for_property_type(p.type));
+        }
+    }
+    return os;
+}
+
 } // namespace realm
 
 Schema::Schema() noexcept = default;
