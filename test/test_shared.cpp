@@ -4145,7 +4145,8 @@ TEST(Shared_CopyReplication)
     CHECK(*rt == *wt);
 }
 
-TEST(Shared_WriteTo)
+// NICO
+ONLY(Shared_WriteTo)
 {
     SHARED_GROUP_TEST_PATH(path1);
     SHARED_GROUP_TEST_PATH(path2);
@@ -4172,6 +4173,13 @@ TEST(Shared_WriteTo)
         baas->add_column(*embedded, "embedded");
         baas->add_column(type_Mixed, "any", true);
         baas->add_column(*foos, "link");
+
+        // NICO: test stuff here.
+        // nested collections
+        baas->add_column(type_Mixed, "mixed_nested_list", true);
+        baas->add_column(type_Mixed, "mixed_nested_dictionary", true);
+        // auto col_list_list = baas->add_column(type_Int, "int_list_list", false, {CollectionType::List,
+        // CollectionType::List});
 
         auto col_str = foos->add_column(type_String, "str");
         foos->add_search_index(col_str);
@@ -4210,6 +4218,43 @@ TEST(Shared_WriteTo)
         dict.insert("key7", 7);
         dict.insert("key8", 8);
         dict.insert("key9", 9);
+
+        // nested collections
+        // nested list
+        auto col_key_mixed_list = baas->get_column_key("mixed_nested_list");
+        baa.set_collection(col_key_mixed_list, CollectionType::List);
+        auto any_nested_list = baa.get_collection_ptr(col_key_mixed_list);
+        any_nested_list->insert_collection(0, CollectionType::List);
+        any_nested_list->insert_collection(1, CollectionType::Dictionary);
+        // any_nested_list->insert_collection(2, CollectionType::Set);
+        auto nested_list1 = any_nested_list->get_list(0);
+        nested_list1->add(1);
+        nested_list1->add(2);
+        nested_list1->add(3);
+        auto nested_dict1 = any_nested_list->get_dictionary(1);
+        nested_dict1->insert("test", 10);
+        nested_dict1->insert("test", "test");
+        // auto nested_set1 = any_nested_list->get_set(2);
+        // nested_set1->insert(10);
+        // nested_set1->insert(12);
+
+        // nested dictionary
+        //  auto col_key_mixed_dict = baas->get_column_key("mixed_nested_dictionary");
+        //  baa.set_collection(col_key_mixed_dict, CollectionType::Dictionary);
+        //  auto any_nested_dict = baa.get_collection_ptr(col_key_mixed_dict);
+        //  any_nested_dict->insert_collection("List", CollectionType::List);
+        //  any_nested_dict->insert_collection("Dict", CollectionType::Dictionary);
+        //  //any_nested_dict->insert_collection("Set", CollectionType::Set);
+        //  auto nested_list2 = any_nested_dict->get_list("List");
+        //  nested_list2->add(1);
+        //  nested_list2->add(2);
+        //  nested_list2->add(3);
+        //  auto nested_dict2 = any_nested_dict->get_dictionary("Dict");
+        //  nested_dict2->insert("test", 10);
+        //  nested_dict2->insert("test", "test");
+        //  auto nested_set2 = any_nested_dict->get_set("Set");
+        //  nested_set2->insert(10);
+        //  nested_set2->insert(12);
 
         auto baa1 = baas->create_object_with_primary_key(666).set("link", foo.get_key());
         obj = baa1.create_and_set_linked_object(baas->get_column_key("embedded"));

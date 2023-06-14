@@ -16,6 +16,8 @@
  *
  **************************************************************************/
 
+#include <iostream>
+
 #include "realm/obj.hpp"
 #include "realm/array_basic.hpp"
 #include "realm/array_integer.hpp"
@@ -233,40 +235,81 @@ Replication* Obj::get_replication() const
     return m_table->get_repl();
 }
 
+bool Obj::compare_values(Mixed val1, Mixed val2, ColKey ck, Obj other, StringData col_name) const
+{
+    if (val1.is_null()) {
+        if (!val2.is_null())
+            return false;
+    }
+    else {
+        if (val1.get_type() != val2.get_type())
+            return false;
+        if (val1.is_type(type_Link, type_TypedLink)) {
+            auto o1 = _get_linked_object(ck, val1);
+            auto o2 = other._get_linked_object(col_name, val2);
+            if (o1.m_table->is_embedded()) {
+                return o1 == o2;
+            }
+            else {
+                return o1.get_primary_key() == o2.get_primary_key();
+            }
+        }
+        else {
+            const auto type = val1.get_type();
+            if (type == type_List) {
+                auto coll1 = get_listbase_ptr(ck);
+                auto coll2 = other.get_listbase_ptr(other.get_column_key(col_name));
+                return compare_collections_in_mixed(*coll1, *coll2, ck, other, col_name);
+            }
+            else if (type == type_Dictionary) {
+                auto coll1 = get_dictionary_ptr(ck);
+                auto coll2 = other.get_dictionary_ptr(other.get_column_key(col_name));
+                return compare_collections_in_mixed(*coll1, *coll2, ck, other, col_name);
+            }
+            return val1 == val2;
+        }
+    }
+    return true;
+}
+
+bool Obj::compare_collections_in_mixed(CollectionBase& val1, CollectionBase& val2, ColKey ck, Obj other,
+                                       StringData col_name) const
+{
+    if (val1.size() != val2.size())
+        return false;
+
+    for (size_t i = 0; i < val1.size(); ++i) {
+        auto m1 = val1.get_any(i);
+        auto m2 = val2.get_any(i);
+
+        if (m1.is_type(type_List) && m2.is_type(type_List)) {
+            return compare_collections_in_mixed(*val1.get_list(i), *val2.get_list(i), ck, other, col_name);
+        }
+        else if (m1.is_type(type_Dictionary) && m2.is_type(type_Dictionary)) {
+            return compare_collections_in_mixed(*val1.get_dictionary(i), *val2.get_dictionary(i), ck, other,
+                                                col_name);
+        }
+        else if (!compare_values(m1, m2, ck, other, col_name)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 
 bool Obj::operator==(const Obj& other) const
 {
     for (auto ck : m_table->get_column_keys()) {
         StringData col_name = m_table->get_column_name(ck);
 
-        auto compare_values = [&](Mixed val1, Mixed val2) {
-            if (val1.is_null()) {
-                if (!val2.is_null())
-                    return false;
-            }
-            else {
-                if (val1.get_type() != val2.get_type())
-                    return false;
-                if (val1.is_type(type_Link, type_TypedLink)) {
-                    auto o1 = _get_linked_object(ck, val1);
-                    auto o2 = other._get_linked_object(col_name, val2);
-                    if (o1.m_table->is_embedded()) {
-                        return o1 == o2;
-                    }
-                    else {
-                        return o1.get_primary_key() == o2.get_primary_key();
-                    }
-                }
-                else {
-                    if (val1 != val2)
-                        return false;
-                }
-            }
-            return true;
+        std::cout << "Compare col_name: " << col_name << std::endl;
+
+        auto compare = [&](Mixed m1, Mixed m2) {
+            return compare_values(m1, m2, ck, other, col_name);
         };
 
         if (!ck.is_collection()) {
-            if (!compare_values(get_any(ck), other.get_any(col_name)))
+            if (!compare(get_any(ck), other.get_any(col_name)))
                 return false;
         }
         else {
@@ -277,7 +320,7 @@ bool Obj::operator==(const Obj& other) const
                 return false;
             if (ck.is_list() || ck.is_set()) {
                 for (size_t i = 0; i < sz; i++) {
-                    if (!compare_values(coll1->get_any(i), coll2->get_any(i)))
+                    if (!compare(coll1->get_any(i), coll2->get_any(i)))
                         return false;
                 }
             }
@@ -289,7 +332,7 @@ bool Obj::operator==(const Obj& other) const
                     auto val2 = dict2->try_get(key);
                     if (!val2)
                         return false;
-                    if (!compare_values(value, *val2))
+                    if (!compare(value, *val2))
                         return false;
                 }
             }

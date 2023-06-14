@@ -24,6 +24,8 @@
 #include <realm/table_view.hpp>
 #include <realm/group_writer.hpp>
 
+#include <iostream>
+
 namespace {
 
 using namespace realm;
@@ -45,8 +47,53 @@ ColInfo get_col_info(const Table* table)
     return cols;
 }
 
+template <typename Func>
+void add_dictionary_to_repl(Dictionary& dict, Replication& repl, bool is_embedded, Func update_embedded)
+{
+    size_t sz = dict.size();
+    for (size_t n = 0; n < sz; ++n) {
+        const auto& [key, val] = dict.get_pair(n);
+        repl.dictionary_insert(dict, n, key, val);
+        if (val.is_type(type_List)) {
+            auto n_list = dict.get_list({key.get_string()});
+            add_list_to_repl(*n_list, *dict.get_table()->get_repl(), is_embedded, update_embedded);
+        }
+        else if (val.is_type(type_Dictionary)) {
+            repl.dictionary_insert(dict, n, key, val);
+            auto n_dict = dict.get_dictionary({key.get_string()});
+            add_dictionary_to_repl(*n_dict, *dict.get_table()->get_repl(), is_embedded, update_embedded);
+        }
+        else if (is_embedded) {
+            update_embedded(val);
+        }
+    }
+}
+
+template <typename Func>
+void add_list_to_repl(CollectionBase& list, Replication& repl, bool is_embedded, Func update_embedded)
+{
+    auto sz = list.size();
+    for (size_t n = 0; n < sz; n++) {
+        auto val = list.get_any(n);
+        std::cout << "Write List -- type:" << val.get_type() << std::endl;
+        repl.list_insert(list, n, val, n);
+        if (val.is_type(type_List)) {
+            auto n_list = list.get_list({n});
+            add_list_to_repl(*n_list, *list.get_table()->get_repl(), is_embedded, update_embedded);
+        }
+        else if (val.is_type(type_Dictionary)) {
+            auto n_dict = list.get_dictionary({n});
+            add_dictionary_to_repl(*n_dict, *list.get_table()->get_repl(), is_embedded, update_embedded);
+        }
+        else if (is_embedded) {
+            update_embedded(val);
+        }
+    }
+}
+
 void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInfo& cols)
 {
+    // NICO copy things in here.
     for (auto elem : cols) {
         auto col = elem.first;
         auto embedded_table = elem.second;
@@ -61,16 +108,10 @@ void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInf
         };
 
         if (col.is_list()) {
+            const auto is_embedded = embedded_table != nullptr;
             auto list = obj.get_listbase_ptr(col);
-            auto sz = list->size();
             repl.list_clear(*list);
-            for (size_t n = 0; n < sz; n++) {
-                auto val = list->get_any(n);
-                repl.list_insert(*list, n, val, n);
-                if (embedded_table) {
-                    update_embedded(val);
-                }
-            }
+            add_list_to_repl(*list, repl, is_embedded, update_embedded);
         }
         else if (col.is_set()) {
             auto set = obj.get_setbase_ptr(col);
@@ -81,20 +122,27 @@ void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInf
             }
         }
         else if (col.is_dictionary()) {
+            const auto is_embedded = embedded_table != nullptr;
             auto dict = obj.get_dictionary(col);
-            size_t n = 0;
-            for (auto [key, value] : dict) {
-                repl.dictionary_insert(dict, n++, key, value);
-                if (embedded_table) {
-                    update_embedded(value);
-                }
-            }
+            add_dictionary_to_repl(dict, repl, is_embedded, update_embedded);
         }
         else {
             auto val = obj.get_any(col);
-            repl.set(obj.get_table().unchecked_ptr(), col, obj.get_key(), val);
-            if (embedded_table) {
-                update_embedded(val);
+            if (!val.is_null() && val.get_type() == type_List) {
+                const auto is_embedded = embedded_table != nullptr;
+                auto list = obj.get_collection_ptr(col);
+                add_list_to_repl(*list, repl, is_embedded, update_embedded);
+            }
+            else if (!val.is_null() && val.get_type() == type_Dictionary) {
+                const auto is_embedded = embedded_table != nullptr;
+                auto dict = obj.get_dictionary(col);
+                add_dictionary_to_repl(dict, repl, is_embedded, update_embedded);
+            }
+            else {
+                repl.set(obj.get_table().unchecked_ptr(), col, obj.get_key(), val);
+                if (embedded_table) {
+                    update_embedded(val);
+                }
             }
         }
     }
@@ -580,13 +628,13 @@ void Transaction::replicate(Transaction* dest, Replication& repl) const
         auto table = get_table(tk);
         if (table->is_embedded())
             continue;
-        // std::cout << "Table: " << table->get_name() << std::endl;
+        std::cout << "Table: " << table->get_name() << std::endl;
         auto pk_col = table->get_primary_key_column();
         auto cols = get_col_info(table.unchecked_ptr());
         for (auto o : *table) {
             auto obj_key = o.get_key();
             Mixed pk = o.get_any(pk_col);
-            // std::cout << "    Object: " << pk << std::endl;
+            std::cout << "    Object: " << pk << std::endl;
             repl.create_object_with_primary_key(table.unchecked_ptr(), obj_key, pk);
             generate_properties_for_obj(repl, o, cols);
             if (--n == 0) {

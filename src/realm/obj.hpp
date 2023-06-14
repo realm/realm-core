@@ -412,6 +412,9 @@ private:
     inline void nullify_single_link(ColKey col, ValueType target);
 
     void fix_linking_object_during_schema_migration(Obj linking_obj, Obj obj, ColKey opposite_col_key) const;
+
+    bool compare_values(Mixed, Mixed, ColKey, Obj, StringData) const;
+    bool compare_collections_in_mixed(CollectionBase&, CollectionBase&, ColKey, Obj, StringData) const;
 };
 
 std::ostream& operator<<(std::ostream&, const Obj& obj);
