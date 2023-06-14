@@ -199,9 +199,10 @@ struct PathElement {
     }
 };
 
-std::ostream& operator<<(std::ostream& ostr, const PathElement& elem);
-
 using Path = std::vector<PathElement>;
+
+std::ostream& operator<<(std::ostream& ostr, const PathElement& elem);
+std::ostream& operator<<(std::ostream& ostr, const Path& path);
 
 // Path from the group level.
 struct FullPath {

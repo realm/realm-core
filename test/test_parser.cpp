@@ -5114,6 +5114,88 @@ TEST(Parser_DictionarySorting)
     CHECK_EQUAL(results.get_object(3).get_key(), astro.get_key());
 }
 
+TEST(Parser_DictionaryNestedList)
+{
+    Group g;
+    auto persons = g.add_table_with_primary_key("table", type_String, "name");
+    auto col = persons->add_column_dictionary(type_Mixed, "properties");
+
+    Obj paul = persons->create_object_with_primary_key("Paul");
+    auto dict_paul = paul.get_dictionary(col);
+    dict_paul.insert_collection("tickets", CollectionType::List);
+    auto list1 = dict_paul.get_list("tickets");
+    list1->add(0);
+    list1->add(1);
+    list1->add(4);
+
+    Obj john = persons->create_object_with_primary_key("John");
+    auto dict_john = john.get_dictionary(col);
+    dict_john.insert_collection("tickets", CollectionType::List);
+    auto list2 = dict_john.get_list("tickets");
+    list2->add(2);
+    list2->add(3);
+    list2->add(4);
+
+    verify_query(test_context, persons, "properties.tickets[0] == 0", 1);
+    verify_query(test_context, persons, "properties.tickets[last] == 4", 2);
+}
+
+TEST(Parser_ListNestedDictionary)
+{
+    Group g;
+    auto persons = g.add_table_with_primary_key("table", type_String, "name");
+    auto col = persons->add_column_list(type_Mixed, "properties");
+
+    Obj paul = persons->create_object_with_primary_key("Paul");
+    auto list_paul = paul.get_list<Mixed>(col);
+    list_paul.insert_collection(0, CollectionType::Dictionary);
+    auto dict1 = list_paul.get_dictionary(0);
+    dict1->insert("one", 1);
+    dict1->insert("two", 2);
+    dict1->insert("three", 3);
+
+    Obj john = persons->create_object_with_primary_key("John");
+    auto list_john = john.get_list<Mixed>(col);
+    list_john.insert_collection(0, CollectionType::Dictionary);
+    auto dict2 = list_john.get_dictionary(0);
+    dict2->insert("two", 2);
+    dict2->insert("four", 4);
+
+    verify_query(test_context, persons, "properties[0].one == 1", 1);
+    verify_query(test_context, persons, "properties[first].two == 2", 2);
+}
+
+TEST(Parser_NestedDictionaryList)
+{
+    Group g;
+    auto persons = g.add_table_with_primary_key("table", type_String, "name");
+    // Be aware - this is not a dictionary property
+    auto col = persons->add_column(type_Mixed, "properties");
+    auto col_self = persons->add_column(*persons, "self");
+
+    Obj paul = persons->create_object_with_primary_key("Paul");
+    paul.set(col_self, paul.get_key());
+    auto dict_paul = paul.get_dictionary(col);
+    dict_paul.insert_collection("tickets", CollectionType::List);
+    auto list1 = dict_paul.get_list("tickets");
+    list1->add(0);
+    list1->add(1);
+    list1->add(4);
+
+    Obj john = persons->create_object_with_primary_key("John");
+    john.set(col_self, john.get_key());
+    auto dict_john = john.get_dictionary(col);
+    dict_john.insert_collection("tickets", CollectionType::List);
+    auto list2 = dict_john.get_list("tickets");
+    list2->add(2);
+    list2->add(3);
+    list2->add(4);
+
+    verify_query(test_context, persons, "properties.tickets[0] == 0", 1);
+    verify_query(test_context, persons, "properties.tickets[last] == 4", 2);
+    verify_query(test_context, persons, "self.properties.tickets[last] == 4", 2);
+}
+
 TEST_TYPES(Parser_DictionaryAggregates, Prop<float>, Prop<double>, Prop<Decimal128>)
 {
     using type = typename TEST_TYPE::type;

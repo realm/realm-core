@@ -54,6 +54,14 @@ std::ostream& operator<<(std::ostream& ostr, const PathElement& elem)
     return ostr;
 }
 
+std::ostream& operator<<(std::ostream& ostr, const Path& path)
+{
+    for (auto& elem : path) {
+        ostr << '[' << elem << ']';
+    }
+    return ostr;
+}
+
 /***************************** CollectionParent ******************************/
 
 CollectionParent::~CollectionParent() {}

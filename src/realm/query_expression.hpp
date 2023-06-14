@@ -1714,6 +1714,11 @@ public:
         return m_column_key;
     }
 
+    virtual bool has_path() const noexcept
+    {
+        return false;
+    }
+
 protected:
     LinkMap m_link_map;
     // Column index of payload column of m_table
@@ -1986,7 +1991,38 @@ class Columns<Decimal128> : public SimpleQuerySupport<Decimal128> {
 
 template <>
 class Columns<Mixed> : public SimpleQuerySupport<Mixed> {
+public:
     using SimpleQuerySupport::SimpleQuerySupport;
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        SimpleQuerySupport::evaluate(index, destination);
+        if (m_path.size() > 0) {
+            if (auto sz = destination.size()) {
+                for (size_t i = 0; i < sz; i++) {
+                    Mixed val = Collection::get_any(destination.get(i), m_path.begin(), m_path.end(),
+                                                    get_base_table()->get_alloc());
+                    destination.set(i, val);
+                }
+            }
+        }
+    }
+    std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return ObjPropertyExpr::description(state) + util::to_string(m_path);
+    }
+    void path(const Path& path)
+    {
+        for (auto& elem : path) {
+            m_path.emplace_back(elem);
+        }
+    }
+    bool has_path() const noexcept override
+    {
+        return !m_path.empty();
+    }
+
+private:
+    Path m_path;
 };
 
 template <>
@@ -3007,7 +3043,7 @@ public:
     const bool m_is_nullable_storage;
     std::optional<size_t> m_index;
 
-private:
+protected:
     template <typename StorageType>
     void evaluate(size_t index, ValueBase& destination)
     {
@@ -3093,6 +3129,47 @@ public:
     }
 };
 
+template <>
+class Columns<Lst<Mixed>> : public ColumnsCollection<Mixed> {
+public:
+    using ColumnsCollection<Mixed>::ColumnsCollection;
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<Columns<Lst<Mixed>>>(*this);
+    }
+    friend class Table;
+    friend class LinkChain;
+    bool indexes(const Path& path)
+    {
+        ColumnsCollection<Mixed>::index(path[0]);
+        for (auto& elem : path) {
+            m_path.emplace_back(elem);
+        }
+        return true;
+    }
+    std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return ColumnListBase::description(state) + util::to_string(m_path);
+    }
+
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        ColumnsCollection<Mixed>::evaluate<Mixed>(index, destination);
+        if (m_path.size() > 1) {
+            if (auto sz = destination.size()) {
+                for (size_t i = 0; i < sz; i++) {
+                    Mixed val =
+                        Collection::get_any(destination.get(i), m_path.begin() + 1, m_path.end(), get_alloc());
+                    destination.set(i, val);
+                }
+            }
+        }
+    }
+
+private:
+    Path m_path;
+};
+
 // Returns the keys
 class ColumnDictionaryKeys;
 
@@ -3114,15 +3191,23 @@ public:
         if (path.size() == 1) {
             m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(m_column_key);
         }
-        if (path.size() == 2) {
-            init_key(path[1]);
+        if (path.size() > 1) {
+            init_path(&path[1], &*path.end());
         }
     }
 
     // Change the node to handle a specific key value only
-    Columns<Dictionary>& key(const PathElement& key_value)
+    Columns<Dictionary>& key(StringData key)
     {
-        init_key(key_value);
+        PathElement p(key);
+        init_path(&p, &p + 1);
+        return *this;
+    }
+
+    // Change the node to handle a specific key value only
+    Columns<Dictionary>& key(const Path& path)
+    {
+        init_path(&path[0], &*path.end());
         return *this;
     }
 
@@ -3144,11 +3229,7 @@ public:
 
     std::string description(util::serializer::SerialisationState& state) const override
     {
-        std::string key_string;
-        if (m_key) {
-            key_string = "['" + *m_key + "']";
-        }
-        return ColumnListBase::description(state) + key_string;
+        return ColumnListBase::description(state) + util::to_string(m_path);
     }
 
     std::unique_ptr<Subexpr> clone() const override
@@ -3164,15 +3245,15 @@ public:
     Columns(Columns const& other)
         : ColumnsCollection<Mixed>(other)
         , m_key_type(other.m_key_type)
-        , m_key(other.m_key)
+        , m_path(other.m_path)
     {
     }
 
 protected:
     DataType m_key_type = type_String;
-    util::Optional<std::string> m_key;
+    Path m_path;
 
-    void init_key(const PathElement& key_value);
+    void init_path(const PathElement* begin, const PathElement* end);
 };
 
 // Returns the keys
