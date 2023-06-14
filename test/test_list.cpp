@@ -672,7 +672,6 @@ TEST(List_NestedListColumns)
 
 TEST(List_NestedList_Insert)
 {
-    // NICO here for column of explicit nested collection
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(make_in_realm_history(), path);
     auto tr = db->start_write();
@@ -744,7 +743,6 @@ TEST(List_NestedList_Insert)
 
 TEST(List_Nested_InMixed)
 {
-    // NICO here for column of any
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(make_in_realm_history(), path);
     auto tr = db->start_write();

@@ -23,9 +23,6 @@
 #include <realm/dictionary.hpp>
 #include <realm/table_view.hpp>
 #include <realm/group_writer.hpp>
-
-#include <iostream>
-
 namespace {
 
 using namespace realm;
@@ -75,7 +72,6 @@ void add_list_to_repl(CollectionBase& list, Replication& repl, bool is_embedded,
     auto sz = list.size();
     for (size_t n = 0; n < sz; n++) {
         auto val = list.get_any(n);
-        std::cout << "Write List -- type:" << val.get_type() << std::endl;
         repl.list_insert(list, n, val, n);
         if (val.is_type(type_List)) {
             auto n_list = list.get_list({n});
@@ -93,7 +89,6 @@ void add_list_to_repl(CollectionBase& list, Replication& repl, bool is_embedded,
 
 void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInfo& cols)
 {
-    // NICO copy things in here.
     for (auto elem : cols) {
         auto col = elem.first;
         auto embedded_table = elem.second;
@@ -628,13 +623,11 @@ void Transaction::replicate(Transaction* dest, Replication& repl) const
         auto table = get_table(tk);
         if (table->is_embedded())
             continue;
-        std::cout << "Table: " << table->get_name() << std::endl;
         auto pk_col = table->get_primary_key_column();
         auto cols = get_col_info(table.unchecked_ptr());
         for (auto o : *table) {
             auto obj_key = o.get_key();
             Mixed pk = o.get_any(pk_col);
-            std::cout << "    Object: " << pk << std::endl;
             repl.create_object_with_primary_key(table.unchecked_ptr(), obj_key, pk);
             generate_properties_for_obj(repl, o, cols);
             if (--n == 0) {

@@ -16,8 +16,6 @@
  *
  **************************************************************************/
 
-#include <iostream>
-
 #include "realm/obj.hpp"
 #include "realm/array_basic.hpp"
 #include "realm/array_integer.hpp"
@@ -259,12 +257,12 @@ bool Obj::compare_values(Mixed val1, Mixed val2, ColKey ck, Obj other, StringDat
             if (type == type_List) {
                 auto coll1 = get_listbase_ptr(ck);
                 auto coll2 = other.get_listbase_ptr(other.get_column_key(col_name));
-                return compare_collections_in_mixed(*coll1, *coll2, ck, other, col_name);
+                return compare_list_in_mixed(*coll1, *coll2, ck, other, col_name);
             }
             else if (type == type_Dictionary) {
                 auto coll1 = get_dictionary_ptr(ck);
                 auto coll2 = other.get_dictionary_ptr(other.get_column_key(col_name));
-                return compare_collections_in_mixed(*coll1, *coll2, ck, other, col_name);
+                return compare_dict_in_mixed(*coll1, *coll2, ck, other, col_name);
             }
             return val1 == val2;
         }
@@ -272,22 +270,25 @@ bool Obj::compare_values(Mixed val1, Mixed val2, ColKey ck, Obj other, StringDat
     return true;
 }
 
-bool Obj::compare_collections_in_mixed(CollectionBase& val1, CollectionBase& val2, ColKey ck, Obj other,
-                                       StringData col_name) const
+bool Obj::compare_list_in_mixed(LstBase& val1, LstBase& val2, ColKey ck, Obj other, StringData col_name) const
 {
     if (val1.size() != val2.size())
         return false;
 
     for (size_t i = 0; i < val1.size(); ++i) {
+
         auto m1 = val1.get_any(i);
         auto m2 = val2.get_any(i);
 
         if (m1.is_type(type_List) && m2.is_type(type_List)) {
-            return compare_collections_in_mixed(*val1.get_list(i), *val2.get_list(i), ck, other, col_name);
+            DummyParent parent(get_table(), m2.get_ref());
+            Lst<Mixed> list(parent, 0);
+            return compare_list_in_mixed(*val1.get_list(i), list, ck, other, col_name);
         }
         else if (m1.is_type(type_Dictionary) && m2.is_type(type_Dictionary)) {
-            return compare_collections_in_mixed(*val1.get_dictionary(i), *val2.get_dictionary(i), ck, other,
-                                                col_name);
+            DummyParent parent(get_table(), m2.get_ref());
+            Dictionary dict(parent, 0);
+            return compare_dict_in_mixed(*val1.get_dictionary(i), dict, ck, other, col_name);
         }
         else if (!compare_values(m1, m2, ck, other, col_name)) {
             return false;
@@ -296,14 +297,39 @@ bool Obj::compare_collections_in_mixed(CollectionBase& val1, CollectionBase& val
     return true;
 }
 
+bool Obj::compare_dict_in_mixed(Dictionary& val1, Dictionary& val2, ColKey ck, Obj other, StringData col_name) const
+{
+    if (val1.size() != val2.size())
+        return false;
+
+    for (size_t i = 0; i < val1.size(); ++i) {
+
+        auto [k1, m1] = val1.get_pair(i);
+        auto [k2, m2] = val2.get_pair(i);
+        if (k1 != k2)
+            return false;
+
+        if (m1.is_type(type_List) && m2.is_type(type_List)) {
+            DummyParent parent(get_table(), m2.get_ref());
+            Lst<Mixed> list(parent, 0);
+            return compare_list_in_mixed(*val1.get_list(k1.get_string()), list, ck, other, col_name);
+        }
+        else if (m1.is_type(type_Dictionary) && m2.is_type(type_Dictionary)) {
+            DummyParent parent(get_table(), m2.get_ref());
+            Dictionary dict(parent, 0);
+            return compare_dict_in_mixed(*val1.get_dictionary(k1.get_string()), dict, ck, other, col_name);
+        }
+        else if (!compare_values(m1, m2, ck, other, col_name)) {
+            return false;
+        }
+    }
+    return true;
+}
 
 bool Obj::operator==(const Obj& other) const
 {
     for (auto ck : m_table->get_column_keys()) {
         StringData col_name = m_table->get_column_name(ck);
-
-        std::cout << "Compare col_name: " << col_name << std::endl;
-
         auto compare = [&](Mixed m1, Mixed m2) {
             return compare_values(m1, m2, ck, other, col_name);
         };

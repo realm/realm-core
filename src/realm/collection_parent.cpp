@@ -126,8 +126,7 @@ LstBasePtr CollectionParent::get_listbase_ptr(ColKey col_key) const
 {
     auto table = get_table();
     auto attr = table->get_column_attr(col_key);
-    REALM_ASSERT(attr.test(col_attr_List) ||
-                 attr.test(col_attr_Nullable)); // tmp but collection can be also inside a mixed
+    REALM_ASSERT(attr.test(col_attr_List) || attr.test(col_attr_Nullable));
     bool nullable = attr.test(col_attr_Nullable);
 
     switch (table->get_column_type(col_key)) {
