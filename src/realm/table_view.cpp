@@ -489,7 +489,8 @@ void TableView::do_sync()
 
         if (m_query->m_view)
             m_query->m_view->sync_if_needed();
-        m_query->do_find_all(*const_cast<TableView*>(this), m_limit);
+        QueryStateFindAll<KeyColumn> st(m_key_values, m_limit);
+        m_query->do_find_all(st);
     }
 
     do_sort(m_descriptor_ordering);
