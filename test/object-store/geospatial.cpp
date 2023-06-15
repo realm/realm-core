@@ -37,10 +37,6 @@
 #include <realm/group.hpp>
 #include <realm/util/any.hpp>
 
-#if REALM_ENABLE_AUTH_TESTS
-#include "sync/flx_sync_harness.hpp"
-#endif // REALM_ENABLE_AUTH_TESTS
-
 #include <cstdint>
 
 using namespace realm;

@@ -18,11 +18,12 @@
 
 #include <catch2/catch_all.hpp>
 
-#include "collection_fixtures.hpp"
-#include "sync/sync_test_utils.hpp"
+#include "util/collection_fixtures.hpp"
 #include "util/baas_admin_api.hpp"
+#include "util/baas_test_utils.hpp"
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
+#include "util/sync_test_utils.hpp"
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 
@@ -109,7 +110,7 @@ TableRef get_table(Realm& realm, StringData object_type)
 namespace cf = realm::collection_fixtures;
 using reset_utils::create_object;
 
-TEST_CASE("sync: large reset with recovery is restartable", "[client reset][baas]") {
+TEST_CASE("sync: large reset with recovery is restartable", "[sync][pbs][baas][client_reset]") {
     const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
@@ -204,7 +205,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset][baas
     REQUIRE(expected_obj_ids == found_object_ids);
 }
 
-TEST_CASE("sync: pending client resets are cleared when downloads are complete", "[client reset][baas]") {
+TEST_CASE("sync: pending client resets are cleared when downloads are complete", "[sync][pbs][baas][client_reset]") {
     const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
@@ -261,7 +262,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
     wait_for_download(*realm, std::chrono::minutes(10));
 }
 
-TEST_CASE("sync: client reset", "[client reset][baas]") {
+TEST_CASE("sync: client reset", "[sync][pbs][baas][client_reset]") {
     if (!util::EventLoop::has_implementation())
         return;
 
@@ -1781,7 +1782,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
     } // end: The server can prohibit recovery
 }
 
-TEST_CASE("sync: Client reset during async open", "[client reset][baas]") {
+TEST_CASE("sync: Client reset during async open", "[sync][pbs][baas][client_reset]") {
     const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
@@ -1876,8 +1877,8 @@ TEST_CASE("sync: Client reset during async open", "[client reset][baas]") {
 #endif // REALM_ENABLE_AUTH_TESTS
 
 namespace cf = realm::collection_fixtures;
-TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
-                   cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
+TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][local][client_reset][types]", cf::MixedVal, cf::Int, cf::Bool,
+                   cf::Float, cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
                    cf::BoxedOptional<cf::Int>, cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>,
                    cf::BoxedOptional<cf::Double>, cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>,
                    cf::UnboxedOptional<cf::String>, cf::UnboxedOptional<cf::Binary>, cf::UnboxedOptional<cf::Date>,
@@ -2516,7 +2517,7 @@ private:
 
 } // namespace test_instructions
 
-TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][links][collections]",
+TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][local][client_reset][links][collections]",
                    cf::ListOfObjects, cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,
                    cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks)
 {
@@ -2944,7 +2945,7 @@ void combine_array_values(std::vector<T>& from, const std::vector<T>& to)
     }
 }
 
-TEST_CASE("client reset with embedded object", "[client reset][local][embedded objects]") {
+TEST_CASE("client reset with embedded object", "[sync][pbs][local][client_reset][embedded objects]") {
     if (!util::EventLoop::has_implementation())
         return;
 

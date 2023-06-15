@@ -36,10 +36,6 @@
 #include <Windows.h>
 #endif
 
-#if REALM_ENABLE_AUTH_TESTS
-#include "sync/flx_sync_harness.hpp"
-#endif // REALM_ENABLE_AUTH_TESTS
-
 using namespace realm;
 using ObjectType = ObjectSchema::ObjectType;
 using util::any_cast;

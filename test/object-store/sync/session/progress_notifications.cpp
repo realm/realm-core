@@ -24,7 +24,7 @@
 
 using namespace realm;
 
-TEST_CASE("progress notification", "[sync]") {
+TEST_CASE("progress notification", "[sync][local][progress]") {
     using NotifierType = SyncSession::ProgressDirection;
     _impl::SyncProgressNotifier progress;
 

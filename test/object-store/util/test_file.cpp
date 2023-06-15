@@ -18,8 +18,9 @@
 
 #include "util/test_file.hpp"
 
-#include "baas_admin_api.hpp"
-#include "test_utils.hpp"
+#include <util/baas_admin_api.hpp>
+#include <util/baas_test_utils.hpp>
+#include <util/test_utils.hpp>
 #include "../util/crypt_key.hpp"
 #include <realm/object-store/impl/realm_coordinator.hpp>
 

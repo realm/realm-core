@@ -16,8 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_TEST_UTILS_HPP
-#define REALM_TEST_UTILS_HPP
+#pragma once
 
 #include <catch2/catch_all.hpp>
 #include <catch2/matchers/catch_matchers_all.hpp>
@@ -191,5 +190,3 @@ void chmod(const std::string& path, int permissions);
     REQUIRE_THROWS_MATCHES(expr, LogicError, LogicErrorMatcher(err))
 
 #define ENCODE_FAKE_JWT(in) realm::encode_fake_jwt(in)
-
-#endif // REALM_TEST_UTILS_HPP

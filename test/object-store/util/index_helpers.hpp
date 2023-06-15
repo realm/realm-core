@@ -16,6 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#pragma once
+
 #define REQUIRE_INDICES(index_set, ...)                                                                              \
     do {                                                                                                             \
         index_set.verify();                                                                                          \

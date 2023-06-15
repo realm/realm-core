@@ -6,7 +6,7 @@ set(HEADERS
     util/index_helpers.hpp
     util/test_file.hpp
     util/test_utils.hpp
-    collection_fixtures.hpp
+    util/collection_fixtures.hpp
 )
 
 set(SOURCES
@@ -53,17 +53,14 @@ endif()
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
-        sync/flx_sync_harness.hpp
         sync/session/session_util.hpp
-        sync/sync_test_utils.hpp
-        util/baas_admin_api.hpp
+        util/flx_sync_harness.hpp
+        util/sync_test_utils.hpp
     )
     list(APPEND SOURCES
         bson.cpp
         sync/client_reset.cpp
         sync/file.cpp
-        sync/flx_migration.cpp
-        sync/flx_sync.cpp
         sync/metadata.cpp
         sync/migration_store_test.cpp
         sync/remote_mongo_tests.cpp
@@ -72,10 +69,27 @@ if(REALM_ENABLE_SYNC)
         sync/session/session.cpp
         sync/session/wait_for_completion.cpp
         sync/sync_manager.cpp
-        sync/sync_test_utils.cpp
         sync/user.cpp
-        sync/app.cpp
+        util/sync_test_utils.cpp
     )
+    if (REALM_ENABLE_AUTH_TESTS)
+    list(APPEND HEADERS
+        util/baas_admin_api.hpp
+        util/baas_test_utils.hpp
+        util/flx_sync_harness.hpp
+    )
+    list(APPEND SOURCES
+        baas/app_mongo.cpp
+        baas/app_redirects.cpp
+        baas/app_sync.cpp
+        baas/app_user.cpp
+        baas/flx_migration.cpp
+        baas/flx_sync.cpp
+        baas/realm_convert.cpp
+        util/baas_admin_api.cpp
+        util/baas_test_utils.cpp
+    )
+    endif()
     if(APPLE)
         list(APPEND SOURCES audit.cpp)
     endif()

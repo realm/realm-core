@@ -16,18 +16,18 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync_test_utils.hpp"
-
 #include <realm/sync/config.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
-#include "sync/session/session_util.hpp"
-#include "util/event_loop.hpp"
-#include "util/test_utils.hpp"
-
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/scope_exit.hpp>
+
+#include "sync/session/session_util.hpp"
+#include "util/sync_test_utils.hpp"
+#include "util/event_loop.hpp"
+#include "util/test_utils.hpp"
+
 
 using namespace realm;
 using namespace realm::util;

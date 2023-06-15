@@ -18,12 +18,6 @@
 
 #include <catch2/catch_all.hpp>
 
-#include "sync/flx_sync_harness.hpp"
-#include "util/event_loop.hpp"
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
-#include "util/baas_admin_api.hpp"
-
 #include <realm/object-store/audit.hpp>
 #include <realm/object-store/audit_serializer.hpp>
 #include <realm/object-store/property.hpp>
@@ -45,6 +39,13 @@
 #include <realm/dictionary.hpp>
 
 #include <external/json/json.hpp>
+
+#include "util/event_loop.hpp"
+#include "util/flx_sync_harness.hpp"
+#include "util/test_file.hpp"
+#include "util/test_utils.hpp"
+#include "util/baas_admin_api.hpp"
+
 
 using namespace realm;
 using namespace std::string_literals;

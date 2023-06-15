@@ -1,6 +1,6 @@
 #include <catch2/catch_all.hpp>
 
-#include "collection_fixtures.hpp"
+#include "util/collection_fixtures.hpp"
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 #include "util/index_helpers.hpp"

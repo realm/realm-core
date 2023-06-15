@@ -16,13 +16,13 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef FLX_SYNC_HARNESS_H
-#define FLX_SYNC_HARNESS_H
+#pragma once
 
+#ifdef REALM_ENABLE_SYNC
 #ifdef REALM_ENABLE_AUTH_TESTS
 
-#include "sync/sync_test_utils.hpp"
 #include "util/baas_admin_api.hpp"
+#include "util/sync_test_utils.hpp"
 
 namespace realm::app {
 
@@ -156,6 +156,8 @@ private:
     TestAppSession m_test_session;
     Schema m_schema;
 };
+
 } // namespace realm::app
+
 #endif // REALM_ENABLE_AUTH_TESTS
-#endif // FLX_SYNC_HARNESS_H
+#endif // REALM_ENABLE_SYNC

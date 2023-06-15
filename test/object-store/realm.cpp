@@ -41,7 +41,6 @@
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/subscriptions.hpp>
-#include "sync/flx_sync_harness.hpp"
 #endif
 
 #include <realm/db.hpp>

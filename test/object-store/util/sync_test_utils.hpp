@@ -16,8 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_SYNC_TEST_UTILS_HPP
-#define REALM_SYNC_TEST_UTILS_HPP
+#pragma once
 
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
@@ -35,11 +34,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_templated.hpp>
 
-// disable the tests that rely on having baas available on the network
-// but allow opt-in by building with REALM_ENABLE_AUTH_TESTS=1
-#ifndef REALM_ENABLE_AUTH_TESTS
-#define REALM_ENABLE_AUTH_TESTS 0
-#endif
 
 namespace realm {
 
@@ -139,24 +133,6 @@ TestSyncManager::Config get_config(Transport&& transport)
     return config;
 }
 
-#if REALM_ENABLE_AUTH_TESTS
-
-#ifdef REALM_MONGODB_ENDPOINT
-std::string get_base_url();
-#endif
-
-struct AutoVerifiedEmailCredentials : app::AppCredentials {
-    AutoVerifiedEmailCredentials();
-    std::string email;
-    std::string password;
-};
-
-AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app);
-
-void wait_for_advance(Realm& realm);
-
-#endif // REALM_ENABLE_AUTH_TESTS
-
 #endif // REALM_ENABLE_SYNC
 
 namespace reset_utils {
@@ -232,5 +208,3 @@ std::unique_ptr<TestClientReset> make_fake_local_client_reset(const Realm::Confi
 } // namespace reset_utils
 
 } // namespace realm
-
-#endif // REALM_SYNC_TEST_UTILS_HPP

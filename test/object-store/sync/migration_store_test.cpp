@@ -4,7 +4,7 @@
 
 #include <catch2/catch_all.hpp>
 
-#if REALM_ENABLE_SYNC && REALM_ENABLE_AUTH_TESTS
+#if REALM_ENABLE_SYNC
 
 using namespace realm;
 
@@ -255,4 +255,4 @@ TEST_CASE("Migration store", "[flx][migration][local]") {
     }
 }
 
-#endif // REALM_ENABLE_SYNC && REALM_ENABLE_AUTH_TESTS
+#endif // REALM_ENABLE_SYNC

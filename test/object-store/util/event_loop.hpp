@@ -16,8 +16,7 @@
  *
  **************************************************************************/
 
-#ifndef REALM_OS_TESTS_UTIL_EVENT_LOOP_HPP
-#define REALM_OS_TESTS_UTIL_EVENT_LOOP_HPP
+#pragma once
 
 #include <realm/util/function_ref.hpp>
 
@@ -55,5 +54,3 @@ private:
 };
 
 } // namespace realm::util
-
-#endif // REALM_OS_TESTS_UTIL_EVENT_LOOP_HPP

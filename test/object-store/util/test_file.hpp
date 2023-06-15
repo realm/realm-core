@@ -16,8 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_TEST_UTIL_TEST_FILE_HPP
-#define REALM_TEST_UTIL_TEST_FILE_HPP
+#pragma once
 
 #include <realm/object-store/shared_realm.hpp>
 #include <realm/util/tagged_bool.hpp>
@@ -31,7 +30,7 @@
 #include <realm/sync/config.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/app.hpp>
-#include "test_utils.hpp"
+#include "util/test_utils.hpp"
 
 #include <realm/sync/client.hpp>
 #include <realm/sync/noinst/server/server.hpp>
@@ -285,5 +284,3 @@ void set_app_config_defaults(realm::app::App::Config& app_config,
                              const std::shared_ptr<realm::app::GenericNetworkTransport>& transport);
 
 #endif // REALM_ENABLE_SYNC
-
-#endif

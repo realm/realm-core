@@ -20,8 +20,7 @@
 
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
-
-#include "sync/sync_test_utils.hpp"
+#include "util/sync_test_utils.hpp"
 
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>

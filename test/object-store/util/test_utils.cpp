@@ -17,7 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/impl/realm_coordinator.hpp>
-#include "test_utils.hpp"
+#include "util/test_utils.hpp"
 
 #include <realm/util/base64.hpp>
 #include <realm/util/demangle.hpp>

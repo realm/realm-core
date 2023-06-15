@@ -16,8 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_TEST_COLLECTION_FIXTURES_HPP
-#define REALM_TEST_COLLECTION_FIXTURES_HPP
+#pragma once
 
 #include <catch2/catch_all.hpp>
 
@@ -880,5 +879,3 @@ bool operator==(Results const& results, std::vector<T> const& values)
 }
 
 } // namespace realm
-
-#endif // REALM_TEST_COLLECTION_FIXTURES_HPP

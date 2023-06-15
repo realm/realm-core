@@ -9,7 +9,6 @@
 #include <realm/sync/binding_callback_thread_observer.hpp>
 #include <realm/util/base64.hpp>
 
-#include "sync/flx_sync_harness.hpp"
 #include "util/test_file.hpp"
 #include "util/event_loop.hpp"
 #include "realm/util/logger.hpp"
@@ -23,16 +22,19 @@
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/sync_user.hpp>
 #include <external/json/json.hpp>
-#endif
 
 #if REALM_ENABLE_AUTH_TESTS
 #include <realm/object-store/sync/app_utils.hpp>
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/network/websocket.hpp>
 #include <realm/util/misc_errors.hpp>
-#include "sync/sync_test_utils.hpp"
 #include "util/baas_admin_api.hpp"
+#include "util/baas_test_utils.hpp"
+#include "util/flx_sync_harness.hpp"
+#include "util/sync_test_utils.hpp"
 #endif
+#endif
+
 
 using namespace realm;
 
@@ -404,12 +406,12 @@ public:
 };
 #endif // REALM_ENABLE_AUTH_TESTS
 
-TEST_CASE("C API (C)", "[c_api]") {
+TEST_CASE("C API (C)", "[c_api][local]") {
     TestFile file;
     CHECK(realm_c_api_tests(file.path.c_str()) == 0);
 }
 
-TEST_CASE("C API (non-database)", "[c_api]") {
+TEST_CASE("C API (non-database)", "[c_api][local]") {
     SECTION("realm_get_library_version_numbers()") {
         int major, minor, patch;
         const char* extra;
@@ -1095,7 +1097,7 @@ void realm_log_func(realm_userdata_t u, realm_log_level_e, const char* message)
 
 } // anonymous namespace
 
-TEST_CASE("C API", "[c_api]") {
+TEST_CASE("C API", "[c_api][local]") {
     TestFile test_file;
 
     SECTION("schema in config") {
@@ -4982,7 +4984,7 @@ TEST_CASE("C API", "[c_api]") {
     realm_release(realm);
 }
 
-TEST_CASE("C API: convert", "[c_api]") {
+TEST_CASE("C API: convert", "[c_api][local][convert]") {
     TestFile test_file;
     TestFile dest_test_file;
     realm_t* realm;
@@ -5094,7 +5096,7 @@ static void sync_error_handler(void* p, realm_sync_session_t*, const realm_sync_
     userdata_p->error_catagory = error.error_code.category_name;
 }
 
-TEST_CASE("C API - async_open", "[c_api][sync]") {
+TEST_CASE("C API - async_open", "[c_api][pbs][sync][local]") {
     TestSyncManager init_sync_manager;
     SyncTestFile test_config(init_sync_manager.app(), "default");
     test_config.cache = false;
@@ -5184,7 +5186,7 @@ struct BCTOState {
 };
 
 
-TEST_CASE("C API - binding callback thread observer", "[c_api][sync]") {
+TEST_CASE("C API - binding callback thread observer", "[c_api][sync][local]") {
     auto bcto_user_data = BCTOState();
 
     auto bcto_free_userdata = [](realm_userdata_t userdata) {
@@ -5275,7 +5277,6 @@ TEST_CASE("C API - binding callback thread observer", "[c_api][sync]") {
         // Should not crash at scope exit
     }
 }
-#endif
 
 #ifdef REALM_ENABLE_AUTH_TESTS
 
@@ -5284,7 +5285,7 @@ std::atomic<std::size_t> error_handler_counter{0};
 std::atomic<std::size_t> before_client_reset_counter{0};
 std::atomic<std::size_t> after_client_reset_counter{0};
 
-TEST_CASE("C API - client reset", "[c_api][client-reset]") {
+TEST_CASE("C API - client reset", "[c_api][pbs][sync][baas][client_reset]") {
     reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
@@ -5466,7 +5467,7 @@ static void realm_app_user2(void* p, realm_user_t* user, const realm_app_error_t
     }
 }
 
-TEST_CASE("C API app: link_user integration w/c_api transport", "[c_api][sync][app]") {
+TEST_CASE("C API app: link_user integration w/c_api transport", "[c_api][pbs][sync][app][baas]") {
     struct TestTransportUserData {
         TestTransportUserData()
             : logger(std::make_unique<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL))
@@ -5693,7 +5694,7 @@ TEST_CASE("C API app: link_user integration w/c_api transport", "[c_api][sync][a
     realm_release(http_transport);
 }
 
-TEST_CASE("app: flx-sync compensating writes C API support", "[c_api][flx][sync]") {
+TEST_CASE("app: flx-sync compensating writes C API support", "[c_api][flx][sync][baas]") {
     using namespace realm::app;
     FLXSyncTestHarness harness("c_api_comp_writes");
     create_user_and_log_in(harness.app());
@@ -5774,7 +5775,7 @@ TEST_CASE("app: flx-sync compensating writes C API support", "[c_api][flx][sync]
     REQUIRE_THAT(errors[1].reason, Catch::Matchers::ContainsSubstring("object is outside of the current query view"));
 }
 
-TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
+TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync][baas]") {
     using namespace realm::app;
 
     auto make_schema = [] {
@@ -6147,7 +6148,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
     });
 }
 
-TEST_CASE("C API app: websocket provider", "[c_api][sync][app]") {
+TEST_CASE("C API app: websocket provider", "[c_api][sync][app][baas][websocket]") {
     using namespace realm::app;
     using namespace realm::sync;
     using namespace realm::sync::websocket;
@@ -6306,3 +6307,5 @@ TEST_CASE("C API app: websocket provider", "[c_api][sync][app]") {
     REQUIRE(test_data.free_count == 1);
 }
 #endif // REALM_ENABLE_AUTH_TESTS
+
+#endif // REALM_ENABLE_SYNC

@@ -16,10 +16,13 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <sync/flx_sync_harness.hpp>
-#include <sync/sync_test_utils.hpp>
-#include <util/baas_admin_api.hpp>
-#include <util/crypt_key.hpp>
+#if REALM_ENABLE_SYNC
+#if REALM_ENABLE_AUTH_TESTS
+
+#include "util/crypt_key.hpp"
+#include "util/flx_sync_harness.hpp"
+#include "util/sync_test_utils.hpp"
+#include "util/baas_admin_api.hpp"
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
@@ -34,8 +37,6 @@
 #include <catch2/catch_all.hpp>
 #include <chrono>
 
-#if REALM_ENABLE_SYNC
-#if REALM_ENABLE_AUTH_TESTS
 
 using namespace realm;
 

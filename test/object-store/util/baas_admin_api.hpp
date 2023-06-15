@@ -24,7 +24,8 @@
 #include "realm/object-store/sync/app_credentials.hpp"
 #include "realm/object-store/sync/generic_network_transport.hpp"
 
-#include "sync/sync_test_utils.hpp"
+#include "util/baas_test_utils.hpp"
+#include "util/sync_test_utils.hpp"
 
 #include "external/json/json.hpp"
 #include "external/mpark/variant.hpp"
@@ -266,6 +267,32 @@ public:
 
 private:
     std::mutex m_mutex;
+};
+
+class HookedTransport : public SynchronousTestTransport {
+public:
+    void send_request_to_server(const app::Request& request,
+                                util::UniqueFunction<void(const app::Response&)>&& completion) override
+    {
+        if (request_hook) {
+            request_hook(request);
+        }
+        if (simulated_response) {
+            return completion(*simulated_response);
+        }
+        SynchronousTestTransport::send_request_to_server(request, [&](const app::Response& response) mutable {
+            if (response_hook) {
+                response_hook(request, response);
+            }
+            completion(response);
+        });
+    }
+    // Optional handler for the request and response before it is returned to completion
+    std::function<void(const app::Request&, const app::Response&)> response_hook;
+    // Optional handler for the request before it is sent to the server
+    std::function<void(const app::Request&)> request_hook;
+    // Optional Response object to return immediately instead of communicating with the server
+    std::optional<app::Response> simulated_response;
 };
 
 // This will create a new test app in the baas server at base_url
