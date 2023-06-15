@@ -414,7 +414,7 @@ private:
     void fix_linking_object_during_schema_migration(Obj linking_obj, Obj obj, ColKey opposite_col_key) const;
 
     bool compare_values(Mixed, Mixed, ColKey, Obj, StringData) const;
-    bool compare_list_in_mixed(LstBase&, LstBase&, ColKey, Obj, StringData) const;
+    bool compare_list_in_mixed(Lst<Mixed>&, Lst<Mixed>&, ColKey, Obj, StringData) const;
     bool compare_dict_in_mixed(Dictionary&, Dictionary&, ColKey, Obj, StringData) const;
 };
 

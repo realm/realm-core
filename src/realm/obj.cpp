@@ -255,14 +255,14 @@ bool Obj::compare_values(Mixed val1, Mixed val2, ColKey ck, Obj other, StringDat
         else {
             const auto type = val1.get_type();
             if (type == type_List) {
-                auto coll1 = get_listbase_ptr(ck);
-                auto coll2 = other.get_listbase_ptr(other.get_column_key(col_name));
-                return compare_list_in_mixed(*coll1, *coll2, ck, other, col_name);
+                Lst<Mixed> lst1(*this, ck);
+                Lst<Mixed> lst2(other, other.get_column_key(col_name));
+                return compare_list_in_mixed(lst1, lst2, ck, other, col_name);
             }
             else if (type == type_Dictionary) {
-                auto coll1 = get_dictionary_ptr(ck);
-                auto coll2 = other.get_dictionary_ptr(other.get_column_key(col_name));
-                return compare_dict_in_mixed(*coll1, *coll2, ck, other, col_name);
+                Dictionary dict1(*this, ck);
+                Dictionary dict2(other, other.get_column_key(col_name));
+                return compare_dict_in_mixed(dict1, dict2, ck, other, col_name);
             }
             return val1 == val2;
         }
@@ -270,7 +270,7 @@ bool Obj::compare_values(Mixed val1, Mixed val2, ColKey ck, Obj other, StringDat
     return true;
 }
 
-bool Obj::compare_list_in_mixed(LstBase& val1, LstBase& val2, ColKey ck, Obj other, StringData col_name) const
+bool Obj::compare_list_in_mixed(Lst<Mixed>& val1, Lst<Mixed>& val2, ColKey ck, Obj other, StringData col_name) const
 {
     if (val1.size() != val2.size())
         return false;

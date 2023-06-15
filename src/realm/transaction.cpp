@@ -44,8 +44,8 @@ ColInfo get_col_info(const Table* table)
     return cols;
 }
 
-template <typename Func>
-void add_dictionary_to_repl(Dictionary& dict, Replication& repl, bool is_embedded, Func update_embedded)
+void add_list_to_repl(CollectionBase& list, Replication& repl, util::UniqueFunction<void(Mixed)>& update_embedded);
+void add_dictionary_to_repl(Dictionary& dict, Replication& repl, util::UniqueFunction<void(Mixed)>& update_embedded)
 {
     size_t sz = dict.size();
     for (size_t n = 0; n < sz; ++n) {
@@ -53,21 +53,20 @@ void add_dictionary_to_repl(Dictionary& dict, Replication& repl, bool is_embedde
         repl.dictionary_insert(dict, n, key, val);
         if (val.is_type(type_List)) {
             auto n_list = dict.get_list({key.get_string()});
-            add_list_to_repl(*n_list, *dict.get_table()->get_repl(), is_embedded, update_embedded);
+            add_list_to_repl(*n_list, *dict.get_table()->get_repl(), update_embedded);
         }
         else if (val.is_type(type_Dictionary)) {
             repl.dictionary_insert(dict, n, key, val);
             auto n_dict = dict.get_dictionary({key.get_string()});
-            add_dictionary_to_repl(*n_dict, *dict.get_table()->get_repl(), is_embedded, update_embedded);
+            add_dictionary_to_repl(*n_dict, *dict.get_table()->get_repl(), update_embedded);
         }
-        else if (is_embedded) {
+        else {
             update_embedded(val);
         }
     }
 }
 
-template <typename Func>
-void add_list_to_repl(CollectionBase& list, Replication& repl, bool is_embedded, Func update_embedded)
+void add_list_to_repl(CollectionBase& list, Replication& repl, util::UniqueFunction<void(Mixed)>& update_embedded)
 {
     auto sz = list.size();
     for (size_t n = 0; n < sz; n++) {
@@ -75,13 +74,13 @@ void add_list_to_repl(CollectionBase& list, Replication& repl, bool is_embedded,
         repl.list_insert(list, n, val, n);
         if (val.is_type(type_List)) {
             auto n_list = list.get_list({n});
-            add_list_to_repl(*n_list, *list.get_table()->get_repl(), is_embedded, update_embedded);
+            add_list_to_repl(*n_list, *list.get_table()->get_repl(), update_embedded);
         }
         else if (val.is_type(type_Dictionary)) {
             auto n_dict = list.get_dictionary({n});
-            add_dictionary_to_repl(*n_dict, *list.get_table()->get_repl(), is_embedded, update_embedded);
+            add_dictionary_to_repl(*n_dict, *list.get_table()->get_repl(), update_embedded);
         }
-        else if (is_embedded) {
+        else {
             update_embedded(val);
         }
     }
@@ -93,20 +92,23 @@ void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInf
         auto col = elem.first;
         auto embedded_table = elem.second;
         auto cols_2 = get_col_info(embedded_table);
-        auto update_embedded = [&](Mixed val) {
-            if (val.is_null()) {
-                return;
+        util::UniqueFunction<void(Mixed)> update_embedded = [&](Mixed val) {
+            if (auto embedded_table = elem.second) {
+                cols_2 = get_col_info(embedded_table);
+                if (val.is_null()) {
+                    return;
+                }
+                REALM_ASSERT(val.is_type(type_Link, type_TypedLink));
+                Obj embedded_obj = embedded_table->get_object(val.get<ObjKey>());
+                generate_properties_for_obj(repl, embedded_obj, cols_2);
             }
-            REALM_ASSERT(val.is_type(type_Link, type_TypedLink));
-            Obj embedded_obj = embedded_table->get_object(val.get<ObjKey>());
-            generate_properties_for_obj(repl, embedded_obj, cols_2);
+            return;
         };
 
         if (col.is_list()) {
-            const auto is_embedded = embedded_table != nullptr;
             auto list = obj.get_listbase_ptr(col);
             repl.list_clear(*list);
-            add_list_to_repl(*list, repl, is_embedded, update_embedded);
+            add_list_to_repl(*list, repl, update_embedded);
         }
         else if (col.is_set()) {
             auto set = obj.get_setbase_ptr(col);
@@ -117,27 +119,22 @@ void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInf
             }
         }
         else if (col.is_dictionary()) {
-            const auto is_embedded = embedded_table != nullptr;
             auto dict = obj.get_dictionary(col);
-            add_dictionary_to_repl(dict, repl, is_embedded, update_embedded);
+            add_dictionary_to_repl(dict, repl, update_embedded);
         }
         else {
             auto val = obj.get_any(col);
             if (!val.is_null() && val.get_type() == type_List) {
-                const auto is_embedded = embedded_table != nullptr;
-                auto list = obj.get_collection_ptr(col);
-                add_list_to_repl(*list, repl, is_embedded, update_embedded);
+                Lst<Mixed> list(obj, col);
+                add_list_to_repl(list, repl, update_embedded);
             }
             else if (!val.is_null() && val.get_type() == type_Dictionary) {
-                const auto is_embedded = embedded_table != nullptr;
-                auto dict = obj.get_dictionary(col);
-                add_dictionary_to_repl(dict, repl, is_embedded, update_embedded);
+                Dictionary dict(obj, col);
+                add_dictionary_to_repl(dict, repl, update_embedded);
             }
             else {
                 repl.set(obj.get_table().unchecked_ptr(), col, obj.get_key(), val);
-                if (embedded_table) {
-                    update_embedded(val);
-                }
+                update_embedded(val);
             }
         }
     }
