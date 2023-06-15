@@ -1311,6 +1311,15 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
     ObjLink new_link{};
     if (old_value.is_type(type_TypedLink)) {
         old_link = old_value.get<ObjLink>();
+        recurse = remove_backlink(col_key, old_link, state);
+    }
+    else if (old_value.is_type(type_Dictionary)) {
+        Dictionary dict(*this, col_key);
+        dict.remove_backlinks(state);
+    }
+    else if (old_value.is_type(type_List)) {
+        Lst<Mixed> list(*this, col_key);
+        list.remove_backlinks(state);
     }
 
     if (value.is_type(type_TypedLink)) {
@@ -1321,8 +1330,8 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
         m_table->get_parent_group()->validate(new_link);
         if (new_link == old_link)
             return *this;
+        set_backlink(col_key, new_link);
     }
-    recurse = replace_backlink(col_key, old_link, new_link, state);
 
     StringIndex* index = m_table->get_search_index(col_key);
     // The following check on unresolved is just a precaution as it should not
@@ -1927,6 +1936,40 @@ inline void Obj::nullify_single_link(ColKey col, ValueType target)
                            m_key); // Throws
 }
 
+template <>
+inline void Obj::nullify_single_link<Mixed>(ColKey col, Mixed target)
+{
+    ColKey::Idx origin_col_ndx = col.get_index();
+    Allocator& alloc = get_alloc();
+    Array fallback(alloc);
+    Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
+    ArrayMixed mixed(alloc);
+    mixed.set_parent(&fields, origin_col_ndx.val + 1);
+    mixed.init_from_parent();
+    auto val = mixed.get(m_row_ndx);
+    bool result = false;
+    if (val.is_type(type_TypedLink)) {
+        // Ensure we are nullifying correct link
+        result = (val == target);
+        mixed.set(m_row_ndx, Mixed{});
+        sync(fields);
+
+        if (Replication* repl = get_replication())
+            repl->nullify_link(m_table.unchecked_ptr(), col,
+                               m_key); // Throws
+    }
+    else if (val.is_type(type_Dictionary)) {
+        Dictionary dict(*this, col);
+        result = dict.nullify(target.get_link());
+    }
+    else if (val.is_type(type_List)) {
+        Lst<Mixed> list(*this, col);
+        result = list.nullify(target.get_link());
+    }
+    REALM_ASSERT(result);
+    static_cast<void>(result);
+}
+
 void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
 {
     REALM_ASSERT(get_alloc().get_storage_version() == m_storage_version);
@@ -1941,9 +1984,9 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
         {
             nullify_linklist(m_origin_obj, m_origin_col_key, m_target_link.get_obj_key());
         }
-        void on_list_of_mixed(Lst<Mixed>&) final
+        void on_list_of_mixed(Lst<Mixed>& list) final
         {
-            nullify_linklist(m_origin_obj, m_origin_col_key, Mixed(m_target_link));
+            list.nullify(m_target_link);
         }
         void on_set_of_links(LnkSet&) final
         {
@@ -1953,9 +1996,14 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
         {
             nullify_set(m_origin_obj, m_origin_col_key, Mixed(m_target_link));
         }
-        void on_dictionary(Dictionary&) final
+        void on_dictionary(Dictionary& dict) final
         {
-            nullify_dictionary(m_origin_obj, m_origin_col_key, m_target_link);
+            if (m_origin_obj.get_table()->get_nesting_levels(m_origin_col_key)) {
+                nullify_dictionary(m_origin_obj, m_origin_col_key, m_target_link);
+            }
+            else {
+                dict.nullify(m_target_link);
+            }
         }
         void on_link_property(ColKey origin_col_key) final
         {
@@ -2338,10 +2386,9 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
         {
             replace_in_linklist(m_origin_obj, m_origin_col_key, m_dest_orig.get_key(), m_dest_replace.get_key());
         }
-        void on_list_of_mixed(Lst<Mixed>&) final
+        void on_list_of_mixed(Lst<Mixed>& list) final
         {
-            replace_in_linklist<Mixed>(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(),
-                                       m_dest_replace.get_link());
+            list.replace_link(m_dest_orig.get_link(), m_dest_replace.get_link());
         }
         void on_set_of_links(LnkSet&) final
         {
@@ -2352,9 +2399,15 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
             replace_in_linkset<Mixed>(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(),
                                       m_dest_replace.get_link());
         }
-        void on_dictionary(Dictionary&) final
+        void on_dictionary(Dictionary& dict) final
         {
-            replace_in_dictionary(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(), m_dest_replace.get_link());
+            if (m_origin_obj.get_table()->get_nesting_levels(m_origin_col_key)) {
+                replace_in_dictionary(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(),
+                                      m_dest_replace.get_link());
+            }
+            else {
+                dict.replace_link(m_dest_orig.get_link(), m_dest_replace.get_link());
+            }
         }
         void on_link_property(ColKey col) final
         {
@@ -2363,9 +2416,22 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
         }
         void on_mixed_property(ColKey col) final
         {
-            REALM_ASSERT(m_origin_obj.get_any(col).is_null() ||
-                         m_origin_obj.get_any(col).get_link().get_obj_key() == m_dest_orig.get_key());
-            m_origin_obj.set(col, Mixed{m_dest_replace.get_link()});
+            auto val = m_origin_obj.get_any(col);
+            if (val.is_type(type_TypedLink)) {
+                REALM_ASSERT(val.get_link() == m_dest_orig.get_link());
+                m_origin_obj.set(col, Mixed{m_dest_replace.get_link()});
+            }
+            else if (val.is_type(type_Dictionary)) {
+                Dictionary dict(m_origin_obj, m_origin_col_key);
+                dict.replace_link(m_dest_orig.get_link(), m_dest_replace.get_link());
+            }
+            else if (val.is_type(type_List)) {
+                Lst<Mixed> list(m_origin_obj, m_origin_col_key);
+                list.replace_link(m_dest_orig.get_link(), m_dest_replace.get_link());
+            }
+            else {
+                REALM_UNREACHABLE();
+            }
         }
 
     private:

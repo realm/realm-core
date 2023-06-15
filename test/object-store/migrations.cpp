@@ -2712,7 +2712,7 @@ TEST_CASE("migration nested collection automatic") {
         Schema new_schema = {
             {"nested_object",
              {{"nested_list",
-               PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable,
+               PropertyType::Array | PropertyType::String | PropertyType::Nullable,
                {CollectionType::List}}}},
         };
         REQUIRE_UPDATE_SUCCEEDS(*realm, new_schema, 1);
@@ -2722,7 +2722,7 @@ TEST_CASE("migration nested collection automatic") {
         Schema new_schema = {
             {"nested_object",
              {{"nested_list",
-               PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable,
+               PropertyType::Array | PropertyType::Int | PropertyType::Nullable,
                {CollectionType::Dictionary}}}},
         };
         REQUIRE_UPDATE_SUCCEEDS(*realm, new_schema, 1);
@@ -2756,12 +2756,12 @@ TEST_CASE("migration nested collection additive") {
         Schema new_schema = {
             {"nested_object",
              {{"nested_list",
-               PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable,
+               PropertyType::Array | PropertyType::String | PropertyType::Nullable,
                {CollectionType::List}}}},
         };
         INVALID_SCHEMA_CHANGE(*realm, new_schema,
                               "Property 'nested_object.nested_list' has been changed from 'array<array<int>>' to "
-                              "'array<array<mixed>>'");
+                              "'array<array<string>>'");
     }
 
     SECTION("Change type of nested collection") {

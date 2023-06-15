@@ -298,6 +298,7 @@ size_t Lst<Mixed>::find_first(const Mixed& value) const
     }
     return m_tree->find_first(value);
 }
+
 Mixed Lst<Mixed>::set(size_t ndx, Mixed value)
 {
     // get will check for ndx out of bounds
@@ -518,12 +519,24 @@ void Lst<Mixed>::do_insert(size_t ndx, Mixed value)
 
 void Lst<Mixed>::do_remove(size_t ndx)
 {
-    if (Mixed old_value = m_tree->get(ndx); old_value.is_type(type_TypedLink)) {
-        auto old_link = old_value.get<ObjLink>();
+    Mixed old_value = m_tree->get(ndx);
+    if (old_value.is_type(type_TypedLink, type_Dictionary, type_List)) {
 
-        CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All
-                                                                  : CascadeState::Mode::Strong);
-        bool recurse = Base::remove_backlink(m_col_key, old_link, state);
+        bool recurse = false;
+        CascadeState state;
+        if (old_value.is_type(type_TypedLink)) {
+            auto old_link = old_value.get<ObjLink>();
+            if (old_link.get_obj_key().is_unresolved()) {
+                state.m_mode = CascadeState::Mode::All;
+            }
+            recurse = Base::remove_backlink(m_col_key, old_link, state);
+        }
+        else if (old_value.is_type(type_List)) {
+            get_list(ndx)->remove_backlinks(state);
+        }
+        else if (old_value.is_type(type_Dictionary)) {
+            get_dictionary(ndx)->remove_backlinks(state);
+        }
 
         m_tree->erase(ndx);
 
@@ -678,6 +691,84 @@ void Lst<Mixed>::add_index(Path& path, Index index) const
     path.emplace_back(ndx);
 }
 
+bool Lst<Mixed>::nullify(ObjLink link)
+{
+    size_t ndx = find_first(link);
+    if (ndx != realm::not_found) {
+        if (Replication* repl = Base::get_replication()) {
+            repl->list_erase(*this, ndx); // Throws
+        }
+
+        m_tree->erase(ndx);
+        return true;
+    }
+    else {
+        // There must be a link in a nested collection
+        size_t sz = size();
+        for (size_t ndx = 0; ndx < sz; ndx++) {
+            Mixed val = m_tree->get(ndx);
+            if (val.is_type(type_Dictionary)) {
+                auto dict = get_dictionary(ndx);
+                if (dict->nullify(link)) {
+                    return true;
+                }
+            }
+            if (val.is_type(type_List)) {
+                auto list = get_list(ndx);
+                if (list->nullify(link)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+bool Lst<Mixed>::replace_link(ObjLink old_link, ObjLink replace_link)
+{
+    size_t ndx = find_first(old_link);
+    if (ndx != realm::not_found) {
+        set(ndx, replace_link);
+        return true;
+    }
+    else {
+        // There must be a link in a nested collection
+        size_t sz = size();
+        for (size_t ndx = 0; ndx < sz; ndx++) {
+            Mixed val = m_tree->get(ndx);
+            if (val.is_type(type_Dictionary)) {
+                auto dict = get_dictionary(ndx);
+                if (dict->replace_link(old_link, replace_link)) {
+                    return true;
+                }
+            }
+            if (val.is_type(type_List)) {
+                auto list = get_list(ndx);
+                if (list->replace_link(old_link, replace_link)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+void Lst<Mixed>::remove_backlinks(CascadeState& state) const
+{
+    size_t sz = size();
+    for (size_t ndx = 0; ndx < sz; ndx++) {
+        Mixed val = m_tree->get(ndx);
+        if (val.is_type(type_TypedLink)) {
+            Base::remove_backlink(m_col_key, val.get_link(), state);
+        }
+        else if (val.is_type(type_List)) {
+            get_list(ndx)->remove_backlinks(state);
+        }
+        else if (val.is_type(type_Dictionary)) {
+            get_dictionary(ndx)->remove_backlinks(state);
+        }
+    }
+}
 
 bool Lst<Mixed>::update_if_needed() const
 {

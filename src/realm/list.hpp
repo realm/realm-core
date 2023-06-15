@@ -506,6 +506,9 @@ public:
     }
 
     void add_index(Path& path, Index ndx) const final;
+    bool nullify(ObjLink);
+    bool replace_link(ObjLink old_link, ObjLink replace_link);
+    void remove_backlinks(CascadeState& state) const;
     TableRef get_table() const noexcept override
     {
         return get_obj().get_table();
