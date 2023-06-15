@@ -1489,11 +1489,12 @@ void DB::set_logger(const std::shared_ptr<util::Logger>& logger) noexcept
         m_logger = std::make_shared<DBLogger>(logger, m_path_hash);
 }
 
-void DB::open(Replication& repl, const DBOptions options)
+void DB::open(Replication& repl, const DBOptions options, const std::string& in_memory_path)
 {
     REALM_ASSERT(!is_attached());
     repl.initialize(*this); // Throws
     set_replication(&repl);
+    m_db_path = in_memory_path;
 
     m_alloc.init_in_memory_buffer();
 
@@ -2767,12 +2768,12 @@ DBRef DB::create(std::unique_ptr<Replication> repl, const std::string& file,
     return retval;
 }
 
-DBRef DB::create(std::unique_ptr<Replication> repl, const DBOptions& options) NO_THREAD_SAFETY_ANALYSIS
+DBRef DB::create(std::unique_ptr<Replication> repl, const DBOptions& options, const std::string& in_memory_path) NO_THREAD_SAFETY_ANALYSIS
 {
     REALM_ASSERT(repl);
     DBRef retval = std::make_shared<DBInit>(options);
     retval->m_history = std::move(repl);
-    retval->open(*retval->m_history, options);
+    retval->open(*retval->m_history, options, in_memory_path);
     return retval;
 }
 

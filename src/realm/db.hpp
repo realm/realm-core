@@ -133,7 +133,7 @@ public:
     static DBRef create(std::unique_ptr<Replication> repl, const std::string& file,
                         const DBOptions& options = DBOptions());
     static DBRef create(BinaryData, bool take_ownership = true);
-    static DBRef create(std::unique_ptr<Replication> repl, const DBOptions& options = DBOptions());
+    static DBRef create(std::unique_ptr<Replication> repl, const DBOptions& options = DBOptions(), const std::string& in_memory_path = "");
 
     ~DB() noexcept;
 
@@ -540,7 +540,9 @@ private:
         REQUIRES(!m_mutex);
     void open(BinaryData, bool take_ownership = true) REQUIRES(!m_mutex);
     void open(Replication&, const std::string& file, const DBOptions& options = DBOptions()) REQUIRES(!m_mutex);
-    void open(Replication& repl, const DBOptions options = DBOptions()) REQUIRES(!m_mutex);
+    //  in_memory_path is used to set the `db_path` used to register and associate a users's SyncSession with the Realm path (see SyncUser::register_session)
+    //  SyncSession::path() relies on the registered `m_db->get_path`
+    void open(Replication& repl, const DBOptions options = DBOptions(), const std::string& in_memory_path = "") REQUIRES(!m_mutex);
 
     void do_open(const std::string& file, bool no_create, const DBOptions& options);
 
