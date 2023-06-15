@@ -16,6 +16,16 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#if REALM_ENABLE_SYNC
+#if REALM_ENABLE_AUTH_TESTS
+
+#include <util/collection_fixtures.hpp>
+#include <util/baas_admin_api.hpp>
+#include <util/baas_test_utils.hpp>
+#include <util/sync_test_utils.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
+
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/sync/app.hpp>
@@ -23,13 +33,6 @@
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/util/logger.hpp>
-
-#include "util/collection_fixtures.hpp"
-#include "util/baas_admin_api.hpp"
-#include "util/baas_test_utils.hpp"
-#include "util/sync_test_utils.hpp"
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
 
 #include <external/json/json.hpp>
 #include <external/mpark/variant.hpp>
@@ -42,18 +45,6 @@ using namespace realm::app;
 using util::any_cast;
 using util::Optional;
 
-
-namespace realm {
-class TestHelper {
-public:
-    static DBRef get_db(Realm& realm)
-    {
-        return Realm::Internal::get_db(realm);
-    }
-};
-} // namespace realm
-
-#if REALM_ENABLE_AUTH_TESTS
 
 // MARK: - Call Function Tests
 
@@ -954,3 +945,4 @@ TEMPLATE_TEST_CASE("app: partition types", "[sync][pbs][app][baas][partition][ne
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
+#endif // REALM_ENABLE_SYNC

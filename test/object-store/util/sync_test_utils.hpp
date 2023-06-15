@@ -179,29 +179,6 @@ protected:
     bool m_wait_for_reset_completion = true;
 };
 
-#if REALM_ENABLE_SYNC
-
-#if REALM_ENABLE_AUTH_TESTS
-std::unique_ptr<TestClientReset> make_baas_client_reset(const Realm::Config& local_config,
-                                                        const Realm::Config& remote_config,
-                                                        TestAppSession& test_app_session);
-
-std::unique_ptr<TestClientReset> make_baas_flx_client_reset(const Realm::Config& local_config,
-                                                            const Realm::Config& remote_config,
-                                                            const TestAppSession& test_app_session);
-
-void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const AppSession& app_session,
-                                         const std::string& schema_name, const bson::BsonDocument& filter_bson);
-
-void wait_for_num_objects_in_atlas(std::shared_ptr<SyncUser> user, const AppSession& app_session,
-                                   const std::string& schema_name, size_t expected_size);
-
-void trigger_client_reset(const AppSession& app_session);
-void trigger_client_reset(const AppSession& app_session, const SharedRealm& realm);
-#endif // REALM_ENABLE_AUTH_TESTS
-
-#endif // REALM_ENABLE_SYNC
-
 std::unique_ptr<TestClientReset> make_fake_local_client_reset(const Realm::Config& local_config,
                                                               const Realm::Config& remote_config);
 

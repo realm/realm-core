@@ -88,16 +88,6 @@ struct StringMaker<ThreadSafeSyncError> {
 
 using namespace realm;
 
-namespace realm {
-class TestHelper {
-public:
-    static DBRef& get_db(SharedRealm const& shared_realm)
-    {
-        return Realm::Internal::get_db(*shared_realm);
-    }
-};
-} // namespace realm
-
 namespace {
 TableRef get_table(Realm& realm, StringData object_type)
 {

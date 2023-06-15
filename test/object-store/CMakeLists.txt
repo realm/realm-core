@@ -59,6 +59,7 @@ if(REALM_ENABLE_SYNC)
     )
     list(APPEND SOURCES
         bson.cpp
+        sync/app.cpp
         sync/client_reset.cpp
         sync/file.cpp
         sync/metadata.cpp

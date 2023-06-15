@@ -16,6 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#if REALM_ENABLE_SYNC
+#if REALM_ENABLE_AUTH_TESTS
+
+#include <util/baas_admin_api.hpp>
+#include <util/baas_test_utils.hpp>
+
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/app_credentials.hpp>
 #include <realm/object-store/sync/app_utils.hpp>
@@ -28,15 +34,10 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/uri.hpp>
 
-#include "util/baas_admin_api.hpp"
-#include "util/baas_test_utils.hpp"
-
 #include <chrono>
 
 using namespace realm;
 using namespace realm::app;
-
-#if REALM_ENABLE_AUTH_TESTS
 
 struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
     HookedSocketProvider(const std::shared_ptr<util::Logger>& logger, const std::string user_agent,
@@ -543,3 +544,4 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
+#endif // REALM_ENABLE_SYNC

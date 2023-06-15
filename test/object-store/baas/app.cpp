@@ -92,16 +92,6 @@ AppError failed_log_in(std::shared_ptr<App> app, AppCredentials credentials = Ap
 
 } // namespace
 
-namespace realm {
-class TestHelper {
-public:
-    static DBRef get_db(Realm& realm)
-    {
-        return Realm::Internal::get_db(realm);
-    }
-};
-} // namespace realm
-
 #if REALM_ENABLE_AUTH_TESTS
 
 #include <realm/util/sha_crypto.hpp>

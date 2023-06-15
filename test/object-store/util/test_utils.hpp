@@ -20,6 +20,9 @@
 
 #include <catch2/catch_all.hpp>
 #include <catch2/matchers/catch_matchers_all.hpp>
+#include <realm/db.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/shared_realm.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/optional.hpp>
 
@@ -28,6 +31,31 @@
 namespace fs = std::filesystem;
 
 namespace realm {
+
+class TestHelper {
+public:
+    static DBRef get_db(Realm& realm)
+    {
+        return Realm::Internal::get_db(realm);
+    }
+
+    static DBRef get_db(SharedRealm const& shared_realm)
+    {
+        REQUIRE(shared_realm);
+        return Realm::Internal::get_db(*shared_realm);
+    }
+
+    static TableRef get_table(Realm& realm, StringData object_type)
+    {
+        return ObjectStore::table_for_object_type(realm.read_group(), object_type);
+    }
+
+    static void begin_read(SharedRealm const& shared_realm, VersionID version)
+    {
+        Realm::Internal::begin_read(*shared_realm, version);
+    }
+};
+
 template <typename MessageMatcher>
 class ExceptionMatcher final : public Catch::Matchers::MatcherBase<Exception> {
 public:

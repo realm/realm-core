@@ -16,19 +16,21 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#if REALM_ENABLE_SYNC
+#if REALM_ENABLE_AUTH_TESTS
+
+#include <util/collection_fixtures.hpp>
+#include <util/baas_admin_api.hpp>
+
 #include <realm/object-store/sync/mongo_client.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/util/bson/bson.hpp>
 
-#include "util/collection_fixtures.hpp"
-#include "util/baas_admin_api.hpp"
-
 using namespace realm;
 using namespace realm::app;
 using util::Optional;
 
-#if REALM_ENABLE_AUTH_TESTS
 
 // MARK: - Remote Mongo Client Tests
 
@@ -698,4 +700,5 @@ TEST_CASE("app: remote mongo client", "[sync][app][baas][mongo][new]") {
     }
 }
 
-#endif
+#endif // REALM_ENABLE_AUTH_TESTS
+#endif // REALM_ENABLE_SYNC

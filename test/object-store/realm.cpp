@@ -55,18 +55,6 @@
 #include <array>
 
 namespace realm {
-class TestHelper {
-public:
-    static DBRef& get_db(SharedRealm const& shared_realm)
-    {
-        return Realm::Internal::get_db(*shared_realm);
-    }
-
-    static void begin_read(SharedRealm const& shared_realm, VersionID version)
-    {
-        Realm::Internal::begin_read(*shared_realm, version);
-    }
-};
 
 static bool operator==(IndexSet const& a, IndexSet const& b)
 {
@@ -356,7 +344,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         auto realm = Realm::get_shared_realm(config);
         REQUIRE(realm->schema().size() == 1);
 
-        auto& db = TestHelper::get_db(realm);
+        auto db = TestHelper::get_db(realm);
         auto rt = db->start_read();
         VersionID old_version = rt->get_version_of_current_transaction();
         realm->close();
@@ -2854,7 +2842,7 @@ TEST_CASE("SharedRealm: schema updating from external changes") {
         auto r = Realm::get_shared_realm(config);
         r->invalidate();
 
-        auto& db = TestHelper::get_db(r);
+        auto db = TestHelper::get_db(r);
         WriteTransaction wt(db);
         auto& table = *wt.get_table("class_object");
 

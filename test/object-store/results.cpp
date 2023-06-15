@@ -43,15 +43,6 @@
 #include <realm/object-store/sync/sync_session.hpp>
 #endif
 
-namespace realm {
-class TestHelper {
-public:
-    static DBRef& get_shared_group(SharedRealm const& shared_realm)
-    {
-        return Realm::Internal::get_db(*shared_realm);
-    }
-};
-} // namespace realm
 
 namespace Catch {
 template <>
@@ -3300,7 +3291,7 @@ TEST_CASE("results: notifier with no callbacks") {
         REQUIRE(r != r2);
         r->close();
 
-        auto& shared_group = TestHelper::get_shared_group(r2);
+        auto shared_group = TestHelper::get_db(r2);
         // There's always at least 2 live versions because the previous version
         // isn't clean up until the *next* commit
         REQUIRE(shared_group->get_number_of_versions() == 2);

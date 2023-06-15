@@ -36,7 +36,6 @@
 #endif
 
 #if REALM_ENABLE_SYNC
-
 #if REALM_ENABLE_AUTH_TESTS
 
 namespace realm {
@@ -79,5 +78,4 @@ void trigger_client_reset(const AppSession& app_session, const SharedRealm& real
 } // namespace realm
 
 #endif // REALM_ENABLE_AUTH_TESTS
-
 #endif // REALM_ENABLE_SYNC

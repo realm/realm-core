@@ -19,10 +19,12 @@
 #if REALM_ENABLE_SYNC
 #if REALM_ENABLE_AUTH_TESTS
 
-#include "util/crypt_key.hpp"
-#include "util/flx_sync_harness.hpp"
-#include "util/sync_test_utils.hpp"
-#include "util/baas_admin_api.hpp"
+#include <catch2/catch_all.hpp>
+
+#include <util/crypt_key.hpp>
+#include <util/flx_sync_harness.hpp>
+#include <util/sync_test_utils.hpp>
+#include <util/baas_admin_api.hpp>
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
@@ -34,7 +36,6 @@
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/util/future.hpp>
 
-#include <catch2/catch_all.hpp>
 #include <chrono>
 
 

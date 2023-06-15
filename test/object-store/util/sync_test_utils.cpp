@@ -163,14 +163,6 @@ ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::
     legacy_sync_path = (dir_builder / cleaned_partition).string();
 }
 
-class TestHelper {
-public:
-    static DBRef& get_db(SharedRealm const& shared_realm)
-    {
-        return Realm::Internal::get_db(*shared_realm);
-    }
-};
-
 namespace reset_utils {
 
 Obj create_object(Realm& realm, StringData object_type, util::Optional<ObjectId> primary_key,

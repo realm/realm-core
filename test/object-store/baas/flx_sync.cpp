@@ -16,14 +16,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#if REALM_ENABLE_SYNC
 #if REALM_ENABLE_AUTH_TESTS
 
 #include <catch2/catch_all.hpp>
 
-#include "util/crypt_key.hpp"
-#include "util/flx_sync_harness.hpp"
-#include "util/sync_test_utils.hpp"
-#include "util/test_file.hpp"
+#include <util/crypt_key.hpp>
+#include <util/flx_sync_harness.hpp>
+#include <util/sync_test_utils.hpp>
+#include <util/test_file.hpp>
 
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
@@ -54,17 +55,6 @@
 
 using namespace std::string_literals;
 
-namespace realm {
-
-class TestHelper {
-public:
-    static DBRef& get_db(SharedRealm const& shared_realm)
-    {
-        return Realm::Internal::get_db(*shared_realm);
-    }
-};
-
-} // namespace realm
 
 namespace realm::app {
 
@@ -3372,3 +3362,4 @@ TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][app
 } // namespace realm::app
 
 #endif // REALM_ENABLE_AUTH_TESTS
+#endif // REALM_ENABLE_SYNC

@@ -16,20 +16,19 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#if REALM_ENABLE_SYNC
+#if REALM_ENABLE_AUTH_TESTS
+
+#include <util/sync_test_utils.hpp>
+#include <util/baas_admin_api.hpp>
+
 #include <catch2/catch_all.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/sync/app.hpp>
 
-#include "util/sync_test_utils.hpp"
-#include "util/baas_admin_api.hpp"
-
-#include <iostream>
-
 using namespace realm;
-
-#if REALM_ENABLE_AUTH_TESTS
 
 TEST_CASE("app: upgrade from local to synced realm", "[sync][pbs][app][baas][convert]") {
     std::string base_url = get_base_url();
@@ -212,3 +211,4 @@ TEST_CASE("app: make distributable client file", "[sync][pbs][app][baas][convert
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
+#endif // REALM_ENABLE_SYNC

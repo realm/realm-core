@@ -16,7 +16,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#if REALM_ENABLE_SYNC
+#if REALM_ENABLE_AUTH_TESTS
+
 #include <catch2/catch_all.hpp>
+
+#include <util/baas_admin_api.hpp>
+#include <util/baas_test_utils.hpp>
+
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/sync/app.hpp>
@@ -33,12 +40,10 @@
 #include <realm/sync/noinst/server/access_token.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/util/sha_crypto.hpp>
 
 #include <external/json/json.hpp>
 #include <external/mpark/variant.hpp>
-
-#include "util/baas_admin_api.hpp"
-#include "util/baas_test_utils.hpp"
 
 #include <mutex>
 
@@ -74,19 +79,6 @@ AppError failed_log_in(std::shared_ptr<App> app, AppCredentials credentials = Ap
 
 } // namespace
 
-namespace realm {
-class TestHelper {
-public:
-    static DBRef get_db(Realm& realm)
-    {
-        return Realm::Internal::get_db(realm);
-    }
-};
-} // namespace realm
-
-#if REALM_ENABLE_AUTH_TESTS
-
-#include <realm/util/sha_crypto.hpp>
 
 static std::string create_jwt(const std::string& appId)
 {
@@ -1268,3 +1260,4 @@ TEST_CASE("app: jwt login and metadata tests", "[sync][app][baas][user][new]") {
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
+#endif // REALM_ENABLE_SYNC
