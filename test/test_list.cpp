@@ -1093,6 +1093,72 @@ TEST(List_NestedDict_Links)
     CHECK_EQUAL(t.get_backlink_count(), 0);
 }
 
+TEST(List_NestedCollection_Links)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(make_in_realm_history(), path);
+    auto tr = db->start_write();
+    auto target = tr->add_table("target");
+    auto origin = tr->add_table("origin");
+    auto list_col = origin->add_column_list(type_Mixed, "any_list");
+    auto any_col = origin->add_column(type_Mixed, "any");
+
+    Obj o = origin->create_object();
+    Obj target_obj1 = target->create_object();
+    Obj target_obj2 = target->create_object();
+
+    Lst<Mixed> list = o.get_list<Mixed>(list_col);
+    list.insert_collection(0, CollectionType::Dictionary);
+    list.insert_collection(1, CollectionType::Dictionary);
+
+    // Create link from a dictionary contained in a list
+    auto dict0 = list.get_dictionary(0);
+    dict0->insert("Key", target_obj2.get_link());
+
+    // Create link from a list contained in a dictionary contained in a list
+    auto dict1 = list.get_dictionary(1);
+    dict1->insert_collection("Hello", CollectionType::List);
+    ListMixedPtr list1 = dict1->get_list("Hello");
+    list1->add(target_obj1.get_link());
+
+    // Create link from a collection nested in a Mixed property
+    o.set_collection(any_col, CollectionType::Dictionary);
+    auto dict_any = o.get_dictionary(any_col);
+    dict_any.insert("Godbye", target_obj1.get_link());
+
+    // Check that backlinks are created
+    CHECK_EQUAL(target_obj1.get_backlink_count(), 2);
+    CHECK_EQUAL(target_obj2.get_backlink_count(), 1);
+    tr->commit_and_continue_as_read();
+
+    tr->promote_to_write();
+    target_obj1.remove();
+    tr->commit_and_continue_as_read();
+
+    // When target object is removed, link should be removed from list
+    CHECK_EQUAL(list1->size(), 0);
+    // and cleared in dictionary
+    CHECK_EQUAL(dict_any.get("Godbye"), Mixed());
+
+    tr->promote_to_write();
+    // Create links again
+    target_obj1 = target->create_object();
+    list1->insert(0, target_obj1.get_link());
+    dict_any.insert("Godbye", target_obj1.get_link());
+    CHECK_EQUAL(target_obj1.get_backlink_count(), 2);
+
+    // When list is removed, backlink should go
+    list.remove(1);
+    CHECK_EQUAL(target_obj1.get_backlink_count(), 1);
+    // This will implicitly delete dict_any
+    o.set(any_col, Mixed(5));
+    CHECK_EQUAL(target_obj1.get_backlink_count(), 0);
+    // Link still there
+    CHECK_EQUAL(target_obj2.get_backlink_count(), 1);
+    o.remove();
+    CHECK_EQUAL(target_obj2.get_backlink_count(), 0);
+}
+
 TEST(List_NestedDictList_Links)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -1163,8 +1229,7 @@ TEST(List_NestedSet_Unresolved)
     auto tr = db->start_write();
     auto target = tr->add_table_with_primary_key("target", type_String, "_id");
     auto origin = tr->add_table("origin");
-    origin->add_column(type_Mixed, "links", true,
-                       {CollectionType::Dictionary, CollectionType::List, CollectionType::Set});
+    origin->add_column(*target, "links", {CollectionType::Dictionary, CollectionType::List, CollectionType::Set});
 
     Obj o = origin->create_object();
     Obj t = target->create_object_with_primary_key("Adam");
@@ -1173,17 +1238,15 @@ TEST(List_NestedSet_Unresolved)
     auto foo_coll_1 = o.get_collection_ptr({"links", "Foo", 1});
     auto bar_coll_0 = o.get_collection_ptr({"links", "Bar", 0});
     auto bar_coll_1 = o.get_collection_ptr({"links", "Bar", 1});
-    auto foo_ll0 = dynamic_cast<Set<Mixed>*>(foo_coll_0.get());
-    auto foo_ll1 = dynamic_cast<Set<Mixed>*>(foo_coll_1.get());
-    auto bar_ll0 = dynamic_cast<Set<Mixed>*>(bar_coll_0.get());
-    auto bar_ll1 = dynamic_cast<Set<Mixed>*>(bar_coll_1.get());
+    auto foo_ll0 = dynamic_cast<LnkSet*>(foo_coll_0.get());
+    auto foo_ll1 = dynamic_cast<LnkSet*>(foo_coll_1.get());
+    auto bar_ll0 = dynamic_cast<LnkSet*>(bar_coll_0.get());
+    auto bar_ll1 = dynamic_cast<LnkSet*>(bar_coll_1.get());
 
-    foo_ll0->insert(t.get_link());
-    foo_ll0->insert(5);
-    foo_ll0->insert("Hello");
-    foo_ll1->insert(target->create_object_with_primary_key("Brian").get_link());
-    bar_ll0->insert(target->create_object_with_primary_key("Charlie").get_link());
-    bar_ll1->insert(target->create_object_with_primary_key("Daniel").get_link());
+    foo_ll0->insert(t.get_key());
+    foo_ll1->insert(target->create_object_with_primary_key("Brian").get_key());
+    bar_ll0->insert(target->create_object_with_primary_key("Charlie").get_key());
+    bar_ll1->insert(target->create_object_with_primary_key("Daniel").get_key());
     CHECK_EQUAL(t.get_backlink_count(), 1);
     target->invalidate_object(t.get_key());
     auto obj = target->create_object_with_primary_key("Adam");
@@ -1197,7 +1260,7 @@ TEST(List_NestedDict_Unresolved)
     auto tr = db->start_write();
     auto target = tr->add_table_with_primary_key("target", type_String, "_id");
     auto origin = tr->add_table("origin");
-    origin->add_column(type_Mixed, "links", true,
+    origin->add_column(*target, "links",
                        {CollectionType::Dictionary, CollectionType::List, CollectionType::Dictionary});
 
     Obj o = origin->create_object();
@@ -1212,18 +1275,57 @@ TEST(List_NestedDict_Unresolved)
     auto bar_ll0 = dynamic_cast<Dictionary*>(bar_coll_0.get());
     auto bar_ll1 = dynamic_cast<Dictionary*>(bar_coll_1.get());
 
-    foo_ll0->insert("A", t.get_link());
-    foo_ll0->insert("B", 5);
-    foo_ll0->insert("C", "Hello");
-    foo_ll1->insert("A", target->create_object_with_primary_key("Brian").get_link());
-    bar_ll0->insert("A", target->create_object_with_primary_key("Charlie").get_link());
-    bar_ll1->insert("A", target->create_object_with_primary_key("Daniel").get_link());
+    foo_ll0->insert("A", t.get_key());
+    foo_ll1->insert("A", target->create_object_with_primary_key("Brian").get_key());
+    bar_ll0->insert("A", target->create_object_with_primary_key("Charlie").get_key());
+    bar_ll1->insert("A", target->create_object_with_primary_key("Daniel").get_key());
     CHECK_EQUAL(t.get_backlink_count(), 1);
     target->invalidate_object(t.get_key());
     CHECK(foo_ll0->get("A").is_null());
     auto obj = target->create_object_with_primary_key("Adam");
     CHECK_EQUAL(obj.get_backlink_count(), 1);
     CHECK_EQUAL(foo_ll0->get("A"), Mixed(obj.get_link()));
+}
+
+TEST(List_NestedCollection_Unresolved)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(make_in_realm_history(), path);
+    auto tr = db->start_write();
+    auto target = tr->add_table_with_primary_key("target", type_String, "_id");
+    auto origin = tr->add_table("origin");
+    auto col_any = origin->add_column(type_Mixed, "any");
+
+    Obj o = origin->create_object();
+    Obj target_obj = target->create_object_with_primary_key("Adam");
+
+    o.set_collection(col_any, CollectionType::Dictionary);
+    Dictionary dict(o, col_any);
+
+    dict.insert("A", target_obj.get_link());
+    CHECK_EQUAL(target_obj.get_backlink_count(), 1);
+    // Make a tombstone for Adam
+    target->invalidate_object(target_obj.get_key());
+    CHECK(dict.get("A").is_null());
+    // And resurrect
+    auto obj = target->create_object_with_primary_key("Adam");
+    CHECK_EQUAL(obj.get_backlink_count(), 1);
+    CHECK_EQUAL(dict.get("A"), Mixed(obj.get_link()));
+
+    // Now do the same, but with a list
+    o.set_collection(col_any, CollectionType::List);
+    CHECK_EQUAL(obj.get_backlink_count(), 0);
+    Lst<Mixed> list(o, col_any);
+
+    list.insert(0, obj.get_link());
+    CHECK_EQUAL(obj.get_backlink_count(), 1);
+    // Make a tombstone for Adam
+    target->invalidate_object(obj.get_key());
+    CHECK_EQUAL(list.get(0), Mixed());
+    // And resurrect
+    obj = target->create_object_with_primary_key("Adam");
+    CHECK_EQUAL(obj.get_backlink_count(), 1);
+    CHECK_EQUAL(list.get(0), Mixed(obj.get_link()));
 }
 
 TEST(List_NestedList_Path)
