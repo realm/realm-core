@@ -72,8 +72,12 @@ static void error(emscripten_fetch_t* fetch)
     auto guard = util::make_scope_exit([&]() noexcept {
         emscripten_fetch_close(fetch);
     });
+    std::string packed_headers;
+    packed_headers.resize(emscripten_fetch_get_response_headers_length(fetch));
+    emscripten_fetch_get_response_headers(fetch, packed_headers.data(), packed_headers.size());
+
     std::unique_ptr<FetchState> state(reinterpret_cast<FetchState*>(fetch->userData));
-    state->completion_block({fetch->status, 0, {}, std::string(fetch->data, size_t(fetch->numBytes)), ErrorCodes::HTTPError});
+    state->completion_block({fetch->status, 0, parse_headers(packed_headers), std::string(fetch->data, size_t(fetch->numBytes)), ErrorCodes::HTTPError});
 }
 
 void EmscriptenNetworkTransport::send_request_to_server(
