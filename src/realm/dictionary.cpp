@@ -516,6 +516,10 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
             else if (m_col_key.get_type() != col_type_Mixed && value.get_type() != DataType(m_col_key.get_type())) {
                 throw InvalidArgument(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Wrong value type");
             }
+            else if (value.is_type(type_Link) && m_col_key.get_type() != col_type_Link) {
+                throw InvalidArgument(ErrorCodes::InvalidDictionaryValue,
+                                      "Dictionary::insert: No target table for link");
+            }
         }
     }
 
@@ -713,12 +717,83 @@ void Dictionary::nullify(size_t ndx)
     m_values->set(ndx, Mixed());
 }
 
+bool Dictionary::nullify(ObjLink target_link)
+{
+    size_t ndx = find_first(target_link);
+    if (ndx != realm::not_found) {
+        nullify(ndx);
+        return true;
+    }
+    else {
+        // There must be a link in a nested collection
+        size_t sz = size();
+        for (size_t ndx = 0; ndx < sz; ndx++) {
+            auto val = m_values->get(ndx);
+            auto key = do_get_key(ndx);
+            if (val.is_type(type_Dictionary)) {
+                auto dict = get_dictionary(key.get_string());
+                if (dict->nullify(target_link)) {
+                    return true;
+                }
+            }
+            if (val.is_type(type_List)) {
+                auto list = get_list(key.get_string());
+                if (list->nullify(target_link)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+bool Dictionary::replace_link(ObjLink old_link, ObjLink replace_link)
+{
+    size_t ndx = find_first(old_link);
+    if (ndx != realm::not_found) {
+        auto key = do_get_key(ndx);
+        insert(key, replace_link);
+        return true;
+    }
+    else {
+        // There must be a link in a nested collection
+        size_t sz = size();
+        for (size_t ndx = 0; ndx < sz; ndx++) {
+            auto val = m_values->get(ndx);
+            auto key = do_get_key(ndx);
+            if (val.is_type(type_Dictionary)) {
+                auto dict = get_dictionary(key.get_string());
+                if (dict->replace_link(old_link, replace_link)) {
+                    return true;
+                }
+            }
+            if (val.is_type(type_List)) {
+                auto list = get_list(key.get_string());
+                if (list->replace_link(old_link, replace_link)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 void Dictionary::remove_backlinks(CascadeState& state) const
 {
-    if (size() > 0) {
-        m_values->for_all([&](Mixed val) {
-            clear_backlink(val, state);
-        });
+    size_t sz = size();
+    for (size_t ndx = 0; ndx < sz; ndx++) {
+        auto val = m_values->get(ndx);
+        if (val.is_type(type_TypedLink)) {
+            Base::remove_backlink(m_col_key, val.get_link(), state);
+        }
+        else if (val.is_type(type_Dictionary)) {
+            auto key = do_get_key(ndx);
+            get_dictionary(key.get_string())->remove_backlinks(state);
+        }
+        else if (val.is_type(type_List)) {
+            auto key = do_get_key(ndx);
+            get_list(key.get_string())->remove_backlinks(state);
+        }
     }
 }
 

@@ -32,6 +32,7 @@
 #include "realm/column_type_traits.hpp"
 #include "realm/replication.hpp"
 #include "realm/dictionary.hpp"
+#include "realm/list.hpp"
 #include "realm/collection_list.hpp"
 #include <iostream>
 #include <cmath>
@@ -817,7 +818,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 else if (attr.test(col_attr_Dictionary)) {
                     if (col_type == col_type_Mixed || col_type == col_type_Link) {
                         Obj obj(origin_table->m_own_ref, get_mem(), key, ndx);
-                        const Dictionary dict = obj.get_dictionary(col_key);
+                        Dictionary dict(obj, col_key);
                         dict.remove_backlinks(state);
                     }
                 }
@@ -829,18 +830,9 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                     }
                 }
                 else if (col_type == col_type_Mixed) {
-                    BPlusTree<Mixed> list(m_alloc);
-                    list.init_from_ref(ref);
-                    for (size_t i = 0; i < list.size(); i++) {
-                        Mixed val = list.get(i);
-                        if (val.is_type(type_TypedLink)) {
-                            ObjLink link = val.get<ObjLink>();
-                            auto target_obj = origin_table->get_parent_group()->get_object(link);
-                            ColKey backlink_col_key =
-                                target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
-                            target_obj.remove_one_backlink(backlink_col_key, ObjKey(key.value + m_offset));
-                        }
-                    }
+                    Obj obj(origin_table->m_own_ref, get_mem(), key, ndx);
+                    Lst<Mixed> list(obj, col_key);
+                    list.remove_backlinks(state);
                 }
                 Array::destroy_deep(ref, m_alloc);
             }

@@ -128,6 +128,8 @@ public:
     bool try_erase(Mixed key);
 
     void nullify(size_t);
+    bool nullify(ObjLink target_link);
+    bool replace_link(ObjLink old_link, ObjLink replace_link);
     void remove_backlinks(CascadeState& state) const;
     size_t find_first(Mixed value) const;
 

@@ -420,6 +420,9 @@ ColKey Table::add_column(DataType type, StringData name, bool nullable, std::vec
     Table* invalid_link = nullptr;
     col_key = do_insert_column(col_key, type, name, invalid_link, key_type); // Throws
     if (collection_types.size() > 1) {
+        if (type == type_Mixed) {
+            throw IllegalOperation("Collections of Mixed cannot be statically nested");
+        }
         collection_types.pop_back();
         m_spec.set_nested_column_types(m_leaf_ndx2spec_ndx[col_key.get_index().val], collection_types);
     }
