@@ -360,6 +360,7 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
         case type_Double: {
             return MakeConditionNode<FloatDoubleNode<ArrayDouble, Cond>>::make(column_key, value);
         }
+        case type_EnumString:
         case type_String: {
             return MakeConditionNode<StringNode<Cond>>::make(column_key, value);
         }

@@ -40,10 +40,8 @@
 
 #include <stdexcept>
 
-#ifdef REALM_DEBUG
 #include <iostream>
 #include <iomanip>
-#endif
 
 /// \page AccessorConsistencyLevels
 ///
@@ -4427,11 +4425,16 @@ public:
         return symbols.size() + (null_used ? 1 : 0);
 #endif
     }
-    void get_interning_stats(size_t& _total_chars, size_t& _unique, size_t& _dict_size)
+    void get_interning_stats(size_t& _total_chars, size_t& _unique, size_t& _dict_size, size_t& _symbol_table_size)
     {
         _total_chars = total_chars;
         _unique = num_unique_values();
         _dict_size = unique_symbol_size;
+#if INTERN_ONLY
+        _symbol_table_size = 0;
+#else
+        _symbol_table_size = decoding_table.size();
+#endif
     }
 };
 
@@ -4440,24 +4443,29 @@ void Table::dump_interning_stats()
     size_t total_total_chars = 0;
     size_t total_unique = 0;
     size_t total_dict_size = 0;
+    size_t total_compression_table_size = 0;
     for (auto col = 0UL; col < m_interners.size(); ++col) {
         auto& e = m_interners[col];
         if (e) {
             size_t total_chars;
             size_t unique;
             size_t dict_size;
-            e->get_interning_stats(total_chars, unique, dict_size);
+            size_t symbol_table_size;
+            e->get_interning_stats(total_chars, unique, dict_size, symbol_table_size);
             std::cout << "Column " << col;
             std::cout << " Interning " << total_chars << " bytes of input strings into " << unique
-                      << " unique strings in " << dict_size << " bytes" << std::endl;
+                      << " unique strings in " << dict_size << " bytes. Compression table with " << symbol_table_size
+                      << " entries" << std::endl;
             total_total_chars += total_chars;
             total_unique += unique;
             total_dict_size += dict_size;
+            total_compression_table_size += symbol_table_size;
         }
     }
     std::cout << "Total: ";
     std::cout << " Interning " << total_total_chars << " bytes of input strings into " << total_unique
-              << " unique strings in " << total_dict_size << " bytes" << std::endl;
+              << " unique strings in " << total_dict_size << " bytes. Compression tables with "
+              << total_compression_table_size << " entries" << std::endl;
 }
 
 
