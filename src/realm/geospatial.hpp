@@ -109,6 +109,7 @@ struct GeoBox {
         return lo == other.lo && hi == other.hi;
     }
     GeoPolygon to_polygon() const;
+    static std::optional<GeoBox> from_polygon(const GeoPolygon&);
 };
 
 struct GeoCircle {

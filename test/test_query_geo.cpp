@@ -111,6 +111,7 @@ TEST(Geospatial_Assignment)
     CHECK_EQUAL(obj.get<Geospatial>(location_column_key), geo_without_altitude);
 
     Geospatial geo_box(GeoBox{GeoPoint{1.1, 2.2}, GeoPoint{3.3, 4.4}});
+    CHECK(*GeoBox::from_polygon(geo_box.get<GeoBox>().to_polygon()) == geo_box.get<GeoBox>());
     std::string_view err_msg = "The only Geospatial type currently supported for storage is 'point'";
     CHECK_THROW_CONTAINING_MESSAGE(obj.set(location_column_key, geo_box), err_msg);
     Geospatial geo_circle(GeoCircle{10, GeoPoint{1.1, 2.2}});
@@ -160,6 +161,7 @@ TEST(Query_GeoWithinBasics)
     CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{-2, -2}, GeoPoint{0.5, 1}}).count(), 4);
 
     GeoPolygon p{{{GeoPoint{-0.5, -0.5}, GeoPoint{1.0, 2.5}, GeoPoint{2.5, -0.5}, GeoPoint{-0.5, -0.5}}}};
+    CHECK(!GeoBox::from_polygon(p).has_value());
     CHECK_EQUAL(location.geo_within(p).count(), 3);
     p = {{{{-3.0, -1.0}, {-2.0, -2.0}, {-1.0, -1.0}, {1.5, -1.0}, {-1.0, 1.5}, {-3.0, -1.0}}}};
     CHECK_EQUAL(location.geo_within(p).count(), 2);

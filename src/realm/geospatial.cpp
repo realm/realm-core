@@ -71,6 +71,26 @@ GeoPolygon GeoBox::to_polygon() const
     return GeoPolygon{{{lo, GeoPoint{lo.longitude, hi.latitude}, hi, GeoPoint{hi.longitude, lo.latitude}, lo}}};
 }
 
+std::optional<GeoBox> GeoBox::from_polygon(const GeoPolygon& polygon)
+{
+    if (polygon.points.size() != 1) {
+        return {};
+    }
+    if (polygon.points[0].size() != 5) {
+        return {};
+    }
+    if (polygon.points[0][0] != polygon.points[0][4]) {
+        return {}; // closed loop
+    }
+    GeoPoint corner1{polygon.points[0][0].longitude, polygon.points[0][2].latitude};
+    GeoPoint corner2{polygon.points[0][2].longitude, polygon.points[0][0].latitude};
+    if ((polygon.points[0][1] == corner1 && polygon.points[0][3] == corner2) ||
+        (polygon.points[0][1] == corner2 && polygon.points[0][3] == corner1)) {
+        return GeoBox{polygon.points[0][0], polygon.points[0][2]};
+    }
+    return {};
+}
+
 std::string Geospatial::get_type_string() const noexcept
 {
     switch (get_type()) {
