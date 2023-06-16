@@ -966,6 +966,9 @@ void Table::add_search_index(ColKey col_key, IndexType type)
     auto spec_ndx = leaf_ndx2spec_ndx(col_key.get_index());
     auto attr = m_spec.get_column_attr(spec_ndx);
 
+    if (col_key == m_primary_key_col && type == IndexType::Fulltext)
+        throw InvalidColumnKey("primary key cannot have a full text index");
+
     switch (type) {
         case IndexType::None:
             remove_search_index(col_key);
