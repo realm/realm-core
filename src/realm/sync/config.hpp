@@ -43,6 +43,7 @@ class Bson;
 namespace sync {
 using port_type = std::uint_fast16_t;
 enum class ProtocolError;
+class SubscriptionSet;
 } // namespace sync
 
 struct SyncError : public SystemError {
@@ -223,6 +224,9 @@ struct SyncConfig {
         on_sync_client_event_hook;
 
     bool simulate_integration_error = false;
+
+    std::shared_ptr<realm::sync::SubscriptionSet> init_subscription = nullptr;
+    bool always_run = false;
 
     SyncConfig() = default;
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);

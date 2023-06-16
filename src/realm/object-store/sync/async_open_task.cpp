@@ -16,6 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include <realm/sync/subscriptions.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
 
 #include <realm/object-store/impl/realm_coordinator.hpp>
@@ -66,7 +67,34 @@ void AsyncOpenTask::start(util::UniqueFunction<void(ThreadSafeReference, std::ex
         catch (...) {
             return callback({}, std::current_exception());
         }
-        callback(std::move(realm), nullptr);
+
+        // TODO: add a config param to guard this
+        // before the to
+        // the file has been downloaded.
+        SharedRealm shared_realm = Realm::get_shared_realm(std::move(realm));
+        auto config = shared_realm->config();
+
+        if (config.sync_config && config.sync_config->flx_sync_requested) {
+            using namespace sync;
+            auto& subscription = config.sync_config->init_subscription;
+            auto& always_run = config.sync_config->always_run;
+            if (subscription && always_run) {
+                subscription->get_state_change_notification(
+                    SubscriptionSet::State::Complete,
+                    [&](util::Optional<SubscriptionSet::State> state, util::Optional<Status> status) {
+                        if (status && status->is_ok()) {
+                            if (state && *state == SubscriptionSet::State::Complete) {
+                                // subscription has now completed.
+                                // Invoke the callback for notify that we are done.
+                                callback(std::move(realm), nullptr);
+                            }
+                        }
+                    });
+            }
+        }
+        else {
+            callback(std::move(realm), nullptr);
+        }
     });
 
     session->revive_if_needed();
