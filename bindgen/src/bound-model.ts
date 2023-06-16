@@ -363,7 +363,10 @@ export class Class extends NamedType {
 
   getMethod(uniqueName: string) {
     const method = this._methods[uniqueName];
-    assert(method, `Method '${uniqueName}' does not exist on class '${this.name}'.`);
+    assert(
+      method,
+      `Method '${uniqueName}' does not exist on class '${this.name}'. The method in the opt-in list must correspond to a method in the general spec.`,
+    );
 
     return method;
   }
@@ -430,7 +433,10 @@ export class Struct extends NamedType {
 
   getField(name: string) {
     const field = this._fields[name];
-    assert(field, `Field '${name}' does not exist on record/struct '${this.name}'.`);
+    assert(
+      field,
+      `Field '${name}' does not exist on record/struct '${this.name}'. The field in the opt-in list must correspond to a field in the general spec.`,
+    );
 
     return field;
   }
