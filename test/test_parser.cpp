@@ -5114,7 +5114,7 @@ TEST(Parser_DictionarySorting)
     CHECK_EQUAL(results.get_object(3).get_key(), astro.get_key());
 }
 
-TEST(Parser_DictionaryNestedList)
+TEST(Parser_NestedDictionaryList)
 {
     Group g;
     auto persons = g.add_table_with_primary_key("table", type_String, "name");
@@ -5140,7 +5140,7 @@ TEST(Parser_DictionaryNestedList)
     verify_query(test_context, persons, "properties.tickets[last] == 4", 2);
 }
 
-TEST(Parser_ListNestedDictionary)
+TEST(Parser_NestedListDictionary)
 {
     Group g;
     auto persons = g.add_table_with_primary_key("table", type_String, "name");
@@ -5165,7 +5165,7 @@ TEST(Parser_ListNestedDictionary)
     verify_query(test_context, persons, "properties[first].two == 2", 2);
 }
 
-TEST(Parser_NestedDictionaryList)
+TEST(Parser_NestedMixedDictionaryList)
 {
     Group g;
     auto persons = g.add_table_with_primary_key("table", type_String, "name");
@@ -5175,6 +5175,7 @@ TEST(Parser_NestedDictionaryList)
 
     Obj paul = persons->create_object_with_primary_key("Paul");
     paul.set(col_self, paul.get_key());
+    paul.set_collection(col, CollectionType::Dictionary);
     auto dict_paul = paul.get_dictionary(col);
     dict_paul.insert_collection("tickets", CollectionType::List);
     auto list1 = dict_paul.get_list("tickets");
@@ -5184,6 +5185,7 @@ TEST(Parser_NestedDictionaryList)
 
     Obj john = persons->create_object_with_primary_key("John");
     john.set(col_self, john.get_key());
+    john.set_collection(col, CollectionType::Dictionary);
     auto dict_john = john.get_dictionary(col);
     dict_john.insert_collection("tickets", CollectionType::List);
     auto list2 = dict_john.get_list("tickets");
@@ -5194,6 +5196,101 @@ TEST(Parser_NestedDictionaryList)
     verify_query(test_context, persons, "properties.tickets[0] == 0", 1);
     verify_query(test_context, persons, "properties.tickets[last] == 4", 2);
     verify_query(test_context, persons, "self.properties.tickets[last] == 4", 2);
+}
+
+TEST(Parser_NestedDictionaryDeep)
+{
+    Group g;
+    auto persons = g.add_table_with_primary_key("table", type_String, "name");
+    auto col = persons->add_column(type_Mixed, "properties");
+    auto col_self = persons->add_column(*persons, "self");
+
+    Obj paul = persons->create_object_with_primary_key("Paul");
+    paul.set(col_self, paul.get_key());
+    paul.set_collection(col, CollectionType::Dictionary);
+    auto dict1 = paul.get_dictionary(col);
+    dict1.insert("one", 1);
+    dict1.insert_collection("two", CollectionType::List);
+    dict1.insert_collection("three", CollectionType::List);
+
+    auto list1 = dict1.get_list("two");
+    list1->add(5);
+    list1->add(6);
+
+    auto list2 = dict1.get_list("three");
+    list2->add(5);
+    list2->insert_collection(1, CollectionType::Dictionary);
+    auto dict2 = list2->get_dictionary(1);
+    dict2->insert("Hello", 5);
+    bool thrown = false;
+    try {
+        for (int i = 0; i < 100; i++) {
+            dict2->insert_collection("deeper", CollectionType::Dictionary);
+            dict2 = dict2->get_dictionary("deeper");
+        }
+    }
+    catch (const Exception& e) {
+        CHECK(e.code() == ErrorCodes::LimitExceeded);
+        thrown = true;
+    }
+    CHECK(thrown);
+
+    /*
+    "properties": {
+      "one": 1,
+      "two": [
+        5,
+        6
+      ]
+      "three": [
+        5,
+        {
+          "Hello": 5
+        }
+      ],
+    }
+    */
+
+    verify_query(test_context, persons, "self.properties == 1", 0);
+    verify_query(test_context, persons, "properties[0] == 1", 0);
+    verify_query(test_context, persons, "properties['one'] == 1", 1);
+    verify_query(test_context, persons, "properties.two[1].Hello == 5", 0);
+    verify_query(test_context, persons, "properties.three[0].Hello == 5", 0);
+    verify_query(test_context, persons, "properties.three[1].Hello == 5", 1);
+}
+
+TEST(Parser_NestedDictionaryMultipleLinks)
+{
+    // Check that we will follow every link before descending down by path
+    Group g;
+    auto persons = g.add_table_with_primary_key("table", type_String, "name");
+    auto col = persons->add_column(type_Mixed, "properties");
+    auto col_friends = persons->add_column_list(*persons, "friends");
+
+    Obj paul = persons->create_object_with_primary_key("Paul");
+    Obj john = persons->create_object_with_primary_key("John");
+    Obj george = persons->create_object_with_primary_key("George");
+    Obj ringo = persons->create_object_with_primary_key("Ringo");
+    Obj eric = persons->create_object_with_primary_key("Eric");
+
+    paul.set_collection(col, CollectionType::Dictionary);
+    john.set_collection(col, CollectionType::Dictionary);
+    george.set_collection(col, CollectionType::Dictionary);
+    ringo.set_collection(col, CollectionType::Dictionary);
+    paul.get_dictionary(col).insert("plays", "bass");
+    john.get_dictionary(col).insert("plays", "guitar");
+    george.get_dictionary(col).insert("plays", "guitar");
+    ringo.get_dictionary(col).insert("plays", "drums");
+
+    paul.get_linklist(col_friends).add(john.get_key());
+    auto erics_friends = eric.get_linklist(col_friends);
+    erics_friends.add(paul.get_key());
+    erics_friends.add(john.get_key());
+    erics_friends.add(george.get_key());
+    erics_friends.add(ringo.get_key());
+
+    verify_query(test_context, persons, "friends.properties.plays == 'bass'", 1);
+    verify_query(test_context, persons, "friends.properties.plays == 'guitar'", 2);
 }
 
 TEST_TYPES(Parser_DictionaryAggregates, Prop<float>, Prop<double>, Prop<Decimal128>)

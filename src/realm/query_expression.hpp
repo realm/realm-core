@@ -3141,6 +3141,7 @@ public:
     friend class LinkChain;
     bool indexes(const Path& path)
     {
+        REALM_ASSERT(!path.empty());
         ColumnsCollection<Mixed>::index(path[0]);
         for (auto& elem : path) {
             m_path.emplace_back(elem);
@@ -3154,6 +3155,7 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
+        // Base class will handle path[0] and return result in destination
         ColumnsCollection<Mixed>::evaluate<Mixed>(index, destination);
         if (m_path.size() > 1) {
             if (auto sz = destination.size()) {

@@ -1911,11 +1911,11 @@ return yy::parser::make_KEY_VAL (yytext);
 	YY_BREAK
 case 46:
 YY_RULE_SETUP
-return yy::parser::make_INDEX_FIRST ();
+return yy::parser::make_INDEX_FIRST (yytext);
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
-return yy::parser::make_INDEX_LAST ();
+return yy::parser::make_INDEX_LAST (yytext);
 	YY_BREAK
 case 48:
 YY_RULE_SETUP

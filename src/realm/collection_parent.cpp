@@ -66,6 +66,12 @@ std::ostream& operator<<(std::ostream& ostr, const Path& path)
 
 CollectionParent::~CollectionParent() {}
 
+void CollectionParent::check_level() const
+{
+    if (m_level + 1 > s_max_level) {
+        throw LogicError(ErrorCodes::LimitExceeded, "Max nesting level reached");
+    }
+}
 void CollectionParent::set_backlink(ColKey col_key, ObjLink new_link) const
 {
     if (new_link && new_link.get_obj_key()) {

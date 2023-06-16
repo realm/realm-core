@@ -587,14 +587,9 @@ protected:
         return *this;
     }
 
-    ref_type get_collection_ref() const noexcept
+    ref_type get_collection_ref() const
     {
-        try {
-            return m_parent->get_collection_ref(m_index, Interface::s_collection_type);
-        }
-        catch (...) {
-            return ref_type(0);
-        }
+        return m_parent->get_collection_ref(m_index, Interface::s_collection_type);
     }
 
     void set_collection_ref(ref_type ref)

@@ -530,6 +530,8 @@ namespace yy {
       // "limit"
       // "ascending"
       // "descending"
+      // "FIRST"
+      // "LAST"
       // "@size"
       // "@type"
       // "key or value"
@@ -598,46 +600,46 @@ namespace yy {
     TOK_ANY = 271,                 // "any"
     TOK_ALL = 272,                 // "all"
     TOK_NONE = 273,                // "none"
-    TOK_INDEX_FIRST = 274,         // "FIRST"
-    TOK_INDEX_LAST = 275,          // "LAST"
-    TOK_MAX = 276,                 // "@max"
-    TOK_MIN = 277,                 // "@min"
-    TOK_SUM = 278,                 // "@sum"
-    TOK_AVG = 279,                 // "@average"
-    TOK_AND = 280,                 // "&&"
-    TOK_OR = 281,                  // "||"
-    TOK_NOT = 282,                 // "!"
-    TOK_GEOBOX = 283,              // "geobox"
-    TOK_GEOPOLYGON = 284,          // "geopolygon"
-    TOK_GEOCIRCLE = 285,           // "geocircle"
-    TOK_ID = 286,                  // "identifier"
-    TOK_STRING = 287,              // "string"
-    TOK_BASE64 = 288,              // "base64"
-    TOK_INFINITY = 289,            // "infinity"
-    TOK_NAN = 290,                 // "NaN"
-    TOK_NATURAL0 = 291,            // "natural0"
-    TOK_NUMBER = 292,              // "number"
-    TOK_FLOAT = 293,               // "float"
-    TOK_TIMESTAMP = 294,           // "date"
-    TOK_UUID = 295,                // "UUID"
-    TOK_OID = 296,                 // "ObjectId"
-    TOK_LINK = 297,                // "link"
-    TOK_TYPED_LINK = 298,          // "typed link"
-    TOK_ARG = 299,                 // "argument"
-    TOK_BEGINSWITH = 300,          // "beginswith"
-    TOK_ENDSWITH = 301,            // "endswith"
-    TOK_CONTAINS = 302,            // "contains"
-    TOK_TEXT = 303,                // "fulltext"
-    TOK_LIKE = 304,                // "like"
-    TOK_BETWEEN = 305,             // "between"
-    TOK_IN = 306,                  // "in"
-    TOK_GEOWITHIN = 307,           // "geowithin"
-    TOK_OBJ = 308,                 // "obj"
-    TOK_SORT = 309,                // "sort"
-    TOK_DISTINCT = 310,            // "distinct"
-    TOK_LIMIT = 311,               // "limit"
-    TOK_ASCENDING = 312,           // "ascending"
-    TOK_DESCENDING = 313,          // "descending"
+    TOK_MAX = 274,                 // "@max"
+    TOK_MIN = 275,                 // "@min"
+    TOK_SUM = 276,                 // "@sum"
+    TOK_AVG = 277,                 // "@average"
+    TOK_AND = 278,                 // "&&"
+    TOK_OR = 279,                  // "||"
+    TOK_NOT = 280,                 // "!"
+    TOK_GEOBOX = 281,              // "geobox"
+    TOK_GEOPOLYGON = 282,          // "geopolygon"
+    TOK_GEOCIRCLE = 283,           // "geocircle"
+    TOK_ID = 284,                  // "identifier"
+    TOK_STRING = 285,              // "string"
+    TOK_BASE64 = 286,              // "base64"
+    TOK_INFINITY = 287,            // "infinity"
+    TOK_NAN = 288,                 // "NaN"
+    TOK_NATURAL0 = 289,            // "natural0"
+    TOK_NUMBER = 290,              // "number"
+    TOK_FLOAT = 291,               // "float"
+    TOK_TIMESTAMP = 292,           // "date"
+    TOK_UUID = 293,                // "UUID"
+    TOK_OID = 294,                 // "ObjectId"
+    TOK_LINK = 295,                // "link"
+    TOK_TYPED_LINK = 296,          // "typed link"
+    TOK_ARG = 297,                 // "argument"
+    TOK_BEGINSWITH = 298,          // "beginswith"
+    TOK_ENDSWITH = 299,            // "endswith"
+    TOK_CONTAINS = 300,            // "contains"
+    TOK_TEXT = 301,                // "fulltext"
+    TOK_LIKE = 302,                // "like"
+    TOK_BETWEEN = 303,             // "between"
+    TOK_IN = 304,                  // "in"
+    TOK_GEOWITHIN = 305,           // "geowithin"
+    TOK_OBJ = 306,                 // "obj"
+    TOK_SORT = 307,                // "sort"
+    TOK_DISTINCT = 308,            // "distinct"
+    TOK_LIMIT = 309,               // "limit"
+    TOK_ASCENDING = 310,           // "ascending"
+    TOK_DESCENDING = 311,          // "descending"
+    TOK_INDEX_FIRST = 312,         // "FIRST"
+    TOK_INDEX_LAST = 313,          // "LAST"
     TOK_SIZE = 314,                // "@size"
     TOK_TYPE = 315,                // "@type"
     TOK_KEY_VAL = 316,             // "key or value"
@@ -679,46 +681,46 @@ namespace yy {
         SYM_ANY = 16,                            // "any"
         SYM_ALL = 17,                            // "all"
         SYM_NONE = 18,                           // "none"
-        SYM_INDEX_FIRST = 19,                    // "FIRST"
-        SYM_INDEX_LAST = 20,                     // "LAST"
-        SYM_MAX = 21,                            // "@max"
-        SYM_MIN = 22,                            // "@min"
-        SYM_SUM = 23,                            // "@sum"
-        SYM_AVG = 24,                            // "@average"
-        SYM_AND = 25,                            // "&&"
-        SYM_OR = 26,                             // "||"
-        SYM_NOT = 27,                            // "!"
-        SYM_GEOBOX = 28,                         // "geobox"
-        SYM_GEOPOLYGON = 29,                     // "geopolygon"
-        SYM_GEOCIRCLE = 30,                      // "geocircle"
-        SYM_ID = 31,                             // "identifier"
-        SYM_STRING = 32,                         // "string"
-        SYM_BASE64 = 33,                         // "base64"
-        SYM_INFINITY = 34,                       // "infinity"
-        SYM_NAN = 35,                            // "NaN"
-        SYM_NATURAL0 = 36,                       // "natural0"
-        SYM_NUMBER = 37,                         // "number"
-        SYM_FLOAT = 38,                          // "float"
-        SYM_TIMESTAMP = 39,                      // "date"
-        SYM_UUID = 40,                           // "UUID"
-        SYM_OID = 41,                            // "ObjectId"
-        SYM_LINK = 42,                           // "link"
-        SYM_TYPED_LINK = 43,                     // "typed link"
-        SYM_ARG = 44,                            // "argument"
-        SYM_BEGINSWITH = 45,                     // "beginswith"
-        SYM_ENDSWITH = 46,                       // "endswith"
-        SYM_CONTAINS = 47,                       // "contains"
-        SYM_TEXT = 48,                           // "fulltext"
-        SYM_LIKE = 49,                           // "like"
-        SYM_BETWEEN = 50,                        // "between"
-        SYM_IN = 51,                             // "in"
-        SYM_GEOWITHIN = 52,                      // "geowithin"
-        SYM_OBJ = 53,                            // "obj"
-        SYM_SORT = 54,                           // "sort"
-        SYM_DISTINCT = 55,                       // "distinct"
-        SYM_LIMIT = 56,                          // "limit"
-        SYM_ASCENDING = 57,                      // "ascending"
-        SYM_DESCENDING = 58,                     // "descending"
+        SYM_MAX = 19,                            // "@max"
+        SYM_MIN = 20,                            // "@min"
+        SYM_SUM = 21,                            // "@sum"
+        SYM_AVG = 22,                            // "@average"
+        SYM_AND = 23,                            // "&&"
+        SYM_OR = 24,                             // "||"
+        SYM_NOT = 25,                            // "!"
+        SYM_GEOBOX = 26,                         // "geobox"
+        SYM_GEOPOLYGON = 27,                     // "geopolygon"
+        SYM_GEOCIRCLE = 28,                      // "geocircle"
+        SYM_ID = 29,                             // "identifier"
+        SYM_STRING = 30,                         // "string"
+        SYM_BASE64 = 31,                         // "base64"
+        SYM_INFINITY = 32,                       // "infinity"
+        SYM_NAN = 33,                            // "NaN"
+        SYM_NATURAL0 = 34,                       // "natural0"
+        SYM_NUMBER = 35,                         // "number"
+        SYM_FLOAT = 36,                          // "float"
+        SYM_TIMESTAMP = 37,                      // "date"
+        SYM_UUID = 38,                           // "UUID"
+        SYM_OID = 39,                            // "ObjectId"
+        SYM_LINK = 40,                           // "link"
+        SYM_TYPED_LINK = 41,                     // "typed link"
+        SYM_ARG = 42,                            // "argument"
+        SYM_BEGINSWITH = 43,                     // "beginswith"
+        SYM_ENDSWITH = 44,                       // "endswith"
+        SYM_CONTAINS = 45,                       // "contains"
+        SYM_TEXT = 46,                           // "fulltext"
+        SYM_LIKE = 47,                           // "like"
+        SYM_BETWEEN = 48,                        // "between"
+        SYM_IN = 49,                             // "in"
+        SYM_GEOWITHIN = 50,                      // "geowithin"
+        SYM_OBJ = 51,                            // "obj"
+        SYM_SORT = 52,                           // "sort"
+        SYM_DISTINCT = 53,                       // "distinct"
+        SYM_LIMIT = 54,                          // "limit"
+        SYM_ASCENDING = 55,                      // "ascending"
+        SYM_DESCENDING = 56,                     // "descending"
+        SYM_INDEX_FIRST = 57,                    // "FIRST"
+        SYM_INDEX_LAST = 58,                     // "LAST"
         SYM_SIZE = 59,                           // "@size"
         SYM_TYPE = 60,                           // "@type"
         SYM_KEY_VAL = 61,                        // "key or value"
@@ -920,6 +922,8 @@ namespace yy {
       case symbol_kind::SYM_LIMIT: // "limit"
       case symbol_kind::SYM_ASCENDING: // "ascending"
       case symbol_kind::SYM_DESCENDING: // "descending"
+      case symbol_kind::SYM_INDEX_FIRST: // "FIRST"
+      case symbol_kind::SYM_INDEX_LAST: // "LAST"
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_KEY_VAL: // "key or value"
@@ -1336,6 +1340,8 @@ switch (yykind)
       case symbol_kind::SYM_LIMIT: // "limit"
       case symbol_kind::SYM_ASCENDING: // "ascending"
       case symbol_kind::SYM_DESCENDING: // "descending"
+      case symbol_kind::SYM_INDEX_FIRST: // "FIRST"
+      case symbol_kind::SYM_INDEX_LAST: // "LAST"
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_KEY_VAL: // "key or value"
@@ -1795,36 +1801,6 @@ switch (yykind)
       make_NONE ()
       {
         return symbol_type (token::TOK_NONE);
-      }
-#endif
-#if 201103L <= YY_CPLUSPLUS
-      static
-      symbol_type
-      make_INDEX_FIRST ()
-      {
-        return symbol_type (token::TOK_INDEX_FIRST);
-      }
-#else
-      static
-      symbol_type
-      make_INDEX_FIRST ()
-      {
-        return symbol_type (token::TOK_INDEX_FIRST);
-      }
-#endif
-#if 201103L <= YY_CPLUSPLUS
-      static
-      symbol_type
-      make_INDEX_LAST ()
-      {
-        return symbol_type (token::TOK_INDEX_LAST);
-      }
-#else
-      static
-      symbol_type
-      make_INDEX_LAST ()
-      {
-        return symbol_type (token::TOK_INDEX_LAST);
       }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -2400,6 +2376,36 @@ switch (yykind)
 #if 201103L <= YY_CPLUSPLUS
       static
       symbol_type
+      make_INDEX_FIRST (std::string v)
+      {
+        return symbol_type (token::TOK_INDEX_FIRST, std::move (v));
+      }
+#else
+      static
+      symbol_type
+      make_INDEX_FIRST (const std::string& v)
+      {
+        return symbol_type (token::TOK_INDEX_FIRST, v);
+      }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+      static
+      symbol_type
+      make_INDEX_LAST (std::string v)
+      {
+        return symbol_type (token::TOK_INDEX_LAST, std::move (v));
+      }
+#else
+      static
+      symbol_type
+      make_INDEX_LAST (const std::string& v)
+      {
+        return symbol_type (token::TOK_INDEX_LAST, v);
+      }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+      static
+      symbol_type
       make_SIZE (std::string v)
       {
         return symbol_type (token::TOK_SIZE, std::move (v));
@@ -2785,9 +2791,9 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 579,     ///< Last index in yytable_.
+      yylast_ = 583,     ///< Last index in yytable_.
       yynnts_ = 36,  ///< Number of nonterminal symbols.
-      yyfinal_ = 65 ///< Termination state number.
+      yyfinal_ = 67 ///< Termination state number.
     };
 
 
@@ -2974,6 +2980,8 @@ switch (yykind)
       case symbol_kind::SYM_LIMIT: // "limit"
       case symbol_kind::SYM_ASCENDING: // "ascending"
       case symbol_kind::SYM_DESCENDING: // "descending"
+      case symbol_kind::SYM_INDEX_FIRST: // "FIRST"
+      case symbol_kind::SYM_INDEX_LAST: // "LAST"
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_KEY_VAL: // "key or value"
@@ -3128,6 +3136,8 @@ switch (yykind)
       case symbol_kind::SYM_LIMIT: // "limit"
       case symbol_kind::SYM_ASCENDING: // "ascending"
       case symbol_kind::SYM_DESCENDING: // "descending"
+      case symbol_kind::SYM_INDEX_FIRST: // "FIRST"
+      case symbol_kind::SYM_INDEX_LAST: // "LAST"
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_KEY_VAL: // "key or value"

@@ -80,8 +80,6 @@ using namespace realm::query_parser;
   ANY     "any"
   ALL     "all"
   NONE    "none"
-  INDEX_FIRST "FIRST"
-  INDEX_LAST  "LAST"
   MAX     "@max"
   MIN     "@min"
   SUM     "@sum"
@@ -122,6 +120,8 @@ using namespace realm::query_parser;
 %token <std::string> LIMIT "limit"
 %token <std::string> ASCENDING "ascending"
 %token <std::string> DESCENDING "descending"
+%token <std::string> INDEX_FIRST "FIRST"
+%token <std::string> INDEX_LAST  "LAST"
 %token <std::string> SIZE "@size"
 %token <std::string> TYPE "@type"
 %token <std::string> KEY_VAL "key or value"
@@ -383,6 +383,8 @@ id
     | DESCENDING                { $$ = $1; }
     | IN                        { $$ = $1; }
     | TEXT                      { $$ = $1; }
+    | INDEX_FIRST               { $$ = $1; }
+    | INDEX_LAST                { $$ = $1; }
 %%
 
 void

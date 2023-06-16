@@ -428,6 +428,7 @@ Obj Dictionary::create_and_insert_linked_object(Mixed key)
 
 void Dictionary::insert_collection(const PathElement& path_elem, CollectionType dict_or_list)
 {
+    check_level();
     insert(path_elem.get_key(), Mixed(0, dict_or_list));
 }
 

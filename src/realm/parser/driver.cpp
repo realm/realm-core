@@ -892,6 +892,7 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
         }
         else {
             // This must be an integer index
+            REALM_ASSERT(first_index.is_ndx());
             auto ok = false;
             if (indexes.size() == 1) {
                 if (auto coll = dynamic_cast<ColumnListBase*>(subexpr.get())) {
@@ -910,10 +911,6 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
             }
         }
     }
-    /*
-        if (!path->path_elems.back().index.is_null()) {
-        }
-    */
     if (post_op) {
         return post_op->visit(drv, subexpr.get());
     }
