@@ -34,7 +34,7 @@ set_property(TARGET BindgenSpecJsonSchema PROPERTY NPX "${NPX}")
 
 function(bindgen)
     set(options)
-    set(oneValueArgs TEMPLATE OUTDIR)
+    set(oneValueArgs TEMPLATE OUTDIR OPTIN)
     set(multiValueArgs OUTPUTS SPECS SOURCES)
     cmake_parse_arguments(PARSE_ARGV 0 BINDGEN "${options}" "${oneValueArgs}" "${multiValueArgs}")
 
@@ -64,6 +64,7 @@ function(bindgen)
         WORKING_DIRECTORY ${CMAKE_CURRENT_FUNCTION_LIST_DIR}
         COMMAND ${NPX} tsx -- "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/realm-bindgen.ts"
             --spec "$<JOIN:${CORE_SPEC_FILE};${BINDGEN_SPECS},;--spec;>"
+            "$<$<BOOL:${BINDGEN_OPTIN}>:--opt-in;${BINDGEN_OPTIN}>"
             --template "${BINDGEN_TEMPLATE}"
             --output "${BINDGEN_OUTDIR}"
         COMMAND_EXPAND_LISTS
@@ -78,6 +79,7 @@ function(bindgen)
             # from sdk
             ${BINDGEN_SPECS}
             ${BINDGEN_SOURCES}
+            ${BINDGEN_OPTIN}
     )
 
     foreach(FILE ${BINDGEN_OUTPUTS})

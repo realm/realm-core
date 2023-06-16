@@ -17,7 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 import { strict as assert } from "assert";
 
-import { Spec, TypeSpec, MethodSpec } from "./spec";
+import { OptInSpec, Spec, TypeSpec, MethodSpec } from "./spec";
 
 abstract class TypeBase {
   abstract readonly kind: TypeKind;
@@ -29,31 +29,31 @@ abstract class TypeBase {
 
   // This is mostly because TS doesn't know that Type covers all types derived from TypeBase.
   is<Kind extends TypeKind>(kind: Kind): this is Type & { kind: Kind } {
-    return this.kind == kind;
+    return this.kind === kind;
   }
 
   isOptional(): this is Template & { name: "util::Optional" };
   isOptional(type: string): boolean;
   isOptional(type?: string): boolean {
-    return this.isTemplate("util::Optional") && (!type || ("name" in this.args[0] && this.args[0].name == type));
+    return this.isTemplate("util::Optional") && (!type || ("name" in this.args[0] && this.args[0].name === type));
   }
 
   isNullable(): this is Template & { name: "Nullable" };
   isNullable(type: string): boolean;
   isNullable(type?: string): boolean {
-    return this.isTemplate("Nullable") && (!type || ("name" in this.args[0] && this.args[0].name == type));
+    return this.isTemplate("Nullable") && (!type || ("name" in this.args[0] && this.args[0].name === type));
   }
 
   isTemplate(): this is Template;
   isTemplate<Name extends string>(type: Name): this is Template & { name: Name };
   isTemplate(type?: string): boolean {
-    return this.is("Template") && (!type || this.name == type);
+    return this.is("Template") && (!type || this.name === type);
   }
 
   isPrimitive(): this is Primitive;
   isPrimitive<Name extends string>(type: Name): this is Primitive & { name: Name };
   isPrimitive(type?: string): boolean {
-    return this.is("Primitive") && (!type || this.name == type);
+    return this.is("Primitive") && (!type || this.name === type);
   }
 
   isVoid(): this is Primitive & { name: "void" } {
@@ -172,7 +172,7 @@ export class Func extends TypeBase {
   asyncTransform(): Func | undefined {
     if (!this.ret.isVoid()) return undefined;
     const voidType = this.ret;
-    if (this.args.length == 0) return undefined;
+    if (this.args.length === 0) return undefined;
     const lastArgType = this.args[this.args.length - 1].type.removeConstRef();
     if (!lastArgType.isTemplate("AsyncCallback")) return undefined;
 
@@ -196,7 +196,7 @@ export class Func extends TypeBase {
         `but got ${lastCbArgType}`,
     );
     let res: Type = voidType;
-    if (cb.args.length == 2) {
+    if (cb.args.length === 2) {
       res = cb.args[0].type.removeConstRef();
       if (res.isOptional() || res.isNullable()) {
         res = res.args[0];
@@ -263,6 +263,12 @@ export type MethodCallSig = ({ self }: { self: string }, ...args: string[]) => s
 
 export abstract class Method {
   isConstructor = false;
+  /**
+   * Whether this method is opted in to by the consumer/SDK.
+   * For this to be true you must pass an opt-in list to the
+   * binding generator and call `BoundSpec.applyOptInList()`.
+   */
+  isOptedInTo = false;
   abstract isStatic: boolean;
   constructor(
     public on: Class,
@@ -334,10 +340,36 @@ export class Class extends NamedType {
   abstract = false;
   base?: Class;
   subclasses: Class[] = [];
-  methods: Method[] = [];
+  private _methods: { [uniqueName: string]: Method } = {};
   sharedPtrWrapped = false;
   needsDeref = false;
   iterable?: Type;
+
+  /**
+   * Get a new array containing the methods.
+   * For adding a method onto `this` instance, use `addMethod()`.
+   */
+  get methods() {
+    return Object.values(this._methods);
+  }
+
+  addMethod(method: Method) {
+    assert(
+      !(method.unique_name in this._methods),
+      `Duplicate unique method name on class '${this.name}': '${method.unique_name}'`,
+    );
+    this._methods[method.unique_name] = method;
+  }
+
+  getMethod(uniqueName: string) {
+    const method = this._methods[uniqueName];
+    assert(
+      method,
+      `Method '${uniqueName}' does not exist on class '${this.name}'. The method in the opt-in list must correspond to a method in the general spec.`,
+    );
+
+    return method;
+  }
 
   toString() {
     return `class ${this.name}`;
@@ -356,16 +388,22 @@ export class Class extends NamedType {
     return cls;
   }
 
-  *decedents(): Iterable<Class> {
+  *descendants(): Iterable<Class> {
     for (const sub of this.subclasses) {
       assert.notEqual(sub, this, `base class loop detected on ${this.name}`);
       yield sub;
-      yield* sub.decedents();
+      yield* sub.descendants();
     }
   }
 }
 
 export class Field {
+  /**
+   * Whether this field is opted in to by the consumer/SDK.
+   * For this to be true you must pass an opt-in list to the
+   * binding generator and call `BoundSpec.applyOptInList()`.
+   */
+  isOptedInTo = false;
   constructor(
     public name: string,
     public cppName: string,
@@ -378,7 +416,30 @@ export class Field {
 export class Struct extends NamedType {
   readonly kind = "Struct";
   cppName!: string;
-  fields: Field[] = [];
+  private _fields: { [name: string]: Field } = {};
+
+  /**
+   * Get a new array containing the fields.
+   * For adding a field onto `this` instance, use `addField()`.
+   */
+  get fields() {
+    return Object.values(this._fields);
+  }
+
+  addField(field: Field) {
+    assert(!(field.name in this._fields), `Duplicate field name on record/struct '${this.name}': '${field.name}'.`);
+    this._fields[field.name] = field;
+  }
+
+  getField(name: string) {
+    const field = this._fields[name];
+    assert(
+      field,
+      `Field '${name}' does not exist on record/struct '${this.name}'. The field in the opt-in list must correspond to a field in the general spec.`,
+    );
+
+    return field;
+  }
 
   toString() {
     return `struct ${this.name}`;
@@ -477,6 +538,29 @@ export class BoundSpec {
   opaqueTypes: Opaque[] = [];
   mixedInfo!: MixedInfo;
   types: Record<string, Type> = {};
+  optInSpec?: OptInSpec;
+
+  /**
+   * Marks methods and fields in the opt-in list as `isOptedInTo` which the
+   * consumer/SDK then can choose to handle accordingly.
+   */
+  applyOptInList() {
+    for (const [clsName, clsRaw] of Object.entries(this.optInSpec?.classes ?? {})) {
+      const boundClass = this.types[clsName];
+      assert(boundClass instanceof Class);
+      for (const methodName of clsRaw.methods) {
+        boundClass.getMethod(methodName).isOptedInTo = true;
+      }
+    }
+
+    for (const [structName, structRaw] of Object.entries(this.optInSpec?.records ?? {})) {
+      const boundStruct = this.types[structName];
+      assert(boundStruct instanceof Struct);
+      for (const fieldName of structRaw.fields) {
+        boundStruct.getField(fieldName).isOptedInTo = true;
+      }
+    }
+  }
 }
 
 type MixedInfo = {
@@ -485,15 +569,16 @@ type MixedInfo = {
   ctors: Type[];
 };
 
-export function bindModel(spec: Spec): BoundSpec {
+export function bindModel(spec: Spec, optInSpec?: OptInSpec): BoundSpec {
   const templates: Map<string, Spec["templates"][string]> = new Map();
   const rootClasses: Class[] = [];
 
   const out = new BoundSpec();
+  out.optInSpec = optInSpec;
 
   function addType<T extends Type>(name: string, type: T | (new (name: string) => T)) {
     assert(!(name in out.types));
-    if (typeof type == "function") type = new type(name);
+    if (typeof type === "function") type = new type(name);
 
     out.types[name] = type;
     return type;
@@ -548,7 +633,7 @@ export function bindModel(spec: Spec): BoundSpec {
   ) {
     for (const [name, overloads] of Object.entries(methods)) {
       for (const overload of overloads) {
-        on.methods.push(
+        on.addMethod(
           new OutType(
             on,
             name,
@@ -561,7 +646,7 @@ export function bindModel(spec: Spec): BoundSpec {
     }
   }
 
-  // Attach names to instences of Type in types
+  // Attach names to instances of Type in types
   for (const [name, args] of Object.entries(spec.templates)) {
     templates.set(name, args);
   }
@@ -606,12 +691,12 @@ export function bindModel(spec: Spec): BoundSpec {
   for (const [name, { cppName, fields }] of Object.entries(spec.records)) {
     const struct = out.types[name] as Struct;
     struct.cppName = cppName ?? name;
-    struct.fields = Object.entries(fields).map(([name, field]) => {
+    for (const [name, field] of Object.entries(fields)) {
       const type = resolveTypes(field.type);
       // Optional and Nullable fields are never required.
       const required = field.default === undefined && !(type.isNullable() || type.isOptional());
-      return new Field(name, field.cppName ?? name, type, required, field.default);
-    });
+      struct.addField(new Field(name, field.cppName ?? name, type, required, field.default));
+    }
   }
 
   for (const [name, type] of Object.entries(spec.keyTypes)) {
@@ -642,23 +727,24 @@ export function bindModel(spec: Spec): BoundSpec {
 
     // Constructors are exported to js as named static methods. The "real" js constructors
     // are only used internally for attaching the C++ instance to a JS object.
-    cls.methods.push(
-      ...Object.entries(raw.constructors).flatMap(([name, rawSig]) => {
-        const sig = resolveTypes(rawSig);
-        // Constructors implicitly return the type of the class.
-        assert(sig.kind == "Func" && sig.ret.isVoid());
-        sig.ret = cls.sharedPtrWrapped ? new Template("std::shared_ptr", [cls]) : cls;
-        return new Constructor(cls, name, sig);
-      }),
-    );
+    const constructors = Object.entries(raw.constructors).flatMap(([name, rawSig]) => {
+      const sig = resolveTypes(rawSig);
+      // Constructors implicitly return the type of the class.
+      assert(sig.kind === "Func" && sig.ret.isVoid());
+      sig.ret = cls.sharedPtrWrapped ? new Template("std::shared_ptr", [cls]) : cls;
+      return new Constructor(cls, name, sig);
+    });
+    for (const constructor of constructors) {
+      cls.addMethod(constructor);
+    }
 
     for (const [name, type] of Object.entries(raw.properties ?? {})) {
-      cls.methods.push(new Property(cls, name, resolveTypes(type)));
+      cls.addMethod(new Property(cls, name, resolveTypes(type)));
     }
   }
 
   for (const cls of rootClasses) {
-    out.classes.push(cls, ...cls.decedents());
+    out.classes.push(cls, ...cls.descendants());
   }
 
   out.mixedInfo = {
