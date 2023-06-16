@@ -1006,7 +1006,8 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key) const
                 for (size_t i = 0; i < num_keys; ++i) {
                     auto obj = m_table->get_object(keys->get(i));
                     if (pn->m_children.empty() || eval_object(obj)) {
-                        st.match(size_t(obj.get_key().value), obj.get<T>(column_key));
+                        st.m_key_offset = obj.get_key().value;
+                        st.match(0, obj.get<T>(column_key));
                     }
                 }
             }
@@ -1031,7 +1032,8 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key) const
         else {
             m_view->for_each([&](const Obj& obj) {
                 if (eval_object(obj)) {
-                    st.match(size_t(obj.get_key().value), obj.get<T>(column_key));
+                    st.m_key_offset = obj.get_key().value;
+                    st.match(0, obj.get<T>(column_key));
                 }
                 return IteratorControl::AdvanceToNext;
             });
@@ -1309,7 +1311,8 @@ void Query::do_find_all(QueryStateBase& st) const
         for (size_t t = 0; t < sz; t++) {
             const Obj obj = m_view->get_object(t);
             if (eval_object(obj)) {
-                if (!st.match(size_t(obj.get_key().value), Mixed()))
+                st.m_key_offset = obj.get_key().value;
+                if (!st.match(0, Mixed()))
                     break;
             }
         }
@@ -1345,15 +1348,16 @@ void Query::do_find_all(QueryStateBase& st) const
                 const size_t num_keys = keys->size();
                 for (size_t i = 0; i < num_keys; ++i) {
                     ObjKey key = keys->get(i);
+                    st.m_key_offset = key.value;
                     if (pn->m_children.empty()) {
                         // No more conditions - just add key
-                        if (!st.match(size_t(key.value), Mixed()))
+                        if (!st.match(0, Mixed()))
                             break;
                     }
                     else {
                         auto obj = m_table->get_object(key);
                         if (eval_object(obj)) {
-                            if (!st.match(size_t(key.value), Mixed()))
+                            if (!st.match(0, Mixed()))
                                 break;
                         }
                     }
