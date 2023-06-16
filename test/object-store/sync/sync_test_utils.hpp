@@ -24,6 +24,7 @@
 #include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+#include <realm/object-store/thread_safe_reference.hpp>
 
 #include <realm/util/functional.hpp>
 #include <realm/util/function_ref.hpp>
@@ -154,6 +155,8 @@ struct AutoVerifiedEmailCredentials : app::AppCredentials {
 AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app);
 
 void wait_for_advance(Realm& realm);
+
+std::pair<ThreadSafeReference, std::exception_ptr> async_open_realm(const Realm::Config&);
 
 #endif // REALM_ENABLE_AUTH_TESTS
 

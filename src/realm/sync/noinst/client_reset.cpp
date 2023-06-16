@@ -70,9 +70,11 @@ static inline bool should_skip_table(const Transaction& group, TableKey key)
     return !group.table_is_public(key);
 }
 
-void transfer_group(const Transaction& group_src, Transaction& group_dst, util::Logger& logger)
+void transfer_group(const Transaction& group_src, Transaction& group_dst, util::Logger& logger,
+                    bool allow_schema_additions)
 {
-    logger.debug("transfer_group, src size = %1, dst size = %2", group_src.size(), group_dst.size());
+    logger.debug("transfer_group, src size = %1, dst size = %2, allow_schema_additions = %3", group_src.size(),
+                 group_dst.size(), allow_schema_additions);
 
     // Turn off the sync history tracking during state transfer since it will be thrown
     // away immediately after anyways. This reduces the memory footprint of a client reset.
@@ -142,7 +144,12 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
     // 2: Keep the tables locally and ignore them. But the local app schema
     //    still has these classes and trying to modify anything in them will
     //    create sync instructions on tables that sync doesn't know about.
-    if (!tables_to_remove.empty()) {
+    // As an exception in recovery mode, we assume that the corresponding
+    // additive schema changes will be part of the recovery upload. If they
+    // are present, then the server can choose to allow them (if in dev mode).
+    // If they are not present, then the server will emit an error the next time
+    // a value is set on the unknown property.
+    if (!allow_schema_additions && !tables_to_remove.empty()) {
         std::string names_list;
         for (const std::string& table_name : tables_to_remove) {
             names_list += Group::table_name_to_class_name(table_name);
@@ -194,7 +201,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
             if (!should_skip_table(group_dst, table_key))
                 ++num_tables_dst;
         }
-        REALM_ASSERT(num_tables_src == num_tables_dst);
+        REALM_ASSERT_EX(allow_schema_additions || num_tables_src == num_tables_dst, num_tables_src, num_tables_dst);
         num_tables = num_tables_src;
     }
     logger.debug("The number of tables is %1", num_tables);
@@ -216,7 +223,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
                 continue;
             }
         }
-        if (!columns_to_remove.empty()) {
+        if (!allow_schema_additions && !columns_to_remove.empty()) {
             std::string columns_list;
             for (const std::string& col_name : columns_to_remove) {
                 columns_list += col_name;
@@ -372,7 +379,8 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
             continue;
         StringData table_name = table_src->get_name();
         TableRef table_dst = group_dst.get_table(table_name);
-        REALM_ASSERT(table_src->get_column_count() == table_dst->get_column_count());
+        REALM_ASSERT_EX(allow_schema_additions || table_src->get_column_count() == table_dst->get_column_count(),
+                        allow_schema_additions, table_src->get_column_count(), table_dst->get_column_count());
         auto pk_col = table_src->get_primary_key_column();
         REALM_ASSERT(pk_col);
         logger.debug("Updating values for table '%1', number of rows = %2, "
@@ -620,7 +628,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         // needs to be done before they are wiped out by remake_active_subscription()
         std::vector<SubscriptionSet> pending_subscriptions = sub_store->get_pending_subscriptions();
         // transform the local Realm such that all public tables become identical to the remote Realm
-        transfer_group(*wt_remote, *wt_local, logger);
+        transfer_group(*wt_remote, *wt_local, logger, recover_local_changes);
         // now that the state of the fresh and local Realms are identical,
         // reset the local sync history.
         // Note that we do not set the new file ident yet! This is done in the last commit.
@@ -637,7 +645,8 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         // the way to the final state, but since separate commits are necessary, this is
         // unavoidable.
         wt_local = db_local->start_write();
-        RecoverLocalChangesetsHandler handler{*wt_local, *frozen_pre_local_state, logger};
+        RecoverLocalChangesetsHandler handler{*wt_local, *frozen_pre_local_state, logger,
+                                              db_local->get_replication()};
         handler.process_changesets(local_changes, std::move(pending_subscriptions)); // throws on error
         // The new file ident is set as part of the final commit. This is to ensure that if
         // there are any exceptions during recovery, or the process is killed for some
@@ -654,7 +663,8 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
             // In PBS recovery, the strategy is to apply all local changes to the remote realm first,
             // and then transfer the modified state all at once to the local Realm. This creates a
             // nice side effect for notifications because only the minimal state change is made.
-            RecoverLocalChangesetsHandler handler{*wt_remote, *frozen_pre_local_state, logger};
+            RecoverLocalChangesetsHandler handler{*wt_remote, *frozen_pre_local_state, logger,
+                                                  db_local->get_replication()};
             handler.process_changesets(local_changes, {}); // throws on error
             ClientReplication* client_repl = dynamic_cast<ClientReplication*>(wt_remote->get_replication());
             REALM_ASSERT_RELEASE(client_repl);
@@ -664,7 +674,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
         }
 
         // transform the local Realm such that all public tables become identical to the remote Realm
-        transfer_group(*wt_remote, *wt_local, logger);
+        transfer_group(*wt_remote, *wt_local, logger, recover_local_changes);
 
         // now that the state of the fresh and local Realms are identical,
         // reset the local sync history and steal the fresh Realm's ident

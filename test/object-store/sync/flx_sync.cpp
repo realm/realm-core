@@ -40,6 +40,7 @@
 #include "realm/sync/client_base.hpp"
 #include "realm/sync/config.hpp"
 #include "realm/sync/noinst/client_history_impl.hpp"
+#include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include "realm/sync/noinst/pending_bootstrap_store.hpp"
 #include "realm/sync/noinst/server/access_token.hpp"
@@ -896,73 +897,246 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
         }
     }
 
-    SECTION("Recover: schema indexes match in before and after states") {
-        {
-            config_local.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError) {
-                // ignore spurious failures on this instance
-            };
-            SharedRealm realm = Realm::get_shared_realm(config_local);
-            subscribe_to_and_add_objects(realm, 1);
-            auto subs = realm->get_latest_subscription_set();
-            auto result = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
-            CHECK(result == sync::SubscriptionSet::State::Complete);
+    enum class ResetMode { NoReset, InitiateClientReset };
+    auto seed_realm = [&harness, &subscribe_to_and_add_objects](RealmConfig config, ResetMode reset_mode) {
+        config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError) {
+            // ignore spurious failures on this instance
+        };
+        SharedRealm realm = Realm::get_shared_realm(config);
+        subscribe_to_and_add_objects(realm, 1);
+        auto subs = realm->get_latest_subscription_set();
+        auto result = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        CHECK(result == sync::SubscriptionSet::State::Complete);
+        if (reset_mode == ResetMode::InitiateClientReset) {
             reset_utils::trigger_client_reset(harness.session().app_session(), realm);
-            realm->close();
         }
-        {
-            Realm::Config config_copy = config_local;
-            config_copy.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError err) {
+        realm->close();
+    };
+
+    auto setup_reset_handlers_for_schema_validation =
+        [&before_reset_count,
+         &after_reset_count](RealmConfig& config, Schema expected_schema,
+                             std::shared_ptr<util::future_details::Promise<void>> shared_promise) {
+            config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError err) {
                 FAIL(err);
             };
-            // reorder a property such that it does not match the on disk property order
-            std::vector<ObjectSchema> local_schema = schema;
-            std::swap(local_schema[0].persisted_properties[1], local_schema[0].persisted_properties[2]);
-            local_schema[0].persisted_properties.push_back(
-                {"queryable_oid_field", PropertyType::ObjectId | PropertyType::Nullable});
-            config_copy.schema = local_schema;
-            config_copy.sync_config->client_resync_mode = ClientResyncMode::Recover;
-            auto [promise, future] = util::make_promise_future<void>();
-            auto shared_promise = std::make_shared<decltype(promise)>(std::move(promise));
-            config_copy.sync_config->notify_before_client_reset = [&](SharedRealm frozen_before) {
+            config.sync_config->notify_before_client_reset = [&before_reset_count,
+                                                              expected = expected_schema](SharedRealm frozen_before) {
                 ++before_reset_count;
                 REQUIRE(frozen_before->schema().size() > 0);
                 REQUIRE(frozen_before->schema_version() != ObjectStore::NotVersioned);
-                REQUIRE(frozen_before->schema() == Schema(local_schema));
+                REQUIRE(frozen_before->schema() == expected);
             };
-            config_copy.sync_config->notify_after_client_reset =
-                [&, promise = std::move(shared_promise)](SharedRealm frozen_before, ThreadSafeReference after_ref,
-                                                         bool did_recover) {
-                    ++after_reset_count;
-                    REQUIRE(frozen_before->schema().size() > 0);
-                    REQUIRE(frozen_before->schema_version() != ObjectStore::NotVersioned);
-                    REQUIRE(frozen_before->schema() == Schema(local_schema));
-                    SharedRealm after =
-                        Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
-                    REQUIRE(after);
-                    REQUIRE(after->schema() == Schema(local_schema));
-                    // the above check is sufficent unless operator==() is changed to not care about ordering
-                    // so future proof that by explicitly checking the order of properties here as well
-                    REQUIRE(after->schema().size() == frozen_before->schema().size());
-                    auto after_it = after->schema().find("TopLevel");
-                    auto before_it = frozen_before->schema().find("TopLevel");
-                    REQUIRE(after_it != after->schema().end());
-                    REQUIRE(before_it != frozen_before->schema().end());
-                    REQUIRE(after_it->name == before_it->name);
-                    REQUIRE(after_it->persisted_properties.size() == before_it->persisted_properties.size());
-                    REQUIRE(after_it->persisted_properties[1].name == "queryable_int_field");
-                    REQUIRE(after_it->persisted_properties[2].name == "queryable_str_field");
-                    REQUIRE(before_it->persisted_properties[1].name == "queryable_int_field");
-                    REQUIRE(before_it->persisted_properties[2].name == "queryable_str_field");
-                    REQUIRE(did_recover);
+            config.sync_config->notify_after_client_reset = [&after_reset_count, promise = std::move(shared_promise),
+                                                             expected = expected_schema,
+                                                             reset_mode = config.sync_config->client_resync_mode](
+                                                                SharedRealm frozen_before,
+                                                                ThreadSafeReference after_ref, bool did_recover) {
+                ++after_reset_count;
+                REQUIRE(frozen_before->schema().size() > 0);
+                REQUIRE(frozen_before->schema_version() != ObjectStore::NotVersioned);
+                REQUIRE(frozen_before->schema() == expected);
+                SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
+                REQUIRE(after);
+                REQUIRE(after->schema() == expected);
+                // the above check is sufficent unless operator==() is changed to not care about ordering
+                // so future proof that by explicitly checking the order of properties here as well
+                REQUIRE(after->schema().size() == frozen_before->schema().size());
+                auto after_it = after->schema().find("TopLevel");
+                auto before_it = frozen_before->schema().find("TopLevel");
+                REQUIRE(after_it != after->schema().end());
+                REQUIRE(before_it != frozen_before->schema().end());
+                REQUIRE(after_it->name == before_it->name);
+                REQUIRE(after_it->persisted_properties.size() == before_it->persisted_properties.size());
+                REQUIRE(after_it->persisted_properties[1].name == "queryable_int_field");
+                REQUIRE(after_it->persisted_properties[2].name == "queryable_str_field");
+                REQUIRE(before_it->persisted_properties[1].name == "queryable_int_field");
+                REQUIRE(before_it->persisted_properties[2].name == "queryable_str_field");
+                REQUIRE(did_recover == (reset_mode == ClientResyncMode::Recover));
+                if (promise) {
                     promise->emplace_value();
-                };
+                }
+            };
+        };
 
-            SharedRealm realm = Realm::get_shared_realm(config_copy);
+    SECTION("Recover: schema indexes match in before and after states") {
+        seed_realm(config_local, ResetMode::InitiateClientReset);
+        // reorder a property such that it does not match the on disk property order
+        std::vector<ObjectSchema> local_schema = schema;
+        std::swap(local_schema[0].persisted_properties[1], local_schema[0].persisted_properties[2]);
+        local_schema[0].persisted_properties.push_back(
+            {"queryable_oid_field", PropertyType::ObjectId | PropertyType::Nullable});
+        config_local.schema = local_schema;
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        auto [promise, future] = util::make_promise_future<void>();
+        auto shared_promise = std::make_shared<decltype(promise)>(std::move(promise));
+        setup_reset_handlers_for_schema_validation(config_local, local_schema, shared_promise);
+        SharedRealm realm = Realm::get_shared_realm(config_local);
+        future.get();
+        CHECK(before_reset_count == 1);
+        CHECK(after_reset_count == 1);
+    }
+
+    for (auto mode : {ClientResyncMode::DiscardLocal, ClientResyncMode::Recover}) {
+        config_local.sync_config->client_resync_mode = mode;
+        SECTION(util::format("%1: Adding a local property matching a server addition is allowed", mode)) {
+            seed_realm(config_local, ResetMode::InitiateClientReset);
+            std::vector<ObjectSchema> changed_schema = schema;
+            changed_schema[0].persisted_properties.push_back(
+                {"queryable_oid_field", PropertyType::ObjectId | PropertyType::Nullable});
+            // In a separate Realm, make the property addition.
+            // Since this is dev mode, it will be added to the server's schema.
+            config_remote.schema = changed_schema;
+            seed_realm(config_remote, ResetMode::NoReset);
+            std::swap(changed_schema[0].persisted_properties[1], changed_schema[0].persisted_properties[2]);
+            config_local.schema = changed_schema;
+            auto [promise, future] = util::make_promise_future<void>();
+            auto shared_promise = std::make_shared<decltype(promise)>(std::move(promise));
+            setup_reset_handlers_for_schema_validation(config_local, changed_schema, shared_promise);
+            auto [ref, error] = async_open_realm(config_local);
+            REQUIRE(ref);
+            REQUIRE_FALSE(error);
+            auto realm = Realm::get_shared_realm(std::move(ref));
             future.get();
             CHECK(before_reset_count == 1);
             CHECK(after_reset_count == 1);
         }
     }
+
+    auto make_additive_changes = [](std::vector<ObjectSchema> schema) {
+        schema[0].persisted_properties.push_back(
+            {"added_oid_field", PropertyType::ObjectId | PropertyType::Nullable});
+        std::swap(schema[0].persisted_properties[1], schema[0].persisted_properties[2]);
+        schema.push_back({"AddedClass",
+                          {
+                              {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                              {"str_field", PropertyType::String | PropertyType::Nullable},
+                          }});
+        return schema;
+    };
+    SECTION("Recover: additive schema changes are recovered in dev mode") {
+        seed_realm(config_local, ResetMode::InitiateClientReset);
+        std::vector<ObjectSchema> changed_schema = make_additive_changes(schema);
+        config_local.schema = changed_schema;
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        auto [promise, future] = util::make_promise_future<void>();
+        auto shared_promise = std::make_shared<decltype(promise)>(std::move(promise));
+        setup_reset_handlers_for_schema_validation(config_local, changed_schema, shared_promise);
+        auto [ref, error] = async_open_realm(config_local);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+        auto realm = Realm::get_shared_realm(std::move(ref));
+        future.get();
+        CHECK(before_reset_count == 1);
+        CHECK(after_reset_count == 1);
+        {
+            // make changes to the newly added property
+            realm->begin_transaction();
+            auto table = realm->read_group().get_table("class_TopLevel");
+            ColKey new_col = table->get_column_key("added_oid_field");
+            REQUIRE(new_col);
+            for (auto it = table->begin(); it != table->end(); ++it) {
+                it->set(new_col, ObjectId::gen());
+            }
+            realm->commit_transaction();
+            // subscribe to the new Class and add an object
+            auto new_table = realm->read_group().get_table("class_AddedClass");
+            auto sub_set = realm->get_latest_subscription_set();
+            auto mut_sub = sub_set.make_mutable_copy();
+            mut_sub.insert_or_assign(Query(new_table));
+            mut_sub.commit();
+            realm->begin_transaction();
+            REQUIRE(new_table);
+            new_table->create_object_with_primary_key(ObjectId::gen());
+            realm->commit_transaction();
+        }
+        auto result = realm->get_latest_subscription_set()
+                          .get_state_change_notification(sync::SubscriptionSet::State::Complete)
+                          .get();
+        CHECK(result == sync::SubscriptionSet::State::Complete);
+        wait_for_download(*realm);
+    }
+
+    SECTION("DiscardLocal: additive schema changes not allowed") {
+        seed_realm(config_local, ResetMode::InitiateClientReset);
+        std::vector<ObjectSchema> changed_schema = make_additive_changes(schema);
+        config_local.schema = changed_schema;
+        config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+        auto&& [error_future, err_handler] = make_error_handler();
+        config_local.sync_config->error_handler = err_handler;
+        auto [ref, error] = async_open_realm(config_local);
+        REQUIRE(!ref);
+        REQUIRE(error);
+        REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error),
+                                  "A fatal error occured during client reset: 'Client reset cannot recover when "
+                                  "classes have been removed: {AddedClass}'");
+        error_future.get();
+        CHECK(before_reset_count == 1);
+        CHECK(after_reset_count == 0);
+    }
+
+    SECTION("Recover: incompatible schema changes on async open are an error") {
+        seed_realm(config_local, ResetMode::InitiateClientReset);
+        std::vector<ObjectSchema> changed_schema = schema;
+        changed_schema[0].persisted_properties[0].type = PropertyType::UUID; // incompatible type change
+        config_local.schema = changed_schema;
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        auto&& [error_future, err_handler] = make_error_handler();
+        config_local.sync_config->error_handler = err_handler;
+        auto [ref, error] = async_open_realm(config_local);
+        REQUIRE(!ref);
+        REQUIRE(error);
+        REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error),
+                                  "A fatal error occured during client reset: 'The following changes cannot be "
+                                  "made in additive-only schema mode:\n"
+                                  "- Property 'TopLevel._id' has been changed from 'object id' to 'uuid'.'");
+        error_future.get();
+        CHECK(before_reset_count == 0); // we didn't even get this far because opening the frozen realm fails
+        CHECK(after_reset_count == 0);
+    }
+
+    SECTION("Recover: additive schema changes without dev mode produce an error after client reset") {
+        const AppSession& app_session = harness.session().app_session();
+        app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
+        {
+            seed_realm(config_local, ResetMode::InitiateClientReset);
+            // Disable dev mode so that schema changes are not allowed
+            app_session.admin_api.set_development_mode_to(app_session.server_app_id, false);
+            std::vector<ObjectSchema> changed_schema = make_additive_changes(schema);
+            config_local.schema = changed_schema;
+            config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+            setup_reset_handlers_for_schema_validation(config_local, changed_schema, nullptr);
+            auto&& [error_future, err_handler] = make_error_handler();
+            config_local.sync_config->error_handler = err_handler;
+            auto [ref, error] = async_open_realm(config_local);
+            REQUIRE(ref);
+            REQUIRE_FALSE(error);
+            auto realm = Realm::get_shared_realm(std::move(ref));
+            // make changes to the new property
+            realm->begin_transaction();
+            auto table = realm->read_group().get_table("class_TopLevel");
+            ColKey new_col = table->get_column_key("added_oid_field");
+            REQUIRE(new_col);
+            for (auto it = table->begin(); it != table->end(); ++it) {
+                it->set(new_col, ObjectId::gen());
+            }
+            realm->commit_transaction();
+            auto err = error_future.get();
+            std::string property_err = "Invalid schema change (UPLOAD): non-breaking schema change: adding "
+                                       "\"ObjectID\" column at field \"added_oid_field\" in schema \"TopLevel\", "
+                                       "schema changes from clients are restricted when developer mode is disabled";
+            std::string class_err = "Invalid schema change (UPLOAD): non-breaking schema change: adding schema "
+                                    "for Realm table \"AddedClass\", schema changes from clients are restricted when "
+                                    "developer mode is disabled";
+            REQUIRE_THAT(std::string(err.reason()), Catch::Matchers::ContainsSubstring(property_err) ||
+                                                        Catch::Matchers::ContainsSubstring(class_err));
+            CHECK(before_reset_count == 1);
+            CHECK(after_reset_count == 1);
+        }
+    }
+    // the previous section turns off dev mode, undo that now for later tests
+    const AppSession& app_session = harness.session().app_session();
+    app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
 }
 
 TEST_CASE("flx: creating an object on a class with no subscription throws", "[sync][flx][app][baas]") {

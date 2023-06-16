@@ -23,6 +23,7 @@
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
@@ -233,6 +234,24 @@ void wait_for_advance(Realm& realm)
         return done;
     });
     realm.m_binding_context = nullptr;
+}
+
+std::pair<ThreadSafeReference, std::exception_ptr> async_open_realm(const Realm::Config& config)
+{
+    std::mutex mutex;
+    ThreadSafeReference realm_ref;
+    std::exception_ptr error;
+    auto task = Realm::get_synchronized_realm(config);
+    task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
+        std::lock_guard lock(mutex);
+        realm_ref = std::move(ref);
+        error = e;
+    });
+    util::EventLoop::main().run_until([&] {
+        std::lock_guard lock(mutex);
+        return realm_ref || error;
+    });
+    return std::pair(std::move(realm_ref), error);
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS

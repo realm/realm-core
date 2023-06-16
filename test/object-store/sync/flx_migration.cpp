@@ -836,34 +836,15 @@ TEST_CASE("Async open + client reset", "[flx][migration][baas]") {
     config.sync_config->notify_after_client_reset = [&](SharedRealm before, ThreadSafeReference after_ref,
                                                         bool did_recover) {
         logger_ptr->debug("notify_after_client_reset");
-        CHECK(!did_recover);
+        CHECK(did_recover);
         REQUIRE(before);
         auto table_before = before->read_group().get_table("class_Object");
-        CHECK(!table_before);
+        CHECK(table_before);
         SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
         REQUIRE(after);
         auto table_after = after->read_group().get_table("class_Object");
         REQUIRE(table_after);
-        REQUIRE(table_after->size() == 0);
         ++num_after_reset_notifications;
-    };
-
-    std::mutex mutex;
-
-    auto async_open_realm = [&](const Realm::Config& config) {
-        ThreadSafeReference realm_ref;
-        std::exception_ptr error;
-        auto task = Realm::get_synchronized_realm(config);
-        task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
-            std::lock_guard lock(mutex);
-            realm_ref = std::move(ref);
-            error = e;
-        });
-        util::EventLoop::main().run_until([&] {
-            std::lock_guard lock(mutex);
-            return realm_ref || error;
-        });
-        return std::pair(std::move(realm_ref), error);
     };
 
     SECTION("no initial state") {

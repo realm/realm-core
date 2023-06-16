@@ -58,7 +58,8 @@ struct ClientResetFailed : public std::runtime_error {
 //
 // The result is that src group is unchanged and the dst group is equal to src
 // when this function returns.
-void transfer_group(const Transaction& tr_src, Transaction& tr_dst, util::Logger& logger);
+void transfer_group(const Transaction& tr_src, Transaction& tr_dst, util::Logger& logger,
+                    bool allow_schema_additions = false);
 
 void remove_all_tables(Transaction& tr_dst, util::Logger& logger);
 
