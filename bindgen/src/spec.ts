@@ -28,6 +28,7 @@ import {
   FieldSpec,
   FunctionTypeSpec,
   MethodSpec,
+  OptInSpec,
   RecordSpec,
   AnySpec,
   ValueType,
@@ -68,6 +69,11 @@ const schemaFile = new URL("../generated/spec.schema.json", import.meta.url);
 const schemaJson = JSON.parse(fs.readFileSync(schemaFile, { encoding: "utf8" }));
 export const validate = ajv.compile<RelaxedSpec>(schemaJson);
 
+function parseYaml(filePath: string): unknown {
+  const text = fs.readFileSync(filePath, { encoding: "utf8" });
+  return yaml.parse(text);
+}
+
 export function parseSpecs(specs: ReadonlyArray<string>): Spec {
   const [base, ...extras] = specs;
   const spec = parseSpec(base);
@@ -96,14 +102,22 @@ export function parseSpecs(specs: ReadonlyArray<string>): Spec {
 }
 
 export function parseSpec(filePath: string): AnySpec {
-  const text = fs.readFileSync(filePath, { encoding: "utf8" });
-  const parsed = yaml.parse(text);
+  const parsed = parseYaml(filePath);
   const isValid = validate(parsed);
   if (isValid) {
     return normalizeSpec(parsed);
   } else {
     throw new InvalidSpecError(filePath, validate.errors || []);
   }
+}
+
+export function parseOptInSpec(filePath: string): OptInSpec {
+  const parsed = parseYaml(filePath);
+
+  // TODO:
+  // Validate parsed spec.
+
+  return parsed as OptInSpec;
 }
 
 /**
