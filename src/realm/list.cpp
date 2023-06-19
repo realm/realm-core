@@ -418,6 +418,7 @@ void Lst<Mixed>::swap(size_t ndx1, size_t ndx2)
 void Lst<Mixed>::insert_collection(const PathElement& path_elem, CollectionType dict_or_list)
 {
     ensure_created();
+    check_level();
     m_tree->ensure_keys();
     insert(path_elem.get_ndx(), Mixed(0, dict_or_list));
     int64_t key = generate_key(size());
@@ -434,6 +435,8 @@ void Lst<Mixed>::set_collection(const PathElement& path_elem, CollectionType typ
     // get will check for ndx out of bounds
     Mixed old_val = do_get(ndx, "set()");
     Mixed new_val(0, type);
+
+    check_level();
 
     if (old_val != new_val) {
         m_tree->ensure_keys();

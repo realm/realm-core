@@ -221,10 +221,9 @@ ColumnDictionaryKeys Columns<Dictionary>::keys()
     return ColumnDictionaryKeys(*this);
 }
 
-void Columns<Dictionary>::init_key(Mixed key_value)
+void Columns<Dictionary>::init_path(const PathElement* begin, const PathElement* end)
 {
-    REALM_ASSERT(key_value.is_type(type_String));
-    m_key = key_value.get_string();
+    std::move(begin, end, std::back_inserter(m_path));
 }
 
 void ColumnDictionaryKeys::set_cluster(const Cluster* cluster)
@@ -328,18 +327,18 @@ void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
         for (size_t t = 0; t < sz; t++) {
             const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
             auto dict = obj.get_dictionary(m_column_key);
-            if (m_key) {
-                Mixed val;
-                if (auto opt_val = dict.try_get(*m_key)) {
-                    val = *opt_val;
-                }
-                values.emplace_back(val);
-            }
-            else {
+            if (m_path.empty()) {
                 // Insert all values
                 dict.for_all_values([&values](const Mixed& value) {
                     values.emplace_back(value);
                 });
+            }
+            else {
+                Mixed val;
+                if (auto opt_val = dict.try_get(m_path.front().get_key())) {
+                    val = *opt_val;
+                }
+                values.emplace_back(val);
             }
         }
 
@@ -352,26 +351,13 @@ void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
         Allocator& alloc = get_base_table()->get_alloc();
 
         REALM_ASSERT(m_leaf);
-        if (m_leaf->get(index)) {
-            Array top(alloc);
-            top.set_parent(&*m_leaf, index);
-            top.init_from_parent();
-            BPlusTree<Mixed> values(alloc);
-            values.set_parent(&top, 1);
-            values.init_from_parent();
-
-            if (m_key) {
-                BPlusTree<StringData> keys(alloc);
-                keys.set_parent(&top, 0);
-                keys.init_from_parent();
-                Mixed val;
-                size_t ndx = keys.find_first(StringData(m_key));
-                if (ndx != realm::not_found) {
-                    val = values.get(ndx);
-                }
-                destination.set(0, val);
-            }
-            else {
+        if (ref_type ref = to_ref(m_leaf->get(index))) {
+            if (m_path.empty()) {
+                Array top(alloc);
+                top.init_from_ref(ref);
+                BPlusTree<Mixed> values(alloc);
+                values.set_parent(&top, 1);
+                values.init_from_parent();
                 destination.init(true, values.size());
                 size_t n = 0;
                 // Iterate through BPlusTreee and insert all values
@@ -379,6 +365,11 @@ void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
                     destination.set(n, val);
                     n++;
                 });
+            }
+            else {
+                auto val =
+                    Collection::get_any({ref, CollectionType::Dictionary}, m_path.begin(), m_path.end(), alloc);
+                destination.set(0, val);
             }
         }
     }

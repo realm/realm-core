@@ -537,7 +537,7 @@ Query EqualityNode::visit(ParserDriver* drv)
     else if (right->has_single_value() && (left_type == right_type || left_type == type_Mixed)) {
         Mixed val = right->get_mixed();
         const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
-        if (prop && !prop->links_exist()) {
+        if (prop && !prop->links_exist() && !prop->has_path()) {
             auto col_key = prop->column_key();
             if (val.is_null()) {
                 switch (op) {
@@ -848,9 +848,21 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
     }
     std::unique_ptr<Subexpr> subexpr{drv->column(m_link_chain, path)};
 
-    if (!path->at_end()) {
-        if (path->is_identifier()) {
-            auto trailing = path->next_identifier();
+    Path indexes;
+    while (!path->at_end()) {
+        indexes.emplace_back(std::move(*(path->current_path_elem++)));
+    }
+
+    if (!indexes.empty()) {
+        const PathElement& first_index = indexes.front();
+        if (indexes.size() > 1 && subexpr->get_type() != type_Mixed) {
+            throw InvalidQueryError("Only Property of type 'any' can have nested collections");
+        }
+        if (auto mixed = dynamic_cast<Columns<Mixed>*>(subexpr.get())) {
+            mixed->path(indexes);
+        }
+        else if (first_index.is_key()) {
+            auto trailing = first_index.get_key();
             if (auto dict = dynamic_cast<Columns<Dictionary>*>(subexpr.get())) {
                 if (trailing == "@values") {
                 }
@@ -858,7 +870,7 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
                     subexpr = std::make_unique<ColumnDictionaryKeys>(*dict);
                 }
                 else {
-                    dict->key(trailing);
+                    dict->key(indexes);
                 }
             }
             else {
@@ -879,7 +891,24 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
             }
         }
         else {
-            throw InvalidQueryError("Index not supported");
+            // This must be an integer index
+            REALM_ASSERT(first_index.is_ndx());
+            auto ok = false;
+            if (indexes.size() == 1) {
+                if (auto coll = dynamic_cast<ColumnListBase*>(subexpr.get())) {
+                    ok = coll->index(first_index);
+                }
+            }
+            else {
+                if (auto coll = dynamic_cast<Columns<Lst<Mixed>>*>(subexpr.get())) {
+                    ok = coll->indexes(indexes);
+                }
+            }
+            if (!ok) {
+                throw InvalidQueryError(util::format("Property '%1.%2' does not support index '%3'",
+                                                     m_link_chain.get_current_table()->get_class_name(), identifier,
+                                                     first_index));
+            }
         }
     }
     if (post_op) {

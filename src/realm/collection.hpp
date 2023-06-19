@@ -94,6 +94,8 @@ public:
     virtual Path get_short_path() const = 0;
     // Return a path based on keys instead of indices
     virtual StablePath get_stable_path() const = 0;
+
+    static Mixed get_any(Mixed, Path::const_iterator, Path::const_iterator, Allocator&);
 };
 
 using CollectionPtr = std::shared_ptr<Collection>;
@@ -585,14 +587,9 @@ protected:
         return *this;
     }
 
-    ref_type get_collection_ref() const noexcept
+    ref_type get_collection_ref() const
     {
-        try {
-            return m_parent->get_collection_ref(m_index, Interface::s_collection_type);
-        }
-        catch (...) {
-            return ref_type(0);
-        }
+        return m_parent->get_collection_ref(m_index, Interface::s_collection_type);
     }
 
     void set_collection_ref(ref_type ref)

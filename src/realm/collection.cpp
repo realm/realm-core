@@ -1,6 +1,8 @@
 #include <realm/collection.hpp>
 #include <realm/bplustree.hpp>
 #include <realm/array_key.hpp>
+#include <realm/array_string.hpp>
+#include <realm/array_mixed.hpp>
 
 namespace realm {
 
@@ -90,6 +92,48 @@ void check_for_last_unresolved(BPlusTree<ObjKey>* tree)
 } // namespace _impl
 
 Collection::~Collection() {}
+
+Mixed Collection::get_any(Mixed val, Path::const_iterator begin, Path::const_iterator end, Allocator& alloc)
+{
+    auto path_size = end - begin;
+    if (val.is_type(type_Dictionary) && begin->is_key()) {
+        Array top(alloc);
+        top.init_from_ref(val.get_ref());
+
+        BPlusTree<StringData> keys(alloc);
+        keys.set_parent(&top, 0);
+        keys.init_from_parent();
+        size_t ndx = keys.find_first(StringData(begin->get_key()));
+        if (ndx != realm::not_found) {
+            BPlusTree<Mixed> values(alloc);
+            values.set_parent(&top, 1);
+            values.init_from_parent();
+            val = values.get(ndx);
+            if (path_size > 1) {
+                val = Collection::get_any(val, begin + 1, end, alloc);
+            }
+            return val;
+        }
+    }
+    if (val.is_type(type_List) && begin->is_ndx()) {
+        ArrayMixed list(alloc);
+        list.init_from_ref(val.get_ref());
+        if (size_t sz = list.size()) {
+            auto idx = begin->get_ndx();
+            if (idx == size_t(-1)) {
+                idx = sz - 1;
+            }
+            if (idx < sz) {
+                val = list.get(idx);
+            }
+            if (path_size > 1) {
+                val = Collection::get_any(val, begin + 1, end, alloc);
+            }
+            return val;
+        }
+    }
+    return {};
+}
 
 std::pair<std::string, std::string> CollectionBase::get_open_close_strings(size_t link_depth,
                                                                            JSONOutputMode output_mode) const

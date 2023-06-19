@@ -199,9 +199,10 @@ struct PathElement {
     }
 };
 
-std::ostream& operator<<(std::ostream& ostr, const PathElement& elem);
-
 using Path = std::vector<PathElement>;
+
+std::ostream& operator<<(std::ostream& ostr, const PathElement& elem);
+std::ostream& operator<<(std::ostream& ostr, const Path& path);
 
 // Path from the group level.
 struct FullPath {
@@ -222,6 +223,7 @@ public:
     {
         return m_level;
     }
+    void check_level() const;
     // Return the path to this object. The path is calculated from
     // the topmost Obj - which must be an Obj with a primary key.
     virtual FullPath get_path() const = 0;
@@ -240,6 +242,11 @@ protected:
     friend class CollectionBaseImpl;
     friend class CollectionList;
 
+#ifdef REALM_DEBUG
+    static constexpr size_t s_max_level = 4;
+#else
+    static constexpr size_t s_max_level = 100;
+#endif
     size_t m_level = 0;
 
     constexpr CollectionParent(size_t level = 0)
