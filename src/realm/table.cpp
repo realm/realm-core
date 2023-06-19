@@ -1003,10 +1003,6 @@ void Table::add_search_index(ColKey col_key, IndexType type)
 
 void Table::remove_search_index(ColKey col_key)
 {
-    // forbid removal of search index for primary key
-    if (col_key == m_primary_key_col)
-        return;
-
     check_column(col_key);
     auto column_ndx = col_key.get_index();
 
@@ -3608,10 +3604,12 @@ void Table::set_primary_key_column(ColKey col_key)
 
 void Table::do_set_primary_key_column(ColKey col_key)
 {
-    auto spec_ndx = leaf_ndx2spec_ndx(col_key.get_index());
-    auto attr = m_spec.get_column_attr(spec_ndx);
-    if (attr.test(col_attr_FullText_Indexed)) {
-        throw InvalidColumnKey("primary key cannot have a full text index");
+    if (col_key) {
+        auto spec_ndx = leaf_ndx2spec_ndx(col_key.get_index());
+        auto attr = m_spec.get_column_attr(spec_ndx);
+        if (attr.test(col_attr_FullText_Indexed)) {
+            throw InvalidColumnKey("primary key cannot have a full text index");
+        }
     }
 
     if (m_primary_key_col) {
