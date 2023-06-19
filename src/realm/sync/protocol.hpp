@@ -58,6 +58,12 @@ constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
     return "com.mongodb.realm-sync#";
 }
 
+// Only used by the Sync Server to support older pbs sync clients (prior to protocol v8)
+constexpr std::string_view get_old_pbs_websocket_protocol_prefix() noexcept
+{
+    return "com.mongodb.realm-sync/";
+}
+
 constexpr std::string_view get_flx_websocket_protocol_prefix() noexcept
 {
     return "com.mongodb.realm-query-sync#";
