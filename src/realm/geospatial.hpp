@@ -80,20 +80,6 @@ struct GeoPoint {
     }
 };
 
-// Construct a rectangle from minimum and maximum latitudes and longitudes.
-// If lo.lng() > hi.lng(), the rectangle spans the 180 degree longitude
-// line. Both points must be normalized, with lo.lat() <= hi.lat().
-// The rectangle contains all the points p such that 'lo' <= p <= 'hi',
-// where '<=' is defined in the obvious way.
-struct GeoBox {
-    GeoPoint lo;
-    GeoPoint hi;
-    bool operator==(const GeoBox& other) const
-    {
-        return lo == other.lo && hi == other.hi;
-    }
-};
-
 // A simple spherical polygon. It consists of a single
 // chain of vertices where the first vertex is implicitly connected to the
 // last. Chain of vertices is defined to have a CCW orientation, i.e. the interior
@@ -109,6 +95,21 @@ struct GeoPolygon {
         return points == other.points;
     }
     std::vector<std::vector<GeoPoint>> points;
+};
+
+// This is a shortcut for creating a polygon with a "rectangular" shape. It is just
+// syntatic sugar for making a viewport like region such as a device screen. The
+// ordering of points does not matter. Results are undefined if the intended region
+// wraps a pole.
+struct GeoBox {
+    GeoPoint lo;
+    GeoPoint hi;
+    bool operator==(const GeoBox& other) const
+    {
+        return lo == other.lo && hi == other.hi;
+    }
+    GeoPolygon to_polygon() const;
+    static std::optional<GeoBox> from_polygon(const GeoPolygon&);
 };
 
 struct GeoCircle {
