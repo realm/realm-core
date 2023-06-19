@@ -664,7 +664,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
             // and then transfer the modified state all at once to the local Realm. This creates a
             // nice side effect for notifications because only the minimal state change is made.
             RecoverLocalChangesetsHandler handler{*wt_remote, *frozen_pre_local_state, logger,
-                                                  db_local->get_replication()};
+                db_remote->get_replication()};
             handler.process_changesets(local_changes, {}); // throws on error
             ClientReplication* client_repl = dynamic_cast<ClientReplication*>(wt_remote->get_replication());
             REALM_ASSERT_RELEASE(client_repl);

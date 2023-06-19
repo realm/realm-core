@@ -713,14 +713,13 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::AddTable& inst
         // if the table already existed then no instruction was
         // added to the history so we need to add one now
         if (m_replication && table) {
-            REALM_ASSERT(table);
             if (table->is_embedded()) {
-                m_replication->add_class(table->get_key(), class_name, table->get_table_type());
+                m_replication->add_class(table->get_key(), table->get_name(), table->get_table_type());
             }
             else {
                 ColKey pk_col = table->get_primary_key_column();
                 REALM_ASSERT_EX(pk_col, class_name);
-                m_replication->add_class_with_primary_key(table->get_key(), class_name, DataType(pk_col.get_type()),
+                m_replication->add_class_with_primary_key(table->get_key(), table->get_name(), DataType(pk_col.get_type()),
                                                           table->get_column_name(pk_col), pk_col.is_nullable(),
                                                           table->get_table_type());
             }

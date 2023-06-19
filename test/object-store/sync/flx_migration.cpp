@@ -870,6 +870,9 @@ TEST_CASE("Async open + client reset", "[flx][migration][baas]") {
         auto locally_added_table = realm->read_group().get_table("class_LocallyAdded");
         REQUIRE(locally_added_table);
         REQUIRE(locally_added_table->size() == 0);
+        wait_for_upload(*realm);
+        wait_for_download(*realm);
+        realm->close();
     }
 
     SECTION("initial state") {
@@ -906,6 +909,9 @@ TEST_CASE("Async open + client reset", "[flx][migration][baas]") {
             auto locally_added_table = realm->read_group().get_table("class_LocallyAdded");
             REQUIRE(locally_added_table);
             REQUIRE(locally_added_table->size() == 0);
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
+            realm->close();
         }
     }
 }
