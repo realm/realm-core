@@ -814,14 +814,14 @@ TEST_CASE("Async open + client reset", "[flx][migration][baas]") {
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
     const std::string base_url = get_base_url();
-    const std::string partition = "migration-test";
+    const std::string partition = "async-open-migration-test";
     ObjectSchema shared_object("Object", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                           {"string_field", PropertyType::String | PropertyType::Nullable},
                                           {"realm_id", PropertyType::String | PropertyType::Nullable}});
     const Schema mig_schema{shared_object};
     size_t num_before_reset_notifications = 0;
     size_t num_after_reset_notifications = 0;
-    auto server_app_config = minimal_app_config(base_url, "server_migrate_rollback", mig_schema);
+    auto server_app_config = minimal_app_config(base_url, "async_open_during_migration", mig_schema);
     TestAppSession session(create_app(server_app_config));
     SyncTestFile config(session.app(), partition, server_app_config.schema);
     config.sync_config->client_resync_mode = ClientResyncMode::Recover;
