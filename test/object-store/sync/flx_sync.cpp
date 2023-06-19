@@ -1505,8 +1505,13 @@ TEST_CASE("flx: geospatial", "[sync][flx][app][baas]") {
                                              {"coordinates", std::vector<std::any>{p.longitude, p.latitude}}}}}));
             };
             std::vector<GeoPoint> points = {
-                GeoPoint{-74.006, 40.712800000000001}, GeoPoint{12.568300000000001, 55.676099999999998},
-                GeoPoint{12.082599999999999, 55.628}, GeoPoint{-180.1, -90.1}, // invalid
+                GeoPoint{-74.006, 40.712800000000001},            // New York city
+                GeoPoint{12.568300000000001, 55.676099999999998}, // Copenhagen
+                GeoPoint{12.082599999999999, 55.628},             // ragnarok, Roskilde
+                GeoPoint{-180.1, -90.1},                          // invalid
+                GeoPoint{0, 90},                                  // north pole
+                GeoPoint{-82.68193, 84.74653},                    // northern point that falls within a box later
+                GeoPoint{82.55243, 84.54981}, // another northern point, but on the other side of the pole
             };
             for (auto& point : points) {
                 add_point(point);
@@ -1527,32 +1532,91 @@ TEST_CASE("flx: geospatial", "[sync][flx][app][baas]") {
                 REQUIRE(point.latitude == points[0].latitude);
                 REQUIRE(!point.get_altitude());
                 ColKey location_col = table->get_column_key("location");
-                GeoPolygon bounds{
-                    {{GeoPoint{-80, 40.7128}, GeoPoint{20, 60}, GeoPoint{20, 20}, GeoPoint{-80, 40.7128}}}};
-                Query query = table->column<Link>(location_col).geo_within(Geospatial(bounds));
-                size_t local_matches = query.find_all().size();
-                REQUIRE(local_matches == 2);
+                auto run_query_locally = [&table, &location_col](Geospatial bounds) -> size_t {
+                    Query query = table->column<Link>(location_col).geo_within(Geospatial(bounds));
+                    return query.find_all().size();
+                };
 
                 reset_utils::wait_for_num_objects_in_atlas(
                     harness->app()->current_user(), harness->session().app_session(), "restaurant", points.size());
 
-                bson::BsonDocument filter = make_polygon_filter(bounds);
-                size_t server_results = run_query_on_server(filter);
-                CHECK(server_results == local_matches);
-
-                GeoCircle circle = GeoCircle::from_kms(10, GeoPoint{-180.1, -90.1});
-                CHECK_THROWS_WITH(table->column<Link>(location_col).geo_within(circle).count(),
-                                  "Invalid region in GEOWITHIN query for parameter 'GeoCircle([-180.1, -90.1], "
-                                  "0.00156787)': 'Longitude/latitude is out of bounds, lng: -180.1 lat: -90.1'");
-                filter = make_circle_filter(circle);
-                run_query_on_server(filter, "(BadValue) longitude/latitude is out of bounds");
-
-                circle = GeoCircle::from_kms(-1, GeoPoint{0, 0});
-                CHECK_THROWS_WITH(table->column<Link>(location_col).geo_within(circle).count(),
-                                  "Invalid region in GEOWITHIN query for parameter 'GeoCircle([0, 0], "
-                                  "-0.000156787)': 'The radius of a circle must be a non-negative number'");
-                filter = make_circle_filter(circle);
-                run_query_on_server(filter, "(BadValue) radius must be a non-negative number");
+                {
+                    GeoPolygon bounds{
+                        {{GeoPoint{-80, 40.7128}, GeoPoint{20, 60}, GeoPoint{20, 20}, GeoPoint{-80, 40.7128}}}};
+                    size_t local_matches = run_query_locally(bounds);
+                    size_t server_results = run_query_on_server(make_polygon_filter(bounds));
+                    CHECK(server_results == local_matches);
+                }
+                { // a ring with 3 points without a matching begin/end is an error
+                    GeoPolygon open_bounds{{{GeoPoint{-80, 40.7128}, GeoPoint{20, 60}, GeoPoint{20, 20}}}};
+                    CHECK_THROWS_WITH(run_query_locally(open_bounds),
+                                      "Invalid region in GEOWITHIN query for parameter 'GeoPolygon({[-80, 40.7128], "
+                                      "[20, 60], [20, 20]})': 'Ring is not closed, first vertex 'GeoPoint([-80, "
+                                      "40.7128])' does not equal last vertex 'GeoPoint([20, 20])''");
+                    run_query_on_server(make_polygon_filter(open_bounds), "(BadValue) Loop is not closed:");
+                }
+                {
+                    GeoCircle circle = GeoCircle::from_kms(10, GeoPoint{-180.1, -90.1});
+                    CHECK_THROWS_WITH(run_query_locally(circle),
+                                      "Invalid region in GEOWITHIN query for parameter 'GeoCircle([-180.1, -90.1], "
+                                      "0.00156787)': 'Longitude/latitude is out of bounds, lng: -180.1 lat: -90.1'");
+                    run_query_on_server(make_circle_filter(circle), "(BadValue) longitude/latitude is out of bounds");
+                }
+                {
+                    GeoCircle circle = GeoCircle::from_kms(-1, GeoPoint{0, 0});
+                    CHECK_THROWS_WITH(run_query_locally(circle),
+                                      "Invalid region in GEOWITHIN query for parameter 'GeoCircle([0, 0], "
+                                      "-0.000156787)': 'The radius of a circle must be a non-negative number'");
+                    run_query_on_server(make_circle_filter(circle),
+                                        "(BadValue) radius must be a non-negative number");
+                }
+                {
+                    // This box is from Gershøj to CPH airport. It includes CPH and Ragnarok but not NYC.
+                    std::vector<Geospatial> valid_box_variations = {
+                        GeoBox{GeoPoint{11.97575, 55.71601},
+                               GeoPoint{12.64773, 55.61211}}, // Gershøj, CPH Airport (Top Left, Bottom Right)
+                        GeoBox{GeoPoint{12.64773, 55.61211},
+                               GeoPoint{11.97575, 55.71601}}, // CPH Airport, Gershøj (Bottom Right, Top Left)
+                        GeoBox{GeoPoint{12.64773, 55.71601},
+                               GeoPoint{11.97575, 55.61211}}, // Upper Right, Bottom Left
+                        GeoBox{GeoPoint{11.97575, 55.61211},
+                               GeoPoint{12.64773, 55.71601}}, // Bottom Left, Upper Right
+                    };
+                    constexpr size_t expected_results = 2;
+                    for (auto& geo : valid_box_variations) {
+                        size_t local_matches = run_query_locally(geo);
+                        size_t server_matches =
+                            run_query_on_server(make_polygon_filter(geo.get<GeoBox>().to_polygon()));
+                        CHECK(local_matches == expected_results);
+                        CHECK(server_matches == expected_results);
+                    }
+                    std::vector<Geospatial> invalid_boxes = {
+                        GeoBox{GeoPoint{11.97575, 55.71601}, GeoPoint{11.97575, 55.71601}}, // same point twice
+                        GeoBox{GeoPoint{11.97575, 55.71601},
+                               GeoPoint{11.97575, 57.0}}, // two points on the same longitude
+                        GeoBox{GeoPoint{11.97575, 55.71601},
+                               GeoPoint{12, 55.71601}}, // two points on the same latitude
+                    };
+                    for (auto& geo : invalid_boxes) {
+                        REQUIRE_THROWS_CONTAINING(run_query_locally(geo),
+                                                  "Invalid region in GEOWITHIN query for parameter 'GeoPolygon");
+                        run_query_on_server(make_polygon_filter(geo.get<GeoBox>().to_polygon()),
+                                            "(BadValue) Loop must have at least 3 different vertices");
+                    }
+                }
+                { // a box region that wraps the north pole. It contains the north pole point
+                    // and two others, one each on distinct sides of the globe.
+                    constexpr double lat = 82.83799;
+                    Geospatial north_pole_box =
+                        GeoPolygon{{{GeoPoint{-78.33951, lat}, GeoPoint{-90.33951, lat}, GeoPoint{90.33951, lat},
+                                     GeoPoint{78.33951, lat}, GeoPoint{-78.33951, lat}}}};
+                    constexpr size_t num_matching_points = 3;
+                    size_t local_matches = run_query_locally(north_pole_box);
+                    size_t server_matches =
+                        run_query_on_server(make_polygon_filter(north_pole_box.get<GeoPolygon>()));
+                    CHECK(local_matches == num_matching_points);
+                    CHECK(server_matches == num_matching_points);
+                }
             }
         });
     }

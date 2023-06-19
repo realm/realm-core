@@ -5792,10 +5792,10 @@ TEST(Parser_Geospatial)
     verify_query_sub(test_context, table,
                      "location GEOWITHIN geoPolygon({[$0, $1], [$2, $3], [$4, $5], [$6, $7], [$8, $9]})", coord_args,
                      1);
-    GeoBox b = box.get<GeoBox>();
-    coord_args = {b.lo.longitude, b.lo.latitude, b.hi.longitude, b.hi.latitude};
+    GeoPolygon b = box.get<GeoBox>().to_polygon();
+    coord_args = {b.points[0][0].longitude, b.points[0][0].latitude, b.points[0][2].longitude,
+                  b.points[0][2].latitude};
     verify_query_sub(test_context, table, "location GEOWITHIN geoBox([$0, $1], [$2, $3])", coord_args, 1);
-
 
     CHECK_THROW_EX(
         verify_query(test_context, table, "_id geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 1),
@@ -5807,8 +5807,9 @@ TEST(Parser_Geospatial)
     CHECK_THROW_EX(
         verify_query(test_context, table, "self_link geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 0),
         std::runtime_error,
-        CHECK(std::string(e.what()).find("Query 'self_link GEOWITHIN GeoBox([0.2, 0.2], [0.7, 0.7])' links to data "
-                                         "in the wrong format for a geoWithin query") != std::string::npos));
+        CHECK(std::string(e.what()).find(
+                  "Query 'self_link GEOWITHIN GeoPolygon({[0.2, 0.2], [0.2, 0.7], [0.7, 0.7], [0.7, 0.2], [0.2, "
+                  "0.2]})' links to data in the wrong format for a geoWithin query") != std::string::npos));
     CHECK_THROW_EX(verify_query(test_context, table, "location geoWithin NULL", 1), query_parser::SyntaxError,
                    CHECK(std::string(e.what()).find(
                              "Invalid predicate: 'location geoWithin NULL': syntax error, unexpected null") !=
