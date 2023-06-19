@@ -75,9 +75,7 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident, syn
         clean_up_state();
     });
 
-    REALM_ASSERT(m_notify_before);
-
-    VersionID frozen_before_state_version = m_notify_before();
+    VersionID frozen_before_state_version = m_notify_before ? m_notify_before() : latest_version;
 
     // If m_notify_after is set, pin the previous state to keep it around.
     TransactionRef previous_state;
