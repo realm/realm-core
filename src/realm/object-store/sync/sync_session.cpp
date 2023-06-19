@@ -577,16 +577,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
             return;
         }
         lock.unlock();
-        if (auto local_subs_store = get_flx_subscription_store()) {
-            // In DiscardLocal mode, only the active subscription set is preserved
-            // this means that we have to remove all other subscriptions including later
-            // versioned ones.
-            auto mut_sub = local_subs_store->get_active().make_mutable_copy();
-            local_subs_store->supercede_all_except(mut_sub);
-            mut_sub.update_state(sync::SubscriptionSet::State::Error,
-                                 util::make_optional<std::string_view>(status.reason()));
-            std::move(mut_sub).commit();
-        }
+
         const bool try_again = false;
         sync::SessionErrorInfo synthetic(
             make_error_code(sync::Client::Error::auto_client_reset_failure),
@@ -885,20 +876,12 @@ static sync::Session::Config::ClientReset make_client_reset_config(RealmConfig s
 
     session_config.sync_config = std::make_shared<SyncConfig>(*session_config.sync_config); // deep copy
     session_config.scheduler = nullptr;
-    auto make_frozen_config = [](RealmConfig config) {
-        // Opening without using any explicit schema implies that we will use whatever is on disk without making any
-        // schema changes. Otherwise we may hit a schema error if we are in a client reset when opening a Realm that
-        // has additional tables in the schema config than the one on disk. This may happen in an async open.
-        config.schema.reset();
-        return config;
-    };
     if (session_config.sync_config->notify_after_client_reset) {
-        config.notify_after_client_reset = [config = session_config, &make_frozen_config](VersionID previous_version,
-                                                                                          bool did_recover) {
+        config.notify_after_client_reset = [config = session_config](VersionID previous_version, bool did_recover) {
             auto local_coordinator = RealmCoordinator::get_coordinator(config);
             REALM_ASSERT(local_coordinator);
             ThreadSafeReference active_after = local_coordinator->get_unbound_realm();
-            SharedRealm frozen_before = local_coordinator->get_realm(make_frozen_config(config), previous_version);
+            SharedRealm frozen_before = local_coordinator->get_realm(config, previous_version);
             REALM_ASSERT(frozen_before);
             REALM_ASSERT(frozen_before->is_frozen());
             config.sync_config->notify_after_client_reset(std::move(frozen_before), std::move(active_after),
@@ -906,9 +889,8 @@ static sync::Session::Config::ClientReset make_client_reset_config(RealmConfig s
         };
     }
     if (session_config.sync_config->notify_before_client_reset) {
-        config.notify_before_client_reset = [config = session_config, &make_frozen_config](VersionID version) {
-            config.sync_config->notify_before_client_reset(
-                Realm::get_frozen_realm(make_frozen_config(config), version));
+        config.notify_before_client_reset = [config = session_config](VersionID version) {
+            config.sync_config->notify_before_client_reset(Realm::get_frozen_realm(config, version));
         };
     }
 

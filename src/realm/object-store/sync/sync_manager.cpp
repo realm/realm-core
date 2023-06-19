@@ -192,7 +192,7 @@ bool SyncManager::run_file_action(SyncFileActionMetadata& md)
                 // We successfully copied the Realm file to the recovery directory.
                 bool did_remove = m_file_manager->remove_realm(original_name);
                 // if the copy succeeded but not the delete, then running BackupThenDelete
-                // a second time would fail, so change this action to just delete the originall file.
+                // a second time would fail, so change this action to just delete the original file.
                 if (did_remove) {
                     return true;
                 }

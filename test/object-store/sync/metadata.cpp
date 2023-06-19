@@ -40,7 +40,7 @@ using SyncAction = SyncFileActionMetadata::Action;
 static const std::string base_path = util::make_temp_dir() + "realm_objectstore_sync_metadata";
 static const std::string metadata_path = base_path + "/metadata.realm";
 
-TEST_CASE("sync_metadata: user metadata", "[sync]") {
+TEST_CASE("sync_metadata: user metadata", "[sync][local]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
@@ -139,7 +139,7 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
     }
 }
 
-TEST_CASE("sync_metadata: user metadata APIs", "[sync]") {
+TEST_CASE("sync_metadata: user metadata APIs", "[sync][local]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
@@ -178,7 +178,7 @@ TEST_CASE("sync_metadata: user metadata APIs", "[sync]") {
     }
 }
 
-TEST_CASE("sync_metadata: file action metadata", "[sync]") {
+TEST_CASE("sync_metadata: file action metadata", "[sync][local]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
@@ -229,7 +229,7 @@ TEST_CASE("sync_metadata: file action metadata", "[sync]") {
     }
 }
 
-TEST_CASE("sync_metadata: file action metadata APIs", "[sync]") {
+TEST_CASE("sync_metadata: file action metadata APIs", "[sync][local]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
@@ -258,7 +258,7 @@ TEST_CASE("sync_metadata: file action metadata APIs", "[sync]") {
     }
 }
 
-TEST_CASE("sync_metadata: results", "[sync]") {
+TEST_CASE("sync_metadata: results", "[sync][local]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
@@ -309,7 +309,7 @@ TEST_CASE("sync_metadata: results", "[sync]") {
     }
 }
 
-TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync]") {
+TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync][local]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
@@ -337,7 +337,7 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
     }
 }
 
-TEST_CASE("sync_metadata: encryption", "[sync]") {
+TEST_CASE("sync_metadata: encryption", "[sync][local]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
@@ -492,7 +492,7 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
 }
 
 #ifndef SWIFT_PACKAGE // The SPM build currently doesn't copy resource files
-TEST_CASE("sync metadata: can open old metadata realms", "[sync]") {
+TEST_CASE("sync metadata: can open old metadata realms", "[sync][local]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);

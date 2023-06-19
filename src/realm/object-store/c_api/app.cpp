@@ -39,8 +39,7 @@ static_assert(realm_auth_provider_e(AuthProvider::APPLE) == RLM_AUTH_PROVIDER_AP
 static_assert(realm_auth_provider_e(AuthProvider::CUSTOM) == RLM_AUTH_PROVIDER_CUSTOM);
 static_assert(realm_auth_provider_e(AuthProvider::USERNAME_PASSWORD) == RLM_AUTH_PROVIDER_EMAIL_PASSWORD);
 static_assert(realm_auth_provider_e(AuthProvider::FUNCTION) == RLM_AUTH_PROVIDER_FUNCTION);
-static_assert(realm_auth_provider_e(AuthProvider::USER_API_KEY) == RLM_AUTH_PROVIDER_USER_API_KEY);
-static_assert(realm_auth_provider_e(AuthProvider::SERVER_API_KEY) == RLM_AUTH_PROVIDER_SERVER_API_KEY);
+static_assert(realm_auth_provider_e(AuthProvider::API_KEY) == RLM_AUTH_PROVIDER_API_KEY);
 
 
 static realm_app_error_t to_capi(const AppError& error)
@@ -169,14 +168,9 @@ RLM_API realm_app_credentials_t* realm_app_credentials_new_function(const char* 
     });
 }
 
-RLM_API realm_app_credentials_t* realm_app_credentials_new_user_api_key(const char* api_key) noexcept
+RLM_API realm_app_credentials_t* realm_app_credentials_new_api_key(const char* api_key) noexcept
 {
-    return new realm_app_credentials_t(AppCredentials::user_api_key(api_key));
-}
-
-RLM_API realm_app_credentials_t* realm_app_credentials_new_server_api_key(const char* api_key) noexcept
-{
-    return new realm_app_credentials_t(AppCredentials::server_api_key(api_key));
+    return new realm_app_credentials_t(AppCredentials::api_key(api_key));
 }
 
 RLM_API realm_auth_provider_e realm_auth_credentials_get_provider(realm_app_credentials_t* credentials) noexcept

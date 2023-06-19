@@ -55,7 +55,7 @@ std::ostream& operator<<(std::ostream& os, const ClientResyncMode& mode)
             os << "Recover";
             break;
         case ClientResyncMode::RecoverOrDiscard:
-            os << "RecoveOrDiscard";
+            os << "RecoverOrDiscard";
             break;
     }
     return os;

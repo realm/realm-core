@@ -440,7 +440,11 @@ public:
 
         size_t max_download_size = 0x1000000; // 16 MB as in Server::Config
 
+#if REALM_DISABLE_SYNC_MULTIPLEXING
+        bool one_connection_per_session = true;
+#else
         bool one_connection_per_session = false;
+#endif
 
         bool disable_upload_activation_delay = false;
 
