@@ -543,8 +543,11 @@ bool GeoRegion::contains(const std::optional<GeoPoint>& geo_point) const noexcep
     if (!m_status.is_ok() || !geo_point) {
         return false;
     }
-    auto point = S2LatLng::FromDegrees(geo_point->latitude, geo_point->longitude).ToPoint();
-    return m_region->VirtualContainsPoint(point);
+    auto point = S2LatLng::FromDegrees(geo_point->latitude, geo_point->longitude);
+    if (!point.is_valid()) {
+        return false;
+    }
+    return m_region->VirtualContainsPoint(point.ToPoint());
 }
 
 Status GeoRegion::get_conversion_status() const noexcept
