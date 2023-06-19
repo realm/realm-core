@@ -3209,7 +3209,9 @@ public:
     // Change the node to handle a specific key value only
     Columns<Dictionary>& key(const Path& path)
     {
-        init_path(&path[0], &*path.end());
+        auto sz = path.size();
+        const PathElement* first = &path[0];
+        init_path(first, first + sz);
         return *this;
     }
 
