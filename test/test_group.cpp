@@ -1106,7 +1106,7 @@ TEST(Group_verify_pk_constraints)
     // throw when trying to add a full text search for col
     CHECK_THROW(table->add_fulltext_index(col), InvalidColumnKey);
 
-    // nothrow but do not remove the search index for the primary key
+    // nothrow and remove search index for pk
     CHECK_NOTHROW(table->remove_search_index(col));
     auto pk = table->get_primary_key(obj.get_key());
     CHECK_EQUAL(pk.get_string(), "a");

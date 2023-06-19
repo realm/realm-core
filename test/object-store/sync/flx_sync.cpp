@@ -1512,6 +1512,7 @@ TEST_CASE("flx: geospatial", "[sync][flx][app][baas]") {
                 GeoPoint{0, 90},                                  // north pole
                 GeoPoint{-82.68193, 84.74653},                    // northern point that falls within a box later
                 GeoPoint{82.55243, 84.54981}, // another northern point, but on the other side of the pole
+                GeoPoint{2129, 89},           // invalid
             };
             for (auto& point : points) {
                 add_point(point);
@@ -1545,6 +1546,12 @@ TEST_CASE("flx: geospatial", "[sync][flx][app][baas]") {
                         {{GeoPoint{-80, 40.7128}, GeoPoint{20, 60}, GeoPoint{20, 20}, GeoPoint{-80, 40.7128}}}};
                     size_t local_matches = run_query_locally(bounds);
                     size_t server_results = run_query_on_server(make_polygon_filter(bounds));
+                    CHECK(server_results == local_matches);
+                }
+                {
+                    GeoCircle circle{.5, GeoPoint{0, 90}};
+                    size_t local_matches = run_query_locally(circle);
+                    size_t server_results = run_query_on_server(make_circle_filter(circle));
                     CHECK(server_results == local_matches);
                 }
                 { // a ring with 3 points without a matching begin/end is an error
