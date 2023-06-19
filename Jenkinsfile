@@ -105,9 +105,9 @@ jobWrapper {
 
         parallelExecutors = [
             buildLinuxRelease       : doBuildLinux('Release'),
-            checkLinuxDebug         : doCheckInDocker(buildOptions),
+            checkLinuxDebug         : doCheckInDocker(buildOptions + [useToolchain : true]),
             checkLinuxDebugEncrypt  : doCheckInDocker(buildOptions + [useEncryption : true]),
-            checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: 4, buildType : 'Release']),
+            checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: 4, buildType : 'Release', useToolchain : true]),
             checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync: true, dumpChangesetTransform: true]),
             checkLinuxDebugNoEncryp : doCheckInDocker(buildOptions + [enableEncryption: false]),
             checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType: 'Release', enableSync: true]),
@@ -251,13 +251,19 @@ def doCheckInDocker(Map options = [:]) {
         rlmNode('docker') {
             getArchive()
 
-            def buildEnv = buildDockerEnv('testing.Dockerfile')
+            def buildEnv = buildDockerEnv('linux.Dockerfile')
 
             def environment = environment()
             environment << 'UNITTEST_XML=unit-test-report.xml'
             environment << "UNITTEST_SUITE_NAME=Linux-${options.buildType}"
             if (options.useEncryption) {
                 environment << 'UNITTEST_ENCRYPT_ALL=1'
+            }
+
+            // We don't enable this by default, because using a toolchain with its own sysroot
+            // prevents CMake from finding system libraries like curl which we use in sync tests.
+            if (options.useToolchain) {
+                cmakeDefinitions += " -DCMAKE_TOOLCHAIN_FILE=\"${env.WORKSPACE}/tools/cmake/x86_64-linux-gnu.toolchain.cmake\""
             }
 
             def buildSteps = { String dockerArgs = "" ->
@@ -351,7 +357,7 @@ def doCheckSanity(Map options = [:]) {
               "UNITTEST_SUITE_NAME=Linux-${options.buildType}",
               "TSAN_OPTIONS=\"suppressions=${WORKSPACE}/test/tsan.suppress\""
             ]
-            buildDockerEnv('testing.Dockerfile').inside(privileged) {
+            buildDockerEnv('linux.Dockerfile').inside(privileged) {
                 withEnv(environment) {
                     try {
                         dir('build-dir') {
@@ -379,12 +385,12 @@ def doBuildLinux(String buildType) {
         rlmNode('docker') {
             getSourceArchive()
 
-            buildDockerEnv('packaging.Dockerfile').inside {
+            buildDockerEnv('linux.Dockerfile').inside {
                 sh """
                    rm -rf build-dir
                    mkdir build-dir
                    cd build-dir
-                   cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -DREALM_VERSION="${gitDescribeVersion}" -G Ninja ..
+                   cmake -DCMAKE_BUILD_TYPE=${buildType} -DCMAKE_TOOLCHAIN_FILE=../tools/cmake/x86_64-linux-gnu.toolchain.cmake -DREALM_NO_TESTS=1 -DREALM_VERSION="${gitDescribeVersion}" -G Ninja ..
                    ninja
                    cpack -G TGZ
                 """
@@ -410,7 +416,7 @@ def doBuildLinuxClang(String buildType) {
               'CXX=clang++'
             ]
 
-            buildDockerEnv('testing.Dockerfile').inside {
+            buildDockerEnv('linux.Dockerfile').inside {
                 withEnv(environment) {
                     dir('build-dir') {
                         sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -DREALM_VERSION=\"${gitDescribeVersion}\" -G Ninja .."
@@ -645,7 +651,7 @@ def doBuildMacOs(Map options = [:]) {
             getArchive()
 
             dir('build-macosx') {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer/']) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-14.app/Contents/Developer/']) {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
@@ -663,7 +669,7 @@ def doBuildMacOs(Map options = [:]) {
                     )
                 }
             }
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-14.app/Contents/Developer']) {
                 runAndCollectWarnings(
                     parser: 'clang',
                     script: 'xcrun swift build',
@@ -706,8 +712,7 @@ def doBuildApplePlatform(String platform, String buildType, boolean test = false
         rlmNode('osx') {
             getArchive()
 
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer/',
-                     'XCODE_14_DEVELOPER_DIR=/Applications/Xcode-14.app/Contents/Developer/']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-14.app/Contents/Developer/']) {
                 sh "tools/build-apple-device.sh -p '${platform}' -c '${buildType}' -v '${gitDescribeVersion}'"
 
                 if (test) {
@@ -778,7 +783,7 @@ def doBuildCoverage() {
     rlmNode('docker') {
       getArchive()
 
-      buildDockerEnv('testing.Dockerfile').inside {
+      buildDockerEnv('linux.Dockerfile').inside {
         sh '''
           mkdir build
           cd build

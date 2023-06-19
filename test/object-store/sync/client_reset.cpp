@@ -109,7 +109,7 @@ TableRef get_table(Realm& realm, StringData object_type)
 namespace cf = realm::collection_fixtures;
 using reset_utils::create_object;
 
-TEST_CASE("sync: large reset with recovery is restartable", "[client reset]") {
+TEST_CASE("sync: large reset with recovery is restartable", "[client reset][baas]") {
     const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
@@ -204,7 +204,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset]") {
     REQUIRE(expected_obj_ids == found_object_ids);
 }
 
-TEST_CASE("sync: pending client resets are cleared when downloads are complete", "[client reset]") {
+TEST_CASE("sync: pending client resets are cleared when downloads are complete", "[client reset][baas]") {
     const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
@@ -261,7 +261,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
     wait_for_download(*realm, std::chrono::minutes(10));
 }
 
-TEST_CASE("sync: client reset", "[client reset]") {
+TEST_CASE("sync: client reset", "[client reset][baas]") {
     if (!util::EventLoop::has_implementation())
         return;
 
@@ -1781,7 +1781,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
     } // end: The server can prohibit recovery
 }
 
-TEST_CASE("sync: Client reset during async open", "[client reset]") {
+TEST_CASE("sync: Client reset during async open", "[client reset][baas]") {
     const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
