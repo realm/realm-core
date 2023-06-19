@@ -7,8 +7,6 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * A GeoBox is now just a shortcut for the equivilent GeoPolygon. This provides consistent query results and error checking. ([#6703](https://github.com/realm/realm-core/issues/6703), since v13.11.0) 
-* Querying with object list arguments does not work. ([#6688](https://github.com/realm/realm-core/issues/6688), since v10.3.3)
-* Fix SessionWrapper use-after-free crash when tearing down sessions when using session multiplexing ([#6656](https://github.com/realm/realm-core/issues/6656), since v13.9.3)
 
 ### Breaking changes
 * None.
@@ -20,6 +18,20 @@
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 13.15.1 Release notes
+
+### Fixed
+* Querying with object list arguments does not work. ([#6688](https://github.com/realm/realm-core/issues/6688), since v10.3.3)
+* Fix SessionWrapper use-after-free crash when tearing down sessions when using session multiplexing ([#6656](https://github.com/realm/realm-core/issues/6656), since v13.9.3)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
 
 ----------------------------------------------
 
