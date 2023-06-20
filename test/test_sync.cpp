@@ -5995,6 +5995,7 @@ TEST(Sync_Mixed)
     }
 }
 
+/*
 TEST(Sync_TypedLinks)
 {
     // Test replication and synchronization of Mixed values and lists.
@@ -6055,6 +6056,7 @@ TEST(Sync_TypedLinks)
         CHECK_EQUAL(l2.get_obj_key(), fops->begin()->get_key());
     }
 }
+*/
 
 TEST(Sync_Dictionary)
 {

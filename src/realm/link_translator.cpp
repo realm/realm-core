@@ -42,10 +42,6 @@ void LinkTranslator::run()
             Lst<Mixed> list = m_origin_obj.get_list<Mixed>(m_origin_col_key);
             on_list_of_mixed(list);
         }
-        else if (m_origin_col_key.get_type() == col_type_TypedLink) {
-            Lst<ObjLink> list = m_origin_obj.get_list<ObjLink>(m_origin_col_key);
-            on_list_of_typedlink(list);
-        }
         else {
             throw std::runtime_error(
                 util::format("LinkTranslator unhandled list type: %1", m_origin_col_key.get_type()));
@@ -59,10 +55,6 @@ void LinkTranslator::run()
         else if (m_origin_col_key.get_type() == col_type_Mixed) {
             Set<Mixed> set = m_origin_obj.get_set<Mixed>(m_origin_col_key);
             on_set_of_mixed(set);
-        }
-        else if (m_origin_col_key.get_type() == col_type_TypedLink) {
-            Set<ObjLink> set = m_origin_obj.get_set<ObjLink>(m_origin_col_key);
-            on_set_of_typedlink(set);
         }
         else {
             throw std::runtime_error(
@@ -80,9 +72,6 @@ void LinkTranslator::run()
         }
         else if (m_origin_col_key.get_type() == col_type_Mixed) {
             on_mixed_property(m_origin_col_key);
-        }
-        else if (m_origin_col_key.get_type() == col_type_TypedLink) {
-            on_typedlink_property(m_origin_col_key);
         }
         else {
             throw std::runtime_error(

@@ -395,6 +395,9 @@ ColKey Table::add_column(DataType type, StringData name, bool nullable, std::vec
                          DataType key_type)
 {
     REALM_ASSERT(!is_link_type(ColumnType(type)));
+    if (type == type_TypedLink) {
+        throw IllegalOperation("TypedLink properties not yet supported");
+    }
 
     ColumnAttrMask attr;
     if (!collection_types.empty()) {

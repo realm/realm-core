@@ -975,10 +975,6 @@ void Obj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
         {
             REALM_UNREACHABLE(); // we don't support Mixed link to embedded object yet
         }
-        void on_list_of_typedlink(Lst<ObjLink>&) final
-        {
-            REALM_UNREACHABLE(); // we don't support TypedLink to embedded object yet
-        }
         void on_set_of_links(LnkSet&) final
         {
             REALM_UNREACHABLE(); // sets of embedded objects are not allowed at the schema level
@@ -987,13 +983,8 @@ void Obj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
         {
             REALM_UNREACHABLE(); // we don't support Mixed link to embedded object yet
         }
-        void on_set_of_typedlink(Set<ObjLink>&) final
-        {
-            REALM_UNREACHABLE(); // we don't support TypedLink to embedded object yet
-        }
         void on_link_property(ColKey) final {}
         void on_mixed_property(ColKey) final {}
-        void on_typedlink_property(ColKey) final {}
         Mixed result()
         {
             return m_index;
@@ -1954,10 +1945,6 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
         {
             nullify_linklist(m_origin_obj, m_origin_col_key, Mixed(m_target_link));
         }
-        void on_list_of_typedlink(Lst<ObjLink>&) final
-        {
-            nullify_linklist(m_origin_obj, m_origin_col_key, m_target_link);
-        }
         void on_set_of_links(LnkSet&) final
         {
             nullify_set(m_origin_obj, m_origin_col_key, m_target_link.get_obj_key());
@@ -1965,10 +1952,6 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
         void on_set_of_mixed(Set<Mixed>&) final
         {
             nullify_set(m_origin_obj, m_origin_col_key, Mixed(m_target_link));
-        }
-        void on_set_of_typedlink(Set<ObjLink>&) final
-        {
-            nullify_set(m_origin_obj, m_origin_col_key, m_target_link);
         }
         void on_dictionary(Dictionary&) final
         {
@@ -1981,10 +1964,6 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
         void on_mixed_property(ColKey origin_col_key) final
         {
             m_origin_obj.nullify_single_link<Mixed>(origin_col_key, Mixed{m_target_link});
-        }
-        void on_typedlink_property(ColKey origin_col_key) final
-        {
-            m_origin_obj.nullify_single_link<ObjLink>(origin_col_key, m_target_link);
         }
 
     private:
@@ -2035,19 +2014,7 @@ struct EmbeddedObjectLinkMigrator : public LinkTranslator {
         REALM_ASSERT(did_erase_pair.second);
         set.insert(m_dest_replace.get_link());
     }
-    void on_set_of_typedlink(Set<ObjLink>& set) final
-    {
-        auto did_erase_pair = set.erase(m_dest_orig.get_link());
-        REALM_ASSERT(did_erase_pair.second);
-        set.insert(m_dest_replace.get_link());
-    }
     void on_list_of_mixed(Lst<Mixed>& list) final
-    {
-        auto n = list.find_any(m_dest_orig.get_link());
-        REALM_ASSERT(n != realm::npos);
-        list.insert_any(n, m_dest_replace.get_link());
-    }
-    void on_list_of_typedlink(Lst<ObjLink>& list) final
     {
         auto n = list.find_any(m_dest_orig.get_link());
         REALM_ASSERT(n != realm::npos);
@@ -2058,12 +2025,6 @@ struct EmbeddedObjectLinkMigrator : public LinkTranslator {
         REALM_ASSERT(m_origin_obj.get<Mixed>(col).is_null() ||
                      m_origin_obj.get<Mixed>(col) == m_dest_orig.get_link());
         m_origin_obj.set_any(col, m_dest_replace.get_link());
-    }
-    void on_typedlink_property(ColKey col) final
-    {
-        REALM_ASSERT(m_origin_obj.get<ObjLink>(col).is_null() ||
-                     m_origin_obj.get<ObjLink>(col) == m_dest_orig.get_link());
-        m_origin_obj.set(col, m_dest_replace.get_link());
     }
 
 private:
@@ -2382,10 +2343,6 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
             replace_in_linklist<Mixed>(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(),
                                        m_dest_replace.get_link());
         }
-        void on_list_of_typedlink(Lst<ObjLink>&) final
-        {
-            replace_in_linklist(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(), m_dest_replace.get_link());
-        }
         void on_set_of_links(LnkSet&) final
         {
             replace_in_linkset(m_origin_obj, m_origin_col_key, m_dest_orig.get_key(), m_dest_replace.get_key());
@@ -2394,10 +2351,6 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
         {
             replace_in_linkset<Mixed>(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(),
                                       m_dest_replace.get_link());
-        }
-        void on_set_of_typedlink(Set<ObjLink>&) final
-        {
-            replace_in_linkset(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(), m_dest_replace.get_link());
         }
         void on_dictionary(Dictionary&) final
         {
@@ -2413,12 +2366,6 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
             REALM_ASSERT(m_origin_obj.get_any(col).is_null() ||
                          m_origin_obj.get_any(col).get_link().get_obj_key() == m_dest_orig.get_key());
             m_origin_obj.set(col, Mixed{m_dest_replace.get_link()});
-        }
-        void on_typedlink_property(ColKey col) final
-        {
-            REALM_ASSERT(m_origin_obj.get_any(col).is_null() ||
-                         m_origin_obj.get_any(col).get_link().get_obj_key() == m_dest_orig.get_key());
-            m_origin_obj.set(col, m_dest_replace.get_link());
         }
 
     private:
