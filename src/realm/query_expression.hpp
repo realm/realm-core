@@ -2290,8 +2290,7 @@ public:
             m_link_map.set_cluster(cluster);
         }
         else {
-            m_keys = cluster->get_key_array();
-            m_offset = cluster->get_offset();
+            m_cluster = cluster;
         }
     }
 
@@ -2307,8 +2306,7 @@ public:
             count = m_link_map.count_all_backlinks(index);
         }
         else {
-            ObjKey key(m_keys->get(index) + m_offset);
-            const Obj obj = m_link_map.get_base_table()->get_object(key);
+            const Obj obj = m_link_map.get_base_table()->get_object(m_cluster->get_real_key(index));
             count = obj.get_backlink_count();
         }
         destination = Value<int64_t>(count);
@@ -2325,8 +2323,7 @@ public:
     }
 
 private:
-    const ClusterKeyArray* m_keys = nullptr;
-    uint64_t m_offset = 0;
+    const Cluster* m_cluster = nullptr;
     LinkMap m_link_map;
 };
 
