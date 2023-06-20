@@ -4955,6 +4955,9 @@ TEST(Parser_Dictionary)
         if ((i % 5) == 0) {
             dict.insert("Foo", 5);
         }
+        if (i == 78) {
+            dict.insert("Value", Mixed()); // Insert NULL
+        }
         dict.insert("Bar", i);
         if (incr) {
             expected++;
@@ -4981,20 +4984,22 @@ TEST(Parser_Dictionary)
     size_t num_args = 1;
 
     verify_query(test_context, foo, "dict.@values > 50", 50);
+    verify_query(test_context, foo, "dict[*] > 50", 50);
     verify_query(test_context, foo, "dict['Value'] > 50", expected);
     verify_query(test_context, foo, "dict.Value > 50", expected);
     verify_query_sub(test_context, foo, "dict[$0] > 50", args, num_args, expected);
     verify_query(test_context, foo, "dict['Value'] > 50", expected);
     verify_query(test_context, foo, "ANY dict.@keys == 'Foo'", 20);
-    verify_query(test_context, foo, "NONE dict.@keys == 'Value'", 23);
-    verify_query(test_context, foo, "dict.@keys == {'Bar'}", 20);
+    verify_query(test_context, foo, "NONE dict.@keys == 'Value'", 22);
+    verify_query(test_context, foo, "dict.@keys == {'Bar'}", 19);
     verify_query(test_context, foo, "ANY dict.@keys == {'Bar'}", 100);
     verify_query(test_context, foo, "dict.@keys == {'Bar', 'Foo'}", 3);
-    verify_query(test_context, foo, "dict['Value'] == {}", 0);
+    verify_query(test_context, foo, "dict['Value'] == NULL", 1);
+    verify_query(test_context, foo, "dict['Value'] == {}", 22); // Tricky - what does this even mean?
     verify_query(test_context, foo, "dict['Value'] == {0, 100}", 3);
     verify_query(test_context, foo, "dict['Value'].@type == 'int'", num_ints_for_value);
     verify_query(test_context, foo, "dict.@type == 'int'", 100);      // ANY is implied, all have int values
-    verify_query(test_context, foo, "ALL dict.@type == 'int'", 100);  // all dictionaries have ints
+    verify_query(test_context, foo, "ALL dict.@type == 'int'", 99);   // One dictionary has a NULL
     verify_query(test_context, foo, "NONE dict.@type == 'int'", 0);   // each object has Bar:i
     verify_query(test_context, foo, "ANY dict.@type == 'string'", 0); // no strings present
     // Dictionaries are not ordered
@@ -5005,7 +5010,7 @@ TEST(Parser_Dictionary)
     verify_query(test_context, origin, "link.dict.Value > 50", 3);
     verify_query(test_context, origin, "links.dict['Value'] > 50", 5);
     verify_query(test_context, origin, "links.dict > 50", 6);
-    verify_query(test_context, origin, "links.dict['Value'] == NULL", 10);
+    verify_query(test_context, origin, "links.dict['Value'] == NULL", 1);
 
     verify_query(test_context, foo, "dict.@size == 3", 17);
     verify_query(test_context, foo, "dict.@max == 100", 2);
@@ -5152,6 +5157,7 @@ TEST(Parser_NestedListDictionary)
     auto dict1 = list_paul.get_dictionary(0);
     dict1->insert("one", 1);
     dict1->insert("two", 2);
+    dict1->insert("foo", 5);
     dict1->insert("three", 3);
 
     Obj john = persons->create_object_with_primary_key("John");
@@ -5159,10 +5165,13 @@ TEST(Parser_NestedListDictionary)
     list_john.insert_collection(0, CollectionType::Dictionary);
     auto dict2 = list_john.get_dictionary(0);
     dict2->insert("two", 2);
+    dict2->insert("bar", 5);
     dict2->insert("four", 4);
 
     verify_query(test_context, persons, "properties[0].one == 1", 1);
+    verify_query(test_context, persons, "properties[*].one == 1", 1);
     verify_query(test_context, persons, "properties[first].two == 2", 2);
+    verify_query(test_context, persons, "properties[0][*] == 5", 2);
 }
 
 TEST(Parser_NestedMixedDictionaryList)
@@ -5180,6 +5189,7 @@ TEST(Parser_NestedMixedDictionaryList)
     dict_paul.insert_collection("tickets", CollectionType::List);
     auto list1 = dict_paul.get_list("tickets");
     list1->add(0);
+    list1->add(5);
     list1->add(1);
     list1->add(4);
 
@@ -5191,9 +5201,12 @@ TEST(Parser_NestedMixedDictionaryList)
     auto list2 = dict_john.get_list("tickets");
     list2->add(2);
     list2->add(3);
+    list2->add(5);
     list2->add(4);
 
     verify_query(test_context, persons, "properties.tickets[0] == 0", 1);
+    verify_query(test_context, persons, "properties.tickets[*] == 5", 2);
+    verify_query(test_context, persons, "properties.tickets[*] > 1", 2);
     verify_query(test_context, persons, "properties.tickets[last] == 4", 2);
     verify_query(test_context, persons, "self.properties.tickets[last] == 4", 2);
 }

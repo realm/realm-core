@@ -50,6 +50,9 @@ std::ostream& operator<<(std::ostream& ostr, const PathElement& elem)
     else if (elem.is_key()) {
         ostr << "'" << elem.get_key() << "'";
     }
+    else if (elem.is_all()) {
+        ostr << '*';
+    }
 
     return ostr;
 }

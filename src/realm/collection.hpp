@@ -8,6 +8,7 @@
 
 #include <iosfwd>      // std::ostream
 #include <type_traits> // std::void_t
+#include <set>
 
 namespace realm {
 
@@ -95,7 +96,19 @@ public:
     // Return a path based on keys instead of indices
     virtual StablePath get_stable_path() const = 0;
 
-    static Mixed get_any(Mixed, Path::const_iterator, Path::const_iterator, Allocator&);
+    struct QueryCtrlBlock {
+        QueryCtrlBlock(Path& p, Allocator& a, bool is_from_list)
+            : path(p)
+            , from_list(is_from_list)
+            , alloc(a)
+        {
+        }
+        Path& path;
+        std::set<Mixed> matches;
+        bool from_list;
+        Allocator& alloc;
+    };
+    static void get_any(QueryCtrlBlock&, Mixed, size_t);
 };
 
 using CollectionPtr = std::shared_ptr<Collection>;

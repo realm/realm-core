@@ -262,7 +262,7 @@ public:
 
     ValueBase& operator=(const ValueBase& other)
     {
-        m_from_list = other.m_from_list;
+        init(other.m_from_list, other.size());
         set(other.begin(), other.end());
         return *this;
     }
@@ -310,8 +310,6 @@ public:
     template <class T>
     void set(T b, T e)
     {
-        size_t sz = e - b;
-        resize(sz);
         size_t i = 0;
         for (auto from = b; from != e; ++from) {
             set(i, *from);
@@ -1995,14 +1993,18 @@ public:
     using SimpleQuerySupport::SimpleQuerySupport;
     void evaluate(size_t index, ValueBase& destination) override
     {
+        destination.init(false, 1); // Size of 1 is expected by SimpleQuerySupport
         SimpleQuerySupport::evaluate(index, destination);
         if (m_path.size() > 0) {
             if (auto sz = destination.size()) {
+                Collection::QueryCtrlBlock ctrl(m_path, get_base_table()->get_alloc(),
+                                                destination.m_from_list || !m_path_only_unary_keys);
                 for (size_t i = 0; i < sz; i++) {
-                    Mixed val = Collection::get_any(destination.get(i), m_path.begin(), m_path.end(),
-                                                    get_base_table()->get_alloc());
-                    destination.set(i, val);
+                    Collection::get_any(ctrl, destination.get(i), 0);
                 }
+                sz = ctrl.matches.size();
+                destination.init(ctrl.from_list || sz == 0, sz);
+                destination.set(ctrl.matches.begin(), ctrl.matches.end());
             }
         }
     }
@@ -2013,6 +2015,9 @@ public:
     void path(const Path& path)
     {
         for (auto& elem : path) {
+            if (elem.is_all()) {
+                m_path_only_unary_keys = false;
+            }
             m_path.emplace_back(elem);
         }
     }
@@ -2023,6 +2028,7 @@ public:
 
 private:
     Path m_path;
+    bool m_path_only_unary_keys = true;
 };
 
 template <>
@@ -3037,8 +3043,14 @@ public:
 
     bool index(const PathElement& ndx) override
     {
-        m_index = ndx.get_ndx();
-        return true;
+        if (ndx.is_ndx()) {
+            m_index = ndx.get_ndx();
+            return true;
+        }
+        else if (ndx.is_all()) {
+            return true;
+        }
+        return false;
     }
     const bool m_is_nullable_storage;
     std::optional<size_t> m_index;
@@ -3142,11 +3154,13 @@ public:
     bool indexes(const Path& path)
     {
         REALM_ASSERT(!path.empty());
-        ColumnsCollection<Mixed>::index(path[0]);
-        for (auto& elem : path) {
-            m_path.emplace_back(elem);
+        if (ColumnsCollection<Mixed>::index(path[0])) {
+            for (auto& elem : path) {
+                m_path.emplace_back(elem);
+            }
+            return true;
         }
-        return true;
+        return false;
     }
     std::string description(util::serializer::SerialisationState& state) const override
     {
@@ -3159,11 +3173,12 @@ public:
         ColumnsCollection<Mixed>::evaluate<Mixed>(index, destination);
         if (m_path.size() > 1) {
             if (auto sz = destination.size()) {
+                Collection::QueryCtrlBlock ctrl(m_path, get_alloc(), destination.m_from_list);
                 for (size_t i = 0; i < sz; i++) {
-                    Mixed val =
-                        Collection::get_any(destination.get(i), m_path.begin() + 1, m_path.end(), get_alloc());
-                    destination.set(i, val);
+                    Collection::get_any(ctrl, destination.get(i), 1);
                 }
+                destination.init(ctrl.from_list, ctrl.matches.size());
+                destination.set(ctrl.matches.begin(), ctrl.matches.end());
             }
         }
     }
@@ -3184,18 +3199,20 @@ public:
         : ColumnsCollection<Mixed>(column, table, std::move(links), type)
     {
         m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(m_column_key);
+        m_path.push_back(PathElement::AllTag());
+        m_path_only_unary_keys = false;
     }
 
     Columns(const Path& path, ConstTableRef table, std::vector<ColKey> links = {},
             util::Optional<ExpressionComparisonType> type = util::none)
         : ColumnsCollection<Mixed>(path[0].get_col_key(), table, std::move(links), type)
     {
-        if (path.size() == 1) {
+        size_t path_size = path.size();
+        REALM_ASSERT(path_size > 0);
+        if (path_size == 1) {
             m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(m_column_key);
         }
-        if (path.size() > 1) {
-            init_path(&path[1], &*path.end());
-        }
+        init_path(&path[1], &path[1] + path_size - 1);
     }
 
     // Change the node to handle a specific key value only
@@ -3250,12 +3267,14 @@ public:
         : ColumnsCollection<Mixed>(other)
         , m_key_type(other.m_key_type)
         , m_path(other.m_path)
+        , m_path_only_unary_keys(other.m_path_only_unary_keys)
     {
     }
 
 protected:
     DataType m_key_type = type_String;
     Path m_path;
+    bool m_path_only_unary_keys;
 
     void init_path(const PathElement* begin, const PathElement* end);
 };
@@ -3755,6 +3774,7 @@ public:
 
                 int64_t res[ValueBase::chunk_size];
                 static_cast<const Array*>(leaf)->get_chunk(index, res);
+                destination.init(false, rows);
                 destination.set(res, res + rows);
                 return;
             }

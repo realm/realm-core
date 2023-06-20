@@ -364,6 +364,7 @@ path
     | path '[' NATURAL0 ']'     { $1->add_element(size_t(strtoll($3.c_str(), nullptr, 0))); $$ = $1; }
     | path '[' INDEX_FIRST ']'  { $1->add_element(size_t(0)); $$ = $1; }
     | path '[' INDEX_LAST ']'   { $1->add_element(size_t(-1)); $$ = $1; }
+    | path '[' '*' ']'          { $1->add_element(PathElement::AllTag()); $$ = $1; }
     | path '[' STRING ']'       { $1->add_element($3.substr(1, $3.size() - 2)); $$ = $1; }
     | path '[' ARG ']'          { $1->add_element(drv.get_arg_for_index($3)); $$ = $1; }
 

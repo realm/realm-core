@@ -81,7 +81,8 @@ struct PathElement {
         std::string string_val;
         int64_t int_val;
     };
-    enum Type { column, key, index } m_type;
+    enum Type { column, key, index, all } m_type;
+    struct AllTag {};
 
     PathElement()
         : int_val(-1)
@@ -112,6 +113,11 @@ struct PathElement {
     PathElement(const char* str)
         : string_val(str)
         , m_type(Type::key)
+    {
+    }
+    PathElement(AllTag)
+        : int_val(0)
+        , m_type(Type::all)
     {
     }
     PathElement(const std::string& str)
@@ -158,6 +164,10 @@ struct PathElement {
     bool is_key() const noexcept
     {
         return m_type == Type::key;
+    }
+    bool is_all() const noexcept
+    {
+        return m_type == Type::all;
     }
 
     ColKey get_col_key() const noexcept
