@@ -607,6 +607,7 @@ private:
     size_t m_result_get = 0;
     ObjKey m_last_start_key;
 
+protected:
     IntegerNode(const IntegerNode<LeafType, Equal>& from)
         : BaseType(from)
         , m_needles(from.m_needles)
@@ -1582,34 +1583,33 @@ public:
             m_lcase = std::move(*lower);
         }
     }
-    /*
-        EnumStringNode(const EnumStringNode& from)
-            //  : IntegerNode<ArrayInteger, TConditionFunction>(from)
-            : Base(from)
-        //, m_ucase(from.m_ucase)
-        //, m_lcase(from.m_lcase)
-        {
-        }
-    */
+
+    EnumStringNode(const EnumStringNode& from)
+        : Base(from)
+        , m_ucase(from.m_ucase)
+        , m_lcase(from.m_lcase)
+    {
+    }
+
     void init(bool will_query_ranges) override
     {
         Base::init(will_query_ranges);
         // clear_leaf_state();
     }
 
-    size_t find_first_local(size_t start, size_t end) override
-    {
-        TConditionFunction cond;
-        /*
-                for (size_t s = start; s < end; ++s) {
-                    StringData t = get_string(s);
+    /*
+size_t find_first_local(size_t start, size_t end) override
+{
+    TConditionFunction cond;
+            for (size_t s = start; s < end; ++s) {
+                StringData t = get_string(s);
 
-                    if (cond(StringData(m_value), m_ucase.c_str(), m_lcase.c_str(), t))
-                        return s;
-                }
-                */
-        return not_found;
-    }
+                if (cond(StringData(m_value), m_ucase.c_str(), m_lcase.c_str(), t))
+                    return s;
+            }
+    return not_found;
+}
+            */
 
     virtual std::string describe_condition() const override
     {
@@ -1618,8 +1618,8 @@ public:
 
     std::unique_ptr<ParentNode> clone() const override
     {
-        REALM_ASSERT(false);
-        // return std::unique_ptr<ParentNode>(new EnumStringNode<TConditionFunction>(*this));
+        // REALM_ASSERT(false);
+        return std::unique_ptr<ParentNode>(new EnumStringNode<TConditionFunction>(*this));
     }
 
 protected:

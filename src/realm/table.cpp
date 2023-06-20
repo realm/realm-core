@@ -4486,7 +4486,10 @@ size_t Table::search_enum_string(ColKey col_key, StringData value) const
     unsigned column_ndx = col_key.get_index().val;
     REALM_ASSERT(column_ndx < m_interners.size());
     auto& interner = m_interners[column_ndx];
-    return interner->search(value);
+    if (interner)
+        return interner->search(value);
+    else
+        return npos;
 }
 
 size_t Table::get_num_unique_values(ColKey col_key) const
