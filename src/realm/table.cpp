@@ -4481,7 +4481,7 @@ size_t Table::add_insert_enum_string(ColKey col_key, StringData value)
     return m_interners[column_ndx]->handle(value);
 }
 
-size_t Table::search_enum_string(ColKey col_key, StringData value)
+size_t Table::search_enum_string(ColKey col_key, StringData value) const
 {
     unsigned column_ndx = col_key.get_index().val;
     REALM_ASSERT(column_ndx < m_interners.size());

@@ -214,9 +214,7 @@ public:
         cluster_changed();
     }
 
-    virtual void collect_dependencies(std::vector<TableKey>&) const
-    {
-    }
+    virtual void collect_dependencies(std::vector<TableKey>&) const {}
 
     virtual size_t find_first_local(size_t start, size_t end) = 0;
     virtual size_t find_all_local(size_t start, size_t end);
@@ -322,9 +320,7 @@ protected:
     }
 
 private:
-    virtual void table_changed()
-    {
-    }
+    virtual void table_changed() {}
     virtual void cluster_changed()
     {
         // TODO: Should eventually be pure
@@ -347,7 +343,6 @@ protected:
         : ParentNode(from)
     {
     }
-
 };
 
 template <class LeafType>
@@ -505,9 +500,7 @@ public:
         : BaseType(value, column_key)
     {
     }
-    ~IntegerNode()
-    {
-    }
+    ~IntegerNode() {}
 
     void init(bool will_query_ranges) override
     {
@@ -1569,6 +1562,69 @@ protected:
     {
         return m_leaf_ptr->get(s);
     }
+};
+
+// Conditions for enumerated strings. TODO: Optimizations
+template <class TConditionFunction>
+class EnumStringNode : public IntegerNode<ArrayInteger, TConditionFunction> {
+public:
+    using Base = IntegerNode<ArrayInteger, TConditionFunction>;
+    EnumStringNode(const Table& table, StringData v, ColKey column)
+        : Base(table.search_enum_string(column, v), column)
+    {
+        auto upper = case_map(v, true);
+        auto lower = case_map(v, false);
+        if (!upper || !lower) {
+            throw std::runtime_error(util::format("Malformed UTF-8: %1", v));
+        }
+        else {
+            m_ucase = std::move(*upper);
+            m_lcase = std::move(*lower);
+        }
+    }
+    /*
+        EnumStringNode(const EnumStringNode& from)
+            //  : IntegerNode<ArrayInteger, TConditionFunction>(from)
+            : Base(from)
+        //, m_ucase(from.m_ucase)
+        //, m_lcase(from.m_lcase)
+        {
+        }
+    */
+    void init(bool will_query_ranges) override
+    {
+        Base::init(will_query_ranges);
+        // clear_leaf_state();
+    }
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        TConditionFunction cond;
+        /*
+                for (size_t s = start; s < end; ++s) {
+                    StringData t = get_string(s);
+
+                    if (cond(StringData(m_value), m_ucase.c_str(), m_lcase.c_str(), t))
+                        return s;
+                }
+                */
+        return not_found;
+    }
+
+    virtual std::string describe_condition() const override
+    {
+        return TConditionFunction::description();
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        REALM_ASSERT(false);
+        // return std::unique_ptr<ParentNode>(new EnumStringNode<TConditionFunction>(*this));
+    }
+
+protected:
+    std::string m_ucase;
+    std::string m_lcase;
 };
 
 // Conditions for strings. Note that Equal is specialized later in this file!

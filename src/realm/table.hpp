@@ -718,12 +718,14 @@ private:
     void clear_indexes();
     // Interning/Enumeration and compression
     size_t add_insert_enum_string(ColKey col_key, StringData value);
-    size_t search_enum_string(ColKey col_key, StringData value);
+
+public:
+    size_t search_enum_string(ColKey col_key, StringData value) const;
     size_t get_num_unique_values(ColKey col_key) const;
     StringData get_enum_string(ColKey col_key, size_t id);
     bool is_null_enum_string(ColKey col_key, size_t id);
 
-
+private:
     // Migration support
     void migrate_column_info();
     bool verify_column_keys();
