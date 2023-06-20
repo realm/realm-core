@@ -18,22 +18,25 @@
 
 #pragma once
 
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_templated.hpp>
+
+#if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+#include <realm/sync/network/http.hpp>
+#include <external/json/json.hpp>
+#endif
 
 #include <realm/util/functional.hpp>
 #include <realm/util/function_ref.hpp>
 
-#include "util/event_loop.hpp"
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
-
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_templated.hpp>
-
+#include <util/event_loop.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
 
 namespace realm {
 
@@ -132,6 +135,107 @@ TestSyncManager::Config get_config(Transport&& transport)
     config.transport = transport;
     return config;
 }
+
+const std::string CONTENT_TYPE_JSON = "application/json;charset=utf-8";
+const std::string CONTENT_TYPE_PLAIN = "text/plain";
+
+inline app::Response make_ok_response(std::string&& body = {})
+{
+    return {static_cast<int>(sync::HTTPStatus::Ok), 0, {}, std::move(body)};
+}
+
+inline app::Response make_json_response(sync::HTTPStatus http_status, nlohmann::json&& json_body)
+{
+    return {static_cast<int>(http_status), 0, {{"Content-Type", CONTENT_TYPE_JSON}}, json_body.dump()};
+}
+
+inline app::Response make_test_response(sync::HTTPStatus http_status, std::string&& body)
+{
+    return {static_cast<int>(http_status), 0, {{"Content-Type", CONTENT_TYPE_JSON}}, std::move(body)};
+}
+
+inline app::Response make_test_response(sync::HTTPStatus http_status, app::HttpHeaders&& headers, std::string&& body)
+{
+    return {static_cast<int>(http_status), 0, std::move(headers), std::move(body)};
+}
+
+inline app::Response make_location_response(std::string_view http_url, std::string_view websocket_url,
+                                            std::string_view model = "GLOBAL", std::string_view location = "US-VA")
+{
+    return make_json_response(sync::HTTPStatus::Ok, {{"deployment_model", model},
+                                                     {"location", location},
+                                                     {"hostname", http_url},
+                                                     {"ws_hostname", websocket_url}});
+}
+
+inline app::Response make_redirect_response(sync::HTTPStatus http_status, const std::string& new_url)
+{
+    return {static_cast<int>(http_status),
+            0,
+            {{"Location", new_url}, {"Content-Type", CONTENT_TYPE_PLAIN}},
+            "Some body data"};
+}
+
+// A GenericNetworkTransport that relies on the simulated_response value to be
+// provided as the response to a request. A request_hook can be provided to
+// optionally provide a Response based on the request received.
+class LocalTransport : public app::GenericNetworkTransport {
+public:
+    LocalTransport(app::Response&& response)
+        : simulated_response{std::move(response)}
+    {
+    }
+
+    LocalTransport(const app::Response& response)
+        : simulated_response{response}
+    {
+    }
+
+    LocalTransport()
+        : LocalTransport(make_ok_response())
+    {
+    }
+
+    void send_request_to_server(const app::Request& request,
+                                util::UniqueFunction<void(const app::Response&)>&& completion) override
+    {
+        if (send_hook) {
+            return send_hook(request, std::move(completion));
+        }
+        if (request_hook) {
+            auto response = request_hook(request);
+            if (response)
+                return completion(*response);
+        }
+        completion(simulated_response);
+    }
+
+    inline void set_http_status(sync::HTTPStatus http_status)
+    {
+        simulated_response.http_status_code = static_cast<int>(http_status);
+    }
+
+    inline void set_custom_error(int custom_error)
+    {
+        simulated_response.custom_status_code = custom_error;
+    }
+
+    inline void set_body(std::string&& body)
+    {
+        simulated_response.body = std::move(body);
+    }
+
+    inline void set_headers(app::HttpHeaders&& headers)
+    {
+        simulated_response.headers = std::move(headers);
+    }
+
+    app::Response simulated_response;
+    // Provided in case the error or message needs to be adjusted based on the request
+    std::function<std::optional<app::Response>(const app::Request&)> request_hook;
+    // Allow a subclass provide a function that replaces send_request_to_server();
+    std::function<void(const app::Request&, util::UniqueFunction<void(const app::Response&)>&&)> send_hook;
+};
 
 #endif // REALM_ENABLE_SYNC
 

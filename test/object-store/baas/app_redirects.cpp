@@ -83,8 +83,6 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
     std::string ws_url = "ws://localhost:9090";
     std::string redir_app_url = "http://127.0.0.1:9090";
     std::string redir_ws_url = "ws://127.0.0.1:9090";
-    const int moved_permanently = static_cast<int>(sync::HTTPStatus::MovedPermanently);   // 301
-    const int permanent_redirect = static_cast<int>(sync::HTTPStatus::PermanentRedirect); // 308
 
     auto parse_url = [&](std::string request_url) {
         auto host_url = util::Uri(request_url);
@@ -143,43 +141,65 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
 
     SECTION("Test invalid redirect response") {
         int request_count = 0;
+        int redirect_count = 0;
+        const int max_request_count = 3;
+
         // initialize app and sync client
         auto redir_app = app::App::get_uncached_app(app_config, sc_config);
 
         redir_transport->request_hook = [&](const Request& request) {
+            REALM_ASSERT(request_count < max_request_count);
             if (request_count == 0) {
                 logger->trace("request.url (%1): %2", request_count, request.url);
+                // This will fail due to no headers
                 redir_transport->simulated_response = {
-                    moved_permanently, 0, {{"Content-Type", "application/json"}}, "Some body data"};
-                request_count++;
+                    static_cast<int>(sync::HTTPStatus::MovedPermanently), 0, {}, "Some body data"};
             }
             else if (request_count == 1) {
                 logger->trace("request.url (%1): %2", request_count, request.url);
-                redir_transport->simulated_response = {permanent_redirect,
+                // This will fail due to no Location header
+                redir_transport->simulated_response = {static_cast<int>(sync::HTTPStatus::PermanentRedirect),
                                                        0,
-                                                       {{"Location", ""}, {"Content-Type", "application/json"}},
+                                                       {{"Content-Type", "application/json"}},
                                                        "Some body data"};
-                request_count++;
             }
+            else if (request_count == 2) {
+                logger->trace("request.url (%1): %2", request_count, request.url);
+                // This will fail due to empty Location header
+                redir_transport->simulated_response = make_redirect_response(sync::HTTPStatus::MovedPermanently, "");
+            }
+            request_count++;
         };
 
-        // This will fail due to no Location header
-        redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
-            creds.email, creds.password, [&](util::Optional<app::AppError> error) {
-                REQUIRE(error);
-                REQUIRE(error->is_client_error());
-                REQUIRE(error->code() == ErrorCodes::ClientRedirectError);
-                REQUIRE(error->reason() == "Redirect response missing location header");
-            });
+        auto check_redirect_error = [&] {
+            auto [promise, error_future] = util::make_promise_future<AppError>();
+            util::CopyablePromiseHolder<AppError> error_promise(std::move(promise));
+            redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+                creds.email, creds.password,
+                [promise = std::move(promise)](util::Optional<app::AppError> error) mutable {
+                    if (!error) {
+                        promise.set_error(
+                            {ErrorCodes::RuntimeError, "App error not received for invalid redirect response"});
+                        return;
+                    }
+                    promise.emplace_value(std::move(*error));
+                });
 
-        // This will fail due to empty Location header
-        redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
-            creds.email, creds.password, [&](util::Optional<app::AppError> error) {
-                REQUIRE(error);
-                REQUIRE(error->is_client_error());
-                REQUIRE(error->code() == ErrorCodes::ClientRedirectError);
-                REQUIRE(error->reason() == "Redirect response missing location header");
-            });
+            auto error = wait_for_future(std::move(error_future), std::chrono::seconds(15)).get_no_throw();
+            if (!error.is_ok()) {
+                logger->error("Invalid redirect response test failed: %1", error.get_status().reason());
+            }
+            REQUIRE(error.is_ok());
+
+            REQUIRE(error.get_value().is_client_error());
+            REQUIRE(error.get_value().code() == ErrorCodes::ClientRedirectError);
+            REQUIRE(error.get_value().reason() == "Redirect response missing location header");
+        };
+
+        while (redirect_count < max_request_count) {
+            check_redirect_error();
+            redirect_count++;
+        }
     }
 
     SECTION("Test redirect response") {
@@ -198,32 +218,24 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
             else if (request_count == 1) {
                 // HTTP request #2 will respond with a redirect to an invalid URL ("somehost:9090")
                 REQUIRE(!request.redirect_count);
-                redir_transport->simulated_response = {
-                    moved_permanently,
-                    0,
-                    {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
-                    "Some body data"};
+                redir_transport->simulated_response =
+                    make_redirect_response(sync::HTTPStatus::MovedPermanently, "http://somehost:9090");
             }
             else if (request_count == 2) {
                 // HTTP request #3 should be a location request to "somehost:9090"
                 // A redirect response to the redirect URL will be sent
                 REQUIRE(request.url.find("/location") != std::string::npos);
                 REQUIRE(request.url.find("somehost:9090") != std::string::npos);
-                redir_transport->simulated_response = {
-                    permanent_redirect,
-                    0,
-                    {{"Location", redir_app_url}, {"Content-Type", "application/json"}},
-                    "Some body data"};
+                redir_transport->simulated_response =
+                    make_redirect_response(sync::HTTPStatus::PermanentRedirect, redir_app_url);
             }
             else if (request_count == 3) {
                 // HTTP request #4 should be a location request to the redirect url
                 // A redirect response to the original URL will be sent
                 REQUIRE(request.url.find("/location") != std::string::npos);
                 REQUIRE(request.url.find(redir_app_url) != std::string::npos);
-                redir_transport->simulated_response = {moved_permanently,
-                                                       0,
-                                                       {{"Location", app_url}, {"Content-Type", "application/json"}},
-                                                       "Some body data"};
+                redir_transport->simulated_response =
+                    make_redirect_response(sync::HTTPStatus::MovedPermanently, app_url);
             }
             else if (request_count == 4) {
                 // HTTP request #5 will be a location request to the original URL
@@ -270,11 +282,9 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
         redir_transport->request_hook = [&](const Request& request) {
             logger->trace("Received request[%1]: %2", request_count, request.url);
             REQUIRE(request_count <= 21);
-            redir_transport->simulated_response = {
-                request_count % 2 == 1 ? permanent_redirect : moved_permanently,
-                0,
-                {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
-                "Some body data"};
+            redir_transport->simulated_response = make_redirect_response(
+                request_count % 2 == 1 ? sync::HTTPStatus::PermanentRedirect : sync::HTTPStatus::MovedPermanently,
+                "http://somehost:9090");
             request_count++;
         };
 
@@ -314,13 +324,7 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
                 REQUIRE(request.url.find("http://somehost:9090") != std::string::npos);
                 REQUIRE(request.url.find("/location") != std::string::npos);
                 // app hostname will be updated via the metadata info
-                redir_transport->simulated_response = {
-                    static_cast<int>(sync::HTTPStatus::Ok),
-                    0,
-                    {{"Content-Type", "application/json"}},
-                    util::format("{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"%1\",\"ws_"
-                                 "hostname\":\"%2\"}",
-                                 app_url, ws_url)};
+                redir_transport->simulated_response = make_location_response(app_url, ws_url);
             }
             else {
                 REQUIRE(request.url.find(app_url) != std::string::npos);
@@ -401,21 +405,12 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
                     REQUIRE(request.url.find(app_url) != std::string::npos);
                     REQUIRE(request.url.find("/location") != std::string::npos);
                     REQUIRE(request.redirect_count == 0);
-                    redir_transport->simulated_response = {
-                        permanent_redirect,
-                        0,
-                        {{"Location", redir_app_url}, {"Content-Type", "application/json"}},
-                        "Some body data"};
+                    redir_transport->simulated_response =
+                        make_redirect_response(sync::HTTPStatus::PermanentRedirect, redir_app_url);
                 }
                 // Otherwise, if there are any location requests, respond with the redirect URLs
                 else if (request.url.find("/location") != std::string::npos) {
-                    redir_transport->simulated_response = {
-                        static_cast<int>(sync::HTTPStatus::Ok),
-                        0,
-                        {{"Content-Type", "application/json"}},
-                        util::format("{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"%1\","
-                                     "\"ws_hostname\":\"%2\"}",
-                                     redir_app_url, redir_ws_url)};
+                    redir_transport->simulated_response = make_location_response(redir_app_url, redir_ws_url);
                 }
                 else {
                     redir_transport->simulated_response.reset();
@@ -454,21 +449,11 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
                     REQUIRE(request.url.find(original_host) != std::string::npos);
                     REQUIRE(request.url.find("/location") != std::string::npos);
                     REQUIRE(request.redirect_count == 0);
-                    redir_transport->simulated_response = {
-                        moved_permanently,
-                        0,
-                        {{"Location", redir_app_url}, {"Content-Type", "application/json"}},
-                        "Some body data"};
+                    redir_transport->simulated_response =
+                        make_redirect_response(sync::HTTPStatus::MovedPermanently, redir_app_url);
                 }
                 else if (request.url.find("/location") != std::string::npos) {
-                    redir_transport->simulated_response = {
-                        static_cast<int>(sync::HTTPStatus::Ok),
-                        0,
-                        {{"Content-Type", "application/json"}},
-                        util::format(
-                            "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"%1\",\"ws_"
-                            "hostname\":\"%2\"}",
-                            redir_app_url, redir_ws_url)};
+                    redir_transport->simulated_response = make_location_response(redir_app_url, redir_ws_url);
                 }
                 else if (request.url.find("auth/session") != std::string::npos) {
                     redir_transport->simulated_response = {static_cast<int>(sync::HTTPStatus::Unauthorized),
@@ -518,11 +503,8 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
                 if (request.url.find("/location") != std::string::npos) {
                     // Keep returning the redirected response
                     REQUIRE(request.redirect_count < max_http_redirects);
-                    redir_transport->simulated_response = {
-                        moved_permanently,
-                        0,
-                        {{"Location", redir_app_url}, {"Content-Type", "application/json"}},
-                        "Some body data"};
+                    redir_transport->simulated_response =
+                        make_redirect_response(sync::HTTPStatus::MovedPermanently, redir_app_url);
                 }
                 else {
                     // should not get any other types of requests during the test - the log out is local

@@ -62,6 +62,8 @@ if(REALM_ENABLE_SYNC)
         sync/app.cpp
         sync/client_reset.cpp
         sync/file.cpp
+        sync/flx_migration.cpp
+        sync/flx_sync.cpp
         sync/metadata.cpp
         sync/migration_store_test.cpp
         sync/remote_mongo_tests.cpp
@@ -74,22 +76,20 @@ if(REALM_ENABLE_SYNC)
         util/sync_test_utils.cpp
     )
     if (REALM_ENABLE_AUTH_TESTS)
-    list(APPEND HEADERS
-        util/baas_admin_api.hpp
-        util/baas_test_utils.hpp
-        util/flx_sync_harness.hpp
-    )
-    list(APPEND SOURCES
-        baas/app_mongo.cpp
-        baas/app_redirects.cpp
-        baas/app_sync.cpp
-        baas/app_user.cpp
-        baas/flx_migration.cpp
-        baas/flx_sync.cpp
-        baas/realm_convert.cpp
-        util/baas_admin_api.cpp
-        util/baas_test_utils.cpp
-    )
+        list(APPEND HEADERS
+            util/baas_admin_api.hpp
+            util/baas_test_utils.hpp
+            util/flx_sync_harness.hpp
+        )
+        list(APPEND SOURCES
+            baas/app_mongo.cpp
+            baas/app_redirects.cpp
+            baas/app_sync.cpp
+            baas/app_user.cpp
+            baas/realm_convert.cpp
+            util/baas_admin_api.cpp
+            util/baas_test_utils.cpp
+        )
     endif()
     if(APPLE)
         list(APPEND SOURCES audit.cpp)

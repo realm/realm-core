@@ -16,9 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "app_utils.hpp"
 #include <realm/object-store/sync/app_utils.hpp>
-
 #include <realm/object-store/sync/generic_network_transport.hpp>
 
 #include <external/json/json.hpp>
@@ -43,6 +41,29 @@ AppUtils::find_header(const std::string& key_name, const std::map<std::string, s
     return nullptr;
 }
 
+bool AppUtils::contains_string(const std::string& haystack, const std::string& needle)
+{
+    char first_char = std::tolower(needle[0]);
+    // Only need to check for the first character of needle through haystack minus the
+    // length of needle plus one.
+    for (size_t idx_a = 0; idx_a < (haystack.length() - needle.length() + 1); idx_a++) {
+        if (std::tolower(haystack[idx_a]) == first_char) {
+            size_t cmp = 1;
+            while (cmp < needle.length()) {
+                if (std::tolower(haystack[idx_a + cmp]) != std::tolower(needle[cmp])) {
+                    break;
+                }
+                cmp++;
+            }
+            // All characters matched
+            if (cmp == needle.length()) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
 {
     std::string error_msg;
@@ -50,8 +71,8 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
         response.http_status_code >= 300 || (response.http_status_code < 200 && response.http_status_code != 0);
 
     try {
-        auto ct = find_header("content-type", response.headers);
-        if (ct && ct->second == "application/json") {
+        auto ct = AppUtils::find_header("content-type", response.headers);
+        if (ct && AppUtils::contains_string(ct->second, "application/json")) {
             auto body = nlohmann::json::parse(response.body);
             auto message = body.find("error");
             auto link = body.find("link");

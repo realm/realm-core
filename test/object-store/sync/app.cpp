@@ -79,28 +79,12 @@ AppError failed_log_in(std::shared_ptr<App> app, AppCredentials credentials = Ap
 } // namespace
 
 TEST_CASE("app: custom error handling", "[sync][app][local][custom_errors]") {
-    class CustomErrorTransport : public GenericNetworkTransport {
-    public:
-        CustomErrorTransport(int code, const std::string& message)
-            : m_code(code)
-            , m_message(message)
-        {
-        }
-
-        void send_request_to_server(const Request&, util::UniqueFunction<void(const Response&)>&& completion) override
-        {
-            completion(Response{0, m_code, HttpHeaders(), m_message});
-        }
-
-    private:
-        int m_code;
-        std::string m_message;
-    };
-
     SECTION("custom code and message is sent back") {
-        TestSyncManager::Config config;
-        config.transport = std::make_shared<CustomErrorTransport>(1001, "Boom!");
-        TestSyncManager tsm(config);
+        auto transport = std::make_shared<LocalTransport>();
+        transport->set_custom_error(1001);
+        transport->set_body("Boom!");
+
+        TestSyncManager tsm(get_config(transport));
         auto error = failed_log_in(tsm.app());
         CHECK(error.is_custom_error());
         CHECK(*error.additional_status_code == 1001);
@@ -146,13 +130,14 @@ static nlohmann::json user_profile_json(std::string user_id = random_string(15),
 
 // MARK: - Unit Tests
 
-class UnitTestTransport : public GenericNetworkTransport {
+class UnitTestTransport : public LocalTransport {
     std::string m_provider_type;
 
 public:
     UnitTestTransport(const std::string& provider_type = "anon-user")
         : m_provider_type(provider_type)
     {
+        request_hook = handle_request();
     }
 
     static std::string access_token;
@@ -165,41 +150,81 @@ public:
     static const std::string identity_0_id;
     static const std::string identity_1_id;
 
+    std::function<std::optional<app::Response>(const app::Request&)> custom_request_hook;
+
     void set_provider_type(const std::string& provider_type)
     {
         m_provider_type = provider_type;
     }
 
 private:
-    void handle_profile(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
+    std::function<std::optional<app::Response>(const app::Request& request)> handle_request()
+    {
+        return [this](const app::Request& request) -> std::optional<app::Response> {
+            if (custom_request_hook) {
+                auto response = custom_request_hook(request);
+                if (response) {
+                    return response;
+                }
+            }
+            if (request.url.find("/login") != std::string::npos) {
+                return handle_login(request);
+            }
+            else if (request.url.find("/profile") != std::string::npos) {
+                return handle_profile(request);
+            }
+            else if (request.url.find("/session") != std::string::npos && request.method != HttpMethod::post) {
+                return make_ok_response();
+            }
+            else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::post) {
+                return handle_create_api_key(request);
+            }
+            else if (request.url.find(util::format("/api_keys/%1", api_key_id)) != std::string::npos &&
+                     request.method == HttpMethod::get) {
+                return handle_fetch_api_key(request);
+            }
+            else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::get) {
+                return handle_fetch_api_keys(request);
+            }
+            else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
+                return handle_token_refresh(request);
+            }
+            else if (request.url.find("/location") != std::string::npos && request.method == HttpMethod::get) {
+                return handle_location(request);
+            }
+            else {
+                return make_ok_response("something arbitrary");
+            }
+        };
+    }
+
+    app::Response handle_profile(const Request& request)
     {
         CHECK(request.method == HttpMethod::get);
         auto content_type = AppUtils::find_header("Content-Type", request.headers);
         CHECK(content_type);
-        CHECK(content_type->second == "application/json;charset=utf-8");
+        CHECK(content_type->second == CONTENT_TYPE_JSON);
         auto authorization = AppUtils::find_header("Authorization", request.headers);
         CHECK(authorization);
         CHECK(authorization->second == "Bearer " + access_token);
         CHECK(request.body.empty());
         CHECK(request.timeout_ms == 60000);
 
-        std::string response =
-            nlohmann::json({{"user_id", user_id},
-                            {"identities",
-                             {{{"id", identity_0_id}, {"provider_type", m_provider_type}, {"provider_id", "lol"}},
-                              {{"id", identity_1_id}, {"provider_type", "lol_wut"}, {"provider_id", "nah_dawg"}}}},
-                            {"data", profile_0}})
-                .dump();
-
-        completion(Response{200, 0, {}, response});
+        return make_json_response(
+            sync::HTTPStatus::Ok,
+            {{"user_id", user_id},
+             {"identities",
+              {{{"id", identity_0_id}, {"provider_type", m_provider_type}, {"provider_id", "lol"}},
+               {{"id", identity_1_id}, {"provider_type", "lol_wut"}, {"provider_id", "nah_dawg"}}}},
+             {"data", profile_0}});
     }
 
-    void handle_login(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
+    app::Response handle_login(const Request& request)
     {
         CHECK(request.method == HttpMethod::post);
         auto item = AppUtils::find_header("Content-Type", request.headers);
         CHECK(item);
-        CHECK(item->second == "application/json;charset=utf-8");
+        CHECK(item->second == CONTENT_TYPE_JSON);
         CHECK(nlohmann::json::parse(request.body)["options"] ==
               nlohmann::json({{"device",
                                {{"appId", "app_id"},
@@ -218,67 +243,54 @@ private:
 
         CHECK(request.timeout_ms == 60000);
 
-        std::string response = nlohmann::json({{"access_token", access_token},
-                                               {"refresh_token", access_token},
-                                               {"user_id", random_string(15)},
-                                               {"device_id", "Panda Bear"}})
-                                   .dump();
-
-        completion(Response{200, 0, {}, response});
+        return make_json_response(sync::HTTPStatus::Ok, {{"access_token", access_token},
+                                                         {"refresh_token", access_token},
+                                                         {"user_id", random_string(15)},
+                                                         {"device_id", "Panda Bear"}});
     }
 
-    void handle_location(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
+    app::Response handle_location(const Request& request)
     {
         CHECK(request.method == HttpMethod::get);
         CHECK(request.timeout_ms == 60000);
 
-        std::string response = nlohmann::json({{"deployment_model", "this"},
-                                               {"hostname", "field"},
-                                               {"ws_hostname", "shouldn't"},
-                                               {"location", "matter"}})
-                                   .dump();
-
-        completion(Response{200, 0, {}, response});
+        return make_location_response("field", "shouldn't");
     }
 
-    void handle_create_api_key(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
+    app::Response handle_create_api_key(const Request& request)
     {
         CHECK(request.method == HttpMethod::post);
         auto item = AppUtils::find_header("Content-Type", request.headers);
         CHECK(item);
-        CHECK(item->second == "application/json;charset=utf-8");
+        CHECK(item->second == CONTENT_TYPE_JSON);
         CHECK(nlohmann::json::parse(request.body) == nlohmann::json({{"name", api_key_name}}));
         CHECK(request.timeout_ms == 60000);
 
-        std::string response =
-            nlohmann::json({{"_id", api_key_id}, {"key", api_key}, {"name", api_key_name}, {"disabled", false}})
-                .dump();
-
-        completion(Response{200, 0, {}, response});
+        return make_json_response(
+            sync::HTTPStatus::Ok,
+            {{"_id", api_key_id}, {"key", api_key}, {"name", api_key_name}, {"disabled", false}});
     }
 
-    void handle_fetch_api_key(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
+    app::Response handle_fetch_api_key(const Request& request)
     {
         CHECK(request.method == HttpMethod::get);
         auto item = AppUtils::find_header("Content-Type", request.headers);
         CHECK(item);
-        CHECK(item->second == "application/json;charset=utf-8");
+        CHECK(item->second == CONTENT_TYPE_JSON);
 
         CHECK(request.body == "");
         CHECK(request.timeout_ms == 60000);
 
-        std::string response =
-            nlohmann::json({{"_id", api_key_id}, {"name", api_key_name}, {"disabled", false}}).dump();
-
-        completion(Response{200, 0, {}, response});
+        return make_json_response(sync::HTTPStatus::Ok,
+                                  {{"_id", api_key_id}, {"name", api_key_name}, {"disabled", false}});
     }
 
-    void handle_fetch_api_keys(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
+    app::Response handle_fetch_api_keys(const Request& request)
     {
         CHECK(request.method == HttpMethod::get);
         auto item = AppUtils::find_header("Content-Type", request.headers);
         CHECK(item);
-        CHECK(item->second == "application/json;charset=utf-8");
+        CHECK(item->second == CONTENT_TYPE_JSON);
 
         CHECK(request.body == "");
         CHECK(request.timeout_ms == 60000);
@@ -288,57 +300,20 @@ private:
             elements.push_back({{"_id", api_key_id}, {"name", api_key_name}, {"disabled", false}});
         }
 
-        completion(Response{200, 0, {}, nlohmann::json(elements).dump()});
+        return make_json_response(sync::HTTPStatus::Ok, nlohmann::json(elements));
     }
 
-    void handle_token_refresh(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
+    app::Response handle_token_refresh(const Request& request)
     {
         CHECK(request.method == HttpMethod::post);
         auto item = AppUtils::find_header("Content-Type", request.headers);
         CHECK(item);
-        CHECK(item->second == "application/json;charset=utf-8");
+        CHECK(item->second == CONTENT_TYPE_JSON);
 
         CHECK(request.body == "");
         CHECK(request.timeout_ms == 60000);
 
-        auto elements = std::vector<nlohmann::json>();
-        nlohmann::json json{{"access_token", access_token}};
-
-        completion(Response{200, 0, {}, json.dump()});
-    }
-
-public:
-    void send_request_to_server(const Request& request,
-                                util::UniqueFunction<void(const Response&)>&& completion) override
-    {
-        if (request.url.find("/login") != std::string::npos) {
-            handle_login(request, std::move(completion));
-        }
-        else if (request.url.find("/profile") != std::string::npos) {
-            handle_profile(request, std::move(completion));
-        }
-        else if (request.url.find("/session") != std::string::npos && request.method != HttpMethod::post) {
-            completion(Response{200, 0, {}, ""});
-        }
-        else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::post) {
-            handle_create_api_key(request, std::move(completion));
-        }
-        else if (request.url.find(util::format("/api_keys/%1", api_key_id)) != std::string::npos &&
-                 request.method == HttpMethod::get) {
-            handle_fetch_api_key(request, std::move(completion));
-        }
-        else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::get) {
-            handle_fetch_api_keys(request, std::move(completion));
-        }
-        else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
-            handle_token_refresh(request, std::move(completion));
-        }
-        else if (request.url.find("/location") != std::string::npos && request.method == HttpMethod::get) {
-            handle_location(request, std::move(completion));
-        }
-        else {
-            completion(Response{200, 0, {}, "something arbitrary"});
-        }
+        return make_json_response(sync::HTTPStatus::Ok, {{"access_token", access_token}});
     }
 };
 
@@ -494,20 +469,14 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][local]") {
     }
 
     SECTION("login_anonymous bad") {
-        struct transport : UnitTestTransport {
-            void send_request_to_server(const Request& request,
-                                        util::UniqueFunction<void(const Response&)>&& completion) override
-            {
-                if (request.url.find("/login") != std::string::npos) {
-                    completion({200, 0, {}, user_json(bad_access_token).dump()});
-                }
-                else {
-                    UnitTestTransport::send_request_to_server(request, std::move(completion));
-                }
+        auto transport = std::make_shared<UnitTestTransport>();
+        transport->custom_request_hook = [](const app::Request& request) -> std::optional<app::Response> {
+            if (request.url.find("/login") != std::string::npos) {
+                return make_json_response(sync::HTTPStatus::Ok, user_json(bad_access_token));
             }
+            return std::nullopt;
         };
-
-        config.transport = instance_of<transport>;
+        config.transport = std::move(transport);
         TestSyncManager tsm(config);
         auto error = failed_log_in(tsm.app());
         CHECK(error.reason() == std::string("jwt missing parts"));
@@ -707,34 +676,17 @@ TEST_CASE("app: user_semantics", "[app][local]") {
     }
 }
 
-struct ErrorCheckingTransport : public GenericNetworkTransport {
-    ErrorCheckingTransport(Response* r)
-        : m_response(r)
-    {
-    }
-    void send_request_to_server(const Request&, util::UniqueFunction<void(const Response&)>&& completion) override
-    {
-        completion(Response(*m_response));
-    }
-
-private:
-    Response* m_response;
-};
-
 TEST_CASE("app: response error handling", "[sync][app][local]") {
-    std::string response_body = nlohmann::json({{"access_token", good_access_token},
-                                                {"refresh_token", good_access_token},
-                                                {"user_id", "Brown Bear"},
-                                                {"device_id", "Panda Bear"}})
-                                    .dump();
-
-    Response response{200, 0, {{"Content-Type", "text/plain"}}, response_body};
-
-    TestSyncManager tsm(get_config(std::make_shared<ErrorCheckingTransport>(&response)));
+    auto transport = std::make_shared<LocalTransport>();
+    transport->simulated_response = make_json_response(sync::HTTPStatus::Ok, {{"access_token", good_access_token},
+                                                                              {"refresh_token", good_access_token},
+                                                                              {"user_id", "Brown Bear"},
+                                                                              {"device_id", "Panda Bear"}});
+    TestSyncManager tsm(get_config(transport));
     auto app = tsm.app();
 
     SECTION("http 404") {
-        response.http_status_code = 404;
+        transport->set_http_status(sync::HTTPStatus::NotFound);
         auto error = failed_log_in(app);
         CHECK(!error.is_json_error());
         CHECK(!error.is_custom_error());
@@ -744,7 +696,7 @@ TEST_CASE("app: response error handling", "[sync][app][local]") {
         CHECK(error.reason().find(std::string("http error code considered fatal")) != std::string::npos);
     }
     SECTION("http 500") {
-        response.http_status_code = 500;
+        transport->set_http_status(sync::HTTPStatus::InternalServerError);
         auto error = failed_log_in(app);
         CHECK(!error.is_json_error());
         CHECK(!error.is_custom_error());
@@ -756,8 +708,8 @@ TEST_CASE("app: response error handling", "[sync][app][local]") {
     }
 
     SECTION("custom error code") {
-        response.custom_status_code = 42;
-        response.body = "Custom error message";
+        transport->simulated_response.custom_status_code = 42;
+        transport->set_body("Custom error message");
         auto error = failed_log_in(app);
         CHECK(!error.is_http_error());
         CHECK(!error.is_json_error());
@@ -769,16 +721,14 @@ TEST_CASE("app: response error handling", "[sync][app][local]") {
     }
 
     SECTION("session error code") {
-        response.headers = HttpHeaders{{"Content-Type", "application/json"}};
-        response.http_status_code = 400;
-        response.body = nlohmann::json({{"error_code", "MongoDBError"},
-                                        {"error", "a fake MongoDB error message!"},
-                                        {"access_token", good_access_token},
-                                        {"refresh_token", good_access_token},
-                                        {"user_id", "Brown Bear"},
-                                        {"device_id", "Panda Bear"},
-                                        {"link", "http://...whatever the server passes us"}})
-                            .dump();
+        transport->simulated_response =
+            make_json_response(sync::HTTPStatus::BadRequest, {{"error_code", "MongoDBError"},
+                                                              {"error", "a fake MongoDB error message!"},
+                                                              {"access_token", good_access_token},
+                                                              {"refresh_token", good_access_token},
+                                                              {"user_id", "Brown Bear"},
+                                                              {"device_id", "Panda Bear"},
+                                                              {"link", "http://...whatever the server passes us"}});
         auto error = failed_log_in(app);
         CHECK(!error.is_http_error());
         CHECK(!error.is_json_error());
@@ -790,7 +740,7 @@ TEST_CASE("app: response error handling", "[sync][app][local]") {
     }
 
     SECTION("json error code") {
-        response.body = "this: is not{} a valid json body!";
+        transport->set_body("this: is not{} a valid json body!");
         auto error = failed_log_in(app);
         CHECK(!error.is_http_error());
         CHECK(error.is_json_error());
@@ -1064,24 +1014,19 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][local]") {
     };
 
     SECTION("refresh custom data happy path") {
-        static bool session_route_hit = false;
+        bool session_route_hit = false;
 
-        struct transport : UnitTestTransport {
-            void send_request_to_server(const Request& request,
-                                        util::UniqueFunction<void(const Response&)>&& completion) override
-            {
-                if (request.url.find("/session") != std::string::npos) {
-                    session_route_hit = true;
-                    nlohmann::json json{{"access_token", good_access_token}};
-                    completion({200, 0, {}, json.dump()});
-                }
-                else {
-                    UnitTestTransport::send_request_to_server(request, std::move(completion));
-                }
+        auto transport = std::make_shared<UnitTestTransport>();
+        transport->custom_request_hook =
+            [&session_route_hit](const app::Request& request) -> std::optional<app::Response> {
+            if (request.url.find("/session") != std::string::npos) {
+                session_route_hit = true;
+                return make_json_response(sync::HTTPStatus::Ok, {{"access_token", good_access_token}});
             }
+            return std::nullopt;
         };
 
-        TestSyncManager sync_manager(get_config(instance_of<transport>));
+        TestSyncManager sync_manager(get_config(transport));
         auto app = sync_manager.app();
         setup_user(app);
 
@@ -1095,24 +1040,19 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][local]") {
     }
 
     SECTION("refresh custom data sad path") {
-        static bool session_route_hit = false;
+        bool session_route_hit = false;
 
-        struct transport : UnitTestTransport {
-            void send_request_to_server(const Request& request,
-                                        util::UniqueFunction<void(const Response&)>&& completion) override
-            {
-                if (request.url.find("/session") != std::string::npos) {
-                    session_route_hit = true;
-                    nlohmann::json json{{"access_token", bad_access_token}};
-                    completion({200, 0, {}, json.dump()});
-                }
-                else {
-                    UnitTestTransport::send_request_to_server(request, std::move(completion));
-                }
+        auto transport = std::make_shared<UnitTestTransport>();
+        transport->custom_request_hook =
+            [&session_route_hit](const app::Request& request) -> std::optional<app::Response> {
+            if (request.url.find("/session") != std::string::npos) {
+                session_route_hit = true;
+                return make_json_response(sync::HTTPStatus::Ok, {{"access_token", bad_access_token}});
             }
+            return std::nullopt;
         };
 
-        TestSyncManager sync_manager(get_config(instance_of<transport>));
+        TestSyncManager sync_manager(get_config(transport));
         auto app = sync_manager.app();
         setup_user(app);
 
@@ -1134,64 +1074,56 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][local]") {
          Refresh token - get a new token for the user
          Get profile - get the profile with the new token
          */
+        bool login_hit = false;
+        bool get_profile_1_hit = false;
+        bool get_profile_2_hit = false;
+        bool refresh_hit = false;
 
-        struct transport : GenericNetworkTransport {
-            bool login_hit = false;
-            bool get_profile_1_hit = false;
-            bool get_profile_2_hit = false;
-            bool refresh_hit = false;
+        auto transport = std::make_shared<LocalTransport>();
+        transport->request_hook = [&](const Request& request) -> std::optional<app::Response> {
+            if (request.url.find("/login") != std::string::npos) {
+                login_hit = true;
+                return make_json_response(sync::HTTPStatus::Ok, user_json(good_access_token));
+            }
+            else if (request.url.find("/profile") != std::string::npos) {
+                CHECK(login_hit);
 
-            void send_request_to_server(const Request& request,
-                                        util::UniqueFunction<void(const Response&)>&& completion) override
-            {
-                if (request.url.find("/login") != std::string::npos) {
-                    login_hit = true;
-                    completion({200, 0, {}, user_json(good_access_token).dump()});
-                }
-                else if (request.url.find("/profile") != std::string::npos) {
-                    CHECK(login_hit);
-
-                    auto item = AppUtils::find_header("Authorization", request.headers);
-                    CHECK(item);
-                    auto access_token = item->second;
-                    // simulated bad token request
-                    if (access_token.find(good_access_token2) != std::string::npos) {
-                        CHECK(login_hit);
-                        CHECK(get_profile_1_hit);
-                        CHECK(refresh_hit);
-
-                        get_profile_2_hit = true;
-
-                        completion({200, 0, {}, user_profile_json().dump()});
-                    }
-                    else if (access_token.find(good_access_token) != std::string::npos) {
-                        CHECK(!get_profile_2_hit);
-                        get_profile_1_hit = true;
-
-                        completion({401, 0, {}});
-                    }
-                }
-                else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
+                auto item = AppUtils::find_header("Authorization", request.headers);
+                CHECK(item);
+                auto access_token = item->second;
+                // simulated bad token request
+                if (access_token.find(good_access_token2) != std::string::npos) {
                     CHECK(login_hit);
                     CHECK(get_profile_1_hit);
-                    CHECK(!get_profile_2_hit);
-                    refresh_hit = true;
+                    CHECK(refresh_hit);
 
-                    nlohmann::json json{{"access_token", good_access_token2}};
-                    completion({200, 0, {}, json.dump()});
+                    get_profile_2_hit = true;
+
+                    return make_json_response(sync::HTTPStatus::Ok, user_profile_json());
                 }
-                else if (request.url.find("/location") != std::string::npos) {
-                    CHECK(request.method == HttpMethod::get);
-                    completion({200,
-                                0,
-                                {},
-                                "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
-                                "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
+                else if (access_token.find(good_access_token) != std::string::npos) {
+                    CHECK(!get_profile_2_hit);
+                    get_profile_1_hit = true;
+
+                    return app::Response{401, 0, {}};
                 }
             }
+            else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
+                CHECK(login_hit);
+                CHECK(get_profile_1_hit);
+                CHECK(!get_profile_2_hit);
+                refresh_hit = true;
+
+                return make_json_response(sync::HTTPStatus::Ok, {{"access_token", good_access_token2}});
+            }
+            else if (request.url.find("/location") != std::string::npos) {
+                CHECK(request.method == HttpMethod::get);
+                return make_location_response("http://localhost:9090", "ws://localhost:9090");
+            }
+            return std::nullopt;
         };
 
-        TestSyncManager sync_manager(get_config(instance_of<transport>));
+        TestSyncManager sync_manager(get_config(transport));
         auto app = sync_manager.app();
         setup_user(app);
         REQUIRE(log_in(app));
@@ -1273,107 +1205,97 @@ private:
     JoiningThread transport_thread;
 };
 
+template <typename State>
+struct TestStateBundle {
+    void advance_to(State new_state)
+    {
+        std::lock_guard<std::mutex> lk(mutex);
+        state = new_state;
+        cond.notify_one();
+    }
+
+    State get() const
+    {
+        std::lock_guard<std::mutex> lk(mutex);
+        return state;
+    }
+
+    void wait_for(State new_state)
+    {
+        std::unique_lock lk(mutex);
+        bool failed = !cond.wait_for(lk, std::chrono::seconds(5), [&] {
+            return state == new_state;
+        });
+        if (failed) {
+            throw std::runtime_error("wait timed out");
+        }
+    }
+
+    mutable std::mutex mutex;
+    std::condition_variable cond;
+
+    State state = State::unknown;
+};
+
 } // namespace
 
 TEST_CASE("app: app destroyed during token refresh", "[sync][app][local]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, profile_1, profile_2, refresh_1, refresh_2, refresh_3 };
-    struct TestStateBundle {
-        void advance_to(TestState new_state)
-        {
-            std::lock_guard<std::mutex> lk(mutex);
-            state = new_state;
-            cond.notify_one();
+    struct TestStateBundle<TestState> state;
+    auto transport = std::make_shared<LocalTransport>();
+    transport->send_hook = [&state, &mock_transport_worker](
+                               const Request& request, util::UniqueFunction<void(const Response&)>&& completion) {
+        if (request.url.find("/login") != std::string::npos) {
+            CHECK(state.get() == TestState::location);
+            state.advance_to(TestState::login);
+            mock_transport_worker.add_work_item(
+                make_json_response(sync::HTTPStatus::Ok, user_json(encode_fake_jwt("access token 1"))),
+                std::move(completion));
         }
-
-        TestState get() const
-        {
-            std::lock_guard<std::mutex> lk(mutex);
-            return state;
-        }
-
-        void wait_for(TestState new_state)
-        {
-            std::unique_lock lk(mutex);
-            bool failed = !cond.wait_for(lk, std::chrono::seconds(5), [&] {
-                return state == new_state;
-            });
-            if (failed) {
-                throw std::runtime_error("wait timed out");
+        else if (request.url.find("/profile") != std::string::npos) {
+            // simulated bad token request
+            auto cur_state = state.get();
+            CHECK((cur_state == TestState::refresh_1 || cur_state == TestState::login));
+            if (cur_state == TestState::refresh_1) {
+                state.advance_to(TestState::profile_2);
+                mock_transport_worker.add_work_item(make_json_response(sync::HTTPStatus::Ok, user_profile_json()),
+                                                    std::move(completion));
+            }
+            else if (cur_state == TestState::login) {
+                state.advance_to(TestState::profile_1);
+                mock_transport_worker.add_work_item(Response{401, 0, {}}, std::move(completion));
             }
         }
-
-        mutable std::mutex mutex;
-        std::condition_variable cond;
-
-        TestState state = TestState::unknown;
-    } state;
-    struct transport : public GenericNetworkTransport {
-        transport(AsyncMockNetworkTransport& worker, TestStateBundle& state)
-            : mock_transport_worker(worker)
-            , state(state)
-        {
-        }
-
-        void send_request_to_server(const Request& request,
-                                    util::UniqueFunction<void(const Response&)>&& completion) override
-        {
-            if (request.url.find("/login") != std::string::npos) {
-                CHECK(state.get() == TestState::location);
-                state.advance_to(TestState::login);
+        else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
+            if (state.get() == TestState::profile_1) {
+                state.advance_to(TestState::refresh_1);
                 mock_transport_worker.add_work_item(
-                    Response{200, 0, {}, user_json(encode_fake_jwt("access token 1")).dump()}, std::move(completion));
+                    make_json_response(sync::HTTPStatus::Ok, {{"access_token", encode_fake_jwt("access token 1")}}),
+                    std::move(completion));
             }
-            else if (request.url.find("/profile") != std::string::npos) {
-                // simulated bad token request
-                auto cur_state = state.get();
-                CHECK((cur_state == TestState::refresh_1 || cur_state == TestState::login));
-                if (cur_state == TestState::refresh_1) {
-                    state.advance_to(TestState::profile_2);
-                    mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
-                                                        std::move(completion));
-                }
-                else if (cur_state == TestState::login) {
-                    state.advance_to(TestState::profile_1);
-                    mock_transport_worker.add_work_item(Response{401, 0, {}}, std::move(completion));
-                }
-            }
-            else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
-                if (state.get() == TestState::profile_1) {
-                    state.advance_to(TestState::refresh_1);
-                    nlohmann::json json{{"access_token", encode_fake_jwt("access token 1")}};
-                    mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()}, std::move(completion));
-                }
-                else if (state.get() == TestState::profile_2) {
-                    state.advance_to(TestState::refresh_2);
-                    mock_transport_worker.add_work_item(Response{200, 0, {}, "{\"error\":\"too bad, buddy!\"}"},
-                                                        std::move(completion));
-                }
-                else {
-                    CHECK(state.get() == TestState::refresh_2);
-                    state.advance_to(TestState::refresh_3);
-                    nlohmann::json json{{"access_token", encode_fake_jwt("access token 2")}};
-                    mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()}, std::move(completion));
-                }
-            }
-            else if (request.url.find("/location") != std::string::npos) {
-                CHECK(request.method == HttpMethod::get);
-                CHECK(state.get() == TestState::unknown);
-                state.advance_to(TestState::location);
+            else if (state.get() == TestState::profile_2) {
+                state.advance_to(TestState::refresh_2);
                 mock_transport_worker.add_work_item(
-                    Response{200,
-                             0,
-                             {},
-                             "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
-                             "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"},
+                    make_json_response(sync::HTTPStatus::Ok, {{"error", "too bad, buddy!"}}), std::move(completion));
+            }
+            else {
+                CHECK(state.get() == TestState::refresh_2);
+                state.advance_to(TestState::refresh_3);
+                mock_transport_worker.add_work_item(
+                    make_json_response(sync::HTTPStatus::Ok, {{"access_token", encode_fake_jwt("access token 2")}}),
                     std::move(completion));
             }
         }
-
-        AsyncMockNetworkTransport& mock_transport_worker;
-        TestStateBundle& state;
+        else if (request.url.find("/location") != std::string::npos) {
+            CHECK(request.method == HttpMethod::get);
+            CHECK(state.get() == TestState::unknown);
+            state.advance_to(TestState::location);
+            mock_transport_worker.add_work_item(
+                make_location_response("http://localhost:9090", "ws://localhost:9090"), std::move(completion));
+        }
     };
-    TestSyncManager sync_manager(get_config(std::make_shared<transport>(mock_transport_worker, state)));
+    TestSyncManager sync_manager(get_config(transport));
     auto app = sync_manager.app();
 
     {
@@ -1426,34 +1348,24 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][local]") {
 }
 
 TEST_CASE("app: metadata is persisted between sessions", "[sync][app][local]") {
-    static const auto test_hostname = "proto://host:1234";
-    static const auto test_ws_hostname = "wsproto://host:1234";
+    const auto test_hostname = "proto://host:1234";
+    const auto test_ws_hostname = "wsproto://host:1234";
 
-    struct transport : UnitTestTransport {
-        void send_request_to_server(const Request& request,
-                                    util::UniqueFunction<void(const Response&)>&& completion) override
-        {
-            if (request.url.find("/location") != std::string::npos) {
-                CHECK(request.method == HttpMethod::get);
-                completion({200,
-                            0,
-                            {},
-                            nlohmann::json({{"deployment_model", "LOCAL"},
-                                            {"location", "IE"},
-                                            {"hostname", test_hostname},
-                                            {"ws_hostname", test_ws_hostname}})
-                                .dump()});
-            }
-            else if (request.url.find("functions/call") != std::string::npos) {
-                REQUIRE(request.url.rfind(test_hostname, 0) != std::string::npos);
-            }
-            else {
-                UnitTestTransport::send_request_to_server(request, std::move(completion));
-            }
+    auto transport = std::make_shared<UnitTestTransport>();
+    transport->custom_request_hook =
+        [&test_hostname, &test_ws_hostname](const app::Request& request) -> std::optional<app::Response> {
+        if (request.url.find("/location") != std::string::npos) {
+            CHECK(request.method == HttpMethod::get);
+            return make_location_response(test_hostname, test_ws_hostname, "LOCAL", "IE");
         }
+        else if (request.url.find("functions/call") != std::string::npos) {
+            REQUIRE(request.url.rfind(test_hostname, 0) != std::string::npos);
+            return make_ok_response();
+        }
+        return std::nullopt;
     };
 
-    TestSyncManager::Config config = get_config(instance_of<transport>);
+    TestSyncManager::Config config = get_config(transport);
     config.base_path = util::make_temp_dir();
     config.should_teardown_test_directory = false;
 
@@ -1594,76 +1506,34 @@ TEST_CASE("app: sync_user_profile unit tests", "[sync][app][local]") {
 TEST_CASE("app: app cannot get deallocated during log in", "[sync][app][local]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, app_deallocated, profile };
-    struct TestStateBundle {
-        void advance_to(TestState new_state)
-        {
-            std::lock_guard<std::mutex> lk(mutex);
-            state = new_state;
-            cond.notify_one();
+    struct TestStateBundle<TestState> state;
+    auto transport = std::make_shared<LocalTransport>();
+    transport->send_hook = [&state, &mock_transport_worker](const Request& request, util::UniqueFunction<void(const Response&)>&& completion) {
+        if (request.url.find("/login") != std::string::npos) {
+            state.advance_to(TestState::login);
+            state.wait_for(TestState::app_deallocated);
+            mock_transport_worker.add_work_item(
+                make_json_response(sync::HTTPStatus::Ok, user_json(encode_fake_jwt("access token"))),
+                std::move(completion));
         }
-
-        TestState get() const
-        {
-            std::lock_guard<std::mutex> lk(mutex);
-            return state;
+        else if (request.url.find("/profile") != std::string::npos) {
+            state.advance_to(TestState::profile);
+            mock_transport_worker.add_work_item(
+                make_json_response(sync::HTTPStatus::Ok, user_profile_json()),
+                std::move(completion));
         }
-
-        void wait_for(TestState new_state)
-        {
-            std::unique_lock<std::mutex> lk(mutex);
-            cond.wait(lk, [&] {
-                return state == new_state;
-            });
+        else if (request.url.find("/location") != std::string::npos) {
+            CHECK(request.method == HttpMethod::get);
+            state.advance_to(TestState::location);
+            mock_transport_worker.add_work_item(
+                make_location_response("http://localhost:9090", "ws://localhost:9090"),
+                std::move(completion));
         }
-
-        mutable std::mutex mutex;
-        std::condition_variable cond;
-
-        TestState state = TestState::unknown;
-    } state;
-    struct transport : public GenericNetworkTransport {
-        transport(AsyncMockNetworkTransport& worker, TestStateBundle& state)
-            : mock_transport_worker(worker)
-            , state(state)
-        {
-        }
-
-        void send_request_to_server(const Request& request, util::UniqueFunction<void(const Response&)>&& completion) override
-        {
-            if (request.url.find("/login") != std::string::npos) {
-                state.advance_to(TestState::login);
-                state.wait_for(TestState::app_deallocated);
-                mock_transport_worker.add_work_item(
-                    Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()},
-                    std::move(completion));
-            }
-            else if (request.url.find("/profile") != std::string::npos) {
-                state.advance_to(TestState::profile);
-                mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
-                                                    std::move(completion));
-            }
-            else if (request.url.find("/location") != std::string::npos) {
-                CHECK(request.method == HttpMethod::get);
-                state.advance_to(TestState::location);
-                mock_transport_worker.add_work_item(
-                    Response{200,
-                             0,
-                             {},
-                             "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
-                             "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"},
-                    std::move(completion));
-            }
-        }
-
-        AsyncMockNetworkTransport& mock_transport_worker;
-        TestStateBundle& state;
     };
 
     auto [cur_user_promise, cur_user_future] = util::make_promise_future<std::shared_ptr<SyncUser>>();
-    auto transporter = std::make_shared<transport>(mock_transport_worker, state);
-
     {
-        TestSyncManager sync_manager(get_config(transporter));
+        TestSyncManager sync_manager(get_config(transport));
         auto app = sync_manager.app();
 
         app->log_in_with_credentials(AppCredentials::anonymous(),
@@ -1686,78 +1556,33 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app][local]")
 TEST_CASE("app: user logs out while profile is fetched", "[sync][app][local][user]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, profile };
-    struct TestStateBundle {
-        void advance_to(TestState new_state)
-        {
-            std::lock_guard<std::mutex> lk(mutex);
-            state = new_state;
-            cond.notify_one();
+    struct TestStateBundle<TestState> state;
+    std::shared_ptr<SyncUser> logged_in_user;
+
+    auto transport = std::make_shared<LocalTransport>();
+    transport->send_hook = [&state, &mock_transport_worker, &logged_in_user](
+                               const Request& request, util::UniqueFunction<void(const Response&)>&& completion) {
+        if (request.url.find("/login") != std::string::npos) {
+            state.advance_to(TestState::login);
+            mock_transport_worker.add_work_item(
+                make_json_response(sync::HTTPStatus::Ok, user_json(encode_fake_jwt("access token"))),
+                std::move(completion));
         }
-
-        TestState get() const
-        {
-            std::lock_guard<std::mutex> lk(mutex);
-            return state;
+        else if (request.url.find("/profile") != std::string::npos) {
+            logged_in_user->log_out();
+            state.advance_to(TestState::profile);
+            mock_transport_worker.add_work_item(make_json_response(sync::HTTPStatus::Ok, user_profile_json().dump()),
+                                                std::move(completion));
         }
-
-        void wait_for(TestState new_state)
-        {
-            std::unique_lock<std::mutex> lk(mutex);
-            cond.wait(lk, [&] {
-                return state == new_state;
-            });
+        else if (request.url.find("/location") != std::string::npos) {
+            CHECK(request.method == HttpMethod::get);
+            state.advance_to(TestState::location);
+            mock_transport_worker.add_work_item(
+                make_location_response("http://localhost:9090", "ws://localhost:9090"), std::move(completion));
         }
-
-        mutable std::mutex mutex;
-        std::condition_variable cond;
-
-        TestState state = TestState::unknown;
-    } state;
-    struct transport : public GenericNetworkTransport {
-        transport(AsyncMockNetworkTransport& worker, TestStateBundle& state,
-                  std::shared_ptr<SyncUser>& logged_in_user)
-            : mock_transport_worker(worker)
-            , state(state)
-            , logged_in_user(logged_in_user)
-        {
-        }
-
-        void send_request_to_server(const Request& request,
-                                    util::UniqueFunction<void(const Response&)>&& completion) override
-        {
-            if (request.url.find("/login") != std::string::npos) {
-                state.advance_to(TestState::login);
-                mock_transport_worker.add_work_item(
-                    Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()}, std::move(completion));
-            }
-            else if (request.url.find("/profile") != std::string::npos) {
-                logged_in_user->log_out();
-                state.advance_to(TestState::profile);
-                mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
-                                                    std::move(completion));
-            }
-            else if (request.url.find("/location") != std::string::npos) {
-                CHECK(request.method == HttpMethod::get);
-                state.advance_to(TestState::location);
-                mock_transport_worker.add_work_item(
-                    Response{200,
-                             0,
-                             {},
-                             "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
-                             "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"},
-                    std::move(completion));
-            }
-        }
-
-        AsyncMockNetworkTransport& mock_transport_worker;
-        TestStateBundle& state;
-        std::shared_ptr<SyncUser>& logged_in_user;
     };
 
-    std::shared_ptr<SyncUser> logged_in_user;
-    auto transporter = std::make_shared<transport>(mock_transport_worker, state, logged_in_user);
-
-    TestSyncManager sync_manager(get_config(transporter));
+    TestSyncManager sync_manager(get_config(transport));
     auto app = sync_manager.app();
 
     logged_in_user = app->sync_manager()->get_user(UnitTestTransport::user_id, good_access_token, good_access_token,
