@@ -57,6 +57,9 @@ primitives:
   - EJsonArray
   - EJsonObj
 
+  # used by sync proxy
+  - std::uint_fast16_t
+
 typeAliases:
   int: int32_t
   KeyPath: std::vector<std::pair<TableKey, ColKey>>
@@ -65,6 +68,7 @@ typeAliases:
   AppCredentialsToken: std::string
   Email: std::string
   SchemaVersion: int64_t # is uint64_t in C++ but -1 is used as a sentinel.
+  PortType: std::uint_fast16_t
 
 templates: # value tells you how many arguments it takes ('*' means any number)
   util::Optional: 1
@@ -292,6 +296,11 @@ enums:
       - NEED_DATA
       - HAVE_EVENT
       - HAVE_ERROR
+  ProxyType:
+    cppName: SyncConfig::ProxyConfig::Type
+    values:
+      - HTTP
+      - HTTPS
 
 # These types are handled specially. They must be structs with a single fields named "value".
 keyTypes:
@@ -412,6 +421,13 @@ records:
         type: std::string
       disabled:
         type: bool
+    
+  SyncProxyConfig:
+    cppName: SyncConfig::ProxyConfig
+    fields:
+      address: std::string
+      port: PortType
+      type: ProxyType
 
   SyncConfig:
     fields:
@@ -442,6 +458,7 @@ records:
       cancel_waits_on_nonfatal_error:
         type: bool
         default: false
+      proxy_config: util::Optional<SyncProxyConfig>
         
   SyncSubscription:
     cppName: sync::Subscription
