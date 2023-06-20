@@ -33,6 +33,7 @@
 #include <realm/object-store/sync/mongo_client.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
+#include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/util/bson/bson.hpp>
 #include "realm/object-store/sync/sync_session.hpp"
 #include "realm/object_id.hpp"
@@ -3297,6 +3298,40 @@ TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][app
 
     // The user commit is the last one.
     CHECK(user_commit_version == bootstrap_version + 1);
+}
+
+TEST_CASE("flx: async open + register subscription callack while bootstrapping", "[sync][flx][async-open]") {
+    std::mutex mutex_task_completed;
+    std::condition_variable cv;
+    bool task_completed = false;
+    bool subscription_filler_called = false;
+    FLXSyncTestHarness harness("flx_bootstrap_batching", {g_large_array_schema, {"queryable_int_field"}});
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+    auto subscription_callback = [&](std::shared_ptr<Realm> realm) -> std::vector<Query> {
+        REQUIRE(realm);
+        auto table = realm->read_group().get_table("class_TopLevel");
+        Query query(table);
+        subscription_filler_called = true;
+        return {query};
+    };
+    config.sync_config->subscription_initializer = subscription_callback;
+    config.sync_config->always_run = true;
+    auto async_open = Realm::get_synchronized_realm(config);
+    async_open->start([&](ThreadSafeReference realm_ref, std::exception_ptr err) {
+        REQUIRE(!err);
+        SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
+        REQUIRE(realm);
+        task_completed = true;
+        cv.notify_one();
+    });
+
+    std::unique_lock<std::mutex> lock(mutex_task_completed);
+    cv.wait(lock, [&] {
+        return task_completed;
+    });
+    REQUIRE(subscription_filler_called);
+    REQUIRE(task_completed);
 }
 
 

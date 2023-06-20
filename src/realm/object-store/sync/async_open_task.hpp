@@ -53,6 +53,11 @@ public:
     void unregister_download_progress_notifier(uint64_t token) REQUIRES(!m_mutex);
 
 private:
+    using Callback = util::UniqueFunction<void(ThreadSafeReference, std::exception_ptr)>;
+    void handle_realm_async_open(Callback&& callback, std::shared_ptr<_impl::RealmCoordinator> coordinator,
+                                 Status status);
+
+private:
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator GUARDED_BY(m_mutex);
     std::shared_ptr<SyncSession> m_session GUARDED_BY(m_mutex);
     std::vector<uint64_t> m_registered_callbacks GUARDED_BY(m_mutex);

@@ -33,6 +33,58 @@ AsyncOpenTask::AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinato
 {
 }
 
+void AsyncOpenTask::handle_realm_async_open(Callback&& callback, std::shared_ptr<_impl::RealmCoordinator> coordinator,
+                                            Status status)
+{
+    if (!status.is_ok())
+        return callback({}, std::make_exception_ptr(Exception(status)));
+
+    ThreadSafeReference realm;
+    try {
+        realm = coordinator->get_unbound_realm();
+    }
+    catch (...) {
+        return callback({}, std::current_exception());
+    }
+
+    const auto& config = coordinator->get_config();
+    if (config.sync_config && config.sync_config->flx_sync_requested) {
+        using namespace sync;
+        const auto subscription_initializer = config.sync_config->subscription_initializer;
+        const auto always_run = config.sync_config->always_run;
+        if (subscription_initializer && always_run) {
+
+            auto shared_realm = Realm::get_shared_realm(std::move(realm));
+            const auto& queries = subscription_initializer(shared_realm);
+            auto subscription = shared_realm->get_latest_subscription_set();
+            auto mutable_subscription = subscription.make_mutable_copy();
+            for (auto&& q : queries)
+                mutable_subscription.insert_or_assign(q);
+            auto committed_subscription = mutable_subscription.commit();
+
+            committed_subscription.get_state_change_notification(SubscriptionSet::State::Complete)
+                .get_async([callback = std::move(callback),
+                            coordinator](StatusWith<realm::sync::SubscriptionSet::State> state) {
+                    try {
+                        if (state.is_ok()) {
+                            callback(coordinator->get_unbound_realm(), nullptr);
+                        }
+                        else {
+                            callback(coordinator->get_unbound_realm(),
+                                     std::make_exception_ptr(Exception(state.get_status())));
+                        }
+                    }
+                    catch (...) {
+                        callback({}, std::current_exception());
+                    }
+                });
+        }
+        else {
+            callback(std::move(realm), nullptr);
+        }
+    }
+}
+
 void AsyncOpenTask::start(util::UniqueFunction<void(ThreadSafeReference, std::exception_ptr)> callback)
 {
     util::CheckedUniqueLock lock(m_mutex);
@@ -56,42 +108,7 @@ void AsyncOpenTask::start(util::UniqueFunction<void(ThreadSafeReference, std::ex
             // Hold on to the coordinator until after we've called the callback
             coordinator = std::move(m_coordinator);
         }
-
-        if (!status.is_ok())
-            return callback({}, std::make_exception_ptr(Exception(status)));
-
-        ThreadSafeReference realm;
-        try {
-            realm = coordinator->get_unbound_realm();
-        }
-        catch (...) {
-            return callback({}, std::current_exception());
-        }
-
-        const auto& config = coordinator->get_config();
-        if (config.sync_config && config.sync_config->flx_sync_requested) {
-            using namespace sync;
-            const auto subscription_initializer = config.sync_config->subscription_initializer;
-            const auto always_run = config.sync_config->always_run;
-            if (subscription_initializer && always_run) {
-                auto subscription = subscription_initializer(std::move(realm));
-                subscription->make_mutable_copy().commit();
-                subscription->get_state_change_notification(
-                    SubscriptionSet::State::Complete,
-                    [&](util::Optional<SubscriptionSet::State> state, util::Optional<Status> status) {
-                        if (status && status->is_ok()) {
-                            if (state && *state == SubscriptionSet::State::Complete) {
-                                // subscription has now completed.
-                                // Invoke the callback for notify that we are done.
-                                callback(std::move(realm), nullptr);
-                            }
-                        }
-                    });
-            }
-        }
-        else {
-            callback(std::move(realm), nullptr);
-        }
+        self->handle_realm_async_open(std::move(const_cast<Callback&>(callback)), coordinator, status);
     });
 
     session->revive_if_needed();
