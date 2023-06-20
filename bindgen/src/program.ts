@@ -23,11 +23,12 @@ import path from "path";
 
 import { debug, enableDebugging } from "./debug";
 import { generate } from "./generator";
-import { InvalidSpecError, parseSpecs } from "./spec";
+import { OptInSpec, InvalidSpecError, parseOptInSpec, parseSpecs } from "./spec";
 import { Template, importTemplate } from "./templates";
 
 type GenerateOptions = {
   spec: ReadonlyArray<string>;
+  optIn?: string;
   template: Promise<Template>;
   output: string;
   debug: boolean;
@@ -67,11 +68,18 @@ const specOption = program
   .argParser((arg, previous: ReadonlyArray<string> = []) => [...previous, parseExistingFilePath(arg)])
   .makeOptionMandatory();
 
+/**
+ * If provided (and once `BoundSpec.applyOptInList()` has been invoked by the SDK),
+ * the methods and fields on the `BoundSpec` that also appear in the opt-in list
+ * will have the property `isOptedInTo = true`, otherwise it will be set to `false`.
+ */
+const optInOption = program
+  .createOption("--opt-in <opt-in list>", "Path of the 'opt-in list' specification")
+  .argParser(parseExistingFilePath);
+
 const templateOption = program
   .createOption("-t, --template <template>", "Path to template source file to apply when generating")
-  .argParser((name) => {
-    return importTemplate(name);
-  })
+  .argParser(importTemplate)
   .makeOptionMandatory();
 
 const outputOption = program
@@ -84,18 +92,23 @@ const debugOption = program.createOption("-d, --debug", "Turn on debug printing"
 program
   .command("generate", { isDefault: true })
   .addOption(specOption)
+  .addOption(optInOption)
   .addOption(templateOption)
   .addOption(outputOption)
   .addOption(debugOption)
   .action(async (args: GenerateOptions) => {
-    const { spec: specPaths, template, output: outputPath, debug: isDebugging } = args;
+    const { spec: specPaths, optIn: optInPath, template, output: outputPath, debug: isDebugging } = args;
     if (isDebugging) {
       enableDebugging();
       debug("Debugging enabled");
     }
     try {
-      const spec = parseSpecs(specPaths);
-      generate({ spec, template: await template, outputPath });
+      const rawSpec = parseSpecs(specPaths);
+      let optInSpec: OptInSpec | undefined;
+      if (optInPath) {
+        optInSpec = parseOptInSpec(optInPath);
+      }
+      generate({ rawSpec, optInSpec, template: await template, outputPath });
       process.exit(0);
     } catch (err) {
       printError(err);

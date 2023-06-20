@@ -34,6 +34,42 @@ export type Spec = ReplaceFields<
   }
 >;
 
+/**
+ * @example
+ * // Spec/yaml file example:
+ * records:
+ *   Property:
+ *     fields:
+ *       - name
+ *       - public_name
+ *       - type
+ *   ObjectSchema:
+ *     fields:
+ *       - name
+ *       - persisted_properties
+ *       - computed_properties
+ *
+ * classes:
+ *   Results:
+ *     methods:
+ *       - from_table
+ *       - is_valid
+ *       - sort_by_names
+ *   Realm:
+ *     methods:
+ *       - get_shared_realm
+ *       - config
+ *       - begin_transaction
+ */
+export type OptInSpec = {
+  classes?: {
+    [name: string]: { methods: string[] };
+  };
+  records?: {
+    [name: string]: { fields: string[] };
+  };
+};
+
 type AdditionalSpec = ReplaceFields<
   Spec,
   {

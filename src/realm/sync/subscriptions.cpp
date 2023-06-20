@@ -901,35 +901,6 @@ void SubscriptionStore::supercede_prior_to(TransactionRef tr, int64_t version_id
     remove_query.remove();
 }
 
-void SubscriptionStore::supercede_all_except(MutableSubscriptionSet& mut_sub) const
-{
-    auto version_to_keep = mut_sub.version();
-    supercede_prior_to(mut_sub.m_tr, version_to_keep);
-
-    std::list<SubscriptionStore::NotificationRequest> to_finish;
-    std::unique_lock<std::mutex> lk(m_pending_notifications_mutex);
-    m_pending_notifications_cv.wait(lk, [&] {
-        return m_outstanding_requests == 0;
-    });
-    for (auto it = m_pending_notifications.begin(); it != m_pending_notifications.end();) {
-        if (it->version != version_to_keep) {
-            to_finish.splice(to_finish.end(), m_pending_notifications, it++);
-        }
-        else {
-            ++it;
-        }
-    }
-
-    REALM_ASSERT_EX(version_to_keep >= m_min_outstanding_version, version_to_keep, m_min_outstanding_version);
-    m_min_outstanding_version = version_to_keep;
-
-    lk.unlock();
-
-    for (auto& req : to_finish) {
-        req.promise.emplace_value(SubscriptionSet::State::Superseded);
-    }
-}
-
 MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSet& set) const
 {
     auto new_tr = m_db->start_write();

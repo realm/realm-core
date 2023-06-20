@@ -5040,6 +5040,7 @@ TEST(Parser_DictionaryObjects)
 
     Obj adam = persons->create_object_with_primary_key("adam");
     Obj bernie = persons->create_object_with_primary_key("bernie");
+    Obj charlie = persons->create_object_with_primary_key("charlie");
 
     Obj astro = dogs->create_object_with_primary_key("astro", {{col_age, 4}});
     Obj pluto = dogs->create_object_with_primary_key("pluto", {{col_age, 5}});
@@ -5055,17 +5056,55 @@ TEST(Parser_DictionaryObjects)
     bernie_pets.insert("dog1", astro);
     bernie_pets.insert("dog2", snoopy);
 
+    auto charlie_pets = charlie.get_dictionary(col_dict);
+    charlie_pets.insert("dog1", pluto);
+
     adam.set(col_friend, bernie.get_key());
     bernie.set(col_friend, adam.get_key());
 
     auto q = persons->link(col_dict).column<Int>(col_age) > 4;
-    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.count(), 2);
     q = persons->link(col_friend).link(col_dict).column<Int>(col_age) > 4;
     CHECK_EQUAL(q.count(), 1);
 
-    verify_query(test_context, persons, "pets.@values.age > 4", 1);
-    verify_query(test_context, persons, "pets.@values == obj('dog', 'pluto')", 1);
-    verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'pluto'), obj('dog', 'astro') }", 2);
+    verify_query(test_context, persons, "pets.@values.age > 4", 2);
+    verify_query(test_context, persons, "pets.@values == obj('dog', 'pluto')", 2);
+    verify_query(test_context, persons, "pets.@values != obj('dog', 'pluto')", 2);
+    verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'lady'), obj('dog', 'astro') }", 2);
+    verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'astro'), NULL }", 2);
+}
+
+TEST(Parser_DictionarySorting)
+{
+    Group g;
+    auto dogs = g.add_table_with_primary_key("dog", type_String, "name");
+    auto col_meta = dogs->add_column_dictionary(type_Int, "meta");
+
+    Obj astro = dogs->create_object_with_primary_key("astro");
+    Obj pluto = dogs->create_object_with_primary_key("pluto");
+    Obj lady = dogs->create_object_with_primary_key("lady");
+    Obj snoopy = dogs->create_object_with_primary_key("snoopy");
+    Obj scooby = dogs->create_object_with_primary_key("scooby");
+
+    astro.get_dictionary(col_meta).insert("age", 4);
+    pluto.get_dictionary(col_meta).insert("age", 5);
+    lady.get_dictionary(col_meta).insert("age", 6);
+    snoopy.get_dictionary(col_meta).insert("age", 7);
+    scooby.get_dictionary(col_meta).insert("age", 7);
+
+    auto results = get_sorted_view(dogs, "TRUEPREDICATE SORT(meta[\"age\"] ASC) DISTINCT(meta['age'])");
+    CHECK_EQUAL(results.size(), 4);
+    CHECK_EQUAL(results.get_object(0).get_key(), astro.get_key());
+    CHECK_EQUAL(results.get_object(1).get_key(), pluto.get_key());
+    CHECK_EQUAL(results.get_object(2).get_key(), lady.get_key());
+    CHECK_EQUAL(results.get_object(3).get_key(), snoopy.get_key());
+
+    results = get_sorted_view(dogs, "TRUEPREDICATE SORT(meta[\"age\"] DESC) DISTINCT(meta['age'])");
+    CHECK_EQUAL(results.size(), 4);
+    CHECK_EQUAL(results.get_object(0).get_key(), snoopy.get_key());
+    CHECK_EQUAL(results.get_object(1).get_key(), lady.get_key());
+    CHECK_EQUAL(results.get_object(2).get_key(), pluto.get_key());
+    CHECK_EQUAL(results.get_object(3).get_key(), astro.get_key());
 }
 
 TEST_TYPES(Parser_DictionaryAggregates, Prop<float>, Prop<double>, Prop<Decimal128>)
@@ -5732,7 +5771,8 @@ TEST(Parser_Geospatial)
 
     Geospatial box{GeoBox{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}}};
     Geospatial circle{GeoCircle{1, GeoPoint{0.3, 0.3}}};
-    Geospatial polygon{GeoPolygon{{GeoPoint{0, 0}, GeoPoint{1, 0}, GeoPoint{1, 1}, GeoPoint{0, 1}, GeoPoint{0, 0}}}};
+    Geospatial polygon{
+        GeoPolygon{{{GeoPoint{0, 0}, GeoPoint{1, 0}, GeoPoint{1, 1}, GeoPoint{0, 1}, GeoPoint{0, 0}}}}};
     Geospatial invalid;
     Geospatial point{GeoPoint{0, 0}};
     std::vector<Mixed> args = {Mixed{&box},          Mixed{&circle}, Mixed{&polygon}, Mixed{&invalid},

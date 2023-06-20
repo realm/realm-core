@@ -105,6 +105,9 @@ public:
     // Find links that point to specific target objects
     Query& links_to(ColKey column_key, const std::vector<ObjKey>& target_obj);
 
+    // Find links that does not point to specific target objects
+    Query& not_links_to(ColKey column_key, const std::vector<ObjKey>& target_obj);
+
     // Conditions: null
     Query& equal(ColKey column_key, null);
     Query& not_equal(ColKey column_key, null);

@@ -670,7 +670,7 @@ tasks:
                 export DEVELOPER_DIR="${xcode_developer_dir}"
             fi
 
-            ./evergreen/install_baas.sh -w ./baas-work-dir -b df5aafd817ba377744d32976c15b175c9b68685a 2>&1 | tee install_baas_output.log
+            ./evergreen/install_baas.sh -w ./baas-work-dir -b 2e23bf2f77d85f3e2fbe07e1c448e4d1cafa3a10 2>&1 | tee install_baas_output.log
         fi
 
   - command: shell.exec

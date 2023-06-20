@@ -2776,6 +2776,14 @@ DBRef DB::create(std::unique_ptr<Replication> repl, const DBOptions& options) NO
     return retval;
 }
 
+DBRef DB::create_in_memory(std::unique_ptr<Replication> repl, const std::string& in_memory_path,
+                           const DBOptions& options) NO_THREAD_SAFETY_ANALYSIS
+{
+    DBRef db = create(std::move(repl), options);
+    db->m_db_path = in_memory_path;
+    return db;
+}
+
 DBRef DB::create(BinaryData buffer, bool take_ownership) NO_THREAD_SAFETY_ANALYSIS
 {
     DBOptions options;

@@ -16,12 +16,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-import { Spec } from "./spec";
+import { OptInSpec, Spec } from "./spec";
 import { Template } from "./templates";
+import { bindModel } from "./bound-model";
 import { createOutputDirectory } from "./output-directory";
 
 type GenerateOptions = {
-  spec: Spec;
+  rawSpec: Spec;
+  optInSpec?: OptInSpec;
   template: Template;
   outputPath: string;
 };
@@ -31,12 +33,13 @@ type GenerateOptions = {
  *
  * @param options The spec to generate from, the template to apply and the path of the directory to write output
  */
-export function generate({ spec, template, outputPath }: GenerateOptions): void {
+export function generate({ rawSpec, optInSpec, template, outputPath }: GenerateOptions): void {
   // Apply the template
   const outputDirectory = createOutputDirectory(outputPath);
   try {
     template({
-      spec,
+      rawSpec,
+      spec: bindModel(rawSpec, optInSpec),
       file: outputDirectory.file.bind(outputDirectory),
     });
   } finally {

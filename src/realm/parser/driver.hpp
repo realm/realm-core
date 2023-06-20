@@ -191,6 +191,9 @@ public:
     {
         target_table = table_name.substr(1, table_name.size() - 2);
     }
+
+    std::unique_ptr<ConstantMixedList> copy_list_of_args(std::vector<Mixed>&);
+    std::unique_ptr<Subexpr> copy_arg(ParserDriver*, DataType, size_t, DataType, std::string&);
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
     util::Optional<ExpressionComparisonType> m_comp_type;
     std::string target_table;
@@ -529,7 +532,7 @@ public:
 class DescriptorNode : public ParserNode {
 public:
     enum Type { SORT, DISTINCT, LIMIT };
-    std::vector<std::vector<std::string>> columns;
+    std::vector<std::vector<PathElem>> columns;
     std::vector<bool> ascending;
     size_t limit = size_t(-1);
     Type type;
@@ -551,9 +554,7 @@ public:
     void add(PathNode* path)
     {
         auto& vec = columns.emplace_back();
-        for (PathElem& e : path->path_elems) {
-            vec.push_back(e.id);
-        }
+        vec = std::move(path->path_elems);
     }
     void add(PathNode* path, bool direction)
     {
