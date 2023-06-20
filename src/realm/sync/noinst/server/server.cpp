@@ -105,6 +105,11 @@ namespace {
 
 enum class SchedStatus { done = 0, pending, in_progress };
 
+// Only used by the Sync Server to support older pbs sync clients (prior to protocol v8)
+constexpr std::string_view get_old_pbs_websocket_protocol_prefix() noexcept
+{
+    return "com.mongodb.realm-sync/";
+}
 
 std::string short_token_fmt(const std::string& str, size_t cutoff = 30)
 {
@@ -201,8 +206,8 @@ public:
     Formatter formatter;
     OutputBuffer download_message;
 
-    using ProtocolVersions = std::vector<std::pair<std::string_view, ProtocolVersionRange>>;
-    ProtocolVersions protocol_version_ranges;
+    using ProtocolVersionRanges = std::vector<ProtocolVersionRange>;
+    ProtocolVersionRanges protocol_version_ranges;
 
     std::vector<char> compress;
 
@@ -1672,8 +1677,8 @@ private:
         // Figure out whether there are any protocol versions supported by both
         // the client and the server, and if so, choose the newest one of them.
         MiscBuffers& misc_buffers = m_server.get_misc_buffers();
-        using ProtocolVersions = MiscBuffers::ProtocolVersions;
-        ProtocolVersions& protocol_version_ranges = misc_buffers.protocol_version_ranges;
+        using ProtocolVersionRanges = MiscBuffers::ProtocolVersionRanges;
+        ProtocolVersionRanges& protocol_version_ranges = misc_buffers.protocol_version_ranges;
         {
             protocol_version_ranges.clear();
             util::MemoryInputStream in;
@@ -1684,32 +1689,15 @@ private:
                 value = *sec_websocket_protocol;
             HttpListHeaderValueParser parser{value};
             std::string_view elem;
-            // Support the new (with '#') and old (with '/') protocol prefix strings
-            std::vector<std::string_view> prefixes = {get_pbs_websocket_protocol_prefix(),
-                                                      get_old_pbs_websocket_protocol_prefix()};
-            std::string_view last_prefix;
-            auto check_prefix = [&prefixes, &last_prefix](std::string_view elem) -> std::optional<std::string_view> {
-                // Start by trying to find the last match, since the prefixes shouldn't change within the same request
-                if (!last_prefix.empty()) {
-                    if (elem.size() >= last_prefix.size() &&
-                        std::equal(elem.data(), elem.data() + last_prefix.size(), last_prefix.data())) {
-                        return last_prefix;
-                    }
-                }
-                for (auto prefix : prefixes) {
-                    // FIXME: Use std::string_view::begins_with() in C++20.
-                    if (elem.size() >= prefix.size() &&
-                        std::equal(elem.data(), elem.data() + prefix.size(), prefix.data())) {
-                        last_prefix = prefix;
-                        return prefix;
-                    }
-                }
-                return std::nullopt;
-            };
-
             while (parser.next(elem)) {
-                auto prefix = check_prefix(elem);
-                if (prefix) {
+                // FIXME: Use std::string_view::begins_with() in C++20.
+                const StringData protocol{elem};
+                std::string_view prefix;
+                if (protocol.begins_with(get_pbs_websocket_protocol_prefix()))
+                    prefix = get_pbs_websocket_protocol_prefix();
+                else if (protocol.begins_with(get_old_pbs_websocket_protocol_prefix()))
+                    prefix = get_old_pbs_websocket_protocol_prefix();
+                if (!prefix.empty()) {
                     auto parse_version = [&](std::string_view str) {
                         in.set_buffer(str.data(), str.data() + str.size());
                         int version = 0;
@@ -1719,7 +1707,7 @@ private:
                         return -1;
                     };
                     int min, max;
-                    std::string_view range = elem.substr(prefix->size());
+                    std::string_view range = elem.substr(prefix.size());
                     auto i = range.find('-');
                     if (i != std::string_view::npos) {
                         min = parse_version(range.substr(0, i));
@@ -1730,7 +1718,7 @@ private:
                         max = min;
                     }
                     if (REALM_LIKELY(min >= 0 && max >= 0 && min <= max)) {
-                        protocol_version_ranges.emplace_back(*prefix, std::make_pair(min, max)); // Throws
+                        protocol_version_ranges.emplace_back(min, max); // Throws
                         continue;
                     }
                     logger.error("Protocol version negotiation failed: Client sent malformed "
@@ -1754,18 +1742,14 @@ private:
             }
         }
         int negotiated_protocol_version = 0;
-        // Match the protocol version prefix sent by the client in the response from the server
-        std::string_view negotiated_protocol_prefix = get_pbs_websocket_protocol_prefix();
         {
             ProtocolVersionRange server_range = m_server.get_protocol_version_range();
             int server_min = server_range.first;
             int server_max = server_range.second;
             int best_match = 0;
-            std::string_view best_match_prefix;
             int overall_client_min = std::numeric_limits<int>::max();
             int overall_client_max = std::numeric_limits<int>::min();
-            for (const auto& prefix_range : protocol_version_ranges) {
-                auto range = prefix_range.second;
+            for (const auto& range : protocol_version_ranges) {
                 int client_min = range.first;
                 int client_max = range.second;
                 if (client_max >= server_min && client_min <= server_max) {
@@ -1773,7 +1757,6 @@ private:
                     int version = std::min(client_max, server_max);
                     if (version > best_match) {
                         best_match = version;
-                        best_match_prefix = prefix_range.first;
                     }
                 }
                 if (client_min < overall_client_min)
@@ -1795,10 +1778,9 @@ private:
                     elaboration = "Client is too new for server";
                     identifier_hint = "CLIENT_TOO_NEW";
                 }
-                auto format_ranges = [&](const ProtocolVersions& list) {
+                auto format_ranges = [&](const auto& list) {
                     bool nonfirst = false;
-                    for (auto prefix_range : list) {
-                        auto range = prefix_range.second;
+                    for (auto range : list) {
                         if (nonfirst)
                             formatter << ", "; // Throws
                         int min = range.first, max = range.second;
@@ -1809,6 +1791,7 @@ private:
                         nonfirst = true;
                     }
                 };
+                using Range = ProtocolVersionRange;
                 formatter.reset();
                 format_ranges(protocol_version_ranges); // Throws
                 logger.error("Protocol version negotiation failed: %1 "
@@ -1819,7 +1802,7 @@ private:
                              ""
                           << elaboration << ".\n\n";                                   // Throws
                 formatter << "Server supports: ";                                      // Throws
-                format_ranges({{"", {server_min, server_max}}});                       // Throws
+                format_ranges(std::initializer_list<Range>{{server_min, server_max}}); // Throws
                 formatter << "\n";                                                     // Throws
                 formatter << "Client supports: ";                                      // Throws
                 format_ranges(protocol_version_ranges);                                // Throws
@@ -1832,17 +1815,18 @@ private:
                 return;
             }
             negotiated_protocol_version = best_match;
-            negotiated_protocol_prefix = best_match_prefix;
-            logger.debug("Received: Sync HTTP request (negotiated_protocol_version=%1, prefix='%2')",
-                         negotiated_protocol_version, negotiated_protocol_prefix); // Throws
+            logger.debug("Received: Sync HTTP request (negotiated_protocol_version=%1)",
+                         negotiated_protocol_version); // Throws
             formatter.reset();
         }
 
         std::string sec_websocket_protocol_2;
         {
+            std::string_view prefix = negotiated_protocol_version < 8 ? get_old_pbs_websocket_protocol_prefix()
+                                                                      : get_pbs_websocket_protocol_prefix();
             std::ostringstream out;
             out.imbue(std::locale::classic());
-            out << negotiated_protocol_prefix << negotiated_protocol_version; // Throws
+            out << prefix << negotiated_protocol_version; // Throws
             sec_websocket_protocol_2 = std::move(out).str();
         }
 
