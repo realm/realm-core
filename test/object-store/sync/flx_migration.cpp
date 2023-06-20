@@ -874,10 +874,7 @@ TEST_CASE("Async open + client reset", "[flx][migration][baas]") {
         REQUIRE(locally_added_table->size() == 0);
         auto sync_session = realm->sync_session();
         REQUIRE(sync_session);
-        auto sub_store = sync_session->get_flx_subscription_store();
-        REQUIRE(sub_store);
-        sub_store->get_latest().get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
-        realm->close();
+        sync_session->shutdown_and_wait();
     }
 
     SECTION("initial state") {
@@ -916,10 +913,7 @@ TEST_CASE("Async open + client reset", "[flx][migration][baas]") {
             REQUIRE(locally_added_table->size() == 0);
             auto sync_session = realm->sync_session();
             REQUIRE(sync_session);
-            auto sub_store = sync_session->get_flx_subscription_store();
-            REQUIRE(sub_store);
-            sub_store->get_latest().get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
-            realm->close();
+            sync_session->shutdown_and_wait();
         }
     }
 }
