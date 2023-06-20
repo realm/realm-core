@@ -90,10 +90,12 @@ TestFile::~TestFile()
 {
     if (!m_persist) {
         try {
+            util::Logger::get_default_logger()->detail("~TestFile() removing '%1' and '%2'", path, m_temp_dir);
             util::File::try_remove(path);
             util::try_remove_dir_recursive(m_temp_dir);
         }
-        catch (...) {
+        catch (const std::exception& e) {
+            util::Logger::get_default_logger()->warn("~TestFile() cleanup failed for '%1': %2", path, e.what());
             // clean up is best effort, ignored.
         }
     }
