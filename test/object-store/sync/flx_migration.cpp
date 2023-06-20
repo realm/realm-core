@@ -822,10 +822,11 @@ TEST_CASE("Async open + client reset", "[flx][migration][baas]") {
     size_t num_before_reset_notifications = 0;
     size_t num_after_reset_notifications = 0;
     auto server_app_config = minimal_app_config(base_url, "async_open_during_migration", mig_schema);
+    std::unique_ptr<SyncTestFile> config;
     TestAppSession session(create_app(server_app_config));
-    SyncTestFile config(session.app(), partition, server_app_config.schema);
-    config.sync_config->client_resync_mode = ClientResyncMode::Recover;
-    config.sync_config->notify_before_client_reset = [&](SharedRealm before) {
+    config = std::make_unique<SyncTestFile>(session.app(), partition, server_app_config.schema);
+    config->sync_config->client_resync_mode = ClientResyncMode::Recover;
+    config->sync_config->notify_before_client_reset = [&](SharedRealm before) {
         logger_ptr->debug("notify_before_client_reset");
         REQUIRE(before);
         REQUIRE(before->is_frozen());
@@ -833,8 +834,8 @@ TEST_CASE("Async open + client reset", "[flx][migration][baas]") {
         CHECK(table);
         ++num_before_reset_notifications;
     };
-    config.sync_config->notify_after_client_reset = [&](SharedRealm before, ThreadSafeReference after_ref,
-                                                        bool did_recover) {
+    config->sync_config->notify_after_client_reset = [&](SharedRealm before, ThreadSafeReference after_ref,
+                                                         bool did_recover) {
         logger_ptr->debug("notify_after_client_reset");
         CHECK(did_recover);
         REQUIRE(before);
@@ -851,12 +852,13 @@ TEST_CASE("Async open + client reset", "[flx][migration][baas]") {
         // Migrate to FLX
         trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
         shared_object.persisted_properties.push_back({"oid_field", PropertyType::ObjectId | PropertyType::Nullable});
-        config.schema = {shared_object, ObjectSchema("LocallyAdded",
-                                                     {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                                                      {"string_field", PropertyType::String | PropertyType::Nullable},
-                                                      {"realm_id", PropertyType::String | PropertyType::Nullable}})};
+        config->schema = {
+            shared_object,
+            ObjectSchema("LocallyAdded", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                          {"string_field", PropertyType::String | PropertyType::Nullable},
+                                          {"realm_id", PropertyType::String | PropertyType::Nullable}})};
 
-        auto [ref, error] = async_open_realm(config);
+        auto [ref, error] = async_open_realm(*config);
         REQUIRE(ref);
         REQUIRE_FALSE(error);
 
@@ -870,15 +872,18 @@ TEST_CASE("Async open + client reset", "[flx][migration][baas]") {
         auto locally_added_table = realm->read_group().get_table("class_LocallyAdded");
         REQUIRE(locally_added_table);
         REQUIRE(locally_added_table->size() == 0);
-        wait_for_upload(*realm);
-        wait_for_download(*realm);
+        auto sync_session = realm->sync_session();
+        REQUIRE(sync_session);
+        auto sub_store = sync_session->get_flx_subscription_store();
+        REQUIRE(sub_store);
+        sub_store->get_latest().get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         realm->close();
     }
 
     SECTION("initial state") {
         {
-            config.schema = {shared_object};
-            auto realm = Realm::get_shared_realm(config);
+            config->schema = {shared_object};
+            auto realm = Realm::get_shared_realm(*config);
             realm->begin_transaction();
             auto table = realm->read_group().get_table("class_Object");
             table->create_object_with_primary_key(ObjectId::gen());
@@ -889,13 +894,13 @@ TEST_CASE("Async open + client reset", "[flx][migration][baas]") {
         {
             shared_object.persisted_properties.push_back(
                 {"oid_field", PropertyType::ObjectId | PropertyType::Nullable});
-            config.schema = {
+            config->schema = {
                 shared_object,
                 ObjectSchema("LocallyAdded", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                               {"string_field", PropertyType::String | PropertyType::Nullable},
                                               {"realm_id", PropertyType::String | PropertyType::Nullable}})};
 
-            auto [ref, error] = async_open_realm(config);
+            auto [ref, error] = async_open_realm(*config);
             REQUIRE(ref);
             REQUIRE_FALSE(error);
 
@@ -909,8 +914,11 @@ TEST_CASE("Async open + client reset", "[flx][migration][baas]") {
             auto locally_added_table = realm->read_group().get_table("class_LocallyAdded");
             REQUIRE(locally_added_table);
             REQUIRE(locally_added_table->size() == 0);
-            wait_for_upload(*realm);
-            wait_for_download(*realm);
+            auto sync_session = realm->sync_session();
+            REQUIRE(sync_session);
+            auto sub_store = sync_session->get_flx_subscription_store();
+            REQUIRE(sub_store);
+            sub_store->get_latest().get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
             realm->close();
         }
     }
