@@ -225,7 +225,8 @@ struct SyncConfig {
 
     bool simulate_integration_error = false;
 
-    std::shared_ptr<realm::sync::SubscriptionSet> init_subscription = nullptr;
+    using SubscriptionSetPtr = std::shared_ptr<realm::sync::SubscriptionSet>;
+    std::function<SubscriptionSetPtr(ThreadSafeReference)> subscription_initializer{nullptr};
     bool always_run = false;
 
     SyncConfig() = default;

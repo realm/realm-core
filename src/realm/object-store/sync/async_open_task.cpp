@@ -68,17 +68,14 @@ void AsyncOpenTask::start(util::UniqueFunction<void(ThreadSafeReference, std::ex
             return callback({}, std::current_exception());
         }
 
-        // TODO: add a config param to guard this
-        // before the to
-        // the file has been downloaded.
-        SharedRealm shared_realm = Realm::get_shared_realm(std::move(realm));
-        auto config = shared_realm->config();
-
+        const auto& config = coordinator->get_config();
         if (config.sync_config && config.sync_config->flx_sync_requested) {
             using namespace sync;
-            auto& subscription = config.sync_config->init_subscription;
-            auto& always_run = config.sync_config->always_run;
-            if (subscription && always_run) {
+            const auto subscription_initializer = config.sync_config->subscription_initializer;
+            const auto always_run = config.sync_config->always_run;
+            if (subscription_initializer && always_run) {
+                auto subscription = subscription_initializer(std::move(realm));
+                subscription->make_mutable_copy().commit();
                 subscription->get_state_change_notification(
                     SubscriptionSet::State::Complete,
                     [&](util::Optional<SubscriptionSet::State> state, util::Optional<Status> status) {
