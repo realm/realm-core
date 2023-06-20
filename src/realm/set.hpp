@@ -449,11 +449,6 @@ template <>
 void Set<ObjKey>::do_clear();
 
 template <>
-void Set<ObjLink>::do_insert(size_t, ObjLink);
-template <>
-void Set<ObjLink>::do_erase(size_t);
-
-template <>
 void Set<Mixed>::do_insert(size_t, Mixed);
 template <>
 void Set<Mixed>::do_erase(size_t);

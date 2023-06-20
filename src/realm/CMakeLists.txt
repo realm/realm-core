@@ -130,7 +130,6 @@ set(REALM_INSTALL_HEADERS
     array_string.hpp
     array_string_short.hpp
     array_timestamp.hpp
-    array_typed_link.hpp
     array_unsigned.hpp
     array_with_find.hpp
     binary_data.hpp

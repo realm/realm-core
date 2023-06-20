@@ -128,7 +128,6 @@ TEST(ToString_DataTypes)
     CHECK_ENUM(col_type_LinkList);
     CHECK_ENUM(col_type_BackLink);
     CHECK_ENUM(col_type_ObjectId);
-    CHECK_ENUM(col_type_TypedLink);
     CHECK_ENUM(col_type_UUID);
     CHECK_ENUM(col_type_OldStringEnum);
     CHECK_ENUM(col_type_OldTable);

@@ -409,12 +409,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
 
             auto visitor = util::overload{
                 [&](const ObjLink& link) {
-                    if (data_type == type_TypedLink) {
-                        REALM_ASSERT(dynamic_cast<Lst<ObjLink>*>(&list));
-                        auto& link_list = static_cast<Lst<ObjLink>&>(list);
-                        link_list.set(index, link);
-                    }
-                    else if (data_type == type_Mixed) {
+                    if (data_type == type_Mixed) {
                         REALM_ASSERT(dynamic_cast<Lst<Mixed>*>(&list));
                         auto& mixed_list = static_cast<Lst<Mixed>&>(list);
                         mixed_list.set(index, link);
@@ -712,12 +707,7 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
 
             auto inserter = util::overload{
                 [&](const ObjLink& link) {
-                    if (data_type == type_TypedLink) {
-                        REALM_ASSERT(dynamic_cast<Lst<ObjLink>*>(&list));
-                        auto& link_list = static_cast<Lst<ObjLink>&>(list);
-                        link_list.insert(index, link);
-                    }
-                    else if (data_type == type_Mixed) {
+                    if (data_type == type_Mixed) {
                         REALM_ASSERT(dynamic_cast<Lst<Mixed>*>(&list));
                         auto& mixed_list = static_cast<Lst<Mixed>&>(list);
                         mixed_list.insert(index, link);
@@ -1030,12 +1020,7 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
 
             auto inserter = util::overload{
                 [&](const ObjLink& link) {
-                    if (data_type == type_TypedLink) {
-                        REALM_ASSERT(dynamic_cast<Set<ObjLink>*>(&set));
-                        auto& link_set = static_cast<Set<ObjLink>&>(set);
-                        link_set.insert(link);
-                    }
-                    else if (data_type == type_Mixed) {
+                    if (data_type == type_Mixed) {
                         REALM_ASSERT(dynamic_cast<Set<Mixed>*>(&set));
                         auto& mixed_set = static_cast<Set<Mixed>&>(set);
                         mixed_set.insert(link);
@@ -1114,12 +1099,7 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
 
             auto inserter = util::overload{
                 [&](const ObjLink& link) {
-                    if (data_type == type_TypedLink) {
-                        REALM_ASSERT(dynamic_cast<Set<ObjLink>*>(&set));
-                        auto& link_set = static_cast<Set<ObjLink>&>(set);
-                        link_set.erase(link);
-                    }
-                    else if (data_type == type_Mixed) {
+                    if (data_type == type_Mixed) {
                         REALM_ASSERT(dynamic_cast<Set<Mixed>*>(&set));
                         auto& mixed_set = static_cast<Set<Mixed>&>(set);
                         mixed_set.erase(link);

@@ -79,7 +79,7 @@ void CollectionParent::set_backlink(ColKey col_key, ObjLink new_link) const
         auto target_table = t->get_parent_group()->get_table(new_link.get_table_key());
         ColKey backlink_col_key;
         auto type = col_key.get_type();
-        if (type == col_type_TypedLink || type == col_type_Mixed || col_key.is_dictionary()) {
+        if (type == col_type_Mixed || col_key.is_dictionary()) {
             // This may modify the target table
             backlink_col_key = target_table->find_or_add_backlink_column(col_key, t->get_key());
             // it is possible that this was a link to the same table and that adding a backlink column has
@@ -117,7 +117,7 @@ bool CollectionParent::remove_backlink(ColKey col_key, ObjLink old_link, Cascade
         TableRef target_table = target_obj.get_table();
         ColKey backlink_col_key;
         auto type = col_key.get_type();
-        if (type == col_type_TypedLink || type == col_type_Mixed || col_key.is_dictionary()) {
+        if (type == col_type_Mixed || col_key.is_dictionary()) {
             backlink_col_key = target_table->find_or_add_backlink_column(col_key, t->get_key());
         }
         else {
@@ -201,14 +201,12 @@ LstBasePtr CollectionParent::get_listbase_ptr(ColKey col_key) const
             else
                 return std::make_unique<Lst<UUID>>(col_key);
         }
-        case type_TypedLink: {
-            return std::make_unique<Lst<ObjLink>>(col_key);
-        }
         case type_Mixed: {
             return std::make_unique<Lst<Mixed>>(col_key, get_level() + 1);
         }
         case type_LinkList:
             return std::make_unique<LnkLst>(col_key);
+        case type_TypedLink:
         case type_Link:
             break;
     }
@@ -271,15 +269,13 @@ SetBasePtr CollectionParent::get_setbase_ptr(ColKey col_key) const
             else
                 return std::make_unique<Set<UUID>>(col_key);
         }
-        case type_TypedLink: {
-            return std::make_unique<Set<ObjLink>>(col_key);
-        }
         case type_Mixed: {
             return std::make_unique<Set<Mixed>>(col_key);
         }
         case type_Link: {
             return std::make_unique<LnkSet>(col_key);
         }
+        case type_TypedLink:
         case type_LinkList:
             break;
     }

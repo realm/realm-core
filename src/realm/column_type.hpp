@@ -42,7 +42,6 @@ struct ColumnType {
         LinkList = 13,
         BackLink = 14,
         ObjectId = 15,
-        TypedLink = 16,
         UUID = 17
     };
 
@@ -100,7 +99,6 @@ struct ColumnType {
             case Type::LinkList:
             case Type::BackLink:
             case Type::ObjectId:
-            case Type::TypedLink:
             case Type::UUID:
                 return true;
         }
@@ -123,7 +121,6 @@ static constexpr ColumnType col_type_Link = ColumnType{ColumnType::Type::Link};
 static constexpr ColumnType col_type_LinkList = ColumnType{ColumnType::Type::LinkList};
 static constexpr ColumnType col_type_BackLink = ColumnType{ColumnType::Type::BackLink};
 static constexpr ColumnType col_type_ObjectId = ColumnType{ColumnType::Type::ObjectId};
-static constexpr ColumnType col_type_TypedLink = ColumnType{ColumnType::Type::TypedLink};
 static constexpr ColumnType col_type_UUID = ColumnType{ColumnType::Type::UUID};
 
 // Deprecated column types that must still be handled in migration code, but not
@@ -256,8 +253,6 @@ constexpr inline ColumnType::operator util::Printable() const noexcept
             return "col_type_BackLink";
         case col_type_ObjectId:
             return "col_type_ObjectId";
-        case col_type_TypedLink:
-            return "col_type_TypedLink";
         case col_type_UUID:
             return "col_type_UUID";
     }

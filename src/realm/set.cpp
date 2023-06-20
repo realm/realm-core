@@ -26,7 +26,6 @@
 #include "realm/array_timestamp.hpp"
 #include "realm/array_decimal128.hpp"
 #include "realm/array_fixed_bytes.hpp"
-#include "realm/array_typed_link.hpp"
 #include "realm/array_mixed.hpp"
 #include "realm/replication.hpp"
 
@@ -136,29 +135,6 @@ void Set<ObjKey>::do_clear()
     }
 
     m_tree->set_context_flag(false);
-}
-
-template <>
-void Set<ObjLink>::do_insert(size_t ndx, ObjLink target_link)
-{
-    set_backlink(m_col_key, target_link);
-    m_tree->insert(ndx, target_link);
-}
-
-template <>
-void Set<ObjLink>::do_erase(size_t ndx)
-{
-    ObjLink old_link = get(ndx);
-    CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
-
-    bool recurse = remove_backlink(m_col_key, old_link, state);
-
-    m_tree->erase(ndx);
-
-    if (recurse) {
-        auto table = get_table_unchecked();
-        _impl::TableFriend::remove_recursive(*table, state); // Throws
-    }
 }
 
 template <>

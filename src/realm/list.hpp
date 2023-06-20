@@ -35,7 +35,6 @@
 #include <realm/array_fixed_bytes.hpp>
 #include <realm/array_decimal128.hpp>
 #include <realm/array_mixed.hpp>
-#include <realm/array_typed_link.hpp>
 #include <realm/replication.hpp>
 
 namespace realm {
@@ -656,15 +655,6 @@ template <>
 void Lst<ObjKey>::do_clear();
 
 extern template class Lst<ObjKey>;
-
-// Specialization of Lst<ObjLink>:
-template <>
-void Lst<ObjLink>::do_set(size_t, ObjLink);
-template <>
-void Lst<ObjLink>::do_insert(size_t, ObjLink);
-template <>
-void Lst<ObjLink>::do_remove(size_t);
-extern template class Lst<ObjLink>;
 
 // Extern template declarations for lists of primitives:
 extern template class Lst<int64_t>;

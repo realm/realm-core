@@ -539,7 +539,6 @@ std::unique_ptr<ArrayPayload> TwoColumnsNodeBase::update_cached_leaf_pointers_fo
             return std::make_unique<ArrayObjectIdNull>(alloc);
         case col_type_UUID:
             return std::make_unique<ArrayUUIDNull>(alloc);
-        case col_type_TypedLink:
         case col_type_BackLink:
         case col_type_LinkList:
             break;
@@ -615,11 +614,6 @@ size_t size_of_list_from_ref(ref_type ref, Allocator& alloc, ColumnType col_type
         }
         case col_type_LinkList: {
             BPlusTree<ObjKey> list(alloc);
-            list.init_from_ref(ref);
-            return list.size();
-        }
-        case col_type_TypedLink: {
-            BPlusTree<ObjLink> list(alloc);
             list.init_from_ref(ref);
             return list.size();
         }

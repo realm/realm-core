@@ -22,7 +22,6 @@
 #include "realm/array_key.hpp"
 #include "realm/array_integer.hpp"
 #include "realm/array_backlink.hpp"
-#include "realm/array_typed_link.hpp"
 #include "realm/array_timestamp.hpp"
 #include "realm/array_bool.hpp"
 #include "realm/array_string.hpp"
@@ -1166,13 +1165,6 @@ void ClusterTree::remove_all_links(CascadeState& state)
                                     cluster->do_remove_backlinks(origin_key, col_key, links.get_all(), state);
                                 }
                             }
-                            else if (col_type == col_type_TypedLink) {
-                                BPlusTree<ObjLink> links(alloc);
-                                links.init_from_ref(ref);
-                                if (links.size() > 0) {
-                                    cluster->do_remove_backlinks(origin_key, col_key, links.get_all(), state);
-                                }
-                            }
                             else if (col_type == col_type_Mixed) {
                                 BPlusTree<Mixed> mix_arr(alloc);
                                 mix_arr.init_from_ref(ref);
@@ -1221,17 +1213,6 @@ void ClusterTree::remove_all_links(CascadeState& state)
                         if (ObjKey key = values.get(i)) {
                             cluster->do_remove_backlinks(cluster->get_real_key(i), col_key, std::vector<ObjKey>{key},
                                                          state);
-                        }
-                    }
-                }
-                else if (col_type == col_type_TypedLink) {
-                    ArrayTypedLink values(alloc);
-                    cluster->init_leaf(col_key, &values);
-                    size_t sz = values.size();
-                    for (size_t i = 0; i < sz; i++) {
-                        if (ObjLink link = values.get(i)) {
-                            cluster->do_remove_backlinks(cluster->get_real_key(i), col_key,
-                                                         std::vector<ObjLink>{link}, state);
                         }
                     }
                 }

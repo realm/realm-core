@@ -28,7 +28,6 @@
 #include "realm/array_fixed_bytes.hpp"
 #include "realm/array_key.hpp"
 #include "realm/array_ref.hpp"
-#include "realm/array_typed_link.hpp"
 #include "realm/array_backlink.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/replication.hpp"
@@ -183,9 +182,6 @@ void Cluster::create()
             case col_type_Link:
                 do_create<ArrayKey>(col_key);
                 break;
-            case col_type_TypedLink:
-                do_create<ArrayTypedLink>(col_key);
-                break;
             case col_type_BackLink:
                 do_create<ArrayBacklink>(col_key);
                 break;
@@ -324,25 +320,6 @@ inline void Cluster::do_insert_mixed(size_t ndx, ColKey col_key, Mixed init_valu
     }
 }
 
-inline void Cluster::do_insert_link(size_t ndx, ColKey col_key, Mixed init_val, ObjKey origin_key)
-{
-    ObjLink target_link = init_val.is_null() ? ObjLink{} : init_val.get<ObjLink>();
-    ArrayTypedLink arr(m_alloc);
-    auto col_ndx = col_key.get_index();
-    arr.set_parent(this, col_ndx.val + s_first_col_index);
-    arr.init_from_parent();
-    arr.insert(ndx, target_link);
-
-    // Insert backlink if link is not null
-    if (target_link) {
-        Table* origin_table = const_cast<Table*>(m_tree_top.get_owning_table());
-        auto target_table = origin_table->get_parent_group()->get_table(target_link.get_table_key());
-
-        ColKey backlink_col_key = target_table->find_or_add_backlink_column(col_key, origin_table->get_key());
-        target_table->get_object(target_link.get_obj_key()).add_backlink(backlink_col_key, origin_key);
-    }
-}
-
 void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
 {
     // Ensure the cluster array is big enough to hold 64 bit values.
@@ -419,9 +396,6 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
                 break;
             case col_type_Link:
                 do_insert_key(ndx, col_key, init_value, ObjKey(k.value + get_offset()));
-                break;
-            case col_type_TypedLink:
-                do_insert_link(ndx, col_key, init_value, ObjKey(k.value + get_offset()));
                 break;
             case col_type_BackLink: {
                 ArrayBacklink arr(m_alloc);
@@ -512,9 +486,6 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 break;
             case col_type_Link:
                 do_move<ArrayKey>(ndx, col_key, new_leaf);
-                break;
-            case col_type_TypedLink:
-                do_move<ArrayTypedLink>(ndx, col_key, new_leaf);
                 break;
             case col_type_BackLink:
                 do_move<ArrayBacklink>(ndx, col_key, new_leaf);
@@ -637,9 +608,6 @@ void Cluster::insert_column(ColKey col_key)
             break;
         case col_type_Link:
             do_insert_column<ArrayKey>(col_key, nullable);
-            break;
-        case col_type_TypedLink:
-            do_insert_column<ArrayTypedLink>(col_key, nullable);
             break;
         case col_type_BackLink:
             do_insert_column<ArrayBacklink>(col_key, nullable);
@@ -860,17 +828,6 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                         do_remove_backlinks(ObjKey(key.value + m_offset), col_key, links.get_all(), state);
                     }
                 }
-                else if (col_type == col_type_TypedLink) {
-                    BPlusTree<ObjLink> links(m_alloc);
-                    links.init_from_ref(ref);
-                    for (size_t i = 0; i < links.size(); i++) {
-                        ObjLink link = links.get(i);
-                        auto target_obj = origin_table->get_parent_group()->get_object(link);
-                        ColKey backlink_col_key =
-                            target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
-                        target_obj.remove_one_backlink(backlink_col_key, ObjKey(key.value + m_offset));
-                    }
-                }
                 else if (col_type == col_type_Mixed) {
                     BPlusTree<Mixed> list(m_alloc);
                     list.init_from_ref(ref);
@@ -934,9 +891,6 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 break;
             case col_type_Link:
                 do_erase_key(ndx, col_key, state);
-                break;
-            case col_type_TypedLink:
-                do_erase<ArrayTypedLink>(ndx, col_key);
                 break;
             case col_type_BackLink:
                 if (state.m_mode == CascadeState::Mode::None) {

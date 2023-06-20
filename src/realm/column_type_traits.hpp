@@ -134,9 +134,7 @@ struct ColumnTypeTraits<Link> {
 
 template <>
 struct ColumnTypeTraits<ObjLink> {
-    using cluster_leaf_type = ArrayTypedLink;
     static constexpr const DataType id = type_TypedLink;
-    static constexpr const ColumnType column_id = col_type_TypedLink;
 };
 
 template <>

@@ -313,8 +313,8 @@ InterRealmValueConverter::InterRealmValueConverter(ConstTableRef src_table, ColK
     , m_dst_col(dst_col)
     , m_embedded_converter(ec)
     , m_is_embedded_link(false)
-    , m_primitive_types_only(!(src_col.get_type() == col_type_TypedLink || src_col.get_type() == col_type_Link ||
-                               src_col.get_type() == col_type_LinkList || src_col.get_type() == col_type_Mixed))
+    , m_primitive_types_only(!(src_col.get_type() == col_type_Link || src_col.get_type() == col_type_LinkList ||
+                               src_col.get_type() == col_type_Mixed))
 {
     if (!m_primitive_types_only) {
         REALM_ASSERT(src_table);
