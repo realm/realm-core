@@ -506,9 +506,6 @@ void Results::evaluate_query_if_needed(bool wants_notifications)
 template <>
 size_t Results::index_of(Obj const& obj)
 {
-    util::CheckedUniqueLock lock(m_mutex);
-    validate_read();
-    ensure_up_to_date();
     if (!obj.is_valid()) {
         throw StaleAccessor{"Attempting to access an invalid object"};
     }
@@ -517,36 +514,46 @@ size_t Results::index_of(Obj const& obj)
                               util::format("Object of type '%1' does not match Results type '%2'",
                                            obj.get_table()->get_class_name(), m_table->get_class_name()));
     }
-
-    switch (m_mode) {
-        case Mode::Empty:
-        case Mode::Table:
-            return m_table->get_object_ndx(obj.get_key());
-        case Mode::Collection:
-            return m_collection->find_any(obj.get_key());
-        case Mode::Query:
-        case Mode::TableView:
-            return m_table_view.find_by_source_ndx(obj.get_key());
-    }
-    REALM_COMPILER_HINT_UNREACHABLE();
+    return index_of(Mixed(obj.get_key()));
 }
 
-template <typename T>
-size_t Results::index_of(T const& value)
+template <>
+size_t Results::index_of(Mixed const& value)
 {
     util::CheckedUniqueLock lock(m_mutex);
     validate_read();
     ensure_up_to_date();
-    if (m_mode != Mode::Collection)
-        return not_found; // Non-Collection results can only ever contain Objects
-    if (m_list_indices) {
-        for (size_t i = 0; i < m_list_indices->size(); ++i) {
-            if (value == get_unwraped<T>(*m_collection, (*m_list_indices)[i]))
-                return i;
+
+    if (value.is_type(type_TypedLink)) {
+        if (m_table && m_table->get_key() != value.get_link().get_table_key()) {
+            return realm::not_found;
         }
-        return not_found;
     }
-    return m_collection->find_any(value);
+
+    switch (m_mode) {
+        case Mode::Empty:
+        case Mode::Table:
+            if (value.is_type(type_Link, type_TypedLink)) {
+                return m_table->get_object_ndx(value.get<ObjKey>());
+            }
+            break;
+        case Mode::Collection:
+            if (m_list_indices) {
+                for (size_t i = 0; i < m_list_indices->size(); ++i) {
+                    if (value == m_collection->get_any(m_list_indices->at(i)))
+                        return i;
+                }
+                return not_found;
+            }
+            return m_collection->find_any(value);
+        case Mode::Query:
+        case Mode::TableView:
+            if (value.is_type(type_Link, type_TypedLink)) {
+                return m_table_view.find_by_source_ndx(value.get<ObjKey>());
+            }
+            break;
+    }
+    return realm::not_found;
 }
 
 size_t Results::index_of(Query&& q)
@@ -1074,12 +1081,7 @@ ColKey Results::key(StringData name) const
 #define REALM_RESULTS_TYPE(T)                                                                                        \
     template T Results::get<T>(size_t);                                                                              \
     template util::Optional<T> Results::first<T>();                                                                  \
-    template util::Optional<T> Results::last<T>();                                                                   \
-    template size_t Results::index_of<T>(T const&);
-
-template Obj Results::get<Obj>(size_t);
-template util::Optional<Obj> Results::first<Obj>();
-template util::Optional<Obj> Results::last<Obj>();
+    template util::Optional<T> Results::last<T>();
 
 REALM_RESULTS_TYPE(bool)
 REALM_RESULTS_TYPE(int64_t)
@@ -1092,6 +1094,7 @@ REALM_RESULTS_TYPE(ObjectId)
 REALM_RESULTS_TYPE(Decimal)
 REALM_RESULTS_TYPE(UUID)
 REALM_RESULTS_TYPE(Mixed)
+REALM_RESULTS_TYPE(Obj)
 REALM_RESULTS_TYPE(util::Optional<bool>)
 REALM_RESULTS_TYPE(util::Optional<int64_t>)
 REALM_RESULTS_TYPE(util::Optional<float>)
