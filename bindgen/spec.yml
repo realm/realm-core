@@ -65,6 +65,7 @@ typeAliases:
   AppCredentialsToken: std::string
   Email: std::string
   SchemaVersion: int64_t # is uint64_t in C++ but -1 is used as a sentinel.
+  PortType: uint64_t # is uint_fast16_t in C++ but we don't want to add more primitive types and node.js will not parse URLs with port number > 65535
 
 templates: # value tells you how many arguments it takes ('*' means any number)
   util::Optional: 1
@@ -292,6 +293,11 @@ enums:
       - NEED_DATA
       - HAVE_EVENT
       - HAVE_ERROR
+  ProxyType:
+    cppName: SyncConfig::ProxyConfig::Type
+    values:
+      - HTTP
+      - HTTPS
 
 # These types are handled specially. They must be structs with a single fields named "value".
 keyTypes:
@@ -413,6 +419,13 @@ records:
       disabled:
         type: bool
 
+  SyncProxyConfig:
+    cppName: SyncConfig::ProxyConfig
+    fields:
+      address: std::string
+      port: PortType
+      type: ProxyType
+
   SyncConfig:
     fields:
       user: SharedSyncUser
@@ -442,6 +455,7 @@ records:
       cancel_waits_on_nonfatal_error:
         type: bool
         default: false
+      proxy_config: util::Optional<SyncProxyConfig>
         
   SyncSubscription:
     cppName: sync::Subscription
