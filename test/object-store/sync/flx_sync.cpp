@@ -3319,10 +3319,7 @@ TEST_CASE("flx: async open + register subscription callack while bootstrapping",
         subscription_invoked = true;
         mutable_subscription.commit();
     };
-    config.sync_config->subscription_initializer = subscription_callback;
-    config.sync_config->always_run = true;
-    auto async_open = Realm::get_synchronized_realm(config);
-    async_open->start([&](ThreadSafeReference ref, std::exception_ptr err) {
+    auto async_open_complete = [&](ThreadSafeReference ref, std::exception_ptr err) {
         if (err) {
             // there has been an error, the test must fail.
             async_open_invoked = true;
@@ -3334,7 +3331,10 @@ TEST_CASE("flx: async open + register subscription callack while bootstrapping",
         async_open_invoked = true;
         async_open_completed = true;
         cv.notify_one();
-    });
+    };
+
+    auto async_open = Realm::get_synchronized_realm(config);
+    async_open->start(async_open_complete, subscription_callback);
 
     std::unique_lock<std::mutex> lock(mutex_task_completed);
     cv.wait(lock, [&] {

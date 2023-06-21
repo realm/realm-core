@@ -29,6 +29,7 @@ namespace realm {
 class Realm;
 class SyncSession;
 class ThreadSafeReference;
+class Status;
 namespace _impl {
 class RealmCoordinator;
 }
@@ -37,13 +38,17 @@ class RealmCoordinator;
 // Timeouts are not handled by this class but must be handled by each binding.
 class AsyncOpenTask : public std::enable_shared_from_this<AsyncOpenTask> {
 public:
+    using AsyncOpenCallback = util::UniqueFunction<void(ThreadSafeReference, std::exception_ptr)>;
+    using SubscriptionCallback = util::UniqueFunction<void(std::shared_ptr<Realm>)>;
+
     AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinator, std::shared_ptr<realm::SyncSession> session);
     // Starts downloading the Realm. The callback will be triggered either when the download completes
     // or an error is encountered.
     //
     // If multiple AsyncOpenTasks all attempt to download the same Realm and one of them is canceled,
     // the other tasks will receive a "Cancelled" exception.
-    void start(util::UniqueFunction<void(ThreadSafeReference, std::exception_ptr)> callback) REQUIRES(!m_mutex);
+    void start(AsyncOpenCallback async_open_complete, SubscriptionCallback subscription_initializer = nullptr)
+        REQUIRES(!m_mutex);
 
     // Cancels the download and stops the session. No further functions should be called on this class.
     void cancel() REQUIRES(!m_mutex);
@@ -53,11 +58,10 @@ public:
     void unregister_download_progress_notifier(uint64_t token) REQUIRES(!m_mutex);
 
 private:
-    using Callback = util::UniqueFunction<void(ThreadSafeReference, std::exception_ptr)>;
-    void handle_realm_async_open(Callback&& callback, std::shared_ptr<_impl::RealmCoordinator> coordinator,
-                                 Status status);
+    void async_open_complete(AsyncOpenCallback&&, std::shared_ptr<_impl::RealmCoordinator>, Status);
+    void run_subscription_initializer(SubscriptionCallback&&, AsyncOpenCallback&&,
+                                      std::shared_ptr<_impl::RealmCoordinator>);
 
-private:
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator GUARDED_BY(m_mutex);
     std::shared_ptr<SyncSession> m_session GUARDED_BY(m_mutex);
     std::vector<uint64_t> m_registered_callbacks GUARDED_BY(m_mutex);

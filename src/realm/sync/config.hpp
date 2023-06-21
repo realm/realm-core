@@ -224,9 +224,6 @@ struct SyncConfig {
 
     bool simulate_integration_error = false;
 
-    std::function<void(std::shared_ptr<Realm>)> subscription_initializer{nullptr};
-    bool always_run = false;
-
     SyncConfig() = default;
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);
