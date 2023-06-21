@@ -19,7 +19,7 @@
 -----------
 
 ### Internals
-* None.
+* Fixed Valgrind error ([#6643](https://github.com/realm/realm-core/issues/6643))
 
 ----------------------------------------------
 
