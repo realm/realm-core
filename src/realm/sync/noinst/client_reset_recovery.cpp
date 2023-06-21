@@ -724,8 +724,6 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::AddTable& inst
                                                           pk_col.is_nullable(), table->get_table_type());
             }
         }
-
-        InstructionApplier::operator()(instr);
     }
     catch (const std::runtime_error& err) {
         handle_error(util::format(
