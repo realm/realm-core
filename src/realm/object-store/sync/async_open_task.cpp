@@ -47,35 +47,23 @@ void AsyncOpenTask::handle_realm_async_open(Callback&& callback, std::shared_ptr
         return callback({}, std::current_exception());
     }
 
-    const auto& config = coordinator->get_config();
+    auto config = coordinator->get_config();
     if (config.sync_config && config.sync_config->flx_sync_requested) {
         using namespace sync;
         const auto subscription_initializer = config.sync_config->subscription_initializer;
         const auto always_run = config.sync_config->always_run;
         if (subscription_initializer && always_run) {
-
-            auto shared_realm = Realm::get_shared_realm(std::move(realm));
-            const auto& queries = subscription_initializer(shared_realm);
-            auto subscription = shared_realm->get_latest_subscription_set();
-            auto mutable_subscription = subscription.make_mutable_copy();
-            for (auto&& q : queries)
-                mutable_subscription.insert_or_assign(q);
-            auto committed_subscription = mutable_subscription.commit();
-
+            auto shared_realm = coordinator->get_realm();
+            subscription_initializer(shared_realm);
+            auto committed_subscription = shared_realm->get_active_subscription_set();
             committed_subscription.get_state_change_notification(SubscriptionSet::State::Complete)
-                .get_async([callback = std::move(callback),
-                            coordinator](StatusWith<realm::sync::SubscriptionSet::State> state) {
-                    try {
-                        if (state.is_ok()) {
-                            callback(coordinator->get_unbound_realm(), nullptr);
-                        }
-                        else {
-                            callback(coordinator->get_unbound_realm(),
-                                     std::make_exception_ptr(Exception(state.get_status())));
-                        }
+                .get_async([callback = std::move(callback), &realm,
+                            shared_realm](StatusWith<realm::sync::SubscriptionSet::State> state) {
+                    if (state.is_ok()) {
+                        callback(std::move(realm), nullptr);
                     }
-                    catch (...) {
-                        callback({}, std::current_exception());
+                    else {
+                        callback({}, std::make_exception_ptr(Exception(state.get_status())));
                     }
                 });
         }

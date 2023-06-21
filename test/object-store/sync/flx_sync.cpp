@@ -3303,35 +3303,46 @@ TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][app
 TEST_CASE("flx: async open + register subscription callack while bootstrapping", "[sync][flx][async-open]") {
     std::mutex mutex_task_completed;
     std::condition_variable cv;
-    bool task_completed = false;
-    bool subscription_filler_called = false;
+    bool async_open_invoked = false;
+    bool subscription_invoked = false;
+    bool async_open_completed = false;
     FLXSyncTestHarness harness("flx_bootstrap_batching", {g_large_array_schema, {"queryable_int_field"}});
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
 
-    auto subscription_callback = [&](std::shared_ptr<Realm> realm) -> std::vector<Query> {
+    auto subscription_callback = [&](std::shared_ptr<Realm> realm) {
         REQUIRE(realm);
         auto table = realm->read_group().get_table("class_TopLevel");
         Query query(table);
-        subscription_filler_called = true;
-        return {query};
+        auto subscription = realm->get_latest_subscription_set();
+        auto mutable_subscription = subscription.make_mutable_copy();
+        mutable_subscription.insert_or_assign(query);
+        subscription_invoked = true;
+        mutable_subscription.commit();
     };
     config.sync_config->subscription_initializer = subscription_callback;
     config.sync_config->always_run = true;
     auto async_open = Realm::get_synchronized_realm(config);
-    async_open->start([&](ThreadSafeReference realm_ref, std::exception_ptr err) {
-        REQUIRE(!err);
-        SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
+    async_open->start([&](ThreadSafeReference ref, std::exception_ptr err) {
+        if (err) {
+            // there has been an error, the test must fail.
+            async_open_invoked = true;
+            cv.notify_one();
+            return;
+        }
+        auto realm = Realm::get_shared_realm(std::move(ref));
         REQUIRE(realm);
-        task_completed = true;
+        async_open_invoked = true;
+        async_open_completed = true;
         cv.notify_one();
     });
 
     std::unique_lock<std::mutex> lock(mutex_task_completed);
     cv.wait(lock, [&] {
-        return task_completed;
+        return async_open_invoked;
     });
-    REQUIRE(subscription_filler_called);
-    REQUIRE(task_completed);
+    REQUIRE(subscription_invoked);
+    REQUIRE(async_open_invoked);
+    REQUIRE(async_open_completed);
 }
 
 

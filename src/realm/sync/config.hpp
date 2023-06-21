@@ -224,7 +224,7 @@ struct SyncConfig {
 
     bool simulate_integration_error = false;
 
-    std::function<std::vector<realm::Query>(std::shared_ptr<Realm>)> subscription_initializer{nullptr};
+    std::function<void(std::shared_ptr<Realm>)> subscription_initializer{nullptr};
     bool always_run = false;
 
     SyncConfig() = default;
