@@ -7,12 +7,11 @@ SCRIPT=$(basename "${BASH_SOURCE[0]}")
 VERSION=$(git describe)
 
 function usage {
-    echo "Usage: ${SCRIPT} [-b] [-m] [-x] [-c <realm-cocoa-folder>] [-v <version>] [-f <cmake-flags>]"
+    echo "Usage: ${SCRIPT} [-b] [-m] [-c <realm-cocoa-folder>] [-v <version>] [-f <cmake-flags>]"
     echo ""
     echo "Arguments:"
     echo "   -b : build from source. If absent it will expect prebuilt packages"
     echo "   -m : build for macOS only"
-    echo "   -x : build as an xcframework"
     echo "   -d : include debug libraries"
     echo "   -c : copy core to the specified folder instead of packaging it"
     echo "   -v : specify version string to use"
@@ -25,7 +24,6 @@ while getopts ":bmxdc:v:f:" opt; do
     case "${opt}" in
         b) BUILD=1;;
         m) MACOS_ONLY=1;;
-        x) BUILD_XCFRAMEWORK=1;;
         d) BUILD_DEBUG=1;;
         c) COPY=1
            DESTINATION=${OPTARG};;
@@ -90,9 +88,6 @@ for bt in "${BUILD_TYPES[@]}"; do
         # core binary
         tar -C core -zxvf "${filename}" "lib/librealm${suffix}.a"
         mv "core/lib/librealm${suffix}.a" "core/librealm-${p}${suffix}.a"
-        # parser binary
-        tar -C core -zxvf "${filename}" "lib/librealm-parser${suffix}.a"
-        mv "core/lib/librealm-parser${suffix}.a" "core/librealm-parser-${p}${suffix}.a"
         # sync binary
         tar -C core -zxvf "${filename}" "lib/librealm-sync${suffix}.a"
         mv "core/lib/librealm-sync${suffix}.a" "core/librealm-sync-${p}${suffix}.a"
@@ -207,10 +202,7 @@ EOF
 }
 
 # Produce xcframeworks
-if [[ -n $BUILD_XCFRAMEWORK ]]; then
-    create_xcframework realm-monorepo librealm-monorepo
-    create_xcframework realm-parser librealm-parser
-fi
+create_xcframework realm-monorepo librealm-monorepo
 
 # Package artifacts
 if [[ -n $COPY ]]; then
@@ -218,11 +210,6 @@ if [[ -n $COPY ]]; then
     mkdir -p "${DESTINATION}"
     cp -R core "${DESTINATION}"
 else
-    if [[ -n $BUILD_XCFRAMEWORK ]]; then
-        rm -f "realm-parser-cocoa-${VERSION}.tar.xz"
-        tar -cJvf "realm-parser-cocoa-${VERSION}.tar.xz" core/realm-parser*.xcframework
-        rm -f "realm-monorepo-xcframework-${VERSION}.tar.xz"
-        # until realmjs requires an xcframework, only package as .xz
-        tar -cJvf "realm-monorepo-xcframework-${VERSION}.tar.xz" core/realm-monorepo*.xcframework
-    fi
+    rm -f "realm-monorepo-xcframework-${VERSION}.tar.xz"
+    tar -cJvf "realm-monorepo-xcframework-${VERSION}.tar.xz" core/realm-monorepo*.xcframework
 fi

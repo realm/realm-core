@@ -104,24 +104,16 @@ jobWrapper {
             parallelExecutors = [
                 buildMacOsRelease   : doBuildMacOs(buildOptions + [buildType : "Release"]),
                 buildCatalystRelease: doBuildApplePlatform('maccatalyst', 'Release'),
-
-                buildLinuxASAN      : doBuildLinuxClang("RelASAN"),
-                buildLinuxTSAN      : doBuildLinuxClang("RelTSAN")
             ]
 
             androidAbis = ['armeabi-v7a', 'x86', 'x86_64', 'arm64-v8a']
-            androidBuildTypes = ['Debug', 'Release']
-
             for (abi in androidAbis) {
-                for (buildType in androidBuildTypes) {
-                    parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType)
-                }
+                parallelExecutors["android-${abi}"] = doAndroidBuildInDocker(abi, 'Release')
             }
 
             appleSdks = ['iphoneos', 'iphonesimulator',
                          'appletvos', 'appletvsimulator',
                          'watchos', 'watchsimulator']
-
             for (sdk in appleSdks) {
                 parallelExecutors[sdk] = doBuildApplePlatform(sdk, 'Release')
             }
@@ -131,16 +123,12 @@ jobWrapper {
                 parallelExecutors["buildLinux${buildType}"] = doBuildLinux(buildType)
             }
 
-            windowsBuildTypes = ['Debug', 'Release']
             windowsPlatforms = ['Win32', 'x64', 'ARM64']
-
-            for (buildType in windowsBuildTypes) {
-                for (platform in windowsPlatforms) {
-                    parallelExecutors["buildWindows-${platform}-${buildType}"] = doBuildWindows(buildType, false, platform, false)
-                    parallelExecutors["buildWindowsUniversal-${platform}-${buildType}"] = doBuildWindows(buildType, true, platform, false)
-                }
-                parallelExecutors["buildWindowsUniversal-ARM-${buildType}"] = doBuildWindows(buildType, true, 'ARM', false)
+            for (platform in windowsPlatforms) {
+                parallelExecutors["buildWindows-${platform}"] = doBuildWindows('Release', false, platform, false)
+                parallelExecutors["buildWindowsUniversal-${platform}"] = doBuildWindows('Release', true, platform, false)
             }
+            parallelExecutors["buildWindowsUniversal-ARM"] = doBuildWindows('Release', true, 'ARM', false)
 
             parallel parallelExecutors
         }
@@ -150,7 +138,7 @@ jobWrapper {
                 for (cocoaStash in cocoaStashes) {
                     unstash name: cocoaStash
                 }
-                sh "tools/build-cocoa.sh -x -v \"${gitDescribeVersion}\""
+                sh "tools/build-cocoa.sh -v \"${gitDescribeVersion}\""
                 archiveArtifacts('realm-*.tar.xz')
                 stash includes: 'realm-*.tar.xz', name: "cocoa"
                 publishingStashes << "cocoa"
@@ -168,9 +156,6 @@ jobWrapper {
                                 def files = findFiles(glob: '**')
                                 for (file in files) {
                                     s3Upload file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}", bucket: 'static.realm.io'
-                                    if (!requireNightlyBuild) { // don't publish nightly builds in the non-versioned folder path
-                                        s3Upload file: file.path, path: "downloads/core/${file.name}", bucket: 'static.realm.io'
-                                    }
                                 }
                             }
                         }
@@ -396,13 +381,6 @@ def doBuildLinux(String buildType) {
                    cpack -G TGZ
                 """
             }
-
-            dir('build-dir') {
-                archiveArtifacts("*.tar.gz")
-                def stashName = "linux___${buildType}"
-                stash includes:"*.tar.gz", name:stashName
-                publishingStashes << stashName
-            }
         }
     }
 }
@@ -430,13 +408,6 @@ def doBuildLinuxClang(String buildType) {
                         sh 'cpack -G TGZ'
                     }
                 }
-            }
-
-            dir('build-dir') {
-                archiveArtifacts("*.tar.gz")
-                def stashName = "linux___${buildType}"
-                stash includes:"*.tar.gz", name:stashName
-                publishingStashes << stashName
             }
         }
     }
@@ -470,16 +441,6 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
                         name: "android-armeabi-${abi}-${buildType}",
                         filters: warningFilters,
                     )
-                }
-                if (test == TestAction.None) {
-                    dir(buildDir) {
-                        archiveArtifacts('realm-*.tar.gz')
-                        stash includes: 'realm-*.tar.gz', name: stashName
-                    }
-                    androidStashes << stashName
-                    if (gitTag) {
-                        publishingStashes << stashName
-                    }
                 }
             }
 
@@ -571,12 +532,6 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                     )
                 }
                 bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
-                archiveArtifacts('*.tar.gz')
-                if (gitTag) {
-                    def stashName = "windows___${platform}___${isUWP?'uwp':'nouwp'}___${buildType}"
-                    stash includes:'*.tar.gz', name:stashName
-                    publishingStashes << stashName
-                }
             }
             if (runTests && !isUWP) {
                 def prefix = "Windows-${platform}-${buildType}";
@@ -653,14 +608,7 @@ def doBuildMacOs(Map options = [:]) {
 
             dir('build-macosx') {
                 withEnv(['DEVELOPER_DIR=/Applications/Xcode-14.app/Contents/Developer/']) {
-                    // This is a dirty trick to work around a bug in xcode
-                    // It will hang if launched on the same project (cmake trying the compiler out)
-                    // in parallel.
-                    retry(3) {
-                        timeout(time: 2, unit: 'MINUTES') {
-                            sh "cmake ${cmakeDefinitions} -G Xcode .."
-                        }
-                    }
+                    sh "cmake ${cmakeDefinitions} -G Xcode .."
 
                     runAndCollectWarnings(
                         parser: 'clang',
