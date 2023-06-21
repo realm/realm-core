@@ -612,7 +612,7 @@ def doBuildMacOs(Map options = [:]) {
 
                     runAndCollectWarnings(
                         parser: 'clang',
-                        script: "cmake --build . --config ${buildType} --target package -- ONLY_ACTIVE_ARCH=NO",
+                        script: "cmake --build . --config ${buildType} --target package -- ONLY_ACTIVE_ARCH=NO -destination generic/name=macOS -sdk macosx",
                         name: "xcode-macosx-${buildType}",
                         filters: warningFilters,
                     )
