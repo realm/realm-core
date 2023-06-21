@@ -848,8 +848,16 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
             })
             ->on_post_reset([&, err_future = std::move(error_future)](SharedRealm) mutable {
                 auto sync_error = wait_for_future(std::move(err_future)).get();
-                CHECK(sync_error.get_system_error() ==
-                      sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+                INFO(sync_error.reason());
+                // There is a race here depending on if the server produces a query error or responds to
+                // the ident message first. We consider either error to be a sufficient outcome.
+                if (sync_error.get_system_error() ==
+                    sync::make_error_code(sync::ClientError::auto_client_reset_failure)) {
+                    CHECK(sync_error.is_client_reset_requested());
+                }
+                else {
+                    CHECK(sync_error.get_system_error() == sync::make_error_code(sync::ProtocolError::bad_query));
+                }
             })
             ->run();
     }

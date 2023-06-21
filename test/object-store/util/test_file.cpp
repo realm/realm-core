@@ -341,6 +341,10 @@ TestAppSession::TestAppSession(AppSession session,
     sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
     sc_config.reconnect_mode = reconnect_mode;
     sc_config.socket_provider = custom_socket_provider;
+    // With multiplexing enabled, the linger time controls how long a
+    // connection is kept open for reuse. In tests, we want to shut
+    // down sync clients immediately.
+    sc_config.timeouts.connection_linger_time = 0;
 
     m_app = app::App::get_uncached_app(app_config, sc_config);
 
