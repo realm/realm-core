@@ -302,6 +302,12 @@ void import(const char* filename)
                     auto the_string = e.value.get_string();
                     REALM_ASSERT(got_string == the_string);
                     /*
+                    o.set<StringData>(e.col_key, 0);
+                    o.set<StringData>(e.col_key, the_string);
+                    got_string = o.get<StringData>(e.col_key);
+                    REALM_ASSERT(got_string == the_string);
+                    */
+                    /*
                                         auto q1 = t->where();
                                         auto q2 = q1.equal(e.col_key, got_string);
                                         auto q_res = q2.find_all();

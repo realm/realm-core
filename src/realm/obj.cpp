@@ -1699,10 +1699,16 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
     auto attrs = col_key.get_attrs();
     auto col_ndx = col_key.get_index();
 
-    if (type != ColumnTypeTraits<T>::column_id)
-        throw LogicError(LogicError::illegal_type);
-    if (value_is_null(value) && !attrs.test(col_attr_Nullable))
-        throw LogicError(LogicError::column_not_nullable);
+    if (type == col_type_EnumString) {
+        bool ok_type = std::is_same<T, StringData>();
+        REALM_ASSERT(ok_type);
+    }
+    else {
+        if (type != ColumnTypeTraits<T>::column_id)
+            throw LogicError(LogicError::illegal_type);
+        if (value_is_null(value) && !attrs.test(col_attr_Nullable))
+            throw LogicError(LogicError::column_not_nullable);
+    }
 
     check_range(value);
 
@@ -1716,13 +1722,25 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
     Array fallback(alloc);
     Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
     REALM_ASSERT(col_ndx.val + 1 < fields.size());
-    using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
-    LeafType values(alloc);
-    values.set_parent(&fields, col_ndx.val + 1);
-    set_spec<LeafType>(values, col_key);
-    values.init_from_parent();
-    values.set(m_row_ndx, value);
-
+    if (type != col_type_EnumString) {
+        using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+        LeafType values(alloc);
+        values.set_parent(&fields, col_ndx.val + 1);
+        set_spec<LeafType>(values, col_key);
+        values.init_from_parent();
+        values.set(m_row_ndx, value);
+    }
+    else {
+        if constexpr (std::is_same_v<T, StringData>) {
+            ArrayInteger values(alloc);
+            values.set_parent(&fields, col_ndx.val + 1);
+            values.init_from_parent();
+            values.set(m_row_ndx, m_table->add_insert_enum_string(col_key, value));
+        }
+        else {
+            REALM_ASSERT(false); // not possible
+        }
+    }
     sync(fields);
 
     if (Replication* repl = get_replication())
