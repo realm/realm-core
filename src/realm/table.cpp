@@ -2936,11 +2936,14 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
     for (auto& v : values) {
         if (v.col_key.get_type() == col_type_EnumString) {
             if (v.value.is_null()) {
+                auto id = add_insert_enum_string(v.col_key, {nullptr, 0});
+                REALM_ASSERT(id == 0);
                 translated_values.insert(v.col_key, Mixed(0), v.is_default);
             }
             else {
                 // convert value
                 size_t id = add_insert_enum_string(v.col_key, v.value.get_string());
+                REALM_ASSERT(id);
                 translated_values.insert(v.col_key, Mixed((int64_t)id), false);
             }
         }
@@ -4228,7 +4231,7 @@ public:
             REALM_ASSERT(null_used);
             return nullptr;
         }
-        std::vector<uint16_t>& syms = symbols[id];
+        std::vector<uint16_t>& syms = symbols[id - 1];
         char decompressed[8192];
         auto size = syms.size();
         auto from = syms.begin();
@@ -4365,7 +4368,7 @@ public:
             symbol[j] = symbol_buffer[j];
         auto it = symbol_map.find(symbol);
         if (it == symbol_map.end()) {
-            auto id = symbols.size();
+            auto id = symbols.size() + 1;
             symbols.push_back(symbol);
             symbol_map[symbol] = id;
             unique_symbol_size += 2 * size;
@@ -4486,10 +4489,12 @@ size_t Table::search_enum_string(ColKey col_key, StringData value) const
     unsigned column_ndx = col_key.get_index().val;
     REALM_ASSERT(column_ndx < m_interners.size());
     auto& interner = m_interners[column_ndx];
-    if (interner)
+    if (interner) {
         return interner->search(value);
-    else
+    }
+    else {
         return npos;
+    }
 }
 
 size_t Table::get_num_unique_values(ColKey col_key) const
@@ -4503,7 +4508,7 @@ size_t Table::get_num_unique_values(ColKey col_key) const
 StringData Table::get_enum_string(ColKey col_key, size_t id)
 {
     if (!id)
-        return nullptr;
+        return {nullptr, 0};
     auto column_ndx = col_key.get_index().val;
     REALM_ASSERT(m_interners[column_ndx]);
     return m_interners[column_ndx]->decompress(id);
