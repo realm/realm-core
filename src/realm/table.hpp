@@ -722,7 +722,7 @@ private:
 public:
     size_t search_enum_string(ColKey col_key, StringData value) const;
     size_t get_num_unique_values(ColKey col_key) const;
-    StringData get_enum_string(ColKey col_key, size_t id);
+    StringData get_enum_string(ColKey col_key, size_t id) const;
     bool is_null_enum_string(ColKey col_key, size_t id);
 
 private:

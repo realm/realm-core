@@ -4505,7 +4505,7 @@ size_t Table::get_num_unique_values(ColKey col_key) const
     return interner->num_unique_values();
 }
 
-StringData Table::get_enum_string(ColKey col_key, size_t id)
+StringData Table::get_enum_string(ColKey col_key, size_t id) const
 {
     if (!id)
         return {nullptr, 0};
