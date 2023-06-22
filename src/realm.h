@@ -3468,9 +3468,15 @@ typedef struct realm_sync_session_connection_state_notification_token
  *              the object and must release it when used.
  * @param error Null, if the operation complete successfully.
  */
+
+// invoked when the synchronized realm file has been downloaded
 typedef void (*realm_async_open_task_completion_func_t)(realm_userdata_t userdata,
                                                         realm_thread_safe_reference_t* realm,
                                                         const realm_async_error_t* error);
+
+// invoked once the file has been downloaded. Allows the caller to run some initial subscription before the completion
+// callback runs.
+typedef void (*realm_async_open_task_init_subscription_func_t)(realm_t* realm, realm_userdata_t userdata);
 
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_base_file_path(realm_sync_client_config_t*, const char*) RLM_API_NOEXCEPT;
@@ -3734,7 +3740,7 @@ realm_sync_subscription_set_commit(realm_flx_sync_mutable_subscription_set_t*);
  */
 RLM_API realm_async_open_task_t* realm_open_synchronized(realm_config_t*) RLM_API_NOEXCEPT;
 RLM_API void realm_async_open_task_start(realm_async_open_task_t*, realm_async_open_task_completion_func_t,
-                                         realm_userdata_t userdata,
+                                         realm_async_open_task_init_subscription_func_t, realm_userdata_t userdata,
                                          realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 RLM_API void realm_async_open_task_cancel(realm_async_open_task_t*) RLM_API_NOEXCEPT;
 RLM_API realm_async_open_task_progress_notification_token_t*

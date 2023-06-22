@@ -63,7 +63,7 @@ void AsyncOpenTask::start(AsyncOpenCallback async_open_complete, SubscriptionCal
             self->async_open_complete(std::move(async_open_complete), coordinator, status);
 
         auto config = coordinator->get_config();
-        if (subscription_initializer) {
+        if (config.sync_config && config.sync_config->flx_sync_requested && subscription_initializer) {
             self->run_subscription_initializer(std::move(subscription_initializer), std::move(async_open_complete),
                                                coordinator);
         }

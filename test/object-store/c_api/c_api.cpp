@@ -5079,6 +5079,11 @@ static void task_completion_func(void* p, realm_thread_safe_reference_t* realm,
     userdata_p->called = true;
 }
 
+static void task_init_subscription(realm_t* realm, void*)
+{
+    REQUIRE(realm);
+}
+
 static void sync_error_handler(void* p, realm_sync_session_t*, const realm_sync_error_t error)
 {
     auto userdata_p = static_cast<Userdata*>(p);
@@ -5109,7 +5114,7 @@ TEST_CASE("C API - async_open", "[c_api][sync]") {
         Userdata userdata;
         realm_async_open_task_t* task = realm_open_synchronized(config);
         REQUIRE(task);
-        realm_async_open_task_start(task, task_completion_func, &userdata, nullptr);
+        realm_async_open_task_start(task, task_completion_func, task_init_subscription, &userdata, nullptr);
         util::EventLoop::main().run_until([&] {
             return userdata.called.load();
         });
@@ -5153,7 +5158,7 @@ TEST_CASE("C API - async_open", "[c_api][sync]") {
 
         realm_async_open_task_t* task = realm_open_synchronized(config);
         REQUIRE(task);
-        realm_async_open_task_start(task, task_completion_func, &userdata, nullptr);
+        realm_async_open_task_start(task, task_completion_func, task_init_subscription, &userdata, nullptr);
         init_sync_manager.network_callback(app::Response{403});
         util::EventLoop::main().run_until([&] {
             return userdata.called.load();

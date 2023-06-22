@@ -718,10 +718,11 @@ RLM_API realm_async_open_task_t* realm_open_synchronized(realm_config_t* config)
 }
 
 RLM_API void realm_async_open_task_start(realm_async_open_task_t* task, realm_async_open_task_completion_func_t done,
+                                         realm_async_open_task_init_subscription_func_t subscription,
                                          realm_userdata_t userdata, realm_free_userdata_func_t userdata_free) noexcept
 {
-    auto cb = [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](ThreadSafeReference realm,
-                                                                                       std::exception_ptr error) {
+    auto done_cb = [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
+                       ThreadSafeReference realm, std::exception_ptr error) {
         if (error) {
             realm_async_error_t c_error(std::move(error));
             done(userdata.get(), nullptr, &c_error);
@@ -731,7 +732,16 @@ RLM_API void realm_async_open_task_start(realm_async_open_task_t* task, realm_as
             done(userdata.get(), tsr, nullptr);
         }
     };
-    (*task)->start(std::move(cb));
+
+    auto init_sub_cb = [subscription,
+                        userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](SharedRealm realm) {
+        if (subscription) {
+            realm_t r{realm};
+            subscription(&r, userdata.get());
+        }
+    };
+
+    (*task)->start(std::move(done_cb), std::move(init_sub_cb));
 }
 
 RLM_API void realm_async_open_task_cancel(realm_async_open_task_t* task) noexcept
