@@ -522,7 +522,7 @@ void Lst<Mixed>::do_remove(size_t ndx)
     Mixed old_value = m_tree->get(ndx);
     if (old_value.is_type(type_TypedLink, type_Dictionary, type_List)) {
 
-        bool recurse;
+        bool recurse = false;
         CascadeState state;
         if (old_value.is_type(type_TypedLink)) {
             auto old_link = old_value.get<ObjLink>();
