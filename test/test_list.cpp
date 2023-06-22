@@ -887,6 +887,17 @@ TEST(List_Nested_InMixed)
     tr->promote_to_write();
     list2->remove(1);
     CHECK_EQUAL(dict2->get("Hello"), Mixed("World"));
+    obj.set(col_any, Mixed());
+    CHECK_EQUAL(dict->size(), 0);
+    CHECK_THROW_ANY(dict->insert("Five", 5)); // This dictionary ceased to be
+
+    obj.set_collection(col_any, CollectionType::List);
+    auto list3 = obj.get_list_ptr<Mixed>(col_any);
+    list3->add(5);
+    obj.set(col_any, Mixed());
+    CHECK_EQUAL(list3->size(), 0);
+    CHECK_THROW_ANY(list3->add(42));
+    tr->verify();
 }
 
 TEST(List_NestedList_Remove)

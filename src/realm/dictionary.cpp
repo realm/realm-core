@@ -664,8 +664,9 @@ UpdateStatus Dictionary::update_if_needed_with_status() const noexcept
 void Dictionary::ensure_created()
 {
     if (Base::should_update() || !(m_dictionary_top && m_dictionary_top->is_attached())) {
-        bool attached = init_from_parent(true);
-        REALM_ASSERT(attached);
+        if (!init_from_parent(true)) {
+            throw IllegalOperation("This is an ex-dictionary");
+        }
     }
 }
 
@@ -828,49 +829,54 @@ void Dictionary::clear()
 
 bool Dictionary::init_from_parent(bool allow_create) const
 {
-    auto ref = Base::get_collection_ref();
-
-    if ((ref || allow_create) && !m_dictionary_top) {
-        Allocator& alloc = get_alloc();
-        m_dictionary_top.reset(new Array(alloc));
-        m_dictionary_top->set_parent(const_cast<Dictionary*>(this), 0);
-        switch (m_key_type) {
-            case type_String: {
-                m_keys.reset(new BPlusTree<StringData>(alloc));
-                break;
+    try {
+        auto ref = Base::get_collection_ref();
+        if ((ref || allow_create) && !m_dictionary_top) {
+            Allocator& alloc = get_alloc();
+            m_dictionary_top.reset(new Array(alloc));
+            m_dictionary_top->set_parent(const_cast<Dictionary*>(this), 0);
+            switch (m_key_type) {
+                case type_String: {
+                    m_keys.reset(new BPlusTree<StringData>(alloc));
+                    break;
+                }
+                case type_Int: {
+                    m_keys.reset(new BPlusTree<Int>(alloc));
+                    break;
+                }
+                default:
+                    break;
             }
-            case type_Int: {
-                m_keys.reset(new BPlusTree<Int>(alloc));
-                break;
-            }
-            default:
-                break;
-        }
-        m_keys->set_parent(m_dictionary_top.get(), 0);
-        m_values.reset(new BPlusTree<Mixed>(alloc));
-        m_values->set_parent(m_dictionary_top.get(), 1);
-    }
-
-    if (ref) {
-        m_dictionary_top->init_from_ref(ref);
-        m_keys->init_from_parent();
-        m_values->init_from_parent();
-    }
-    else {
-        // dictionary detached
-        if (!allow_create) {
-            m_dictionary_top.reset();
-            return false;
+            m_keys->set_parent(m_dictionary_top.get(), 0);
+            m_values.reset(new BPlusTree<Mixed>(alloc));
+            m_values->set_parent(m_dictionary_top.get(), 1);
         }
 
-        // Create dictionary
-        m_dictionary_top->create(Array::type_HasRefs, false, 2, 0);
-        m_values->create();
-        m_keys->create();
-        m_dictionary_top->update_parent();
-    }
+        if (ref) {
+            m_dictionary_top->init_from_ref(ref);
+            m_keys->init_from_parent();
+            m_values->init_from_parent();
+        }
+        else {
+            // dictionary detached
+            if (!allow_create) {
+                m_dictionary_top.reset();
+                return false;
+            }
 
-    return true;
+            // Create dictionary
+            m_dictionary_top->create(Array::type_HasRefs, false, 2, 0);
+            m_values->create();
+            m_keys->create();
+            m_dictionary_top->update_parent();
+        }
+
+        return true;
+    }
+    catch (...) {
+        m_dictionary_top.reset();
+        return false;
+    }
 }
 
 size_t Dictionary::do_find_key(Mixed key) const noexcept

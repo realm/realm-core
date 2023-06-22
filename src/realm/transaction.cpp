@@ -125,10 +125,12 @@ void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInf
         else {
             auto val = obj.get_any(col);
             if (val.is_type(type_List)) {
+                repl.set(obj.get_table().unchecked_ptr(), col, obj.get_key(), Mixed(0, CollectionType::List));
                 Lst<Mixed> list(obj, col);
                 add_list_to_repl(list, repl, std::move(update_embedded));
             }
             else if (val.is_type(type_Dictionary)) {
+                repl.set(obj.get_table().unchecked_ptr(), col, obj.get_key(), Mixed(0, CollectionType::Dictionary));
                 Dictionary dict(obj, col);
                 add_dictionary_to_repl(dict, repl, std::move(update_embedded));
             }
