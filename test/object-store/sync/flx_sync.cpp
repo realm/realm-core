@@ -3303,9 +3303,9 @@ TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][app
 TEST_CASE("flx: async open + register subscription callack while bootstrapping", "[sync][flx][async-open]") {
     std::mutex mutex_task_completed;
     std::condition_variable cv;
-    bool async_open_invoked = false;
-    bool subscription_invoked = false;
-    bool async_open_completed = false;
+    std::atomic<bool> async_open_invoked = false;
+    std::atomic<bool> subscription_invoked = false;
+    std::atomic<bool> async_open_completed = false;
     FLXSyncTestHarness harness("flx_bootstrap_batching", {g_large_array_schema, {"queryable_int_field"}});
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
 
@@ -3333,16 +3333,44 @@ TEST_CASE("flx: async open + register subscription callack while bootstrapping",
         cv.notify_one();
     };
 
+    config.sync_config->subscription_initializer = subscription_callback;
     auto async_open = Realm::get_synchronized_realm(config);
-    async_open->start(async_open_complete, subscription_callback);
+    async_open->start(async_open_complete);
 
     std::unique_lock<std::mutex> lock(mutex_task_completed);
     cv.wait(lock, [&] {
-        return async_open_invoked;
+        return async_open_invoked.load();
     });
-    REQUIRE(subscription_invoked);
-    REQUIRE(async_open_invoked);
-    REQUIRE(async_open_completed);
+    REQUIRE(subscription_invoked.load());
+    REQUIRE(async_open_invoked.load());
+    REQUIRE(async_open_completed.load());
+
+    SECTION("subscription not run because realm alredy opened no error") {
+        subscription_invoked = async_open_invoked = async_open_completed = false;
+        auto async_open = Realm::get_synchronized_realm(config);
+        async_open->start(async_open_complete);
+
+        cv.wait(lock, [&] {
+            return async_open_invoked.load();
+        });
+        REQUIRE_FALSE(subscription_invoked.load());
+        REQUIRE(async_open_invoked.load());
+        REQUIRE(async_open_completed.load());
+    }
+
+    SECTION("force rerun on open") {
+        subscription_invoked = async_open_invoked = async_open_completed = false;
+        config.sync_config->rerun_init_subscription_on_open = true;
+        auto async_open = Realm::get_synchronized_realm(config);
+        async_open->start(async_open_complete);
+
+        cv.wait(lock, [&] {
+            return async_open_invoked.load();
+        });
+        REQUIRE(subscription_invoked.load());
+        REQUIRE(async_open_invoked.load());
+        REQUIRE(async_open_completed.load());
+    }
 }
 
 

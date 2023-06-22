@@ -3539,7 +3539,11 @@ RLM_API void
 realm_sync_config_set_after_client_reset_handler(realm_sync_config_t*, realm_sync_after_client_reset_func_t,
                                                  realm_userdata_t userdata,
                                                  realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
-
+RLM_API void realm_sync_config_set_initial_subscription_handler(realm_sync_config_t*,
+                                                                realm_async_open_task_init_subscription_func_t,
+                                                                realm_userdata_t userdata,
+                                                                realm_free_userdata_func_t userdata_free,
+                                                                bool rerun_on_open);
 /**
  * Fetch subscription id for the subscription passed as argument.
  * @return realm_object_id_t for the subscription passed as argument
@@ -3740,7 +3744,7 @@ realm_sync_subscription_set_commit(realm_flx_sync_mutable_subscription_set_t*);
  */
 RLM_API realm_async_open_task_t* realm_open_synchronized(realm_config_t*) RLM_API_NOEXCEPT;
 RLM_API void realm_async_open_task_start(realm_async_open_task_t*, realm_async_open_task_completion_func_t,
-                                         realm_async_open_task_init_subscription_func_t, realm_userdata_t userdata,
+                                         realm_userdata_t userdata,
                                          realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 RLM_API void realm_async_open_task_cancel(realm_async_open_task_t*) RLM_API_NOEXCEPT;
 RLM_API realm_async_open_task_progress_notification_token_t*

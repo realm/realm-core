@@ -47,8 +47,7 @@ public:
     //
     // If multiple AsyncOpenTasks all attempt to download the same Realm and one of them is canceled,
     // the other tasks will receive a "Cancelled" exception.
-    void start(AsyncOpenCallback async_open_complete, SubscriptionCallback subscription_initializer = nullptr)
-        REQUIRES(!m_mutex);
+    void start(AsyncOpenCallback async_open_complete) REQUIRES(!m_mutex);
 
     // Cancels the download and stops the session. No further functions should be called on this class.
     void cancel() REQUIRES(!m_mutex);
@@ -60,7 +59,7 @@ public:
 private:
     void async_open_complete(AsyncOpenCallback&&, std::shared_ptr<_impl::RealmCoordinator>, Status);
     void run_subscription_initializer(SubscriptionCallback&&, AsyncOpenCallback&&,
-                                      std::shared_ptr<_impl::RealmCoordinator>);
+                                      std::shared_ptr<_impl::RealmCoordinator>, bool);
 
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator GUARDED_BY(m_mutex);
     std::shared_ptr<SyncSession> m_session GUARDED_BY(m_mutex);

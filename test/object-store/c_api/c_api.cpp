@@ -5108,13 +5108,15 @@ TEST_CASE("C API - async_open", "[c_api][sync]") {
         config->schema = Schema{object_schema};
         realm_user user(init_sync_manager.app()->current_user());
         realm_sync_config_t* sync_config = realm_sync_config_new(&user, "default");
+        realm_sync_config_set_initial_subscription_handler(sync_config, task_init_subscription, nullptr, nullptr,
+                                                           false);
         realm_config_set_path(config, test_config.path.c_str());
         realm_config_set_sync_config(config, sync_config);
         realm_config_set_schema_version(config, 1);
-        Userdata userdata;
         realm_async_open_task_t* task = realm_open_synchronized(config);
         REQUIRE(task);
-        realm_async_open_task_start(task, task_completion_func, task_init_subscription, &userdata, nullptr);
+        Userdata userdata;
+        realm_async_open_task_start(task, task_completion_func, &userdata, nullptr);
         util::EventLoop::main().run_until([&] {
             return userdata.called.load();
         });
@@ -5147,6 +5149,8 @@ TEST_CASE("C API - async_open", "[c_api][sync]") {
         config->schema = Schema{object_schema};
         realm_user user(init_sync_manager.app()->current_user());
         realm_sync_config_t* sync_config = realm_sync_config_new(&user, "realm");
+        realm_sync_config_set_initial_subscription_handler(sync_config, task_init_subscription, nullptr, nullptr,
+                                                           false);
         sync_config->user->update_refresh_token(std::string(invalid_token));
         sync_config->user->update_access_token(std::move(invalid_token));
 
@@ -5158,7 +5162,7 @@ TEST_CASE("C API - async_open", "[c_api][sync]") {
 
         realm_async_open_task_t* task = realm_open_synchronized(config);
         REQUIRE(task);
-        realm_async_open_task_start(task, task_completion_func, task_init_subscription, &userdata, nullptr);
+        realm_async_open_task_start(task, task_completion_func, &userdata, nullptr);
         init_sync_manager.network_callback(app::Response{403});
         util::EventLoop::main().run_until([&] {
             return userdata.called.load();

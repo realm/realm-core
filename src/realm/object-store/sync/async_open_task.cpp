@@ -33,7 +33,7 @@ AsyncOpenTask::AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinato
 {
 }
 
-void AsyncOpenTask::start(AsyncOpenCallback async_open_complete, SubscriptionCallback subscription_initializer)
+void AsyncOpenTask::start(AsyncOpenCallback async_open_complete)
 {
     util::CheckedUniqueLock lock(m_mutex);
     if (!m_session)
@@ -42,35 +42,37 @@ void AsyncOpenTask::start(AsyncOpenCallback async_open_complete, SubscriptionCal
     lock.unlock();
 
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
-    session->wait_for_download_completion([async_open_complete = std::move(async_open_complete),
-                                           subscription_initializer = std::move(subscription_initializer), self,
-                                           this](Status status) mutable {
-        std::shared_ptr<_impl::RealmCoordinator> coordinator;
-        {
-            util::CheckedLockGuard lock(m_mutex);
-            if (!m_session)
-                return; // Swallow all events if the task has been cancelled.
+    session->wait_for_download_completion(
+        [async_open_complete = std::move(async_open_complete), self, this](Status status) mutable {
+            std::shared_ptr<_impl::RealmCoordinator> coordinator;
+            {
+                util::CheckedLockGuard lock(m_mutex);
+                if (!m_session)
+                    return; // Swallow all events if the task has been cancelled.
 
-            for (auto token : m_registered_callbacks) {
-                m_session->unregister_progress_notifier(token);
+                for (auto token : m_registered_callbacks) {
+                    m_session->unregister_progress_notifier(token);
+                }
+                m_session = nullptr;
+                // Hold on to the coordinator until after we've called the callback
+                coordinator = std::move(m_coordinator);
             }
-            m_session = nullptr;
-            // Hold on to the coordinator until after we've called the callback
-            coordinator = std::move(m_coordinator);
-        }
 
-        if (!status.is_ok())
-            self->async_open_complete(std::move(async_open_complete), coordinator, status);
+            if (!status.is_ok())
+                self->async_open_complete(std::move(async_open_complete), coordinator, status);
 
-        auto config = coordinator->get_config();
-        if (config.sync_config && config.sync_config->flx_sync_requested && subscription_initializer) {
-            self->run_subscription_initializer(std::move(subscription_initializer), std::move(async_open_complete),
-                                               coordinator);
-        }
-        else {
-            self->async_open_complete(std::move(async_open_complete), coordinator, status);
-        }
-    });
+            auto config = coordinator->get_config();
+            if (config.sync_config && config.sync_config->flx_sync_requested &&
+                config.sync_config->subscription_initializer) {
+                auto subscription_initializer = config.sync_config->subscription_initializer;
+                auto rerun_subscription = config.sync_config->rerun_init_subscription_on_open;
+                self->run_subscription_initializer(std::move(subscription_initializer),
+                                                   std::move(async_open_complete), coordinator, rerun_subscription);
+            }
+            else {
+                self->async_open_complete(std::move(async_open_complete), coordinator, status);
+            }
+        });
     session->revive_if_needed();
 }
 
@@ -122,17 +124,24 @@ void AsyncOpenTask::unregister_download_progress_notifier(uint64_t token)
 
 void AsyncOpenTask::run_subscription_initializer(SubscriptionCallback&& subscription_callback,
                                                  AsyncOpenCallback&& async_open_callback,
-                                                 std::shared_ptr<_impl::RealmCoordinator> coordinator)
+                                                 std::shared_ptr<_impl::RealmCoordinator> coordinator,
+                                                 bool rerun_subscription_on_open)
 {
     auto shared_realm = coordinator->get_realm();
-    subscription_callback(shared_realm);
-    auto committed_subscription = shared_realm->get_active_subscription_set();
-    std::shared_ptr<AsyncOpenTask> self(shared_from_this());
-    committed_subscription.get_state_change_notification(sync::SubscriptionSet::State::Complete)
-        .get_async([self, coordinator, async_open_callback = std::move(async_open_callback)](
-                       StatusWith<realm::sync::SubscriptionSet::State> state) mutable {
-            self->async_open_complete(std::move(async_open_callback), coordinator, state.get_status());
-        });
+    auto latest_subscription = shared_realm->get_latest_subscription_set();
+    if (latest_subscription.version() == 0 || rerun_subscription_on_open) {
+        subscription_callback(shared_realm);
+        auto committed_subscription = shared_realm->get_active_subscription_set();
+        std::shared_ptr<AsyncOpenTask> self(shared_from_this());
+        committed_subscription.get_state_change_notification(sync::SubscriptionSet::State::Complete)
+            .get_async([self, coordinator, async_open_callback = std::move(async_open_callback)](
+                           StatusWith<realm::sync::SubscriptionSet::State> state) mutable {
+                self->async_open_complete(std::move(async_open_callback), coordinator, state.get_status());
+            });
+    }
+    else {
+        return async_open_complete(std::move(async_open_callback), coordinator, Status::OK());
+    }
 }
 
 void AsyncOpenTask::async_open_complete(AsyncOpenCallback&& callback,
