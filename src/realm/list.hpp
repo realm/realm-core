@@ -476,9 +476,10 @@ public:
     void ensure_created()
     {
         if (Base::should_update() || !(m_tree && m_tree->is_attached())) {
-            bool attached = init_from_parent(true);
+            if (!init_from_parent(true)) {
+                throw IllegalOperation("This is an ex-list");
+            }
             Base::update_content_version();
-            REALM_ASSERT(attached);
         }
     }
 
@@ -597,29 +598,7 @@ private:
     using Base::m_col_key;
     using Base::m_nullable;
 
-    bool init_from_parent(bool allow_create) const
-    {
-        if (!m_tree) {
-            m_tree.reset(new BPlusTreeMixed(get_alloc()));
-            const ArrayParent* parent = this;
-            m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
-        }
-
-        if (m_tree->init_from_parent()) {
-            // All is well
-            return true;
-        }
-
-        if (!allow_create) {
-            m_tree->detach();
-            return false;
-        }
-
-        // The ref in the column was NULL, create the tree in place.
-        m_tree->create();
-        REALM_ASSERT(m_tree->is_attached());
-        return true;
-    }
+    bool init_from_parent(bool allow_create) const;
 
     template <class Func>
     void find_all_mixed_unresolved_links(Func&& func) const

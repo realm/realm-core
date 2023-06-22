@@ -282,6 +282,37 @@ void Lst<ObjLink>::do_remove(size_t ndx)
 
 /******************************** Lst<Mixed> *********************************/
 
+bool Lst<Mixed>::init_from_parent(bool allow_create) const
+{
+    if (!m_tree) {
+        m_tree.reset(new BPlusTreeMixed(get_alloc()));
+        const ArrayParent* parent = this;
+        m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
+    }
+    try {
+        auto ref = Base::get_collection_ref();
+        if (ref) {
+            m_tree->init_from_ref(ref);
+        }
+        else {
+            if (!allow_create) {
+                m_tree->detach();
+                return false;
+            }
+
+            // The ref in the column was NULL, create the tree in place.
+            m_tree->create();
+            REALM_ASSERT(m_tree->is_attached());
+        }
+    }
+    catch (...) {
+        m_tree->detach();
+        return false;
+    }
+
+    return true;
+}
+
 size_t Lst<Mixed>::find_first(const Mixed& value) const
 {
     if (!update())
@@ -315,10 +346,9 @@ Mixed Lst<Mixed>::set(size_t ndx, Mixed value)
 
 void Lst<Mixed>::insert(size_t ndx, Mixed value)
 {
+    ensure_created();
     auto sz = size();
     CollectionBase::validate_index("insert()", ndx, sz + 1);
-
-    ensure_created();
 
     if (Replication* repl = Base::get_replication()) {
         repl->list_insert(*this, ndx, value, sz);
