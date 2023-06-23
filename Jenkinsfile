@@ -93,51 +93,6 @@ jobWrapper {
         }
     }
 
-    stage('Checking') {
-        def buildOptions = [
-            buildType : 'Debug',
-            maxBpNodeSize: 1000,
-            enableEncryption: true,
-            useEncryption: false,
-            enableSync: false,
-            runTests: true,
-        ]
-
-        parallelExecutors = [
-            buildLinuxRelease       : doBuildLinux('Release'),
-            checkLinuxDebug         : doCheckInDocker(buildOptions + [useToolchain : true]),
-            checkLinuxDebugEncrypt  : doCheckInDocker(buildOptions + [useEncryption : true]),
-            checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: 4, buildType : 'Release', useToolchain : true]),
-            checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync: true, dumpChangesetTransform: true]),
-            checkLinuxDebugNoEncryp : doCheckInDocker(buildOptions + [enableEncryption: false]),
-            checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType: 'Release', enableSync: true]),
-            checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
-            checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
-            buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
-            buildWindows_ARM64_Debug: doBuildWindows('Debug', false, 'ARM64', false),
-            buildUWP_ARM64_Debug    : doBuildWindows('Debug', true, 'ARM64', false),
-            checkiOSSimulator_Debug : doBuildApplePlatform('iphonesimulator', 'Debug', true),
-            buildAppleTV_Debug      : doBuildApplePlatform('appletvos', 'Debug', false),
-            buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
-            buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
-            buildEmscripten         : doBuildEmscripten('Debug'),
-            threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
-            addressSanitizer        : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'address']),
-        ]
-        if (releaseTesting) {
-            extendedChecks = [
-                checkMacOsDebug               : doBuildMacOs(buildOptions + [buildType: "Release"]),
-                checkAndroidarmeabiDebug      : doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Run),
-                // FIXME: https://github.com/realm/realm-core/issues/4159
-                //checkAndroidx86Release        : doAndroidBuildInDocker('x86', 'Release', TestAction.Run),
-                // FIXME: https://github.com/realm/realm-core/issues/4162
-                //coverage                      : doBuildCoverage(),
-            ]
-            parallelExecutors.putAll(extendedChecks)
-        }
-        parallel parallelExecutors
-    }
-
     if (isPublishingRun) {
 
         stage('BuildPackages') {
@@ -222,6 +177,52 @@ jobWrapper {
                     }
                 }
             }
+        }
+    }
+    else {
+        stage('Checking') {
+            def buildOptions = [
+                buildType : 'Debug',
+                maxBpNodeSize: 1000,
+                enableEncryption: true,
+                useEncryption: false,
+                enableSync: false,
+                runTests: true,
+            ]
+
+            parallelExecutors = [
+                buildLinuxRelease       : doBuildLinux('Release'),
+                checkLinuxDebug         : doCheckInDocker(buildOptions + [useToolchain : true]),
+                checkLinuxDebugEncrypt  : doCheckInDocker(buildOptions + [useEncryption : true]),
+                checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: 4, buildType : 'Release', useToolchain : true]),
+                checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync: true, dumpChangesetTransform: true]),
+                checkLinuxDebugNoEncryp : doCheckInDocker(buildOptions + [enableEncryption: false]),
+                checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType: 'Release', enableSync: true]),
+                checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
+                checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
+                buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
+                buildWindows_ARM64_Debug: doBuildWindows('Debug', false, 'ARM64', false),
+                buildUWP_ARM64_Debug    : doBuildWindows('Debug', true, 'ARM64', false),
+                checkiOSSimulator_Debug : doBuildApplePlatform('iphonesimulator', 'Debug', true),
+                buildAppleTV_Debug      : doBuildApplePlatform('appletvos', 'Debug', false),
+                buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
+                buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
+                buildEmscripten         : doBuildEmscripten('Debug'),
+                threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
+                addressSanitizer        : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'address']),
+            ]
+            if (releaseTesting) {
+                extendedChecks = [
+                    checkMacOsDebug               : doBuildMacOs(buildOptions + [buildType: "Release"]),
+                    checkAndroidarmeabiDebug      : doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Run),
+                    // FIXME: https://github.com/realm/realm-core/issues/4159
+                    //checkAndroidx86Release        : doAndroidBuildInDocker('x86', 'Release', TestAction.Run),
+                    // FIXME: https://github.com/realm/realm-core/issues/4162
+                    //coverage                      : doBuildCoverage(),
+                ]
+                parallelExecutors.putAll(extendedChecks)
+            }
+            parallel parallelExecutors
         }
     }
 }

@@ -7,9 +7,6 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix an error during async open and client reset if properties have been added to the schema. This fix applies to PBS to FLX migration if async open is used. ([#6707](https://github.com/realm/realm-core/issues/6707), since v12.3.0)
-* A GeoBox is now just a shortcut for the equivilent GeoPolygon. This provides consistent query results and error checking. ([#6703](https://github.com/realm/realm-core/issues/6703), since v13.11.0) 
-* Fixed several corner cases (eg. around the poles) where invalid points matched a geoWithin query.
-* Disallow full text search index for primary key columns. ([#6657](https://github.com/realm/realm-core/issues/6657), since v13.2.0)
 
 ### Breaking changes
 * None.
@@ -21,6 +18,30 @@
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 13.15.2 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* A GeoBox is now just a shortcut for the equivilent GeoPolygon. This provides consistent query results and error checking. ([#6703](https://github.com/realm/realm-core/issues/6703), since v13.11.0) 
+* Fixed several corner cases (eg. around the poles) where invalid points matched a geoWithin query.
+* Disallow full text search index for primary key columns. ([#6657](https://github.com/realm/realm-core/issues/6657), since v13.2.0)
+* Searching for objects in Results would not always find the requested item. This is particularly the case when the C API is used. ([#6695](https://github.com/realm/realm-core/issues/6695), since v10.0.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Fixed Valgrind error ([#6643](https://github.com/realm/realm-core/issues/6643))
 
 ----------------------------------------------
 
