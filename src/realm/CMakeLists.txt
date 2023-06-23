@@ -62,6 +62,7 @@ set(REALM_SOURCES
     object_id.cpp
     table_view.cpp
     tokenizer.cpp
+    to_json.cpp
     transaction.cpp
     sort_descriptor.cpp
     status.cpp

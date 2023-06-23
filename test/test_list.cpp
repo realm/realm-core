@@ -898,6 +898,10 @@ TEST(List_Nested_InMixed)
     CHECK_EQUAL(list3->size(), 0);
     CHECK_THROW_ANY(list3->add(42));
     tr->verify();
+    obj.set_json(col_any,
+                 "[{\"Seven\":7, \"Six\":6}, \"Hello\", {\"Points\": [1.25, 4.5, 6.75], \"Hello\": \"World\"}]");
+    CHECK_EQUAL(list3->size(), 3);
+    // tr->to_json(std::cout);
 }
 
 TEST(List_NestedList_Remove)

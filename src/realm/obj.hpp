@@ -217,6 +217,7 @@ public:
     {
         return set_null(get_column_key(col_name), is_default);
     }
+    Obj& set_json(ColKey col_key, StringData json);
 
     Obj& add_int(ColKey col_key, int64_t value);
     Obj& add_int(StringData col_name, int64_t value)
