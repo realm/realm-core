@@ -52,7 +52,7 @@ jobWrapper {
 
             isCoreCronJob = isCronJob()
             requireNightlyBuild = false
-            if(isCoreCronJob) {
+            if (isCoreCronJob) {
                 requireNightlyBuild = isNightlyBuildNeeded()
             }
         }
@@ -67,7 +67,7 @@ jobWrapper {
         if (gitTag) {
             isPublishingRun = currentBranch.contains('release')
         }
-        else if(isCoreCronJob && requireNightlyBuild) {
+        else if (isCoreCronJob && requireNightlyBuild) {
             isPublishingRun = true
             longRunningTests = true
             def localDate = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE)
@@ -81,7 +81,7 @@ jobWrapper {
         echo "Is nightly build: ${requireNightlyBuild ? 'yes' : 'no'}"
         echo "Long running test: ${longRunningTests ? 'yes' : 'no'}"
 
-        if(isCoreCronJob && !requireNightlyBuild) {
+        if (isCoreCronJob && !requireNightlyBuild) {
             currentBuild.result = 'ABORTED'
             error 'Nightly build is not needed because there are no new commits to build'
         }
@@ -94,7 +94,6 @@ jobWrapper {
     }
 
     if (isPublishingRun) {
-
         stage('BuildPackages') {
             def buildOptions = [
                 enableSync: "ON",
@@ -102,8 +101,10 @@ jobWrapper {
             ]
 
             parallelExecutors = [
-                buildMacOsRelease   : doBuildMacOs(buildOptions + [buildType : "Release"]),
-                buildCatalystRelease: doBuildApplePlatform('maccatalyst', 'Release'),
+                macOS      : doBuildMacOs(buildOptions + [buildType: "Release"]),
+                catalyst   : doBuildApplePlatform('maccatalyst', 'Release'),
+                xros       : doBuildApplePlatformXcode15('xros', 'Release'),
+                xrsimulator: doBuildApplePlatformXcode15('xrsimulator', 'Release'),
             ]
 
             androidAbis = ['armeabi-v7a', 'x86', 'x86_64', 'arm64-v8a']
@@ -111,9 +112,9 @@ jobWrapper {
                 parallelExecutors["android-${abi}"] = doAndroidBuildInDocker(abi, 'Release')
             }
 
-            appleSdks = ['iphoneos', 'iphonesimulator',
+            appleSdks = ['iphoneos',  'iphonesimulator',
                          'appletvos', 'appletvsimulator',
-                         'watchos', 'watchsimulator']
+                         'watchos',   'watchsimulator']
             for (sdk in appleSdks) {
                 parallelExecutors[sdk] = doBuildApplePlatform(sdk, 'Release')
             }
@@ -132,6 +133,7 @@ jobWrapper {
 
             parallel parallelExecutors
         }
+
         stage('Aggregate Cocoa xcframeworks') {
             rlmNode('osx') {
                 getArchive()
@@ -144,6 +146,7 @@ jobWrapper {
                 publishingStashes << "cocoa"
             }
         }
+
         stage('Publish to S3') {
             rlmNode('docker') {
                 deleteDir()
@@ -591,7 +594,7 @@ def doBuildMacOs(Map options = [:]) {
     ]
     if (!options.runTests) {
         cmakeOptions << [
-            REALM_NO_TESTS: 'ON',
+            REALM_BUILD_LIB_ONLY: 'ON',
         ]
     }
     if (longRunningTests) {
@@ -706,6 +709,27 @@ def doBuildApplePlatform(String platform, String buildType, boolean test = false
     }
 }
 
+def doBuildApplePlatformXcode15(String platform, String buildType) {
+    return {
+        rlmNode('macos_13') {
+            getArchive()
+
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-15.app/Contents/Developer/']) {
+                sh "tools/build-apple-device.sh -p '${platform}' -c '${buildType}' -v '${gitDescribeVersion}'"
+            }
+
+            String tarball = "realm-${buildType}-${gitDescribeVersion}-${platform}-devel.tar.gz";
+            archiveArtifacts tarball
+
+            def stashName = "${platform}___${buildType}"
+            stash includes: tarball, name: stashName
+            cocoaStashes << stashName
+            publishingStashes << stashName
+        }
+    }
+}
+
+
 def doBuildEmscripten(String buildType) {
     return {
         rlmNode('docker') {
@@ -778,7 +802,7 @@ def isCronJob() {
     for(upstream in upstreams) {
         def upstreamProjectName = upstream.getFullProjectName()
         def isRealmCronBuild = upstreamProjectName == 'realm-core-cron'
-        if(isRealmCronBuild)
+        if (isRealmCronBuild)
             return true;
     }
     return false;

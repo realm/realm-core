@@ -2,7 +2,7 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Add visionOS binaries to the Cocoa release package ([PR #6746](https://github.com/realm/realm-core/pull/6746)).
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Prebuilt binaries for non-Apple platforms are no longer published as nothing was using them ([PR #6746](https://github.com/realm/realm-core/pull/6746)).
 
 ----------------------------------------------
 

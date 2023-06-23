@@ -193,7 +193,7 @@ EOF
             add_to_xcframework "$xcf" "$library" "watchos" "watchsimulator" "$bt"
             add_to_xcframework "$xcf" "$library" "tvos" "appletvos" "$bt"
             add_to_xcframework "$xcf" "$library" "tvos" "appletvsimulator" "$bt"
-            if [[ "$has_xr" = "1" ]]; then
+            if find core -name '*xros*' | grep -q xros; then
                 add_to_xcframework "$xcf" "$library" "xros" "xros" "$bt"
                 add_to_xcframework "$xcf" "$library" "xros" "xrsimulator" "$bt"
             fi
