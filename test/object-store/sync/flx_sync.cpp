@@ -3301,12 +3301,21 @@ TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][app
 }
 
 TEST_CASE("flx: async open + register subscription callack while bootstrapping", "[sync][flx][async-open]") {
-    std::mutex mutex_task_completed;
     std::condition_variable cv;
+    std::mutex mutex;
     std::atomic<bool> async_open_invoked = false;
     std::atomic<bool> subscription_invoked = false;
     std::atomic<bool> async_open_completed = false;
-    FLXSyncTestHarness harness("flx_bootstrap_batching", {g_large_array_schema, {"queryable_int_field"}});
+    FLXSyncTestHarness harness("flx_bootstrap_batching");
+    auto foo_obj_id = ObjectId::gen();
+    harness.load_initial_data([&](SharedRealm realm) {
+        CppContext c(realm);
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", foo_obj_id},
+                                        {"queryable_str_field", "foo"s},
+                                        {"queryable_int_field", static_cast<int64_t>(5)},
+                                        {"non_queryable_field", "created as initial data seed"s}}));
+    });
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
 
     auto subscription_callback = [&](std::shared_ptr<Realm> realm) {
@@ -3330,6 +3339,13 @@ TEST_CASE("flx: async open + register subscription callack while bootstrapping",
         REQUIRE(realm);
         async_open_invoked = true;
         async_open_completed = true;
+        auto table_ref = realm->read_group().get_table("class_TopLevel");
+        REQUIRE(table_ref);
+        REQUIRE(table_ref->get_column_count() == 4);
+        REQUIRE(table_ref->get_column_key("_id"));
+        REQUIRE(table_ref->get_column_key("queryable_str_field"));
+        REQUIRE(table_ref->get_column_key("queryable_int_field"));
+        REQUIRE(table_ref->get_column_key("non_queryable_field"));
         cv.notify_one();
     };
 
@@ -3337,7 +3353,7 @@ TEST_CASE("flx: async open + register subscription callack while bootstrapping",
     auto async_open = Realm::get_synchronized_realm(config);
     async_open->start(async_open_complete);
 
-    std::unique_lock<std::mutex> lock(mutex_task_completed);
+    std::unique_lock<std::mutex> lock(mutex);
     cv.wait(lock, [&] {
         return async_open_invoked.load();
     });
@@ -3371,6 +3387,98 @@ TEST_CASE("flx: async open + register subscription callack while bootstrapping",
         REQUIRE(async_open_invoked.load());
         REQUIRE(async_open_completed.load());
     }
+}
+TEST_CASE("flx sync: Client reset during async open", "[sync][flx][client-reset][async-open]") {
+    FLXSyncTestHarness harness("flx_bootstrap_batching");
+    auto foo_obj_id = ObjectId::gen();
+    std::atomic<bool> subscription_invoked = false;
+    harness.load_initial_data([&](SharedRealm realm) {
+        CppContext c(realm);
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", foo_obj_id},
+                                        {"queryable_str_field", "foo"s},
+                                        {"queryable_int_field", static_cast<int64_t>(5)},
+                                        {"non_queryable_field", "created as initial data seed"s}}));
+    });
+    SyncTestFile realm_config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+    auto subscription_callback = [&](std::shared_ptr<Realm> realm) {
+        REQUIRE(realm);
+        auto table = realm->read_group().get_table("class_TopLevel");
+        Query query(table);
+        auto subscription = realm->get_latest_subscription_set();
+        auto mutable_subscription = subscription.make_mutable_copy();
+        mutable_subscription.insert_or_assign(query);
+        subscription_invoked = true;
+        mutable_subscription.commit();
+    };
+
+    auto before_callback_called = util::make_promise_future<void>();
+    auto after_callback_called = util::make_promise_future<void>();
+    realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+    realm_config.sync_config->subscription_initializer = subscription_callback;
+
+    realm_config.sync_config->on_sync_client_event_hook =
+        [&, client_reset_triggered = false](std::weak_ptr<SyncSession> weak_sess,
+                                            const SyncClientHookData& event_data) mutable {
+            auto sess = weak_sess.lock();
+            if (!sess) {
+                return SyncClientHookAction::NoAction;
+            }
+            if (sess->path() != realm_config.path) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            if (event_data.event != SyncClientHookEvent::DownloadMessageReceived) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            if (client_reset_triggered) {
+                return SyncClientHookAction::NoAction;
+            }
+            client_reset_triggered = true;
+            reset_utils::trigger_client_reset(harness.session().app_session());
+            return SyncClientHookAction::EarlyReturn;
+        };
+
+    realm_config.sync_config->notify_before_client_reset =
+        [promise = util::CopyablePromiseHolder(std::move(before_callback_called.promise))](
+            std::shared_ptr<Realm> realm) mutable {
+            CHECK(realm->schema_version() == 1);
+            promise.get_promise().emplace_value();
+        };
+
+    realm_config.sync_config->notify_after_client_reset =
+        [promise = util::CopyablePromiseHolder(std::move(after_callback_called.promise))](
+            std::shared_ptr<Realm> realm, ThreadSafeReference, bool) mutable {
+            CHECK(realm->schema_version() == 1);
+            promise.get_promise().emplace_value();
+        };
+
+    auto realm_task = Realm::get_synchronized_realm(realm_config);
+    auto realm_pf = util::make_promise_future<SharedRealm>();
+    realm_task->start([promise_holder = util::CopyablePromiseHolder(std::move(realm_pf.promise))](
+                          ThreadSafeReference ref, std::exception_ptr ex) mutable {
+        auto promise = promise_holder.get_promise();
+        if (ex) {
+            try {
+                std::rethrow_exception(ex);
+            }
+            catch (...) {
+                promise.set_error(exception_to_status());
+            }
+            return;
+        }
+        auto realm = Realm::get_shared_realm(std::move(ref));
+        if (!realm) {
+            promise.set_error({ErrorCodes::RuntimeError, "could not get realm from threadsaferef"});
+        }
+        promise.emplace_value(std::move(realm));
+    });
+    auto realm = realm_pf.future.get();
+    before_callback_called.future.get();
+    after_callback_called.future.get();
+    REQUIRE(subscription_invoked.load());
 }
 
 

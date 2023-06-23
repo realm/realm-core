@@ -57,9 +57,10 @@ public:
     void unregister_download_progress_notifier(uint64_t token) REQUIRES(!m_mutex);
 
 private:
-    void async_open_complete(AsyncOpenCallback&&, std::shared_ptr<_impl::RealmCoordinator>, Status);
+    void async_open_complete(AsyncOpenCallback&&, std::shared_ptr<_impl::RealmCoordinator>, Status)
+        REQUIRES(!m_mutex);
     void run_subscription_initializer(SubscriptionCallback&&, AsyncOpenCallback&&,
-                                      std::shared_ptr<_impl::RealmCoordinator>, bool);
+                                      std::shared_ptr<_impl::RealmCoordinator>, bool) REQUIRES(!m_mutex);
 
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator GUARDED_BY(m_mutex);
     std::shared_ptr<SyncSession> m_session GUARDED_BY(m_mutex);

@@ -50,10 +50,6 @@ void AsyncOpenTask::start(AsyncOpenCallback async_open_complete)
                 if (!m_session)
                     return; // Swallow all events if the task has been cancelled.
 
-                for (auto token : m_registered_callbacks) {
-                    m_session->unregister_progress_notifier(token);
-                }
-                m_session = nullptr;
                 // Hold on to the coordinator until after we've called the callback
                 coordinator = std::move(m_coordinator);
             }
@@ -79,7 +75,6 @@ void AsyncOpenTask::start(AsyncOpenCallback async_open_complete)
 void AsyncOpenTask::cancel()
 {
     std::shared_ptr<SyncSession> session;
-
     {
         util::CheckedLockGuard lock(m_mutex);
         if (!m_session)
@@ -131,7 +126,7 @@ void AsyncOpenTask::run_subscription_initializer(SubscriptionCallback&& subscrip
     auto latest_subscription = shared_realm->get_latest_subscription_set();
     if (latest_subscription.version() == 0 || rerun_subscription_on_open) {
         subscription_callback(shared_realm);
-        auto committed_subscription = shared_realm->get_active_subscription_set();
+        auto committed_subscription = shared_realm->get_latest_subscription_set();
         std::shared_ptr<AsyncOpenTask> self(shared_from_this());
         committed_subscription.get_state_change_notification(sync::SubscriptionSet::State::Complete)
             .get_async([self, coordinator, async_open_callback = std::move(async_open_callback)](
@@ -147,6 +142,14 @@ void AsyncOpenTask::run_subscription_initializer(SubscriptionCallback&& subscrip
 void AsyncOpenTask::async_open_complete(AsyncOpenCallback&& callback,
                                         std::shared_ptr<_impl::RealmCoordinator> coordinator, Status status)
 {
+    {
+        util::CheckedLockGuard lock(m_mutex);
+        for (auto token : m_registered_callbacks) {
+            m_session->unregister_progress_notifier(token);
+        }
+        m_session = nullptr;
+    }
+
     if (status.is_ok()) {
         ThreadSafeReference realm;
         try {

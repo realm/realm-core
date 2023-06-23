@@ -3541,9 +3541,8 @@ realm_sync_config_set_after_client_reset_handler(realm_sync_config_t*, realm_syn
                                                  realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_initial_subscription_handler(realm_sync_config_t*,
                                                                 realm_async_open_task_init_subscription_func_t,
-                                                                realm_userdata_t userdata,
-                                                                realm_free_userdata_func_t userdata_free,
-                                                                bool rerun_on_open);
+                                                                bool rerun_on_open, realm_userdata_t userdata,
+                                                                realm_free_userdata_func_t userdata_free);
 /**
  * Fetch subscription id for the subscription passed as argument.
  * @return realm_object_id_t for the subscription passed as argument
