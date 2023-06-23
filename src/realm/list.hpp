@@ -427,6 +427,9 @@ public:
         insert(size(), std::move(value));
     }
 
+    template <typename T>
+    void add_json(const T&);
+
     Mixed operator[](size_t ndx) const
     {
         return this->get(ndx);

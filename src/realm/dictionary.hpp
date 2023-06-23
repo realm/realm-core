@@ -104,6 +104,9 @@ public:
     std::pair<Iterator, bool> insert(Mixed key, Mixed value);
     std::pair<Iterator, bool> insert(Mixed key, const Obj& obj);
 
+    template <typename T>
+    void insert_json(const std::string&, const T&);
+
     Obj create_and_insert_linked_object(Mixed key);
 
     void insert_collection(const PathElement&, CollectionType dict_or_list) override;

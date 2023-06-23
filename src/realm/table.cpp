@@ -1965,27 +1965,6 @@ void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::s
     out << "]}";
 }
 
-void Table::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
-                    JSONOutputMode output_mode) const
-{
-    // Represent table as list of objects
-    out << "[";
-    bool first = true;
-
-    for (auto& obj : *this) {
-        if (first) {
-            first = false;
-        }
-        else {
-            out << ",";
-        }
-        obj.to_json(out, link_depth, renames, output_mode);
-    }
-
-    out << "]";
-}
-
-
 bool Table::operator==(const Table& t) const
 {
     if (size() != t.size()) {
