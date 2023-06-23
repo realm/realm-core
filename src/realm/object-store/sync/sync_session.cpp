@@ -889,7 +889,10 @@ static sync::Session::Config::ClientReset make_client_reset_config(RealmConfig s
         };
     }
     config.notify_before_client_reset = [config = session_config]() -> VersionID {
-        auto frozen = Realm::get_shared_realm(config)->freeze(); // throws
+        auto coordinator = RealmCoordinator::get_coordinator(config);
+        auto tsr = coordinator->get_unbound_realm();
+        auto realm_updated = Realm::get_shared_realm(std::move(tsr));
+        auto frozen = realm_updated->freeze(); // throws
         REALM_ASSERT_EX(frozen, config.path);
         REALM_ASSERT(frozen->is_frozen());
         util::Optional<VersionID> version = frozen->current_transaction_version();
