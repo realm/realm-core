@@ -3346,6 +3346,9 @@ TEST_CASE("flx: async open + register subscription callack while bootstrapping",
         REQUIRE(table_ref->get_column_key("queryable_str_field"));
         REQUIRE(table_ref->get_column_key("queryable_int_field"));
         REQUIRE(table_ref->get_column_key("non_queryable_field"));
+        REQUIRE(table_ref->size() == 1);
+        auto str_col = table_ref->get_column_key("queryable_str_field");
+        REQUIRE(table_ref->get_object(0).get<String>(str_col) == "foo");
         cv.notify_one();
     };
 

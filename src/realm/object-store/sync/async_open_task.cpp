@@ -124,13 +124,31 @@ void AsyncOpenTask::run_subscription_initializer(SubscriptionCallback&& subscrip
 {
     auto shared_realm = coordinator->get_realm();
     auto latest_subscription = shared_realm->get_latest_subscription_set();
-    if (latest_subscription.version() == 0 || rerun_subscription_on_open) {
+    static std::atomic<bool> subscription_state = false;
+
+    // we can end up here into 2 cases:
+    //  1. this is the first time we are opening/creating a realm, in this case the subscription version must be 0
+    //  2. the realm file has already been created, but the SDK has instructed us to run the subscription initializer.
+    //
+    //  In case 2. we don't want to run the subscription callback multiple times, so we keep some sort of state in
+    //  order to minimize this possibility. However there is still a chance that the subscription could fail and the
+    //  callback not run, as long as we don't receive acknowledgment of this from the server.
+    if (latest_subscription.version() == 0 || (rerun_subscription_on_open && !subscription_state.load())) {
         subscription_callback(shared_realm);
+
+        if (latest_subscription.version() > 0) // rerun subscription flag is true
+            subscription_state.store(true);
+
         auto committed_subscription = shared_realm->get_latest_subscription_set();
         std::shared_ptr<AsyncOpenTask> self(shared_from_this());
         committed_subscription.get_state_change_notification(sync::SubscriptionSet::State::Complete)
             .get_async([self, coordinator, async_open_callback = std::move(async_open_callback)](
                            StatusWith<realm::sync::SubscriptionSet::State> state) mutable {
+                if (!state.is_ok()) {
+                    // subscription has failed, if the app retries to async open with the flag set, we should let it
+                    // rerun the subscription
+                    subscription_state.store(false);
+                }
                 self->async_open_complete(std::move(async_open_callback), coordinator, state.get_status());
             });
     }
