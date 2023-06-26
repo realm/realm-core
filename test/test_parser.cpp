@@ -2440,6 +2440,7 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
         verify_query_sub(test_context, t, util::format("%1values[first] == $1", path), args, num_args, 1);
         verify_query_sub(test_context, t, util::format("%1values[4] == $2", path), args, num_args, 1);
         verify_query_sub(test_context, t, util::format("%1values[last] == $3", path), args, num_args, 1);
+        verify_query_sub(test_context, t, util::format("%1values[*] == $0", path), args, num_args, num_matching_value_1);
         verify_query_sub(test_context, t, util::format("%1values == $0", path), args, num_args, num_matching_value_1);
         verify_query_sub(test_context, t, util::format("%1values != $0", path), args, num_args,
                          num_not_matching_value_1);
@@ -5174,7 +5175,7 @@ TEST(Parser_NestedListDictionary)
     verify_query(test_context, persons, "properties[0][*] == 5", 2);
 }
 
-TEST(Parser_NestedMixedDictionaryList)
+ONLY(Parser_NestedMixedDictionaryList)
 {
     Group g;
     auto persons = g.add_table_with_primary_key("table", type_String, "name");
@@ -5186,29 +5187,83 @@ TEST(Parser_NestedMixedDictionaryList)
     paul.set(col_self, paul.get_key());
     paul.set_collection(col, CollectionType::Dictionary);
     auto dict_paul = paul.get_dictionary(col);
-    dict_paul.insert_collection("tickets", CollectionType::List);
-    auto list1 = dict_paul.get_list("tickets");
-    list1->add(0);
-    list1->add(5);
-    list1->add(1);
-    list1->add(4);
+    {
+        dict_paul.insert_collection("instruments", CollectionType::List);
+        auto list = dict_paul.get_list("instruments");
+        list->insert_collection(0, CollectionType::Dictionary);
+        list->insert_collection(1, CollectionType::Dictionary);
+        list->insert_collection(2, CollectionType::Dictionary);
+        auto bass = list->get_dictionary(0);
+        bass->insert("brand", "høfner");
+        bass->insert("strings", 4);
+        bass->insert("electric", true);
+        auto guitar = list->get_dictionary(1);
+        guitar->insert("brand", "gibson");
+        guitar->insert("strings", 6);
+        guitar->insert("electric", true);
+        guitar = list->get_dictionary(2);
+        guitar->insert("brand", "martin");
+        guitar->insert("strings", 12);
+        guitar->insert("electric", false);
+    }
+    {
+        dict_paul.insert_collection("pets", CollectionType::List);
+        auto list = dict_paul.get_list("pets");
+        list->insert_collection(0, CollectionType::Dictionary);
+        list->insert_collection(1, CollectionType::Dictionary);
+        auto bird = list->get_dictionary(0);
+        bird->insert("name", "pipper");
+        bird->insert("legs", 2);
+        bird->insert("age", 4);
+        auto dog = list->get_dictionary(1);
+        dog->insert("name", "fido");
+        dog->insert("legs", 4);
+        dog->insert("age", 8);
+    }
 
     Obj john = persons->create_object_with_primary_key("John");
     john.set(col_self, john.get_key());
     john.set_collection(col, CollectionType::Dictionary);
     auto dict_john = john.get_dictionary(col);
-    dict_john.insert_collection("tickets", CollectionType::List);
-    auto list2 = dict_john.get_list("tickets");
-    list2->add(2);
-    list2->add(3);
-    list2->add(5);
-    list2->add(4);
+    dict_john.insert_collection("tickets", CollectionType::List); // Value here is NULL
+    {
+        dict_john.insert_collection("instruments", CollectionType::List);
+        auto list = dict_john.get_list("instruments");
+        list->insert_collection(0, CollectionType::Dictionary);
+        list->insert_collection(1, CollectionType::Dictionary);
+        auto guitar = list->get_dictionary(0);
+        guitar->insert("brand", "fender");
+        guitar->insert("strings", 6);
+        guitar->insert("electric", true);
+        guitar = list->get_dictionary(1);
+        guitar->insert("brand", "gibson");
+        guitar->insert("color", "red");
+        guitar->insert("strings", 6);
+        guitar->insert("electric", true);
+    }
+    {
+        dict_john.insert_collection("pets", CollectionType::List);
+        auto list = dict_john.get_list("pets");
+        list->insert_collection(0, CollectionType::Dictionary);
+        list->insert_collection(1, CollectionType::Dictionary);
+        auto cat = list->get_dictionary(0);
+        cat->insert("name", "Lady"); 
+        cat->insert("legs", 4);
+        cat->insert("age", 6);
+        auto snake = list->get_dictionary(1);
+        snake->insert("name", "carl");
+        snake->insert("legs", 0);
+        snake->insert("age", 20);
+    }
 
-    verify_query(test_context, persons, "properties.tickets[0] == 0", 1);
-    verify_query(test_context, persons, "properties.tickets[*] == 5", 2);
-    verify_query(test_context, persons, "properties.tickets[*] > 1", 2);
-    verify_query(test_context, persons, "properties.tickets[last] == 4", 2);
-    verify_query(test_context, persons, "self.properties.tickets[last] == 4", 2);
+    verify_query(test_context, persons, "properties.instruments[0].strings == 6", 1);
+    verify_query(test_context, persons, "properties.instruments[*].strings == 6", 2);
+    verify_query(test_context, persons, "properties.instruments[LAST].strings == 6", 1);
+    verify_query(test_context, persons, "properties.instruments[*].@keys  == 'color'", 1);
+    verify_query(test_context, persons, "properties[*][0].legs  == 2", 1); // Pipper the bird
+    verify_query(test_context, persons, "properties[*][0].legs  == 4", 1); // Lady the cat
+    verify_query(test_context, persons, "properties[*][*].legs  == 0", 1); // carl the snake
+    verify_query(test_context, persons, "properties[*][*][*] > 10", 2); // carl the snake and martin the guitar
 }
 
 TEST(Parser_NestedDictionaryDeep)

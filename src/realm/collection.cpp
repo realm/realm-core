@@ -98,8 +98,11 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
     auto path_size = ctrl.path.size() - index;
     PathElement& pe = ctrl.path[index];
     if (val.is_type(type_Dictionary) && (pe.is_key() || pe.is_all())) {
+        auto ref = val.get_ref();
+        if (!ref)
+            return;
         Array top(ctrl.alloc);
-        top.init_from_ref(val.get_ref());
+        top.init_from_ref(ref);
 
         BPlusTree<StringData> keys(ctrl.alloc);
         keys.set_parent(&top, 0);
@@ -109,6 +112,11 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
             if (pe.is_key()) {
                 start = keys.find_first(StringData(pe.get_key()));
                 if (start == realm::not_found) {
+                    if (pe.get_key() == "@keys") {
+                        keys.for_all([&](auto& k) {
+                            ctrl.matches.insert(k);
+                            });
+                    }
                     return;
                 }
                 finish = start + 1;
@@ -127,9 +135,12 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
             }
         }
     }
-    if (val.is_type(type_List) && (pe.is_ndx() || pe.is_all())) {
+    else if (val.is_type(type_List) && (pe.is_ndx() || pe.is_all())) {
+        auto ref = val.get_ref();
+        if (!ref)
+            return;
         ArrayMixed list(ctrl.alloc);
-        list.init_from_ref(val.get_ref());
+        list.init_from_ref(ref);
         if (size_t sz = list.size()) {
             size_t start = 0;
             size_t finish = sz;
