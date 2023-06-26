@@ -226,7 +226,8 @@ struct SyncConfig {
 
     // callback invoked when async open is used in order to setup an initial subscription.
     // This callback is run before asyn open completes
-    std::function<void(std::shared_ptr<Realm>)> subscription_initializer;
+    using SubscriptionInitializerCallback = std::function<void(std::shared_ptr<Realm>)>;
+    SubscriptionInitializerCallback subscription_initializer;
 
     // in case the initial subscription contains a dynamic query, the user may want to force
     // the query to be run again every time the realm is opened. This flag should be set to true

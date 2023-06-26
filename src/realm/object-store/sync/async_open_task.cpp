@@ -27,9 +27,10 @@
 namespace realm {
 
 AsyncOpenTask::AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinator,
-                             std::shared_ptr<realm::SyncSession> session)
+                             std::shared_ptr<realm::SyncSession> session, bool db_created)
     : m_coordinator(coordinator)
     , m_session(session)
+    , m_db_created(db_created)
 {
 }
 
@@ -42,33 +43,31 @@ void AsyncOpenTask::start(AsyncOpenCallback async_open_complete)
     lock.unlock();
 
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
-    session->wait_for_download_completion(
-        [async_open_complete = std::move(async_open_complete), self, this](Status status) mutable {
-            std::shared_ptr<_impl::RealmCoordinator> coordinator;
-            {
-                util::CheckedLockGuard lock(m_mutex);
-                if (!m_session)
-                    return; // Swallow all events if the task has been cancelled.
+    session->wait_for_download_completion([async_open_complete = std::move(async_open_complete), self,
+                                           this](Status status) mutable {
+        std::shared_ptr<_impl::RealmCoordinator> coordinator;
+        {
+            util::CheckedLockGuard lock(m_mutex);
+            if (!m_session)
+                return; // Swallow all events if the task has been cancelled.
 
-                // Hold on to the coordinator until after we've called the callback
-                coordinator = std::move(m_coordinator);
-            }
+            // Hold on to the coordinator until after we've called the callback
+            coordinator = std::move(m_coordinator);
+        }
 
-            if (!status.is_ok())
-                self->async_open_complete(std::move(async_open_complete), coordinator, status);
+        if (!status.is_ok())
+            self->async_open_complete(std::move(async_open_complete), coordinator, status);
 
-            auto config = coordinator->get_config();
-            if (config.sync_config && config.sync_config->flx_sync_requested &&
-                config.sync_config->subscription_initializer) {
-                auto subscription_initializer = config.sync_config->subscription_initializer;
-                auto rerun_subscription = config.sync_config->rerun_init_subscription_on_open;
-                self->run_subscription_initializer(std::move(subscription_initializer),
-                                                   std::move(async_open_complete), coordinator, rerun_subscription);
-            }
-            else {
-                self->async_open_complete(std::move(async_open_complete), coordinator, status);
-            }
-        });
+        auto config = coordinator->get_config();
+        if (config.sync_config && config.sync_config->flx_sync_requested &&
+            config.sync_config->subscription_initializer) {
+            auto rerun_subscription = config.sync_config->rerun_init_subscription_on_open;
+            self->attach_to_subscription_initializer(std::move(async_open_complete), coordinator, rerun_subscription);
+        }
+        else {
+            self->async_open_complete(std::move(async_open_complete), coordinator, status);
+        }
+    });
     session->revive_if_needed();
 }
 
@@ -117,38 +116,20 @@ void AsyncOpenTask::unregister_download_progress_notifier(uint64_t token)
         m_session->unregister_progress_notifier(token);
 }
 
-void AsyncOpenTask::run_subscription_initializer(SubscriptionCallback&& subscription_callback,
-                                                 AsyncOpenCallback&& async_open_callback,
-                                                 std::shared_ptr<_impl::RealmCoordinator> coordinator,
-                                                 bool rerun_subscription_on_open)
+void AsyncOpenTask::attach_to_subscription_initializer(AsyncOpenCallback&& async_open_callback,
+                                                       std::shared_ptr<_impl::RealmCoordinator> coordinator,
+                                                       bool rerun_subscription_on_open)
 {
-    auto shared_realm = coordinator->get_realm();
-    auto latest_subscription = shared_realm->get_latest_subscription_set();
-    static std::atomic<bool> subscription_state = false;
-
-    // we can end up here into 2 cases:
-    //  1. this is the first time we are opening/creating a realm, in this case the subscription version must be 0
-    //  2. the realm file has already been created, but the SDK has instructed us to run the subscription initializer.
-    //
-    //  In case 2. we don't want to run the subscription callback multiple times, so we keep some sort of state in
-    //  order to minimize this possibility. However there is still a chance that the subscription could fail and the
-    //  callback not run, as long as we don't receive acknowledgment of this from the server.
-    if (latest_subscription.version() == 0 || (rerun_subscription_on_open && !subscription_state.load())) {
-        subscription_callback(shared_realm);
-
-        if (latest_subscription.version() > 0) // rerun subscription flag is true
-            subscription_state.store(true);
-
-        auto committed_subscription = shared_realm->get_latest_subscription_set();
+    // we need to wait until the initial subscription has been committed.
+    if (m_db_created || (rerun_subscription_on_open && !m_db_created)) {
+        // the subscription initilizer is going to be called by get_realm().
+        // here we just wait until the latest committed subscription has been completed.
+        auto shared_realm = coordinator->get_realm();
         std::shared_ptr<AsyncOpenTask> self(shared_from_this());
-        committed_subscription.get_state_change_notification(sync::SubscriptionSet::State::Complete)
+        const auto init_subscription = shared_realm->get_latest_subscription_set();
+        init_subscription.get_state_change_notification(sync::SubscriptionSet::State::Complete)
             .get_async([self, coordinator, async_open_callback = std::move(async_open_callback)](
                            StatusWith<realm::sync::SubscriptionSet::State> state) mutable {
-                if (!state.is_ok()) {
-                    // subscription has failed, if the app retries to async open with the flag set, we should let it
-                    // rerun the subscription
-                    subscription_state.store(false);
-                }
                 self->async_open_complete(std::move(async_open_callback), coordinator, state.get_status());
             });
     }
