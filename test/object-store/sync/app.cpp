@@ -1571,7 +1571,7 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app][local][use
         else if (request.url.find("/profile") != std::string::npos) {
             logged_in_user->log_out();
             state.advance_to(TestState::profile);
-            mock_transport_worker.add_work_item(make_json_response(sync::HTTPStatus::Ok, user_profile_json().dump()),
+            mock_transport_worker.add_work_item(make_json_response(sync::HTTPStatus::Ok, user_profile_json()),
                                                 std::move(completion));
         }
         else if (request.url.find("/location") != std::string::npos) {

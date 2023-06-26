@@ -172,28 +172,26 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
         };
 
         auto check_redirect_error = [&] {
-            auto [promise, error_future] = util::make_promise_future<AppError>();
-            util::CopyablePromiseHolder<AppError> error_promise(std::move(promise));
+            std::unique_ptr<StatusWith<AppError>> app_error;
             redir_app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
-                creds.email, creds.password,
-                [promise = std::move(promise)](util::Optional<app::AppError> error) mutable {
+                creds.email, creds.password, [&app_error](util::Optional<app::AppError> error) {
                     if (!error) {
-                        promise.set_error(
-                            {ErrorCodes::RuntimeError, "App error not received for invalid redirect response"});
+                        app_error = std::make_unique<StatusWith<AppError>>(
+                            Status{ErrorCodes::RuntimeError, "App error not received for invalid redirect response"});
                         return;
                     }
-                    promise.emplace_value(std::move(*error));
+                    app_error = std::make_unique<StatusWith<AppError>>(std::move(*error));
                 });
 
-            auto error = wait_for_future(std::move(error_future), std::chrono::seconds(15)).get_no_throw();
-            if (!error.is_ok()) {
-                logger->error("Invalid redirect response test failed: %1", error.get_status().reason());
+            REQUIRE(app_error);
+            if (!app_error->is_ok()) {
+                logger->error("Invalid redirect response test failed: %1", app_error->get_status().reason());
             }
-            REQUIRE(error.is_ok());
+            REQUIRE(app_error->is_ok());
 
-            REQUIRE(error.get_value().is_client_error());
-            REQUIRE(error.get_value().code() == ErrorCodes::ClientRedirectError);
-            REQUIRE(error.get_value().reason() == "Redirect response missing location header");
+            REQUIRE(app_error->get_value().is_client_error());
+            REQUIRE(app_error->get_value().code() == ErrorCodes::ClientRedirectError);
+            REQUIRE(app_error->get_value().reason() == "Redirect response missing location header");
         };
 
         while (redirect_count < max_request_count) {
