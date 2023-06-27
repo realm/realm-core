@@ -126,6 +126,7 @@ mixedInfo:
     - LinkList
   extraCtors:
     - Obj
+    - Geospatial
 
 enums:
   SchemaMode:
@@ -361,6 +362,28 @@ records:
       alias:
         type: std::string
         default: ''
+
+  GeoPoint:
+    fields:
+      longitude: double
+      latitude: double
+      altitude: 
+        type: double
+        default: std::numeric_limits<double>::quiet_NaN()
+
+  GeoCircle:
+    fields:
+      radius_radians: double
+      center: GeoPoint
+
+  GeoBox:
+    fields:
+      lo: GeoPoint
+      hi: GeoPoint
+
+  GeoPolygon:
+    fields:
+      points: std::vector<std::vector<GeoPoint>>
 
   RealmConfig:
     fields:
@@ -751,6 +774,12 @@ classes:
     properties:
       get_seconds: int64_t
       get_nanoseconds: int32_t
+
+  Geospatial:
+    constructors:
+      make_from_circle: '(circle: GeoCircle)'
+      make_from_box: '(box: GeoBox)'
+      make_from_polygon: '(polygon: GeoPolygon)'
 
   ObjLink:
     properties:
