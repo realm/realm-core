@@ -966,6 +966,9 @@ void Table::add_search_index(ColKey col_key, IndexType type)
     auto spec_ndx = leaf_ndx2spec_ndx(col_key.get_index());
     auto attr = m_spec.get_column_attr(spec_ndx);
 
+    if (col_key == m_primary_key_col && type == IndexType::Fulltext)
+        throw InvalidColumnKey("primary key cannot have a full text index");
+
     switch (type) {
         case IndexType::None:
             remove_search_index(col_key);
@@ -3601,6 +3604,14 @@ void Table::set_primary_key_column(ColKey col_key)
 
 void Table::do_set_primary_key_column(ColKey col_key)
 {
+    if (col_key) {
+        auto spec_ndx = leaf_ndx2spec_ndx(col_key.get_index());
+        auto attr = m_spec.get_column_attr(spec_ndx);
+        if (attr.test(col_attr_FullText_Indexed)) {
+            throw InvalidColumnKey("primary key cannot have a full text index");
+        }
+    }
+
     if (m_primary_key_col) {
         // If the search index has not been set explicitly on current pk col, we remove it again
         auto spec_ndx = leaf_ndx2spec_ndx(m_primary_key_col.get_index());

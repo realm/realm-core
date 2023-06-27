@@ -417,6 +417,17 @@ auto Results::last(Context& ctx)
     });
 }
 
+template <>
+size_t Results::index_of(Obj const& obj);
+template <>
+size_t Results::index_of(Mixed const& value);
+
+template <typename T>
+inline size_t Results::index_of(T const& value)
+{
+    return index_of(Mixed(value));
+}
+
 template <typename Context, typename T>
 size_t Results::index_of(Context& ctx, T value)
 {

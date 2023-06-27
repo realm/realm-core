@@ -1,12 +1,13 @@
 # NEXT RELEASE
 
 ### Enhancements
-*Added support for configuring initial subscriptions for synchronized realms. ([#5962](https://github.com/realm/realm-core/issues/5962))
+* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* Add visionOS binaries to the Cocoa release package ([PR #6746](https://github.com/realm/realm-core/pull/6746)).
+* Added support for running initial subscription callback when opening realm. ([#5962](https://github.com/realm/realm-core/issues/5962))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Querying with object list arguments does not work. ([#6688](https://github.com/realm/realm-core/issues/6688), since v10.3.3)
-* Fix SessionWrapper use-after-free crash when tearing down sessions when using session multiplexing ([#6656](https://github.com/realm/realm-core/issues/6656), since v13.9.3)
+* None.
 
 ### Breaking changes
 * None.
@@ -17,7 +18,45 @@
 -----------
 
 ### Internals
+* Prebuilt binaries for non-Apple platforms are no longer published as nothing was using them ([PR #6746](https://github.com/realm/realm-core/pull/6746)).
+
+----------------------------------------------
+
+# 13.15.2 Release notes
+
+### Enhancements
 * None.
+
+### Fixed
+* A GeoBox is now just a shortcut for the equivilent GeoPolygon. This provides consistent query results and error checking. ([#6703](https://github.com/realm/realm-core/issues/6703), since v13.11.0) 
+* Fixed several corner cases (eg. around the poles) where invalid points matched a geoWithin query.
+* Disallow full text search index for primary key columns. ([#6657](https://github.com/realm/realm-core/issues/6657), since v13.2.0)
+* Searching for objects in Results would not always find the requested item. This is particularly the case when the C API is used. ([#6695](https://github.com/realm/realm-core/issues/6695), since v10.0.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Fixed Valgrind error ([#6643](https://github.com/realm/realm-core/issues/6643))
+
+----------------------------------------------
+
+# 13.15.1 Release notes
+
+### Fixed
+* Querying with object list arguments does not work. ([#6688](https://github.com/realm/realm-core/issues/6688), since v10.3.3)
+* Fix SessionWrapper use-after-free crash when tearing down sessions when using session multiplexing ([#6656](https://github.com/realm/realm-core/issues/6656), since v13.9.3)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
 
 ----------------------------------------------
 

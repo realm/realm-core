@@ -1396,8 +1396,7 @@ bool QueryStateFindAll<KeyColumn>::match(size_t index, Mixed) noexcept
 {
     ++m_match_count;
 
-    REALM_ASSERT(m_key_values);
-    int64_t key_value = m_key_values->get(index) + m_key_offset;
+    int64_t key_value = (m_key_values ? m_key_values->get(index) : index) + m_key_offset;
     m_keys.add(ObjKey(key_value));
 
     return (m_limit > m_match_count);

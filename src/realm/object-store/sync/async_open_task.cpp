@@ -42,30 +42,30 @@ void AsyncOpenTask::start(AsyncOpenCallback async_open_complete)
     lock.unlock();
 
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
-    session->wait_for_download_completion([async_open_complete = std::move(async_open_complete), self,
-                                           this](Status status) mutable {
-        std::shared_ptr<_impl::RealmCoordinator> coordinator;
-        {
-            util::CheckedLockGuard lock(m_mutex);
-            if (!m_session)
-                return; // Swallow all events if the task has been cancelled.
+    session->wait_for_download_completion(
+        [async_open_complete = std::move(async_open_complete), self, this](Status status) mutable {
+            std::shared_ptr<_impl::RealmCoordinator> coordinator;
+            {
+                util::CheckedLockGuard lock(m_mutex);
+                if (!m_session)
+                    return; // Swallow all events if the task has been cancelled.
 
-            // Hold on to the coordinator until after we've called the callback
-            coordinator = std::move(m_coordinator);
-        }
+                // Hold on to the coordinator until after we've called the callback
+                coordinator = std::move(m_coordinator);
+            }
 
-        if (!status.is_ok())
-            self->async_open_complete(std::move(async_open_complete), coordinator, status);
+            if (!status.is_ok())
+                self->async_open_complete(std::move(async_open_complete), coordinator, status);
 
-        auto config = coordinator->get_config();
-        if (config.sync_config && config.sync_config->flx_sync_requested &&
-            config.sync_config->subscription_initializer) {
-            self->attach_to_subscription_initializer(std::move(async_open_complete), coordinator);
-        }
-        else {
-            self->async_open_complete(std::move(async_open_complete), coordinator, status);
-        }
-    });
+            auto config = coordinator->get_config();
+            if (config.sync_config && config.sync_config->flx_sync_requested &&
+                config.sync_config->subscription_initializer) {
+                self->attach_to_subscription_initializer(std::move(async_open_complete), coordinator);
+            }
+            else {
+                self->async_open_complete(std::move(async_open_complete), coordinator, status);
+            }
+        });
     session->revive_if_needed();
 }
 

@@ -120,10 +120,11 @@ void set_key(util::Optional<std::vector<char>>& key, CFStringRef account, CFStri
         case errSecDuplicateItem:
             // A keychain item already exists but we didn't fine it in get_key(),
             // meaning that we didn't have permission to access it.
+        case errSecMissingEntitlement:
         case errSecUserCanceled:
         case errSecInteractionNotAllowed:
         case errSecInvalidKeychain:
-            // We were unable to save the key for "expected" reasons, so proceeed unencrypted
+            // We were unable to save the key for "expected" reasons, so proceed unencrypted
             key = none;
             return;
         default:
