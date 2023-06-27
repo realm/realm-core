@@ -2703,10 +2703,17 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(value.type == RLM_TYPE_LINK);
                     CHECK(value.link.target_table == class_foo.key);
                     CHECK(value.link.target == realm_object_get_key(obj1.get()));
-                    CHECK(!realm_results_get(r.get(), 1, &value));
-                    CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
                     size_t index = -1;
                     bool found = false;
+                    CHECK(realm_results_find(r.get(), &value, &index, &found));
+                    CHECK(index == 0);
+                    CHECK(found == true);
+
+                    value = rlm_null();
+                    CHECK(!realm_results_get(r.get(), 1, &value));
+                    CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
+                    index = -1;
+                    found = false;
                     CHECK(realm_results_find(r.get(), &value, &index, &found));
                     CHECK(index == realm::not_found);
                     CHECK(found == false);

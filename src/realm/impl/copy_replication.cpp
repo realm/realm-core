@@ -171,17 +171,17 @@ void CopyReplication::dictionary_insert(const CollectionBase& coll, size_t, Mixe
     if (value.is_type(type_Link, type_TypedLink)) {
         value = handle_link(col_key, value, [&](TableRef dest_target_table) {
             // Check if dictionary obj has embedded obj already
-            auto tmp = dict.try_get(key);
-            Obj embedded;
-            if (tmp && tmp->is_type(type_TypedLink)) {
-                ObjKey key = tmp->get<ObjKey>();
-                embedded = dest_target_table->get_object(key);
+            size_t ndx = dict.find_any_key(key);
+            if (ndx != realm::not_found) {
+                auto val = dict.get_any(ndx);
+                if (val.is_type(type_Link)) {
+                    ObjKey key = val.get<ObjKey>();
+                    m_current.obj_in_destination = dest_target_table->get_object(key);
+                    return;
+                }
             }
-            else {
-                // If not, create one
-                embedded = dict.create_and_insert_linked_object(key);
-            }
-            m_current.obj_in_destination = embedded;
+            // If not, create one
+            m_current.obj_in_destination = dict.create_and_insert_linked_object(key);
         });
         if (value.is_null())
             return;

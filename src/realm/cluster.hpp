@@ -187,9 +187,9 @@ public:
     {
         return ObjKey(get_key_value(ndx) + m_offset);
     }
-    const ClusterKeyArray* get_key_array() const
+    const ArrayUnsigned* get_key_array() const
     {
-        return &m_keys;
+        return m_keys.is_attached() ? &m_keys : nullptr;
     }
     void set_offset(uint64_t offs)
     {
@@ -208,6 +208,16 @@ protected:
 #endif
 
     static constexpr size_t cluster_node_size = 1 << node_shift_factor;
+
+    class ClusterKeyArray : public ArrayUnsigned {
+    public:
+        using ArrayUnsigned::ArrayUnsigned;
+
+        uint64_t get(size_t ndx) const
+        {
+            return (m_data != nullptr) ? ArrayUnsigned::get(ndx) : uint64_t(ndx);
+        }
+    };
 
     const ClusterTree& m_tree_top;
     ClusterKeyArray m_keys;
