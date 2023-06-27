@@ -26,6 +26,7 @@
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
 #include <realm/db_options.hpp>
 #include <realm/sync/client.hpp>
@@ -890,8 +891,12 @@ static sync::Session::Config::ClientReset make_client_reset_config(RealmConfig s
     }
     config.notify_before_client_reset = [config = session_config]() -> VersionID {
         auto coordinator = RealmCoordinator::get_coordinator(config);
-        auto tsr = coordinator->get_unbound_realm();
-        auto realm_updated = Realm::get_shared_realm(std::move(tsr));
+        // Opening the Realm live here may make a write if the schema is different
+        // than what exists on disk. It is necessary to pass a fully usable Realm
+        // to the user here. Note that the schema changes made here will be considered
+        // an "offline write" to be recovered if this is recovery mode.
+        auto no_notifier = util::Scheduler::make_dummy();
+        auto realm_updated = coordinator->get_realm(no_notifier);
         auto frozen = realm_updated->freeze(); // throws
         REALM_ASSERT_EX(frozen, config.path);
         REALM_ASSERT(frozen->is_frozen());
