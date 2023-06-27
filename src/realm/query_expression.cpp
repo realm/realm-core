@@ -223,7 +223,20 @@ ColumnDictionaryKeys Columns<Dictionary>::keys()
 
 void Columns<Dictionary>::init_path(const PathElement* begin, const PathElement* end)
 {
+    m_path.clear();
+    m_path_only_unary_keys = true;
+    while (begin != end) {
+        if (begin->is_all()) {
+            m_path_only_unary_keys = false;
+        }
+        m_path.emplace_back(std::move(*begin));
+        ++begin;
+    }
     std::move(begin, end, std::back_inserter(m_path));
+    if (m_path.empty()) {
+        m_path_only_unary_keys = false;
+        m_path.push_back(PathElement::AllTag());
+    }
 }
 
 void ColumnDictionaryKeys::set_cluster(const Cluster* cluster)
@@ -317,62 +330,35 @@ SizeOperator<int64_t> Columns<Dictionary>::size()
 
 void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
 {
+    Collection::QueryCtrlBlock ctrl(m_path, get_base_table()->get_alloc(), !m_path_only_unary_keys);
+
     if (links_exist()) {
         REALM_ASSERT(!m_leaf);
         std::vector<ObjKey> links = m_link_map.get_links(index);
         auto sz = links.size();
+        if (!m_link_map.only_unary_links())
+            ctrl.from_list = true;
 
-        // Here we don't really know how many values to expect
-        std::vector<Mixed> values;
         for (size_t t = 0; t < sz; t++) {
             const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
-            auto dict = obj.get_dictionary(m_column_key);
-            if (m_path.empty()) {
-                // Insert all values
-                dict.for_all_values([&values](const Mixed& value) {
-                    values.emplace_back(value);
-                });
-            }
-            else {
-                Mixed val;
-                if (auto opt_val = dict.try_get(m_path.front().get_key())) {
-                    val = *opt_val;
-                }
-                values.emplace_back(val);
+            auto val = obj.get_any(m_column_key);
+            if (!val.is_null()) {
+                Collection::get_any(ctrl, val, 0);
             }
         }
-
-        // Copy values over
-        destination.init(true, values.size());
-        destination.set(values.begin(), values.end());
     }
     else {
         // Not a link column
-        Allocator& alloc = get_base_table()->get_alloc();
-
         REALM_ASSERT(m_leaf);
         if (ref_type ref = to_ref(m_leaf->get(index))) {
-            if (m_path.empty()) {
-                Array top(alloc);
-                top.init_from_ref(ref);
-                BPlusTree<Mixed> values(alloc);
-                values.set_parent(&top, 1);
-                values.init_from_parent();
-                destination.init(true, values.size());
-                size_t n = 0;
-                // Iterate through BPlusTreee and insert all values
-                values.for_all([&](Mixed val) {
-                    destination.set(n, val);
-                    n++;
-                });
-            }
-            else {
-                auto val =
-                    Collection::get_any({ref, CollectionType::Dictionary}, m_path.begin(), m_path.end(), alloc);
-                destination.set(0, val);
-            }
+            Collection::get_any(ctrl, {ref, CollectionType::Dictionary}, 0);
         }
     }
+
+    // Copy values over
+    auto sz = ctrl.matches.size();
+    destination.init(ctrl.from_list || sz == 0, sz);
+    destination.set(ctrl.matches.begin(), ctrl.matches.end());
 }
 
 

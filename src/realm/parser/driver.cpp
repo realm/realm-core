@@ -648,7 +648,7 @@ Query RelationalNode::visit(ParserDriver* drv)
     }
 
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
-    if (prop && !prop->links_exist() && right->has_single_value() &&
+    if (prop && !prop->links_exist() && !prop->has_path() && right->has_single_value() &&
         (left_type == right_type || left_type == type_Mixed)) {
         auto col_key = prop->column_key();
         switch (left->get_type()) {
@@ -854,16 +854,19 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
     }
 
     if (!indexes.empty()) {
+        auto ok = false;
         const PathElement& first_index = indexes.front();
         if (indexes.size() > 1 && subexpr->get_type() != type_Mixed) {
             throw InvalidQueryError("Only Property of type 'any' can have nested collections");
         }
         if (auto mixed = dynamic_cast<Columns<Mixed>*>(subexpr.get())) {
+            ok = true;
             mixed->path(indexes);
         }
-        else if (first_index.is_key()) {
-            auto trailing = first_index.get_key();
-            if (auto dict = dynamic_cast<Columns<Dictionary>*>(subexpr.get())) {
+        else if (auto dict = dynamic_cast<Columns<Dictionary>*>(subexpr.get())) {
+            if (first_index.is_key()) {
+                ok = true;
+                auto trailing = first_index.get_key();
                 if (trailing == "@values") {
                 }
                 else if (trailing == "@keys") {
@@ -873,7 +876,23 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
                     dict->key(indexes);
                 }
             }
-            else {
+            else if (first_index.is_all()) {
+                ok = true;
+                dict->key(indexes);
+            }
+        }
+        else if (auto coll = dynamic_cast<Columns<Lst<Mixed>>*>(subexpr.get())) {
+            ok = coll->indexes(indexes);
+        }
+        else if (auto coll = dynamic_cast<ColumnListBase*>(subexpr.get())) {
+            if (indexes.size() == 1) {
+                ok = coll->index(first_index);
+            }
+        }
+
+        if (!ok) {
+            if (first_index.is_key()) {
+                auto trailing = first_index.get_key();
                 if (!post_op && is_length_suffix(trailing)) {
                     // If 'length' is the operator, the last id in the path must be the name
                     // of a list property
@@ -889,22 +908,7 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
                                                      m_link_chain.get_current_table()->get_class_name(), identifier,
                                                      trailing));
             }
-        }
-        else {
-            // This must be an integer index
-            REALM_ASSERT(first_index.is_ndx());
-            auto ok = false;
-            if (indexes.size() == 1) {
-                if (auto coll = dynamic_cast<ColumnListBase*>(subexpr.get())) {
-                    ok = coll->index(first_index);
-                }
-            }
             else {
-                if (auto coll = dynamic_cast<Columns<Lst<Mixed>>*>(subexpr.get())) {
-                    ok = coll->indexes(indexes);
-                }
-            }
-            if (!ok) {
                 throw InvalidQueryError(util::format("Property '%1.%2' does not support index '%3'",
                                                      m_link_chain.get_current_table()->get_class_name(), identifier,
                                                      first_index));

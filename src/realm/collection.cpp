@@ -93,46 +93,77 @@ void check_for_last_unresolved(BPlusTree<ObjKey>* tree)
 
 Collection::~Collection() {}
 
-Mixed Collection::get_any(Mixed val, Path::const_iterator begin, Path::const_iterator end, Allocator& alloc)
+void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
 {
-    auto path_size = end - begin;
-    if (val.is_type(type_Dictionary) && begin->is_key()) {
-        Array top(alloc);
-        top.init_from_ref(val.get_ref());
+    auto path_size = ctrl.path.size() - index;
+    PathElement& pe = ctrl.path[index];
+    if (val.is_type(type_Dictionary) && (pe.is_key() || pe.is_all())) {
+        auto ref = val.get_ref();
+        if (!ref)
+            return;
+        Array top(ctrl.alloc);
+        top.init_from_ref(ref);
 
-        BPlusTree<StringData> keys(alloc);
+        BPlusTree<StringData> keys(ctrl.alloc);
         keys.set_parent(&top, 0);
         keys.init_from_parent();
-        size_t ndx = keys.find_first(StringData(begin->get_key()));
-        if (ndx != realm::not_found) {
-            BPlusTree<Mixed> values(alloc);
+        size_t start = 0;
+        if (size_t finish = keys.size()) {
+            if (pe.is_key()) {
+                start = keys.find_first(StringData(pe.get_key()));
+                if (start == realm::not_found) {
+                    if (pe.get_key() == "@keys") {
+                        keys.for_all([&](const auto& k) {
+                            ctrl.matches.insert(k);
+                        });
+                    }
+                    return;
+                }
+                finish = start + 1;
+            }
+            BPlusTree<Mixed> values(ctrl.alloc);
             values.set_parent(&top, 1);
             values.init_from_parent();
-            val = values.get(ndx);
-            if (path_size > 1) {
-                val = Collection::get_any(val, begin + 1, end, alloc);
+            for (; start < finish; start++) {
+                val = values.get(start);
+                if (path_size > 1) {
+                    Collection::get_any(ctrl, val, index + 1);
+                }
+                else {
+                    ctrl.matches.insert(val);
+                }
             }
-            return val;
         }
     }
-    if (val.is_type(type_List) && begin->is_ndx()) {
-        ArrayMixed list(alloc);
-        list.init_from_ref(val.get_ref());
+    else if (val.is_type(type_List) && (pe.is_ndx() || pe.is_all())) {
+        auto ref = val.get_ref();
+        if (!ref)
+            return;
+        ArrayMixed list(ctrl.alloc);
+        list.init_from_ref(ref);
         if (size_t sz = list.size()) {
-            auto idx = begin->get_ndx();
-            if (idx == size_t(-1)) {
-                idx = sz - 1;
+            size_t start = 0;
+            size_t finish = sz;
+            if (pe.is_ndx()) {
+                start = pe.get_ndx();
+                if (start == size_t(-1)) {
+                    start = sz - 1;
+                }
+                if (start < sz) {
+                    finish = start + 1;
+                }
             }
-            if (idx < sz) {
-                val = list.get(idx);
+            for (; start < finish; start++) {
+                val = list.get(start);
+                if (path_size > 1) {
+                    Collection::get_any(ctrl, val, index + 1);
+                }
+                else {
+                    ctrl.matches.insert(val);
+                }
             }
-            if (path_size > 1) {
-                val = Collection::get_any(val, begin + 1, end, alloc);
-            }
-            return val;
         }
     }
-    return {};
 }
 
 std::pair<std::string, std::string> CollectionBase::get_open_close_strings(size_t link_depth,
