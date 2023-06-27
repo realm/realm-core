@@ -260,6 +260,7 @@ private:
 
     std::shared_ptr<AuditInterface> m_audit_context;
 
+    // returns true the first time the database is opened, false otherwise.
     bool open_db() REQUIRES(m_realm_mutex);
 
     void set_config(const Realm::Config&) REQUIRES(m_realm_mutex, !m_schema_cache_mutex);

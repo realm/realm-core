@@ -41,8 +41,7 @@ public:
     using AsyncOpenCallback = util::UniqueFunction<void(ThreadSafeReference, std::exception_ptr)>;
     using SubscriptionCallback = util::UniqueFunction<void(std::shared_ptr<Realm>)>;
 
-    AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinator, std::shared_ptr<realm::SyncSession> session,
-                  bool db_created);
+    AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinator, std::shared_ptr<realm::SyncSession> session);
     // Starts downloading the Realm. The callback will be triggered either when the download completes
     // or an error is encountered.
     //
@@ -60,14 +59,13 @@ public:
 private:
     void async_open_complete(AsyncOpenCallback&&, std::shared_ptr<_impl::RealmCoordinator>, Status)
         REQUIRES(!m_mutex);
-    void attach_to_subscription_initializer(AsyncOpenCallback&&, std::shared_ptr<_impl::RealmCoordinator>, bool)
+    void attach_to_subscription_initializer(AsyncOpenCallback&&, std::shared_ptr<_impl::RealmCoordinator>)
         REQUIRES(!m_mutex);
 
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator GUARDED_BY(m_mutex);
     std::shared_ptr<SyncSession> m_session GUARDED_BY(m_mutex);
     std::vector<uint64_t> m_registered_callbacks GUARDED_BY(m_mutex);
     mutable util::CheckedMutex m_mutex;
-    bool m_db_created;
 };
 
 } // namespace realm

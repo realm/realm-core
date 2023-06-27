@@ -224,8 +224,7 @@ struct SyncConfig {
 
     bool simulate_integration_error = false;
 
-    // callback invoked when async open is used in order to setup an initial subscription.
-    // This callback is run before asyn open completes
+    // callback invoked right after DataInitializationFunction. It is used in order to setup an initial subscription.
     using SubscriptionInitializerCallback = std::function<void(std::shared_ptr<Realm>)>;
     SubscriptionInitializerCallback subscription_initializer;
 

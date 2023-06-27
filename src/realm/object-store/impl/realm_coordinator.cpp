@@ -321,7 +321,7 @@ ThreadSafeReference RealmCoordinator::get_unbound_realm()
 void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>& realm,
                                     util::Optional<VersionID> version, util::CheckedUniqueLock& realm_lock)
 {
-    const auto db_created = open_db();
+    const auto db_opened_first_time = open_db();
 
     auto schema = std::move(config.schema);
     auto migration_function = std::move(config.migration_function);
@@ -376,7 +376,7 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
     // rerun_on_open was set
     if (subscription_function) {
         const auto current_subscription = realm->get_latest_subscription_set();
-        if (current_subscription.version() == 0 || (rerun_on_open && !db_created)) {
+        if ((current_subscription.version() == 0) || (rerun_on_open && db_opened_first_time)) {
             subscription_function(realm);
         }
     }
@@ -404,8 +404,8 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
 
     util::CheckedLockGuard lock(m_realm_mutex);
     set_config(config);
-    const auto db_created = open_db();
-    return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session, db_created);
+    open_db();
+    return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session);
 }
 
 #endif
@@ -424,7 +424,7 @@ bool RealmCoordinator::open_db()
         if (m_sync_session) {
             m_db = SyncSession::Internal::get_db(*m_sync_session);
             init_external_helpers();
-            return true;
+            return false;
         }
     }
 #endif
