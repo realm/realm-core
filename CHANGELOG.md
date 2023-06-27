@@ -18,6 +18,7 @@
 
 ### Internals
 * Prebuilt binaries for non-Apple platforms are no longer published as nothing was using them ([PR #6746](https://github.com/realm/realm-core/pull/6746)).
+* Separate out local vs. baas object store app tests into separate directories ([PR #6751](https://github.com/realm/realm-core/pull/6751)).
 
 ----------------------------------------------
 
