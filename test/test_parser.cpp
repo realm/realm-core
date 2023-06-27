@@ -2440,7 +2440,8 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
         verify_query_sub(test_context, t, util::format("%1values[first] == $1", path), args, num_args, 1);
         verify_query_sub(test_context, t, util::format("%1values[4] == $2", path), args, num_args, 1);
         verify_query_sub(test_context, t, util::format("%1values[last] == $3", path), args, num_args, 1);
-        verify_query_sub(test_context, t, util::format("%1values[*] == $0", path), args, num_args, num_matching_value_1);
+        verify_query_sub(test_context, t, util::format("%1values[*] == $0", path), args, num_args,
+                         num_matching_value_1);
         verify_query_sub(test_context, t, util::format("%1values == $0", path), args, num_args, num_matching_value_1);
         verify_query_sub(test_context, t, util::format("%1values != $0", path), args, num_args,
                          num_not_matching_value_1);
@@ -5247,7 +5248,7 @@ ONLY(Parser_NestedMixedDictionaryList)
         list->insert_collection(0, CollectionType::Dictionary);
         list->insert_collection(1, CollectionType::Dictionary);
         auto cat = list->get_dictionary(0);
-        cat->insert("name", "Lady"); 
+        cat->insert("name", "Lady");
         cat->insert("legs", 4);
         cat->insert("age", 6);
         auto snake = list->get_dictionary(1);
@@ -5263,7 +5264,7 @@ ONLY(Parser_NestedMixedDictionaryList)
     verify_query(test_context, persons, "properties[*][0].legs  == 2", 1); // Pipper the bird
     verify_query(test_context, persons, "properties[*][0].legs  == 4", 1); // Lady the cat
     verify_query(test_context, persons, "properties[*][*].legs  == 0", 1); // carl the snake
-    verify_query(test_context, persons, "properties[*][*][*] > 10", 2); // carl the snake and martin the guitar
+    verify_query(test_context, persons, "properties[*][*][*] > 10", 2);    // carl the snake and martin the guitar
 }
 
 TEST(Parser_NestedDictionaryDeep)
