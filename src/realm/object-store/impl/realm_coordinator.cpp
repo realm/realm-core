@@ -322,12 +322,7 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
                                     util::Optional<VersionID> version, util::CheckedUniqueLock& realm_lock)
 {
     const auto db_opened_first_time = open_db();
-
-    auto schema = std::move(config.schema);
-    auto migration_function = std::move(config.migration_function);
-    auto initialization_function = std::move(config.initialization_function);
-    config.schema = {};
-
+#ifdef REALM_ENABLE_SYNC
     SyncConfig::SubscriptionInitializerCallback subscription_function = nullptr;
     bool rerun_on_open = false;
     if (config.sync_config && config.sync_config->flx_sync_requested &&
@@ -335,6 +330,14 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
         subscription_function = std::move(config.sync_config->subscription_initializer);
         rerun_on_open = config.sync_config->rerun_init_subscription_on_open;
     }
+#else
+    static_cast<void>(db_opened_first_time);
+#endif
+
+    auto schema = std::move(config.schema);
+    auto migration_function = std::move(config.migration_function);
+    auto initialization_function = std::move(config.initialization_function);
+    config.schema = {};
 
     realm = Realm::make_shared_realm(std::move(config), version, shared_from_this());
     m_weak_realm_notifiers.emplace_back(realm, config.cache);
@@ -404,8 +407,8 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
 
     util::CheckedLockGuard lock(m_realm_mutex);
     set_config(config);
-    open_db();
-    return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session);
+    const auto db_open_first_time = open_db();
+    return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session, db_open_first_time);
 }
 
 #endif

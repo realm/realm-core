@@ -3371,7 +3371,7 @@ TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][app
     CHECK(user_commit_version == bootstrap_version + 1);
 }
 
-TEST_CASE("flx: async open + register subscription callack while bootstrapping", "[sync][flx][async-open]") {
+TEST_CASE("flx: open realm + register subscription callack while bootstrapping", "[sync][flx][async-open]") {
     FLXSyncTestHarness harness("flx_bootstrap_batching");
     auto foo_obj_id = ObjectId::gen();
     harness.load_initial_data([&](SharedRealm realm) {
@@ -3396,9 +3396,9 @@ TEST_CASE("flx: async open + register subscription callack while bootstrapping",
         auto mutable_subscription = subscription.make_mutable_copy();
         mutable_subscription.insert_or_assign(query);
         auto promise = promise_holder.get_promise();
+        mutable_subscription.commit();
         subscription_invoked = true;
         promise.emplace_value(true);
-        mutable_subscription.commit();
     };
     // verify that the subscription has changed the database
     auto verify_subscription = [](SharedRealm realm) {
@@ -3419,6 +3419,7 @@ TEST_CASE("flx: async open + register subscription callack while bootstrapping",
     SECTION("Sync open") {
         // sync open with subscription callback. Subscription will be run, since this is the first time that realm is
         // opened
+        subscription_invoked = false;
         config.sync_config->subscription_initializer = init_subscription_callback;
         auto realm = Realm::get_shared_realm(config);
         REQUIRE(subscription_pf.future.get());
@@ -3431,7 +3432,6 @@ TEST_CASE("flx: async open + register subscription callack while bootstrapping",
     }
 
     SECTION("Async open") {
-        subscription_invoked = false;
 
         SECTION("Initial async open with no rerun on open set") {
             // subscription will be run since this is the first time we are opening the realm file.
@@ -3446,6 +3446,7 @@ TEST_CASE("flx: async open + register subscription callack while bootstrapping",
                         promise.emplace_value(verify_subscription(Realm::get_shared_realm(std::move(ref))));
                 };
 
+            subscription_invoked = false;
             config.sync_config->subscription_initializer = init_subscription_callback;
             auto async_open = Realm::get_synchronized_realm(config);
             async_open->start(open_realm_completed_callback);
@@ -3506,32 +3507,36 @@ TEST_CASE("flx: async open + register subscription callack while bootstrapping",
             auto async_open_task1 = Realm::get_synchronized_realm(config);
             auto async_open_task2 = Realm::get_synchronized_realm(config);
 
-            auto open_t1_pf = util::make_promise_future<bool>();
-            auto open_t2_pf = util::make_promise_future<bool>();
+            auto open_t1_pf = util::make_promise_future<SharedRealm>();
+            auto open_t2_pf = util::make_promise_future<SharedRealm>();
 
             auto open_callback_task_1 = [&,
                                          promise_holder = util::CopyablePromiseHolder(std::move(open_t1_pf.promise))](
                                             ThreadSafeReference ref, std::exception_ptr err) mutable {
                 REQUIRE_FALSE(err);
                 auto realm = Realm::get_shared_realm(std::move(ref));
-                verify_subscription(realm);
-                promise_holder.get_promise().emplace_value(true);
+                REQUIRE(realm);
+                promise_holder.get_promise().emplace_value(realm);
             };
             auto open_callback_task_2 = [&,
                                          promise_holder = util::CopyablePromiseHolder(std::move(open_t2_pf.promise))](
                                             ThreadSafeReference ref, std::exception_ptr err) mutable {
                 REQUIRE_FALSE(err);
                 auto realm = Realm::get_shared_realm(std::move(ref));
-                verify_subscription(realm);
-                promise_holder.get_promise().emplace_value(true);
+                REQUIRE(realm);
+                promise_holder.get_promise().emplace_value(realm);
             };
 
             async_open_task1->start(open_callback_task_1);
             async_open_task2->start(open_callback_task_2);
 
             // subscription init called only once but realm opened twice
-            REQUIRE(open_t1_pf.future.get());
-            REQUIRE(open_t2_pf.future.get());
+            auto realm1 = open_t1_pf.future.get();
+            auto realm2 = open_t2_pf.future.get();
+            REQUIRE(realm1->get_latest_subscription_set().version() == 1);
+            REQUIRE(realm1->get_active_subscription_set().version() == 1);
+            REQUIRE(realm2->get_latest_subscription_set().version() == 1);
+            REQUIRE(realm2->get_active_subscription_set().version() == 1);
             REQUIRE(subscription_pf.future.get());
         }
     }

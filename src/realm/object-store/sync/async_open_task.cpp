@@ -27,9 +27,10 @@
 namespace realm {
 
 AsyncOpenTask::AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinator,
-                             std::shared_ptr<realm::SyncSession> session)
+                             std::shared_ptr<realm::SyncSession> session, bool db_first_open)
     : m_coordinator(coordinator)
     , m_session(session)
+    , m_db_first_open(db_first_open)
 {
 }
 
@@ -42,30 +43,31 @@ void AsyncOpenTask::start(AsyncOpenCallback async_open_complete)
     lock.unlock();
 
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
-    session->wait_for_download_completion(
-        [async_open_complete = std::move(async_open_complete), self, this](Status status) mutable {
-            std::shared_ptr<_impl::RealmCoordinator> coordinator;
-            {
-                util::CheckedLockGuard lock(m_mutex);
-                if (!m_session)
-                    return; // Swallow all events if the task has been cancelled.
+    session->wait_for_download_completion([async_open_complete = std::move(async_open_complete), self,
+                                           this](Status status) mutable {
+        std::shared_ptr<_impl::RealmCoordinator> coordinator;
+        {
+            util::CheckedLockGuard lock(m_mutex);
+            if (!m_session)
+                return; // Swallow all events if the task has been cancelled.
 
-                // Hold on to the coordinator until after we've called the callback
-                coordinator = std::move(m_coordinator);
-            }
+            // Hold on to the coordinator until after we've called the callback
+            coordinator = std::move(m_coordinator);
+        }
 
-            if (!status.is_ok())
-                self->async_open_complete(std::move(async_open_complete), coordinator, status);
+        if (!status.is_ok())
+            self->async_open_complete(std::move(async_open_complete), coordinator, status);
 
-            auto config = coordinator->get_config();
-            if (config.sync_config && config.sync_config->flx_sync_requested &&
-                config.sync_config->subscription_initializer) {
-                self->attach_to_subscription_initializer(std::move(async_open_complete), coordinator);
-            }
-            else {
-                self->async_open_complete(std::move(async_open_complete), coordinator, status);
-            }
-        });
+        auto config = coordinator->get_config();
+        if (config.sync_config && config.sync_config->flx_sync_requested &&
+            config.sync_config->subscription_initializer) {
+            const bool rerun_on_launch = config.sync_config->rerun_init_subscription_on_open;
+            self->attach_to_subscription_initializer(std::move(async_open_complete), coordinator, rerun_on_launch);
+        }
+        else {
+            self->async_open_complete(std::move(async_open_complete), coordinator, status);
+        }
+    });
     session->revive_if_needed();
 }
 
@@ -115,22 +117,32 @@ void AsyncOpenTask::unregister_download_progress_notifier(uint64_t token)
 }
 
 void AsyncOpenTask::attach_to_subscription_initializer(AsyncOpenCallback&& async_open_callback,
-                                                       std::shared_ptr<_impl::RealmCoordinator> coordinator)
+                                                       std::shared_ptr<_impl::RealmCoordinator> coordinator,
+                                                       bool rerun_on_launch)
 {
     // Subscription initialization will occure in either of these 2 cases.
-    // 1. The realm file has been created (this is the first time we ever open the file)
+    // 1. The realm file has been created (this is the first time we ever open the file). The latest
+    //    subscription version must be 0 when we open realm for the first time, and then become 1 as soon as the
+    //    subscription is committed. This will happen when the subscription initializer callback is invoked by
+    //    coordinator->get_realm().
     // 2. we are instructed to run the subscription initializer via sync_config->rerun_init_subscription_on_open.
     //    But we do that only if this is the first time we open realm.
 
-    // subscription initializer called here. We need to wait until it completes
     auto shared_realm = coordinator->get_realm();
-    std::shared_ptr<AsyncOpenTask> self(shared_from_this());
     const auto init_subscription = shared_realm->get_latest_subscription_set();
-    init_subscription.get_state_change_notification(sync::SubscriptionSet::State::Complete)
-        .get_async([self, coordinator, async_open_callback = std::move(async_open_callback)](
-                       StatusWith<realm::sync::SubscriptionSet::State> state) mutable {
-            self->async_open_complete(std::move(async_open_callback), coordinator, state.get_status());
-        });
+
+    if (init_subscription.version() == 1 || (rerun_on_launch && m_db_first_open)) {
+        // We need to wait until subscription initializer completes
+        std::shared_ptr<AsyncOpenTask> self(shared_from_this());
+        init_subscription.get_state_change_notification(sync::SubscriptionSet::State::Complete)
+            .get_async([self, coordinator, async_open_callback = std::move(async_open_callback)](
+                           StatusWith<realm::sync::SubscriptionSet::State> state) mutable {
+                self->async_open_complete(std::move(async_open_callback), coordinator, state.get_status());
+            });
+    }
+    else {
+        async_open_complete(std::move(async_open_callback), coordinator, Status::OK());
+    }
 }
 
 void AsyncOpenTask::async_open_complete(AsyncOpenCallback&& callback,
