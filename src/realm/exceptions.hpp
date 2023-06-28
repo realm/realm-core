@@ -355,7 +355,8 @@ private:
 
 struct SystemError : RuntimeError {
     SystemError(std::error_code err, std::string_view msg)
-        : RuntimeError(ErrorCodes::SystemError, msg)
+        : RuntimeError(ErrorCodes::SystemError,
+                       util::format("%1. SystemError %2: %3", msg, err.value(), err.message()))
     {
         const_cast<Status&>(to_status()).set_std_error_code(err);
     }
