@@ -151,7 +151,7 @@ if(NOT APPLE AND NOT EMSCRIPTEN AND NOT WINDOWS_STORE)
         include(FetchContent)
         set(libUV_Git_TAG "v1.35.0")
         if(MSVC)
-            set(liUV_Git_TAG "v1.43.0")
+            set(libUV_Git_TAG "v1.43.0")
         endif()
         FetchContent_Declare(
             libuv
