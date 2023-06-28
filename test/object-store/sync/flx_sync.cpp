@@ -900,8 +900,9 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
 
     enum class ResetMode { NoReset, InitiateClientReset };
     auto seed_realm = [&harness, &subscribe_to_and_add_objects](RealmConfig config, ResetMode reset_mode) {
-        config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError) {
+        config.sync_config->error_handler = [path = config.path](std::shared_ptr<SyncSession>, SyncError err) {
             // ignore spurious failures on this instance
+            util::format(std::cout, "spurious error while seeding a Realm at '%1': %2\n", path, err.what());
         };
         SharedRealm realm = Realm::get_shared_realm(config);
         subscribe_to_and_add_objects(realm, 1);

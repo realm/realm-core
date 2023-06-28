@@ -848,15 +848,15 @@ TEST_CASE("Async open + client reset", "[flx][migration][baas]") {
         ++num_after_reset_notifications;
     };
 
+    ObjectSchema locally_added("LocallyAdded", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                                {"string_field", PropertyType::String | PropertyType::Nullable},
+                                                {"realm_id", PropertyType::String | PropertyType::Nullable}});
+
     SECTION("no initial state") {
         // Migrate to FLX
         trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
         shared_object.persisted_properties.push_back({"oid_field", PropertyType::ObjectId | PropertyType::Nullable});
-        config->schema = {
-            shared_object,
-            ObjectSchema("LocallyAdded", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                                          {"string_field", PropertyType::String | PropertyType::Nullable},
-                                          {"realm_id", PropertyType::String | PropertyType::Nullable}})};
+        config->schema = {shared_object, locally_added};
 
         auto [ref, error] = async_open_realm(*config);
         REQUIRE(ref);
@@ -891,11 +891,7 @@ TEST_CASE("Async open + client reset", "[flx][migration][baas]") {
         {
             shared_object.persisted_properties.push_back(
                 {"oid_field", PropertyType::ObjectId | PropertyType::Nullable});
-            config->schema = {
-                shared_object,
-                ObjectSchema("LocallyAdded", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                                              {"string_field", PropertyType::String | PropertyType::Nullable},
-                                              {"realm_id", PropertyType::String | PropertyType::Nullable}})};
+            config->schema = {shared_object, locally_added};
 
             auto [ref, error] = async_open_realm(*config);
             REQUIRE(ref);
