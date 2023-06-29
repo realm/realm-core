@@ -362,7 +362,7 @@ struct SystemError : RuntimeError {
     }
 
     SystemError(int err_no, std::string_view msg)
-        : SystemError(std::error_code(err_no, std::system_category()), msg)
+        : SystemError(std::error_code(err_no, std::generic_category()), msg)
     {
     }
 
