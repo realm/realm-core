@@ -689,7 +689,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
             REQUIRE(!added); // partial recovery halted at remove_column() but rolled back everything in the change
             // table is missing num_objects_added_after and the last commit after the latest subscription
             // this is due to how recovery batches together changesets up until a subscription
-            constexpr size_t expected_added_objects = num_objects_added_before - 1;
+            const size_t expected_added_objects = num_objects_added_before - 1;
             REQUIRE(table->size() == expected_added_objects + num_objects_added_by_harness);
             size_t count_of_valid_array_data = validate_integrity_of_arrays(table);
             REQUIRE(count_of_valid_array_data == expected_added_objects);
