@@ -2833,4 +2833,80 @@ TEST(TableView_CopyKeyValues)
     CHECK_EQUAL(yet_another_view.get_key(0), ObjKey(0));
 }
 
+TEST(TableView_VectorSearch)
+{
+    Table table;
+    auto col_id = table.add_column(type_Int, "id");
+    auto col_lst = table.add_column_list(type_Float, "embeddings");
+    
+    {
+        Obj o1 = table.create_object();
+        o1.set(col_id, 1);
+        Lst<float> lst = o1.get_list<float>(col_lst);
+        lst.add(0.003);
+        lst.add(0.004);
+        lst.add(0.005);
+        lst.add(0.100);
+        lst.add(0.010);
+    }
+    
+    {
+        Obj o1 = table.create_object();
+        o1.set(col_id, 2);
+        Lst<float> lst = o1.get_list<float>(col_lst);
+        lst.add(0.001);
+        lst.add(0.004);
+        lst.add(0.005);
+        lst.add(0.100);
+        lst.add(0.010);
+    }
+    
+    {
+        Obj o1 = table.create_object();
+        o1.set(col_id, 3);
+        Lst<float> lst = o1.get_list<float>(col_lst);
+        lst.add(0.001);
+        lst.add(0.004);
+        lst.add(0.005);
+        lst.add(0.100);
+        lst.add(0.010);
+    }
+    
+    {
+        Obj o1 = table.create_object();
+        o1.set(col_id, 4);
+        Lst<float> lst = o1.get_list<float>(col_lst);
+        lst.add(0.004);
+        lst.add(0.005);
+        lst.add(0.010);
+        lst.add(0.025);
+        lst.add(0.100);
+    }
+    
+    {
+        Obj o1 = table.create_object();
+        o1.set(col_id, 5);
+        Lst<float> lst = o1.get_list<float>(col_lst);
+        lst.add(0.003);
+        lst.add(0.007);
+        lst.add(0.008);
+        lst.add(0.020);
+        lst.add(0.100);
+    }
+
+    // Test single knn query
+    TableView v = table.where().find_all();
+    v.knnsearch(col_lst, {0.003, 0.005, 0.010, 0.020, 0.100}, 2);
+    CHECK_EQUAL(2, v.size());
+    CHECK_EQUAL(4, v[0].get<Int>(col_id));
+    CHECK_EQUAL(5, v[1].get<Int>(col_id));
+    
+    // Test knn combined with regular query
+    TableView v2 = table.where().less(col_id, 5).find_all();
+    v2.knnsearch(col_lst, {0.003, 0.005, 0.010, 0.020, 0.100}, 2);
+    CHECK_EQUAL(2, v2.size());
+    CHECK_EQUAL(4, v2[0].get<Int>(col_id));
+    CHECK_EQUAL(1, v2[1].get<Int>(col_id));
+}
+
 #endif // TEST_TABLE_VIEW

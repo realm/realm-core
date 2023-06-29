@@ -25,7 +25,7 @@
 
 using namespace realm;
 
-void TableView::KeyValues::copy_from(const KeyValues& rhs)
+void KeyValues::copy_from(const KeyValues& rhs)
 {
     Allocator& rhs_alloc = rhs.get_alloc();
 
@@ -41,7 +41,7 @@ void TableView::KeyValues::copy_from(const KeyValues& rhs)
     }
 }
 
-void TableView::KeyValues::move_from(KeyValues& rhs)
+void KeyValues::move_from(KeyValues& rhs)
 {
     // Destroy current tree
     destroy();
@@ -416,6 +416,13 @@ void TableView::limit(LimitDescriptor lim)
     do_sync();
 }
 
+void TableView::knnsearch(SemanticSearchDescriptor knn)
+{
+    m_descriptor_ordering.append_knn(std::move(knn));
+    do_sync();
+}
+
+
 void TableView::apply_descriptor_ordering(const DescriptorOrdering& new_ordering)
 {
     m_descriptor_ordering = new_ordering;
@@ -506,44 +513,71 @@ void TableView::do_sort(const DescriptorOrdering& ordering)
     if (sz == 0)
         return;
 
-    // Gather the current rows into a container we can use std algorithms on
     size_t detached_ref_count = 0;
     BaseDescriptor::IndexPairs index_pairs;
-    index_pairs.reserve(sz);
-    // always put any detached refs at the end of the sort
-    // FIXME: reconsider if this is the right thing to do
-    // FIXME: consider specialized implementations in derived classes
-    // (handling detached refs is not required in linkviews)
-    for (size_t t = 0; t < sz; t++) {
-        ObjKey key = get_key(t);
-        if (m_table->is_valid(key)) {
-            index_pairs.emplace_back(key, t);
-        }
-        else
-            ++detached_ref_count;
-    }
+    bool using_indexpairs = false;
 
+    auto apply_indexpairs = [](KeyValues& key_values, const BaseDescriptor::IndexPairs& index_pairs, size_t detached_ref_count)
+    {
+        key_values.clear();
+        for (auto& pair : index_pairs) {
+            key_values.add(pair.key_for_object);
+        }
+        for (size_t t = 0; t < detached_ref_count; ++t)
+            key_values.add(null_key);
+        };
+    
     const int num_descriptors = int(ordering.size());
     for (int desc_ndx = 0; desc_ndx < num_descriptors; ++desc_ndx) {
         const BaseDescriptor* base_descr = ordering[desc_ndx];
-        const BaseDescriptor* next = ((desc_ndx + 1) < num_descriptors) ? ordering[desc_ndx + 1] : nullptr;
-        BaseDescriptor::Sorter predicate = base_descr->sorter(*m_table, index_pairs);
-
-        // Sorting can be specified by multiple columns, so that if two entries in the first column are
-        // identical, then the rows are ordered according to the second column, and so forth. For the
-        // first column, we cache all the payload of fields of the view in a std::vector<Mixed>
-        predicate.cache_first_column(index_pairs);
-
-        base_descr->execute(index_pairs, predicate, next);
+        
+        // Some descriptors, like Sort and Distinct, needs us to gather the current rows
+        // into a container we can use std algorithms on
+        if (base_descr->need_indexpair()) {
+            if (!using_indexpairs) {
+                index_pairs.reserve(sz);
+                // always put any detached refs at the end of the sort
+                // FIXME: reconsider if this is the right thing to do
+                // FIXME: consider specialized implementations in derived classes
+                // (handling detached refs is not required in linkviews)
+                for (size_t t = 0; t < sz; t++) {
+                    ObjKey key = get_key(t);
+                    if (m_table->is_valid(key)) {
+                        index_pairs.emplace_back(key, t);
+                    }
+                    else
+                        ++detached_ref_count;
+                }
+                using_indexpairs = true;
+            }
+            
+            const BaseDescriptor* next = ((desc_ndx + 1) < num_descriptors) ? ordering[desc_ndx + 1] : nullptr;
+            BaseDescriptor::Sorter predicate = base_descr->sorter(*m_table, index_pairs);
+            
+            // Sorting can be specified by multiple columns, so that if two entries in the first column are
+            // identical, then the rows are ordered according to the second column, and so forth. For the
+            // first column, we cache all the payload of fields of the view in a std::vector<Mixed>
+            predicate.cache_first_column(index_pairs);
+            
+            base_descr->execute(index_pairs, predicate, next);
+        }
+        else {
+            if (using_indexpairs) {
+                //BaseDescriptor::Sorter predicate = base_descr->sorter(*m_table, index_pairs);
+                //base_descr->execute(index_pairs, predicate, nullptr);
+                apply_indexpairs(m_key_values, index_pairs, detached_ref_count);
+                m_limit_count = index_pairs.m_removed_by_limit;
+                using_indexpairs = false;
+            }
+            base_descr->execute(*m_table, m_key_values);
+        }
     }
     // Apply the results
-    m_limit_count = index_pairs.m_removed_by_limit;
-    m_key_values.clear();
-    for (auto& pair : index_pairs) {
-        m_key_values.add(pair.key_for_object);
+    if (using_indexpairs) {
+        apply_indexpairs(m_key_values, index_pairs, detached_ref_count);
+        m_limit_count = index_pairs.m_removed_by_limit;
+
     }
-    for (size_t t = 0; t < detached_ref_count; ++t)
-        m_key_values.add(null_key);
 }
 
 bool TableView::is_in_table_order() const
@@ -565,3 +599,8 @@ bool TableView::is_in_table_order() const
         return m_query->produces_results_in_table_order() && !m_descriptor_ordering.will_apply_sort();
     }
 }
+
+void TableView::knnsearch(ColKey column, const std::vector<float>& query_data, size_t k) {
+    knnsearch(SemanticSearchDescriptor(query_data, k, column));
+}
+

@@ -19,6 +19,7 @@
 #ifndef REALM_TABLE_HPP
 #define REALM_TABLE_HPP
 
+#include "external/hnswlib/hnswlib.h"
 #include "external/mpark/variant.hpp"
 #include <algorithm>
 #include <map>
@@ -402,6 +403,9 @@ public:
     std::optional<Mixed> min(ColKey col_key, ObjKey* = nullptr) const;
     std::optional<Mixed> max(ColKey col_key, ObjKey* = nullptr) const;
     std::optional<Mixed> avg(ColKey col_key, size_t* value_count = nullptr) const;
+    
+    // Calculate the distance between the two vectors (embeddings)
+    float dist_knn(const std::vector<float>& query_data, ColKey column, ObjKey row, hnswlib::SpaceInterface<float>& s) const;
 
     // Will return pointer to search index accessor. Will return nullptr if no index
     StringIndex* get_search_index(ColKey col) const noexcept

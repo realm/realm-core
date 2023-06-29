@@ -19,6 +19,8 @@
 #ifndef REALM_SORT_DESCRIPTOR_HPP
 #define REALM_SORT_DESCRIPTOR_HPP
 
+#include "external/hnswlib/hnswlib.h"
+#include "external/hnswlib/space_ip.h"
 #include <vector>
 #include <unordered_set>
 #include <realm/cluster.hpp>
@@ -31,8 +33,9 @@ namespace realm {
 class SortDescriptor;
 class ConstTableRef;
 class Group;
+class KeyValues;
 
-enum class DescriptorType { Sort, Distinct, Limit };
+enum class DescriptorType { Sort, Distinct, Limit, Knn };
 
 // A key wrapper to be used for sorting,
 // In addition to column key, it supports index into collection.
@@ -169,6 +172,7 @@ public:
     BaseDescriptor() = default;
     virtual ~BaseDescriptor() = default;
     virtual bool is_valid() const noexcept = 0;
+    virtual bool need_indexpair() const noexcept = 0;
     virtual std::string get_description(ConstTableRef attached_table) const = 0;
     virtual std::unique_ptr<BaseDescriptor> clone() const = 0;
     virtual DescriptorType get_type() const = 0;
@@ -176,6 +180,7 @@ public:
     virtual Sorter sorter(Table const& table, const IndexPairs& indexes) const = 0;
     // Do what you have to do
     virtual void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const = 0;
+    virtual void execute(const Table& table, KeyValues& keyvalues) const = 0;
 };
 
 
@@ -213,6 +218,8 @@ public:
     }
 
     std::unique_ptr<BaseDescriptor> clone() const override;
+    
+    bool need_indexpair() const noexcept override { return true; }
 
     DescriptorType get_type() const override
     {
@@ -221,6 +228,7 @@ public:
 
     Sorter sorter(Table const& table, const IndexPairs& indexes) const override;
     void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const override;
+    void execute(const Table&, KeyValues&) const override { }
 
     std::string get_description(ConstTableRef attached_table) const override;
 };
@@ -236,6 +244,8 @@ public:
     SortDescriptor() = default;
     ~SortDescriptor() = default;
     std::unique_ptr<BaseDescriptor> clone() const override;
+    
+    bool need_indexpair() const noexcept override { return true; }
 
     DescriptorType get_type() const override
     {
@@ -268,6 +278,8 @@ public:
     Sorter sorter(Table const& table, const IndexPairs& indexes) const override;
 
     void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const override;
+    
+    void execute(const Table&, KeyValues&) const override { }
 
     std::string get_description(ConstTableRef attached_table) const override;
 
@@ -294,6 +306,8 @@ public:
     {
         return m_limit;
     }
+    
+    bool need_indexpair() const noexcept override { return true; }
 
     DescriptorType get_type() const override
     {
@@ -308,10 +322,51 @@ public:
     void collect_dependencies(const Table*, std::vector<TableKey>&) const override
     {
     }
-    void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const override;
+    void execute(IndexPairs&, const Sorter&, const BaseDescriptor*) const override;
+    
+    void execute(const Table&, KeyValues&) const override { }
 
 private:
     size_t m_limit = size_t(-1);
+};
+
+class SemanticSearchDescriptor : public BaseDescriptor {
+public:
+    SemanticSearchDescriptor(const std::vector<float>& query_data, size_t k, ColKey column)
+        : m_query_data(query_data), m_k(k), m_column(column), m_sp(query_data.size())
+    {
+    }
+    
+    bool is_valid() const noexcept override { return true; }
+    bool need_indexpair() const noexcept override { return false; }
+    Sorter sorter(Table const&, const IndexPairs&) const override { return Sorter(); }
+    void collect_dependencies(const Table*, std::vector<TableKey>&) const override { }
+    void execute(IndexPairs&, const Sorter&, const BaseDescriptor*) const override { }
+    
+    void execute(const Table& table, KeyValues& keyvalues) const override;
+    
+    std::string get_description(ConstTableRef) const override;
+    DescriptorType get_type() const override
+    {
+        return DescriptorType::Knn;
+    }
+    std::unique_ptr<BaseDescriptor> clone() const override
+    {
+        return std::unique_ptr<BaseDescriptor>(new SemanticSearchDescriptor(*this));
+    }
+    
+    size_t get_k() const { return m_k; }
+    ColKey get_column() const { return m_column; }
+    const std::vector<float>& get_query_data() const { return m_query_data; }
+    hnswlib::SpaceInterface<float>& get_sp() const { return m_sp; }
+    
+private:
+    std::vector<float> m_query_data;
+    size_t m_k;
+    ColKey m_column;
+    
+    // We are going to default to measure distance by Inner Product for now
+    mutable hnswlib::InnerProductSpace m_sp;
 };
 
 class DescriptorOrdering : public util::AtomicRefCountBase {
@@ -325,6 +380,7 @@ public:
     void append_sort(SortDescriptor sort, SortDescriptor::MergeMode mode = SortDescriptor::MergeMode::prepend);
     void append_distinct(DistinctDescriptor distinct);
     void append_limit(LimitDescriptor limit);
+    void append_knn(SemanticSearchDescriptor knn);
     void append(const DescriptorOrdering& other);
     void append(DescriptorOrdering&& other);
     realm::util::Optional<size_t> get_min_limit() const;
@@ -346,6 +402,7 @@ public:
     bool will_apply_sort() const;
     bool will_apply_distinct() const;
     bool will_apply_limit() const;
+    bool will_apply_knn() const;
     std::string get_description(ConstTableRef target_table) const;
     void collect_dependencies(const Table* table);
     void get_versions(const Group* group, TableVersions& versions) const;

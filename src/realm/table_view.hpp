@@ -147,6 +147,24 @@ namespace realm {
 // However, these are problems that you should expect, since the activity is spread over multiple
 // transactions.
 
+// FIXME: This class should eventually be replaced by std::vector<ObjKey>
+// It implements a vector of ObjKey, where the elements are held in the
+// heap (default allocator is the only option)
+class KeyValues : public KeyColumn {
+public:
+    KeyValues()
+        : KeyColumn(Allocator::get_default())
+    {
+    }
+    KeyValues(const KeyValues&) = delete;
+    ~KeyValues()
+    {
+        destroy();
+    }
+    void move_from(KeyValues&);
+    void copy_from(const KeyValues&);
+};
+
 class TableView : public ObjList {
 public:
     /// Construct null view (no memory allocated).
@@ -345,6 +363,10 @@ public:
     void distinct(ColKey column);
     void distinct(DistinctDescriptor columns);
     void limit(LimitDescriptor limit);
+    
+    // Vector search. Semantic nearest neighbour search over lists of doubles (vector embeddings)
+    void knnsearch(ColKey column, const std::vector<float>& query_data, size_t k);
+    void knnsearch(SemanticSearchDescriptor knn);
 
     // Replace the order of sort and distinct operations, bypassing manually
     // calling sort and distinct. This is a convenience method for bindings.
@@ -394,24 +416,6 @@ protected:
     std::optional<Query> m_query;
     // parameters for findall, needed to rerun the query
     size_t m_limit = size_t(-1);
-
-    // FIXME: This class should eventually be replaced by std::vector<ObjKey>
-    // It implements a vector of ObjKey, where the elements are held in the
-    // heap (default allocator is the only option)
-    class KeyValues : public KeyColumn {
-    public:
-        KeyValues()
-            : KeyColumn(Allocator::get_default())
-        {
-        }
-        KeyValues(const KeyValues&) = delete;
-        ~KeyValues()
-        {
-            destroy();
-        }
-        void move_from(KeyValues&);
-        void copy_from(const KeyValues&);
-    };
 
     mutable TableVersions m_last_seen_versions;
     KeyValues m_key_values;
