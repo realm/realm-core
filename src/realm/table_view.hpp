@@ -371,6 +371,10 @@ public:
     void limit(LimitDescriptor limit);
     void filter(FilterDescriptor filter);
 
+    // Vector search. Semantic nearest neighbour search over lists of doubles (vector embeddings)
+    void knnsearch(ColKey column, const std::vector<float>& query_data, size_t k);
+    void knnsearch(SemanticSearchDescriptor knn);
+
     // Replace the order of sort and distinct operations, bypassing manually
     // calling sort and distinct. This is a convenience method for bindings.
     void apply_descriptor_ordering(const DescriptorOrdering& new_ordering);

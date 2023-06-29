@@ -19,6 +19,8 @@
 #ifndef REALM_SORT_DESCRIPTOR_HPP
 #define REALM_SORT_DESCRIPTOR_HPP
 
+#include "external/hnswlib/hnswlib.h"
+#include "external/hnswlib/space_ip.h"
 #include <vector>
 #include <unordered_set>
 #include <realm/cluster.hpp>
@@ -34,7 +36,7 @@ class ConstTableRef;
 class Group;
 class KeyValues;
 
-enum class DescriptorType { Sort, Distinct, Limit, Filter };
+enum class DescriptorType { Sort, Distinct, Limit, Filter, Knn };
 
 struct LinkPathPart {
     // Constructor for forward links
@@ -308,6 +310,61 @@ private:
     std::function<bool(const Obj&)> m_predicate;
 };
 
+class SemanticSearchDescriptor : public BaseDescriptor {
+public:
+    SemanticSearchDescriptor(ColKey column, const std::vector<float>& query_data, size_t k)
+        : m_query_data(query_data)
+        , m_k(k)
+        , m_column(column)
+        , m_sp(query_data.size())
+    {
+        if (!(column.get_type() == col_type_Float && column.is_list())) {
+            throw InvalidArgument("Knn distance can only be calculated on lists of floats");
+        }
+    }
+
+    bool is_valid() const noexcept override
+    {
+        return true;
+    }
+    void execute(const Table& table, KeyValues& keyvalues, const BaseDescriptor*) const override;
+
+    std::string get_description(ConstTableRef) const override;
+    DescriptorType get_type() const override
+    {
+        return DescriptorType::Knn;
+    }
+    std::unique_ptr<BaseDescriptor> clone() const override
+    {
+        return std::unique_ptr<BaseDescriptor>(new SemanticSearchDescriptor(*this));
+    }
+
+    size_t get_k() const
+    {
+        return m_k;
+    }
+    ColKey get_column() const
+    {
+        return m_column;
+    }
+    const std::vector<float>& get_query_data() const
+    {
+        return m_query_data;
+    }
+    hnswlib::SpaceInterface<float>& get_sp() const
+    {
+        return m_sp;
+    }
+
+private:
+    std::vector<float> m_query_data;
+    size_t m_k;
+    ColKey m_column;
+
+    // We are going to default to measure distance by Inner Product for now
+    mutable hnswlib::InnerProductSpace m_sp;
+};
+
 class DescriptorOrdering : public util::AtomicRefCountBase {
 public:
     DescriptorOrdering() = default;
@@ -320,6 +377,7 @@ public:
     void append_distinct(DistinctDescriptor distinct);
     void append_limit(LimitDescriptor limit);
     void append_filter(FilterDescriptor predicate);
+    void append_knn(SemanticSearchDescriptor knn);
     void append(const DescriptorOrdering& other);
     void append(DescriptorOrdering&& other);
     realm::util::Optional<size_t> get_min_limit() const;
@@ -342,6 +400,7 @@ public:
     bool will_apply_distinct() const;
     bool will_apply_limit() const;
     bool will_apply_filter() const;
+    bool will_apply_knn() const;
     std::string get_description(ConstTableRef target_table) const;
     void collect_dependencies(const Table* table);
     void get_versions(const Group* group, TableVersions& versions) const;

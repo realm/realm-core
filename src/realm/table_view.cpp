@@ -397,6 +397,12 @@ void TableView::filter(FilterDescriptor filter)
     do_sync();
 }
 
+void TableView::knnsearch(SemanticSearchDescriptor knn)
+{
+    m_descriptor_ordering.append_knn(std::move(knn));
+    do_sync();
+}
+
 void TableView::apply_descriptor_ordering(const DescriptorOrdering& new_ordering)
 {
     m_descriptor_ordering = new_ordering;
@@ -582,4 +588,9 @@ bool TableView::is_in_table_order() const
         m_query->m_table.check();
         return m_query->produces_results_in_table_order() && !m_descriptor_ordering.will_apply_sort();
     }
+}
+
+void TableView::knnsearch(ColKey column, const std::vector<float>& query_data, size_t k)
+{
+    knnsearch(SemanticSearchDescriptor(column, query_data, k));
 }

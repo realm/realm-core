@@ -1006,6 +1006,19 @@ Results Results::filter_by_method(std::function<bool(const Obj&)>&& predicate) c
     return Results(m_realm, do_get_query(), std::move(new_order));
 }
 
+Results Results::knn_search(ColKey column, const std::vector<float>& query_data, size_t k) const
+{
+    if (!m_table->is_list(column) || m_table->get_column_type(column) != type_Float)
+        throw IllegalOperation("Semantic knn search can only be done on lists of floats");
+
+    auto new_order = m_descriptor_ordering;
+    new_order.append_knn(SemanticSearchDescriptor(column, query_data, k));
+    util::CheckedUniqueLock lock(m_mutex);
+    if (m_mode == Mode::Collection)
+        return Results(m_realm, m_collection, std::move(new_order));
+    return Results(m_realm, do_get_query(), std::move(new_order));
+}
+
 SectionedResults Results::sectioned_results(SectionedResults::SectionKeyFunc&& section_key_func) REQUIRES(m_mutex)
 {
     return SectionedResults(*this, std::move(section_key_func));

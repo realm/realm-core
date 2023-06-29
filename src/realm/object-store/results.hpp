@@ -182,6 +182,10 @@ public:
     // Create a new Results by adding sort and distinct combinations
     Results apply_ordering(DescriptorOrdering&& ordering) REQUIRES(!m_mutex);
 
+    // Do a vector knn search. Returns the k nearest neighbours ordered closest first
+    // (only valid on properties that are lists of floats, and all the lists have to be of same length)
+    Results knn_search(ColKey column, const std::vector<float>& query_data, size_t k) const REQUIRES(!m_mutex);
+
     // Return a snapshot of this Results that never updates to reflect changes in the underlying data.
     // A snapshot can still change if modified explicitly. The problem that a snapshot solves is that
     // a collection of links may change in unexpected ways if the destination objects are removed.
