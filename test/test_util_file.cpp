@@ -308,7 +308,7 @@ TEST(Utils_File_SystemErrorMessage)
 {
     std::error_code err = std::make_error_code(std::errc::too_many_files_open);
     std::string_view message = "my message";
-    std::string expected = util::format("%1. SystemError %2: %3", message, err.value(), "Too many open files");
+    std::string expected = util::format("%1 (SystemError %2: %3)", message, err.value(), "Too many open files");
     CHECK_THROW_CONTAINING_MESSAGE(throw SystemError(err, message), expected);
     CHECK_THROW_CONTAINING_MESSAGE(throw SystemError(err.value(), message), expected);
 }
