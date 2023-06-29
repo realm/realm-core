@@ -7,9 +7,8 @@
 #
 
 # shellcheck disable=SC1091
+# shellcheck disable=SC2164
 
-set -o errexit
-set -o pipefail
 set -o functrace
 
 case $(uname -s) in
@@ -330,7 +329,6 @@ function cleanup() {
         wait "${BAAS_PID}"
     fi
 
-
     if [[ -n "${MONGOD_PID}" ]]; then
         echo "Killing mongod ${MONGOD_PID}"
         kill "${MONGOD_PID}"
@@ -353,18 +351,20 @@ echo "Starting mongodb"
     --pidfilepath "${WORK_PATH}/mongod.pid" &
 
 echo "Initializing replica set"
-retries=0
+retries=1
+
 until "${MONGO_BINARIES_DIR}/bin/${MONGOSH}" mongodb://localhost:26000/auth --eval 'try { rs.initiate(); } catch (e) { if (e.codeName != "AlreadyInitialized") { throw e; } }' > /dev/null
 do
-    (( retries++ ))
+    (( ++retries ))
     if [[ -z "$(pgrep mongod)" ]]; then
         echo "Mongodb process has terminated"
         exit 1
-    elif [[ ${retries} -ge 10 ]]; then
-        echo 'Failed to connect to mongodb'
+    elif [[ ${retries} -gt 10 ]]; then
+        echo "Failed to connect to mongodb"
         exit 1
     fi
 
+    echo "Initialized mongodb replica set"
     sleep 1
 done
 

@@ -81,7 +81,8 @@ fi
 SSH_USER="$(printf "%s@%s" "${BAAS_USER}" "${BAAS_HOST_NAME}")"
 
 ssh-agent > ssh_agent_commands.sh
-# shellcheck disable=SC1090
+
+# shellcheck disable=SC1091
 source ssh_agent_commands.sh
 
 if [[ -f ~/.ssh/id_rsa ]]; then

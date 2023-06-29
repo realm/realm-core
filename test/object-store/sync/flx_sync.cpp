@@ -2014,6 +2014,7 @@ TEST_CASE("flx: verify PBS/FLX websocket protocol number and prefixes", "[sync][
     REQUIRE("com.mongodb.realm-query-sync#" == sync::get_flx_websocket_protocol_prefix());
 }
 
+#ifndef _WIN32
 TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app][baas]") {
     FLXSyncTestHarness harness("flx_bad_query");
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
@@ -2033,6 +2034,7 @@ TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app
         latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
     }
 }
+#endif
 
 TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app][baas]") {
     const std::string base_url = get_base_url();

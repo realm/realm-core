@@ -12,6 +12,7 @@ set -o functrace
 
 BAAS_BRANCH=
 AWS_CREDS_SCRIPT=
+VERBOSE=
 
 trap 'catch $? ${LINENO}' EXIT
 catch() {
@@ -35,7 +36,7 @@ while getopts "b:a:vh" opt; do
     case "${opt}" in
         b) BAAS_BRANCH="${OPTARG}";;
         a) AWS_CREDS_SCRIPT="${OPTARG}";;
-        v) set -o verbose; set -o xtrace;;
+        v) VERBOSE="-v"; set -o verbose; set -o xtrace;;
         h) usage 0;;
         *) usage 1;;
     esac
@@ -54,11 +55,15 @@ echo "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEii
 sudo chmod 600 "${HOME}/.ssh"/*
 
 DATA_DIR=/data/baas_remote
+BAAS_WORK_DIR="${DATA_DIR}/baas-work-dir"
+
+# Delete data dir if is already exists
+[[ -d "${DATA_DIR}" ]] && rm -rf "${DATA_DIR}"
+# Create the data and baas work directories
 sudo mkdir -p "${DATA_DIR}"
 echo "Setting ${DATA_DIR} to '$(id -u):$(id -g)'"
 sudo chown -R "$(id -u):$(id -g)" "${DATA_DIR}"
 sudo chmod -R 755 "${DATA_DIR}"
-BAAS_WORK_DIR="${DATA_DIR}/baas-work-dir"
 mkdir -p "${BAAS_WORK_DIR}"
 chmod -R 755 "${BAAS_WORK_DIR}"
 
@@ -71,7 +76,7 @@ pushd realm-core > /dev/null
 git checkout "${REALM_CORE_REVISION}"
 git submodule update --init --recursive
 if [[ -f "${HOME}/install_baas.sh" ]]; then
-    mv "${HOME}/install_baas.sh" evergreen/
+    cp "${HOME}/install_baas.sh" evergreen/
 fi
 
 OPT_BAAS_BRANCH=
@@ -79,7 +84,7 @@ if [[ -n "${BAAS_BRANCH}" ]]; then
     OPT_BAAS_BRANCH=(-b "${BAAS_BRANCH}")
 fi
 
-./evergreen/install_baas.sh -w "${BAAS_WORK_DIR}" "${OPT_BAAS_BRANCH[@]}" 2>&1
+./evergreen/install_baas.sh "${VERBOSE}" -w "${BAAS_WORK_DIR}" "${OPT_BAAS_BRANCH[@]}" 2>&1
 
 popd > /dev/null  # realm-core
 popd > /dev/null  # data
