@@ -41,6 +41,7 @@
 ### Internals
 * Prebuilt binaries for non-Apple platforms are no longer published as nothing was using them ([PR #6746](https://github.com/realm/realm-core/pull/6746)).
 * SystemError exceptions now have a more detailed error message. ([#6739](https://github.com/realm/realm-core/issues/6739))
+* Run baas for non x86_84 linux variants on remote ubuntu host. ([PR #6757](https://github.com/realm/realm-core/pull/6757))
 
 ----------------------------------------------
 
