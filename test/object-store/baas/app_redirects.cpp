@@ -149,14 +149,13 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
 
         redir_transport->request_hook = [&](const Request& request) {
             REALM_ASSERT(request_count < max_request_count);
+            logger->trace("Received request[%1]: %2", request_count, request.url);
             if (request_count == 0) {
-                logger->trace("request.url (%1): %2", request_count, request.url);
                 // This will fail due to no headers
                 redir_transport->simulated_response = {
                     static_cast<int>(sync::HTTPStatus::MovedPermanently), 0, {}, "Some body data"};
             }
             else if (request_count == 1) {
-                logger->trace("request.url (%1): %2", request_count, request.url);
                 // This will fail due to no Location header
                 redir_transport->simulated_response = {static_cast<int>(sync::HTTPStatus::PermanentRedirect),
                                                        0,
@@ -164,7 +163,6 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
                                                        "Some body data"};
             }
             else if (request_count == 2) {
-                logger->trace("request.url (%1): %2", request_count, request.url);
                 // This will fail due to empty Location header
                 redir_transport->simulated_response = make_redirect_response(sync::HTTPStatus::MovedPermanently, "");
             }
@@ -360,6 +358,7 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
 
         // Use the transport to grab the current url so it can be converted
         redir_transport->request_hook = [&](const Request& request) {
+            logger->trace("Received request: %1", request.url);
             // Parse the URL to determine the scheme, host and port
             parse_url(request.url);
         };
