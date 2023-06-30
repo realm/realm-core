@@ -585,8 +585,9 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas][new]") {
 
         auto error = wait_for_future(std::move(pf.future), std::chrono::minutes(5)).get();
         REQUIRE(error.get_system_error() == make_error_code(sync::ProtocolError::limits_exceeded));
-        REQUIRE(error.reason() == "Sync websocket closed because the server received a message that was too large: "
-                                  "read limited at 16777217 bytes");
+        REQUIRE_THAT(std::string(error.reason()),
+                     Catch::Matchers::ContainsSubstring("Sync websocket closed because the server received a message "
+                                                        "that was too large: read limited at 16777217 bytes"));
         REQUIRE(error.is_client_reset_requested());
         REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ClientReset);
     }

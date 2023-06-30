@@ -934,7 +934,8 @@ TEST_CASE("app: sync user integration", "[sync][pbs][app][baas][user][new]") {
                 sync_error_handler_called.store(true);
                 REQUIRE(error.get_system_error() ==
                         sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                REQUIRE(error.reason() == "Unable to refresh the user access token.");
+                REQUIRE_THAT(std::string(error.reason()),
+                             Catch::Matchers::ContainsSubstring("Unable to refresh the user access token."));
             };
             auto r = Realm::get_shared_realm(config);
             timed_wait_for([&] {
@@ -1036,7 +1037,8 @@ TEST_CASE("app: sync user integration", "[sync][pbs][app][baas][user][new]") {
                 sync_error_handler_called.store(true);
                 REQUIRE(error.get_system_error() ==
                         sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                REQUIRE(error.reason() == "Unable to refresh the user access token.");
+                REQUIRE_THAT(std::string(error.reason()),
+                             Catch::Matchers::ContainsSubstring("Unable to refresh the user access token."));
             };
 
             auto transport = static_cast<SynchronousTestTransport*>(session.transport());

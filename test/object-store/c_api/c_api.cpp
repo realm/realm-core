@@ -5088,6 +5088,11 @@ static void task_completion_func(void* p, realm_thread_safe_reference_t* realm,
     userdata_p->called = true;
 }
 
+static void task_init_subscription(realm_t* realm, void*)
+{
+    REQUIRE(realm);
+}
+
 static void sync_error_handler(void* p, realm_sync_session_t*, const realm_sync_error_t error)
 {
     auto userdata_p = static_cast<Userdata*>(p);
@@ -5112,12 +5117,14 @@ TEST_CASE("C API - async_open", "[c_api][pbs][sync][local]") {
         config->schema = Schema{object_schema};
         realm_user user(init_sync_manager.app()->current_user());
         realm_sync_config_t* sync_config = realm_sync_config_new(&user, "default");
+        realm_sync_config_set_initial_subscription_handler(sync_config, task_init_subscription, false, nullptr,
+                                                           nullptr);
         realm_config_set_path(config, test_config.path.c_str());
         realm_config_set_sync_config(config, sync_config);
         realm_config_set_schema_version(config, 1);
-        Userdata userdata;
         realm_async_open_task_t* task = realm_open_synchronized(config);
         REQUIRE(task);
+        Userdata userdata;
         realm_async_open_task_start(task, task_completion_func, &userdata, nullptr);
         util::EventLoop::main().run_until([&] {
             return userdata.called.load();
@@ -5151,6 +5158,8 @@ TEST_CASE("C API - async_open", "[c_api][pbs][sync][local]") {
         config->schema = Schema{object_schema};
         realm_user user(init_sync_manager.app()->current_user());
         realm_sync_config_t* sync_config = realm_sync_config_new(&user, "realm");
+        realm_sync_config_set_initial_subscription_handler(sync_config, task_init_subscription, false, nullptr,
+                                                           nullptr);
         sync_config->user->update_refresh_token(std::string(invalid_token));
         sync_config->user->update_access_token(std::move(invalid_token));
 

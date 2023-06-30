@@ -224,6 +224,15 @@ struct SyncConfig {
 
     bool simulate_integration_error = false;
 
+    // callback invoked right after DataInitializationFunction. It is used in order to setup an initial subscription.
+    using SubscriptionInitializerCallback = std::function<void(std::shared_ptr<Realm>)>;
+    SubscriptionInitializerCallback subscription_initializer;
+
+    // in case the initial subscription contains a dynamic query, the user may want to force
+    // the query to be run again every time the realm is opened. This flag should be set to true
+    // in this case.
+    bool rerun_init_subscription_on_open{false};
+
     SyncConfig() = default;
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);
