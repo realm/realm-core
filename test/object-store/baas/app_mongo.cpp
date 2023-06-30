@@ -661,7 +661,6 @@ TEST_CASE("app: remote mongo client", "[sync][app][baas][mongo][new]") {
     }
 
     SECTION("delete") {
-
         bool processed = false;
 
         bson::BsonArray documents;
