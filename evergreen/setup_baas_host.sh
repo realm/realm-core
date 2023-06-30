@@ -2,13 +2,11 @@
 # The script to be run on the ubuntu host that will run baas for the evergreen windows tests
 #
 # Usage:
-# ./evergreen/setup_baas_host.sh -a {path to aws creds script for baas} [-b {branch/git spec for baas}] [-w]
+# ./evergreen/setup_baas_host.sh -a PATH [-b BRANCH] [-v] -h
 #
 
-# shellcheck disable=SC1091
 set -o errexit
 set -o pipefail
-set -o functrace
 
 BAAS_BRANCH=
 AWS_CREDS_SCRIPT=
@@ -23,7 +21,7 @@ catch() {
 
 usage()
 {
-    echo "Usage: setup_baas_host.sh -a PATH [-b BRANCH] [-x] -h"
+    echo "Usage: setup_baas_host.sh -a PATH [-b BRANCH] [-v] -h"
     echo -e "\t-a PATH\t\tPath to AWS credentials script (e.g. baas_host_vars.sh)"
     echo -e "\t-b BRANCH\tOptional branch or git spec of baas to checkout/build"
     echo -e "\t-v\t\tEnable verbose script debugging"

@@ -9,6 +9,8 @@
 # shellcheck disable=SC1091
 # shellcheck disable=SC2164
 
+set -o errexit
+set -o pipefail
 set -o functrace
 
 case $(uname -s) in
@@ -120,7 +122,7 @@ REALPATH="${BASE_PATH}/abspath.sh"
 
 function usage()
 {
-    echo "Usage: install_baas.sh -w PATH [-b BRANCH] -h"
+    echo "Usage: install_baas.sh -w PATH [-b BRANCH] [-v] -h"
     echo -e "\t-w PATH\t\tPath to working dir"
     echo -e "\t-b BRANCH\tOptional branch or git spec of baas to checkout/build"
     echo -e "\t-v\t\tEnable verbose script debugging"
@@ -129,13 +131,15 @@ function usage()
     exit "${1:0}"
 }
 
-WORK_PATH=""
-BAAS_VERSION=""
+WORK_PATH=
+BAAS_VERSION=
+VERBOSE=
+
 while getopts "w:b:vh" opt; do
     case "${opt}" in
         w) WORK_PATH="$($REALPATH "${OPTARG}")";;
         b) BAAS_VERSION="${OPTARG}";;
-        v) set -o verbose; set -o xtrace;;
+        v) VERBOSE="-v"; set -o verbose; set -o xtrace;;
         h) usage 0;;
         *) usage 1;;
     esac
@@ -146,14 +150,17 @@ if [[ -z "${WORK_PATH}" ]]; then
     usage 1
 fi
 
+# Create and cd into the working directory
 [[ -d ${WORK_PATH} ]] || mkdir -p "${WORK_PATH}"
 pushd "${WORK_PATH}" > /dev/null
 echo "Work path: ${WORK_PATH}"
 
+# Remove the baas_ready file from a previous run if it exists
 if [[ -f "${WORK_PATH}/baas_ready" ]]; then
     rm "${WORK_PATH}/baas_ready"
 fi
 
+# Set up some directory paths
 BAAS_DIR="${WORK_PATH}/baas"
 BAAS_DEPS_DIR="${WORK_PATH}/baas_dep_binaries"
 NODE_BINARIES_DIR="${WORK_PATH}/node_binaries"
@@ -184,20 +191,28 @@ fi
 
 echo "Installing node and go to build baas and its dependencies"
 
+# Create the <work_path>/node_binaries/ directory
 [[ -d "${NODE_BINARIES_DIR}" ]] || mkdir -p "${NODE_BINARIES_DIR}"
+# Download node if it's not found
 if [[ ! -x "${NODE_BINARIES_DIR}/bin/node" ]]; then
     pushd "${NODE_BINARIES_DIR}" > /dev/null
     ${CURL} -LsS "${NODE_URL}" | tar -xz --strip-components=1
     popd > /dev/null  # node_binaries
 fi
 export PATH="${NODE_BINARIES_DIR}/bin":${PATH}
+echo "Node version: $(node --version)"
 
+# Download go if it's not found and set up the GOROOT for building/running baas
 [[ -x ${WORK_PATH}/go/bin/go ]] || (${CURL} -sL $GO_URL | tar -xz)
 export GOROOT="${WORK_PATH}/go"
 export PATH="${WORK_PATH}/go/bin":${PATH}
+echo "Go version: $(go version)"
 
+# Create the <work_path>/baas_dep_binaries/ directory
 [[ -d "${BAAS_DEPS_DIR}" ]] || mkdir -p "${BAAS_DEPS_DIR}"
 export PATH="${BAAS_DEPS_DIR}":${PATH}
+
+# Download jq (used for parsing json files) if it's not found
 if [[ ! -x "${BAAS_DEPS_DIR}/jq" ]]; then
     pushd "${BAAS_DEPS_DIR}" > /dev/null
     which jq || (${CURL} -LsS "${JQ_DOWNLOAD_URL}" > jq && chmod +x jq)
@@ -207,10 +222,12 @@ fi
 # Fix incompatible github path that was changed in a BAAS dependency
 git config --global url."git@github.com:".insteadOf "https://github.com/"
 
+# If a baas branch or commit version was not provided, retrieve the latest release version
 if [[ -z "${BAAS_VERSION}" ]]; then
     BAAS_VERSION=$(${CURL} -LsS "https://realm.mongodb.com/api/private/v1.0/version" | jq -r '.backend.git_hash')
 fi
 
+# Clone the baas repo and check out the specified version
 if [[ ! -d "${BAAS_DIR}/.git" ]]; then
     git clone git@github.com:10gen/baas.git
     pushd "${BAAS_DIR}" > /dev/null
@@ -224,6 +241,7 @@ git checkout "${BAAS_VERSION}"
 echo "Using baas commit: $(git rev-parse HEAD)"
 popd > /dev/null  # baas
 
+# Copy or download and extract the stitch support archive if it's not found
 if [[ ! -d "${DYLIB_DIR}" ]]; then
     if [[ -n "${STITCH_SUPPORT_LIB_PATH}" ]]; then
         echo "Copying stitch support library from ${STITCH_SUPPORT_LIB_PATH}"
@@ -240,10 +258,11 @@ fi
 export LD_LIBRARY_PATH="${DYLIB_LIB_DIR}"
 export DYLD_LIBRARY_PATH="${DYLIB_LIB_DIR}"
 
+# Copy or download the assisted agg library as libmongo.so (for Linux) if it's not found
 LIBMONGO_LIB="${BAAS_DEPS_DIR}/libmongo.so"
 if [[ ! -x "${LIBMONGO_LIB}" ]]; then
     if [[ -n "${STITCH_ASSISTED_AGG_LIB_PATH}" ]]; then
-        echo "Copying stitch support library from ${STITCH_ASSISTED_AGG_LIB_PATH}"
+        echo "Copying assisted agg library from ${STITCH_ASSISTED_AGG_LIB_PATH}"
         cp -rav "${STITCH_ASSISTED_AGG_LIB_PATH}" "${LIBMONGO_LIB}"
         chmod 755 "${LIBMONGO_LIB}"
     elif [[ -n "${STITCH_ASSISTED_AGG_LIB_URL}" ]]; then
@@ -255,6 +274,7 @@ if [[ ! -x "${LIBMONGO_LIB}" ]]; then
     fi
 fi
 
+# Download the assisted agg library as assisted_agg (for MacOS) if it's not found
 if [[ ! -x "${BAAS_DEPS_DIR}/assisted_agg" && -n "${STITCH_ASSISTED_AGG_URL}" ]]; then
     echo "Downloading assisted agg binary (assisted_agg)"
     pushd "${BAAS_DEPS_DIR}" > /dev/null
@@ -263,6 +283,7 @@ if [[ ! -x "${BAAS_DEPS_DIR}/assisted_agg" && -n "${STITCH_ASSISTED_AGG_URL}" ]]
     popd > /dev/null  # baas_dep_binaries
 fi
 
+# Download yarn if it's not found
 YARN="${WORK_PATH}/yarn/bin/yarn"
 if [[ ! -x "${YARN}" ]]; then
     echo "Getting yarn"
@@ -272,6 +293,7 @@ if [[ ! -x "${YARN}" ]]; then
     mkdir "${WORK_PATH}/yarn_cache"
 fi
 
+# Use yarn to build the transpiler for the baas server
 BAAS_TRANSPILER="${BAAS_DEPS_DIR}/transpiler"
 if [[ ! -x "${BAAS_TRANSPILER}" ]]; then
     echo "Building transpiler"
@@ -282,6 +304,7 @@ if [[ ! -x "${BAAS_TRANSPILER}" ]]; then
     ln -s "${TRANSPILER_DIR}/bin/transpiler" "${BAAS_TRANSPILER}"
 fi
 
+# Download mongod (daemon) and mongosh (shell) binaries
 if [ ! -x "${MONGO_BINARIES_DIR}/bin/mongod" ]; then
     echo "Downloading mongodb"
     ${CURL} -sLS "${MONGODB_DOWNLOAD_URL}" --output mongodb-binaries.tgz
@@ -303,17 +326,16 @@ fi
 
 ulimit -n 32000
 
+# The mongod files will be stored in the <work_path>/mongodb_dbpath directory
 if [[ -d "${MONGODB_PATH}" ]]; then
     rm -rf "${MONGODB_PATH}"
 fi
 mkdir -p "${MONGODB_PATH}"
 
+# Set up the cleanup function that runs at exit and stops mongod and the baas server
 function cleanup() {
     BAAS_PID=""
     MONGOD_PID=""
-    if [ "$1" != "0" ]; then
-        echo "Error $1 occurred while starting baas at line $2"
-    fi
     if [[ -f ${WORK_PATH}/baas_server.pid ]]; then
         BAAS_PID="$(< "${WORK_PATH}/baas_server.pid")"
     fi
@@ -338,8 +360,9 @@ function cleanup() {
 }
 
 trap "exit" INT TERM ERR
-trap 'cleanup $? ${LINENO}' EXIT
+trap 'cleanup' EXIT
 
+# Start mongod on port 26000 and listening on all network interfaces
 echo "Starting mongodb"
 "${MONGO_BINARIES_DIR}/bin/mongod" \
     --replSet rs \
@@ -350,6 +373,8 @@ echo "Starting mongodb"
     --dbpath "${MONGODB_PATH}/" \
     --pidfilepath "${WORK_PATH}/mongod.pid" &
 
+
+# Wait for mongod to start (up to 20 secs) while attempting to initialize the replica set
 echo "Initializing replica set"
 retries=1
 
@@ -364,10 +389,10 @@ do
         exit 1
     fi
 
-    echo "Initialized mongodb replica set"
-    sleep 1
+    sleep 2
 done
 
+# Add the baas user to mongod so it can connect to and access the database
 pushd "${BAAS_DIR}" > /dev/null
 echo "Adding stitch user"
 go run -exec="env LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}" cmd/auth/user.go \
@@ -378,18 +403,22 @@ go run -exec="env LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DYLD_LIBRARY_PATH=${DYLD_LI
     -id "unique_user@domain.com" \
     -password "password"
 
+# Build the baas server using go
 [[ -d tmp ]] || mkdir tmp
 echo "Building stitch app server"
 [[ -f "${WORK_PATH}/baas_server.pid" ]] && rm "${WORK_PATH}/baas_server.pid"
 go build -o "${WORK_PATH}/baas_server" cmd/server/main.go
 
+# Start the baas server on port *:9090 with the provided config JSON files
 echo "Starting stitch app server"
 
+BAAS_SERVER_LOG="${WORK_PATH}/baas_server.log"
 "${WORK_PATH}/baas_server" \
-    --configFile=etc/configs/test_config.json --configFile="${BASE_PATH}/config_overrides.json" > "${WORK_PATH}/baas_server.log" 2>&1 &
+    --configFile=etc/configs/test_config.json --configFile="${BASE_PATH}/config_overrides.json" > "${BAAS_SERVER_LOG}" 2>&1 &
 echo $! > "${WORK_PATH}/baas_server.pid"
-"${BASE_PATH}/wait_for_baas.sh" "${WORK_PATH}/baas_server.pid"
+"${BASE_PATH}/wait_for_baas.sh" "${VERBOSE}" -p "${WORK_PATH}/baas_server.pid" -l "${BAAS_SERVER_LOG}"
 
+# Create the admin user and set up the allowed roles
 echo "Adding roles to admin user"
 ${CURL} 'http://localhost:9090/api/admin/v3.0/auth/providers/local-userpass/login' \
   -H 'Accept: application/json' \
@@ -401,6 +430,7 @@ ${CURL} 'http://localhost:9090/api/admin/v3.0/auth/providers/local-userpass/logi
 
 "${MONGO_BINARIES_DIR}/bin/${MONGOSH}"  --quiet mongodb://localhost:26000/auth "${BASE_PATH}/add_admin_roles.js"
 
+# All done! the 'baas_ready' file indicates the baas server has finished initializing
 touch "${WORK_PATH}/baas_ready"
 
 echo "---------------------------------------------"

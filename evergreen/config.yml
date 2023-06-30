@@ -9,6 +9,7 @@ functions:
         shell: bash
         script: |-
           set -o errexit
+          set -o pipefail
           set -o verbose
 
           if [[ "$OS" = "Windows_NT" ]]; then
@@ -43,6 +44,7 @@ functions:
         shell: bash
         script: |-
           set -o errexit
+          set -o pipefail
           set -o verbose
 
           if [ -d cmake_vars ]; then
@@ -257,6 +259,7 @@ functions:
       shell: bash
       script: |-
         set -o errexit
+        set -o pipefail
         set -o verbose
 
         if [[ -n "${disable_tests_against_baas|}" ]]; then
@@ -276,8 +279,10 @@ functions:
         ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=No -o ConnectTimeout=10 -i .baas_ssh_key"
 
         # Copy the baas_server.log file from the remote baas host
-        mkdir baas-work-dir
-        scp $ssh_options $ssh_user:/data/baas_remote/baas-work-dir/baas_server.log ./baas-work-dir/baas_server.log
+        mkdir baas-work-dir/
+        mkdir baas-work-dir/mongodb-dbpath/
+        scp $ssh_options $ssh_user:/data/baas_remote/baas-work-dir/baas_server.log ./baas-work-dir/baas_server.log || true
+        scp $ssh_options $ssh_user:/data/baas_remote/baas-work-dir/mongodb-dbpath/mongod.log ./baas-work-dir/mongodb-dbpath/mongod.log || true
 
   - command: s3.put
     params:
@@ -300,6 +305,17 @@ functions:
       permissions: public-read
       content_type: text/text
       display_name: install baas output
+      optional: true
+  - command: s3.put
+    params:
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      local_file: 'realm-core/baas-work-dir/mongodb-dbpath/mongod.log'
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/mongod.log'
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/text
+      display_name: mongod logs
       optional: true
 
   "upload fuzzer results":
@@ -337,6 +353,7 @@ functions:
       shell: bash
       script: |-
         set -o errexit
+        set -o pipefail
         set -o verbose
 
         if [[ -n "${disable_tests_against_baas|}" ]]; then
@@ -446,6 +463,7 @@ functions:
       shell: bash
       script: |-
         set -o errexit
+        set -o pipefail
         set -o verbose
 
         # Save the remote host ssh key and details to files
@@ -471,10 +489,16 @@ functions:
       background: true
       script: |-
         set -o errexit
+        set -o pipefail
         set -o verbose
 
+        OPT_BAAS_BRANCH=
+        if [ -n "${baas_branch}" ]; then
+            OPT_BAAS_BRANCH="-b ${baas_branch}"
+        fi
+
         # Run the setup_baas_host_local.sh script to configure and run baas on the remote host
-        ./evergreen/setup_baas_host_local.sh -v -f ./baas_host_vars.sh -i ./.baas_ssh_key -u ubuntu 2>&1 | tee install_baas_output.log
+        ./evergreen/setup_baas_host_local.sh -v -f ./baas_host_vars.sh -i ./.baas_ssh_key -u ubuntu $OPT_BAAS_BRANCH 2>&1 | tee install_baas_output.log
 
   "launch local baas":
   - command: shell.exec
@@ -485,6 +509,8 @@ functions:
       script: |-
         set -o errexit
         set -o pipefail
+        set -o verbose
+
         export CURL=${curl|curl}
 
         if [[ -n "${disable_tests_against_baas|}" ]]; then
@@ -503,13 +529,13 @@ functions:
             export DEVELOPER_DIR="${xcode_developer_dir}"
         fi
 
-        INSTALL_BAAS_BRANCH=
+        OPT_BAAS_BRANCH=
         if [ -n "${baas_branch}" ]; then
-            INSTALL_BAAS_BRANCH="-b ${baas_branch}"
+            OPT_BAAS_BRANCH="-b ${baas_branch}"
         fi
 
         # Run the install_baas.sh script to run baas locally
-        ./evergreen/install_baas.sh -w ./baas-work-dir $INSTALL_BAAS_BRANCH 2>&1 | tee install_baas_output.log
+        ./evergreen/install_baas.sh -w ./baas-work-dir $OPT_BAAS_BRANCH 2>&1 | tee install_baas_output.log
 
   "wait for baas to start":
   - command: shell.exec
@@ -517,23 +543,14 @@ functions:
       working_dir: realm-core
       shell: bash
       script: |-
+        set -o errexit
         set -o verbose
+
         if [[ -n "${disable_tests_against_baas|}" ]]; then
           exit 0
         fi
 
-        BAAS_TIMEOUT_SECS=600
-        WAIT_START=$(date -u +'%s')
-
-        until curl --output /dev/null --head --fail http://localhost:9090 --silent ; do
-          SECS_SPENT_WAITING=$(($(date -u +'%s') - $WAIT_START))
-          if [[ $SECS_SPENT_WAITING -ge $BAAS_TIMEOUT_SECS ]]; then
-            echo "Timed out waiting for baas to start"
-            exit 1
-          fi
-          echo "Waiting for baas to start...$SECS_SPENT_WAITING/$BAAS_TIMEOUT_SECS seconds"
-          sleep 5
-        done
+        ./evergreen/wait_for_baas.sh -s
 
         echo "Baas is started!"
 
@@ -798,6 +815,8 @@ tasks:
     vars:
       target_to_build: ObjectStoreTests
   - func: "launch local baas"
+    vars:
+      baas_branch: 2e23bf2f77d85f3e2fbe07e1c448e4d1cafa3a10
   - func: "wait for baas to start"
   - func: "run tests"
     vars:
@@ -809,6 +828,8 @@ tasks:
   exec_timeout_secs: 3600
   commands:
   - func: "launch remote baas"
+    vars:
+      baas_branch: 2e23bf2f77d85f3e2fbe07e1c448e4d1cafa3a10
   - func: "compile"
     vars:
       target_to_build: ObjectStoreTests
@@ -816,6 +837,7 @@ tasks:
   - func: "run tests"
     vars:
       test_filter: ObjectStoreTests
+      verbose_test_output: true
 
 - name: process_coverage_data
   tags: [ "for_pull_requests" ]
@@ -829,6 +851,7 @@ tasks:
         COVERALLS_TOKEN: "${coveralls_token}"
       script: |-
         set -o errexit
+        set -o pipefail
         set -o verbose
 
         if [[ -n "${xcode_developer_dir}" ]]; then
@@ -1466,6 +1489,7 @@ buildvariants:
     extra_flags: "-A x64"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
     fetch_missing_dependencies: On
+    curl_base: "/cygdrive/c/curl"
     python3: "/cygdrive/c/python/python37/python.exe"
     run_with_encryption: On
   tasks:
