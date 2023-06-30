@@ -35,7 +35,6 @@
 #include <realm/util/uri.hpp>
 
 #include <chrono>
-#include <iostream>
 
 using namespace realm;
 using namespace realm::app;
@@ -398,18 +397,10 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
             int request_count = 0;
             redir_transport->request_hook = [&](const Request& request) {
                 logger->trace("Received request[%1]: %2", request_count, request.url);
-                std::cerr << "request url:   " << request.url << std::endl;
-                std::cerr << "app url:       " << app_url << std::endl;
-                std::cerr << "ws url:        " << ws_url << std::endl;
-                std::cerr << "redir app url: " << redir_app_url << std::endl;
-                std::cerr << "redir ws url:  " << redir_ws_url << std::endl;
-                std::cout << "request url:   " << request.url << std::endl;
-                std::cout << "app url:       " << app_url << std::endl;
-                std::cout << "ws url:        " << ws_url << std::endl;
-                std::cout << "redir app url: " << redir_app_url << std::endl;
-                std::cout << "redir ws url:  " << redir_ws_url << std::endl << std::flush;
                 if (request_count++ == 0) {
                     // First request should be a location request against the original URL
+                    logger->trace("request.url: '%1'", request.url);
+                    logger->trace("app_url: '%1'", app_url);
                     REQUIRE(request.url.find(app_url) != std::string::npos);
                     REQUIRE(request.url.find("/location") != std::string::npos);
                     REQUIRE(request.redirect_count == 0);
