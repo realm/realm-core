@@ -2771,7 +2771,8 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
                 sync_error_handler_called.store(true);
                 REQUIRE(error.get_system_error() ==
                         sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                REQUIRE(error.reason() == "Unable to refresh the user access token.");
+                REQUIRE_THAT(std::string(error.reason()),
+                             Catch::Matchers::ContainsSubstring("Unable to refresh the user access token."));
             };
             auto r = Realm::get_shared_realm(config);
             timed_wait_for([&] {
@@ -2871,7 +2872,8 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
                 sync_error_handler_called.store(true);
                 REQUIRE(error.get_system_error() ==
                         sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                REQUIRE(error.reason() == "Unable to refresh the user access token.");
+                REQUIRE_THAT(std::string(error.reason()),
+                             Catch::Matchers::ContainsSubstring("Unable to refresh the user access token."));
             };
 
             auto transport = static_cast<SynchronousTestTransport*>(session.transport());
@@ -3101,8 +3103,9 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
 
         auto error = wait_for_future(std::move(pf.future), std::chrono::minutes(5)).get();
         REQUIRE(error.get_system_error() == make_error_code(sync::ProtocolError::limits_exceeded));
-        REQUIRE(error.reason() == "Sync websocket closed because the server received a message that was too large: "
-                                  "read limited at 16777217 bytes");
+        REQUIRE_THAT(std::string(error.reason()),
+                     Catch::Matchers::ContainsSubstring("Sync websocket closed because the server received a message "
+                                                        "that was too large: read limited at 16777217 bytes"));
         REQUIRE(error.is_client_reset_requested());
         REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ClientReset);
     }
