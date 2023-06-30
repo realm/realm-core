@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Separate out local vs. baas object store app tests into separate directories ([PR #6751](https://github.com/realm/realm-core/pull/6751)).
 
 ----------------------------------------------
 
@@ -41,7 +41,6 @@
 ### Internals
 * Prebuilt binaries for non-Apple platforms are no longer published as nothing was using them ([PR #6746](https://github.com/realm/realm-core/pull/6746)).
 * SystemError exceptions now have a more detailed error message. ([#6739](https://github.com/realm/realm-core/issues/6739))
-* Separate out local vs. baas object store app tests into separate directories ([PR #6751](https://github.com/realm/realm-core/pull/6751)).
 
 ----------------------------------------------
 
