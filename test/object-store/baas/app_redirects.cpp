@@ -399,13 +399,13 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
                 logger->trace("Received request[%1]: %2", request_count, request.url);
                 if (request_count++ == 0) {
                     // First request should be a location request against the original URL
-                    logger->trace("request.url: '%1'", request.url);
-                    logger->trace("app_url: '%1'", app_url);
-                    REQUIRE(request.url.find(app_url) != std::string::npos);
+                    logger->debug("request.url: '%1'", request.url);
+                    logger->debug("app_url: '%1'", app_url);
                     REQUIRE(request.url.find("/location") != std::string::npos);
                     REQUIRE(request.redirect_count == 0);
                     redir_transport->simulated_response =
                         make_redirect_response(sync::HTTPStatus::PermanentRedirect, redir_app_url);
+                    REQUIRE(request.url.find(app_url) != std::string::npos);
                 }
                 // Otherwise, if there are any location requests, respond with the redirect URLs
                 else if (request.url.find("/location") != std::string::npos) {
