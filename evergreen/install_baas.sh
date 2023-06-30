@@ -376,15 +376,15 @@ echo "Starting mongodb"
 
 # Wait for mongod to start (up to 20 secs) while attempting to initialize the replica set
 echo "Initializing replica set"
-retries=1
+retries=0
 
 until "${MONGO_BINARIES_DIR}/bin/${MONGOSH}" mongodb://localhost:26000/auth --eval 'try { rs.initiate(); } catch (e) { if (e.codeName != "AlreadyInitialized") { throw e; } }' > /dev/null
 do
-    (( ++retries ))
+    ((++retries))
     if [[ -z "$(pgrep mongod)" ]]; then
         echo "Mongodb process has terminated"
         exit 1
-    elif [[ ${retries} -gt 10 ]]; then
+    elif [[ ${retries} -ge 10 ]]; then
         echo "Failed to connect to mongodb"
         exit 1
     fi

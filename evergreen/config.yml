@@ -492,13 +492,15 @@ functions:
         set -o pipefail
         set -o verbose
 
+        BAAS_USER=ubuntu
+
         OPT_BAAS_BRANCH=
         if [ -n "${baas_branch}" ]; then
             OPT_BAAS_BRANCH="-b ${baas_branch}"
         fi
 
         # Run the setup_baas_host_local.sh script to configure and run baas on the remote host
-        ./evergreen/setup_baas_host_local.sh -v -f ./baas_host_vars.sh -i ./.baas_ssh_key -u ubuntu $OPT_BAAS_BRANCH 2>&1 | tee install_baas_output.log
+        ./evergreen/setup_baas_host_local.sh -v -f ./baas_host_vars.sh -i ./.baas_ssh_key -u $BAAS_USER $OPT_BAAS_BRANCH 2>&1 | tee install_baas_output.log
 
   "launch local baas":
   - command: shell.exec

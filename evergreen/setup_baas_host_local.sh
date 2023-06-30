@@ -97,18 +97,18 @@ SSH_OPTIONS=(-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=
 
 echo "running ssh with ${SSH_OPTIONS[*]}"
 
-attempts=1
-connection_attempts=20
+attempts=0
+connection_attempts=25
 
 # Check for remote connectivity
 until ssh "${SSH_OPTIONS[@]}" "${SSH_USER}" "echo -n 'hello from '; hostname" ; do
-  if [[ ${attempts} -gt ${connection_attempts} ]] ; then
+  if [[ ${attempts} -ge ${connection_attempts} ]] ; then
     echo "Timed out waiting for host ${BAAS_HOST_NAME} to start"
     exit 1
   fi
   ((++attempts))
   printf "SSH connection attempt %d/%d failed. Retrying...\n" "${attempts}" "${connection_attempts}"
-  sleep 5
+  sleep 10
 done
 
 echo "Transferring setup scripts to ${SSH_USER}:${FILE_DEST_DIR}"
