@@ -2,11 +2,32 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* None.
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.16.0 Release notes
+
+### Enhancements
 * Add visionOS binaries to the Cocoa release package ([PR #6746](https://github.com/realm/realm-core/pull/6746)).
 * Added support for running initial subscription callback when opening realm, both for synchronous and asynchronous flows. Sync Config contains `subscription_initializer` and `rerun_init_subscription_on_open` in order to setup the subscription callback, and select whether rerun this the first time the file is opened or not. ([#5962](https://github.com/realm/realm-core/issues/5962))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
 
 ### Breaking changes
