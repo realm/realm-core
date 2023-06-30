@@ -35,6 +35,7 @@
 #include <realm/util/uri.hpp>
 
 #include <chrono>
+#include <iostream>
 
 using namespace realm;
 using namespace realm::app;
@@ -387,25 +388,26 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
 
             int connect_count = 0;
             redir_provider->handshake_response_func =
-                [&connect_count]() -> std::optional<std::pair<int, std::string>> {
+                [&logger, &connect_count]() -> std::optional<std::pair<int, std::string>> {
                 // Only return the simulated response on the first connection attempt
                 if (connect_count++ > 0)
                     return {};
 
+                logger->debug("Received websocket request; returning PermanentRedirect");
                 return std::make_pair(static_cast<int>(sync::HTTPStatus::PermanentRedirect), "");
             };
             int request_count = 0;
             redir_transport->request_hook = [&](const Request& request) {
-                logger->trace("Received request[%1]: %2", request_count, request.url);
+                logger->debug("Received request[%1]: '%2'", request_count, request.url);
+                logger->debug("app_url: '%1'", app_url);
+                std::cerr << std::flush;
                 if (request_count++ == 0) {
                     // First request should be a location request against the original URL
-                    logger->debug("request.url: '%1'", request.url);
-                    logger->debug("app_url: '%1'", app_url);
+                    REQUIRE(request.url.find(app_url) != std::string::npos);
                     REQUIRE(request.url.find("/location") != std::string::npos);
                     REQUIRE(request.redirect_count == 0);
                     redir_transport->simulated_response =
                         make_redirect_response(sync::HTTPStatus::PermanentRedirect, redir_app_url);
-                    REQUIRE(request.url.find(app_url) != std::string::npos);
                 }
                 // Otherwise, if there are any location requests, respond with the redirect URLs
                 else if (request.url.find("/location") != std::string::npos) {
