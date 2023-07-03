@@ -402,6 +402,7 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
                 std::cerr << std::flush;
                 if (request_count++ == 0) {
                     // First request should be a location request against the original URL
+                    REALM_ASSERT_EX(request.url.find(app_url) != std::string::npos, request.url, app_url);
                     REQUIRE(request.url.find(app_url) != std::string::npos);
                     REQUIRE(request.url.find("/location") != std::string::npos);
                     REQUIRE(request.redirect_count == 0);
