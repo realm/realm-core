@@ -385,7 +385,7 @@ RLM_API realm_set_t* realm_get_set(realm_object_t* object, realm_property_key_t 
         auto col_key = ColKey(key);
         table->check_column(col_key);
 
-        if (!col_key.is_set()) {
+        if (!(col_key.is_set() || col_key.get_type() == col_type_Mixed)) {
             report_type_mismatch(object->get_realm(), *table, col_key);
         }
 
