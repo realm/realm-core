@@ -5087,6 +5087,31 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         checked(realm_list_size(list.get(), &size));
         REQUIRE(size == 5);
     }
+
+    SECTION("set") {
+        REQUIRE(realm_set_collection(obj1.get(), foo_any_col_key, RLM_COLLECTION_TYPE_SET));
+        realm_value_t value;
+        realm_get_value(obj1.get(), foo_any_col_key, &value);
+        REQUIRE(value.type == RLM_TYPE_SET);
+        auto set = cptr_checked(realm_get_set(obj1.get(), foo_any_col_key));
+        size_t index;
+        bool inserted = false;
+        REQUIRE(realm_set_insert(set.get(), rlm_str_val("Hello"), &index, &inserted));
+        CHECK(index == 0);
+        CHECK(inserted);
+        REQUIRE(realm_set_insert(set.get(), rlm_int_val(42), &index, &inserted));
+        CHECK(index == 0);
+        CHECK(inserted);
+        size_t size;
+        checked(realm_set_size(set.get(), &size));
+        REQUIRE(size == 2);
+        checked(realm_set_get(set.get(), 0, &value));
+        CHECK(value.type == RLM_TYPE_INT);
+        CHECK(value.integer == 42);
+        checked(realm_set_get(set.get(), 1, &value));
+        CHECK(value.type == RLM_TYPE_STRING);
+        CHECK(strncmp(value.string.data, "Hello", value.string.size) == 0);
+    }
     realm_release(realm);
 }
 
