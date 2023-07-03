@@ -1561,7 +1561,7 @@ TEST_CASE("flx: geospatial", "[sync][flx][app][baas]") {
                                       "Invalid region in GEOWITHIN query for parameter 'GeoPolygon({[-80, 40.7128], "
                                       "[20, 60], [20, 20]})': 'Ring is not closed, first vertex 'GeoPoint([-80, "
                                       "40.7128])' does not equal last vertex 'GeoPoint([20, 20])''");
-                    run_query_on_server(make_polygon_filter(open_bounds), "(BadValue) Loop is not closed:");
+                    run_query_on_server(make_polygon_filter(open_bounds), "(BadValue) Loop is not closed");
                 }
                 {
                     GeoCircle circle = GeoCircle::from_kms(10, GeoPoint{-180.1, -90.1});
