@@ -8,21 +8,24 @@
 # using the 'tail' command after each attempt.
 #
 # Usage:
-# ./evergreen/wait_for_baas.sh [-p FILE] [-r COUNT] [-l FILE] [-s] [-v] -h
+# ./evergreen/wait_for_baas.sh [-w PATH] [-p FILE] [-r COUNT] [-l FILE] [-s] [-v] [-h]
 #
 
 set -o errexit
 set -o pipefail
 
 CURL=${CURL:=curl}
-STITCH_PID_FILE=
+BAAS_PID_FILE=
+BAAS_FAILED_FILE=
 RETRY_COUNT=120
 BAAS_SERVER_LOG=
 STATUS_OUT=
+VERBOSE=
 
 function usage()
 {
-    echo "Usage: wait_for_baas.sh [-p FILE] [-r COUNT] [-l FILE] [-s] [-v] -h"
+    echo "Usage: wait_for_baas.sh [-w PATH] [-p FILE] [-r COUNT] [-l FILE] [-s] [-v] [-h]"
+    echo -e "\t-w PATH\t\tPath to baas server working directory"
     echo -e "\t-p FILE\t\tPath to baas server pid file"
     echo -e "\t-r COUNT\tNumber of attempts to check for baas server (default 120)"
     echo -e "\t-l FILE\t\tPath to baas server log file"
@@ -33,38 +36,53 @@ function usage()
     exit "${1:0}"
 }
 
-while getopts "p:r:l:svh" opt; do 
+function update_paths()
+{
+    if [[ -n "${1}" ]]; then
+        BAAS_SERVER_LOG="${1}/baas_server.log"
+        BAAS_FAILED_FILE="${1}/baas_failed"
+        BAAS_PID_FILE="${1}/baas_server.pid"
+    fi
+}
+
+while getopts "w:p:r:l:svh" opt; do 
     case "${opt}" in
-        p) STITCH_PID_FILE="${OPTARG}";;
+        w) update_paths "${OPTARG}";;
+        p) BAAS_PID_FILE="${OPTARG}";;
         r) RETRY_COUNT="${OPTARG}";;
         l) BAAS_SERVER_LOG="${OPTARG}";;
         s) STATUS_OUT="yes";;
-        v) set -o verbose; set -o xtrace;;
+        v) VERBOSE="yes"; set -o verbose; set -o xtrace;;
         h) usage 0;;
         *) usage 1;;
     esac
 done
 
-WAIT_COUNTER=1
+WAIT_COUNTER=0
 WAIT_START=$(date -u +'%s')
 
 until $CURL --output /dev/null --head --fail http://localhost:9090 --silent ; do
-    if [[ -n "${STITCH_PID_FILE}" && -f "${STITCH_PID_FILE}" ]]; then
-        pgrep -F "${STITCH_PID_FILE}" > /dev/null || (echo "Stitch $(< "${STITCH_PID_FILE}") is not running"; exit 1)
+    if [[ -n "${BAAS_FAILED_FILE}" && -f "${BAAS_FAILED_FILE}" ]]; then
+        echo "Baas server failed to start (found baas_failed file)"
+        exit 1
+    fi
+
+    if [[ -n "${BAAS_PID_FILE}" && -f "${BAAS_PID_FILE}" ]]; then
+        pgrep -F "${BAAS_PID_FILE}" > /dev/null || (echo "Baas server $(< "${BAAS_PID_FILE}") is not running"; exit 1)
     fi
 
     ((++WAIT_COUNTER))
-    if [[ ${WAIT_COUNTER} -gt ${RETRY_COUNT} ]]; then
-        echo "Timed out waiting for stitch to start"
+    if [[ ${WAIT_COUNTER} -ge ${RETRY_COUNT} ]]; then
+        echo "Timed out waiting for baas server to start"
         exit 1
     fi
 
     if [[ -n "${STATUS_OUT}" ]]; then
-        SECS_SPENT_WAITING=$(($(date -u +'%s') - WAIT_START))
-        echo "Waiting for baas to start... ${SECS_SPENT_WAITING} secs so far"
+        secs_spent_waiting=$(($(date -u +'%s') - WAIT_START))
+        echo "Waiting for baas server to start... ${secs_spent_waiting} secs so far"
     fi
 
-    if [[ -n "${BAAS_SERVER_LOG}" && -f "${BAAS_SERVER_LOG}" ]]; then
+    if [[ -n "${VERBOSE}" && -n "${BAAS_SERVER_LOG}" && -f "${BAAS_SERVER_LOG}" ]]; then
         tail -n 5 "${BAAS_SERVER_LOG}"
     fi
 

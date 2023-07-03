@@ -2,24 +2,19 @@
 # The script to be run on the ubuntu host that will run baas for the evergreen windows tests
 #
 # Usage:
-# ./evergreen/setup_baas_host_local.sh [-f PATH] [-i PATH] [-u USER] [-d PATH] [-b BRANCH] [-v] -h
+# ./evergreen/setup_baas_host_local.sh -f FILE [-i FILE] [-w PATH] [-u USER] [-d PATH] [-b BRANCH] [-v] [-h]
 #
 
 set -o errexit
 set -o pipefail
 
-trap 'catch $? ${LINENO}' EXIT
-catch() {
-  if [ "$1" != "0" ]; then
-    echo "Error $1 occurred while starting baas (local) at line $2"
-  fi
-}
-
-usage()
+function usage()
 {
-    echo "Usage: setup_baas_host_local.sh [-f PATH] [-i PATH] [-u USER] [-d PATH] [-b BRANCH] [-v] -h"
-    echo -e "\t-f PATH\t\tPath to baas host vars script (default ./baas_host_vars.sh)"
-    echo -e "\t-i PATH\t\tPath to baas host private key file (default ./.baas_ssh_key)"
+    echo "Usage: setup_baas_host_local.sh [-w PATH] [-u USER] [-d PATH] [-b BRANCH] [-v] [-h] HOST_VARS SSH_KEY"
+    echo -e "\tHOST_VARS\t\tPath to baas host vars script file"
+    echo -e "\tSSH_KEY\t\tPath to baas host private key file"
+    echo "Options:"
+    echo -e "\t-w PATH\t\tPath to local baas server working directory (default ./baas-work-dir)"
     echo -e "\t-u USER\t\tUsername to connect to baas host (default ubuntu)"
     echo -e "\t-d PATH\t\tPath on baas host to transfer files (default /home/<USER>)"
     echo -e "\t-b BRANCH\tOptional branch or git spec of baas to checkout/build"
@@ -29,40 +24,76 @@ usage()
     exit "${1:0}"
 }
 
-BAAS_HOST_VARS=./baas_host_vars.sh
-BAAS_HOST_KEY=./.baas_ssh_key
+EVERGREEN_PATH=./evergreen
+BAAS_WORK_PATH=./baas-work-dir
 BAAS_HOST_NAME=
 BAAS_USER=ubuntu
 BAAS_BRANCH=
 FILE_DEST_DIR=
 VERBOSE=
 
-while getopts "f:i:u:d:b:vh" opt; do
+while getopts "w:u:d:b:vh" opt; do
     case "${opt}" in
-        f) BAAS_HOST_VARS="${OPTARG}";;
-        i) BAAS_HOST_KEY="${OPTARG}";;
+        w) BAAS_WORK_PATH="${OPTARG}";;
         u) BAAS_USER="${OPTARG}";;
         d) FILE_DEST_DIR="${OPTARG}";;
         b) BAAS_BRANCH="${OPTARG}";;
-        v) VERBOSE="-v"; set -o verbose; set -o xtrace;;
+        v) VERBOSE="-v";;
         h) usage 0;;
         *) usage 1;;
     esac
 done
 
+shift $((OPTIND - 1))
+BAAS_HOST_VARS="${1}"; shift;
+BAAS_HOST_KEY="${1}"; shift;
+
 if [[ -z "${BAAS_HOST_VARS}" ]]; then
     echo "Baas host vars script not provided"
     usage 1
-fi
-if [[ ! -f "${BAAS_HOST_VARS}" ]]; then
+elif [[ ! -f "${BAAS_HOST_VARS}" ]]; then
     echo "Baas host vars script not found: ${BAAS_HOST_VARS}"
     usage 1
 fi
+
 if [[ -z "${BAAS_HOST_KEY}" ]]; then
     echo "Baas host private key not provided"
     usage 1
+elif [[ ! -f "${BAAS_HOST_KEY}" ]]; then
+    echo "Baas host private key not found: ${BAAS_HOST_KEY}"
+    usage 1
 fi
-if [[ ! -f "${BAAS_HOST_KEY}" ]]; then
+
+trap 'catch $? ${LINENO}' EXIT
+function catch() {
+  if [ "$1" != "0" ]; then
+    echo "Error $1 occurred while starting baas (local) at line $2"
+    if [[ -n "${BAAS_WORK_PATH}" ]]; then
+        # Create the baas_failed file so wait_for_baas can exit early
+        [[ -d "${BAAS_WORK_PATH}" ]] || mkdir -p "${BAAS_WORK_PATH}"
+        touch "${BAAS_WORK_PATH}/baas_failed"
+    fi
+  fi
+}
+
+# shellcheck disable=SC1090
+source "${BAAS_HOST_VARS}"
+
+# Wait until after the BAAS_HOST_VARS file is loaded to enable verbose tracing
+if [[ -n "${VERBOSE}" ]]; then
+    set -o verbose
+    set -o xtrace
+fi
+
+if [[ -z "${BAAS_HOST_NAME}" ]]; then
+    echo "Baas hostname not found in baas host vars script: ${BAAS_HOST_VARS}"
+    usage 1
+fi
+
+if [[ -z "${BAAS_HOST_KEY}" ]]; then
+    echo "Baas host private key not provided"
+    usage 1
+elif [[ ! -f "${BAAS_HOST_KEY}" ]]; then
     echo "Baas host private key not found: ${BAAS_HOST_KEY}"
     usage 1
 fi
@@ -73,13 +104,6 @@ fi
 
 if [[ -z "${FILE_DEST_DIR}" ]]; then
     FILE_DEST_DIR="/home/${BAAS_USER}"
-fi
-
-# shellcheck disable=SC1090
-source "${BAAS_HOST_VARS}"
-if [[ -z "${BAAS_HOST_NAME}" ]]; then
-    echo "Baas host not found in baas host vars script: ${BAAS_HOST_VARS}"
-    usage 1
 fi
 
 SSH_USER="$(printf "%s@%s" "${BAAS_USER}" "${BAAS_HOST_NAME}")"
@@ -97,27 +121,30 @@ SSH_OPTIONS=(-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=
 
 echo "running ssh with ${SSH_OPTIONS[*]}"
 
-attempts=0
-connection_attempts=25
+RETRY_COUNT=25
+WAIT_COUNTER=0
+WAIT_START=$(date -u +'%s')
 
 # Check for remote connectivity
 until ssh "${SSH_OPTIONS[@]}" "${SSH_USER}" "echo -n 'hello from '; hostname" ; do
-  if [[ ${attempts} -ge ${connection_attempts} ]] ; then
-    echo "Timed out waiting for host ${BAAS_HOST_NAME} to start"
+  if [[ ${WAIT_COUNTER} -ge ${RETRY_COUNT} ]] ; then
+    secs_spent_waiting=$(($(date -u +'%s') - WAIT_START))
+    echo "Timed out after waiting ${secs_spent_waiting} seconds for host ${BAAS_HOST_NAME} to start"
     exit 1
   fi
-  ((++attempts))
-  printf "SSH connection attempt %d/%d failed. Retrying...\n" "${attempts}" "${connection_attempts}"
+  
+  ((++WAIT_COUNTER))
+  printf "SSH connection attempt %d/%d failed. Retrying...\n" "${WAIT_COUNTER}" "${RETRY_COUNT}"
   sleep 10
 done
 
 echo "Transferring setup scripts to ${SSH_USER}:${FILE_DEST_DIR}"
 # Copy the baas host vars script to the baas remote host
-scp "${SSH_OPTIONS[@]}" "${BAAS_HOST_VARS}" "${SSH_USER}:${FILE_DEST_DIR}/" || exit 1
+scp "${SSH_OPTIONS[@]}" "${BAAS_HOST_VARS}" "${SSH_USER}:${FILE_DEST_DIR}/"
 # Copy the current host and baas scripts from the working copy of realm-core
 # This ensures they have the latest copy, esp when running evergreen patches
-scp "${SSH_OPTIONS[@]}" evergreen/setup_baas_host.sh "${SSH_USER}:${FILE_DEST_DIR}/" || exit 1
-scp "${SSH_OPTIONS[@]}" evergreen/install_baas.sh "${SSH_USER}:${FILE_DEST_DIR}/" || exit 1
+scp "${SSH_OPTIONS[@]}" "${EVERGREEN_PATH}/setup_baas_host.sh" "${SSH_USER}:${FILE_DEST_DIR}/"
+scp "${SSH_OPTIONS[@]}" "${EVERGREEN_PATH}/install_baas.sh" "${SSH_USER}:${FILE_DEST_DIR}/"
 
 echo "Starting remote baas with branch/commit: '${BAAS_BRANCH}'"
 OPT_BAAS_BRANCH=
@@ -128,4 +155,4 @@ fi
 # Run the setup baas host script and provide the location of the baas host vars script
 # Also sets up a forward tunnel for port 9090 through the ssh connection to the baas remote host
 echo "Running setup script (with forward tunnel to 127.0.0.1:9090)"
-ssh "${SSH_OPTIONS[@]}" -L 9090:127.0.0.1:9090 "${SSH_USER}" "${FILE_DEST_DIR}/setup_baas_host.sh" "${VERBOSE}" -a "${FILE_DEST_DIR}/baas_host_vars.sh" "${OPT_BAAS_BRANCH[@]}"
+ssh "${SSH_OPTIONS[@]}" -L 9090:127.0.0.1:9090 "${SSH_USER}" "${FILE_DEST_DIR}/setup_baas_host.sh" "${VERBOSE}" "${OPT_BAAS_BRANCH[@]}" "${FILE_DEST_DIR}/baas_host_vars.sh"

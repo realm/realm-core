@@ -3,7 +3,7 @@
 # and will import a given app into it.
 #
 # Usage:
-# ./evergreen/install_baas.sh -w {path to working directory} [-b git revision of baas]
+# ./evergreen/install_baas.sh -w {path to working directory} [-b git revision of baas] [-v] [-h]
 #
 
 # shellcheck disable=SC1091
@@ -122,7 +122,7 @@ REALPATH="${BASE_PATH}/abspath.sh"
 
 function usage()
 {
-    echo "Usage: install_baas.sh -w PATH [-b BRANCH] [-v] -h"
+    echo "Usage: install_baas.sh -w PATH [-b BRANCH] [-v] [-h]"
     echo -e "\t-w PATH\t\tPath to working dir"
     echo -e "\t-b BRANCH\tOptional branch or git spec of baas to checkout/build"
     echo -e "\t-v\t\tEnable verbose script debugging"
@@ -150,27 +150,6 @@ if [[ -z "${WORK_PATH}" ]]; then
     usage 1
 fi
 
-# Create and cd into the working directory
-[[ -d ${WORK_PATH} ]] || mkdir -p "${WORK_PATH}"
-pushd "${WORK_PATH}" > /dev/null
-echo "Work path: ${WORK_PATH}"
-
-# Remove the baas_ready file from a previous run if it exists
-if [[ -f "${WORK_PATH}/baas_ready" ]]; then
-    rm "${WORK_PATH}/baas_ready"
-fi
-
-# Set up some directory paths
-BAAS_DIR="${WORK_PATH}/baas"
-BAAS_DEPS_DIR="${WORK_PATH}/baas_dep_binaries"
-NODE_BINARIES_DIR="${WORK_PATH}/node_binaries"
-MONGO_BINARIES_DIR="${WORK_PATH}/mongodb-binaries"
-MONGODB_PATH="${WORK_PATH}/mongodb-dbpath"
-
-DYLIB_DIR="${BAAS_DIR}/etc/dylib"
-DYLIB_LIB_DIR="${DYLIB_DIR}/lib"
-TRANSPILER_DIR="${BAAS_DIR}/etc/transpiler"
-
 # Check the mongodb and baas_server port availability first
 MONGODB_PORT=26000
 BAAS_PORT=9090
@@ -188,6 +167,88 @@ if [[ -n "${BAAS_PORT_CHECK}" ]]; then
     echo -e "${BAAS_PORT_CHECK}"
     exit 1
 fi
+
+# Create and cd into the working directory
+[[ -d ${WORK_PATH} ]] || mkdir -p "${WORK_PATH}"
+pushd "${WORK_PATH}" > /dev/null
+echo "Work path: ${WORK_PATH}"
+
+# Set up some directory paths
+BAAS_DIR="${WORK_PATH}/baas"
+BAAS_DEPS_DIR="${WORK_PATH}/baas_dep_binaries"
+NODE_BINARIES_DIR="${WORK_PATH}/node_binaries"
+MONGO_BINARIES_DIR="${WORK_PATH}/mongodb-binaries"
+MONGODB_PATH="${WORK_PATH}/mongodb-dbpath"
+
+DYLIB_DIR="${BAAS_DIR}/etc/dylib"
+DYLIB_LIB_DIR="${DYLIB_DIR}/lib"
+TRANSPILER_DIR="${BAAS_DIR}/etc/transpiler"
+
+# Define files for storing state
+BAAS_SERVER_LOG="${WORK_PATH}/baas_server.log"
+BAAS_READY_FILE="${WORK_PATH}/baas_ready"
+BAAS_FAILED_FILE="${WORK_PATH}/baas_failed"
+BAAS_PID_FILE="${WORK_PATH}/baas_server.pid"
+MONGOD_PID_FILE="${WORK_PATH}/mongod.pid"
+MONGOD_LOG="${MONGODB_PATH}/mongod.log"
+
+# Delete the mongod working directory if it exists from a previous run
+# Wait to create this directory until just before mongod is started
+if [[ -d "${MONGODB_PATH}" ]]; then
+    rm -rf "${MONGODB_PATH}"
+fi
+
+# Remove some files from a previous run if they exist
+if [[ -f "${BAAS_SERVER_LOG}" ]]; then
+    rm "${BAAS_SERVER_LOG}"
+fi
+if [[ -f "${BAAS_READY_FILE}" ]]; then
+    rm "${BAAS_READY_FILE}"
+fi
+if [[ -f "${BAAS_FAILED_FILE}" ]]; then
+    rm "${BAAS_FAILED_FILE}"
+fi
+if [[ -f "${BAAS_PID_FILE}" ]]; then
+    rm "${BAAS_PID_FILE}"
+fi
+if [[ -f "${MONGOD_PID_FILE}" ]]; then
+    rm "${MONGOD_PID_FILE}"
+fi
+
+# Set up the cleanup function that runs at exit and stops mongod and the baas server
+function cleanup() {
+    if [ "$1" != "0" ]; then
+        # If baas failed to start, then create a 'baas_failed' file
+        touch "${WORK_PATH}/baas_failed"
+    fi
+
+    baas_pid=""
+    mongod_pid=""
+    if [[ -f "${BAAS_PID_FILE}" ]]; then
+        baas_pid="$(< "${BAAS_PID_FILE}")"
+    fi
+
+    if [[ -f "${MONGOD_PID_FILE}" ]]; then
+        mongod_pid="$(< "${MONGOD_PID_FILE}")"
+    fi
+
+    if [[ -n "${baas_pid}" ]]; then
+        echo "Stopping baas ${baas_pid}"
+        kill "${baas_pid}"
+        echo "Waiting for baas to stop"
+        wait "${baas_pid}"
+    fi
+
+    if [[ -n "${mongod_pid}" ]]; then
+        echo "Killing mongod ${mongod_pid}"
+        kill "${mongod_pid}"
+        echo "Waiting for processes to exit"
+        wait
+    fi
+}
+
+trap "exit" INT TERM ERR
+trap 'cleanup $?' EXIT
 
 echo "Installing node and go to build baas and its dependencies"
 
@@ -241,14 +302,14 @@ git checkout "${BAAS_VERSION}"
 echo "Using baas commit: $(git rev-parse HEAD)"
 popd > /dev/null  # baas
 
-# Copy or download and extract the stitch support archive if it's not found
+# Copy or download and extract the baas support archive if it's not found
 if [[ ! -d "${DYLIB_DIR}" ]]; then
     if [[ -n "${STITCH_SUPPORT_LIB_PATH}" ]]; then
-        echo "Copying stitch support library from ${STITCH_SUPPORT_LIB_PATH}"
+        echo "Copying baas support library from ${STITCH_SUPPORT_LIB_PATH}"
         mkdir -p "${DYLIB_DIR}"
         cp -rav "${STITCH_SUPPORT_LIB_PATH}"/* "${DYLIB_DIR}"
     else
-        echo "Downloading stitch support library"
+        echo "Downloading baas support library"
         mkdir -p "${DYLIB_DIR}"
         pushd "${DYLIB_DIR}" > /dev/null
         ${CURL} -LsS "${STITCH_SUPPORT_LIB_URL}" | tar -xz --strip-components=1
@@ -324,68 +385,43 @@ fi
 
 [[ -n "${MONGOSH_DOWNLOAD_URL}" ]] && MONGOSH="mongosh" || MONGOSH="mongo"
 
-ulimit -n 32000
-
-# The mongod files will be stored in the <work_path>/mongodb_dbpath directory
-if [[ -d "${MONGODB_PATH}" ]]; then
-    rm -rf "${MONGODB_PATH}"
-fi
-mkdir -p "${MONGODB_PATH}"
-
-# Set up the cleanup function that runs at exit and stops mongod and the baas server
-function cleanup() {
-    BAAS_PID=""
-    MONGOD_PID=""
-    if [[ -f ${WORK_PATH}/baas_server.pid ]]; then
-        BAAS_PID="$(< "${WORK_PATH}/baas_server.pid")"
-    fi
-
-    if [[ -f ${WORK_PATH}/mongod.pid ]]; then
-        MONGOD_PID="$(< "${WORK_PATH}/mongod.pid")"
-    fi
-
-    if [[ -n "${BAAS_PID}" ]]; then
-        echo "Stopping baas ${BAAS_PID}"
-        kill "${BAAS_PID}"
-        echo "Waiting for baas to stop"
-        wait "${BAAS_PID}"
-    fi
-
-    if [[ -n "${MONGOD_PID}" ]]; then
-        echo "Killing mongod ${MONGOD_PID}"
-        kill "${MONGOD_PID}"
-        echo "Waiting for processes to exit"
-        wait
-    fi
-}
-
-trap "exit" INT TERM ERR
-trap 'cleanup' EXIT
 
 # Start mongod on port 26000 and listening on all network interfaces
 echo "Starting mongodb"
+
+# Increase the maximum number of open file descriptors (needed by mongod)
+ulimit -n 32000
+
+# The mongod working files will be stored in the <work_path>/mongodb_dbpath directory
+mkdir -p "${MONGODB_PATH}"
+
 "${MONGO_BINARIES_DIR}/bin/mongod" \
     --replSet rs \
     --bind_ip_all \
     --port 26000 \
     --oplogMinRetentionHours 1.0 \
-    --logpath "${MONGODB_PATH}/mongod.log" \
+    --logpath "${MONGOD_LOG}" \
     --dbpath "${MONGODB_PATH}/" \
-    --pidfilepath "${WORK_PATH}/mongod.pid" &
+    --pidfilepath "${MONGOD_PID_FILE}" &
 
 
 # Wait for mongod to start (up to 20 secs) while attempting to initialize the replica set
 echo "Initializing replica set"
-retries=0
+
+RETRY_COUNT=10
+WAIT_COUNTER=0
+WAIT_START=$(date -u +'%s')
 
 until "${MONGO_BINARIES_DIR}/bin/${MONGOSH}" mongodb://localhost:26000/auth --eval 'try { rs.initiate(); } catch (e) { if (e.codeName != "AlreadyInitialized") { throw e; } }' > /dev/null
 do
-    ((++retries))
+    ((++WAIT_COUNTER))
     if [[ -z "$(pgrep mongod)" ]]; then
-        echo "Mongodb process has terminated"
+        secs_spent_waiting=$(($(date -u +'%s') - WAIT_START))
+        echo "Mongodb process has terminated after ${secs_spent_waiting} seconds"
         exit 1
-    elif [[ ${retries} -ge 10 ]]; then
-        echo "Failed to connect to mongodb"
+    elif [[ ${WAIT_COUNTER} -ge ${RETRY_COUNT} ]]; then
+        secs_spent_waiting=$(($(date -u +'%s') - WAIT_START))
+        echo "Timed out after waiting ${secs_spent_waiting} seconds for mongod to start"
         exit 1
     fi
 
@@ -394,7 +430,7 @@ done
 
 # Add the baas user to mongod so it can connect to and access the database
 pushd "${BAAS_DIR}" > /dev/null
-echo "Adding stitch user"
+echo "Adding baas user"
 go run -exec="env LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}" cmd/auth/user.go \
     addUser \
     -domainID 000000000000000000000000 \
@@ -405,18 +441,17 @@ go run -exec="env LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DYLD_LIBRARY_PATH=${DYLD_LI
 
 # Build the baas server using go
 [[ -d tmp ]] || mkdir tmp
-echo "Building stitch app server"
-[[ -f "${WORK_PATH}/baas_server.pid" ]] && rm "${WORK_PATH}/baas_server.pid"
+echo "Building baas app server"
+[[ -f "${BAAS_PID_FILE}" ]] && rm "${BAAS_PID_FILE}"
 go build -o "${WORK_PATH}/baas_server" cmd/server/main.go
 
 # Start the baas server on port *:9090 with the provided config JSON files
-echo "Starting stitch app server"
+echo "Starting baas app server"
 
-BAAS_SERVER_LOG="${WORK_PATH}/baas_server.log"
 "${WORK_PATH}/baas_server" \
     --configFile=etc/configs/test_config.json --configFile="${BASE_PATH}/config_overrides.json" > "${BAAS_SERVER_LOG}" 2>&1 &
-echo $! > "${WORK_PATH}/baas_server.pid"
-"${BASE_PATH}/wait_for_baas.sh" "${VERBOSE}" -p "${WORK_PATH}/baas_server.pid" -l "${BAAS_SERVER_LOG}"
+echo $! > "${BAAS_PID_FILE}"
+"${BASE_PATH}/wait_for_baas.sh" "${VERBOSE}" -w "${WORK_PATH}"
 
 # Create the admin user and set up the allowed roles
 echo "Adding roles to admin user"
@@ -431,7 +466,7 @@ ${CURL} 'http://localhost:9090/api/admin/v3.0/auth/providers/local-userpass/logi
 "${MONGO_BINARIES_DIR}/bin/${MONGOSH}"  --quiet mongodb://localhost:26000/auth "${BASE_PATH}/add_admin_roles.js"
 
 # All done! the 'baas_ready' file indicates the baas server has finished initializing
-touch "${WORK_PATH}/baas_ready"
+touch "${BAAS_READY_FILE}"
 
 echo "---------------------------------------------"
 echo "Baas server ready"
