@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+#include <iostream>
 
 #include <realm/object_converter.hpp>
 
@@ -27,7 +28,7 @@
 namespace realm::converters {
 
 // Takes two lists, src and dst, and makes dst equal src. src is unchanged.
-void InterRealmValueConverter::copy_list(const Obj& src_obj, Obj& dst_obj, bool* update_out)
+void InterRealmValueConverter::copy_list(const LstBase& src, LstBase& dst, bool* update_out)
 {
     // The two arrays are compared by finding the longest common prefix and
     // suffix.  The middle section differs between them and is made equal by
@@ -37,25 +38,23 @@ void InterRealmValueConverter::copy_list(const Obj& src_obj, Obj& dst_obj, bool*
     // src = abcdefghi
     // dst = abcxyhi
     // The common prefix is abc. The common suffix is hi. xy is replaced by defg.
-    LstBasePtr src = src_obj.get_listbase_ptr(m_src_col);
-    LstBasePtr dst = dst_obj.get_listbase_ptr(m_dst_col);
 
     bool updated = false;
-    size_t len_src = src->size();
-    size_t len_dst = dst->size();
+    size_t len_src = src.size();
+    size_t len_dst = dst.size();
     size_t len_min = std::min(len_src, len_dst);
 
     size_t ndx = 0;
     size_t suffix_len = 0;
 
-    while (ndx < len_min && cmp_src_to_dst(src->get_any(ndx), dst->get_any(ndx), nullptr, update_out) == 0) {
+    while (ndx < len_min && cmp_src_to_dst(src.get_any(ndx), dst.get_any(ndx), nullptr, update_out) == 0) {
         ndx++;
     }
 
     size_t suffix_len_max = len_min - ndx;
 
     while (suffix_len < suffix_len_max &&
-           cmp_src_to_dst(src->get_any(len_src - 1 - suffix_len), dst->get_any(len_dst - 1 - suffix_len), nullptr,
+           cmp_src_to_dst(src.get_any(len_src - 1 - suffix_len), dst.get_any(len_dst - 1 - suffix_len), nullptr,
                           update_out) == 0) {
         suffix_len++;
     }
@@ -64,15 +63,15 @@ void InterRealmValueConverter::copy_list(const Obj& src_obj, Obj& dst_obj, bool*
 
     for (size_t i = 0; i < len_min; i++) {
         InterRealmValueConverter::ConversionResult converted_src;
-        if (cmp_src_to_dst(src->get_any(ndx), dst->get_any(ndx), &converted_src, update_out)) {
+        if (cmp_src_to_dst(src.get_any(ndx), dst.get_any(ndx), &converted_src, update_out)) {
             if (converted_src.requires_new_embedded_object) {
-                auto lnklist = dynamic_cast<LnkLst*>(dst.get());
+                auto lnklist = dynamic_cast<LnkLst*>(&dst);
                 REALM_ASSERT(lnklist); // this is the only type of list that supports embedded objects
                 Obj embedded = lnklist->create_and_set_linked_object(ndx);
                 track_new_embedded(converted_src.src_embedded_to_check, embedded);
             }
             else {
-                dst->set_any(ndx, converted_src.converted_value);
+                dst.set_any(ndx, converted_src.converted_value);
             }
             updated = true;
         }
@@ -82,15 +81,15 @@ void InterRealmValueConverter::copy_list(const Obj& src_obj, Obj& dst_obj, bool*
     // New elements must be inserted in dst.
     while (len_dst < len_src) {
         InterRealmValueConverter::ConversionResult converted_src;
-        cmp_src_to_dst(src->get_any(ndx), Mixed{}, &converted_src, update_out);
+        cmp_src_to_dst(src.get_any(ndx), Mixed{}, &converted_src, update_out);
         if (converted_src.requires_new_embedded_object) {
-            auto lnklist = dynamic_cast<LnkLst*>(dst.get());
+            auto lnklist = dynamic_cast<LnkLst*>(&dst);
             REALM_ASSERT(lnklist); // this is the only type of list that supports embedded objects
             Obj embedded = lnklist->create_and_insert_linked_object(ndx);
             track_new_embedded(converted_src.src_embedded_to_check, embedded);
         }
         else {
-            dst->insert_any(ndx, converted_src.converted_value);
+            dst.insert_any(ndx, converted_src.converted_value);
         }
         len_dst++;
         ndx++;
@@ -98,27 +97,24 @@ void InterRealmValueConverter::copy_list(const Obj& src_obj, Obj& dst_obj, bool*
     }
     // Excess elements must be removed from ll_dst.
     if (len_dst > len_src) {
-        dst->remove(len_src - suffix_len, len_dst - suffix_len);
+        dst.remove(len_src - suffix_len, len_dst - suffix_len);
         updated = true;
     }
 
-    REALM_ASSERT(dst->size() == len_src);
+    REALM_ASSERT(dst.size() == len_src);
     if (updated && update_out) {
         *update_out = updated;
     }
 }
 
-void InterRealmValueConverter::copy_set(const Obj& src_obj, Obj& dst_obj, bool* update_out)
+void InterRealmValueConverter::copy_set(const SetBase& src, SetBase& dst, bool* update_out)
 {
-    SetBasePtr src = src_obj.get_setbase_ptr(m_src_col);
-    SetBasePtr dst = dst_obj.get_setbase_ptr(m_dst_col);
-
     std::vector<size_t> sorted_src, sorted_dst, to_insert, to_delete;
     constexpr bool ascending = true;
     // the implementation could be storing elements in sorted order, but
     // we don't assume that here.
-    src->sort(sorted_src, ascending);
-    dst->sort(sorted_dst, ascending);
+    src.sort(sorted_src, ascending);
+    dst.sort(sorted_dst, ascending);
 
     size_t dst_ndx = 0;
     size_t src_ndx = 0;
@@ -132,11 +128,11 @@ void InterRealmValueConverter::copy_set(const Obj& src_obj, Obj& dst_obj, bool* 
             break;
         }
         size_t ndx_in_src = sorted_src[src_ndx];
-        Mixed src_val = src->get_any(ndx_in_src);
+        Mixed src_val = src.get_any(ndx_in_src);
         while (dst_ndx < sorted_dst.size()) {
             size_t ndx_in_dst = sorted_dst[dst_ndx];
 
-            int cmp = cmp_src_to_dst(src_val, dst->get_any(ndx_in_dst), nullptr, update_out);
+            int cmp = cmp_src_to_dst(src_val, dst.get_any(ndx_in_dst), nullptr, update_out);
             if (cmp == 0) {
                 // equal: advance both src and dst
                 ++dst_ndx;
@@ -163,14 +159,14 @@ void InterRealmValueConverter::copy_set(const Obj& src_obj, Obj& dst_obj, bool* 
 
     std::sort(to_delete.begin(), to_delete.end());
     for (auto it = to_delete.rbegin(); it != to_delete.rend(); ++it) {
-        dst->erase_any(dst->get_any(*it));
+        dst.erase_any(dst.get_any(*it));
     }
     for (auto ndx : to_insert) {
         InterRealmValueConverter::ConversionResult converted_src;
-        cmp_src_to_dst(src->get_any(ndx), Mixed{}, &converted_src, update_out);
+        cmp_src_to_dst(src.get_any(ndx), Mixed{}, &converted_src, update_out);
         // we do not support a set of embedded objects
         REALM_ASSERT(!converted_src.requires_new_embedded_object);
-        dst->insert_any(converted_src.converted_value);
+        dst.insert_any(converted_src.converted_value);
     }
 
     if (update_out && (to_delete.size() || to_insert.size())) {
@@ -178,11 +174,8 @@ void InterRealmValueConverter::copy_set(const Obj& src_obj, Obj& dst_obj, bool* 
     }
 }
 
-void InterRealmValueConverter::copy_dictionary(const Obj& src_obj, Obj& dst_obj, bool* update_out)
+void InterRealmValueConverter::copy_dictionary(const Dictionary& src, Dictionary& dst, bool* update_out)
 {
-    Dictionary src = src_obj.get_dictionary(m_src_col);
-    Dictionary dst = dst_obj.get_dictionary(m_dst_col);
-
     std::vector<size_t> to_insert, to_delete;
 
     size_t dst_ndx = 0;
@@ -253,29 +246,189 @@ void InterRealmValueConverter::copy_dictionary(const Obj& src_obj, Obj& dst_obj,
 void InterRealmValueConverter::copy_value(const Obj& src_obj, Obj& dst_obj, bool* update_out)
 {
     if (m_src_col.is_list()) {
-        copy_list(src_obj, dst_obj, update_out);
+        LstBasePtr src = src_obj.get_listbase_ptr(m_src_col);
+        LstBasePtr dst = dst_obj.get_listbase_ptr(m_dst_col);
+        copy_list(*src, *dst, update_out);
     }
     else if (m_src_col.is_dictionary()) {
-        copy_dictionary(src_obj, dst_obj, update_out);
+        Dictionary src = src_obj.get_dictionary(m_src_col);
+        Dictionary dst = dst_obj.get_dictionary(m_dst_col);
+        copy_dictionary(src, dst, update_out);
     }
     else if (m_src_col.is_set()) {
-        copy_set(src_obj, dst_obj, update_out);
+        SetBasePtr src = src_obj.get_setbase_ptr(m_src_col);
+        SetBasePtr dst = dst_obj.get_setbase_ptr(m_dst_col);
+        copy_set(*src, *dst, update_out);
     }
     else {
         REALM_ASSERT(!m_src_col.is_collection());
-        InterRealmValueConverter::ConversionResult converted_src;
-        if (cmp_src_to_dst(src_obj.get_any(m_src_col), dst_obj.get_any(m_dst_col), &converted_src, update_out)) {
-            if (converted_src.requires_new_embedded_object) {
-                Obj new_embedded = dst_obj.create_and_set_linked_object(m_dst_col);
-                track_new_embedded(converted_src.src_embedded_to_check, new_embedded);
-            }
-            else {
-                dst_obj.set_any(m_dst_col, converted_src.converted_value);
+        // nested collections
+        auto src_mixed = src_obj.get_any(m_src_col);
+        if (src_mixed.is_type(type_List)) {
+            dst_obj.set_collection(m_dst_col, CollectionType::List);
+            Lst<Mixed> src_list{src_obj, m_src_col};
+            Lst<Mixed> dst_list{dst_obj, m_dst_col};
+            handle_list_in_mixed(src_list, dst_list, update_out);
+            copy_list(src_list, dst_list, update_out);
+        }
+        else if (src_mixed.is_type(type_Set)) {
+            dst_obj.set_collection(m_dst_col, CollectionType::Set);
+            realm::Set<Mixed> src_set{src_obj, m_src_col};
+            realm::Set<Mixed> dst_set{dst_obj, m_dst_col};
+            // sets cannot be nested, so we just need to copy the values
+            copy_set(src_set, dst_set, update_out);
+        }
+        else if (src_mixed.is_type(type_Dictionary)) {
+            dst_obj.set_collection(m_dst_col, CollectionType::Dictionary);
+            Dictionary src_dict{src_obj, m_src_col};
+            Dictionary dst_dict{dst_obj, m_dst_col};
+            handle_dictionary_in_mixed(src_dict, dst_dict, update_out);
+            copy_dictionary(src_dict, dst_dict, update_out);
+        }
+        else {
+            InterRealmValueConverter::ConversionResult converted_src;
+            auto dst_mixed = dst_obj.get_any(m_dst_col);
+            if (cmp_src_to_dst(src_mixed, dst_mixed, &converted_src, update_out)) {
+                if (converted_src.requires_new_embedded_object) {
+                    Obj new_embedded = dst_obj.create_and_set_linked_object(m_dst_col);
+                    track_new_embedded(converted_src.src_embedded_to_check, new_embedded);
+                }
+                else {
+                    dst_obj.set_any(m_dst_col, converted_src.converted_value);
+                }
             }
         }
     }
 }
 
+void InterRealmValueConverter::handle_list_in_mixed(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list,
+                                                    bool* update_out)
+{
+    // utility functions
+    auto handle_set_copy = [&, this](size_t i) {
+        if (i >= dst_list.size())
+            dst_list.insert_collection(i, CollectionType::Set);
+        auto n_src_set = src_list.get_set(i);
+        auto n_dst_set = dst_list.get_set(i);
+        copy_set(*n_src_set, *n_dst_set, update_out);
+    };
+
+    auto handle_list_copy = [&, this](size_t i) {
+        if (i >= dst_list.size())
+            dst_list.insert_collection(i, CollectionType::List);
+        auto n_src_list = src_list.get_list(i);
+        auto n_dst_list = dst_list.get_list(i);
+        handle_list_in_mixed(*n_src_list, *n_dst_list, update_out);
+        copy_list(*n_src_list, *n_dst_list, update_out);
+    };
+
+    auto handle_dict_copy = [&, this](size_t i) {
+        if (i >= dst_list.size())
+            dst_list.insert_collection(i, CollectionType::Dictionary);
+        auto n_src_dict = src_list.get_dictionary(i);
+        auto n_dst_dict = dst_list.get_dictionary(i);
+        handle_dictionary_in_mixed(*n_src_dict, *n_dst_dict, update_out);
+        copy_dictionary(*n_src_dict, *n_dst_dict, update_out);
+    };
+
+    // main algorithm
+    auto n = src_list.size();
+    for (size_t i = 0; i < n; ++i) {
+        auto any = src_list.get_any(i);
+        if (any.is_type(type_List)) {
+            dst_list.insert_collection(i, CollectionType::List);
+            handle_list_copy(i);
+        }
+        else if (any.is_type(type_Set)) {
+            // nested collections do not support nested sets, set can only be a terminal leaf
+            dst_list.insert_collection(i, CollectionType::Set);
+            handle_set_copy(i);
+        }
+        else if (any.is_type(type_Dictionary)) {
+            dst_list.insert_collection(i, CollectionType::Dictionary);
+            handle_dict_copy(i);
+        }
+        else {
+            // copy single element
+            InterRealmValueConverter::ConversionResult converted_src;
+            auto dst_obj = dst_list.get_obj();
+            auto dst_col = dst_list.get_col_key();
+            auto dst_mixed = dst_obj.get_any(dst_col);
+            if (cmp_src_to_dst(any, dst_mixed, &converted_src, update_out)) {
+                dst_list.insert(i, converted_src.converted_value);
+            }
+        }
+    }
+}
+
+void InterRealmValueConverter::handle_dictionary_in_mixed(const Dictionary& src_dict, Dictionary& dst_dict,
+                                                          bool* update_out)
+{
+    // utility functions
+
+    auto handle_set_copy = [&, this](StringData key) {
+        if (!dst_dict.contains(key))
+            dst_dict.insert_collection(key, CollectionType::Set);
+        auto n_src_set = src_dict.get_set(key);
+        auto n_dst_set = dst_dict.get_set(key);
+        copy_set(*n_src_set, *n_dst_set, update_out);
+    };
+    auto handle_list_copy = [&, this](StringData key) {
+        if (!dst_dict.contains(key))
+            dst_dict.insert_collection(key, CollectionType::List);
+        auto n_src_list = src_dict.get_list(key);
+        auto n_dst_list = dst_dict.get_list(key);
+        handle_list_in_mixed(*n_src_list, *n_dst_list, update_out);
+        copy_list(*n_src_list, *n_dst_list, update_out);
+    };
+    auto handle_dict_copy = [&, this](StringData key) {
+        if (!dst_dict.contains(key))
+            dst_dict.insert_collection(key, CollectionType::Dictionary);
+        auto n_src_dict = src_dict.get_dictionary(key);
+        auto n_dst_dict = dst_dict.get_dictionary(key);
+        handle_dictionary_in_mixed(*n_src_dict, *n_dst_dict, update_out);
+        copy_dictionary(*n_src_dict, *n_dst_dict, update_out);
+    };
+
+    // main algorithm
+    auto n = src_dict.size();
+    for (size_t i = 0; i < n; ++i) {
+        auto [key, any] = src_dict.get_pair(i);
+        if (any.is_type(type_List)) {
+            if (dst_dict.contains(key) && check_collection_in_mixed_mismatch(any, dst_dict.get(key), type_List))
+                dst_dict.insert_collection(key.get_string(), CollectionType::List);
+            handle_list_copy(key.get_string());
+        }
+        else if (any.is_type(type_Set)) {
+            if (dst_dict.contains(key) && check_collection_in_mixed_mismatch(any, dst_dict.get(key), type_Set))
+                dst_dict.insert_collection(key.get_string(), CollectionType::Set);
+            handle_set_copy(key.get_string());
+        }
+        else if (any.is_type(type_Dictionary)) {
+            if (dst_dict.contains(key) && check_collection_in_mixed_mismatch(any, dst_dict.get(key), type_Dictionary))
+                dst_dict.insert_collection(key.get_string(), CollectionType::Dictionary);
+            handle_dict_copy(key.get_string());
+        }
+        else {
+            // copy single element
+            InterRealmValueConverter::ConversionResult converted_src;
+            auto dst_obj = dst_dict.get_obj();
+            auto dst_col = dst_dict.get_col_key();
+            auto dst_mixed = dst_obj.get_any(dst_col);
+            if (cmp_src_to_dst(any, dst_mixed, &converted_src, update_out)) {
+                dst_dict.insert(key, converted_src.converted_value);
+            }
+        }
+    }
+}
+bool InterRealmValueConverter::check_collection_in_mixed_mismatch(Mixed, Mixed dst, DataType type)
+{
+    auto is_null = dst.is_null();
+    if (!is_null && !dst.is_type(type)) {
+        return true;
+    }
+    return false;
+}
 
 // If an embedded object is encountered, add it to a list of embedded objects to process.
 // This relies on the property that embedded objects only have one incoming link

@@ -53,9 +53,14 @@ struct InterRealmValueConverter {
     void copy_value(const Obj& src_obj, Obj& dst_obj, bool* update_out);
 
 private:
-    void copy_list(const Obj& src_obj, Obj& dst_obj, bool* update_out);
-    void copy_set(const Obj& src_obj, Obj& dst_obj, bool* update_out);
-    void copy_dictionary(const Obj& src_obj, Obj& dst_obj, bool* update_out);
+    //
+    void copy_list(const LstBase& src_obj, LstBase& dst_obj, bool* update_out);
+    void copy_set(const SetBase& src_obj, SetBase& dst_obj, bool* update_out);
+    void copy_dictionary(const Dictionary& src_obj, Dictionary& dst_obj, bool* update_out);
+    // collection in mixed.
+    void handle_list_in_mixed(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list, bool* update_out);
+    void handle_dictionary_in_mixed(const Dictionary& src_dict, Dictionary& dst_dict, bool* update_out);
+    bool check_collection_in_mixed_mismatch(Mixed src, Mixed dst, DataType type);
 
     TableRef m_dst_link_table;
     ConstTableRef m_src_table;
