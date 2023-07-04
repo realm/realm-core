@@ -1474,7 +1474,10 @@ TEST_CASE("flx: geospatial", "[sync][flx][app][baas]") {
                             FAIL(error);
                         }
                         else {
-                            std::string_view reason = error->reason();
+                            std::string reason = std::string(error->reason());
+                            std::transform(reason.begin(), reason.end(), reason.begin(), toLowerAscii);
+                            std::transform(expected_error->begin(), expected_error->end(), expected_error->begin(),
+                                           toLowerAscii);
                             auto pos = reason.find(*expected_error);
                             if (pos == std::string::npos) {
                                 util::format(std::cout, "mismatch error: '%1' and '%2'\n", reason, *expected_error);
