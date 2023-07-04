@@ -33,7 +33,7 @@ public:
     static util::Optional<AppError> check_for_errors(const Response& response);
     static const std::pair<const std::string, std::string>*
     find_header(const std::string& key_name, const std::map<std::string, std::string>& search_map);
-    static bool contains_string(const std::string& haystack, const std::string& needle);
+    static size_t ifind_substr(const std::string_view haystack, const std::string_view needle);
 };
 } // namespace realm::app
 

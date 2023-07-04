@@ -26,42 +26,46 @@
 namespace realm {
 namespace app {
 
+// Performs a case insensitive search to see of key_name is in the search_map
+// Returns a pointer to the first key/value pair item found in search map
 const std::pair<const std::string, std::string>*
 AppUtils::find_header(const std::string& key_name, const std::map<std::string, std::string>& search_map)
 {
     for (auto&& current : search_map) {
 #ifdef _MSC_VER
         if (key_name.size() == current.first.size() && _stricmp(key_name.c_str(), current.first.c_str()) == 0) {
-#else
-        if (key_name.size() == current.first.size() && strcasecmp(key_name.c_str(), current.first.c_str()) == 0) {
-#endif
             return &current;
         }
+#else
+        if (key_name.size() == current.first.size() && strcasecmp(key_name.c_str(), current.first.c_str()) == 0) {
+            return &current;
+        }
+#endif
     }
     return nullptr;
 }
 
-bool AppUtils::contains_string(const std::string& haystack, const std::string& needle)
+// Performs a case insensitive search to determine if needle is in haystack
+size_t AppUtils::ifind_substr(const std::string_view haystack, const std::string_view needle)
 {
     char first_char = std::tolower(needle[0]);
+    size_t needle_len = needle.length();
     // Only need to check for the first character of needle through haystack minus the
     // length of needle plus one.
-    for (size_t idx_a = 0; idx_a < (haystack.length() - needle.length() + 1); idx_a++) {
+    size_t max_start_idx = haystack.length() - needle_len + 1;
+    for (size_t idx_a = 0; idx_a < max_start_idx; idx_a++) {
         if (std::tolower(haystack[idx_a]) == first_char) {
             size_t cmp = 1;
-            while (cmp < needle.length()) {
-                if (std::tolower(haystack[idx_a + cmp]) != std::tolower(needle[cmp])) {
-                    break;
-                }
+            while (cmp < needle_len && std::tolower(haystack[idx_a + cmp]) == std::tolower(needle[cmp])) {
                 cmp++;
             }
             // All characters matched
-            if (cmp == needle.length()) {
-                return true;
+            if (cmp == needle_len) {
+                return idx_a;
             }
         }
     }
-    return false;
+    return std::string_view::npos;
 }
 
 util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
@@ -70,9 +74,9 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
     bool http_status_code_is_fatal =
         response.http_status_code >= 300 || (response.http_status_code < 200 && response.http_status_code != 0);
 
-    try {
-        auto ct = AppUtils::find_header("content-type", response.headers);
-        if (ct && AppUtils::contains_string(ct->second, "application/json")) {
+    auto ct = AppUtils::find_header("content-type", response.headers);
+    if (ct && AppUtils::ifind_substr(ct->second, "application/json") != std::string_view::npos) {
+        try {
             auto body = nlohmann::json::parse(response.body);
             auto message = body.find("error");
             auto link = body.find("link");
@@ -89,9 +93,9 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
                                 response.http_status_code);
             }
         }
-    }
-    catch (const std::exception&) {
-        // ignore parse errors from our attempt to read the error from json
+        catch (const std::exception&) {
+            // ignore parse errors from our attempt to read the error from json
+        }
     }
 
     if (response.client_error_code) {
