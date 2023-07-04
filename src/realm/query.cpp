@@ -1348,6 +1348,9 @@ void Query::do_find_all(QueryStateBase& st) const
                 for (auto it = keys->begin(); it.is_valid(); it.advance()) {
                     ObjKey key = it.get_key();
                     st.m_key_offset = key.value;
+                    if (ColKey col = m_table->get_column_key("indexed")) {
+                        std::cout << "found value: " << m_table->get_object(key).get<Int>(col) << std::endl;
+                    }
                     if (pn->m_children.empty()) {
                         // No more conditions - just add key
                         if (!st.match(0, Mixed()))

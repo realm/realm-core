@@ -656,6 +656,8 @@ StringData Mixed::get_index_data(std::array<char, 16>& buffer) const noexcept
     switch (get_type()) {
         case type_Int: {
             int64_t i = get_int();
+            //            const char* c = reinterpret_cast<const char*>(&i);
+            //            realm::safe_copy_n(c, sizeof(int64_t), buffer.data());
             copy_big_endian(buffer.data(), uint64_t(i));
             return StringData{buffer.data(), sizeof(int64_t)};
         }

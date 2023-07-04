@@ -715,7 +715,7 @@ public:
                 return m_index_evaluator->do_search_index(BaseType::m_cluster, start, end);
             }
             else {
-                s = this->m_leaf_ptr->template find_first<TConditionFunction>(this->m_value, start, end);
+                s = this->m_leaf->template find_first<TConditionFunction>(this->m_value, start, end);
             }
         }
 

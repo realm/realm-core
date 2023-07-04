@@ -287,7 +287,7 @@ public:
     void do_dump_node_structure(std::ostream&, int) const;
 #endif
 
-    typedef int32_t key_type;
+    typedef uint32_t key_type;
 
     // s_max_offset specifies the number of levels of recursive string indexes
     // allowed before storing everything in lists. This is to avoid nesting
@@ -373,7 +373,7 @@ private:
     void node_add_key(ref_type ref);
 
 #ifdef REALM_DEBUG
-    static void dump_node_structure(const Array& node, std::ostream&, int level);
+    void dump_node_structure(const Array& node, std::ostream&, int level) const;
 #endif
 };
 
@@ -443,13 +443,13 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) noexcept
 // (encoded like this to allow literal comparisons
 // independently of endianness)
 four:
-    key |= (key_type(static_cast<unsigned char>(str[3])) << 0);
+    key |= (key_type(static_cast<unsigned char>(str[0])) << 0);
 three:
-    key |= (key_type(static_cast<unsigned char>(str[2])) << 8);
+    key |= (key_type(static_cast<unsigned char>(str[1])) << 8);
 two:
-    key |= (key_type(static_cast<unsigned char>(str[1])) << 16);
+    key |= (key_type(static_cast<unsigned char>(str[2])) << 16);
 one:
-    key |= (key_type(static_cast<unsigned char>(str[0])) << 24);
+    key |= (key_type(static_cast<unsigned char>(str[3])) << 24);
 none:
     return key;
 }
@@ -537,7 +537,7 @@ void StringIndex::set(ObjKey key, util::Optional<T> new_value)
 template <class T>
 IndexIterator StringIndex::find_gte(T value) const
 {
-    // this->do_dump_node_structure(std::cout, 0);
+    this->do_dump_node_structure(std::cout, 0);
     return m_array->index_string_find_gte(Mixed(value), m_target_column);
 }
 
