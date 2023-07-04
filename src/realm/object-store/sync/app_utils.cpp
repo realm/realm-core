@@ -46,7 +46,7 @@ AppUtils::find_header(const std::string& key_name, const std::map<std::string, s
 }
 
 // Performs a case insensitive search to determine if needle is in haystack
-size_t AppUtils::ifind_substr(const std::string_view haystack, const std::string_view needle)
+static size_t ifind_substr(const std::string_view haystack, const std::string_view needle)
 {
     char first_char = std::tolower(needle[0]);
     size_t needle_len = needle.length();
@@ -75,7 +75,7 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
         response.http_status_code >= 300 || (response.http_status_code < 200 && response.http_status_code != 0);
 
     auto ct = AppUtils::find_header("content-type", response.headers);
-    if (ct && AppUtils::ifind_substr(ct->second, "application/json") != std::string_view::npos) {
+    if (ct && ifind_substr(ct->second, "application/json") != std::string_view::npos) {
         try {
             auto body = nlohmann::json::parse(response.body);
             auto message = body.find("error");
