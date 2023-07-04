@@ -37,6 +37,13 @@
 #include <chrono>
 #include <iostream>
 
+// include file for sleep()
+#ifdef _WIN32
+#include <windows.h> // DEBUGGING
+#else
+#include <unistd.h> // DEBUGGING
+#endif
+
 using namespace realm;
 using namespace realm::app;
 
