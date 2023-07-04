@@ -1329,6 +1329,9 @@ void Query::do_find_all(TableView& ret, size_t limit) const
 
                 for (auto it = keys->begin(); it.is_valid(); it.advance()) {
                     ObjKey key = it.get_key();
+                    if (ColKey col = m_table->get_column_key("indexed")) {
+                        std::cout << "found value: " << m_table->get_object(key).get<Int>(col) << std::endl;
+                    }
                     if (limit == 0)
                         break;
                     if (pn->m_children.empty()) {

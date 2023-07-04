@@ -5430,14 +5430,13 @@ ONLY(Query_IntIndexedGreater)
     auto col_int = table->add_column(type_Int, "int");
     table->add_search_index(col_int_indexed);
 
-    std::vector<int64_t> values = {0, -1, -1, 2, 2, 2, 3, 4, 4, 4, 4, 5, -2, -2, -2, -2};
-    //    for (int64_t i = 0; i < int64_t(1); ++i) {
-    //        values.push_back(i);
-    //        values.push_back(-i);
-    //        values.push_back(i + 0xffffffffll);
-    //        values.push_back(-(0xffffffffll) - i);
-    //    }
-
+    std::vector<int64_t> values;
+    for (int64_t i = 0; i < int64_t(3); ++i) {
+        values.push_back(i);
+        // values.push_back(-i);
+        values.push_back(i + 0xffffffffll);
+        // values.push_back(-(0xffffffffll) - i);
+    }
 
     for (int64_t val : values) {
         table->create_object().set(col_int_indexed, val).set(col_int, val);
@@ -5448,15 +5447,27 @@ ONLY(Query_IntIndexedGreater)
         auto it = std::lower_bound(values.begin(), values.end(), val);
         REALM_ASSERT(it != values.end());
         size_t num_expected = values.end() - it;
+        Query q_baseline = (table->column<Int>(col_int) >= val);
+        TableView tv_baseline = q_baseline.find_all();
         Query q = (table->column<Int>(col_int_indexed) >= val);
         TableView tv = q.find_all();
+        tv.sort(col_int_indexed);
+        CHECK_EQUAL(tv_baseline.size(), num_expected);
         CHECK_EQUAL(tv.size(), num_expected);
         if (tv.size() != num_expected) {
             util::format(std::cout, "search for '%1', expected %2, found %3\n", val, num_expected, tv.size());
+            std::vector<int64_t> found;
             for (size_t i = 0; i < tv.size(); ++i) {
                 Obj obj = tv[i];
-                util::format(std::cout, "\tfound: %1\n", obj.get<Int>(col_int_indexed));
+                found.push_back(obj.get<Int>(col_int_indexed));
             }
+
+            std::vector<int64_t> diff;
+            std::set_difference(it, values.end(), found.begin(), found.end(), std::back_inserter(diff));
+            for (size_t i = 0; i < diff.size(); ++i) {
+                util::format(std::cout, "\tmissing: %1\n", diff[i]);
+            }
+            std::cout << std::endl;
         }
         tv = (table->column<Int>(col_int) >= val).find_all();
         CHECK_EQUAL(tv.size(), num_expected);

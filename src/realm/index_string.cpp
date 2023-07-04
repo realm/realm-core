@@ -67,7 +67,23 @@ IndexIterator& IndexIterator::operator++()
 
 IndexIterator IndexIterator::next() const
 {
-    return m_index->next(*this);
+    auto print = [](const IndexIterator& it) {
+        std::cout << "iterator: {";
+        for (size_t i = 0; i < it.m_positions.size(); ++i) {
+            if (i) {
+                std::cout << ", ";
+            }
+            std::cout << it.m_positions[i];
+        }
+        std::cout << "}";
+    };
+    auto next = m_index->next(*this);
+    std::cout << "advance from: ";
+    print(*this);
+    std::cout << " to: ";
+    print(next);
+    std::cout << std::endl;
+    return next;
 }
 
 ObjKey IndexIterator::get_key() const
@@ -1178,7 +1194,10 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
             return false;
 
         // When key is outside current range, we can just add it
-        keys.add(key);
+        keys.add(int32_t(key));
+        if (keys.get_width() != 32) {
+            std::cout << "width overflow inserting: " << key << std::endl;
+        }
         if (!m_target_column.is_fulltext() || is_at_string_end) {
             int64_t shifted = int64_t((uint64_t(obj_key.value) << 1) + 1); // shift to indicate literal
             m_array->add(shifted);
@@ -1837,7 +1856,7 @@ void StringIndex::verify_entries(const ClusterColumn& column) const
     }
 }
 
-void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int level)
+void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int level) const
 {
     int indent = level * 2;
     Allocator& alloc = node.get_alloc();
@@ -1878,7 +1897,8 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
             bool is_single_row_index = (value & 1) != 0;
             if (is_single_row_index) {
                 out << std::setw(indent) << ""
-                    << "  Single row index (value: " << (value / 2) << ")\n";
+                    << "  Single row index (value: " << (value / 2) << ", "
+                    << m_target_column.get_value(ObjKey(value / 2)) << ")\n";
                 continue;
             }
             subnode.init_from_ref(to_ref(value));
