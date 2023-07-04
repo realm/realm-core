@@ -1474,7 +1474,10 @@ TEST_CASE("flx: geospatial", "[sync][flx][app][baas]") {
                             FAIL(error);
                         }
                         else {
-                            std::string_view reason = error->reason();
+                            std::string reason = std::string(error->reason());
+                            std::transform(reason.begin(), reason.end(), reason.begin(), toLowerAscii);
+                            std::transform(expected_error->begin(), expected_error->end(), expected_error->begin(),
+                                           toLowerAscii);
                             auto pos = reason.find(*expected_error);
                             if (pos == std::string::npos) {
                                 util::format(std::cout, "mismatch error: '%1' and '%2'\n", reason, *expected_error);
@@ -1561,7 +1564,7 @@ TEST_CASE("flx: geospatial", "[sync][flx][app][baas]") {
                                       "Invalid region in GEOWITHIN query for parameter 'GeoPolygon({[-80, 40.7128], "
                                       "[20, 60], [20, 20]})': 'Ring is not closed, first vertex 'GeoPoint([-80, "
                                       "40.7128])' does not equal last vertex 'GeoPoint([20, 20])''");
-                    run_query_on_server(make_polygon_filter(open_bounds), "(BadValue) Loop is not closed:");
+                    run_query_on_server(make_polygon_filter(open_bounds), "(BadValue) Loop is not closed");
                 }
                 {
                     GeoCircle circle = GeoCircle::from_kms(10, GeoPoint{-180.1, -90.1});
