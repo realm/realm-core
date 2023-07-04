@@ -85,6 +85,7 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
     std::string redir_app_url = "http://127.0.0.1:9090";
     std::string redir_ws_url = "ws://127.0.0.1:9090";
 
+    // Parse the first request to determine the current and redirect URL values
     auto parse_url = [&](std::string request_url) {
         auto host_url = util::Uri(request_url);
         app_scheme = host_url.get_scheme();
@@ -103,7 +104,7 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
         else if (original_host == "::1") {
             redirect_host = "localhost";
         }
-        // using baas docker - can't test redirect
+        // using baas docker - can't test redirect due to custom hostname
         else if (original_host == "mongodb-realm") {
             redirect_host = "mongodb-realm";
         }
@@ -377,7 +378,6 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
         };
 
         auto r = Realm::get_shared_realm(r_config);
-
         REQUIRE(!wait_for_download(*r));
 
         SECTION("Valid websocket redirect") {
@@ -386,6 +386,7 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
             sync_session->pause();
 
             int connect_count = 0;
+            logger->debug(">>> Session paused - Setting up for 'Valid websocket redirect' test"); // DEBUGGING
             redir_provider->handshake_response_func =
                 [&logger, &connect_count]() -> std::optional<std::pair<int, std::string>> {
                 // Only return the simulated response on the first connection attempt
@@ -398,11 +399,11 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
             int request_count = 0;
             redir_transport->request_hook = [&](const Request& request) {
                 logger->debug("Received request[%1]: '%2'", request_count, request.url);
-                logger->debug("app_url: '%1'", app_url);
-                std::cerr << std::flush;
+                logger->debug("app_url: '%1'", app_url); // DEBUGGING
+                std::cerr << std::flush;                 // DEBUGGING
+                sleep(2);                                // DEBUGGING
                 if (request_count++ == 0) {
                     // First request should be a location request against the original URL
-                    REALM_ASSERT_EX(request.url.find(app_url) != std::string::npos, request.url, app_url);
                     REQUIRE(request.url.find(app_url) != std::string::npos);
                     REQUIRE(request.url.find("/location") != std::string::npos);
                     REQUIRE(request.redirect_count == 0);
