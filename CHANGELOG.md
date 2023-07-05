@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* Run baas for non x86_84 linux variants on remote ubuntu host. ([PR #6757](https://github.com/realm/realm-core/pull/6757))
+* Run baas on remote ubuntu host for evergreen object-store-tests. ([PR #6757](https://github.com/realm/realm-core/pull/6757))
 
 ----------------------------------------------
 
