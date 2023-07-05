@@ -822,9 +822,9 @@ TEST_CASE("Async open + client reset", "[flx][migration][baas]") {
     size_t num_before_reset_notifications = 0;
     size_t num_after_reset_notifications = 0;
     auto server_app_config = minimal_app_config(base_url, "async_open_during_migration", mig_schema);
-    std::unique_ptr<SyncTestFile> config;
+    std::optional<SyncTestFile> config; // destruct this after the sessions are torn down
     TestAppSession session(create_app(server_app_config));
-    config = std::make_unique<SyncTestFile>(session.app(), partition, server_app_config.schema);
+    config = SyncTestFile{session.app(), partition, server_app_config.schema};
     config->sync_config->client_resync_mode = ClientResyncMode::Recover;
     config->sync_config->notify_before_client_reset = [&](SharedRealm before) {
         logger_ptr->debug("notify_before_client_reset");

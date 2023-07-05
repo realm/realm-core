@@ -979,9 +979,10 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
         CHECK(after_reset_count == 1);
     }
 
-    for (auto mode : {ClientResyncMode::DiscardLocal, ClientResyncMode::Recover}) {
+    SECTION("Adding a local property matching a server addition is allowed") {
+        auto mode = GENERATE(ClientResyncMode::DiscardLocal, ClientResyncMode::Recover);
         config_local.sync_config->client_resync_mode = mode;
-        SECTION(util::format("%1: Adding a local property matching a server addition is allowed", mode)) {
+        SECTION(util::format("In %1 mode", mode)) {
             seed_realm(config_local, ResetMode::InitiateClientReset);
             std::vector<ObjectSchema> changed_schema = schema;
             changed_schema[0].persisted_properties.push_back(
