@@ -951,8 +951,18 @@ void GroupWriter::read_in_freelist()
                     continue;
                 }
             }
-
             free_in_file.emplace_back(ref, size, 0);
+            // try to provoke an error by zeroing the block:
+            if (m_alloc.is_in_memory()) {
+                // do nothing for now
+            }
+            else {
+                MapWindow* window = get_window(ref, size);
+                char* start_addr = window->translate(ref);
+                window->encryption_read_barrier(start_addr, size);
+                memset(start_addr, 0, size);
+                window->encryption_write_barrier(start_addr, size);
+            }
         }
 
         // This will imply a copy-on-write
