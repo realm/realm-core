@@ -68,11 +68,12 @@ trap 'catch $? ${LINENO}' EXIT
 function catch() {
   if [ "$1" != "0" ]; then
     echo "Error $1 occurred while starting baas (local) at line $2"
-    if [[ -n "${BAAS_WORK_PATH}" ]]; then
-        # Create the baas_failed file so wait_for_baas can exit early
-        [[ -d "${BAAS_WORK_PATH}" ]] || mkdir -p "${BAAS_WORK_PATH}"
-        touch "${BAAS_WORK_PATH}/baas_failed"
-    fi
+  fi
+
+  if [[ -n "${BAAS_WORK_PATH}" ]]; then
+      # Create the baas_stopped file so wait_for_baas can exit early
+      [[ -d "${BAAS_WORK_PATH}" ]] || mkdir -p "${BAAS_WORK_PATH}"
+      touch "${BAAS_WORK_PATH}/baas_stopped"
   fi
 }
 

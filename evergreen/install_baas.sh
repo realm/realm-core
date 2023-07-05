@@ -187,7 +187,7 @@ TRANSPILER_DIR="${BAAS_DIR}/etc/transpiler"
 # Define files for storing state
 BAAS_SERVER_LOG="${WORK_PATH}/baas_server.log"
 BAAS_READY_FILE="${WORK_PATH}/baas_ready"
-BAAS_FAILED_FILE="${WORK_PATH}/baas_failed"
+BAAS_STOPPED_FILE="${WORK_PATH}/baas_stopped"
 BAAS_PID_FILE="${WORK_PATH}/baas_server.pid"
 MONGOD_PID_FILE="${WORK_PATH}/mongod.pid"
 MONGOD_LOG="${MONGODB_PATH}/mongod.log"
@@ -205,8 +205,8 @@ fi
 if [[ -f "${BAAS_READY_FILE}" ]]; then
     rm "${BAAS_READY_FILE}"
 fi
-if [[ -f "${BAAS_FAILED_FILE}" ]]; then
-    rm "${BAAS_FAILED_FILE}"
+if [[ -f "${BAAS_STOPPED_FILE}" ]]; then
+    rm "${BAAS_STOPPED_FILE}"
 fi
 if [[ -f "${BAAS_PID_FILE}" ]]; then
     rm "${BAAS_PID_FILE}"
@@ -217,10 +217,8 @@ fi
 
 # Set up the cleanup function that runs at exit and stops mongod and the baas server
 function cleanup() {
-    if [ "$1" != "0" ]; then
-        # If baas failed to start, then create a 'baas_failed' file
-        touch "${WORK_PATH}/baas_failed"
-    fi
+    # The baas server is being stopped (or never started), create a 'baas_stopped' file
+    touch "${BAAS_STOPPED_FILE}"
 
     baas_pid=""
     mongod_pid=""

@@ -16,7 +16,7 @@ set -o pipefail
 
 CURL=${CURL:=curl}
 BAAS_PID_FILE=
-BAAS_FAILED_FILE=
+BAAS_STOPPED_FILE=
 RETRY_COUNT=120
 BAAS_SERVER_LOG=
 STATUS_OUT=
@@ -40,7 +40,7 @@ function update_paths()
 {
     if [[ -n "${1}" ]]; then
         BAAS_SERVER_LOG="${1}/baas_server.log"
-        BAAS_FAILED_FILE="${1}/baas_failed"
+        BAAS_STOPPED_FILE="${1}/baas_stopped"
         BAAS_PID_FILE="${1}/baas_server.pid"
     fi
 }
@@ -62,8 +62,8 @@ WAIT_COUNTER=0
 WAIT_START=$(date -u +'%s')
 
 until $CURL --output /dev/null --head --fail http://localhost:9090 --silent ; do
-    if [[ -n "${BAAS_FAILED_FILE}" && -f "${BAAS_FAILED_FILE}" ]]; then
-        echo "Baas server failed to start (found baas_failed file)"
+    if [[ -n "${BAAS_STOPPED_FILE}" && -f "${BAAS_STOPPED_FILE}" ]]; then
+        echo "Baas server failed to start (found baas_stopped file)"
         exit 1
     fi
 
