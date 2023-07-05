@@ -442,6 +442,10 @@ Mixed Obj::get_any(ColKey col_key) const
             return Mixed{_get<util::Optional<float>>(col_ndx)};
         case col_type_Double:
             return Mixed{_get<util::Optional<double>>(col_ndx)};
+        case col_type_EnumString: {
+            auto id = _get<int64_t>(col_ndx);
+            return Mixed(m_table->get_enum_string(col_key, id));
+        }
         case col_type_String:
             return Mixed{_get<String>(col_ndx)};
         case col_type_Binary:
