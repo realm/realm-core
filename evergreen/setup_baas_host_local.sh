@@ -118,7 +118,7 @@ if [[ -f ~/.ssh/id_rsa ]]; then
     ssh-add ~/.ssh/id_rsa
 fi
 ssh-add "${BAAS_HOST_KEY}"
-SSH_OPTIONS=(-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=No -o ConnectTimeout=10 -i "${BAAS_HOST_KEY}")
+SSH_OPTIONS=(-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i "${BAAS_HOST_KEY}")
 
 echo "running ssh with ${SSH_OPTIONS[*]}"
 
