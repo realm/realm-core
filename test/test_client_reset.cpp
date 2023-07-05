@@ -61,7 +61,8 @@ TEST(ClientReset_TransferGroupWithDanglingLinks)
     obj.invalidate();
 
     wt->commit_and_continue_writing();
-    _impl::client_reset::transfer_group(*rt, *wt, *test_context.logger);
+    constexpr bool allow_schema_additions = false;
+    _impl::client_reset::transfer_group(*rt, *wt, *test_context.logger, allow_schema_additions);
 }
 
 TEST(ClientReset_NoLocalChanges)
