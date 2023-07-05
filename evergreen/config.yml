@@ -766,7 +766,7 @@ tasks:
       report_test_progress: On
 
 - name: core-tests
-  tags: [ "test_suite_linux", "test_suite_nonlinux", "for_pull_requests" ]
+  tags: [ "test_suite", "for_pull_requests" ]
   exec_timeout_secs: 1800
   commands:
   - func: "compile"
@@ -802,7 +802,7 @@ tasks:
       benchmark_name: sync
 
 - name: sync-tests
-  tags: [ "test_suite_linux", "test_suite_nonlinux", "for_pull_requests" ]
+  tags: [ "test_suite", "for_pull_requests" ]
   exec_timeout_secs: 1800
   commands:
   - func: "compile"
@@ -813,8 +813,8 @@ tasks:
       test_filter: SyncTests
       test_executable_name: "realm-sync-tests"
 
-- name: object-store-tests
-  tags: [ "test_suite_linux", "for_pull_requests" ]
+- name: object-store-tests-local-baas
+  tags: [ "test_suite_local_baas", "for_pull_requests" ]
   exec_timeout_secs: 3600
   commands:
   - func: "compile"
@@ -830,8 +830,9 @@ tasks:
       test_executable_name: "realm-object-store-tests"
       verbose_test_output: true
 
-- name: object-store-tests-remote-baas
-  tags: [ "test_suite_nonlinux", "for_pull_requests" ]
+# Default object store tests will use a remote host for baas
+- name: object-store-tests
+  tags: [ "test_suite_remote_baas", "for_pull_requests" ]
   exec_timeout_secs: 3600
   commands:
   - func: "launch remote baas"
@@ -1017,11 +1018,10 @@ task_groups:
   - func: "run hang analyzer"
   tasks:
   - compile
-  - core-tests
-  - sync-tests
+  - .test_suite
 
-# Use for x86_64 based linux variants
-- name: compile_test_and_package_linux
+# Runs object-store-tests against baas running locally
+- name: compile_test_and_package_local_baas
   max_hosts: 1
   setup_group_can_fail_task: true
   setup_group:
@@ -1033,11 +1033,12 @@ task_groups:
   - func: "run hang analyzer"
   tasks:
   - compile
-  - .test_suite_linux
+  - .test_suite
+  - .test_suite_local_baas
   - package
 
-# Use for variants other than x86_64 linux
-- name: compile_test_and_package_nonlinux
+# Runs object-store-tests against baas running on remote host
+- name: compile_test_and_package
   max_hosts: 1
   setup_group_can_fail_task: true
   setup_group:
@@ -1049,11 +1050,12 @@ task_groups:
   - func: "run hang analyzer"
   tasks:
   - compile
-  - .test_suite_nonlinux
+  - .test_suite
+  - .test_suite_remote_baas
   - package
 
-# Use for x86_64 based linux variants
-- name: compile_test_linux
+# Runs object-store-tests against baas running locally
+- name: compile_test_local_baas
   max_hosts: 1
   setup_group_can_fail_task: true
   setup_group:
@@ -1065,10 +1067,11 @@ task_groups:
   - func: "run hang analyzer"
   tasks:
   - compile
-  - .test_suite_linux
+  - .test_suite
+  - .test_suite_local_baas
 
-# Use for variants other than x86_64 linux
-- name: compile_test_nonlinux
+# Runs object-store-tests against baas running on remote host
+- name: compile_test
   max_hosts: 1
   setup_group_can_fail_task: true
   setup_group:
@@ -1080,10 +1083,11 @@ task_groups:
   - func: "run hang analyzer"
   tasks:
   - compile
-  - .test_suite_nonlinux
+  - .test_suite
+  - .test_suite_remote_baas
 
-# Use for x86_64 based linux variants
-- name: compile_test_coverage_linux
+# Runs object-store-tests against baas running locally
+- name: compile_test_coverage_local_baas
   max_hosts: 1
   setup_group_can_fail_task: true
   setup_group:
@@ -1095,11 +1099,12 @@ task_groups:
   - func: "run hang analyzer"
   tasks:
   - compile
-  - .test_suite_linux
+  - .test_suite
+  - .test_suite_local_baas
   - process_coverage_data
 
-# Use for variants other than x86_64 linux
-- name: compile_test_coverage_nonlinux
+# Runs object-store-tests against baas running on remote host
+- name: compile_test_coverage
   max_hosts: 1
   setup_group_can_fail_task: true
   setup_group:
@@ -1111,7 +1116,8 @@ task_groups:
   - func: "run hang analyzer"
   tasks:
   - compile
-  - .test_suite_nonlinux
+  - .test_suite
+  - .test_suite_remote_baas
   - process_coverage_data
 
 - name: benchmarks
@@ -1169,7 +1175,7 @@ buildvariants:
     cxx_compiler: "./clang_binaries/bin/clang++"
     extra_flags: -DREALM_ENABLE_GEOSPATIAL=OFF # can be removed once SDKs pick this feature up
   tasks:
-  - name: compile_test_linux
+  - name: compile_test
 
 
 - name: ubuntu2204
@@ -1200,7 +1206,7 @@ buildvariants:
     cxx_compiler: "./clang_binaries/bin/clang++"
     disable_sync_multiplexing: On
   tasks:
-  - name: compile_test_linux
+  - name: compile_test
 
 - name: ubuntu2004-encryption-tsan
   display_name: "Ubuntu 20.04 x86_64 (Clang 11 Encryption Enabled w/TSAN)"
@@ -1251,7 +1257,7 @@ buildvariants:
     cxx_compiler: "./clang_binaries/bin/clang++"
     python3: /opt/mongodbtoolchain/v3/bin/python3
   tasks:
-  - name: compile_test_and_package_linux
+  - name: compile_test_and_package
     distros:
     - ubuntu2004-large
   - name: benchmarks
@@ -1273,7 +1279,7 @@ buildvariants:
     cxx_compiler: "./clang_binaries/bin/clang++"
     llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
   tasks:
-  - name: compile_test_linux
+  - name: compile_test
   - name: long-running-tests
     distros:
     - ubuntu2004-small
@@ -1290,7 +1296,7 @@ buildvariants:
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
   tasks:
-  - name: compile_test_linux
+  - name: compile_test
 
 - name: ubuntu2004-ubsan
   display_name: "Ubuntu 20.04 x86_64 (Clang 11 UBSAN)"
@@ -1304,7 +1310,7 @@ buildvariants:
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
   tasks:
-  - name: compile_test_linux
+  - name: compile_test
     distros:
     - ubuntu2004-large
 
@@ -1340,7 +1346,7 @@ buildvariants:
     python3: "/opt/mongodbtoolchain/v3/bin/python3"
     ninja: "/opt/mongodbtoolchain/v4/bin/ninja"
   tasks:
-  - name: compile_test_and_package_linux
+  - name: compile_test_and_package
 
 - name: ubuntu-valgrind
   display_name: "Ubuntu 2204 Valgrind"
@@ -1364,7 +1370,7 @@ buildvariants:
     use_system_openssl: On
     fetch_missing_dependencies: On
   tasks:
-  - name: compile_test_and_package_nonlinux  # Treat as nonlinux since it's arch is not x86_64
+  - name: compile_test_and_package
   - name: benchmarks
 
 - name: macos
@@ -1379,7 +1385,7 @@ buildvariants:
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
   tasks:
-  - name: compile_test_nonlinux
+  - name: compile_test
   - name: swift-build-and-test
 
 - name: macos-encrypted
@@ -1410,7 +1416,7 @@ buildvariants:
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
   tasks:
-  - name: compile_test_and_package_nonlinux
+  - name: compile_test_and_package
   - name: benchmarks
   - name: long-running-tests
   - name: swift-build-and-test
@@ -1428,7 +1434,7 @@ buildvariants:
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64 -DREALM_ENABLE_GEOSPATIAL=OFF
   tasks:
-  - name: compile_test_nonlinux
+  - name: compile_test
   - name: swift-build-and-test
 
 - name: macos-1100-arm64-release
@@ -1444,7 +1450,7 @@ buildvariants:
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
   tasks:
-  - name: compile_test_and_package_nonlinux
+  - name: compile_test_and_package
   - name: benchmarks
   - name: long-running-tests
   - name: swift-build-and-test
@@ -1464,7 +1470,7 @@ buildvariants:
     coveralls_flag_name: "macos-arm64"
     grcov_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/grcov-aarch64-apple-darwin.tar.bz2"
   tasks:
-  - name: compile_test_coverage_nonlinux
+  - name: compile_test_coverage
 
 - name: ubuntu-coverage
   display_name: "Ubuntu 20.04 x86_64 (Code Coverage)"
@@ -1480,7 +1486,7 @@ buildvariants:
     coveralls_flag_name: "ubuntu-x86_64"
     grcov_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/grcov-x86_64-unknown-linux-gnu.tar.bz2"
   tasks:
-  - name: compile_test_coverage_linux
+  - name: compile_test_coverage
   - name: finalize_coverage_data
 
 - name: windows-64-vs2019
@@ -1496,7 +1502,7 @@ buildvariants:
     curl_base: "/cygdrive/c/curl"
     python3: "/cygdrive/c/python/python37/python.exe"
   tasks:
-  - name: compile_test_and_package_nonlinux
+  - name: compile_test_and_package
   - name: long-running-tests
 
 - name: windows-64-encryption
@@ -1529,4 +1535,4 @@ buildvariants:
     curl_base: "/cygdrive/c/curl"
     python3: "/cygdrive/c/python/python37/python.exe"
   tasks:
-  - name: compile_test_nonlinux
+  - name: compile_test
