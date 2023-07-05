@@ -78,7 +78,7 @@ struct HookedSocketProvider : public sync::websocket::DefaultSocketProvider {
 
 
 TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
-    auto logger = std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    auto logger = util::Logger::get_default_logger();
 
     // redirect URL is localhost or 127.0.0.1 depending on what the initial value is
     std::string original_host = "localhost";
@@ -91,12 +91,15 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
     std::string ws_url = "ws://localhost:9090";
     std::string redir_app_url = "http://127.0.0.1:9090";
     std::string redir_ws_url = "ws://127.0.0.1:9090";
+    std::string mongodb_realm_host = "mongodb-realm";
 
     // Parse the first request to determine the current and redirect URL values
     auto parse_url = [&](std::string request_url) {
         auto host_url = util::Uri(request_url);
         app_scheme = host_url.get_scheme();
         host_url.get_auth(userinfo, original_host, port);
+
+        logger->debug("Parse url: [%1]//[%2]:[%3]", app_scheme, original_host, port);
 
         // using https?
         if (app_scheme == "https:") {
@@ -112,8 +115,8 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
             redirect_host = "localhost";
         }
         // using baas docker - can't test redirect due to custom hostname
-        else if (original_host == "mongodb-realm") {
-            redirect_host = "mongodb-realm";
+        else if (original_host == mongodb_realm_host) {
+            redirect_host = mongodb_realm_host;
         }
         app_url = util::format("%1//%2:%3", app_scheme, original_host, port);
         ws_url = util::format("%1//%2:%3", ws_scheme, original_host, port);
@@ -318,11 +321,8 @@ TEST_CASE("app: redirects", "[sync][pbs][app][baas][redirects][new]") {
             }
             else if (request_count == 1) {
                 REQUIRE(!request.redirect_count);
-                redir_transport->simulated_response = {
-                    308,
-                    0,
-                    {{"Location", "http://somehost:9090"}, {"Content-Type", "application/json"}},
-                    "Some body data"};
+                redir_transport->simulated_response = make_redirect_response(
+                sync::HTTPStatus::PermanentRedirect, "http://somehost:9090");
             }
             else if (request_count == 2) {
                 REQUIRE(request.url.find("http://somehost:9090") != std::string::npos);
