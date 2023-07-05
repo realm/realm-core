@@ -26,6 +26,7 @@
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
 #include <realm/db_options.hpp>
 #include <realm/sync/client.hpp>
@@ -888,11 +889,24 @@ static sync::Session::Config::ClientReset make_client_reset_config(RealmConfig s
                                                           did_recover);
         };
     }
-    if (session_config.sync_config->notify_before_client_reset) {
-        config.notify_before_client_reset = [config = session_config](VersionID version) {
-            config.sync_config->notify_before_client_reset(Realm::get_frozen_realm(config, version));
-        };
-    }
+    config.notify_before_client_reset = [config = session_config]() -> VersionID {
+        auto coordinator = RealmCoordinator::get_coordinator(config);
+        // Opening the Realm live here may make a write if the schema is different
+        // than what exists on disk. It is necessary to pass a fully usable Realm
+        // to the user here. Note that the schema changes made here will be considered
+        // an "offline write" to be recovered if this is recovery mode.
+        auto no_notifier = util::Scheduler::make_dummy();
+        auto realm_updated = coordinator->get_realm(no_notifier);
+        auto frozen = realm_updated->freeze(); // throws
+        REALM_ASSERT_EX(frozen, config.path);
+        REALM_ASSERT(frozen->is_frozen());
+        util::Optional<VersionID> version = frozen->current_transaction_version();
+        REALM_ASSERT(version);
+        if (config.sync_config->notify_before_client_reset) {
+            config.sync_config->notify_before_client_reset(frozen);
+        }
+        return *version;
+    };
 
     return config;
 }
