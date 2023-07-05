@@ -822,7 +822,7 @@ tasks:
       target_to_build: ObjectStoreTests
   - func: "launch local baas"
     vars:
-      baas_branch: 2e23bf2f77d85f3e2fbe07e1c448e4d1cafa3a10
+      baas_branch: 1a0d1c021460d2215b21bc4f7c7f668714ce81c7
   - func: "wait for baas to start"
   - func: "run tests"
     vars:
@@ -836,7 +836,7 @@ tasks:
   commands:
   - func: "launch remote baas"
     vars:
-      baas_branch: 2e23bf2f77d85f3e2fbe07e1c448e4d1cafa3a10
+      baas_branch: 1a0d1c021460d2215b21bc4f7c7f668714ce81c7
   - func: "compile"
     vars:
       target_to_build: ObjectStoreTests
