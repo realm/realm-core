@@ -539,7 +539,9 @@ void GroupWriter::backdate()
         ALLOC_DBG_COUT("    Considering [" << entry.ref << ", " << entry.size << "]-" << entry.released_at_version
                                            << " {");
         auto end = m_top_ref_map.end();
+        // go through all versions:
         for (auto top_ref_map = m_top_ref_map.begin(); top_ref_map != end && !referenced; ++top_ref_map) {
+            // locate any overlapping block in each versions' freelist
             auto info_begin = top_ref_map->second.reachable_blocks.begin();
             auto info_end = top_ref_map->second.reachable_blocks.end();
             auto it = std::lower_bound(info_begin, info_end, entry.ref, [](const Reachable& a, size_t val) {
@@ -571,11 +573,8 @@ void GroupWriter::backdate()
 
     auto backdate_single_entry = [&](FreeSpaceEntry& entry) -> void {
         const auto referenced = is_referenced(entry);
-        // early out if the reference is to the most recent version
-        if (entry.released_at_version == m_current_version) {
-            REALM_ASSERT_DEBUG(!referenced);
-            return;
-        }
+        // references must be to a version before the one we're currently building:
+        REALM_ASSERT(entry.released_at_version < m_current_version);
         while (entry.released_at_version) {
             // early out for references before oldest freelist:
             if (entry.released_at_version <= this->m_oldest_reachable_version) {
@@ -744,7 +743,7 @@ ref_type GroupWriter::write_group()
     size_t reserve_pos = reserve->second;
     size_t reserve_size = reserve->first;
     verify_freelists();
-    
+
     // Now we can check, if we can reduce the logical file size. This can be done
     // when there is only one block in m_under_evacuation, which means that all
     // nodes in this range have been moved
