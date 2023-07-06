@@ -66,15 +66,6 @@ public:
     {
         m_arr->set_parent(p, n);
     }
-    bool need_spec() const override
-    {
-        return true;
-    }
-    void set_spec(Spec* spec, size_t col_ndx) const override
-    {
-        m_spec = spec;
-        m_col_ndx = col_ndx;
-    }
 
     void update_parent()
     {
@@ -135,8 +126,6 @@ private:
     Allocator& m_alloc;
     Storage m_storage;
     Array* m_arr;
-    mutable Spec* m_spec = nullptr;
-    mutable size_t m_col_ndx = realm::npos;
     bool m_nullable = true;
 
     // std::unique_ptr<ArrayString> m_string_enum_values;

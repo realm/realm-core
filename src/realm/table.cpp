@@ -1470,7 +1470,6 @@ public:
     std::unique_ptr<BPlusTreeLeaf> init_leaf_node(ref_type ref) override
     {
         auto leaf = std::make_unique<LeafNode>(this);
-        leaf->ArrayString::set_spec(m_spec, m_col_ndx);
         leaf->set_nullability(m_nullable);
         leaf->init_from_ref(ref);
         return leaf;
