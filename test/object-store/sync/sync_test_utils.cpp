@@ -242,8 +242,8 @@ void async_open_realm(const Realm::Config& config,
     std::mutex mutex;
     bool did_finish = false;
     auto task = Realm::get_synchronized_realm(config);
-    task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
-        finish(std::move(ref), e);
+    task->start([&, callback = std::move(finish)](ThreadSafeReference&& ref, std::exception_ptr e) {
+        callback(std::move(ref), e);
         std::lock_guard lock(mutex);
         did_finish = true;
     });
@@ -251,6 +251,7 @@ void async_open_realm(const Realm::Config& config,
         std::lock_guard lock(mutex);
         return did_finish;
     });
+    task->cancel(); // don't run the above notifier again on this session
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
