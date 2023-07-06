@@ -156,7 +156,8 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app);
 
 void wait_for_advance(Realm& realm);
 
-std::pair<ThreadSafeReference, std::exception_ptr> async_open_realm(const Realm::Config&);
+void async_open_realm(const Realm::Config& config,
+                      util::UniqueFunction<void(ThreadSafeReference&& ref, std::exception_ptr e)> finish);
 
 #endif // REALM_ENABLE_AUTH_TESTS
 
