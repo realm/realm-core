@@ -997,13 +997,16 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
             auto [promise, future] = util::make_promise_future<void>();
             auto shared_promise = std::make_shared<decltype(promise)>(std::move(promise));
             setup_reset_handlers_for_schema_validation(config_local, changed_schema, shared_promise);
-            auto [ref, error] = async_open_realm(config_local);
-            REQUIRE(ref);
-            REQUIRE_FALSE(error);
-            auto realm = Realm::get_shared_realm(std::move(ref));
-            future.get();
-            CHECK(before_reset_count == 1);
-            CHECK(after_reset_count == 1);
+
+            async_open_realm(config_local,
+                             [&, fut = std::move(future)](ThreadSafeReference&& ref, std::exception_ptr error) {
+                                 REQUIRE(ref);
+                                 REQUIRE_FALSE(error);
+                                 auto realm = Realm::get_shared_realm(std::move(ref));
+                                 fut.get();
+                                 CHECK(before_reset_count == 1);
+                                 CHECK(after_reset_count == 1);
+                             });
         }
     }
 
@@ -1026,13 +1029,14 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
         auto [promise, future] = util::make_promise_future<void>();
         auto shared_promise = std::make_shared<decltype(promise)>(std::move(promise));
         setup_reset_handlers_for_schema_validation(config_local, changed_schema, shared_promise);
-        auto [ref, error] = async_open_realm(config_local);
-        REQUIRE(ref);
-        REQUIRE_FALSE(error);
-        auto realm = Realm::get_shared_realm(std::move(ref));
+        async_open_realm(config_local, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
+            REQUIRE(ref);
+            REQUIRE_FALSE(error);
+        });
         future.get();
         CHECK(before_reset_count == 1);
         CHECK(after_reset_count == 1);
+        auto realm = Realm::get_shared_realm(config_local);
         {
             // make changes to the newly added property
             realm->begin_transaction();
@@ -1068,12 +1072,13 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
         auto&& [error_future, err_handler] = make_error_handler();
         config_local.sync_config->error_handler = err_handler;
-        auto [ref, error] = async_open_realm(config_local);
-        REQUIRE(!ref);
-        REQUIRE(error);
-        REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error),
-                                  "A fatal error occured during client reset: 'Client reset cannot recover when "
-                                  "classes have been removed: {AddedClass}'");
+        async_open_realm(config_local, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
+            REQUIRE(!ref);
+            REQUIRE(error);
+            REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error),
+                                      "A fatal error occured during client reset: 'Client reset cannot recover when "
+                                      "classes have been removed: {AddedClass}'");
+        });
         error_future.get();
         CHECK(before_reset_count == 1);
         CHECK(after_reset_count == 0);
@@ -1087,13 +1092,14 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
         auto&& [error_future, err_handler] = make_error_handler();
         config_local.sync_config->error_handler = err_handler;
-        auto [ref, error] = async_open_realm(config_local);
-        REQUIRE(!ref);
-        REQUIRE(error);
-        REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error),
-                                  "A fatal error occured during client reset: 'The following changes cannot be "
-                                  "made in additive-only schema mode:\n"
-                                  "- Property 'TopLevel._id' has been changed from 'object id' to 'uuid'.'");
+        async_open_realm(config_local, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
+            REQUIRE(!ref);
+            REQUIRE(error);
+            REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error),
+                                      "A fatal error occured during client reset: 'The following changes cannot be "
+                                      "made in additive-only schema mode:\n"
+                                      "- Property 'TopLevel._id' has been changed from 'object id' to 'uuid'.'");
+        });
         error_future.get();
         CHECK(before_reset_count == 0); // we didn't even get this far because opening the frozen realm fails
         CHECK(after_reset_count == 0);
@@ -1112,19 +1118,21 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
             setup_reset_handlers_for_schema_validation(config_local, changed_schema, nullptr);
             auto&& [error_future, err_handler] = make_error_handler();
             config_local.sync_config->error_handler = err_handler;
-            auto [ref, error] = async_open_realm(config_local);
-            REQUIRE(ref);
-            REQUIRE_FALSE(error);
-            auto realm = Realm::get_shared_realm(std::move(ref));
-            // make changes to the new property
-            realm->begin_transaction();
-            auto table = realm->read_group().get_table("class_TopLevel");
-            ColKey new_col = table->get_column_key("added_oid_field");
-            REQUIRE(new_col);
-            for (auto it = table->begin(); it != table->end(); ++it) {
-                it->set(new_col, ObjectId::gen());
-            }
-            realm->commit_transaction();
+            async_open_realm(config_local, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
+                REQUIRE(ref);
+                REQUIRE_FALSE(error);
+                auto realm = Realm::get_shared_realm(std::move(ref));
+                // make changes to the new property
+                realm->begin_transaction();
+                auto table = realm->read_group().get_table("class_TopLevel");
+                ColKey new_col = table->get_column_key("added_oid_field");
+                REQUIRE(new_col);
+                for (auto it = table->begin(); it != table->end(); ++it) {
+                    it->set(new_col, ObjectId::gen());
+                }
+                realm->commit_transaction();
+            });
+            auto realm = Realm::get_shared_realm(config_local);
             auto err = error_future.get();
             std::string property_err = "Invalid schema change (UPLOAD): non-breaking schema change: adding "
                                        "\"ObjectID\" column at field \"added_oid_field\" in schema \"TopLevel\", "

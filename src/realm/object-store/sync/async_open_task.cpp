@@ -55,8 +55,10 @@ void AsyncOpenTask::start(AsyncOpenCallback async_open_complete)
             coordinator = std::move(m_coordinator);
         }
 
-        if (!status.is_ok())
+        if (!status.is_ok()) {
             self->async_open_complete(std::move(async_open_complete), coordinator, status);
+            return;
+        }
 
         auto config = coordinator->get_config();
         if (config.sync_config && config.sync_config->flx_sync_requested &&
