@@ -93,6 +93,7 @@ UnsupportedFileFormatVersion::~UnsupportedFileFormatVersion() noexcept = default
 LogicError::LogicError(ErrorCodes::Error code, std::string_view msg)
     : Exception(code, msg)
 {
+    // A LogicError cannot be created with an OK error code
     REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::logic_error));
 }
 LogicError::~LogicError() noexcept = default;
@@ -101,6 +102,7 @@ LogicError::~LogicError() noexcept = default;
 RuntimeError::RuntimeError(ErrorCodes::Error code, std::string_view msg)
     : Exception(code, msg)
 {
+    // A RuntimeError cannot be created with an OK error code
     REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::runtime_error));
 }
 RuntimeError::~RuntimeError() noexcept = default;
@@ -113,6 +115,7 @@ InvalidArgument::InvalidArgument(std::string_view msg)
 InvalidArgument::InvalidArgument(ErrorCodes::Error code, std::string_view msg)
     : LogicError(code, msg)
 {
+    // An InvalidArgument cannot be created with an OK error code
     REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::invalid_argument));
 }
 InvalidArgument::~InvalidArgument() noexcept = default;
@@ -134,6 +137,7 @@ FileAccessError::FileAccessError(ErrorCodes::Error code, std::string_view msg, s
     , m_path(path)
     , m_errno(err)
 {
+    // A FileAccessError cannot be created with an OK error code
     REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::file_access));
 }
 FileAccessError::~FileAccessError() noexcept = default;

@@ -16,10 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "app_utils.hpp"
 #include <realm/object-store/sync/app_utils.hpp>
-
 #include <realm/object-store/sync/generic_network_transport.hpp>
+#include <realm/util/logger.hpp>
+#include <realm/util/to_string.hpp>
 
 #include <external/json/json.hpp>
 
@@ -34,11 +34,13 @@ AppUtils::find_header(const std::string& key_name, const std::map<std::string, s
     for (auto&& current : search_map) {
 #ifdef _MSC_VER
         if (key_name.size() == current.first.size() && _stricmp(key_name.c_str(), current.first.c_str()) == 0) {
-#else
-        if (key_name.size() == current.first.size() && strcasecmp(key_name.c_str(), current.first.c_str()) == 0) {
-#endif
             return &current;
         }
+#else
+        if (key_name.size() == current.first.size() && strcasecmp(key_name.c_str(), current.first.c_str()) == 0) {
+            return &current;
+        }
+#endif
     }
     return nullptr;
 }
@@ -59,9 +61,19 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
 
             if (auto error_code = body.find("error_code");
                 error_code != body.end() && !error_code->get<std::string>().empty()) {
-                return AppError(ErrorCodes::from_string(body["error_code"].get<std::string>()),
-                                message != body.end() ? message->get<std::string>() : "no error message",
-                                std::move(parsed_link), response.http_status_code);
+                auto error_stg = error_code->get<std::string>();
+                auto code = ErrorCodes::from_string(error_stg);
+                auto error_message = message != body.end() ? message->get<std::string>() : "no error message";
+                // If the app error in the string is not found or not assigned the app_error category,
+                // use AppUnknownError, print a debug message and update the message for AppError
+                if (code == ErrorCodes::UnknownError ||
+                    !ErrorCodes::error_categories(code).test(ErrorCategory::app_error)) {
+                    auto logger = util::Logger::get_default_logger();
+                    logger->error("Unknown app error: %1", error_stg);
+                    code = ErrorCodes::AppUnknownError;
+                    error_message = util::format("%1: %2", error_stg, error_message);
+                }
+                return AppError(code, error_message, std::move(parsed_link), response.http_status_code);
             }
             else if (message != body.end()) {
                 return AppError(ErrorCodes::AppUnknownError, message->get<std::string>(), std::move(parsed_link),
@@ -91,6 +103,7 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
 
     return {};
 }
+
 
 } // namespace app
 } // namespace realm

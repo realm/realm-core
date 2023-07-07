@@ -151,6 +151,55 @@ static std::string create_jwt(const std::string& appId)
     return jwtPayload + "." + signature;
 }
 
+// MARK: - Verify AppError with all error codes
+TEST_CASE("app: verify app error codes", "[sync][app][local]") {
+    auto error_codes = ErrorCodes::get_error_list();
+    std::vector<std::pair<int, std::string>> http_status_codes = {
+        {100, "some error. Informational: 100"}, {200, "some error. Success: 200"},
+        {300, "some error. Redirection: 300"},   {400, "some error. Client Error: 400"},
+        {500, "some error. Server Error: 500"},  {600, "some error. Unknown HTTP Error: 600"}};
+
+    auto make_http_error = [](std::string_view error_stg, int http_status = 500) -> app::Response {
+        return {
+            http_status,
+            0,
+            {{"Content-Type", "application/json"}, {"Accept", "application/json"}},
+            util::format("{\"error_code\": \"%1\", \"error\": \"some error\", \"link\": \"http://dummy-link/\"}",
+                         error_stg),
+        };
+    };
+
+    for (auto [name, error] : error_codes) {
+        if (ErrorCodes::error_categories(error).test(ErrorCategory::app_error) && error != ErrorCodes::HTTPError) {
+            auto response = make_http_error(name);
+            auto app_error = AppUtils::check_for_errors(response);
+            REQUIRE(app_error);
+            REQUIRE(app_error->code() == error);
+            REQUIRE(app_error->code_string() == name);
+            REQUIRE(app_error->reason() == "some error");
+            REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
+        }
+    }
+    // HTTPError with different status values
+    for (auto [status, message] : http_status_codes) {
+        auto response = make_http_error("HTTPError", status);
+        auto app_error = AppUtils::check_for_errors(response);
+        REQUIRE(app_error);
+        REQUIRE(app_error->code() == ErrorCodes::HTTPError);
+        REQUIRE(app_error->code_string() == "HTTPError");
+        REQUIRE(app_error->reason() == message);
+        REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
+    }
+    // Unknown error string
+    auto response = make_http_error("SomeError");
+    auto app_error = AppUtils::check_for_errors(response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::AppUnknownError);
+    REQUIRE(app_error->code_string() == "AppUnknownError");
+    REQUIRE(app_error->reason() == "SomeError: some error");
+    REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
+}
+
 // MARK: - Login with Credentials Tests
 
 TEST_CASE("app: login_with_credentials integration", "[sync][app][baas]") {
