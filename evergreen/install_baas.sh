@@ -216,7 +216,8 @@ if [[ -f "${MONGOD_PID_FILE}" ]]; then
 fi
 
 # Set up the cleanup function that runs at exit and stops mongod and the baas server
-function cleanup() {
+function cleanup()
+{
     # The baas server is being stopped (or never started), create a 'baas_stopped' file
     touch "${BAAS_STOPPED_FILE}"
 

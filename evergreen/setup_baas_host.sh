@@ -9,7 +9,8 @@ set -o errexit
 set -o pipefail
 
 trap 'catch $? ${LINENO}' EXIT
-catch() {
+function catch()
+{
   if [ "$1" != "0" ]; then
     echo "Error $1 occurred while starting remote baas at line $2"
   fi

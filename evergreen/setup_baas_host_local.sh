@@ -65,7 +65,8 @@ elif [[ ! -f "${BAAS_HOST_KEY}" ]]; then
 fi
 
 trap 'catch $? ${LINENO}' EXIT
-function catch() {
+function catch()
+{
   if [ "$1" != "0" ]; then
     echo "Error $1 occurred while starting baas (local) at line $2"
   fi
@@ -125,18 +126,24 @@ echo "running ssh with ${SSH_OPTIONS[*]}"
 RETRY_COUNT=25
 WAIT_COUNTER=0
 WAIT_START=$(date -u +'%s')
+CONNECT_COUNT=2
 
-# Check for remote connectivity
-until ssh "${SSH_OPTIONS[@]}" "${SSH_USER}" "echo -n 'hello from '; hostname" ; do
-  if [[ ${WAIT_COUNTER} -ge ${RETRY_COUNT} ]] ; then
-    secs_spent_waiting=$(($(date -u +'%s') - WAIT_START))
-    echo "Timed out after waiting ${secs_spent_waiting} seconds for host ${BAAS_HOST_NAME} to start"
-    exit 1
-  fi
-  
-  ((++WAIT_COUNTER))
-  printf "SSH connection attempt %d/%d failed. Retrying...\n" "${WAIT_COUNTER}" "${RETRY_COUNT}"
-  sleep 10
+# Check for remote connectivity - try to connect twice to verify server is "really" ready
+# The tests failed one time due to this ssh command passing, but the next scp command failed
+while [[ ${CONNECT_COUNT} -gt 0 ]]; do
+    until ssh "${SSH_OPTIONS[@]}" "${SSH_USER}" "echo -n 'hello from '; hostname" ; do
+        if [[ ${WAIT_COUNTER} -ge ${RETRY_COUNT} ]] ; then
+            secs_spent_waiting=$(($(date -u +'%s') - WAIT_START))
+            echo "Timed out after waiting ${secs_spent_waiting} seconds for host ${BAAS_HOST_NAME} to start"
+            exit 1
+        fi
+
+        ((++WAIT_COUNTER))
+        printf "SSH connection attempt %d/%d failed. Retrying...\n" "${WAIT_COUNTER}" "${RETRY_COUNT}"
+        sleep 10
+    done
+
+    ((CONNECT_COUNT--))
 done
 
 echo "Transferring setup scripts to ${SSH_USER}:${FILE_DEST_DIR}"
