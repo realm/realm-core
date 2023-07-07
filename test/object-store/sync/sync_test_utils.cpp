@@ -236,22 +236,22 @@ void wait_for_advance(Realm& realm)
     realm.m_binding_context = nullptr;
 }
 
-std::pair<ThreadSafeReference, std::exception_ptr> async_open_realm(const Realm::Config& config)
+void async_open_realm(const Realm::Config& config,
+                      util::UniqueFunction<void(ThreadSafeReference&& ref, std::exception_ptr e)> finish)
 {
     std::mutex mutex;
-    ThreadSafeReference realm_ref;
-    std::exception_ptr error;
+    bool did_finish = false;
     auto task = Realm::get_synchronized_realm(config);
-    task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
+    task->start([&, callback = std::move(finish)](ThreadSafeReference&& ref, std::exception_ptr e) {
+        callback(std::move(ref), e);
         std::lock_guard lock(mutex);
-        realm_ref = std::move(ref);
-        error = e;
+        did_finish = true;
     });
     util::EventLoop::main().run_until([&] {
         std::lock_guard lock(mutex);
-        return realm_ref || error;
+        return did_finish;
     });
-    return std::pair(std::move(realm_ref), error);
+    task->cancel(); // don't run the above notifier again on this session
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
