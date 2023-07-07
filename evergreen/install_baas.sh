@@ -404,10 +404,10 @@ mkdir -p "${MONGODB_PATH}"
     --pidfilepath "${MONGOD_PID_FILE}" &
 
 
-# Wait for mongod to start (up to 20 secs) while attempting to initialize the replica set
+# Wait for mongod to start (up to 40 secs) while attempting to initialize the replica set
 echo "Initializing replica set"
 
-RETRY_COUNT=10
+RETRY_COUNT=20
 WAIT_COUNTER=0
 WAIT_START=$(date -u +'%s')
 
