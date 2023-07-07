@@ -9,7 +9,7 @@
 * None.
 
 ### Breaking changes
-* None.
+* The previous list of AppError error codes between 4300-4399 was updated to the 5000-6000 range to allow more than 100 values. (PR [#6772](https://github.com/realm/realm-core/pull/6772))
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* Update list of server app errors and fix assertion failure if unknown app error string is received. (PR [#????](https://github.com/realm/realm-core/pull/????))
+* Update list of server app errors and fix assertion failure if unknown app error string is received. (PR [#6772](https://github.com/realm/realm-core/pull/6772))
 
 ----------------------------------------------
 
