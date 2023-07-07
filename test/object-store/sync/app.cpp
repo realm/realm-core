@@ -45,6 +45,7 @@
 #include <realm/util/base64.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/overload.hpp>
+#include <realm/util/platform_info.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/sync/network/websocket.hpp>
 
@@ -152,7 +153,7 @@ static std::string create_jwt(const std::string& appId)
 
 // MARK: - Login with Credentials Tests
 
-TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
+TEST_CASE("app: login_with_credentials integration", "[sync][app][baas]") {
     SECTION("login") {
         TestAppSession session;
         auto app = session.app();
@@ -189,7 +190,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
 
 // MARK: - UsernamePasswordProviderClient Tests
 
-TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
+TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][baas]") {
     const std::string base_url = get_base_url();
     AutoVerifiedEmailCredentials creds;
     auto email = creds.email;
@@ -367,7 +368,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
 
 // MARK: - UserAPIKeyProviderClient Tests
 
-TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
+TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app][baas]") {
     TestAppSession session;
     auto app = session.app();
     auto client = app->provider_client<App::UserAPIKeyProviderClient>();
@@ -629,7 +630,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
 // MARK: - Auth Providers Function Tests
 
-TEST_CASE("app: auth providers function integration", "[sync][app]") {
+TEST_CASE("app: auth providers function integration", "[sync][app][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -643,7 +644,7 @@ TEST_CASE("app: auth providers function integration", "[sync][app]") {
 
 // MARK: - Link User Tests
 
-TEST_CASE("app: link_user integration", "[sync][app]") {
+TEST_CASE("app: link_user integration", "[sync][app][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -676,7 +677,7 @@ TEST_CASE("app: link_user integration", "[sync][app]") {
 
 // MARK: - Delete User Tests
 
-TEST_CASE("app: delete anonymous user integration", "[sync][app]") {
+TEST_CASE("app: delete anonymous user integration", "[sync][app][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -718,7 +719,7 @@ TEST_CASE("app: delete anonymous user integration", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: delete user with credentials integration", "[sync][app]") {
+TEST_CASE("app: delete user with credentials integration", "[sync][app][baas]") {
     TestAppSession session;
     auto app = session.app();
     app->remove_user(app->current_user(), [](auto) {});
@@ -759,7 +760,7 @@ TEST_CASE("app: delete user with credentials integration", "[sync][app]") {
 
 // MARK: - Call Function Tests
 
-TEST_CASE("app: call function", "[sync][app]") {
+TEST_CASE("app: call function", "[sync][app][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -775,7 +776,7 @@ TEST_CASE("app: call function", "[sync][app]") {
 
 // MARK: - Remote Mongo Client Tests
 
-TEST_CASE("app: remote mongo client", "[sync][app]") {
+TEST_CASE("app: remote mongo client", "[sync][app][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -1443,7 +1444,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
 
 // MARK: - Push Notifications Tests
 
-TEST_CASE("app: push notifications", "[sync][app]") {
+TEST_CASE("app: push notifications", "[sync][app][baas]") {
     TestAppSession session;
     auto app = session.app();
     std::shared_ptr<SyncUser> sync_user = app->current_user();
@@ -1525,7 +1526,7 @@ TEST_CASE("app: push notifications", "[sync][app]") {
 
 // MARK: - Token refresh
 
-TEST_CASE("app: token refresh", "[sync][app][token]") {
+TEST_CASE("app: token refresh", "[sync][app][token][baas]") {
     TestAppSession session;
     auto app = session.app();
     std::shared_ptr<SyncUser> sync_user = app->current_user();
@@ -1557,7 +1558,7 @@ TEST_CASE("app: token refresh", "[sync][app][token]") {
 
 // MARK: - Sync Tests
 
-TEST_CASE("app: mixed lists with object links", "[sync][app]") {
+TEST_CASE("app: mixed lists with object links", "[sync][app][baas]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
@@ -1633,7 +1634,7 @@ TEST_CASE("app: mixed lists with object links", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: roundtrip values", "[sync][app]") {
+TEST_CASE("app: roundtrip values", "[sync][app][baas]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
@@ -1682,7 +1683,7 @@ TEST_CASE("app: roundtrip values", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
+TEST_CASE("app: upgrade from local to synced realm", "[sync][app][baas]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
@@ -1784,7 +1785,7 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
     // r1->read_group().to_json(std::cout);
 }
 
-TEST_CASE("app: set new embedded object", "[sync][app]") {
+TEST_CASE("app: set new embedded object", "[sync][app][baas]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
@@ -1922,7 +1923,7 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: make distributable client file", "[sync][app]") {
+TEST_CASE("app: make distributable client file", "[sync][app][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -1996,7 +1997,7 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: sync integration", "[sync][app]") {
+TEST_CASE("app: sync integration", "[sync][app][baas]") {
     auto logger = std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
     const auto schema = default_app_config("").schema;
@@ -2212,7 +2213,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 logger->trace("Received request[%1]: %2", request_count, request.url);
                 if (request_count == 0) {
                     // First request should be to location
-                    REQUIRE(request.url.find_first_of("/location") != std::string::npos);
+                    REQUIRE(request.url.find("/location") != std::string::npos);
                     if (request.url.find("https://") != std::string::npos) {
                         redirect_scheme = "https://";
                     }
@@ -2360,10 +2361,10 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         std::string websocket_url = "ws://some-websocket:9090";
         std::string original_url;
         redir_transport->request_hook = [&](const Request& request) {
-            logger->trace("Received request[%1]: %2", request_count, request.url);
+            logger->trace("request.url (%1): %2", request_count, request.url);
             if (request_count == 0) {
                 // First request should be to location
-                REQUIRE(request.url.find_first_of("/location") != std::string::npos);
+                REQUIRE(request.url.find("/location") != std::string::npos);
                 if (request.url.find("https://") != std::string::npos) {
                     original_scheme = "https://";
                 }
@@ -2379,7 +2380,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 logger->trace("original_url (%1): %2", request_count, original_url);
             }
             else if (request_count == 1) {
-                logger->trace("request.url (%1): %2", request_count, request.url);
                 REQUIRE(!request.redirect_count);
                 redir_transport->simulated_response = {
                     308,
@@ -2388,7 +2388,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     "Some body data"};
             }
             else if (request_count == 2) {
-                logger->trace("request.url (%1): %2", request_count, request.url);
                 REQUIRE(request.url.find("http://somehost:9090") != std::string::npos);
                 REQUIRE(request.url.find("location") != std::string::npos);
                 // app hostname will be updated via the metadata info
@@ -2401,7 +2400,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                                  original_url, websocket_url)};
             }
             else {
-                logger->trace("request.url (%1): %2", request_count, request.url);
                 REQUIRE(request.url.find(original_url) != std::string::npos);
                 redir_transport->simulated_response.reset();
             }
@@ -2506,10 +2504,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             };
             int request_count = 0;
             redir_transport->request_hook = [&](const Request& request) {
+                logger->trace("request.url (%1): %2", request_count, request.url);
                 if (request_count++ == 0) {
-                    logger->trace("request.url (%1): %2", request_count, request.url);
-                    // First request should be to location
-                    REQUIRE(request.url.find_first_of("/location") != std::string::npos);
+                    // First request should be a location request against the original URL
+                    REQUIRE(request.url.find(original_host) != std::string::npos);
+                    REQUIRE(request.url.find("/location") != std::string::npos);
                     REQUIRE(request.redirect_count == 0);
                     redir_transport->simulated_response = {
                         static_cast<int>(sync::HTTPStatus::PermanentRedirect),
@@ -2517,8 +2516,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                         {{"Location", redirect_url}, {"Content-Type", "application/json"}},
                         "Some body data"};
                 }
-                else if (request.url.find("location") != std::string::npos) {
-                    logger->trace("request.url (%1): %2", request_count, request.url);
+                else if (request.url.find("/location") != std::string::npos) {
                     redir_transport->simulated_response = {
                         static_cast<int>(sync::HTTPStatus::Ok),
                         0,
@@ -2529,7 +2527,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                             redirect_host, redirect_scheme, websocket_scheme)};
                 }
                 else {
-                    logger->trace("request.url (%1): %2", request_count, request.url);
                     redir_transport->simulated_response.reset();
                 }
             };
@@ -2560,10 +2557,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             };
             int request_count = 0;
             redir_transport->request_hook = [&](const Request& request) {
+                logger->trace("request.url (%1): %2", request_count, request.url);
                 if (request_count++ == 0) {
-                    logger->trace("request.url (%1): %2", request_count, request.url);
-                    // First request should be to location
-                    REQUIRE(request.url.find_first_of("/location") != std::string::npos);
+                    // First request should be a location request against the original URL
+                    REQUIRE(request.url.find(original_host) != std::string::npos);
+                    REQUIRE(request.url.find("/location") != std::string::npos);
                     REQUIRE(request.redirect_count == 0);
                     redir_transport->simulated_response = {
                         static_cast<int>(sync::HTTPStatus::MovedPermanently),
@@ -2571,8 +2569,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                         {{"Location", redirect_url}, {"Content-Type", "application/json"}},
                         "Some body data"};
                 }
-                else if (request.url.find("location") != std::string::npos) {
-                    logger->trace("request.url (%1): %2", request_count, request.url);
+                else if (request.url.find("/location") != std::string::npos) {
                     redir_transport->simulated_response = {
                         static_cast<int>(sync::HTTPStatus::Ok),
                         0,
@@ -2583,14 +2580,12 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                             redirect_host, redirect_scheme, websocket_scheme)};
                 }
                 else if (request.url.find("auth/session") != std::string::npos) {
-                    logger->trace("request.url (%1): %2", request_count, request.url);
                     redir_transport->simulated_response = {static_cast<int>(sync::HTTPStatus::Unauthorized),
                                                            0,
                                                            {{"Content-Type", "application/json"}},
                                                            ""};
                 }
                 else {
-                    logger->trace("request.url (%1): %2", request_count, request.url);
                     redir_transport->simulated_response.reset();
                 }
             };
@@ -2599,9 +2594,59 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             sync_session->resume();
             REQUIRE(wait_for_download(*r));
             std::unique_lock lk(logout_mutex);
-            REQUIRE(logout_cv.wait_for(lk, std::chrono::seconds(15), [&]() {
+            auto result = logout_cv.wait_for(lk, std::chrono::seconds(15), [&]() {
                 return logged_out;
-            }));
+            });
+            REQUIRE(result);
+            REQUIRE(!user1->is_logged_in());
+        }
+        SECTION("Too many websocket redirects logs out user") {
+            auto sync_manager = test_session.app()->sync_manager();
+            auto sync_session = sync_manager->get_existing_session(r->config().path);
+            sync_session->pause();
+
+            int connect_count = 0;
+            redir_provider->websocket_connect_func = [&connect_count](int& status_code, std::string& body) {
+                if (connect_count++ > 0)
+                    return false;
+
+                status_code = static_cast<int>(sync::HTTPStatus::MovedPermanently);
+                body = "";
+                return true;
+            };
+            int request_count = 0;
+            const int max_http_redirects = 20; // from app.cpp in object-store
+            redir_transport->request_hook = [&](const Request& request) {
+                logger->trace("request.url (%1): %2", request_count, request.url);
+                if (request_count++ == 0) {
+                    // First request should be a location request against the original URL
+                    REQUIRE(request.url.find(original_host) != std::string::npos);
+                    REQUIRE(request.url.find("/location") != std::string::npos);
+                    REQUIRE(request.redirect_count == 0);
+                }
+                if (request.url.find("/location") != std::string::npos) {
+                    // Keep returning the redirected response
+                    REQUIRE(request.redirect_count < max_http_redirects);
+                    redir_transport->simulated_response = {
+                        static_cast<int>(sync::HTTPStatus::MovedPermanently),
+                        0,
+                        {{"Location", redirect_url}, {"Content-Type", "application/json"}},
+                        "Some body data"};
+                }
+                else {
+                    // should not get any other types of requests during the test - the log out is local
+                    REQUIRE(false);
+                }
+            };
+
+            SyncManager::OnlyForTesting::voluntary_disconnect_all_connections(*sync_manager);
+            sync_session->resume();
+            REQUIRE(wait_for_download(*r));
+            std::unique_lock lk(logout_mutex);
+            auto result = logout_cv.wait_for(lk, std::chrono::seconds(15), [&]() {
+                return logged_out;
+            });
+            REQUIRE(result);
             REQUIRE(!user1->is_logged_in());
         }
     }
@@ -2726,7 +2771,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 sync_error_handler_called.store(true);
                 REQUIRE(error.get_system_error() ==
                         sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                REQUIRE(error.reason() == "Unable to refresh the user access token.");
+                REQUIRE_THAT(std::string(error.reason()),
+                             Catch::Matchers::ContainsSubstring("Unable to refresh the user access token."));
             };
             auto r = Realm::get_shared_realm(config);
             timed_wait_for([&] {
@@ -2826,7 +2872,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 sync_error_handler_called.store(true);
                 REQUIRE(error.get_system_error() ==
                         sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                REQUIRE(error.reason() == "Unable to refresh the user access token.");
+                REQUIRE_THAT(std::string(error.reason()),
+                             Catch::Matchers::ContainsSubstring("Unable to refresh the user access token."));
             };
 
             auto transport = static_cast<SynchronousTestTransport*>(session.transport());
@@ -3056,8 +3103,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
         auto error = wait_for_future(std::move(pf.future), std::chrono::minutes(5)).get();
         REQUIRE(error.get_system_error() == make_error_code(sync::ProtocolError::limits_exceeded));
-        REQUIRE(error.reason() == "Sync websocket closed because the server received a message that was too large: "
-                                  "read limited at 16777217 bytes");
+        REQUIRE_THAT(std::string(error.reason()),
+                     Catch::Matchers::ContainsSubstring("Sync websocket closed because the server received a message "
+                                                        "that was too large: read limited at 16777217 bytes"));
         REQUIRE(error.is_client_reset_requested());
         REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ClientReset);
     }
@@ -3176,7 +3224,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: custom user data integration tests", "[sync][app]") {
+TEST_CASE("app: custom user data integration tests", "[sync][app][baas]") {
     TestAppSession session;
     auto app = session.app();
     auto user = app->current_user();
@@ -3201,7 +3249,7 @@ TEST_CASE("app: custom user data integration tests", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: jwt login and metadata tests", "[sync][app]") {
+TEST_CASE("app: jwt login and metadata tests", "[sync][app][baas]") {
     TestAppSession session;
     auto app = session.app();
     auto jwt = create_jwt(session.app()->config().app_id);
@@ -3232,7 +3280,7 @@ TEST_CASE("app: jwt login and metadata tests", "[sync][app]") {
 }
 
 namespace cf = realm::collection_fixtures;
-TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collections]", cf::ListOfObjects,
+TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][baas][collections]", cf::ListOfObjects,
                    cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks, cf::DictionaryOfObjects,
                    cf::DictionaryOfMixedLinks)
 {
@@ -3383,7 +3431,7 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collect
     }
 }
 
-TEMPLATE_TEST_CASE("app: partition types", "[sync][app][partition]", cf::Int, cf::String, cf::OID, cf::UUID,
+TEMPLATE_TEST_CASE("app: partition types", "[sync][app][baas][partition]", cf::Int, cf::String, cf::OID, cf::UUID,
                    cf::BoxedOptional<cf::Int>, cf::UnboxedOptional<cf::String>, cf::BoxedOptional<cf::OID>,
                    cf::BoxedOptional<cf::UUID>)
 {
@@ -3472,7 +3520,7 @@ TEMPLATE_TEST_CASE("app: partition types", "[sync][app][partition]", cf::Int, cf
 
 #endif // REALM_ENABLE_AUTH_TESTS
 
-TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
+TEST_CASE("app: custom error handling", "[sync][app][baas][custom_errors]") {
     class CustomErrorTransport : public GenericNetworkTransport {
     public:
         CustomErrorTransport(int code, const std::string& message)
@@ -3598,16 +3646,17 @@ private:
               nlohmann::json({{"device",
                                {{"appId", "app_id"},
                                 {"appVersion", "A Local App Version"},
-                                {"platform", "Object Store Test Platform"},
+                                {"platform", util::get_library_platform()},
                                 {"platformVersion", "Object Store Test Platform Version"},
                                 {"sdk", "SDK Name"},
                                 {"sdkVersion", "SDK Version"},
-                                {"cpuArch", "CPU Arch"},
+                                {"cpuArch", util::get_library_cpu_arch()},
                                 {"deviceName", "Device Name"},
                                 {"deviceVersion", "Device Version"},
                                 {"frameworkName", "Framework Name"},
                                 {"frameworkVersion", "Framework Version"},
-                                {"coreVersion", REALM_VERSION_STRING}}}}));
+                                {"coreVersion", REALM_VERSION_STRING},
+                                {"bundleId", "Bundle Id"}}}}));
 
         CHECK(request.timeout_ms == 60000);
 
@@ -3765,7 +3814,7 @@ const std::string UnitTestTransport::user_id = "Ailuropoda melanoleuca";
 const std::string UnitTestTransport::identity_0_id = "Ursus arctos isabellinus";
 const std::string UnitTestTransport::identity_1_id = "Ursus arctos horribilis";
 
-TEST_CASE("subscribable unit tests", "[sync][app]") {
+TEST_CASE("subscribable unit tests", "[sync][app][local]") {
     struct Foo : public Subscribable<Foo> {
         void event()
         {
@@ -3834,7 +3883,7 @@ TEST_CASE("subscribable unit tests", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
+TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][local]") {
     auto config = get_config();
 
     SECTION("login_anonymous good") {
@@ -3922,7 +3971,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
+TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app][local]") {
     TestSyncManager sync_manager(get_config(), {});
     auto app = sync_manager.app();
     auto client = app->provider_client<App::UserAPIKeyProviderClient>();
@@ -3969,7 +4018,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
 }
 
 
-TEST_CASE("app: user_semantics", "[app]") {
+TEST_CASE("app: user_semantics", "[app][local]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4114,7 +4163,7 @@ private:
     Response* m_response;
 };
 
-TEST_CASE("app: response error handling", "[sync][app]") {
+TEST_CASE("app: response error handling", "[sync][app][local]") {
     std::string response_body = nlohmann::json({{"access_token", good_access_token},
                                                 {"refresh_token", good_access_token},
                                                 {"user_id", "Brown Bear"},
@@ -4197,7 +4246,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: switch user", "[sync][app]") {
+TEST_CASE("app: switch user", "[sync][app][local]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4253,7 +4302,7 @@ TEST_CASE("app: switch user", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: remove anonymous user", "[sync][app]") {
+TEST_CASE("app: remove anonymous user", "[sync][app][local]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4295,7 +4344,7 @@ TEST_CASE("app: remove anonymous user", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: remove user with credentials", "[sync][app]") {
+TEST_CASE("app: remove user with credentials", "[sync][app][local]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4328,7 +4377,7 @@ TEST_CASE("app: remove user with credentials", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: link_user", "[sync][app]") {
+TEST_CASE("app: link_user", "[sync][app][local]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4367,7 +4416,7 @@ TEST_CASE("app: link_user", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: auth providers", "[sync][app]") {
+TEST_CASE("app: auth providers", "[sync][app][local]") {
     SECTION("auth providers facebook") {
         auto credentials = AppCredentials::facebook("a_token");
         CHECK(credentials.provider() == AuthProvider::FACEBOOK);
@@ -4438,22 +4487,16 @@ TEST_CASE("app: auth providers", "[sync][app]") {
         CHECK(credentials.serialize_as_bson() == bson::BsonDocument{{"name", "mongo"}});
     }
 
-    SECTION("auth providers user api key") {
-        auto credentials = AppCredentials::user_api_key("a key");
-        CHECK(credentials.provider() == AuthProvider::USER_API_KEY);
-        CHECK(credentials.provider_as_string() == IdentityProviderUserAPIKey);
+    SECTION("auth providers api key") {
+        auto credentials = AppCredentials::api_key("a key");
+        CHECK(credentials.provider() == AuthProvider::API_KEY);
+        CHECK(credentials.provider_as_string() == IdentityProviderAPIKey);
         CHECK(credentials.serialize_as_bson() == bson::BsonDocument{{"provider", "api-key"}, {"key", "a key"}});
-    }
-
-    SECTION("auth providers server api key") {
-        auto credentials = AppCredentials::server_api_key("a key");
-        CHECK(credentials.provider() == AuthProvider::SERVER_API_KEY);
-        CHECK(credentials.provider_as_string() == IdentityProviderServerAPIKey);
-        CHECK(credentials.serialize_as_bson() == bson::BsonDocument{{"provider", "api-key"}, {"key", "a key"}});
+        CHECK(enum_from_provider_type(provider_type_from_enum(AuthProvider::API_KEY)) == AuthProvider::API_KEY);
     }
 }
 
-TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
+TEST_CASE("app: refresh access token unit tests", "[sync][app][local]") {
     auto setup_user = [](std::shared_ptr<App> app) {
         if (app->sync_manager()->get_current_user()) {
             return;
@@ -4674,7 +4717,7 @@ private:
 
 } // namespace
 
-TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
+TEST_CASE("app: app destroyed during token refresh", "[sync][app][local]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, profile_1, profile_2, refresh_1, refresh_2, refresh_3 };
     struct TestStateBundle {
@@ -4824,7 +4867,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
     mock_transport_worker.mark_complete();
 }
 
-TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
+TEST_CASE("app: metadata is persisted between sessions", "[sync][app][local]") {
     static const auto test_hostname = "proto://host:1234";
     static const auto test_ws_hostname = "wsproto://host:1234";
 
@@ -4878,7 +4921,7 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: make_streaming_request", "[sync][app]") {
+TEST_CASE("app: make_streaming_request", "[sync][app][local]") {
     UnitTestTransport::access_token = good_access_token;
 
     constexpr uint64_t timeout_ms = 60000;
@@ -4952,7 +4995,7 @@ TEST_CASE("app: make_streaming_request", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: sync_user_profile unit tests", "[sync][app]") {
+TEST_CASE("app: sync_user_profile unit tests", "[sync][app][local]") {
     SECTION("with empty map") {
         auto profile = SyncUserProfile(bson::BsonDocument());
         CHECK(profile.name() == util::none);
@@ -4990,7 +5033,7 @@ TEST_CASE("app: sync_user_profile unit tests", "[sync][app]") {
 }
 
 #if 0
-TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
+TEST_CASE("app: app cannot get deallocated during log in", "[sync][app][local]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, app_deallocated, profile };
     struct TestStateBundle {
@@ -5082,7 +5125,7 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
 }
 #endif
 
-TEST_CASE("app: user logs out while profile is fetched", "[sync][app]") {
+TEST_CASE("app: user logs out while profile is fetched", "[sync][app][local]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, profile };
     struct TestStateBundle {
@@ -5179,7 +5222,7 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app]") {
     mock_transport_worker.mark_complete();
 }
 
-TEST_CASE("app: shared instances", "[sync][app]") {
+TEST_CASE("app: shared instances", "[sync][app][local]") {
     App::Config base_config;
     set_app_config_defaults(base_config, instance_of<UnitTestTransport>);
 

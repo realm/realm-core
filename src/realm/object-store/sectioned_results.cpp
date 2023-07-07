@@ -23,20 +23,20 @@
 namespace realm {
 
 static SectionedResults::SectionKeyFunc builtin_comparison(Results& results, Results::SectionedResultsOperator op,
-                                                           util::Optional<StringData> prop_name)
+                                                           StringData prop_name)
 {
     switch (op) {
         case Results::SectionedResultsOperator::FirstLetter:
             if (results.get_type() == PropertyType::Object) {
-                auto col_key = results.get_table()->get_column_key(*prop_name);
-                return [col_key](Mixed value, SharedRealm realm) {
+                auto col_key = results.get_table()->get_column_key(prop_name);
+                return [col_key](Mixed value, const SharedRealm& realm) {
                     auto link = value.get_link();
                     auto v = realm->read_group().get_object(link).get<StringData>(col_key);
                     return v.size() > 0 ? v.prefix(1) : "";
                 };
             }
             else {
-                return [](Mixed value, SharedRealm) {
+                return [](Mixed value, const SharedRealm&) {
                     auto v = value.get_string();
                     return v.size() > 0 ? v.prefix(1) : "";
                 };
@@ -46,9 +46,44 @@ static SectionedResults::SectionKeyFunc builtin_comparison(Results& results, Res
     }
 }
 
+namespace {
+template <typename T>
+T& at(std::vector<T>& vec, size_t index)
+{
+    if (index >= vec.size()) {
+        if (vec.capacity() <= index)
+            vec.reserve(index * 2 + 1);
+        vec.resize(index + 1);
+    }
+    return vec[index];
+}
+
+struct IndexSetAdder {
+    IndexSet* set;
+    IndexSetAdder& operator=(size_t value)
+    {
+        set->add(value);
+        return *this;
+    }
+    IndexSetAdder& operator++()
+    {
+        return *this;
+    }
+    IndexSetAdder& operator++(int)
+    {
+        return *this;
+    }
+    IndexSetAdder& operator*()
+    {
+        return *this;
+    }
+};
+} // anonymous namespace
+
 struct SectionedResultsNotificationHandler {
 public:
-    SectionedResultsNotificationHandler(SectionedResults& sectioned_results, SectionedResultsNotificatonCallback cb,
+    SectionedResultsNotificationHandler(SectionedResults& sectioned_results,
+                                        SectionedResultsNotificationCallback&& cb,
                                         util::Optional<Mixed> section_filter = util::none)
         : m_cb(std::move(cb))
         , m_sectioned_results(sectioned_results)
@@ -59,161 +94,182 @@ public:
 
     void operator()(CollectionChangeSet const& c)
     {
-        auto convert_indices = [&](const IndexSet& indices,
-                                   const std::vector<std::pair<size_t, size_t>>& rows_to_index_path) {
-            std::map<size_t, IndexSet> ret;
-            for (auto index : indices.as_indexes()) {
-                auto& index_path = rows_to_index_path[index];
-                ret[index_path.first].add(index_path.second);
-            }
-            return ret;
-        };
-
         util::CheckedUniqueLock lock(m_sectioned_results.m_mutex);
 
         m_sectioned_results.calculate_sections_if_required();
-
-        auto converted_insertions = convert_indices(c.insertions, m_sectioned_results.m_row_to_index_path);
-        auto converted_modifications = convert_indices(c.modifications, m_prev_row_to_index_path);
-        auto converted_modifications_new =
-            convert_indices(c.modifications_new, m_sectioned_results.m_row_to_index_path);
-        auto converted_deletions = convert_indices(c.deletions, m_prev_row_to_index_path);
-
-        std::map<size_t, IndexSet> modifications_to_keep, modifications_to_keep_new;
-        auto section_changes = calculate_sections_to_insert_and_delete();
-
-        for (auto [section_old, indexes_old] : converted_modifications) {
-            auto it = m_sectioned_results.m_prev_section_index_to_key.find(section_old);
-            REALM_ASSERT(it != m_sectioned_results.m_prev_section_index_to_key.end());
-            auto section_identifier = m_sectioned_results.m_sections.find(it->second);
-            // This section still exists.
-            if (section_identifier != m_sectioned_results.m_sections.end()) {
-                auto old_indexes = indexes_old.as_indexes();
-                auto new_indexes = converted_modifications_new[section_identifier->second.index].as_indexes();
-                std::vector<size_t> out_indexes;
-                std::set_intersection(old_indexes.begin(), old_indexes.end(), new_indexes.begin(), new_indexes.end(),
-                                      std::back_inserter(out_indexes));
-                auto& old_modifications = converted_modifications[section_old];
-                // These are the indexes which are still in the
-                // same position as they were in the old collection.
-                for (auto& i : out_indexes) {
-                    modifications_to_keep[section_old].add(i);
-                    modifications_to_keep_new[section_identifier->second.index].add(i);
-                    // Anything remaining in converted_modifications will be added to deletions.
-                    old_modifications.remove(i);
-                    // Anything remaining in converted_modifications_new will be added to insertions.
-                    converted_modifications_new[section_identifier->second.index].remove(i);
-                }
-                if (!old_modifications.empty())
-                    converted_deletions[section_old].add(converted_modifications[section_old]);
-            }
-        }
-
-        for (auto [section, indexes] : converted_modifications_new) {
-            if (!indexes.empty())
-                converted_insertions[section].add(indexes);
-        }
-
-        // Cocoa only requires the index of the deleted sections to remove all deleted rows.
-        // There is no need to pass back each individual deletion IndexPath.
-        for (auto section : section_changes.second.as_indexes()) {
-            converted_deletions.erase(section);
-        }
-
-        converted_modifications = modifications_to_keep;
-        converted_modifications_new = modifications_to_keep_new;
-
-        if (m_section_filter) {
-            std::map<size_t, IndexSet> filtered_insertions, filtered_modifications, filtered_deletions;
-
-            auto current_section = m_sectioned_results.m_sections.find(*m_section_filter);
-
-            auto previous_index_of_section_key =
-                m_sectioned_results.m_previous_key_to_index_lookup.find(*m_section_filter);
-            auto current_key_exists = current_section != m_sectioned_results.m_sections.end();
-            auto previous_key_exists =
-                previous_index_of_section_key != m_sectioned_results.m_previous_key_to_index_lookup.end();
-
-            bool has_insertions =
-                current_key_exists && converted_insertions.count(current_section->second.index) != 0;
-            if (has_insertions) {
-                filtered_insertions[current_section->second.index] =
-                    converted_insertions[current_section->second.index];
-            }
-            bool has_modifications =
-                previous_key_exists && converted_modifications.count(previous_index_of_section_key->second) != 0;
-            if (has_modifications) {
-                filtered_modifications[previous_index_of_section_key->second] =
-                    converted_modifications[previous_index_of_section_key->second];
-            }
-
-            bool has_deletions =
-                previous_key_exists && converted_deletions.count(previous_index_of_section_key->second) != 0;
-            if (has_deletions) {
-                filtered_deletions[previous_index_of_section_key->second] =
-                    converted_deletions[previous_index_of_section_key->second];
-            }
-
-            IndexSet filtered_sections_to_insert, filtered_sections_to_delete;
-
-            if (current_key_exists) {
-                if (section_changes.first.contains(current_section->second.index))
-                    filtered_sections_to_insert.add(current_section->second.index);
-            }
-
-            if (previous_key_exists) {
-                if (section_changes.second.contains(previous_index_of_section_key->second))
-                    filtered_sections_to_delete.add(previous_index_of_section_key->second);
-            }
-
-            bool should_notify = has_insertions || has_modifications || has_deletions ||
-                                 !filtered_sections_to_insert.empty() || !filtered_sections_to_delete.empty();
-
-            if (should_notify || m_section_filter_should_deliver_initial_notification) {
-                m_cb(SectionedResultsChangeSet{filtered_insertions, filtered_modifications, filtered_deletions,
-                                               filtered_sections_to_insert, filtered_sections_to_delete});
-                m_section_filter_should_deliver_initial_notification = false;
-            }
-        }
-        else {
-            m_cb(SectionedResultsChangeSet{converted_insertions, converted_modifications, converted_deletions,
-                                           section_changes.first, section_changes.second});
-        }
-
-        REALM_ASSERT(m_sectioned_results.m_results.is_valid());
+        section_initial_changes(c);
         m_prev_row_to_index_path = m_sectioned_results.m_row_to_index_path;
-    }
 
-    std::pair<IndexSet, IndexSet> calculate_sections_to_insert_and_delete() REQUIRES(m_sectioned_results.m_mutex)
-    {
-        IndexSet sections_to_insert, sections_to_remove;
+        // Add source to target[i], expanding target if needed
+        auto add = [](auto& source, auto& target, size_t i) {
+            if (source.empty())
+                return;
+            if (i >= target.size())
+                target.resize(i + 1);
+            target[i].add(source);
+        };
 
-        for (auto& [key, section] : m_sectioned_results.m_sections) {
-            if (m_sectioned_results.m_previous_key_to_index_lookup.find(key) ==
-                m_sectioned_results.m_previous_key_to_index_lookup.end()) {
-                sections_to_insert.add(section.index);
+        // Modifications to rows in the unsectioned results may result in rows
+        // moving between sections, which need to be reported as a delete+insert
+        // instead. We don't have enough information at this point to produce a
+        // correct minimal diff, so we err on the side of producing deletes and
+        // inserts for everything that isn't marked as modified in both the old
+        // and new versions.
+
+        // Looping backwards here ensures that we have to resize the output
+        // arrays at most once, as we encounter the back element that needs to
+        // be present first.
+        for (size_t i = m_change.modifications.size(); i > 0; --i) {
+            auto& indexes_old = m_change.modifications[i - 1];
+            auto key = m_sectioned_results.m_previous_index_to_key[i - 1];
+            auto it = m_sectioned_results.m_current_key_to_index.find(key);
+            if (it == m_sectioned_results.m_current_key_to_index.end()) {
+                // Section was removed due to all of the rows being moved to
+                // other sections. No need to report the individual rows as deleted.
+                indexes_old.clear();
+                continue;
             }
+            size_t old_section = i - 1;
+            size_t new_section = it->second;
+
+            // Extract the intersection of the two sets
+            IndexSet still_present;
+            if (new_section < m_new_modifications.size()) {
+                auto old_indexes = indexes_old.as_indexes();
+                auto new_indexes = m_new_modifications[new_section].as_indexes();
+                std::set_intersection(old_indexes.begin(), old_indexes.end(), new_indexes.begin(), new_indexes.end(),
+                                      IndexSetAdder{&still_present});
+                m_new_modifications[new_section].remove(still_present);
+                m_change.modifications[old_section].remove(still_present);
+            }
+
+            // Anything in old modifications but not new gets added to deletions
+            add(m_change.modifications[old_section], m_change.deletions, old_section);
+
+            // Any positions marked as modified in both the old and new collections
+            // stay marked as modified.
+            m_change.modifications[old_section] = std::move(still_present);
         }
 
-        for (auto& [key, index] : m_sectioned_results.m_previous_key_to_index_lookup) {
-            if (m_sectioned_results.m_sections.find(key) == m_sectioned_results.m_sections.end()) {
-                sections_to_remove.add(index);
-            }
+        // Anything remaining in new_modifications is now an insertion. This is
+        // once again a reverse loop to ensure we only resize once.
+        for (size_t i = m_new_modifications.size(); i > 0; --i)
+            add(m_new_modifications[i - 1], m_change.insertions, i - 1);
+
+        // The modifications array may now be longer than needed. This isn't
+        // strictly needed but makes writing tests awkward.
+        while (!m_change.modifications.empty() && m_change.modifications.back().empty())
+            m_change.modifications.pop_back();
+
+        // If we have a section filter we might have been called when there were
+        // no changes to the section we care about, in which case we should skip
+        // calling the callback unless it's the initial notification
+        if (m_section_filter) {
+            bool no_changes = m_change.insertions.empty() && m_change.deletions.empty() &&
+                              m_change.modifications.empty() && m_change.sections_to_insert.empty() &&
+                              m_change.sections_to_delete.empty();
+            if (m_section_filter_should_deliver_initial_notification)
+                m_section_filter_should_deliver_initial_notification = false;
+            else if (no_changes)
+                return;
         }
 
-        return {sections_to_insert, sections_to_remove};
+        m_cb(m_change);
     }
 
 private:
-    SectionedResultsNotificatonCallback m_cb;
+    SectionedResultsNotificationCallback m_cb;
     SectionedResults& m_sectioned_results;
     std::vector<std::pair<size_t, size_t>> m_prev_row_to_index_path;
+    SectionedResultsChangeSet m_change;
+    std::vector<IndexSet> m_new_modifications;
     // When set change notifications will be filtered to only deliver
-    // change indices refering to the supplied section key.
+    // change indices referring to the supplied section key.
     util::Optional<Mixed> m_section_filter;
     bool m_section_filter_should_deliver_initial_notification = true;
+
+    // Group the changes in the changeset by the section
+    void section_initial_changes(CollectionChangeSet const& c) REQUIRES(m_sectioned_results.m_mutex)
+    {
+        m_change.insertions.clear();
+        m_change.modifications.clear();
+        m_change.deletions.clear();
+        m_change.sections_to_insert.clear();
+        m_change.sections_to_delete.clear();
+        m_new_modifications.clear();
+
+        // If we have a section filter, just check if it was added or removed
+        // and for changes within that specific section
+        if (m_section_filter) {
+            auto get_index = [&](auto& map) -> size_t {
+                if (auto it = map.find(*m_section_filter); it != map.end())
+                    return it->second;
+                return npos;
+            };
+
+            size_t old_index = get_index(m_sectioned_results.m_previous_key_to_index);
+            size_t new_index = get_index(m_sectioned_results.m_current_key_to_index);
+            if (old_index == npos && new_index == npos)
+                return;
+            if (old_index == npos && new_index != npos)
+                m_change.sections_to_insert.add(new_index);
+            else if (old_index != npos && new_index == npos)
+                m_change.sections_to_delete.add(old_index);
+
+            auto populate = [](auto& src, auto& mapping, size_t filter, auto& dst) {
+                for (auto index : src.as_indexes()) {
+                    auto [section, row] = mapping[index];
+                    if (section == filter)
+                        at(dst, section).add(row);
+                }
+            };
+            populate(c.insertions, m_sectioned_results.m_row_to_index_path, new_index, m_change.insertions);
+            populate(c.modifications, m_prev_row_to_index_path, old_index, m_change.modifications);
+            populate(c.modifications_new, m_sectioned_results.m_row_to_index_path, new_index, m_new_modifications);
+
+            // Only report deletions inside the section if it still exists
+            if (new_index != npos) {
+                populate(c.deletions, m_prev_row_to_index_path, old_index, m_change.deletions);
+            }
+            return;
+        }
+
+        // Symmetrical diff of new and old sections
+        for (auto& section : m_sectioned_results.m_sections) {
+            if (!m_sectioned_results.m_previous_key_to_index.count(section.key)) {
+                m_change.sections_to_insert.add(section.index);
+            }
+        }
+        for (auto& [key, index] : m_sectioned_results.m_previous_key_to_index) {
+            if (!m_sectioned_results.m_current_key_to_index.count(key)) {
+                m_change.sections_to_delete.add(index);
+            }
+        }
+
+        // Group the change indexes by section
+        for (auto index : c.insertions.as_indexes()) {
+            auto [section, row] = m_sectioned_results.m_row_to_index_path[index];
+            at(m_change.insertions, section).add(row);
+        }
+        for (auto index : c.modifications.as_indexes()) {
+            auto [section, row] = m_prev_row_to_index_path[index];
+            at(m_change.modifications, section).add(row);
+        }
+        for (auto index : c.modifications_new.as_indexes()) {
+            auto [section, row] = m_sectioned_results.m_row_to_index_path[index];
+            at(m_new_modifications, section).add(row);
+        }
+        for (auto index : c.deletions.as_indexes()) {
+            auto [section, row] = m_prev_row_to_index_path[index];
+            // If the section has been deleted that's the only information we
+            // need and we can skip reporting the rows inside the section
+            if (!m_change.sections_to_delete.contains(section))
+                at(m_change.deletions, section).add(row);
+        }
+    }
 };
 
+namespace {
 template <typename StringType>
 void create_buffered_key(Mixed& key, std::unique_ptr<char[]>& buffer, StringType value)
 {
@@ -227,25 +283,38 @@ void create_buffered_key(Mixed& key, std::unique_ptr<char[]>& buffer, StringType
     }
 }
 
-ResultsSection::ResultsSection()
-    : m_parent(nullptr)
-    , m_key(Mixed())
+template <typename StringType>
+void create_buffered_key(Mixed& key, std::list<std::string>& buffer, StringType value)
 {
+    if (value.size() == 0) {
+        key = StringType("", 0);
+    }
+    else {
+        key = buffer.emplace_back(value.data(), value.size());
+    }
 }
+
+template <typename Buffer>
+void create_buffered_key(Mixed& key, Buffer& buffer)
+{
+    if (key.is_null())
+        return;
+    if (key.is_type(type_String))
+        create_buffered_key(key, buffer, key.get_string());
+    else if (key.is_type(type_Binary))
+        create_buffered_key(key, buffer, key.get_binary());
+}
+
+} // anonymous namespace
 
 ResultsSection::ResultsSection(SectionedResults* parent, Mixed key)
     : m_parent(parent)
+    , m_key(key)
 {
     // Give the ResultsSection its own copy of the string data
     // to counter the event that the m_previous_str_buffers, m_current_str_buffers
     // no longer hold a reference to the data.
-    if (key.is_type(type_String, type_Binary)) {
-        key.is_type(type_String) ? create_buffered_key(m_key, m_key_buffer, key.get_string())
-                                 : create_buffered_key(m_key, m_key_buffer, key.get_binary());
-    }
-    else {
-        m_key = key;
-    }
+    create_buffered_key(m_key, m_key_buffer);
 }
 
 bool ResultsSection::is_valid() const
@@ -261,11 +330,10 @@ Section* ResultsSection::get_if_valid() const
     // See if we need to recalculate the sections before
     // searching for the key.
     m_parent->calculate_sections_if_required();
-    auto it = m_parent->m_sections.find(m_key);
-    if (it == m_parent->m_sections.end())
+    auto it = m_parent->m_current_key_to_index.find(m_key);
+    if (it == m_parent->m_current_key_to_index.end())
         return nullptr;
-    else
-        return &it->second;
+    return &m_parent->m_sections[it->second];
 }
 
 Section* ResultsSection::get_section() const
@@ -281,7 +349,7 @@ Mixed ResultsSection::operator[](size_t idx) const
     Section* section = get_section();
     auto size = section->indices.size();
     if (idx >= size)
-        throw OutOfBounds(util::format("ResultsSection[]"), idx, size);
+        throw OutOfBounds("ResultsSection[]", idx, size);
     return m_parent->m_results.get_any(section->indices[idx]);
 }
 
@@ -302,7 +370,7 @@ size_t ResultsSection::size()
     return get_section()->indices.size();
 }
 
-NotificationToken ResultsSection::add_notification_callback(SectionedResultsNotificatonCallback callback,
+NotificationToken ResultsSection::add_notification_callback(SectionedResultsNotificationCallback&& callback,
                                                             std::optional<KeyPathArray> key_path_array) &
 {
     return m_parent->add_notification_callback_for_section(m_key, std::move(callback), key_path_array);
@@ -314,8 +382,7 @@ SectionedResults::SectionedResults(Results results, SectionKeyFunc section_key_f
 {
 }
 
-SectionedResults::SectionedResults(Results results, Results::SectionedResultsOperator op,
-                                   util::Optional<StringData> prop_name)
+SectionedResults::SectionedResults(Results results, Results::SectionedResultsOperator op, StringData prop_name)
     : m_results(results)
     , m_callback(builtin_comparison(results, op, prop_name))
 {
@@ -325,7 +392,7 @@ void SectionedResults::calculate_sections_if_required()
 {
     if (m_results.m_update_policy == Results::UpdatePolicy::Never)
         return;
-    if ((m_results.is_frozen() || !m_results.has_changed()) && m_has_performed_initial_evalutation)
+    if ((m_results.is_frozen() || !m_results.has_changed()) && m_has_performed_initial_evaluation)
         return;
 
     {
@@ -336,17 +403,6 @@ void SectionedResults::calculate_sections_if_required()
     calculate_sections();
 }
 
-template <typename StringType>
-void create_buffered_key(Mixed& key, std::list<std::string>& buffer, StringType value)
-{
-    if (value.size() == 0) {
-        key = StringType("", 0);
-    }
-    else {
-        key = buffer.emplace_back(value.data(), value.size());
-    }
-}
-
 // This method will run in the following scenarios:
 // - SectionedResults is performing its initial evaluation.
 // - The underlying Table in the Results collection has changed
@@ -354,12 +410,11 @@ void SectionedResults::calculate_sections()
 {
     m_previous_str_buffers.clear();
     m_previous_str_buffers.swap(m_current_str_buffers);
-    m_previous_key_to_index_lookup.clear();
-    m_prev_section_index_to_key.clear();
-    m_current_section_index_to_key_lookup.clear();
-    for (auto& [key, section] : m_sections) {
-        m_previous_key_to_index_lookup[key] = section.index;
-        m_prev_section_index_to_key[section.index] = section.key;
+    m_previous_key_to_index.clear();
+    m_previous_key_to_index.swap(m_current_key_to_index);
+    m_previous_index_to_key.clear();
+    for (auto& section : m_sections) {
+        m_previous_index_to_key.push_back(section.key);
     }
 
     m_sections.clear();
@@ -375,37 +430,29 @@ void SectionedResults::calculate_sections()
             throw InvalidArgument("Links are not supported as section keys.");
         }
 
-        auto it = m_sections.find(key);
-        if (it == m_sections.end()) {
-            if (!key.is_null() && key.is_type(type_String, type_Binary)) {
-                (key.get_type() == type_String) ? create_buffered_key(key, m_current_str_buffers, key.get_string())
-                                                : create_buffered_key(key, m_current_str_buffers, key.get_binary());
-            }
-
+        auto it = m_current_key_to_index.find(key);
+        if (it == m_current_key_to_index.end()) {
+            create_buffered_key(key, m_current_str_buffers);
             auto idx = m_sections.size();
-            Section section;
-            section.key = key;
-            section.index = idx;
-            section.indices.push_back(i);
-            m_sections[key] = section;
-            m_row_to_index_path[i] = {idx, section.indices.size() - 1};
-            m_current_section_index_to_key_lookup[idx] = key;
+            m_sections.push_back(Section{idx, key, {i}});
+            m_current_key_to_index[key] = idx;
+            m_row_to_index_path[i] = {idx, 0};
         }
         else {
-            auto& section = it->second;
+            auto& section = m_sections[it->second];
             section.indices.push_back(i);
             m_row_to_index_path[i] = {section.index, section.indices.size() - 1};
         }
     }
-    if (!m_has_performed_initial_evalutation) {
-        REALM_ASSERT_EX(m_previous_key_to_index_lookup.size() == 0, m_previous_key_to_index_lookup.size());
-        REALM_ASSERT_EX(m_prev_section_index_to_key.size() == 0, m_prev_section_index_to_key.size());
-        for (auto& [key, section] : m_sections) {
-            m_previous_key_to_index_lookup[key] = section.index;
-            m_prev_section_index_to_key[section.index] = section.key;
+    if (!m_has_performed_initial_evaluation) {
+        REALM_ASSERT_EX(m_previous_key_to_index.size() == 0, m_previous_key_to_index.size());
+        REALM_ASSERT_EX(m_previous_index_to_key.size() == 0, m_previous_index_to_key.size());
+        m_previous_key_to_index = m_current_key_to_index;
+        for (auto& section : m_sections) {
+            m_previous_index_to_key.push_back(section.key);
         }
     }
-    m_has_performed_initial_evalutation = true;
+    m_has_performed_initial_evaluation = true;
 }
 
 size_t SectionedResults::size()
@@ -422,9 +469,7 @@ ResultsSection SectionedResults::operator[](size_t idx)
     if (idx >= s)
         throw OutOfBounds("SectionedResults[]", idx, s);
     util::CheckedUniqueLock lock(m_mutex);
-    auto it = m_current_section_index_to_key_lookup.find(idx);
-    REALM_ASSERT(it != m_current_section_index_to_key_lookup.end());
-    auto& section = m_sections[it->second];
+    auto& section = m_sections[idx];
     return ResultsSection(this, section.key);
 }
 
@@ -433,14 +478,13 @@ ResultsSection SectionedResults::operator[](Mixed key)
     util::CheckedUniqueLock lock(m_mutex);
     check_valid();
     calculate_sections_if_required();
-    if (auto it = m_sections.find(key); it != m_sections.end()) {
-        return ResultsSection(this, it->second.key);
+    if (!m_current_key_to_index.count(key)) {
+        throw InvalidArgument(util::format("Section key %1 not found.", key));
     }
-
-    throw InvalidArgument(util::format("Section key %1 not found.", key));
+    return ResultsSection(this, key);
 }
 
-NotificationToken SectionedResults::add_notification_callback(SectionedResultsNotificatonCallback callback,
+NotificationToken SectionedResults::add_notification_callback(SectionedResultsNotificationCallback&& callback,
                                                               std::optional<KeyPathArray> key_path_array) &
 {
     return m_results.add_notification_callback(SectionedResultsNotificationHandler(*this, std::move(callback)),
@@ -448,40 +492,29 @@ NotificationToken SectionedResults::add_notification_callback(SectionedResultsNo
 }
 
 NotificationToken SectionedResults::add_notification_callback_for_section(
-    Mixed section_key, SectionedResultsNotificatonCallback callback, std::optional<KeyPathArray> key_path_array)
+    Mixed section_key, SectionedResultsNotificationCallback&& callback, std::optional<KeyPathArray> key_path_array)
 {
     return m_results.add_notification_callback(
         SectionedResultsNotificationHandler(*this, std::move(callback), section_key), std::move(key_path_array));
 }
 
-SectionedResults SectionedResults::copy(Results&& results)
+// Thread-safety analysis doesn't work when creating a different instance of the
+// same type
+SectionedResults SectionedResults::copy(Results&& results) NO_THREAD_SAFETY_ANALYSIS
 {
     util::CheckedUniqueLock lock(m_mutex);
     calculate_sections_if_required();
     // m_callback will never be run when using frozen results so we do
     // not need to set it.
-    std::list<std::string> str_buffers;
-    std::map<Mixed, Section> sections;
-    std::map<size_t, Mixed> current_section_index_to_key_lookup;
-
-    for (auto& [key, section] : m_sections) {
-        Mixed new_key;
-        if (key.is_type(type_String, type_Binary)) {
-            key.is_type(type_String) ? create_buffered_key(new_key, str_buffers, key.get_string())
-                                     : create_buffered_key(new_key, str_buffers, key.get_binary());
-        }
-        else {
-            new_key = key;
-        }
-        Section new_section;
-        new_section.index = section.index;
-        new_section.key = new_key;
-        new_section.indices = section.indices;
-        sections[Mixed(new_key)] = new_section;
-        current_section_index_to_key_lookup[section.index] = new_key;
+    SectionedResults ret;
+    ret.m_has_performed_initial_evaluation = true;
+    ret.m_results = std::move(results);
+    ret.m_sections = m_sections;
+    for (auto& section : ret.m_sections) {
+        create_buffered_key(section.key, ret.m_current_str_buffers);
+        ret.m_current_key_to_index[section.key] = section.index;
     }
-    return SectionedResults(std::move(results), std::move(sections), std::move(current_section_index_to_key_lookup),
-                            std::move(str_buffers));
+    return ret;
 }
 
 SectionedResults SectionedResults::snapshot()
@@ -513,11 +546,11 @@ void SectionedResults::reset_section_callback(SectionKeyFunc section_callback)
 {
     util::CheckedUniqueLock lock(m_mutex);
     m_callback = std::move(section_callback);
-    m_has_performed_initial_evalutation = false;
+    m_has_performed_initial_evaluation = false;
     m_sections.clear();
-    m_current_section_index_to_key_lookup.clear();
+    m_previous_index_to_key.clear();
+    m_current_key_to_index.clear();
+    m_previous_key_to_index.clear();
     m_row_to_index_path.clear();
-    m_previous_key_to_index_lookup.clear();
-    m_prev_section_index_to_key.clear();
 }
 } // namespace realm

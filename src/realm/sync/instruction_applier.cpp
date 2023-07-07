@@ -1300,7 +1300,7 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
         return begin_status;
     }
     if (!obj) {
-        m_applier->bad_transaction_log("%1: No such object: %3 in class '%2'", m_instr_name,
+        m_applier->bad_transaction_log("%1: No such object: '%2' in class '%3'", m_instr_name,
                                        format_pk(m_applier->m_log->get_key(m_path_instr.object)),
                                        get_string(m_path_instr.table));
     }

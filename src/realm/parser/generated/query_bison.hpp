@@ -621,7 +621,7 @@ namespace yy {
     TOK_NOT = 281,                 // "!"
     TOK_GEOBOX = 282,              // "geobox"
     TOK_GEOPOLYGON = 283,          // "geopolygon"
-    TOK_GEOSPHERE = 284,           // "geosphere"
+    TOK_GEOCIRCLE = 284,           // "geocircle"
     TOK_ID = 285,                  // "identifier"
     TOK_STRING = 286,              // "string"
     TOK_BASE64 = 287,              // "base64"
@@ -700,7 +700,7 @@ namespace yy {
         SYM_NOT = 26,                            // "!"
         SYM_GEOBOX = 27,                         // "geobox"
         SYM_GEOPOLYGON = 28,                     // "geopolygon"
-        SYM_GEOSPHERE = 29,                      // "geosphere"
+        SYM_GEOCIRCLE = 29,                      // "geocircle"
         SYM_ID = 30,                             // "identifier"
         SYM_STRING = 31,                         // "string"
         SYM_BASE64 = 32,                         // "base64"
@@ -1467,7 +1467,7 @@ switch (yykind)
       {
 #if !defined _MSC_VER || defined __clang__
         YY_ASSERT (tok == token::TOK_END
-                   || (token::TOK_YYerror <= tok && tok <= token::TOK_GEOSPHERE)
+                   || (token::TOK_YYerror <= tok && tok <= token::TOK_GEOCIRCLE)
                    || tok == 43
                    || tok == 45
                    || tok == 42
@@ -1978,16 +1978,16 @@ switch (yykind)
 #if 201103L <= YY_CPLUSPLUS
       static
       symbol_type
-      make_GEOSPHERE ()
+      make_GEOCIRCLE ()
       {
-        return symbol_type (token::TOK_GEOSPHERE);
+        return symbol_type (token::TOK_GEOCIRCLE);
       }
 #else
       static
       symbol_type
-      make_GEOSPHERE ()
+      make_GEOCIRCLE ()
       {
-        return symbol_type (token::TOK_GEOSPHERE);
+        return symbol_type (token::TOK_GEOCIRCLE);
       }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -2528,7 +2528,7 @@ switch (yykind)
     // YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
     // Performed when YYTABLE does not specify something else to do.  Zero
     // means the default is an error.
-    static const signed char yydefact_[];
+    static const unsigned char yydefact_[];
 
     // YYPGOTO[NTERM-NUM].
     static const short yypgoto_[];

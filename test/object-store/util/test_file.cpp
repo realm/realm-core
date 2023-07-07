@@ -90,10 +90,12 @@ TestFile::~TestFile()
 {
     if (!m_persist) {
         try {
+            util::Logger::get_default_logger()->detail("~TestFile() removing '%1' and '%2'", path, m_temp_dir);
             util::File::try_remove(path);
             util::try_remove_dir_recursive(m_temp_dir);
         }
-        catch (...) {
+        catch (const std::exception& e) {
+            util::Logger::get_default_logger()->warn("~TestFile() cleanup failed for '%1': %2", path, e.what());
             // clean up is best effort, ignored.
         }
     }
@@ -287,16 +289,12 @@ void set_app_config_defaults(app::App::Config& app_config,
 {
     if (!app_config.transport)
         app_config.transport = transport;
-    if (app_config.device_info.platform.empty())
-        app_config.device_info.platform = "Object Store Test Platform";
     if (app_config.device_info.platform_version.empty())
         app_config.device_info.platform_version = "Object Store Test Platform Version";
     if (app_config.device_info.sdk_version.empty())
         app_config.device_info.sdk_version = "SDK Version";
     if (app_config.device_info.sdk.empty())
         app_config.device_info.sdk = "SDK Name";
-    if (app_config.device_info.cpu_arch.empty())
-        app_config.device_info.cpu_arch = "CPU Arch";
     if (app_config.device_info.device_name.empty())
         app_config.device_info.device_name = "Device Name";
     if (app_config.device_info.device_version.empty())
@@ -305,6 +303,8 @@ void set_app_config_defaults(app::App::Config& app_config,
         app_config.device_info.framework_name = "Framework Name";
     if (app_config.device_info.framework_version.empty())
         app_config.device_info.framework_version = "Framework Version";
+    if (app_config.device_info.bundle_id.empty())
+        app_config.device_info.bundle_id = "Bundle Id";
     if (app_config.app_id.empty())
         app_config.app_id = "app_id";
     if (!app_config.local_app_version)
@@ -341,6 +341,10 @@ TestAppSession::TestAppSession(AppSession session,
     sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
     sc_config.reconnect_mode = reconnect_mode;
     sc_config.socket_provider = custom_socket_provider;
+    // With multiplexing enabled, the linger time controls how long a
+    // connection is kept open for reuse. In tests, we want to shut
+    // down sync clients immediately.
+    sc_config.timeouts.connection_linger_time = 0;
 
     m_app = app::App::get_uncached_app(app_config, sc_config);
 

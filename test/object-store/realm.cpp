@@ -844,11 +844,19 @@ TEST_CASE("SharedRealm: schema_subset_mode") {
     SECTION("obtaining a frozen realm with an incompatible schema throws") {
         config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
         auto old_realm = Realm::get_shared_realm(config);
+        {
+            auto tr = db->start_write();
+            auto table = tr->get_table("class_object");
+            table->create_object();
+            tr->commit();
+        }
         old_realm->read_group();
 
         {
             auto tr = db->start_write();
-            tr->add_table("class_object 2")->add_column(type_Int, "value");
+            auto table = tr->add_table("class_object 2");
+            ColKey val_col = table->add_column(type_Int, "value");
+            table->create_object().set(val_col, 1);
             tr->commit();
         }
 
@@ -862,10 +870,46 @@ TEST_CASE("SharedRealm: schema_subset_mode") {
         REQUIRE(old_realm->freeze()->schema().size() == 1);
         REQUIRE(new_realm->freeze()->schema().size() == 2);
         REQUIRE(Realm::get_frozen_realm(config, new_realm->read_transaction_version())->schema().size() == 2);
-        // Fails because the requested version doesn't have the "object 2" table
-        // required by the config
+        // An additive change is allowed, the unknown table is empty
+        REQUIRE(Realm::get_frozen_realm(config, old_realm->read_transaction_version())->schema().size() == 2);
+
+        config.schema = Schema{{"object", {{"value", PropertyType::String}}}}; // int -> string
+        // Fails because the schema has an invalid breaking change
+        REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, new_realm->read_transaction_version()),
+                          InvalidReadOnlySchemaChangeException);
         REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, old_realm->read_transaction_version()),
-                          InvalidExternalSchemaChangeException);
+                          InvalidReadOnlySchemaChangeException);
+        config.schema = Schema{
+            {"object", {{"value", PropertyType::Int}}},
+            {"object 2", {{"value", PropertyType::String}}}, // int -> string
+        };
+        // fails due to invalid change on object 2 type
+        REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, new_realm->read_transaction_version()),
+                          InvalidReadOnlySchemaChangeException);
+        // opening the old state does not fail because the schema is an additive change
+        auto frozen_old = Realm::get_frozen_realm(config, old_realm->read_transaction_version());
+        REQUIRE(frozen_old->schema().size() == 2);
+        {
+            TableRef table = frozen_old->read_group().get_table("class_object");
+            Results results(frozen_old, table);
+            REQUIRE(results.is_frozen());
+            REQUIRE(results.size() == 1);
+        }
+        {
+            TableRef table = frozen_old->read_group().get_table("class_object 2");
+            REQUIRE(!table);
+            Results results(frozen_old, table);
+            REQUIRE(results.is_frozen());
+            REQUIRE(results.size() == 0);
+        }
+        config.schema = Schema{
+            {"object", {{"value", PropertyType::Int}, {"value 2", PropertyType::String}}}, // add property
+        };
+        // fails due to additional property on object
+        REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, old_realm->read_transaction_version()),
+                          InvalidReadOnlySchemaChangeException);
+        REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, new_realm->read_transaction_version()),
+                          InvalidReadOnlySchemaChangeException);
     }
 }
 
@@ -1895,6 +1939,7 @@ TEST_CASE("SharedRealm: async writes") {
                                   "an error");
         REQUIRE(realm->is_closed());
     }
+#endif
     SECTION("exception thrown from async commit completion callback with error handler") {
         Realm::AsyncHandle h;
         realm->set_async_error_handler([&](Realm::AsyncHandle handle, std::exception_ptr error) {
@@ -1912,6 +1957,7 @@ TEST_CASE("SharedRealm: async writes") {
         wait_for_done();
         verify_persisted_count(1);
     }
+#ifndef _WIN32
     SECTION("exception thrown from async commit completion callback without error handler") {
         realm->begin_transaction();
         table->create_object();
@@ -1924,6 +1970,7 @@ TEST_CASE("SharedRealm: async writes") {
                                   "an error");
         REQUIRE(table->size() == 1);
     }
+#endif
 
     if (_impl::SimulatedFailure::is_enabled()) {
         SECTION("error in the synchronous part of async commit") {
@@ -2340,15 +2387,38 @@ TEST_CASE("SharedRealm: async writes") {
         REQUIRE(table->size() == 6);
     }
 
+    SECTION("async writes which would run inside sync writes are deferred") {
+        realm->async_begin_transaction([&] {
+            done = true;
+        });
+
+        // Wait for the background thread to hold the write lock (without letting
+        // the event loop run so that the scheduled task isn't run)
+        DBOptions options;
+        options.encryption_key = config.encryption_key.data();
+        auto db = DB::create(make_in_realm_history(), config.path, options);
+        while (db->start_write(true))
+            millisleep(1);
+
+        realm->begin_transaction();
+
+        // Invoke the pending callback
+        util::EventLoop::main().run_pending();
+        // Should not have run the async write block
+        REQUIRE(done == false);
+
+        // Should run the async write block once the synchronous transaction is done
+        realm->cancel_transaction();
+        REQUIRE(done == false);
+        util::EventLoop::main().run_pending();
+        REQUIRE(done == true);
+    }
+
     util::EventLoop::main().run_until([&] {
         return !realm || !realm->has_pending_async_work();
     });
-#endif
 
-
-#ifdef _WIN32
     _impl::RealmCoordinator::clear_all_caches();
-#endif
 }
 // Our libuv scheduler currently does not support background threads, so we can
 // only run this on apple platforms

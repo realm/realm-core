@@ -2751,8 +2751,7 @@ typedef enum realm_auth_provider {
     RLM_AUTH_PROVIDER_CUSTOM,
     RLM_AUTH_PROVIDER_EMAIL_PASSWORD,
     RLM_AUTH_PROVIDER_FUNCTION,
-    RLM_AUTH_PROVIDER_USER_API_KEY,
-    RLM_AUTH_PROVIDER_SERVER_API_KEY,
+    RLM_AUTH_PROVIDER_API_KEY,
 } realm_auth_provider_e;
 
 typedef struct realm_app_user_apikey {
@@ -2828,8 +2827,7 @@ RLM_API realm_app_credentials_t* realm_app_credentials_new_apple(const char* id_
 RLM_API realm_app_credentials_t* realm_app_credentials_new_jwt(const char* jwt_token) RLM_API_NOEXCEPT;
 RLM_API realm_app_credentials_t* realm_app_credentials_new_email_password(const char* email,
                                                                           realm_string_t password) RLM_API_NOEXCEPT;
-RLM_API realm_app_credentials_t* realm_app_credentials_new_user_api_key(const char* api_key) RLM_API_NOEXCEPT;
-RLM_API realm_app_credentials_t* realm_app_credentials_new_server_api_key(const char* api_key) RLM_API_NOEXCEPT;
+RLM_API realm_app_credentials_t* realm_app_credentials_new_api_key(const char* api_key) RLM_API_NOEXCEPT;
 
 /**
  * Create Custom Function authentication app credentials.
@@ -2855,11 +2853,9 @@ RLM_API void realm_app_config_set_base_url(realm_app_config_t*, const char*) RLM
 RLM_API void realm_app_config_set_local_app_name(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_local_app_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t*, uint64_t ms) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_platform(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_platform_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_sdk_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_sdk(realm_app_config_t* config, const char* sdk) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_cpu_arch(realm_app_config_t* config, const char* cpu_arch) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_device_name(realm_app_config_t* config, const char* device_name) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_device_version(realm_app_config_t* config,
                                                  const char* device_version) RLM_API_NOEXCEPT;
@@ -2867,6 +2863,7 @@ RLM_API void realm_app_config_set_framework_name(realm_app_config_t* config,
                                                  const char* framework_name) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_framework_version(realm_app_config_t* config,
                                                     const char* framework_version) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_bundle_id(realm_app_config_t* config, const char* bundle_id) RLM_API_NOEXCEPT;
 
 /**
  * Get an existing @a realm_app_credentials_t and return it's json representation
@@ -3471,9 +3468,15 @@ typedef struct realm_sync_session_connection_state_notification_token
  *              the object and must release it when used.
  * @param error Null, if the operation complete successfully.
  */
+
+// invoked when the synchronized realm file has been downloaded
 typedef void (*realm_async_open_task_completion_func_t)(realm_userdata_t userdata,
                                                         realm_thread_safe_reference_t* realm,
                                                         const realm_async_error_t* error);
+
+// invoked once the file has been downloaded. Allows the caller to run some initial subscription before the completion
+// callback runs.
+typedef void (*realm_async_open_task_init_subscription_func_t)(realm_t* realm, realm_userdata_t userdata);
 
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_base_file_path(realm_sync_client_config_t*, const char*) RLM_API_NOEXCEPT;
@@ -3536,7 +3539,10 @@ RLM_API void
 realm_sync_config_set_after_client_reset_handler(realm_sync_config_t*, realm_sync_after_client_reset_func_t,
                                                  realm_userdata_t userdata,
                                                  realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
-
+RLM_API void realm_sync_config_set_initial_subscription_handler(realm_sync_config_t*,
+                                                                realm_async_open_task_init_subscription_func_t,
+                                                                bool rerun_on_open, realm_userdata_t userdata,
+                                                                realm_free_userdata_func_t userdata_free);
 /**
  * Fetch subscription id for the subscription passed as argument.
  * @return realm_object_id_t for the subscription passed as argument

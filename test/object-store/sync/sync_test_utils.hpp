@@ -24,6 +24,7 @@
 #include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+#include <realm/object-store/thread_safe_reference.hpp>
 
 #include <realm/util/functional.hpp>
 #include <realm/util/function_ref.hpp>
@@ -155,6 +156,9 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app);
 
 void wait_for_advance(Realm& realm);
 
+void async_open_realm(const Realm::Config& config,
+                      util::UniqueFunction<void(ThreadSafeReference&& ref, std::exception_ptr e)> finish);
+
 #endif // REALM_ENABLE_AUTH_TESTS
 
 #endif // REALM_ENABLE_SYNC
@@ -216,6 +220,9 @@ std::unique_ptr<TestClientReset> make_baas_flx_client_reset(const Realm::Config&
 
 void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const AppSession& app_session,
                                          const std::string& schema_name, const bson::BsonDocument& filter_bson);
+
+void wait_for_num_objects_in_atlas(std::shared_ptr<SyncUser> user, const AppSession& app_session,
+                                   const std::string& schema_name, size_t expected_size);
 
 void trigger_client_reset(const AppSession& app_session);
 void trigger_client_reset(const AppSession& app_session, const SharedRealm& realm);

@@ -23,6 +23,7 @@
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
@@ -235,6 +236,24 @@ void wait_for_advance(Realm& realm)
     realm.m_binding_context = nullptr;
 }
 
+void async_open_realm(const Realm::Config& config,
+                      util::UniqueFunction<void(ThreadSafeReference&& ref, std::exception_ptr e)> finish)
+{
+    std::mutex mutex;
+    bool did_finish = false;
+    auto task = Realm::get_synchronized_realm(config);
+    task->start([&, callback = std::move(finish)](ThreadSafeReference&& ref, std::exception_ptr e) {
+        callback(std::move(ref), e);
+        std::lock_guard lock(mutex);
+        did_finish = true;
+    });
+    util::EventLoop::main().run_until([&] {
+        std::lock_guard lock(mutex);
+        return did_finish;
+    });
+    task->cancel(); // don't run the above notifier again on this session
+}
+
 #endif // REALM_ENABLE_AUTH_TESTS
 #endif // REALM_ENABLE_SYNC
 
@@ -405,6 +424,32 @@ void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const A
                 }
             });
             return pf.future.get() > 0;
+        },
+        std::chrono::minutes(15), std::chrono::milliseconds(500));
+}
+
+void wait_for_num_objects_in_atlas(std::shared_ptr<SyncUser> user, const AppSession& app_session,
+                                   const std::string& schema_name, size_t expected_size)
+{
+    app::MongoClient remote_client = user->mongo_client("BackingDB");
+    app::MongoDatabase db = remote_client.db(app_session.config.mongo_dbname);
+    app::MongoCollection object_coll = db[schema_name];
+
+    const bson::BsonDocument& filter_bson{};
+    timed_sleeping_wait_for(
+        [&]() -> bool {
+            auto pf = util::make_promise_future<uint64_t>();
+            object_coll.count(filter_bson, [promise = std::move(pf.promise)](
+                                               uint64_t count, util::Optional<app::AppError> error) mutable {
+                REQUIRE(!error);
+                if (error) {
+                    promise.set_error({ErrorCodes::RuntimeError, error->reason()});
+                }
+                else {
+                    promise.emplace_value(count);
+                }
+            });
+            return pf.future.get() >= expected_size;
         },
         std::chrono::minutes(15), std::chrono::milliseconds(500));
 }

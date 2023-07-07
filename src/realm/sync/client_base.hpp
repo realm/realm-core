@@ -62,7 +62,7 @@ struct ClientReset {
     realm::ClientResyncMode mode;
     DBRef fresh_copy;
     bool recovery_is_allowed = true;
-    util::UniqueFunction<void(VersionID)> notify_before_client_reset;
+    util::UniqueFunction<VersionID()> notify_before_client_reset;
     util::UniqueFunction<void(VersionID before_version, bool did_recover)> notify_after_client_reset;
 };
 
@@ -324,6 +324,19 @@ struct SessionErrorInfo : public ProtocolErrorInfo {
 };
 
 enum class ConnectionState { disconnected, connecting, connected };
+
+inline std::ostream& operator<<(std::ostream& os, ConnectionState state)
+{
+    switch (state) {
+        case ConnectionState::disconnected:
+            return os << "Disconnected";
+        case ConnectionState::connecting:
+            return os << "Connecting";
+        case ConnectionState::connected:
+            return os << "Connected";
+    }
+    REALM_TERMINATE("Invalid ConnectionState value");
+}
 
 } // namespace realm::sync
 

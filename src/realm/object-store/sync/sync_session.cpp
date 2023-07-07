@@ -26,6 +26,7 @@
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
 #include <realm/db_options.hpp>
 #include <realm/sync/client.hpp>
@@ -577,16 +578,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
             return;
         }
         lock.unlock();
-        if (auto local_subs_store = get_flx_subscription_store()) {
-            // In DiscardLocal mode, only the active subscription set is preserved
-            // this means that we have to remove all other subscriptions including later
-            // versioned ones.
-            auto mut_sub = local_subs_store->get_active().make_mutable_copy();
-            local_subs_store->supercede_all_except(mut_sub);
-            mut_sub.update_state(sync::SubscriptionSet::State::Error,
-                                 util::make_optional<std::string_view>(status.reason()));
-            std::move(mut_sub).commit();
-        }
+
         const bool try_again = false;
         sync::SessionErrorInfo synthetic(
             make_error_code(sync::Client::Error::auto_client_reset_failure),
@@ -763,13 +755,16 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
         }
     }
     else if (error_code.category() == sync::websocket::websocket_error_category()) {
+        using WebSocketError = sync::websocket::WebSocketError;
+        auto websocket_error = static_cast<WebSocketError>(error_code.value());
+
         // The server replies with '401: unauthorized' if the access token is invalid, expired, revoked, or the user
         // is disabled. In this scenario we attempt an automatic token refresh and if that succeeds continue as
         // normal. If the refresh request also fails with 401 then we need to stop retrying and pass along the error;
         // see handle_refresh().
-        bool redirect_occurred = error_code == sync::websocket::WebSocketError::websocket_moved_permanently;
-        if (redirect_occurred || error_code == sync::websocket::WebSocketError::websocket_unauthorized ||
-            error_code == sync::websocket::WebSocketError::websocket_abnormal_closure) {
+        bool redirect_occurred = websocket_error == WebSocketError::websocket_moved_permanently;
+        if (redirect_occurred || websocket_error == WebSocketError::websocket_unauthorized ||
+            websocket_error == WebSocketError::websocket_abnormal_closure) {
             if (auto u = user()) {
                 // If a redirection occurred, the location metadata will be updated before refreshing the access
                 // token.
@@ -780,14 +775,13 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
 
         // If the websocket was closed cleanly or if the socket disappeared, don't notify the user as an error
         // since the sync client will retry.
-        if (error_code == sync::websocket::WebSocketError::websocket_read_error ||
-            error_code == sync::websocket::WebSocketError::websocket_write_error) {
+        if (websocket_error == WebSocketError::websocket_read_error ||
+            websocket_error == WebSocketError::websocket_write_error) {
             return;
         }
 
         // Surface a simplified websocket error to the user.
-        auto simplified_error = sync::websocket::get_simplified_websocket_error(
-            static_cast<sync::websocket::WebSocketError>(error_code.value()));
+        auto simplified_error = sync::websocket::get_simplified_websocket_error(websocket_error);
         std::error_code new_error_code(simplified_error, sync::websocket::websocket_error_category());
         error = sync::SessionErrorInfo(new_error_code, error.message, error.try_again);
     }
@@ -895,11 +889,24 @@ static sync::Session::Config::ClientReset make_client_reset_config(RealmConfig s
                                                           did_recover);
         };
     }
-    if (session_config.sync_config->notify_before_client_reset) {
-        config.notify_before_client_reset = [config = session_config](VersionID version) {
-            config.sync_config->notify_before_client_reset(Realm::get_frozen_realm(config, version));
-        };
-    }
+    config.notify_before_client_reset = [config = session_config]() -> VersionID {
+        auto coordinator = RealmCoordinator::get_coordinator(config);
+        // Opening the Realm live here may make a write if the schema is different
+        // than what exists on disk. It is necessary to pass a fully usable Realm
+        // to the user here. Note that the schema changes made here will be considered
+        // an "offline write" to be recovered if this is recovery mode.
+        auto no_notifier = util::Scheduler::make_dummy();
+        auto realm_updated = coordinator->get_realm(no_notifier);
+        auto frozen = realm_updated->freeze(); // throws
+        REALM_ASSERT_EX(frozen, config.path);
+        REALM_ASSERT(frozen->is_frozen());
+        util::Optional<VersionID> version = frozen->current_transaction_version();
+        REALM_ASSERT(version);
+        if (config.sync_config->notify_before_client_reset) {
+            config.sync_config->notify_before_client_reset(frozen);
+        }
+        return *version;
+    };
 
     return config;
 }

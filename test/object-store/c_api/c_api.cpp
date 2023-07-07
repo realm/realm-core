@@ -288,8 +288,9 @@ class CApiUnitTestTransport : public app::GenericNetworkTransport {
     std::string m_provider_type;
 
 public:
-    CApiUnitTestTransport(const std::string& provider_type = "anon-user")
-        : m_provider_type(provider_type)
+    CApiUnitTestTransport(const std::string& provider_type = {}, uint64_t request_timeout = 60000)
+        : m_provider_type(provider_type.empty() ? "anon-user" : provider_type)
+        , request_timeout(request_timeout)
     {
         profile_0 = nlohmann::json({{"name", "profile_0_name"},
                                     {"first_name", "profile_0_first_name"},
@@ -300,6 +301,11 @@ public:
                                     {"birthday", "profile_0_birthday"},
                                     {"min_age", "profile_0_min_age"},
                                     {"max_age", "profile_0_max_age"}});
+    }
+
+    explicit CApiUnitTestTransport(const uint64_t request_timeout)
+        : CApiUnitTestTransport({}, request_timeout)
+    {
     }
 
     void set_provider_type(const std::string& provider_type)
@@ -316,6 +322,7 @@ public:
     const std::string identity_0_id = "eflkjf393flkj33fjf3";
     const std::string identity_1_id = "aewfjklewfwoifejjef";
     nlohmann::json profile_0;
+    uint64_t request_timeout;
 
 
 private:
@@ -343,18 +350,19 @@ private:
               nlohmann::json({{"device",
                                {{"appId", "app_id_123"},
                                 {"appVersion", "some_app_version"},
-                                {"platform", "some_platform_name"},
+                                {"platform", util::get_library_platform()},
                                 {"platformVersion", "some_platform_version"},
                                 {"sdk", "some_sdk_name"},
                                 {"sdkVersion", "some_sdk_version"},
-                                {"cpuArch", "some_cpu_arch"},
+                                {"cpuArch", util::get_library_cpu_arch()},
                                 {"deviceName", "some_device_name"},
                                 {"deviceVersion", "some_device_version"},
                                 {"frameworkName", "some_framework_name"},
                                 {"frameworkVersion", "some_framework_version"},
-                                {"coreVersion", REALM_VERSION_STRING}}}}));
+                                {"coreVersion", REALM_VERSION_STRING},
+                                {"bundleId", "some_bundle_id"}}}}));
 
-        CHECK(request.timeout_ms == 60000);
+        CHECK(request.timeout_ms == request_timeout);
 
         std::string response = nlohmann::json({{"access_token", access_token},
                                                {"refresh_token", access_token},
@@ -613,7 +621,9 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
 #if REALM_ENABLE_AUTH_TESTS
     SECTION("realm_app_config_t") {
-        std::shared_ptr<app::GenericNetworkTransport> transport = std::make_shared<CApiUnitTestTransport>();
+        const uint64_t request_timeout = 2500;
+        std::shared_ptr<app::GenericNetworkTransport> transport =
+            std::make_shared<CApiUnitTestTransport>(request_timeout);
         auto http_transport = realm_http_transport(transport);
         auto app_config = cptr(realm_app_config_new("app_id_123", &http_transport));
         CHECK(app_config.get() != nullptr);
@@ -629,11 +639,8 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_app_config_set_local_app_version(app_config.get(), "some_app_version");
         CHECK(app_config->local_app_version == "some_app_version");
 
-        realm_app_config_set_default_request_timeout(app_config.get(), 2500);
-        CHECK(app_config->default_request_timeout_ms == 2500);
-
-        realm_app_config_set_platform(app_config.get(), "some_platform_name");
-        CHECK(app_config->device_info.platform == "some_platform_name");
+        realm_app_config_set_default_request_timeout(app_config.get(), request_timeout);
+        CHECK(app_config->default_request_timeout_ms == request_timeout);
 
         realm_app_config_set_platform_version(app_config.get(), "some_platform_version");
         CHECK(app_config->device_info.platform_version == "some_platform_version");
@@ -643,9 +650,6 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
         realm_app_config_set_sdk(app_config.get(), "some_sdk_name");
         CHECK(app_config->device_info.sdk == "some_sdk_name");
-
-        realm_app_config_set_cpu_arch(app_config.get(), "some_cpu_arch");
-        CHECK(app_config->device_info.cpu_arch == "some_cpu_arch");
 
         realm_app_config_set_device_name(app_config.get(), "some_device_name");
         CHECK(app_config->device_info.device_name == "some_device_name");
@@ -658,6 +662,9 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
         realm_app_config_set_framework_version(app_config.get(), "some_framework_version");
         CHECK(app_config->device_info.framework_version == "some_framework_version");
+
+        realm_app_config_set_bundle_id(app_config.get(), "some_bundle_id");
+        CHECK(app_config->device_info.bundle_id == "some_bundle_id");
 
         auto test_app = std::make_shared<app::App>(*app_config);
         auto credentials = app::AppCredentials::anonymous();
@@ -2366,6 +2373,72 @@ TEST_CASE("C API", "[c_api]") {
                 CHECK_ERR_CAT(RLM_ERR_INDEX_OUT_OF_BOUNDS, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
             }
 
+            SECTION("string in list") {
+                char foo[] = "foo";
+                realm_value_t str = rlm_str_val(foo);
+                realm_value_t list_arg[2] = {str, rlm_str_val("bar")};
+
+                write([&]() {
+                    CHECK(realm_set_value(obj1.get(), foo_properties["string"], rlm_str_val("foo"), false));
+                });
+
+                static const size_t num_args = 1;
+                realm_query_arg_t args[num_args] = {realm_query_arg_t{1, false, &str}};
+                realm_query_arg_t* arg_list_simple = &args[0];
+
+                realm_query_arg_t args_in_list[num_args] = {realm_query_arg_t{2, true, &list_arg[0]}};
+                realm_query_arg_t* arg_list = &args_in_list[0];
+
+                auto q_string_single_param =
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "string == $0", num_args, arg_list_simple));
+                auto q_string_in_list =
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "string IN $0", num_args, arg_list));
+
+                // changing the value for one of the parameters passed should not change the result of the query.
+                // essentially we must assure that core is copying all the arguments passed inside the list (like for
+                // normal query arguments), and after realm_query_parse completes any modification of the memory that
+                // was used to store the parameter does not impact in any way core.
+                char* s = foo;
+                s[0] = 'a';
+                size_t count, count_list;
+
+                CHECK(checked(realm_query_count(q_string_single_param.get(), &count)));
+                CHECK(1 == count);
+                CHECK(checked(realm_query_count(q_string_in_list.get(), &count_list)));
+                CHECK(1 == count_list);
+            }
+
+            SECTION("link in list") {
+                auto link = rlm_link_val(class_bar.key, realm_object_get_key(obj2.get()));
+                realm_value_t link_value = link;
+                write([&]() {
+                    CHECK(realm_set_value(obj1.get(), foo_properties["link"], link_value, false));
+                });
+
+                static const size_t num_args = 1;
+                realm_query_arg_t args[num_args] = {realm_query_arg_t{1, false, &link_value}};
+                realm_query_arg_t* arg = &args[0];
+
+                realm_value_t list_arg[num_args] = {link_value};
+                realm_query_arg_t args_in_list[num_args] = {realm_query_arg_t{num_args, true, &list_arg[0]}};
+                realm_query_arg_t* arg_list = &args_in_list[0];
+
+                auto q_link_single_param =
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "link == $0", num_args, arg));
+                auto q_link_in_list =
+                    cptr_checked(realm_query_parse(realm, class_foo.key, "link IN $0", num_args, arg_list));
+
+                size_t count, count_list;
+
+                // change the link
+                link = rlm_null();
+
+                CHECK(checked(realm_query_count(q_link_single_param.get(), &count)));
+                CHECK(1 == count);
+                CHECK(checked(realm_query_count(q_link_in_list.get(), &count_list)));
+                CHECK(1 == count_list);
+            }
+
             SECTION("decimal NaN") {
                 realm_value_t decimal = rlm_decimal_nan();
 
@@ -2627,10 +2700,17 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(value.type == RLM_TYPE_LINK);
                     CHECK(value.link.target_table == class_foo.key);
                     CHECK(value.link.target == realm_object_get_key(obj1.get()));
-                    CHECK(!realm_results_get(r.get(), 1, &value));
-                    CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
                     size_t index = -1;
                     bool found = false;
+                    CHECK(realm_results_find(r.get(), &value, &index, &found));
+                    CHECK(index == 0);
+                    CHECK(found == true);
+
+                    value = rlm_null();
+                    CHECK(!realm_results_get(r.get(), 1, &value));
+                    CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
+                    index = -1;
+                    found = false;
                     CHECK(realm_results_find(r.get(), &value, &index, &found));
                     CHECK(index == realm::not_found);
                     CHECK(found == false);
@@ -5006,6 +5086,11 @@ static void task_completion_func(void* p, realm_thread_safe_reference_t* realm,
     userdata_p->called = true;
 }
 
+static void task_init_subscription(realm_t* realm, void*)
+{
+    REQUIRE(realm);
+}
+
 static void sync_error_handler(void* p, realm_sync_session_t*, const realm_sync_error_t error)
 {
     auto userdata_p = static_cast<Userdata*>(p);
@@ -5030,12 +5115,14 @@ TEST_CASE("C API - async_open", "[c_api][sync]") {
         config->schema = Schema{object_schema};
         realm_user user(init_sync_manager.app()->current_user());
         realm_sync_config_t* sync_config = realm_sync_config_new(&user, "default");
+        realm_sync_config_set_initial_subscription_handler(sync_config, task_init_subscription, false, nullptr,
+                                                           nullptr);
         realm_config_set_path(config, test_config.path.c_str());
         realm_config_set_sync_config(config, sync_config);
         realm_config_set_schema_version(config, 1);
-        Userdata userdata;
         realm_async_open_task_t* task = realm_open_synchronized(config);
         REQUIRE(task);
+        Userdata userdata;
         realm_async_open_task_start(task, task_completion_func, &userdata, nullptr);
         util::EventLoop::main().run_until([&] {
             return userdata.called.load();
@@ -5069,6 +5156,8 @@ TEST_CASE("C API - async_open", "[c_api][sync]") {
         config->schema = Schema{object_schema};
         realm_user user(init_sync_manager.app()->current_user());
         realm_sync_config_t* sync_config = realm_sync_config_new(&user, "realm");
+        realm_sync_config_set_initial_subscription_handler(sync_config, task_init_subscription, false, nullptr,
+                                                           nullptr);
         sync_config->user->update_refresh_token(std::string(invalid_token));
         sync_config->user->update_access_token(std::move(invalid_token));
 
@@ -5618,6 +5707,7 @@ TEST_CASE("app: flx-sync compensating writes C API support", "[c_api][flx][sync]
     FLXSyncTestHarness harness("c_api_comp_writes");
     create_user_and_log_in(harness.app());
     SyncTestFile test_config(harness.app()->current_user(), harness.schema(), realm::SyncConfig::FLXSyncEnabled{});
+    test_config.sync_config = std::make_shared<realm_sync_config_t>(*test_config.sync_config);
     realm_sync_config_t* sync_config = static_cast<realm_sync_config_t*>(test_config.sync_config.get());
 
     struct TestState {

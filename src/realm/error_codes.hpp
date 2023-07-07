@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <type_traits>
 #include <string>
 #include <vector>

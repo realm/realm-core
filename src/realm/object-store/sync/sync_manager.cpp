@@ -192,7 +192,7 @@ bool SyncManager::run_file_action(SyncFileActionMetadata& md)
                 // We successfully copied the Realm file to the recovery directory.
                 bool did_remove = m_file_manager->remove_realm(original_name);
                 // if the copy succeeded but not the delete, then running BackupThenDelete
-                // a second time would fail, so change this action to just delete the originall file.
+                // a second time would fail, so change this action to just delete the original file.
                 if (did_remove) {
                     return true;
                 }
@@ -245,6 +245,12 @@ void SyncManager::reset_for_testing()
         }
         // Callers of `SyncManager::reset_for_testing` should ensure there are no existing sessions
         // prior to calling `reset_for_testing`.
+        if (!no_sessions) {
+            util::CheckedLockGuard lock(m_mutex);
+            for (auto session : m_sessions) {
+                m_logger_ptr->error("open session at path '%1'", session.first);
+            }
+        }
         REALM_ASSERT_RELEASE(no_sessions);
 
         // Destroy any inactive sessions.

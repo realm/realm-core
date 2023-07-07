@@ -321,7 +321,18 @@ ThreadSafeReference RealmCoordinator::get_unbound_realm()
 void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>& realm,
                                     util::Optional<VersionID> version, util::CheckedUniqueLock& realm_lock)
 {
-    open_db();
+    const auto db_opened_first_time = open_db();
+#ifdef REALM_ENABLE_SYNC
+    SyncConfig::SubscriptionInitializerCallback subscription_function = nullptr;
+    bool rerun_on_open = false;
+    if (config.sync_config && config.sync_config->flx_sync_requested &&
+        config.sync_config->subscription_initializer) {
+        subscription_function = std::move(config.sync_config->subscription_initializer);
+        rerun_on_open = config.sync_config->rerun_init_subscription_on_open;
+    }
+#else
+    static_cast<void>(db_opened_first_time);
+#endif
 
     auto schema = std::move(config.schema);
     auto migration_function = std::move(config.migration_function);
@@ -360,6 +371,19 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
         realm->update_schema(std::move(*schema), config.schema_version, std::move(migration_function),
                              std::move(initialization_function));
     }
+
+#ifdef REALM_ENABLE_SYNC
+    // run subscription initializer if the SDK has instructed core to do so. The subscription callback will be run if:
+    // 1. this is the first time we are creating the realm file
+    // 2. the database was already created, but this is the first time we are opening the db and the flag
+    // rerun_on_open was set
+    if (subscription_function) {
+        const auto current_subscription = realm->get_latest_subscription_set();
+        if ((current_subscription.version() == 0) || (rerun_on_open && db_opened_first_time)) {
+            subscription_function(realm);
+        }
+    }
+#endif
 }
 
 void RealmCoordinator::bind_to_context(Realm& realm)
@@ -383,16 +407,16 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
 
     util::CheckedLockGuard lock(m_realm_mutex);
     set_config(config);
-    open_db();
-    return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session);
+    const auto db_open_first_time = open_db();
+    return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session, db_open_first_time);
 }
 
 #endif
 
-void RealmCoordinator::open_db()
+bool RealmCoordinator::open_db()
 {
     if (m_db)
-        return;
+        return false;
 
 #if REALM_ENABLE_SYNC
     if (m_config.sync_config) {
@@ -403,7 +427,7 @@ void RealmCoordinator::open_db()
         if (m_sync_session) {
             m_db = SyncSession::Internal::get_db(*m_sync_session);
             init_external_helpers();
-            return;
+            return false;
         }
     }
 #endif
@@ -414,7 +438,7 @@ void RealmCoordinator::open_db()
     try {
         if (m_config.immutable() && m_config.realm_data) {
             m_db = DB::create(m_config.realm_data, false);
-            return;
+            return true;
         }
         std::unique_ptr<Replication> history;
         if (server_synchronization_mode) {
@@ -448,7 +472,7 @@ void RealmCoordinator::open_db()
             // Force the DB to be created in memory-only mode, ignoring the filesystem path supplied in the config.
             // This is so we can run an SDK on top without having to solve the browser persistence problem yet,
             // or teach RealmConfig and SDKs about pure in-memory realms.
-            m_db = DB::create(std::move(history), options);
+            m_db = DB::create_in_memory(std::move(history), m_config.path, options);
 #else
             if (m_config.path.size()) {
                 m_db = DB::create(std::move(history), m_config.path, options);
@@ -489,6 +513,7 @@ void RealmCoordinator::open_db()
     }
 
     init_external_helpers();
+    return true;
 }
 
 void RealmCoordinator::init_external_helpers()
@@ -644,24 +669,26 @@ void RealmCoordinator::unregister_realm(Realm* realm)
     }
 }
 
-// Thread-safety analsys doesn't reasonably handle calling functions on different
+// Thread-safety analysis doesn't reasonably handle calling functions on different
 // instances of this type
 void RealmCoordinator::clear_cache() NO_THREAD_SAFETY_ANALYSIS
 {
-    std::vector<std::shared_ptr<Realm>> realms_to_close;
     std::vector<std::shared_ptr<RealmCoordinator>> coordinators;
     {
         std::lock_guard<std::mutex> lock(s_coordinator_mutex);
-
         for (auto& weak_coordinator : s_coordinators_per_path) {
-            auto coordinator = weak_coordinator.second.lock();
-            if (!coordinator) {
-                continue;
+            if (auto coordinator = weak_coordinator.second.lock()) {
+                coordinators.push_back(coordinator);
             }
-            coordinators.push_back(coordinator);
+        }
+        s_coordinators_per_path.clear();
+    }
 
-            coordinator->m_notifier = nullptr;
+    for (auto& coordinator : coordinators) {
+        coordinator->m_notifier = nullptr;
 
+        std::vector<std::shared_ptr<Realm>> realms_to_close;
+        {
             // Gather a list of all of the realms which will be removed
             util::CheckedLockGuard lock(coordinator->m_realm_mutex);
             for (auto& weak_realm_notifier : coordinator->m_weak_realm_notifiers) {
@@ -671,14 +698,11 @@ void RealmCoordinator::clear_cache() NO_THREAD_SAFETY_ANALYSIS
             }
         }
 
-        s_coordinators_per_path.clear();
+        // Close all of the previously cached Realms. This can't be done while
+        // locks are held as it may try to re-lock them.
+        for (auto& realm : realms_to_close)
+            realm->close();
     }
-    coordinators.clear();
-
-    // Close all of the previously cached Realms. This can't be done while
-    // s_coordinator_mutex is held as it may try to re-lock it.
-    for (auto& realm : realms_to_close)
-        realm->close();
 }
 
 void RealmCoordinator::clear_all_caches()

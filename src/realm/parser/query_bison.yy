@@ -101,7 +101,7 @@ using namespace realm::query_parser;
   NOT     "!"
   GEOBOX        "geobox"
   GEOPOLYGON    "geopolygon"
-  GEOSPHERE     "geosphere"
+  GEOCIRCLE     "geocircle"
 ;
 
 %token <std::string> ID "identifier"
@@ -251,6 +251,7 @@ subquery
 coordinate
     : FLOAT         { $$ = strtod($1.c_str(), nullptr); }
     | NATURAL0      { $$ = double(strtoll($1.c_str(), nullptr, 0)); }
+    | ARG           { $$ = drv.get_arg_for_coordinate($1); }
 
 geopoint
     : '[' coordinate ',' coordinate ']' { $$ = GeoPoint{$2, $4}; }
@@ -268,7 +269,7 @@ geopoly_content
 
 geospatial
     : GEOBOX '(' geopoint ',' geopoint ')'  { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Box{}, *$3, *$5); }
-    | GEOSPHERE '(' geopoint ',' coordinate ')' { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Sphere{}, *$3, $5); }
+    | GEOCIRCLE '(' geopoint ',' coordinate ')' { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Circle{}, *$3, $5); }
     | GEOPOLYGON '(' geopoly_content ')'    { $$ = $3; }
 
 post_query
