@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Update list of server app errors and fix assertion failure if unknown app error string is received. (PR [#????](https://github.com/realm/realm-core/pull/????))
 
 ----------------------------------------------
 
