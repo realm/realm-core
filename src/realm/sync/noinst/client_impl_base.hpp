@@ -118,7 +118,7 @@ struct ErrorBackoffState {
             cur_delay_interval = delay_info.resumption_delay_interval;
             return jitter_value(*cur_delay_interval);
         }
-        if (*cur_delay_interval >= delay_info.max_resumption_delay_interval) {
+        if (*cur_delay_interval == delay_info.max_resumption_delay_interval) {
             return jitter_value(delay_info.max_resumption_delay_interval);
         }
         auto safe_delay_interval = cur_delay_interval->count();
@@ -127,9 +127,9 @@ struct ErrorBackoffState {
             *cur_delay_interval = delay_info.max_resumption_delay_interval;
         }
         else {
-            *cur_delay_interval = std::chrono::milliseconds(safe_delay_interval);
+            *cur_delay_interval =
+                std::min(delay_info.max_resumption_delay_interval, std::chrono::milliseconds(safe_delay_interval));
         }
-
         return jitter_value(*cur_delay_interval);
     }
 
