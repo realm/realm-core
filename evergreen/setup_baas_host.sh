@@ -57,6 +57,62 @@ source "${BAAS_HOST_VARS}"
 # Github SSH host key updated 06/26/2023
 echo "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=" | tee -a /home/ubuntu/.ssh/known_hosts
 
+DATA_DIR=/data
+DATA_TEMP_DIR="${DATA_DIR}/tmp"
+BAAS_REMOTE_DIR="${DATA_DIR}/baas-remote"
+BAAS_WORK_DIR="${BAAS_REMOTE_DIR}/baas-work-dir"
+
+function setup_data_dir()
+{
+    data_device=
+
+    # Find /data ebs device to be mounted
+    devices=$(sudo lsblk | grep disk| awk '{print $1}')
+    for device in ${devices}; do
+        is_data=$(sudo file -s "/dev/${device}" | awk '{print $2}')
+        if [ "${is_data}" == "data" ]; then
+            data_device="/dev/${device}"
+        fi
+    done
+
+    # If a data device was discovered, set up the device
+    if [[ -n "${data_device}" ]]; then
+        sudo umount /mnt || true
+        sudo umount "${data_device}" || true
+        sudo /sbin/mkfs.xfs -f "${data_device}"
+        sudo mkdir -p "${DATA_DIR}"
+        # get uuid of data device
+        data_uuid=$(sudo blkid | grep "${data_device}" | awk '{print $2}')
+        echo "Found data device: ${data_device}(${data_uuid})"
+        echo "${data_uuid} ${DATA_DIR} auto noatime 0 0" | sudo tee -a /etc/fstab
+        sudo mount "${DATA_DIR}"
+        echo "Successfully mounted ${data_device} to ${DATA_DIR}"
+    else
+        # Otherwise, create a local /data dir
+        sudo mkdir -p "${DATA_DIR}"
+    fi
+
+    sudo chmod 777 "${DATA_DIR}"
+
+    # Delete /data/baas-remote/ dir if is already exists
+    [[ -d "${BAAS_REMOTE_DIR}" ]] && sudo rm -rf "${BAAS_REMOTE_DIR}"
+
+    # Create the baseline baas remote directories and set perms
+    DIR_PERMS="$(id -u):$(id -g)"
+    echo "Creating and setting ${BAAS_REMOTE_DIR} to '${DIR_PERMS}'"
+    mkdir -p "${BAAS_REMOTE_DIR}"
+    chown -R "${DIR_PERMS}" "${BAAS_REMOTE_DIR}"
+    chmod -R 755 "${BAAS_REMOTE_DIR}"
+    mkdir -p "${BAAS_WORK_DIR}"
+    chmod -R 755 "${BAAS_WORK_DIR}"
+
+    # Set up the temp directory
+    mkdir -p "${DATA_TEMP_DIR}"
+    chmod 1777 "${DATA_TEMP_DIR}"
+    echo "original TMP=${TMPDIR}"
+    export TMPDIR="${DATA_TEMP_DIR}"
+}
+
 # Wait until after the BAAS_HOST_VARS file is loaded to enable verbose tracing
 if [[ -n "${VERBOSE}" ]]; then
     set -o verbose
@@ -65,22 +121,9 @@ fi
 
 sudo chmod 600 "${HOME}/.ssh"/*
 
-DATA_DIR=/data/baas_remote
-BAAS_WORK_DIR="${DATA_DIR}/baas-work-dir"
+setup_data_dir
 
-# Delete data dir if is already exists
-[[ -d "${DATA_DIR}" ]] && sudo rm -rf "${DATA_DIR}"
-
-# Create the data and baas work directories
-sudo mkdir -p "${DATA_DIR}"
-DIR_PERMS="$(id -u):$(id -g)"
-echo "Setting ${DATA_DIR} to '${DIR_PERMS}'"
-sudo chown -R "${DIR_PERMS}" "${DATA_DIR}"
-sudo chmod -R 755 "${DATA_DIR}"
-mkdir -p "${BAAS_WORK_DIR}"
-chmod -R 755 "${BAAS_WORK_DIR}"
-
-pushd "${DATA_DIR}" > /dev/null
+pushd "${BAAS_REMOTE_DIR}" > /dev/null
 git clone git@github.com:realm/realm-core.git realm-core
 pushd realm-core > /dev/null
 
@@ -98,4 +141,4 @@ fi
 ./evergreen/install_baas.sh "${VERBOSE}" -w "${BAAS_WORK_DIR}" "${OPT_BAAS_BRANCH[@]}" 2>&1
 
 popd > /dev/null  # realm-core
-popd > /dev/null  # data
+popd > /dev/null  # /data/baas-remote
