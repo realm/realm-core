@@ -279,10 +279,13 @@ functions:
         ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i .baas_ssh_key"
 
         # Copy the baas_server.log and mongod.log files from the remote baas host
-        mkdir -p ./baas-work-dir/
-        mkdir -p ./baas-work-dir/mongodb-dbpath/
-        scp $ssh_options $ssh_user:/data/baas_remote/baas-work-dir/baas_server.log ./baas-work-dir/baas_server.log || true
-        scp $ssh_options $ssh_user:/data/baas_remote/baas-work-dir/mongodb-dbpath/mongod.log ./baas-work-dir/mongodb-dbpath/mongod.log || true
+        REMOTE_PATH=/data/baas-remote/baas-work-dir
+        LOCAL_PATH=./baas-work-dir
+
+        mkdir -p "$LOCAL_PATH/"
+        mkdir -p "$LOCAL_PATH/mongodb-dbpath/"
+        scp $ssh_options $ssh_user:"$REMOTE_PATH/baas_server.log" "$LOCAL_PATH/baas_server.log" || true
+        scp $ssh_options $ssh_user:"$REMOTE_PATH/mongodb-dbpath/mongod.log" "$LOCAL_PATH/mongodb-dbpath/mongod.log" || true
 
   - command: s3.put
     params:
