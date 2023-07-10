@@ -991,9 +991,7 @@ void out_mixed_xjson(std::ostream& out, const Mixed& val)
         }
         case type_Timestamp: {
             out << "{\"$date\": {\"$numberLong\": \"";
-            auto ts = val.get<Timestamp>();
-            int64_t timeMillis = ts.get_seconds() * 1000 + ts.get_nanoseconds() / 1000000;
-            out << timeMillis;
+            out << util::serializer::print_value(val.get<Timestamp>());
             out << "\"}}";
             break;
         }

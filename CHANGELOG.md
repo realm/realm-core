@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix timestamp rapresentation when converting to json on different platforms. ([#5451](https://github.com/realm/realm-core/issues/5451)).
 
 ### Breaking changes
 * None.
