@@ -1867,8 +1867,8 @@ TEST_CASE("object") {
 
         REQUIRE_FALSE(obj.get_property_value<std::any>(d, "object").has_value());
         obj.set_property_value(d, "object", std::any(linkobj));
-        REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(d, "object")).obj().get_key() ==
-                linkobj.obj().get_key());
+        REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(d, "object")).get_obj().get_key() ==
+                linkobj.get_obj().get_key());
 
         auto linking = util::any_cast<Results>(linkobj.get_property_value<std::any>(d, "origin"));
         REQUIRE(linking.size() == 1);
@@ -1985,11 +1985,11 @@ TEST_CASE("object") {
 
         REQUIRE_FALSE(obj.get_property_value<std::any>(d, "object").has_value());
         obj.set_property_value(d, "object", std::any(linkobj));
-        REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(d, "object")).obj().get_key() ==
+        REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(d, "object")).get_obj().get_key() ==
                 linkobj.get_obj().get_key());
 
         REQUIRE(!obj.get_obj().is_unresolved(link_col));
-        linkobj.obj().invalidate();
+        linkobj.get_obj().invalidate();
         REQUIRE(obj.get_obj().is_unresolved(link_col));
 
         CHECK_FALSE(obj.get_property_value<std::any>(d, "object").has_value());
@@ -2396,7 +2396,7 @@ TEST_CASE("Asymmetric Object") {
         REQUIRE_EXCEPTION(create(
                               AnyDict{
                                   {"_id", INT64_C(1)},
-                                  {"location", Mixed(ObjLink{table->get_key(), obj.obj().get_key()})},
+                                  {"location", Mixed(ObjLink{table->get_key(), obj.get_obj().get_key()})},
                               },
                               "asymmetric_link"),
                           IllegalOperation, "Links not allowed in asymmetric tables");

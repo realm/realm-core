@@ -1501,7 +1501,7 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
 
     auto check_status = [](auto status) {
         CHECK(!status.is_ok());
-        if (status.get_status().reason().find("Client provided query with bad syntax:") == std::string::npos ||
+        if (status.get_status().reason().find("Invalid query:") == std::string::npos ||
             status.get_status().reason().find("\"TopLevel\": key \"non_queryable_field\" is not a queryable field") ==
                 std::string::npos) {
             FAIL(status.get_status().reason());
@@ -2025,8 +2025,8 @@ TEST_CASE("flx: change-of-query history divergence", "[sync][flx][app][baas]") {
     // The bootstrap should have erase/re-created our object and we should have the version from the server
     // locally.
     auto obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any{foo_obj_id});
-    REQUIRE(obj.obj().get<int64_t>("queryable_int_field") == 5);
-    REQUIRE(obj.obj().get<StringData>("non_queryable_field") == "created as initial data seed");
+    REQUIRE(obj.get_obj().get<int64_t>("queryable_int_field") == 5);
+    REQUIRE(obj.get_obj().get<StringData>("non_queryable_field") == "created as initial data seed");
 
     // Likewise, if we create a new realm and download all the objects, we should see the initial server version
     // in the new realm rather than the "created locally" one.
@@ -2034,8 +2034,8 @@ TEST_CASE("flx: change-of-query history divergence", "[sync][flx][app][baas]") {
         CppContext c(realm);
 
         auto obj = Object::get_for_primary_key(c, realm, "TopLevel", std::any{foo_obj_id});
-        REQUIRE(obj.obj().get<int64_t>("queryable_int_field") == 5);
-        REQUIRE(obj.obj().get<StringData>("non_queryable_field") == "created as initial data seed");
+        REQUIRE(obj.get_obj().get<int64_t>("queryable_int_field") == 5);
+        REQUIRE(obj.get_obj().get<StringData>("non_queryable_field") == "created as initial data seed");
     });
 }
 
