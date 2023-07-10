@@ -778,7 +778,8 @@ ref_type GroupWriter::write_group()
     // Function returns index of element holding the space reserved for the free
     // lists in the file.
     size_t reserve_ndx = recreate_freelist(reserve_pos);
-
+    REALM_ASSERT_RELEASE(reserve_pos == m_free_positions.get(reserve_ndx));
+    REALM_ASSERT_RELEASE(reserve_size == m_free_lengths.get(reserve_ndx));
     ALLOC_DBG_COUT("  Freelist size after merge: " << m_free_positions.size() << "   freelist space required: "
                                                    << max_free_space_needed << std::endl);
     // Before we calculate the actual sizes of the free-list arrays, we must
@@ -845,6 +846,8 @@ ref_type GroupWriter::write_group()
         }
     }
 
+    REALM_ASSERT_RELEASE(reserve_pos == m_free_positions.get(reserve_ndx));
+    REALM_ASSERT_RELEASE(reserve_size == m_free_lengths.get(reserve_ndx));
     // Get final sizes
     size_t top_byte_size = top.get_byte_size();
     ref_type end_ref = top_ref + top_byte_size;
