@@ -63,3 +63,14 @@ macro(add_bundled_test _target)
         add_test(NAME ${_target} COMMAND $<TARGET_FILE_NAME:${_target}>.app/Contents/MacOS/$<TARGET_FILE_NAME:${_target}>)
     endif()
 endmacro()
+
+macro(set_macos_only _dir)
+    get_property(_targets DIRECTORY "${_dir}" PROPERTY BUILDSYSTEM_TARGETS)
+    foreach(_target IN LISTS _targets)
+        set_target_properties(
+                "${_target}" PROPERTIES
+                XCODE_ATTRIBUTE_SDKROOT "macosx"
+                XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS "macosx"
+        )
+    endforeach()
+endmacro()

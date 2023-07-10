@@ -34,7 +34,7 @@ namespace realm::_impl {
 // state Realm download.
 class ClientResetOperation {
 public:
-    using CallbackBeforeType = util::UniqueFunction<void(VersionID)>;
+    using CallbackBeforeType = util::UniqueFunction<VersionID()>;
     using CallbackAfterType = util::UniqueFunction<void(VersionID, bool)>;
 
     ClientResetOperation(util::Logger& logger, DBRef db, DBRef db_fresh, ClientResyncMode mode,

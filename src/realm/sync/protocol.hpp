@@ -231,9 +231,20 @@ struct CompensatingWriteErrorInfo {
 };
 
 struct ResumptionDelayInfo {
+    // This is the maximum delay between trying to resume a session/connection.
     std::chrono::milliseconds max_resumption_delay_interval = std::chrono::minutes{5};
+    // The initial delay between trying to resume a session/connection.
     std::chrono::milliseconds resumption_delay_interval = std::chrono::seconds{1};
+    // After each failure of the same type, the last delay will be multiplied by this value
+    // until it is greater-than-or-equal to the max_resumption_delay_interval.
     int resumption_delay_backoff_multiplier = 2;
+    // When calculating a new delay interval, a random value betwen zero and the result off
+    // dividing the current delay value by the delay_jitter_divisor will be subtracted from the
+    // delay interval. The default is to subtract up to 25% of the current delay interval.
+    //
+    // This is to reduce the likelyhood of a connection storm if the server goes down and
+    // all clients attempt to reconnect at once.
+    int delay_jitter_divisor = 4;
 };
 
 struct ProtocolErrorInfo {

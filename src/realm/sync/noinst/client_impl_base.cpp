@@ -25,7 +25,6 @@
 
 // NOTE: The protocol specification is in `/doc/protocol.md`
 
-
 using namespace realm;
 using namespace _impl;
 using namespace realm::util;
@@ -44,36 +43,45 @@ using OutputBuffer                = ClientImpl::OutputBuffer;
 using ReceivedChangesets          = ClientProtocol::ReceivedChangesets;
 // clang-format on
 
-void ErrorTryAgainBackoffInfo::update(const ProtocolErrorInfo& info)
+void ClientImpl::ReconnectInfo::reset() noexcept
 {
-    if (triggering_error && static_cast<ProtocolError>(info.raw_error_code) == *triggering_error) {
-        return;
-    }
-
-    delay_info = info.resumption_delay_interval.value_or(ResumptionDelayInfo{});
-    cur_delay_interval = util::none;
-    triggering_error = static_cast<ProtocolError>(info.raw_error_code);
+    m_backoff_state.reset();
+    scheduled_reset = false;
 }
 
-void ErrorTryAgainBackoffInfo::reset()
+
+void ClientImpl::ReconnectInfo::update(ConnectionTerminationReason new_reason,
+                                       std::optional<ResumptionDelayInfo> new_delay_info)
 {
-    triggering_error = util::none;
-    cur_delay_interval = util::none;
-    delay_info = ResumptionDelayInfo{};
+    m_backoff_state.update(new_reason, new_delay_info);
 }
 
-std::chrono::milliseconds ErrorTryAgainBackoffInfo::delay_interval()
+
+std::chrono::milliseconds ClientImpl::ReconnectInfo::delay_interval()
 {
-    if (!cur_delay_interval) {
-        cur_delay_interval = delay_info.resumption_delay_interval;
-        return *cur_delay_interval;
+    if (scheduled_reset) {
+        reset();
     }
-    if (*cur_delay_interval >= delay_info.max_resumption_delay_interval) {
-        return delay_info.max_resumption_delay_interval;
+
+    if (!m_backoff_state.triggering_error) {
+        return std::chrono::milliseconds::zero();
     }
-    *cur_delay_interval *= delay_info.resumption_delay_backoff_multiplier;
-    return *cur_delay_interval;
+
+    switch (*m_backoff_state.triggering_error) {
+        case ConnectionTerminationReason::closed_voluntarily:
+            return std::chrono::milliseconds::zero();
+        case ConnectionTerminationReason::server_said_do_not_reconnect:
+            return std::chrono::milliseconds::max();
+        default:
+            if (m_reconnect_mode == ReconnectMode::testing) {
+                return std::chrono::milliseconds::max();
+            }
+
+            REALM_ASSERT(m_reconnect_mode == ReconnectMode::normal);
+            return m_backoff_state.delay_interval();
+    }
 }
+
 
 bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
                                       port_type& port, std::string& path) const
@@ -136,6 +144,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_ping_keepalive_period{config.ping_keepalive_period}
     , m_pong_keepalive_timeout{config.pong_keepalive_timeout}
     , m_fast_reconnect_limit{config.fast_reconnect_limit}
+    , m_reconnect_backoff_info{config.reconnect_backoff_info}
     , m_disable_upload_activation_delay{config.disable_upload_activation_delay}
     , m_dry_run{config.dry_run}
     , m_enable_default_port_hack{config.enable_default_port_hack}
@@ -177,6 +186,10 @@ ClientImpl::ClientImpl(ClientConfig config)
                  config.disable_upload_compaction); // Throws
     logger.debug("Config param: disable_sync_to_disk = %1",
                  config.disable_sync_to_disk); // Throws
+    logger.debug("Config param: reconnect backoff info: max_delay: %1 ms, initial_delay: %2 ms, multiplier: %3",
+                 m_reconnect_backoff_info.max_resumption_delay_interval.count(),
+                 m_reconnect_backoff_info.resumption_delay_interval.count(),
+                 m_reconnect_backoff_info.resumption_delay_backoff_multiplier);
 
     if (config.reconnect_mode != ReconnectMode::normal) {
         logger.warn("Testing/debugging feature 'nonnormal reconnect mode' enabled - "
@@ -360,23 +373,18 @@ void Connection::cancel_reconnect_delay()
         initiate_reconnect_wait(); // Throws
         return;
     }
+
+    // If we are not disconnected, then we need to make sure the next time we get disconnected
+    // that we are allowed to re-connect as quickly as possible.
+    //
+    // Setting m_reconnect_info.scheduled_reset will cause initiate_reconnect_wait to reset the
+    // backoff/delay state before calculating the next delay, unless a PONG message is received
+    // for the urgent PING message we send below.
+    //
+    // If we get a PONG message for the urgent PING message sent below, then the connection is
+    // healthy and we can calculate the next delay normally.
     if (m_state != ConnectionState::disconnected) {
-        // A currently established connection, or an in-progress attempt to
-        // establish the connection may be about to fail for a reason that
-        // precedes the invocation of Session::cancel_reconnect_delay(). For
-        // that reason, it is important that at least one new reconnect attempt
-        // is initiated without delay after the invocation of
-        // Session::cancel_reconnect_delay(). The operation that resets the
-        // reconnect delay (ReconnectInfo::reset()) needs to be postponed,
-        // because some parts of `m_reconnect_info` may get clobbered before
-        // initiate_reconnect_wait() is called again.
-        //
-        // If a PONG message arrives, and it is a response to the urgent PING
-        // message sent below, `m_reconnect_info.m_scheduled_reset` will be
-        // reset back to false, because in that case, we know that the
-        // connection was not about to fail for a reason that preceded the
-        // invocation of cancel_reconnect_delay().
-        m_reconnect_info.m_scheduled_reset = true;
+        m_reconnect_info.scheduled_reset = true;
         m_ping_after_scheduled_reset_of_reconnect_info = false;
 
         schedule_urgent_ping(); // Throws
@@ -463,9 +471,8 @@ void Connection::websocket_connected_handler(const std::string& protocol)
     else {
         logger.error("Missing protocol info from server"); // Throws
     }
-    m_reconnect_info.m_reason = ConnectionTerminationReason::bad_headers_in_http_response;
-    bool is_fatal = true;
-    close_due_to_client_side_error(ClientError::bad_protocol_from_server, std::nullopt, is_fatal); // Throws
+    close_due_to_client_side_error(ClientError::bad_protocol_from_server, std::nullopt, IsFatal{true},
+                                   ConnectionTerminationReason::bad_headers_in_http_response); // Throws
 }
 
 
@@ -507,9 +514,9 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         case WebSocketError::websocket_resolve_failed:
             [[fallthrough]];
         case WebSocketError::websocket_connection_failed: {
-            m_reconnect_info.m_reason = ConnectionTerminationReason::connect_operation_failed;
             constexpr bool try_again = true;
-            involuntary_disconnect(SessionErrorInfo{error_code, try_again}); // Throws
+            involuntary_disconnect(SessionErrorInfo{error_code, status.reason(), try_again},
+                                   ConnectionTerminationReason::connect_operation_failed); // Throws
             break;
         }
         case WebSocketError::websocket_read_error:
@@ -533,14 +540,13 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         case WebSocketError::websocket_no_status_received:
             [[fallthrough]];
         case WebSocketError::websocket_invalid_extension: {
-            m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
             constexpr bool try_again = true;
             SessionErrorInfo error_info{error_code, status.reason(), try_again};
-            involuntary_disconnect(std::move(error_info)); // Throws
+            involuntary_disconnect(std::move(error_info),
+                                   ConnectionTerminationReason::websocket_protocol_violation); // Throws
             break;
         }
         case WebSocketError::websocket_message_too_big: {
-            m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
             constexpr bool try_again = true;
             auto ec = make_error_code(ProtocolError::limits_exceeded);
             auto message =
@@ -548,43 +554,39 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
                              status.reason());
             SessionErrorInfo error_info(ec, message, try_again);
             error_info.server_requests_action = ProtocolErrorInfo::Action::ClientReset;
-            involuntary_disconnect(std::move(error_info)); // Throws
+            involuntary_disconnect(std::move(error_info),
+                                   ConnectionTerminationReason::websocket_protocol_violation); // Throws
             break;
         }
         case WebSocketError::websocket_tls_handshake_failed: {
             error_code = ClientError::ssl_server_cert_rejected;
-            constexpr bool is_fatal = false;
-            m_reconnect_info.m_reason = ConnectionTerminationReason::ssl_certificate_rejected;
-            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            close_due_to_client_side_error(error_code, status.reason(), IsFatal{false},
+                                           ConnectionTerminationReason::ssl_certificate_rejected); // Throws
             break;
         }
         case WebSocketError::websocket_client_too_old: {
             error_code = ClientError::client_too_old_for_server;
-            constexpr bool is_fatal = true;
-            m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            close_due_to_client_side_error(error_code, status.reason(), IsFatal{true},
+                                           ConnectionTerminationReason::http_response_says_fatal_error); // Throws
             break;
         }
         case WebSocketError::websocket_client_too_new: {
             error_code = ClientError::client_too_new_for_server;
-            constexpr bool is_fatal = true;
-            m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            close_due_to_client_side_error(error_code, status.reason(), IsFatal{true},
+                                           ConnectionTerminationReason::http_response_says_fatal_error); // Throws
             break;
         }
         case WebSocketError::websocket_protocol_mismatch: {
             error_code = ClientError::protocol_mismatch;
-            constexpr bool is_fatal = true;
-            m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            close_due_to_client_side_error(error_code, status.reason(), IsFatal{true},
+                                           ConnectionTerminationReason::http_response_says_fatal_error); // Throws
             break;
         }
         case WebSocketError::websocket_fatal_error:
             [[fallthrough]];
         case WebSocketError::websocket_forbidden: {
-            constexpr bool is_fatal = true;
-            m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            close_due_to_client_side_error(error_code, status.reason(), IsFatal{true},
+                                           ConnectionTerminationReason::http_response_says_fatal_error); // Throws
             break;
         }
         case WebSocketError::websocket_unauthorized:
@@ -596,9 +598,8 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         case WebSocketError::websocket_abnormal_closure:
             [[fallthrough]];
         case WebSocketError::websocket_retry_error: {
-            constexpr bool is_fatal = false;
-            m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_nonfatal_error;
-            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            close_due_to_client_side_error(error_code, status.reason(), IsFatal{false},
+                                           ConnectionTerminationReason::http_response_says_nonfatal_error); // Throws
             break;
         }
     }
@@ -619,155 +620,32 @@ void Connection::initiate_reconnect_wait()
         return;
     }
 
-    using milliseconds_lim = ReconnectInfo::milliseconds_lim;
-
-    constexpr milliseconds_type min_delay = 1000;   // 1 second (barring deductions)
-    constexpr milliseconds_type max_delay = 300000; // 5 minutes
-
-    // Delay must increase when scaled by a factor greater than 1.
-    static_assert(min_delay > 0, "");
-    static_assert(max_delay >= min_delay, "");
-
-    if (m_reconnect_info.m_scheduled_reset)
-        m_reconnect_info.reset();
-
-    bool infinite_delay = false;
-    milliseconds_type remaining_delay = 0;
-    if (!m_reconnect_info.m_reason) {
-        // Delay in progress. `m_time_point` specifies when the delay expires.
-        if (m_reconnect_info.m_time_point == milliseconds_lim::max()) {
-            infinite_delay = true;
-        }
-        else {
-            milliseconds_type now = monotonic_clock_now();
-            if (now < m_reconnect_info.m_time_point)
-                remaining_delay = m_reconnect_info.m_time_point - now;
-        }
-    }
-    else {
-        // Compute a new reconnect delay
-        bool zero_delay = false;
-        switch (m_client.get_reconnect_mode()) {
-            case ReconnectMode::normal:
-                break;
-            case ReconnectMode::testing:
-                if (was_voluntary(*m_reconnect_info.m_reason)) {
-                    zero_delay = true;
-                }
-                else {
-                    infinite_delay = true;
-                }
-                break;
-        }
-
-        // Calculate delay
-        milliseconds_type delay = 0;
-        bool record_delay_as_zero = false;
-        if (!zero_delay && !infinite_delay) {
-            switch (*m_reconnect_info.m_reason) {
-                case ConnectionTerminationReason::closed_voluntarily:
-                case ConnectionTerminationReason::read_or_write_error:
-                case ConnectionTerminationReason::pong_timeout:
-                    // Minimum delay after successful connect operation
-                    delay = min_delay;
-                    break;
-                case ConnectionTerminationReason::connect_operation_failed:
-                case ConnectionTerminationReason::http_response_says_nonfatal_error:
-                case ConnectionTerminationReason::sync_connect_timeout:
-                    // The last attempt at establishing a connection failed. In
-                    // this case, the reconnect delay will increase with the
-                    // number of consecutive failures.
-                    delay = m_reconnect_info.m_delay;
-                    // Double the previous delay
-                    if (util::int_multiply_with_overflow_detect(delay, 2))
-                        delay = milliseconds_lim::max();
-                    // Raise to minimum delay in case last delay was zero
-                    if (delay < min_delay)
-                        delay = min_delay;
-                    // Cut off at a fixed maximum delay
-                    if (delay > max_delay)
-                        delay = max_delay;
-                    break;
-                case ConnectionTerminationReason::server_said_try_again_later:
-                    record_delay_as_zero = true;
-                    delay = m_reconnect_info.m_try_again_delay_info.delay_interval().count();
-                    break;
-                case ConnectionTerminationReason::ssl_certificate_rejected:
-                case ConnectionTerminationReason::ssl_protocol_violation:
-                case ConnectionTerminationReason::websocket_protocol_violation:
-                case ConnectionTerminationReason::http_response_says_fatal_error:
-                case ConnectionTerminationReason::bad_headers_in_http_response:
-                case ConnectionTerminationReason::sync_protocol_violation:
-                case ConnectionTerminationReason::server_said_do_not_reconnect:
-                case ConnectionTerminationReason::missing_protocol_feature:
-                    // Use a significantly longer delay in this case to avoid
-                    // disturbing the server too much. It does make sense to try
-                    // again eventually, because the server may get restarted in
-                    // such a way the that problem goes away.
-                    delay = 3600000L; // 1 hour
-                    record_delay_as_zero = true;
-                    break;
-            }
-
-            // Make a randomized deduction of up to 25% to prevent a large
-            // number of clients from trying to reconnect in synchronicity.
-            auto distr = std::uniform_int_distribution<milliseconds_type>(0, delay / 4);
-            milliseconds_type randomized_deduction = distr(m_client.get_random());
-            delay -= randomized_deduction;
-
-            // Finally, deduct the time that has already passed since the last
-            // connection attempt.
-            milliseconds_type now = monotonic_clock_now();
-            REALM_ASSERT_3(now, >=, m_reconnect_info.m_time_point);
-            milliseconds_type time_since_delay_start = now - m_reconnect_info.m_time_point;
-            if (time_since_delay_start < delay)
-                remaining_delay = delay - time_since_delay_start;
-        }
-
-        // Calculate expiration time for delay
-        milliseconds_type time_point;
-        if (infinite_delay) {
-            time_point = milliseconds_lim::max();
-        }
-        else {
-            time_point = m_reconnect_info.m_time_point;
-            if (util::int_add_with_overflow_detect(time_point, delay))
-                time_point = milliseconds_lim::max();
-        }
-
-        // Indicate that a new delay is now in progress
-        m_reconnect_info.m_reason = util::none;
-        m_reconnect_info.m_time_point = time_point;
-        if (record_delay_as_zero) {
-            m_reconnect_info.m_delay = 0;
-        }
-        else {
-            m_reconnect_info.m_delay = delay;
-        }
-    }
-
-    if (infinite_delay) {
+    m_reconnect_delay_in_progress = true;
+    auto delay = m_reconnect_info.delay_interval();
+    if (delay == std::chrono::milliseconds::max()) {
         logger.detail("Reconnection delayed indefinitely"); // Throws
         // Not actually starting a timer corresponds to an infinite wait
-        m_reconnect_delay_in_progress = true;
         m_nonzero_reconnect_delay = true;
         return;
     }
 
-    if (remaining_delay > 0) {
-        logger.detail("Allowing reconnection in %1 milliseconds",
-                      remaining_delay); // Throws
+    if (delay == std::chrono::milliseconds::zero()) {
+        m_nonzero_reconnect_delay = false;
+    }
+    else {
+        logger.detail("Allowing reconnection in %1 milliseconds", delay.count()); // Throws
+        m_nonzero_reconnect_delay = true;
     }
 
-    m_reconnect_disconnect_timer =
-        m_client.create_timer(std::chrono::milliseconds(remaining_delay), [this](Status status) {
-            // If the operation is aborted, the connection object may have been
-            // destroyed.
-            if (status != ErrorCodes::OperationAborted)
-                handle_reconnect_wait(status); // Throws
-        });                                    // Throws
-    m_reconnect_delay_in_progress = true;
-    m_nonzero_reconnect_delay = (remaining_delay > 0);
+    // We create a timer for the reconnect_disconnect timer even if the delay is zero because
+    // we need it to be cancelable in case the connection is terminated before the timer
+    // callback is run.
+    m_reconnect_disconnect_timer = m_client.create_timer(delay, [this](Status status) {
+        // If the operation is aborted, the connection object may have been
+        // destroyed.
+        if (status != ErrorCodes::OperationAborted)
+            handle_reconnect_wait(status); // Throws
+    });                                    // Throws
 }
 
 
@@ -778,6 +656,7 @@ void Connection::handle_reconnect_wait(Status status)
         throw Exception(status);
     }
 
+    REALM_ASSERT(m_reconnect_delay_in_progress);
     m_reconnect_delay_in_progress = false;
 
     if (m_num_active_unsuspended_sessions > 0)
@@ -843,21 +722,8 @@ void Connection::initiate_reconnect()
     m_websocket_sentinel = util::make_bind<LifecycleSentinel>();
     m_websocket.reset();
 
-    // In most cases, the reconnect delay will be counting from the point in
-    // time of the initiation of the last reconnect operation (the initiation of
-    // the DNS resolve operation). It may also be counting from the point in
-    // time of the reception of an ERROR message, but in that case we can simply
-    // update `m_reconnect_info.m_time_point`.
-    m_reconnect_info.m_time_point = monotonic_clock_now();
-
     // Watchdog
     initiate_connect_wait(); // Throws
-
-    // There are three outcomes of the connection operation; success, failure,
-    // or cancellation. Since it is complicated to update the connection
-    // termination reason on cancellation, we mark it as voluntarily closed now, and then
-    // change it if the outcome ends up being success or failure.
-    m_reconnect_info.m_reason = ConnectionTerminationReason::closed_voluntarily;
 
     std::vector<std::string> sec_websocket_protocol;
     {
@@ -920,10 +786,10 @@ void Connection::handle_connect_wait(Status status)
     }
 
     REALM_ASSERT_EX(m_state == ConnectionState::connecting, m_state);
-    m_reconnect_info.m_reason = ConnectionTerminationReason::sync_connect_timeout;
     logger.info("Connect timeout"); // Throws
     constexpr bool try_again = true;
-    involuntary_disconnect(SessionErrorInfo{ClientError::connect_timeout, try_again}); // Throws
+    involuntary_disconnect(SessionErrorInfo{ClientError::connect_timeout, try_again},
+                           ConnectionTerminationReason::sync_connect_timeout); // Throws
 }
 
 
@@ -1061,8 +927,8 @@ void Connection::handle_pong_timeout()
 {
     REALM_ASSERT(m_waiting_for_pong);
     logger.debug("Timeout on reception of PONG message"); // Throws
-    m_reconnect_info.m_reason = ConnectionTerminationReason::pong_timeout;
-    close_due_to_client_side_error(ClientError::pong_timeout, std::nullopt, false);
+    close_due_to_client_side_error(ClientError::pong_timeout, std::nullopt, IsFatal{false},
+                                   ConnectionTerminationReason::pong_timeout);
 }
 
 
@@ -1138,7 +1004,7 @@ void Connection::send_ping()
     REALM_ASSERT(m_send_ping);
 
     m_send_ping = false;
-    if (m_reconnect_info.m_scheduled_reset)
+    if (m_reconnect_info.scheduled_reset)
         m_ping_after_scheduled_reset_of_reconnect_info = true;
 
     m_last_ping_sent_at = monotonic_clock_now();
@@ -1229,23 +1095,21 @@ void Connection::handle_disconnect_wait(Status status)
 
 void Connection::read_or_write_error(std::error_code ec, std::string_view msg)
 {
-    m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
-    bool is_fatal = false;
-    close_due_to_client_side_error(ec, msg, is_fatal); // Throws
+    close_due_to_client_side_error(ec, msg, IsFatal{false},
+                                   ConnectionTerminationReason::read_or_write_error); // Throws
 }
 
 
 void Connection::close_due_to_protocol_error(std::error_code ec, std::optional<std::string_view> msg)
 {
-    m_reconnect_info.m_reason = ConnectionTerminationReason::sync_protocol_violation;
-    bool is_fatal = true;                              // A sync protocol violation is a fatal error
-    close_due_to_client_side_error(ec, msg, is_fatal); // Throws
+    close_due_to_client_side_error(ec, msg, IsFatal{true},
+                                   ConnectionTerminationReason::sync_protocol_violation); // Throws
 }
 
 
 // Close connection due to error discovered on the client-side.
 void Connection::close_due_to_client_side_error(std::error_code ec, std::optional<std::string_view> msg,
-                                                bool is_fatal)
+                                                IsFatal is_fatal, ConnectionTerminationReason reason)
 {
     logger.info("Connection closed due to error"); // Throws
     const bool try_again = !is_fatal;
@@ -1254,7 +1118,7 @@ void Connection::close_due_to_client_side_error(std::error_code ec, std::optiona
         message += ": ";
         message += *msg;
     }
-    involuntary_disconnect(SessionErrorInfo{ec, message, try_again}); // Throws
+    involuntary_disconnect(SessionErrorInfo{ec, message, try_again}, reason); // Throws
 }
 
 
@@ -1262,29 +1126,13 @@ void Connection::close_due_to_client_side_error(std::error_code ec, std::optiona
 // reported to the client by way of a connection-level ERROR message.
 void Connection::close_due_to_server_side_error(ProtocolError error_code, const ProtocolErrorInfo& info)
 {
-    if (info.try_again) {
-        m_reconnect_info.m_reason = ConnectionTerminationReason::server_said_try_again_later;
-    }
-    else {
-        m_reconnect_info.m_reason = ConnectionTerminationReason::server_said_do_not_reconnect;
-    }
-
-    m_reconnect_info.m_try_again_delay_info.update(info);
-
-    // When the server asks us to reconnect later, it is important to make the
-    // reconnect delay start at the time of the reception of the ERROR message,
-    // rather than at the initiation of the connection, as is usually the
-    // case. This is because the message may arrive at a point in time where the
-    // connection has been open for a long time, so if we let the delay count
-    // from the initiation of the connection, it could easly end up as no delay
-    // at all.
-    m_reconnect_info.m_time_point = monotonic_clock_now();
-
     logger.info("Connection closed due to error reported by server: %1 (%2)", info.message,
                 int(error_code)); // Throws
 
     std::error_code ec = make_error_code(error_code);
-    involuntary_disconnect(SessionErrorInfo{info, ec}); // Throws
+    const auto reason = info.try_again ? ConnectionTerminationReason::server_said_try_again_later
+                                       : ConnectionTerminationReason::server_said_do_not_reconnect;
+    involuntary_disconnect(SessionErrorInfo{info, ec}, reason); // Throws
 }
 
 
@@ -1369,9 +1217,9 @@ void Connection::receive_pong(milliseconds_type timestamp)
     // the last invocation of cancel_reconnect_delay(), then the connection is
     // still good, and we do not have to skip the next reconnect delay.
     if (m_ping_after_scheduled_reset_of_reconnect_info) {
-        REALM_ASSERT(m_reconnect_info.m_scheduled_reset);
+        REALM_ASSERT(m_reconnect_info.scheduled_reset);
         m_ping_after_scheduled_reset_of_reconnect_info = false;
-        m_reconnect_info.m_scheduled_reset = false;
+        m_reconnect_info.scheduled_reset = false;
     }
 
     m_heartbeat_timer.reset();
@@ -2303,7 +2151,7 @@ void Session::send_json_error_message()
     error_body_json["message"] = message;
     protocol.make_json_error_message(out, session_ident, static_cast<int>(protocol_error),
                                      error_body_json.dump()); // Throws
-    m_conn.initiate_write_message(out, this); // Throws
+    m_conn.initiate_write_message(out, this);                 // Throws
 
     m_error_to_send = false;
     enlist_to_send(); // Throws
@@ -2712,8 +2560,8 @@ void Session::suspend(const SessionErrorInfo& info)
     // Notify the application of the suspension of the session if the session is
     // still in the Active state
     if (m_state == Active) {
-        m_conn.one_less_active_unsuspended_session();                      // Throws
-        on_suspended(info);                                                // Throws
+        m_conn.one_less_active_unsuspended_session(); // Throws
+        on_suspended(info);                           // Throws
     }
 
     if (info.try_again) {
@@ -2747,7 +2595,8 @@ void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)
 {
     REALM_ASSERT(!m_try_again_activation_timer);
 
-    m_try_again_delay_info.update(error_info);
+    m_try_again_delay_info.update(static_cast<sync::ProtocolError>(error_info.raw_error_code),
+                                  error_info.resumption_delay_interval);
     auto try_again_interval = m_try_again_delay_info.delay_interval();
     if (ProtocolError(error_info.raw_error_code) == ProtocolError::session_closed) {
         // FIXME With compensating writes the server sends this error after completing a bootstrap. Doing the normal
