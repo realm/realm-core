@@ -620,6 +620,7 @@ records:
       device_version: std::string
       framework_name: std::string
       framework_version: std::string
+      bundle_id: std::string
 
   AppConfig:
     cppName: app::App::Config
