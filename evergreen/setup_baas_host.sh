@@ -54,8 +54,11 @@ fi
 # shellcheck disable=SC1090
 source "${BAAS_HOST_VARS}"
 
-# Github SSH host key updated 06/26/2023
-echo "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=" | tee -a /home/ubuntu/.ssh/known_hosts
+if [[ -n "${GITHUB_KNOWN_HOSTS}" ]]; then
+    echo "${GITHUB_KNOWN_HOSTS}" | tee -a "${HOME}/.ssh/known_hosts"
+else
+    echo "Warning: GITHUB_KNOWN_HOSTS not defined in baas host vars script - github clone may hang or fail during setup"
+fi
 
 DATA_DIR=/data
 DATA_TEMP_DIR="${DATA_DIR}/tmp"

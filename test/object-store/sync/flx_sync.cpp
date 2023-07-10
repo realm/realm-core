@@ -2204,7 +2204,7 @@ TEST_CASE("flx: verify PBS/FLX websocket protocol number and prefixes", "[sync][
     REQUIRE("com.mongodb.realm-query-sync#" == sync::get_flx_websocket_protocol_prefix());
 }
 
-// TODO: remote-baas: This test fails consistently with Windows remote baas server
+// TODO: remote-baas: This test fails consistently with Windows remote baas server - to be fixed in RCORE-1674
 #ifndef _WIN32
 TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app][baas]") {
     FLXSyncTestHarness harness("flx_bad_query");
@@ -3043,7 +3043,7 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app][baas]") {
         REQUIRE(table->find_primary_key(bizz_obj_id));
     }
 
-// TODO: remote-baas: This test fails intermittently with Windows remote baas server
+// TODO: remote-baas: This test fails intermittently with Windows remote baas server - to be fixed in RCORE-1674
 #ifndef _WIN32
     SECTION("disconnect between bootstrap and mark") {
         SyncTestFile triggered_config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});

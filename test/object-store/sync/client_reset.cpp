@@ -317,7 +317,8 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
     local_config.path = local_config.path + ".local";
     remote_config.path = remote_config.path + ".remote";
 
-// TODO: remote-baas: This test fails consistently with Windows remote baas server
+// TODO: remote-baas: This test fails consistently with Windows remote baas server - to be fixed in RCORE-1674
+// This may be due to the realm file at `orig_path` not being deleted on Windows since it is still in use.
 #ifndef _WIN32
     SECTION("a client reset in manual mode can be handled") {
         std::string orig_path, recovery_path;
