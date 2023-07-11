@@ -3,6 +3,7 @@ file(GLOB_RECURSE BINDGEN_LIB_TS_FILES
     CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.ts
 )
+list(FILTER BINDGEN_LIB_TS_FILES EXCLUDE REGEX "templates/[^/]*\.ts$")
 list(FILTER BINDGEN_LIB_TS_FILES EXCLUDE REGEX "tests/[^/]*\.ts$")
 
 # Ninja buffers output so we need to tell tools to use colors even though stdout isn't a tty.
@@ -86,3 +87,17 @@ function(bindgen)
         set_property(SOURCE ${FILE} PROPERTY INCLUDE_DIRECTORIES "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_FUNCTION_LIST_DIR}/src>")
     endforeach()
 endfunction()
+
+bindgen(
+  TEMPLATE ${CMAKE_CURRENT_SOURCE_DIR}/src/templates/validate_spec.ts
+  OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/validate_spec.cpp
+  OUTDIR ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+add_library(ValidateBindgenSpec MODULE ${CMAKE_CURRENT_BINARY_DIR}/validate_spec.cpp)
+set_property(TARGET ValidateBindgenSpec PROPERTY CXX_STANDARD 20)
+target_link_libraries(ValidateBindgenSpec Realm::ObjectStore)
+if (NOT MSVC)
+    # Ensure that linking to Realm::ObjectStore doesn't leave undefined symbols.
+    target_link_options(ValidateBindgenSpec PRIVATE LINKER:-z,defs)
+endif()

@@ -42,7 +42,7 @@
 // Equivalent to std::forward<decltype(x)>(x), but faster to compile and less impact on debug builds
 #define FWD(x) ((decltype(x)&&)(x))
 
-namespace realm::js {
+namespace realm {
 namespace {
 
 // These types are exposed to JS in the spec.
@@ -281,20 +281,21 @@ struct Helpers {
             return callback(server_address, server_port, std::string_view(pem_data, pem_size), preverify_ok, depth);
         };
     }
-};
 
-struct ObjectChangeSet {
-    ObjectChangeSet() = default;
-    /*implicit*/ ObjectChangeSet(const CollectionChangeSet& changes)
-    {
-        is_deleted = !changes.deletions.empty();
-        for (const auto& [col_key_val, index_set] : changes.columns) {
-            changed_columns.push_back(ColKey(col_key_val));
+    // TODO There is already a realm::ObjectChangeSet. Find a better name for this that doesn't collide.
+    struct ObjectChangeSet {
+        ObjectChangeSet() = default;
+        /*implicit*/ ObjectChangeSet(const CollectionChangeSet& changes)
+        {
+            is_deleted = !changes.deletions.empty();
+            for (const auto& [col_key_val, index_set] : changes.columns) {
+                changed_columns.push_back(ColKey(col_key_val));
+            }
         }
-    }
 
-    bool is_deleted;
-    std::vector<ColKey> changed_columns;
+        bool is_deleted;
+        std::vector<ColKey> changed_columns;
+    };
 };
 
 ////////////////////////////////////////////////////////////
@@ -383,4 +384,4 @@ auto asSigned(T num)
 }
 
 } // namespace
-} // namespace realm::js
+} // namespace realm

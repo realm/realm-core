@@ -692,13 +692,13 @@ std::shared_ptr<SyncSession> SyncManager::get_session(std::shared_ptr<DB> db, co
     return external_reference;
 }
 
-bool SyncManager::has_existing_sessions()
+bool SyncManager::has_existing_sessions() const
 {
     util::CheckedLockGuard lock(m_session_mutex);
     return do_has_existing_sessions();
 }
 
-bool SyncManager::do_has_existing_sessions()
+bool SyncManager::do_has_existing_sessions() const
 {
     return std::any_of(m_sessions.begin(), m_sessions.end(), [](auto& element) {
         return element.second->existing_external_reference();
