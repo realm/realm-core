@@ -27,7 +27,7 @@
 
 namespace realm {
 namespace {
-static const int sorting_rank[19] = {
+static const int sorting_rank[] = {
     // Observe! Changing these values breaks the file format for Set<Mixed>
 
     -1, // null
@@ -46,9 +46,13 @@ static const int sorting_rank[19] = {
     7,  // type_Link = 12,
     -1, // type_LinkList = 13,
     -1,
-    4, // type_ObjectId = 15,
-    6, // type_TypedLink = 16
-    5, // type_UUID = 17
+    4,  // type_ObjectId = 15,
+    6,  // type_TypedLink = 16
+    5,  // type_UUID = 17
+    7,  // type_TypeOfValue = 18
+    8,  // type_List = 19
+    9,  // type_Set = 20
+    10, // type_Dictionary = 21
 
     // Observe! Changing these values breaks the file format for Set<Mixed>
 };
@@ -333,6 +337,9 @@ int Mixed::compare(const Mixed& b) const noexcept
         default:
             if (type == type_TypeOfValue && b.get_type() == type_TypeOfValue) {
                 return TypeOfValue(int_val).matches(TypeOfValue(b.int_val)) ? 0 : compare_generic(int_val, b.int_val);
+            }
+            if ((type == type_List || type == type_Dictionary || type == type_Set)) {
+                return m_type == b.m_type ? 0 : m_type < b.m_type ? -1 : 1;
             }
             REALM_ASSERT_RELEASE(false && "Compare not supported for this column type");
             break;

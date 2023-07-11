@@ -26,17 +26,38 @@
 
 namespace realm {
 
-class Dictionary final : public CollectionBaseImpl<CollectionBase> {
+class DictionaryBase : public CollectionBase {
 public:
-    using Base = CollectionBaseImpl<CollectionBase>;
+    using CollectionBase::CollectionBase;
+
+protected:
+    static constexpr CollectionType s_collection_type = CollectionType::Dictionary;
+};
+
+class Dictionary final : public CollectionBaseImpl<DictionaryBase>, public CollectionParent {
+public:
+    using Base = CollectionBaseImpl<DictionaryBase>;
     class Iterator;
 
-    Dictionary() {}
+    Dictionary()
+        : CollectionParent(0)
+    {
+    }
     ~Dictionary();
 
-    Dictionary(const Obj& obj, ColKey col_key);
+    Dictionary(const Obj& obj, ColKey col_key)
+        : Dictionary(col_key, 1)
+    {
+        this->set_owner(obj, col_key);
+    }
+    Dictionary(CollectionParent& parent, Index index)
+        : Base(parent, index)
+    {
+    }
+    Dictionary(ColKey col_key, size_t level = 1);
     Dictionary(const Dictionary& other)
         : Base(static_cast<const Base&>(other))
+        , CollectionParent(other.get_level())
         , m_key_type(other.m_key_type)
     {
         *this = other;
@@ -50,7 +71,7 @@ public:
     Mixed get_key(size_t ndx) const;
 
     // Overriding members of CollectionBase:
-    std::unique_ptr<CollectionBase> clone_collection() const final;
+    CollectionBasePtr clone_collection() const final;
     size_t size() const final;
     bool is_null(size_t ndx) const final;
     Mixed get_any(size_t ndx) const final;
@@ -67,12 +88,31 @@ public:
     void sort_keys(std::vector<size_t>& indices, bool ascending = true) const;
     void distinct_keys(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const;
 
+    void set_owner(const Obj& obj, ColKey ck) override
+    {
+        Base::set_owner(obj, ck);
+        get_key_type();
+    }
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        Base::set_owner(std::move(parent), index);
+        get_key_type();
+    }
+
     // first points to inserted/updated element.
     // second is true if the element was inserted
     std::pair<Iterator, bool> insert(Mixed key, Mixed value);
     std::pair<Iterator, bool> insert(Mixed key, const Obj& obj);
 
+    template <typename T>
+    void insert_json(const std::string&, const T&);
+
     Obj create_and_insert_linked_object(Mixed key);
+
+    void insert_collection(const PathElement&, CollectionType dict_or_list) override;
+    DictionaryPtr get_dictionary(const PathElement& path_elem) const override;
+    SetMixedPtr get_set(const PathElement&) const override;
+    ListMixedPtr get_list(const PathElement& path_elem) const override;
 
     // throws std::out_of_range if key is not found
     Mixed get(Mixed key) const;
@@ -90,8 +130,11 @@ public:
     Iterator erase(Iterator it);
     bool try_erase(Mixed key);
 
-    void nullify(Mixed);
+    void nullify(size_t);
+    bool nullify(ObjLink target_link);
+    bool replace_link(ObjLink old_link, ObjLink replace_link);
     void remove_backlinks(CascadeState& state) const;
+    size_t find_first(Mixed value) const;
 
     void clear() final;
 
@@ -99,7 +142,7 @@ public:
     void for_all_values(T&& f)
     {
         if (update()) {
-            BPlusTree<Mixed> values(m_obj.get_alloc());
+            BPlusTree<Mixed> values(get_alloc());
             values.init_from_ref(m_dictionary_top->get_as_ref(1));
             auto func = [&f](BPlusTreeNode* node, size_t) {
                 auto leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
@@ -118,7 +161,7 @@ public:
     void for_all_keys(Func&& f)
     {
         if (update()) {
-            BPlusTree<T> keys(m_obj.get_alloc());
+            BPlusTree<T> keys(get_alloc());
             keys.init_from_ref(m_dictionary_top->get_as_ref(0));
             auto func = [&f](BPlusTreeNode* node, size_t) {
                 auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);
@@ -139,12 +182,43 @@ public:
 
     void migrate();
 
+    // Overriding members in CollectionParent
+    FullPath get_path() const override
+    {
+        return Base::get_path();
+    }
+
+    Path get_short_path() const override
+    {
+        return Base::get_short_path();
+    }
+
+    StablePath get_stable_path() const override
+    {
+        return Base::get_stable_path();
+    }
+
+    void add_index(Path& path, Index ndx) const final;
+    TableRef get_table() const noexcept override
+    {
+        return get_obj().get_table();
+    }
+    UpdateStatus update_if_needed_with_status() const noexcept override;
+    bool update_if_needed() const override;
+    const Obj& get_object() const noexcept override
+    {
+        return get_obj();
+    }
+    ref_type get_collection_ref(Index, CollectionType) const override;
+    void set_collection_ref(Index, ref_type ref, CollectionType) override;
+
+    void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
+
 private:
     template <typename T, typename Op>
     friend class CollectionColumnAggregate;
     friend class DictionaryLinkValues;
     friend class Cluster;
-    friend void Obj::assign_pk_and_backlinks(const Obj& other);
 
     mutable std::unique_ptr<Array> m_dictionary_top;
     mutable std::unique_ptr<BPlusTreeBase> m_keys;
@@ -174,13 +248,13 @@ private:
     template <typename AggregateType>
     void do_accumulate(size_t* return_ndx, AggregateType& agg) const;
 
-    UpdateStatus update_if_needed() const final;
-    UpdateStatus ensure_created() final;
+    void ensure_created();
     inline bool update() const
     {
-        return update_if_needed() != UpdateStatus::Detached;
+        return update_if_needed_with_status() != UpdateStatus::Detached;
     }
     void verify() const;
+    void get_key_type();
 };
 
 class Dictionary::Iterator {
@@ -333,7 +407,7 @@ public:
     {
         return m_source.avg(return_cnt);
     }
-    std::unique_ptr<CollectionBase> clone_collection() const final
+    CollectionBasePtr clone_collection() const final
     {
         return std::make_unique<DictionaryLinkValues>(m_source);
     }
@@ -361,17 +435,21 @@ public:
     {
         return m_source.get_col_key();
     }
-    bool has_changed() const final
+    bool has_changed() const noexcept final
     {
         return m_source.has_changed();
+    }
+    CollectionType get_collection_type() const noexcept override
+    {
+        return CollectionType::List;
     }
 
     // Overrides of ObjCollectionBase:
     UpdateStatus do_update_if_needed() const final
     {
-        return m_source.update_if_needed();
+        return m_source.update_if_needed_with_status();
     }
-    BPlusTree<ObjKey>* get_mutable_tree() const
+    BPlusTree<ObjKey>* get_mutable_tree() const final
     {
         // We are faking being an ObjList because the underlying storage is not
         // actually a BPlusTree<ObjKey> for dictionaries it is all mixed values.
@@ -380,6 +458,31 @@ public:
         // the same way as for LnkSet and LnkLst. This means that the functions
         // that call get_mutable_tree do not need to do anything for dictionaries.
         return nullptr;
+    }
+
+    void set_owner(const Obj& obj, ColKey ck) override
+    {
+        m_source.set_owner(obj, ck);
+    }
+
+    void set_owner(std::shared_ptr<CollectionParent> parent, CollectionParent::Index index) override
+    {
+        m_source.set_owner(std::move(parent), index);
+    }
+
+    FullPath get_path() const noexcept final
+    {
+        return m_source.get_path();
+    }
+
+    Path get_short_path() const noexcept final
+    {
+        return m_source.get_short_path();
+    }
+
+    StablePath get_stable_path() const noexcept final
+    {
+        return m_source.get_stable_path();
     }
 
 private:
@@ -392,9 +495,9 @@ inline std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, const
     return insert(key, Mixed(obj.get_link()));
 }
 
-inline std::unique_ptr<CollectionBase> Dictionary::clone_collection() const
+inline CollectionBasePtr Dictionary::clone_collection() const
 {
-    return m_obj.get_dictionary_ptr(m_col_key);
+    return std::make_unique<Dictionary>(m_obj_mem, this->get_col_key());
 }
 
 

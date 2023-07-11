@@ -216,26 +216,27 @@ std::vector<ObjKey> LinkMap::get_origin_ndxs(ObjKey key, size_t column) const
     return ret;
 }
 
-ColumnDictionaryKey Columns<Dictionary>::key(const Mixed& key_value)
-{
-    if (m_key_type != type_Mixed && key_value.get_type() != m_key_type) {
-        throw InvalidArgument(ErrorCodes::TypeMismatch, util::format("Key not a %1", m_key_type));
-    }
-
-    return ColumnDictionaryKey(key_value, *this);
-}
-
 ColumnDictionaryKeys Columns<Dictionary>::keys()
 {
     return ColumnDictionaryKeys(*this);
 }
 
-void ColumnDictionaryKey::init_key(Mixed key_value)
+void Columns<Dictionary>::init_path(const PathElement* begin, const PathElement* end)
 {
-    REALM_ASSERT(!key_value.is_null());
-
-    m_key = key_value;
-    m_key.use_buffer(m_buffer);
+    m_path.clear();
+    m_path_only_unary_keys = true;
+    while (begin != end) {
+        if (begin->is_all()) {
+            m_path_only_unary_keys = false;
+        }
+        m_path.emplace_back(std::move(*begin));
+        ++begin;
+    }
+    std::move(begin, end, std::back_inserter(m_path));
+    if (m_path.empty()) {
+        m_path_only_unary_keys = false;
+        m_path.push_back(PathElement::AllTag());
+    }
 }
 
 void ColumnDictionaryKeys::set_cluster(const Cluster* cluster)
@@ -296,68 +297,6 @@ void ColumnDictionaryKeys::evaluate(size_t index, ValueBase& destination)
     }
 }
 
-void ColumnDictionaryKey::evaluate(size_t index, ValueBase& destination)
-{
-    if (links_exist()) {
-        REALM_ASSERT(!m_leaf);
-        std::vector<ObjKey> links = m_link_map.get_links(index);
-        auto sz = links.size();
-
-        destination.init_for_links(m_link_map.only_unary_links(), sz);
-        for (size_t t = 0; t < sz; t++) {
-            const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
-            auto dict = obj.get_dictionary(m_column_key);
-            Mixed val;
-            if (auto opt_val = dict.try_get(m_key)) {
-                val = *opt_val;
-                if (m_prop_list.size()) {
-                    if (val.is_type(type_TypedLink)) {
-                        auto obj = get_base_table()->get_parent_group()->get_object(val.get<ObjLink>());
-                        val = obj.get_any(m_prop_list.begin(), m_prop_list.end());
-                    }
-                    else {
-                        val = {};
-                    }
-                }
-            }
-            destination.set(t, val);
-        }
-    }
-    else {
-        // Not a link column
-        Allocator& alloc = get_base_table()->get_alloc();
-
-        REALM_ASSERT(m_leaf);
-        if (m_leaf->get(index)) {
-            Array top(alloc);
-            top.set_parent(&*m_leaf, index);
-            top.init_from_parent();
-            BPlusTree<StringData> keys(alloc);
-            keys.set_parent(&top, 0);
-            keys.init_from_parent();
-
-            Mixed val;
-            size_t ndx = keys.find_first(m_key.get_string());
-            if (ndx != realm::npos) {
-                BPlusTree<Mixed> values(alloc);
-                values.set_parent(&top, 1);
-                values.init_from_parent();
-                val = values.get(ndx);
-                if (m_prop_list.size()) {
-                    if (val.is_type(type_TypedLink)) {
-                        auto obj = get_base_table()->get_parent_group()->get_object(val.get<ObjLink>());
-                        val = obj.get_any(m_prop_list.begin(), m_prop_list.end());
-                    }
-                    else {
-                        val = {};
-                    }
-                }
-            }
-            destination.set(0, val);
-        }
-    }
-}
-
 class DictionarySize : public Columns<Dictionary> {
 public:
     DictionarySize(const Columns<Dictionary>& other)
@@ -391,48 +330,35 @@ SizeOperator<int64_t> Columns<Dictionary>::size()
 
 void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
 {
+    Collection::QueryCtrlBlock ctrl(m_path, get_base_table()->get_alloc(), !m_path_only_unary_keys);
+
     if (links_exist()) {
         REALM_ASSERT(!m_leaf);
         std::vector<ObjKey> links = m_link_map.get_links(index);
         auto sz = links.size();
+        if (!m_link_map.only_unary_links())
+            ctrl.from_list = true;
 
-        // Here we don't really know how many values to expect
-        std::vector<Mixed> values;
         for (size_t t = 0; t < sz; t++) {
             const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
-            auto dict = obj.get_dictionary(m_column_key);
-            // Insert all values
-            dict.for_all_values([&values](const Mixed& value) {
-                values.emplace_back(value);
-            });
+            auto val = obj.get_any(m_column_key);
+            if (!val.is_null()) {
+                Collection::get_any(ctrl, val, 0);
+            }
         }
-
-        // Copy values over
-        destination.init(true, values.size());
-        destination.set(values.begin(), values.end());
     }
     else {
         // Not a link column
-        Allocator& alloc = get_base_table()->get_alloc();
-
         REALM_ASSERT(m_leaf);
-        if (m_leaf->get(index)) {
-            Array top(alloc);
-            top.set_parent(&*m_leaf, index);
-            top.init_from_parent();
-            BPlusTree<Mixed> values(alloc);
-            values.set_parent(&top, 1);
-            values.init_from_parent();
-
-            destination.init(true, values.size());
-            size_t n = 0;
-            // Iterate through BPlusTreee and insert all values
-            values.for_all([&](Mixed val) {
-                destination.set(n, val);
-                n++;
-            });
+        if (ref_type ref = to_ref(m_leaf->get(index))) {
+            Collection::get_any(ctrl, {ref, CollectionType::Dictionary}, 0);
         }
     }
+
+    // Copy values over
+    auto sz = ctrl.matches.size();
+    destination.init(ctrl.from_list || sz == 0, sz);
+    destination.set(ctrl.matches.begin(), ctrl.matches.end());
 }
 
 

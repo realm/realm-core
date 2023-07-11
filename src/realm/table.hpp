@@ -61,6 +61,7 @@ struct GlobalKey;
 class LinkChain;
 class Subexpr;
 class StringIndex;
+class DictionaryLinkValues;
 
 struct Link {
 };
@@ -123,6 +124,12 @@ public:
     /// otherwise null is returned.
     Group* get_parent_group() const noexcept;
 
+
+    Replication* get_repl() const noexcept
+    {
+        return *m_repl;
+    }
+
     // Whether or not elements can be null.
     bool is_nullable(ColKey col_key) const;
 
@@ -158,19 +165,60 @@ public:
     ///
     static const size_t max_column_name_length = 63;
     static const uint64_t max_num_columns = 0xFFFFUL; // <-- must be power of two -1
-    ColKey add_column(DataType type, StringData name, bool nullable = false);
-    ColKey add_column(Table& target, StringData name);
-    ColKey add_column_list(DataType type, StringData name, bool nullable = false);
-    ColKey add_column_list(Table& target, StringData name);
-    ColKey add_column_set(DataType type, StringData name, bool nullable = false);
-    ColKey add_column_set(Table& target, StringData name);
-    ColKey add_column_dictionary(DataType type, StringData name, bool nullable = false,
-                                 DataType key_type = type_String);
-    ColKey add_column_dictionary(Table& target, StringData name, DataType key_type = type_String);
 
-    [[deprecated("Use add_column(Table&) or add_column_list(Table&) instead.")]] //
-    ColKey
-    add_column_link(DataType type, StringData name, Table& target);
+    // Add column holding primitive values. The vector of CollectionType specifies if the
+    // property is a collection and if the collection is nested in other collections.
+    // If the vector is empty, the property is a single value. If the vector contains
+    // a single value - eg. CollectionType::Dictionary, the property is a dictionary of
+    // the type specified. If the vector contains {CollectionType::List, CollectionType::Dictionary}
+    // the property is a list of dictionaries.
+    ColKey add_column(DataType type, StringData name, bool nullable = false, std::vector<CollectionType> = {},
+                      DataType key_type = type_String);
+    // As above, but the values are links to objects in the target table.
+    ColKey add_column(Table& target, StringData name, std::vector<CollectionType> = {},
+                      DataType key_type = type_String);
+
+    // Map old functions to the more general interface above
+    ColKey add_column_list(DataType type, StringData name, bool nullable = false)
+    {
+        return add_column(type, name, nullable, {CollectionType::List});
+    }
+    ColKey add_column_list(Table& target, StringData name)
+    {
+        return add_column(target, name, {CollectionType::List});
+    }
+    ColKey add_column_set(DataType type, StringData name, bool nullable = false)
+    {
+        return add_column(type, name, nullable, {CollectionType::Set});
+    }
+    ColKey add_column_set(Table& target, StringData name)
+    {
+        return add_column(target, name, {CollectionType::Set});
+    }
+    ColKey add_column_dictionary(DataType type, StringData name, bool nullable = false,
+                                 DataType key_type = type_String)
+    {
+        return add_column(type, name, nullable, {CollectionType::Dictionary}, key_type);
+    }
+    ColKey add_column_dictionary(Table& target, StringData name, DataType key_type = type_String)
+    {
+        return add_column(target, name, {CollectionType::Dictionary}, key_type);
+    }
+
+    CollectionType get_nested_column_type(ColKey col_key, size_t level) const
+    {
+        auto spec_ndx = colkey2spec_ndx(col_key);
+        REALM_ASSERT_3(spec_ndx, <, get_column_count());
+        return m_spec.get_nested_column_type(spec_ndx, level);
+    }
+
+    size_t get_nesting_levels(ColKey col_key) const
+    {
+        auto spec_ndx = colkey2spec_ndx(col_key);
+        return m_spec.get_nesting_levels(spec_ndx);
+    }
+
+    CollectionType get_collection_type(ColKey col_key, size_t level) const;
 
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);
@@ -714,14 +762,6 @@ private:
     void clear_indexes();
 
     // Migration support
-    void migrate_column_info();
-    bool verify_column_keys();
-    void migrate_indexes(ColKey pk_col_key);
-    void migrate_subspec();
-    void create_columns();
-    bool migrate_objects(); // Returns true if there are no links to migrate
-    void migrate_links();
-    void finalize_migration(ColKey pk_col_key);
     void migrate_sets_and_dictionaries();
 
     /// Disable copying assignment.
@@ -806,7 +846,6 @@ private:
     void nullify_links(CascadeState&);
     void remove_recursive(CascadeState&);
 
-    Replication* get_repl() const noexcept;
     util::Logger* get_logger() const noexcept;
 
     void set_ndx_in_parent(size_t ndx_in_parent) noexcept;
@@ -868,6 +907,8 @@ private:
     friend class ClusterTree;
     friend class ColKeyIterator;
     friend class Obj;
+    friend class CollectionParent;
+    friend class CollectionList;
     friend class LnkLst;
     friend class Dictionary;
     friend class IncludeDescriptor;
@@ -983,15 +1024,12 @@ public:
         return *this;
     }
 
-    LinkChain& link(std::string col_name)
+    bool link(std::string col_name)
     {
-        auto ck = m_current_table->get_column_key(col_name);
-        if (!ck) {
-            throw LogicError(ErrorCodes::InvalidProperty,
-                             util::format("'%1' has no property '%2'", m_current_table->get_class_name(), col_name));
+        if (auto ck = m_current_table->get_column_key(col_name)) {
+            return add(ck);
         }
-        add(ck);
-        return *this;
+        return false;
     }
 
     LinkChain& backlink(const Table& origin, ColKey origin_col_key)
@@ -1068,7 +1106,7 @@ private:
     ConstTableRef m_base_table;
     util::Optional<ExpressionComparisonType> m_comparison_type;
 
-    void add(ColKey ck);
+    bool add(ColKey ck);
 
     template <class T>
     std::unique_ptr<Subexpr> create_subexpr(ColKey col_key)
@@ -1174,9 +1212,12 @@ inline ColumnAttrMask Table::get_column_attr(ColKey column_key) const noexcept
 
 inline DataType Table::get_dictionary_key_type(ColKey column_key) const noexcept
 {
-    auto spec_ndx = colkey2spec_ndx(column_key);
-    REALM_ASSERT_3(spec_ndx, <, get_column_count());
-    return m_spec.get_dictionary_key_type(spec_ndx);
+    if (column_key.is_dictionary()) {
+        auto spec_ndx = colkey2spec_ndx(column_key);
+        REALM_ASSERT_3(spec_ndx, <, get_column_count());
+        return m_spec.get_dictionary_key_type(spec_ndx);
+    }
+    return type_String;
 }
 
 
@@ -1273,11 +1314,6 @@ inline bool Table::operator!=(const Table& t) const
 inline bool Table::is_link_type(ColumnType col_type) noexcept
 {
     return col_type == col_type_Link || col_type == col_type_LinkList;
-}
-
-inline Replication* Table::get_repl() const noexcept
-{
-    return *m_repl;
 }
 
 inline void Table::set_ndx_in_parent(size_t ndx_in_parent) noexcept

@@ -63,6 +63,11 @@ public:
         return *this;
     }
 
+    void set_index(Mixed index)
+    {
+        m_index = index;
+        m_index.use_buffer(m_buffer);
+    }
     ColKey get_col_key() const
     {
         return m_colkey;

@@ -26,6 +26,7 @@
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
 #include <realm/array_key.hpp>
+#include <realm/array_ref.hpp>
 
 namespace realm {
 
@@ -90,15 +91,26 @@ public:
 
     void clear();
     void erase(size_t ndx);
-    void truncate_and_destroy_children(size_t ndx);
     void move(ArrayMixed& dst, size_t ndx);
 
     size_t find_first(Mixed value, size_t begin = 0, size_t end = realm::npos) const noexcept;
+    bool ensure_keys();
+    size_t find_key(int64_t) const noexcept;
+    void set_key(size_t ndx, int64_t key);
+    int64_t get_key(size_t ndx) const;
 
     void verify() const;
 
 private:
-    enum { payload_idx_type, payload_idx_int, payload_idx_pair, payload_idx_str, payload_idx_size };
+    enum {
+        payload_idx_type,
+        payload_idx_int,
+        payload_idx_pair,
+        payload_idx_str,
+        payload_idx_ref,
+        payload_idx_key,
+        payload_idx_size
+    };
 
     static constexpr int64_t s_data_type_mask = 0b0001'1111;
     static constexpr int64_t s_payload_idx_mask = 0b1110'0000;
@@ -120,6 +132,8 @@ private:
     mutable Array m_int_pairs;
     // Used to store String and Binary
     mutable ArrayString m_strings;
+    // Used to store nested collection refs
+    mutable ArrayRef m_refs;
 
     DataType get_type(size_t ndx) const
     {
@@ -130,8 +144,9 @@ private:
     void ensure_int_array() const;
     void ensure_int_pair_array() const;
     void ensure_string_array() const;
+    void ensure_ref_array() const;
     void replace_index(size_t old_ndx, size_t new_ndx, size_t payload_index);
-    void erase_linked_payload(size_t ndx);
+    void erase_linked_payload(size_t ndx, bool free_linked_arrays);
 };
 } // namespace realm
 

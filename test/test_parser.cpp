@@ -2374,7 +2374,7 @@ TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "values.len == 2", 0), message);
-    CHECK_EQUAL(message, "Property 'table.values' is not an object reference");
+    CHECK_EQUAL(message, "Property 'table.values' has no property 'len'");
 }
 
 TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>, Nullable<Bool>, Prop<Float>,
@@ -2392,7 +2392,7 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
     auto col_link = t->add_column(*t, "link");
 
     auto obj1 = t->create_object();
-    std::vector<type> values = gen.values_from_int<type>({0, 9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
+    std::vector<type> values = gen.values_from_int<type>({2, 9, 4, 0, 7, 4, 1, 8, 11, 3, 4, 5, 22});
     obj1.set_list_values(col, values);
     t->create_object();             // empty list
     auto obj3 = t->create_object(); // {1}
@@ -2403,10 +2403,12 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
     obj4.get_list<type>(col).add(value_1);
     auto obj5 = t->create_object(); // {null} or {0}
     obj5.get_list<type>(col).add(TEST_TYPE::default_value());
-
     for (auto it = t->begin(); it != t->end(); ++it) {
         it->set<ObjKey>(col_link, it->get_key()); // self links
     }
+    auto value_first = gen.convert_for_test<underlying_type>(2);
+    auto value_4 = gen.convert_for_test<underlying_type>(7);
+    auto value_last = gen.convert_for_test<underlying_type>(22);
 
     // repeat the same tests but over links, the tests are only the same because the links are self cycles
     std::vector<std::string> column_prefix = {"", "link.", "link.link."};
@@ -2419,8 +2421,8 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
         verify_query(test_context, t, util::format("%1values.@count == 13", path), 1); // obj1
         verify_query(test_context, t, util::format("%1values == NULL", path), (is_nullable ? 1 : 0)); // obj5
 
-        std::any args[] = {value_1};
-        size_t num_args = 1;
+        std::any args[] = {value_1, value_first, value_4, value_last};
+        size_t num_args = 4;
         size_t num_matching_value_1 = 3;                       // obj1, obj3, obj4
         size_t num_not_matching_value_1 = 2;                   // obj1, obj5
         size_t num_all_matching_value_1 = 3;                   // obj2, obj3, obj4
@@ -2435,6 +2437,11 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
             num_none_matching_value_1 = is_nullable ? 2 : 1;
             num_none_not_matching_value_1 = is_nullable ? 3 : 4;
         }
+        verify_query_sub(test_context, t, util::format("%1values[first] == $1", path), args, num_args, 1);
+        verify_query_sub(test_context, t, util::format("%1values[4] == $2", path), args, num_args, 1);
+        verify_query_sub(test_context, t, util::format("%1values[last] == $3", path), args, num_args, 1);
+        verify_query_sub(test_context, t, util::format("%1values[*] == $0", path), args, num_args,
+                         num_matching_value_1);
         verify_query_sub(test_context, t, util::format("%1values == $0", path), args, num_args, num_matching_value_1);
         verify_query_sub(test_context, t, util::format("%1values != $0", path), args, num_args,
                          num_not_matching_value_1);
@@ -2460,7 +2467,7 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
     }
     else {
         CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "values.length == 2", 0), message);
-        CHECK_EQUAL(message, "Property 'table.values' is not an object reference");
+        CHECK_EQUAL(message, "Property 'table.values' has no property 'length'");
     }
 }
 
@@ -4950,6 +4957,9 @@ TEST(Parser_Dictionary)
         if ((i % 5) == 0) {
             dict.insert("Foo", 5);
         }
+        if (i == 78) {
+            dict.insert("Value", Mixed()); // Insert NULL
+        }
         dict.insert("Bar", i);
         if (incr) {
             expected++;
@@ -4976,26 +4986,33 @@ TEST(Parser_Dictionary)
     size_t num_args = 1;
 
     verify_query(test_context, foo, "dict.@values > 50", 50);
+    verify_query(test_context, foo, "dict[*] > 50", 50);
     verify_query(test_context, foo, "dict['Value'] > 50", expected);
+    verify_query(test_context, foo, "dict.Value > 50", expected);
     verify_query_sub(test_context, foo, "dict[$0] > 50", args, num_args, expected);
     verify_query(test_context, foo, "dict['Value'] > 50", expected);
     verify_query(test_context, foo, "ANY dict.@keys == 'Foo'", 20);
-    verify_query(test_context, foo, "NONE dict.@keys == 'Value'", 23);
-    verify_query(test_context, foo, "dict.@keys == {'Bar'}", 20);
+    verify_query(test_context, foo, "NONE dict.@keys == 'Value'", 22);
+    verify_query(test_context, foo, "dict.@keys == {'Bar'}", 19);
     verify_query(test_context, foo, "ANY dict.@keys == {'Bar'}", 100);
     verify_query(test_context, foo, "dict.@keys == {'Bar', 'Foo'}", 3);
-    verify_query(test_context, foo, "dict['Value'] == {}", 0);
+    verify_query(test_context, foo, "dict['Value'] == NULL", 1);
+    verify_query(test_context, foo, "dict['Value'] == {}", 22); // Tricky - what does this even mean?
     verify_query(test_context, foo, "dict['Value'] == {0, 100}", 3);
     verify_query(test_context, foo, "dict['Value'].@type == 'int'", num_ints_for_value);
     verify_query(test_context, foo, "dict.@type == 'int'", 100);      // ANY is implied, all have int values
-    verify_query(test_context, foo, "ALL dict.@type == 'int'", 100);  // all dictionaries have ints
+    verify_query(test_context, foo, "ALL dict.@type == 'int'", 99);   // One dictionary has a NULL
     verify_query(test_context, foo, "NONE dict.@type == 'int'", 0);   // each object has Bar:i
     verify_query(test_context, foo, "ANY dict.@type == 'string'", 0); // no strings present
+    // Dictionaries are not ordered
+    CHECK_THROW_ANY(verify_query(test_context, foo, "dict[FIRST] > 50", expected));
+    CHECK_THROW_ANY(verify_query(test_context, foo, "dict[LAST] > 50", expected));
 
     verify_query(test_context, origin, "link.dict['Value'] > 50", 3);
+    verify_query(test_context, origin, "link.dict.Value > 50", 3);
     verify_query(test_context, origin, "links.dict['Value'] > 50", 5);
     verify_query(test_context, origin, "links.dict > 50", 6);
-    verify_query(test_context, origin, "links.dict['Value'] == NULL", 10);
+    verify_query(test_context, origin, "links.dict['Value'] == NULL", 1);
 
     verify_query(test_context, foo, "dict.@size == 3", 17);
     verify_query(test_context, foo, "dict.@max == 100", 2);
@@ -5013,9 +5030,6 @@ TEST(Parser_Dictionary)
 
     dict.insert("Value", 4.5);
     std::string message;
-
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, origin, "link.dict.Value > 50", 3), message);
-    CHECK_EQUAL(message, "Property 'foo.dict' is not an object reference");
 
     // aggregates still work with mixed types
     verify_query(test_context, foo, "dict.@max == 100", 2);
@@ -5105,6 +5119,247 @@ TEST(Parser_DictionarySorting)
     CHECK_EQUAL(results.get_object(1).get_key(), lady.get_key());
     CHECK_EQUAL(results.get_object(2).get_key(), pluto.get_key());
     CHECK_EQUAL(results.get_object(3).get_key(), astro.get_key());
+}
+
+TEST(Parser_NestedDictionaryList)
+{
+    Group g;
+    auto persons = g.add_table_with_primary_key("table", type_String, "name");
+    auto col = persons->add_column_dictionary(type_Mixed, "properties");
+
+    Obj paul = persons->create_object_with_primary_key("Paul");
+    auto dict_paul = paul.get_dictionary(col);
+    dict_paul.insert_collection("tickets", CollectionType::List);
+    auto list1 = dict_paul.get_list("tickets");
+    list1->add(0);
+    list1->add(1);
+    list1->add(4);
+
+    Obj john = persons->create_object_with_primary_key("John");
+    auto dict_john = john.get_dictionary(col);
+    dict_john.insert_collection("tickets", CollectionType::List);
+    auto list2 = dict_john.get_list("tickets");
+    list2->add(2);
+    list2->add(3);
+    list2->add(4);
+
+    verify_query(test_context, persons, "properties.tickets[0] == 0", 1);
+    verify_query(test_context, persons, "properties.tickets[last] == 4", 2);
+}
+
+TEST(Parser_NestedListDictionary)
+{
+    Group g;
+    auto persons = g.add_table_with_primary_key("table", type_String, "name");
+    auto col = persons->add_column_list(type_Mixed, "properties");
+
+    Obj paul = persons->create_object_with_primary_key("Paul");
+    auto list_paul = paul.get_list<Mixed>(col);
+    list_paul.insert_collection(0, CollectionType::Dictionary);
+    auto dict1 = list_paul.get_dictionary(0);
+    dict1->insert("one", 1);
+    dict1->insert("two", 2);
+    dict1->insert("foo", 5);
+    dict1->insert("three", 3);
+
+    Obj john = persons->create_object_with_primary_key("John");
+    auto list_john = john.get_list<Mixed>(col);
+    list_john.insert_collection(0, CollectionType::Dictionary);
+    auto dict2 = list_john.get_dictionary(0);
+    dict2->insert("two", 2);
+    dict2->insert("bar", 5);
+    dict2->insert("four", 4);
+
+    verify_query(test_context, persons, "properties[0].one == 1", 1);
+    verify_query(test_context, persons, "properties[*].one == 1", 1);
+    verify_query(test_context, persons, "properties[first].two == 2", 2);
+    verify_query(test_context, persons, "properties[0][*] == 5", 2);
+}
+
+ONLY(Parser_NestedMixedDictionaryList)
+{
+    Group g;
+    auto persons = g.add_table_with_primary_key("table", type_String, "name");
+    // Be aware - this is not a dictionary property
+    auto col = persons->add_column(type_Mixed, "properties");
+    auto col_self = persons->add_column(*persons, "self");
+
+    Obj paul = persons->create_object_with_primary_key("Paul");
+    paul.set(col_self, paul.get_key());
+    paul.set_collection(col, CollectionType::Dictionary);
+    auto dict_paul = paul.get_dictionary(col);
+    {
+        dict_paul.insert_collection("instruments", CollectionType::List);
+        auto list = dict_paul.get_list("instruments");
+        list->insert_collection(0, CollectionType::Dictionary);
+        list->insert_collection(1, CollectionType::Dictionary);
+        list->insert_collection(2, CollectionType::Dictionary);
+        auto bass = list->get_dictionary(0);
+        bass->insert("brand", "høfner");
+        bass->insert("strings", 4);
+        bass->insert("electric", true);
+        auto guitar = list->get_dictionary(1);
+        guitar->insert("brand", "gibson");
+        guitar->insert("strings", 6);
+        guitar->insert("electric", true);
+        guitar = list->get_dictionary(2);
+        guitar->insert("brand", "martin");
+        guitar->insert("strings", 12);
+        guitar->insert("electric", false);
+    }
+    {
+        dict_paul.insert_collection("pets", CollectionType::List);
+        auto list = dict_paul.get_list("pets");
+        list->insert_collection(0, CollectionType::Dictionary);
+        list->insert_collection(1, CollectionType::Dictionary);
+        auto bird = list->get_dictionary(0);
+        bird->insert("name", "pipper");
+        bird->insert("legs", 2);
+        bird->insert("age", 4);
+        auto dog = list->get_dictionary(1);
+        dog->insert("name", "fido");
+        dog->insert("legs", 4);
+        dog->insert("age", 8);
+    }
+
+    Obj john = persons->create_object_with_primary_key("John");
+    john.set(col_self, john.get_key());
+    john.set_collection(col, CollectionType::Dictionary);
+    auto dict_john = john.get_dictionary(col);
+    dict_john.insert_collection("tickets", CollectionType::List); // Value here is NULL
+    {
+        dict_john.insert_collection("instruments", CollectionType::List);
+        auto list = dict_john.get_list("instruments");
+        list->insert_collection(0, CollectionType::Dictionary);
+        list->insert_collection(1, CollectionType::Dictionary);
+        auto guitar = list->get_dictionary(0);
+        guitar->insert("brand", "fender");
+        guitar->insert("strings", 6);
+        guitar->insert("electric", true);
+        guitar = list->get_dictionary(1);
+        guitar->insert("brand", "gibson");
+        guitar->insert("color", "red");
+        guitar->insert("strings", 6);
+        guitar->insert("electric", true);
+    }
+    {
+        dict_john.insert_collection("pets", CollectionType::List);
+        auto list = dict_john.get_list("pets");
+        list->insert_collection(0, CollectionType::Dictionary);
+        list->insert_collection(1, CollectionType::Dictionary);
+        auto cat = list->get_dictionary(0);
+        cat->insert("name", "Lady");
+        cat->insert("legs", 4);
+        cat->insert("age", 6);
+        auto snake = list->get_dictionary(1);
+        snake->insert("name", "carl");
+        snake->insert("legs", 0);
+        snake->insert("age", 20);
+    }
+
+    verify_query(test_context, persons, "properties.instruments[0].strings == 6", 1);
+    verify_query(test_context, persons, "properties.instruments[*].strings == 6", 2);
+    verify_query(test_context, persons, "properties.instruments[LAST].strings == 6", 1);
+    verify_query(test_context, persons, "properties.instruments[*].@keys  == 'color'", 1);
+    verify_query(test_context, persons, "properties[*][0].legs  == 2", 1); // Pipper the bird
+    verify_query(test_context, persons, "properties[*][0].legs  == 4", 1); // Lady the cat
+    verify_query(test_context, persons, "properties[*][*].legs  == 0", 1); // carl the snake
+    verify_query(test_context, persons, "properties[*][*][*] > 10", 2);    // carl the snake and martin the guitar
+}
+
+TEST(Parser_NestedDictionaryDeep)
+{
+    Group g;
+    auto persons = g.add_table_with_primary_key("table", type_String, "name");
+    auto col = persons->add_column(type_Mixed, "properties");
+    auto col_self = persons->add_column(*persons, "self");
+
+    Obj paul = persons->create_object_with_primary_key("Paul");
+    paul.set(col_self, paul.get_key());
+    paul.set_collection(col, CollectionType::Dictionary);
+    auto dict1 = paul.get_dictionary(col);
+    dict1.insert("one", 1);
+    dict1.insert_collection("two", CollectionType::List);
+    dict1.insert_collection("three", CollectionType::List);
+
+    auto list1 = dict1.get_list("two");
+    list1->add(5);
+    list1->add(6);
+
+    auto list2 = dict1.get_list("three");
+    list2->add(5);
+    list2->insert_collection(1, CollectionType::Dictionary);
+    auto dict2 = list2->get_dictionary(1);
+    dict2->insert("Hello", 5);
+    bool thrown = false;
+    try {
+        for (int i = 0; i < 100; i++) {
+            dict2->insert_collection("deeper", CollectionType::Dictionary);
+            dict2 = dict2->get_dictionary("deeper");
+        }
+    }
+    catch (const Exception& e) {
+        CHECK(e.code() == ErrorCodes::LimitExceeded);
+        thrown = true;
+    }
+    CHECK(thrown);
+
+    /*
+    "properties": {
+      "one": 1,
+      "two": [
+        5,
+        6
+      ]
+      "three": [
+        5,
+        {
+          "Hello": 5
+        }
+      ],
+    }
+    */
+
+    verify_query(test_context, persons, "self.properties == 1", 0);
+    verify_query(test_context, persons, "properties[0] == 1", 0);
+    verify_query(test_context, persons, "properties['one'] == 1", 1);
+    verify_query(test_context, persons, "properties.two[1].Hello == 5", 0);
+    verify_query(test_context, persons, "properties.three[0].Hello == 5", 0);
+    verify_query(test_context, persons, "properties.three[1].Hello == 5", 1);
+}
+
+TEST(Parser_NestedDictionaryMultipleLinks)
+{
+    // Check that we will follow every link before descending down by path
+    Group g;
+    auto persons = g.add_table_with_primary_key("table", type_String, "name");
+    auto col = persons->add_column(type_Mixed, "properties");
+    auto col_friends = persons->add_column_list(*persons, "friends");
+
+    Obj paul = persons->create_object_with_primary_key("Paul");
+    Obj john = persons->create_object_with_primary_key("John");
+    Obj george = persons->create_object_with_primary_key("George");
+    Obj ringo = persons->create_object_with_primary_key("Ringo");
+    Obj eric = persons->create_object_with_primary_key("Eric");
+
+    paul.set_collection(col, CollectionType::Dictionary);
+    john.set_collection(col, CollectionType::Dictionary);
+    george.set_collection(col, CollectionType::Dictionary);
+    ringo.set_collection(col, CollectionType::Dictionary);
+    paul.get_dictionary(col).insert("plays", "bass");
+    john.get_dictionary(col).insert("plays", "guitar");
+    george.get_dictionary(col).insert("plays", "guitar");
+    ringo.get_dictionary(col).insert("plays", "drums");
+
+    paul.get_linklist(col_friends).add(john.get_key());
+    auto erics_friends = eric.get_linklist(col_friends);
+    erics_friends.add(paul.get_key());
+    erics_friends.add(john.get_key());
+    erics_friends.add(george.get_key());
+    erics_friends.add(ringo.get_key());
+
+    verify_query(test_context, persons, "friends.properties.plays == 'bass'", 1);
+    verify_query(test_context, persons, "friends.properties.plays == 'guitar'", 2);
 }
 
 TEST_TYPES(Parser_DictionaryAggregates, Prop<float>, Prop<double>, Prop<Decimal128>)
@@ -5219,6 +5474,8 @@ TEST_TYPES(Parser_Set, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128
         verify_query(test_context, table, "set.@min == value", 1); // 3
         verify_query(test_context, table, "set.@avg == value", 1); // 3
         verify_query(test_context, table, "set.@sum == value", 1); // 3
+        // Sets not indexable
+        CHECK_THROW_ANY(verify_query(test_context, table, "set[1] == 3", 2));
     }
     else {
         CHECK_THROW_ANY(verify_query(test_context, table, "set.@min > 100", 1));

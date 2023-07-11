@@ -60,6 +60,86 @@ struct StringMaker<object_store::Dictionary> {
 
 namespace cf = realm::collection_fixtures;
 
+TEST_CASE("nested dictionary in mixed", "[dictionary]") {
+
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{{"any_collection", {{"any", PropertyType::Mixed | PropertyType::Nullable}}}};
+
+    auto r = Realm::get_shared_realm(config);
+
+    auto table_any = r->read_group().get_table("class_any_collection");
+    r->begin_transaction();
+
+    Obj any_obj = table_any->create_object();
+    ColKey col_any = table_any->get_column_key("any");
+    any_obj.set_collection(col_any, CollectionType::Dictionary);
+    object_store::Dictionary dict_mixed(r, any_obj, col_any);
+    r->commit_transaction();
+
+    CollectionChangeSet change_dictionary, change_list;
+    size_t calls_dict = 0, calls_list = 0;
+    auto token_dict = dict_mixed.add_notification_callback([&](CollectionChangeSet c) {
+        change_dictionary = c;
+        ++calls_dict;
+    });
+
+    r->begin_transaction();
+    dict_mixed.insert_collection("test", CollectionType::List);
+    r->commit_transaction();
+
+    REQUIRE(calls_dict == 1);
+    advance_and_notify(*r);
+
+    REQUIRE(change_dictionary.insertions.count() == 1);
+    REQUIRE(calls_dict == 2);
+
+    auto list = dict_mixed.get_list("test");
+    auto token_list = list.add_notification_callback([&](CollectionChangeSet c) {
+        change_list = c;
+        ++calls_list;
+    });
+    advance_and_notify(*r);
+
+    r->begin_transaction();
+    list.add(Mixed{5});
+    list.add(Mixed{6});
+    r->commit_transaction();
+
+    REQUIRE(calls_list == 1);
+    advance_and_notify(*r);
+
+    REQUIRE(change_list.insertions.count() == 2);
+    REQUIRE(calls_list == 2);
+
+    r->begin_transaction();
+    list.add(Mixed{5});
+    list.add(Mixed{6});
+    r->commit_transaction();
+    advance_and_notify(*r);
+
+    REQUIRE(change_list.insertions.count() == 2);
+    REQUIRE(calls_list == 3);
+
+    // for keys in dictionary insertion in front of the previous key should not matter.
+    CollectionChangeSet change_list_after_insert;
+    r->begin_transaction();
+    dict_mixed.insert_collection("A", CollectionType::List);
+    r->commit_transaction();
+
+    auto new_list = dict_mixed.get_list("A");
+    auto token_new_list = new_list.add_notification_callback([&](CollectionChangeSet c) {
+        change_list_after_insert = c;
+    });
+    r->begin_transaction();
+    new_list.add(Mixed{42});
+    r->commit_transaction();
+    advance_and_notify(*r);
+
+    REQUIRE_INDICES(change_list_after_insert.insertions, 0);
+}
+
 TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,
                    cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID, cf::BoxedOptional<cf::Int>,
                    cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>, cf::BoxedOptional<cf::Double>,
@@ -688,6 +768,10 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         }
 
         SECTION("clear list") {
+            DictionaryChangeSet key_change;
+            auto token = dict.add_key_based_notification_callback([&key_change](DictionaryChangeSet c) {
+                key_change = c;
+            });
             advance_and_notify(*r);
 
             r->begin_transaction();
@@ -697,6 +781,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE(change.deletions.count() == values.size());
             REQUIRE(rchange.deletions.count() == values.size());
             REQUIRE(srchange.deletions.count() == values.size());
+            REQUIRE(key_change.collection_was_cleared);
         }
 
         SECTION("delete containing row") {

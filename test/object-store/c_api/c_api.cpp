@@ -186,6 +186,9 @@ bool rlm_val_eq(realm_value_t lhs, realm_value_t rhs)
 
     switch (lhs.type) {
         case RLM_TYPE_NULL:
+        case RLM_TYPE_LIST:
+        case RLM_TYPE_SET:
+        case RLM_TYPE_DICTIONARY:
             return true;
         case RLM_TYPE_INT:
             return lhs.integer == rhs.integer;
@@ -4479,6 +4482,7 @@ TEST_CASE("C API", "[c_api]") {
                 auto str2 = rlm_str_val("b");
                 auto null = rlm_null();
 
+
                 auto require_change = [&]() {
                     auto token = cptr_checked(realm_dictionary_add_notification_callback(
                         strings.get(), &state, nullptr, nullptr, on_dictionary_change));
@@ -4518,16 +4522,26 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(num_insertions == 2);
                     CHECK(num_modifications == 0);
                     realm_value_t *deletions = nullptr, *insertions = nullptr, *modifications = nullptr;
+                    bool collection_cleared = false;
                     deletions = (realm_value_t*)malloc(sizeof(realm_value_t) * num_deletions);
                     insertions = (realm_value_t*)malloc(sizeof(realm_value_t) * num_insertions);
                     realm_dictionary_get_changed_keys(state.dictionary_changes.get(), deletions, &num_deletions,
-                                                      insertions, &num_insertions, modifications, &num_modifications);
+                                                      insertions, &num_insertions, modifications, &num_modifications,
+                                                      &collection_cleared);
                     CHECK(deletions != nullptr);
                     CHECK(insertions != nullptr);
                     CHECK(modifications == nullptr);
                     realm_free(deletions);
                     realm_free(insertions);
                     realm_free(modifications);
+
+                    write([&]() {
+                        checked(realm_dictionary_clear(strings.get()));
+                    });
+                    realm_dictionary_get_changed_keys(state.dictionary_changes.get(), deletions, &num_deletions,
+                                                      insertions, &num_insertions, modifications, &num_modifications,
+                                                      &collection_cleared);
+                    CHECK(collection_cleared == true);
                 }
             }
 
@@ -4979,6 +4993,125 @@ TEST_CASE("C API", "[c_api]") {
 
     realm_close(realm);
     REQUIRE(realm_is_closed(realm));
+    realm_release(realm);
+}
+
+TEST_CASE("C API: nested collections", "[c_api]") {
+    TestFile test_file;
+    realm_t* realm;
+    ObjectSchema object_schema = {"Foo",
+                                  {
+                                      {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                      {"any", PropertyType::Mixed | PropertyType::Nullable},
+                                  }};
+
+    auto config = make_config(test_file.path.c_str(), false);
+    config->schema = Schema{object_schema};
+    config->schema_version = 0;
+    realm = realm_open(config.get());
+
+    realm_class_info_t class_foo;
+    bool found = false;
+    CHECK(checked(realm_find_class(realm, "Foo", &found, &class_foo)));
+    REQUIRE(found);
+
+    realm_property_info_t info;
+    found = false;
+    REQUIRE(realm_find_property(realm, class_foo.key, "any", &found, &info));
+    REQUIRE(found);
+    CHECK(info.key != RLM_INVALID_PROPERTY_KEY);
+    realm_property_key_t foo_any_col_key = info.key;
+
+    CPtr<realm_object_t> obj1;
+    checked(realm_begin_write(realm));
+    realm_value_t pk = rlm_int_val(42);
+    obj1 = cptr_checked(realm_object_create_with_primary_key(realm, class_foo.key, pk));
+
+    SECTION("dictionary") {
+        REQUIRE(realm_set_collection(obj1.get(), foo_any_col_key, RLM_COLLECTION_TYPE_DICTIONARY));
+        realm_value_t value;
+        realm_get_value(obj1.get(), foo_any_col_key, &value);
+        REQUIRE(value.type == RLM_TYPE_DICTIONARY);
+        auto dict = cptr_checked(realm_get_dictionary(obj1.get(), foo_any_col_key));
+        checked(realm_dictionary_insert(dict.get(), rlm_str_val("Hello"), rlm_str_val("world"), nullptr, nullptr));
+        // dict -> list
+        realm_dictionary_insert_collection(dict.get(), rlm_str_val("Godbye"), RLM_COLLECTION_TYPE_LIST);
+        auto list = cptr_checked(realm_dictionary_get_list(dict.get(), rlm_str_val("Godbye")));
+        realm_list_insert(list.get(), 0, rlm_str_val("Hello"));
+        realm_list_insert(list.get(), 0, rlm_str_val("42"));
+        realm_list_insert(list.get(), 0, rlm_int_val(42));
+        // dict -> dict
+        realm_dictionary_insert_collection(dict.get(), rlm_str_val("Hi"), RLM_COLLECTION_TYPE_DICTIONARY);
+        auto dict2 = cptr_checked(realm_dictionary_get_dictionary(dict.get(), rlm_str_val("Hi")));
+        checked(realm_dictionary_insert(dict2.get(), rlm_str_val("Nested-Hello"), rlm_str_val("Nested-World"),
+                                        nullptr, nullptr));
+        // dict -> set
+        realm_dictionary_insert_collection(dict.get(), rlm_str_val("Leaf-Set"), RLM_COLLECTION_TYPE_SET);
+        auto set = cptr_checked(realm_dictionary_get_set(dict.get(), rlm_str_val("Leaf-Set")));
+        bool inserted;
+        size_t index;
+        realm_set_insert(set.get(), rlm_str_val("Set-Hello"), &index, &inserted);
+        CHECK(index == 0);
+        CHECK(inserted);
+        size_t size;
+        checked(realm_dictionary_size(dict.get(), &size));
+        REQUIRE(size == 4);
+    }
+
+    SECTION("list") {
+        REQUIRE(realm_set_collection(obj1.get(), foo_any_col_key, RLM_COLLECTION_TYPE_LIST));
+        realm_value_t value;
+        realm_get_value(obj1.get(), foo_any_col_key, &value);
+        REQUIRE(value.type == RLM_TYPE_LIST);
+        auto list = cptr_checked(realm_get_list(obj1.get(), foo_any_col_key));
+        realm_list_insert(list.get(), 0, rlm_str_val("Hello"));
+        realm_list_insert(list.get(), 1, rlm_str_val("World"));
+        // list -> dict
+        realm_list_insert_collection(list.get(), 1, RLM_COLLECTION_TYPE_DICTIONARY);
+        auto dict = cptr_checked(realm_list_get_dictionary(list.get(), 1));
+        checked(realm_dictionary_insert(dict.get(), rlm_str_val("Hello"), rlm_str_val("world"), nullptr, nullptr));
+        // list -> list
+        realm_list_insert_collection(list.get(), 2, RLM_COLLECTION_TYPE_LIST);
+        auto list2 = cptr_checked(realm_list_get_list(list.get(), 2));
+        realm_list_insert(list2.get(), 0, rlm_str_val("Nested-Hello"));
+        realm_list_insert(list2.get(), 1, rlm_str_val("Nested-World"));
+        // list -> set
+        realm_list_insert_collection(list.get(), 3, RLM_COLLECTION_TYPE_SET);
+        auto set = cptr_checked(realm_list_get_set(list.get(), 3));
+        bool inserted;
+        size_t index;
+        realm_set_insert(set.get(), rlm_str_val("Set-Hello"), &index, &inserted);
+        CHECK(index == 0);
+        CHECK(inserted);
+        size_t size;
+        checked(realm_list_size(list.get(), &size));
+        REQUIRE(size == 5);
+    }
+
+    SECTION("set") {
+        REQUIRE(realm_set_collection(obj1.get(), foo_any_col_key, RLM_COLLECTION_TYPE_SET));
+        realm_value_t value;
+        realm_get_value(obj1.get(), foo_any_col_key, &value);
+        REQUIRE(value.type == RLM_TYPE_SET);
+        auto set = cptr_checked(realm_get_set(obj1.get(), foo_any_col_key));
+        size_t index;
+        bool inserted = false;
+        REQUIRE(realm_set_insert(set.get(), rlm_str_val("Hello"), &index, &inserted));
+        CHECK(index == 0);
+        CHECK(inserted);
+        REQUIRE(realm_set_insert(set.get(), rlm_int_val(42), &index, &inserted));
+        CHECK(index == 0);
+        CHECK(inserted);
+        size_t size;
+        checked(realm_set_size(set.get(), &size));
+        REQUIRE(size == 2);
+        checked(realm_set_get(set.get(), 0, &value));
+        CHECK(value.type == RLM_TYPE_INT);
+        CHECK(value.integer == 42);
+        checked(realm_set_get(set.get(), 1, &value));
+        CHECK(value.type == RLM_TYPE_STRING);
+        CHECK(strncmp(value.string.data, "Hello", value.string.size) == 0);
+    }
     realm_release(realm);
 }
 

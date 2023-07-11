@@ -191,8 +191,10 @@ bool json_test(std::string json, std::string expected_file, bool generate)
             return false;
         test_file >> expected;
         if (j != expected) {
-            std::cout << json << std::endl;
-            std::cout << expected << std::endl;
+            std::cout << "Current: " << json << std::endl;
+            std::cout << std::endl;
+            std::cout << "Excpected " << expected << std::endl;
+            std::cout << std::endl;
             std::string file_name = get_test_resource_path();
             std::string path = file_name + "bad_" + expected_file + ".json";
             std::string pathOld = "bad_" + file_name;
@@ -554,6 +556,131 @@ TEST(Xjson_LinkList1)
     CHECK(json_test(ss.str(), "expected_xjson_plus_linklist2", generate_all));
 }
 
+TEST(Xjson_NestedJsonTest)
+{
+    Group group;
+
+    TableRef table1 = group.add_table_with_primary_key("table1", type_String, "primaryKey");
+    TableRef table2 = group.add_table_with_primary_key("table2", type_String, "primaryKey");
+    TableRef table3 = group.add_table_with_primary_key("table3", type_String, "primaryKey");
+    TableRef table4 = group.add_table_with_primary_key("table4", type_String, "primaryKey");
+    TableRef table5 = group.add_table_with_primary_key("table5", type_String, "primaryKey");
+
+    table1->add_column(type_Int, "list_list_int", false, {{CollectionType::List, CollectionType::List}});
+    table2->add_column(type_Int, "list_list_int2", false, {{CollectionType::List, CollectionType::List}});
+    table3->add_column(type_Int, "dict_list_int", false, {{CollectionType::Dictionary, CollectionType::List}});
+    table4->add_column(type_Int, "list_dict_int", false, {{CollectionType::List, CollectionType::Dictionary}});
+    table5->add_column(type_Int, "dict_dict_int", false, {{CollectionType::Dictionary, CollectionType::Dictionary}});
+
+    // add some rows to test basic nested collections
+    auto obj1 = table1->create_object_with_primary_key("t1o1");
+    auto obj2 = table2->create_object_with_primary_key("t2o1");
+    auto obj3 = table3->create_object_with_primary_key("t3o1");
+    auto obj4 = table4->create_object_with_primary_key("t4o1");
+    auto obj5 = table5->create_object_with_primary_key("t5o1");
+    //[[1,2],[3,4],[5,6],[7,8]]
+    auto list1 = obj1.get_list_ptr<Int>({"list_list_int", 0});
+    list1->add(1);
+    list1->add(2);
+    auto list2 = obj1.get_list_ptr<Int>({"list_list_int", 1});
+    list2->add(3);
+    list2->add(4);
+    auto list3 = obj1.get_list_ptr<Int>({"list_list_int", 2});
+    list3->add(5);
+    list3->add(6);
+    auto list4 = obj1.get_list_ptr<Int>({"list_list_int", 3});
+    list4->add(7);
+    list4->add(8);
+
+    //[[1],[2]]
+    list1 = obj2.get_list_ptr<Int>({"list_list_int2", 0});
+    list1->add(1);
+    list2 = obj2.get_list_ptr<Int>({"list_list_int2", 1});
+    list2->add(2);
+
+    //{"Foo":[1,2,3], "Foo1":[4,5], "Foo2":[6,7,8]}
+    list1 = obj3.get_list_ptr<Int>({"dict_list_int", "Foo"});
+    list1->add(1);
+    list1->add(2);
+    list1->add(3);
+    list1 = obj3.get_list_ptr<Int>({"dict_list_int", "Foo1"});
+    list1->add(4);
+    list1->add(5);
+    list1 = obj3.get_list_ptr<Int>({"dict_list_int", "Foo2"});
+    list1->add(6);
+    list1->add(7);
+    list1->add(8);
+
+    //[{"Key1":10,"Key2":10,"Key3":10}, {"Key1":20,"Key2":20,"Key3":20}]
+    auto dict4_1 = obj4.get_dictionary_ptr({"list_dict_int", 0});
+    auto dict4_2 = obj4.get_dictionary_ptr({"list_dict_int", 1});
+    dict4_1->insert("Key1", 10);
+    dict4_1->insert("Key2", 10);
+    dict4_1->insert("Key3", 10);
+    dict4_2->insert("Key1", 20);
+    dict4_2->insert("Key2", 20);
+    dict4_2->insert("Key3", 20);
+
+    //{"Foo":{"Key1":10,"Key2":10,"Key3":10}, "Foo1":{"Key1":20,"Key2":20,"Key3":20}}
+    auto dict5_1 = obj5.get_dictionary_ptr({"dict_dict_int", "Foo"});
+    auto dict5_2 = obj5.get_dictionary_ptr({"dict_dict_int", "Foo1"});
+    dict5_1->insert("Key1", 10);
+    dict5_1->insert("Key2", 10);
+    dict5_1->insert("Key3", 10);
+    dict5_2->insert("Key1", 20);
+    dict5_2->insert("Key2", 20);
+    dict5_2->insert("Key3", 20);
+
+    std::stringstream ss;
+
+    table1->to_json(ss, 0, no_renames, output_mode_xjson);
+    CHECK(json_test(ss.str(), "expected_xjson_nested_linklist1", generate_all));
+
+    ss.str("");
+    table2->to_json(ss, 0, no_renames, output_mode_xjson);
+    CHECK(json_test(ss.str(), "expected_xjson_nested_linklist2", generate_all));
+
+    ss.str("");
+    table3->to_json(ss, 0, no_renames, output_mode_json);
+    CHECK(json_test(ss.str(), "expected_xjson_nested_dictionary1", generate_all));
+
+    ss.str("");
+    table4->to_json(ss, 0, no_renames, output_mode_json);
+    CHECK(json_test(ss.str(), "expected_xjson_nested_dictionary2", generate_all));
+
+    ss.str("");
+    table5->to_json(ss, 0, no_renames, output_mode_json);
+    CHECK(json_test(ss.str(), "expected_xjson_nested_dictionary3", generate_all));
+
+    // test links
+
+    // List<Dictionary<Link>>
+    table1->add_column(*table2, "obj_list_dict", {CollectionType::List, CollectionType::Dictionary});
+    table1->create_object_with_primary_key("to1_list_dict_link");
+    obj1.get_dictionary_ptr({"obj_list_dict", 0})->insert("Link_Key", obj2.get_key());
+
+    // List<List<Link>>
+    table1->add_column(*table2, "obj_list_list", {CollectionType::List, CollectionType::List});
+    table1->create_object_with_primary_key("to1_list_list_link");
+    auto link_list = obj1.get_collection_ptr(Path{"obj_list_list", 0});
+    dynamic_cast<LnkLst*>(link_list.get())->add(obj3.get_key());
+
+    // Dictionary<List<Link>>
+    table1->add_column(*table2, "obj_dict_list", {CollectionType::Dictionary, CollectionType::List});
+    table1->create_object_with_primary_key("to1_dict_list_link");
+    link_list = obj1.get_collection_ptr(Path{"obj_dict_list", "Link_Key"});
+    dynamic_cast<LnkLst*>(link_list.get())->add(obj4.get_key());
+
+    // Dictionary<Dictionary<Link>>
+    table1->add_column(*table2, "obj_dict_dict", {CollectionType::Dictionary, CollectionType::Dictionary});
+    table1->create_object_with_primary_key("to1_dict_dict_link");
+    obj1.get_dictionary_ptr({"obj_dict_dict", "Link_Key"})->insert("Link_Key_Nested", obj5.get_key());
+
+    ss.str("");
+    table1->to_json(ss, 0, no_renames, output_mode_xjson_plus);
+    CHECK(json_test(ss.str(), "expected_xjson_nested_links", generate_all));
+}
+
 TEST(Xjson_LinkSet1)
 {
     // Basic non-cyclic LinkList test that also tests column and table renaming
@@ -840,6 +967,9 @@ TEST(Json_Schema)
     persons->add_column(type_Int, "age", is_nullable);
     persons->add_column_list(type_Timestamp, "dates");
     persons->add_column_list(*dogs, "pet");
+    persons->add_column_dictionary(type_Mixed, "dictionary_pet");
+    persons->add_column(type_Int, "nested_list", false, {CollectionType::List, CollectionType::List});
+    persons->add_column(type_Int, "nested_dict", false, {CollectionType::List, CollectionType::Dictionary});
     dogs->add_column(type_String, "name");
 
     std::stringstream ss;
@@ -851,8 +981,12 @@ TEST(Json_Schema)
         "{\"name\":\"name\",\"type\":\"string\"},"
         "{\"name\":\"isMarried\",\"type\":\"bool\"},"
         "{\"name\":\"age\",\"type\":\"int\",\"isOptional\":true},"
-        "{\"name\":\"dates\",\"type\":\"timestamp\",\"isArray\":true},"
-        "{\"name\":\"pet\",\"type\":\"object\",\"objectType\":\"dog\",\"isArray\":true}"
+        "{\"name\":\"dates\",\"type\":\"timestamp\",\"isArray\":true,\"isNested\":false},"
+        "{\"name\":\"pet\",\"type\":\"object\",\"objectType\":\"dog\",\"isArray\":true,\"isNested\":false},"
+        "{\"name\":\"dictionary_pet\",\"type\":\"mixed\",\"isMap\":true,\"isNested\":false,\"keyType\":\"string\","
+        "\"isOptional\":true},"
+        "{\"name\":\"nested_list\",\"type\":\"int\",\"isArray\":true,\"isNested\":true},"
+        "{\"name\":\"nested_dict\",\"type\":\"int\",\"isMap\":true,\"isNested\":true,\"keyType\":\"string\"}"
         "]},\n"
         "{\"name\":\"dog\",\"tableType\":\"Embedded\",\"properties\":[{\"name\":\"name\",\"type\":\"string\"}]}\n"
         "]\n";

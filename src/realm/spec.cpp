@@ -41,25 +41,25 @@ void Spec::init(MemRef mem) noexcept
 {
     m_top.init_from_mem(mem);
     size_t top_size = m_top.size();
-    REALM_ASSERT(top_size > 2 && top_size <= 6);
+    REALM_ASSERT(top_size > s_attributes_ndx && top_size <= s_spec_max_size);
 
-    m_types.init_from_ref(m_top.get_as_ref(0));
-    m_names.init_from_ref(m_top.get_as_ref(1));
-    m_attr.init_from_ref(m_top.get_as_ref(2));
+    m_types.init_from_ref(m_top.get_as_ref(s_types_ndx));
+    m_names.init_from_ref(m_top.get_as_ref(s_names_ndx));
+    m_attr.init_from_ref(m_top.get_as_ref(s_attributes_ndx));
 
-    while (m_top.size() < 6) {
+    while (m_top.size() < s_spec_max_size) {
         m_top.add(0);
     }
 
     // Enumkeys array is only there when there are StringEnum columns
-    if (auto ref = m_top.get_as_ref(4)) {
+    if (auto ref = m_top.get_as_ref(s_enum_keys_ndx)) {
         m_enumkeys.init_from_ref(ref);
     }
     else {
         m_enumkeys.detach();
     }
 
-    if (m_top.get_as_ref(5) == 0) {
+    if (m_top.get_as_ref(s_col_keys_ndx) == 0) {
         // This is an upgrade - create column key array
         MemRef mem_ref = Array::create_empty_array(Array::type_Normal, false, m_top.get_alloc()); // Throws
         m_keys.init_from_mem(mem_ref);
@@ -97,7 +97,7 @@ void Spec::update_from_parent() noexcept
     m_names.update_from_parent();
     m_attr.update_from_parent();
 
-    if (m_top.get_as_ref(4) != 0) {
+    if (m_top.get_as_ref(s_enum_keys_ndx) != 0) {
         m_enumkeys.update_from_parent();
     }
     else {
@@ -146,7 +146,7 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
         spec_set.add(v); // Throws
         dg_2.release();
     }
-    spec_set.add(0); // Subspecs array
+    spec_set.add(0); // Nested collections array
     spec_set.add(0); // Enumkeys array
     {
         // One key for each column
@@ -309,6 +309,14 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
 
     m_types.insert(column_ndx, int(type)); // Throws
     m_attr.insert(column_ndx, attr); // Throws
+    if (type != col_type_BackLink) {
+        if (auto ref = m_top.get_as_ref(s_nested_types_ndx)) {
+            Array coll_types(m_top.get_alloc());
+            coll_types.set_parent(&m_top, s_nested_types_ndx);
+            coll_types.init_from_ref(ref);
+            coll_types.insert(column_ndx, 0); // Throws
+        }
+    }
     m_keys.insert(column_ndx, col_key.value);
 
     if (m_enumkeys.is_attached() && type != col_type_BackLink) {
@@ -323,6 +331,15 @@ void Spec::erase_column(size_t column_ndx)
     REALM_ASSERT(column_ndx < m_types.size());
 
     if (ColumnType(int(m_types.get(column_ndx))) != col_type_BackLink) {
+        if (auto ref = m_top.get_as_ref(s_nested_types_ndx)) {
+            Array coll_types(m_top.get_alloc());
+            coll_types.set_parent(&m_top, s_nested_types_ndx);
+            coll_types.init_from_ref(ref);
+            if (auto ref2 = coll_types.get_as_ref(column_ndx)) {
+                Array::destroy_deep(ref2, m_top.get_alloc());
+            }
+            coll_types.erase(column_ndx);
+        }
         if (is_string_enum_type(column_ndx)) {
             // Enum columns do also have a separate key list
             ref_type keys_ref = m_enumkeys.get_as_ref(column_ndx);
@@ -355,6 +372,68 @@ void Spec::erase_column(size_t column_ndx)
     m_keys.erase(column_ndx);
 
     update_internals();
+}
+
+
+void Spec::set_nested_column_types(size_t column_ndx, const std::vector<CollectionType>& types)
+{
+    Array coll_types(m_top.get_alloc());
+    coll_types.set_parent(&m_top, s_nested_types_ndx);
+    if (auto ref = m_top.get_as_ref(s_nested_types_ndx)) {
+        coll_types.init_from_ref(ref);
+    }
+    else {
+        coll_types.create(Node::type_HasRefs, false, m_num_public_columns, 0);
+        coll_types.update_parent();
+    }
+    Array arr(m_top.get_alloc());
+    arr.set_parent(&coll_types, column_ndx);
+    auto mem = Array::create_empty_array(Node::type_Normal, false, m_top.get_alloc());
+    arr.init_from_mem(mem);
+    for (auto t : types) {
+        if (t == CollectionType::Set)
+            throw InvalidColumnKey("Sets cannot contain any nested collections");
+        arr.add(int64_t(t));
+    }
+    arr.update_parent();
+}
+
+CollectionType Spec::get_nested_column_type(size_t column_ndx, size_t level) const
+{
+    ref_type ref2 = 0;
+    if (auto ref = m_top.get_as_ref(s_nested_types_ndx)) {
+        Array coll_types(m_top.get_alloc());
+        coll_types.init_from_ref(ref);
+        ref2 = coll_types.get_as_ref(column_ndx);
+    }
+
+    if (!ref2) {
+        throw LogicError(ErrorCodes::IllegalOperation, "Property has no nested collections");
+    }
+    Array arr(m_top.get_alloc());
+    arr.init_from_ref(ref2);
+    if (level >= arr.size()) {
+        throw OutOfBounds("Nesting level too deep", level, arr.size());
+    }
+
+    return CollectionType(arr.get(level));
+}
+
+size_t Spec::get_nesting_levels(size_t column_ndx) const
+{
+    if (column_ndx < m_num_public_columns) {
+        if (auto ref = m_top.get_as_ref(s_nested_types_ndx)) {
+            Array coll_types(m_top.get_alloc());
+            coll_types.init_from_ref(ref);
+            if (auto ref = coll_types.get_as_ref(column_ndx)) {
+                Array arr(m_top.get_alloc());
+                arr.init_from_ref(ref);
+                return arr.size();
+            }
+        }
+    }
+
+    return 0;
 }
 
 
@@ -413,63 +492,6 @@ ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent*& keys_parent) no
     return m_enumkeys.get_as_ref(column_ndx);
 }
 
-TableKey Spec::get_opposite_link_table_key(size_t column_ndx) const noexcept
-{
-    REALM_ASSERT(column_ndx < get_column_count());
-    REALM_ASSERT(get_column_type(column_ndx) == col_type_Link || get_column_type(column_ndx) == col_type_LinkList ||
-                 get_column_type(column_ndx) == col_type_BackLink);
-
-    // Key of opposite table is stored as tagged int in the
-    // subspecs array
-    size_t subspec_ndx = get_subspec_ndx(column_ndx);
-    Array subspecs(m_top.get_alloc());
-    subspecs.init_from_ref(m_top.get_as_ref(3));
-    int64_t tagged_value = subspecs.get(subspec_ndx);
-    REALM_ASSERT(tagged_value != 0); // can't retrieve it if never set
-
-    uint64_t table_ref = uint64_t(tagged_value) >> 1;
-
-    REALM_ASSERT(!util::int_cast_has_overflow<uint32_t>(table_ref));
-    return TableKey(uint32_t(table_ref));
-}
-
-size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const noexcept
-{
-    REALM_ASSERT(backlink_col_ndx < get_column_count());
-    REALM_ASSERT(get_column_type(backlink_col_ndx) == col_type_BackLink);
-
-    // Origin column is stored as second tagged int in the subspecs array
-    size_t subspec_ndx = get_subspec_ndx(backlink_col_ndx);
-    Array subspecs(m_top.get_alloc());
-    subspecs.init_from_ref(m_top.get_as_ref(3));
-    int64_t tagged_value = subspecs.get(subspec_ndx + 1);
-    REALM_ASSERT(tagged_value != 0); // can't retrieve it if never set
-    return size_t(tagged_value) >> 1;
-}
-
-ColKey Spec::find_backlink_column(TableKey origin_table_key, size_t spec_ndx) const noexcept
-{
-    size_t backlinks_column_start = m_num_public_columns;
-    size_t backlinks_start = get_subspec_ndx(backlinks_column_start);
-    Array subspecs(m_top.get_alloc());
-    subspecs.init_from_ref(m_top.get_as_ref(3));
-    size_t count = subspecs.size();
-
-    int64_t tagged_table_ndx = (origin_table_key.value << 1) + 1;
-    int64_t tagged_column_ndx = (spec_ndx << 1) + 1;
-
-    size_t col_ndx = realm::npos;
-    for (size_t i = backlinks_start; i < count; i += 2) {
-        if (subspecs.get(i) == tagged_table_ndx && subspecs.get(i + 1) == tagged_column_ndx) {
-            size_t pos = (i - backlinks_start) / 2;
-            col_ndx = backlinks_column_start + pos;
-            break;
-        }
-    }
-    REALM_ASSERT(col_ndx != realm::npos);
-    return ColKey{m_keys.get(col_ndx)};
-}
-
 namespace {
 
 template <class T>
@@ -505,12 +527,6 @@ bool Spec::operator==(const Spec& spec) const noexcept
             case col_type_LinkList: {
                 // In addition to name and attributes, the link target table must also be compared
                 REALM_ASSERT(false); // We can no longer compare specs - in fact we don't want to
-                /*
-                auto lhs_table_key = get_opposite_link_table_key(col_ndx);
-                auto rhs_table_key = spec.get_opposite_link_table_key(col_ndx);
-                if (lhs_table_key != rhs_table_key)
-                    return false;
-                */
                 break;
             }
             case col_type_Int:

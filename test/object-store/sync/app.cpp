@@ -3325,6 +3325,7 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][baas][c
             test_type.add_link(object.obj(), link);
         }
         r->commit_transaction();
+        return object;
     };
 
     auto create_one_dest_object = [&](realm::SharedRealm r, int64_t val) -> ObjLink {
@@ -3350,11 +3351,13 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][baas][c
     SECTION("integration testing") {
         auto app = test_session.app();
         SyncTestFile config1(app, partition, schema); // uses the current user created above
+        config1.automatic_change_notifications = false;
         auto r1 = realm::Realm::get_shared_realm(config1);
         Results r1_source_objs = realm::Results(r1, r1->read_group().get_table("class_source"));
 
         create_user_and_log_in(app);
         SyncTestFile config2(app, partition, schema); // uses the user created above
+        config2.automatic_change_notifications = false;
         auto r2 = realm::Realm::get_shared_realm(config2);
         Results r2_source_objs = realm::Results(r2, r2->read_group().get_table("class_source"));
 
@@ -3362,12 +3365,14 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][baas][c
         constexpr int64_t dest_pk_1 = 1;
         constexpr int64_t dest_pk_2 = 2;
         constexpr int64_t dest_pk_3 = 3;
+        Object object;
+
         { // add a container collection with three valid links
             REQUIRE(r1_source_objs.size() == 0);
             ObjLink dest1 = create_one_dest_object(r1, dest_pk_1);
             ObjLink dest2 = create_one_dest_object(r1, dest_pk_2);
             ObjLink dest3 = create_one_dest_object(r1, dest_pk_3);
-            create_one_source_object(r1, source_pk, {dest1, dest2, dest3});
+            object = create_one_source_object(r1, source_pk, {dest1, dest2, dest3});
             REQUIRE(r1_source_objs.size() == 1);
             REQUIRE(r1_source_objs.get(0).get<Int>(valid_pk_name) == source_pk);
             REQUIRE(r1_source_objs.get(0).get<String>("realm_id") == partition);
@@ -3407,6 +3412,12 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][baas][c
             remaining_dest_object_ids = {linked_objects[1].template get<Int>(valid_pk_name)};
             REQUIRE(test_type.size_of_collection(r1_source_objs.get(0)) == expected_coll_size);
         }
+        bool coll_cleared = false;
+        advance_and_notify(*r1);
+        auto collection = test_type.get_collection(r1, r1_source_objs.get(0));
+        auto token = collection.add_notification_callback([&coll_cleared](CollectionChangeSet c) {
+            coll_cleared = c.collection_was_cleared;
+        });
 
         { // clear the collection
             REQUIRE(r2_source_objs.size() == 1);
@@ -3422,8 +3433,11 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][baas][c
         }
 
         { // expect an empty collection
+            REQUIRE(!coll_cleared);
             REQUIRE(r1_source_objs.size() == 1);
             wait_for_num_outgoing_links_to_equal(r1, r1_source_objs.get(0), expected_coll_size);
+            advance_and_notify(*r1);
+            REQUIRE(coll_cleared);
         }
     }
 }

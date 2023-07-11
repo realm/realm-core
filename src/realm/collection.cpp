@@ -1,9 +1,12 @@
 #include <realm/collection.hpp>
 #include <realm/bplustree.hpp>
 #include <realm/array_key.hpp>
+#include <realm/array_string.hpp>
+#include <realm/array_mixed.hpp>
 
-namespace realm::_impl {
+namespace realm {
 
+namespace _impl {
 size_t virtual2real(const std::vector<size_t>& vec, size_t ndx) noexcept
 {
     for (auto i : vec) {
@@ -86,4 +89,129 @@ void check_for_last_unresolved(BPlusTree<ObjKey>* tree)
     }
 }
 
-} // namespace realm::_impl
+} // namespace _impl
+
+Collection::~Collection() {}
+
+void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
+{
+    auto path_size = ctrl.path.size() - index;
+    PathElement& pe = ctrl.path[index];
+    if (val.is_type(type_Dictionary) && (pe.is_key() || pe.is_all())) {
+        auto ref = val.get_ref();
+        if (!ref)
+            return;
+        Array top(ctrl.alloc);
+        top.init_from_ref(ref);
+
+        BPlusTree<StringData> keys(ctrl.alloc);
+        keys.set_parent(&top, 0);
+        keys.init_from_parent();
+        size_t start = 0;
+        if (size_t finish = keys.size()) {
+            if (pe.is_key()) {
+                start = keys.find_first(StringData(pe.get_key()));
+                if (start == realm::not_found) {
+                    if (pe.get_key() == "@keys") {
+                        keys.for_all([&](const auto& k) {
+                            ctrl.matches.insert(k);
+                        });
+                    }
+                    return;
+                }
+                finish = start + 1;
+            }
+            BPlusTree<Mixed> values(ctrl.alloc);
+            values.set_parent(&top, 1);
+            values.init_from_parent();
+            for (; start < finish; start++) {
+                val = values.get(start);
+                if (path_size > 1) {
+                    Collection::get_any(ctrl, val, index + 1);
+                }
+                else {
+                    ctrl.matches.insert(val);
+                }
+            }
+        }
+    }
+    else if (val.is_type(type_List) && (pe.is_ndx() || pe.is_all())) {
+        auto ref = val.get_ref();
+        if (!ref)
+            return;
+        ArrayMixed list(ctrl.alloc);
+        list.init_from_ref(ref);
+        if (size_t sz = list.size()) {
+            size_t start = 0;
+            size_t finish = sz;
+            if (pe.is_ndx()) {
+                start = pe.get_ndx();
+                if (start == size_t(-1)) {
+                    start = sz - 1;
+                }
+                if (start < sz) {
+                    finish = start + 1;
+                }
+            }
+            for (; start < finish; start++) {
+                val = list.get(start);
+                if (path_size > 1) {
+                    Collection::get_any(ctrl, val, index + 1);
+                }
+                else {
+                    ctrl.matches.insert(val);
+                }
+            }
+        }
+    }
+}
+
+std::pair<std::string, std::string> CollectionBase::get_open_close_strings(size_t link_depth,
+                                                                           JSONOutputMode output_mode) const
+{
+    std::string open_str;
+    std::string close_str;
+    auto collection_type = get_collection_type();
+    Table* target_table = get_target_table().unchecked_ptr();
+    auto ck = get_col_key();
+    auto type = ck.get_type();
+    if (type == col_type_LinkList)
+        type = col_type_Link;
+    if (type == col_type_Link) {
+        bool is_embedded = target_table->is_embedded();
+        bool link_depth_reached = !is_embedded && (link_depth == 0);
+
+        if (output_mode == output_mode_xjson_plus) {
+            open_str = std::string("{ ") + (is_embedded ? "\"$embedded" : "\"$link");
+            open_str += collection_type_name(collection_type, true);
+            open_str += "\": ";
+            close_str += " }";
+        }
+
+        if ((link_depth_reached && output_mode != output_mode_xjson) || output_mode == output_mode_xjson_plus) {
+            open_str += "{ \"table\": \"" + std::string(target_table->get_name()) + "\", ";
+            open_str += ((is_embedded || collection_type == CollectionType::Dictionary) ? "\"values" : "\"keys");
+            open_str += "\": ";
+            close_str += "}";
+        }
+    }
+    else {
+        if (output_mode == output_mode_xjson_plus) {
+            switch (collection_type) {
+                case CollectionType::List:
+                    break;
+                case CollectionType::Set:
+                    open_str = "{ \"$set\": ";
+                    close_str = " }";
+                    break;
+                case CollectionType::Dictionary:
+                    open_str = "{ \"$dictionary\": ";
+                    close_str = " }";
+                    break;
+            }
+        }
+    }
+    return {open_str, close_str};
+}
+
+} // namespace realm

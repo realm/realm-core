@@ -23,7 +23,6 @@
 #include <realm/dictionary.hpp>
 #include <realm/table_view.hpp>
 #include <realm/group_writer.hpp>
-
 namespace {
 
 using namespace realm;
@@ -45,32 +44,71 @@ ColInfo get_col_info(const Table* table)
     return cols;
 }
 
+void add_list_to_repl(CollectionBase& list, Replication& repl, util::UniqueFunction<void(Mixed)> update_embedded);
+void add_dictionary_to_repl(Dictionary& dict, Replication& repl, util::UniqueFunction<void(Mixed)> update_embedded)
+{
+    size_t sz = dict.size();
+    for (size_t n = 0; n < sz; ++n) {
+        const auto& [key, val] = dict.get_pair(n);
+        repl.dictionary_insert(dict, n, key, val);
+        if (val.is_type(type_List)) {
+            auto n_list = dict.get_list({key.get_string()});
+            add_list_to_repl(*n_list, *dict.get_table()->get_repl(), nullptr);
+        }
+        else if (val.is_type(type_Dictionary)) {
+            repl.dictionary_insert(dict, n, key, val);
+            auto n_dict = dict.get_dictionary({key.get_string()});
+            add_dictionary_to_repl(*n_dict, *dict.get_table()->get_repl(), nullptr);
+        }
+        else if (update_embedded) {
+            update_embedded(val);
+        }
+    }
+}
+
+void add_list_to_repl(CollectionBase& list, Replication& repl, util::UniqueFunction<void(Mixed)> update_embedded)
+{
+    auto sz = list.size();
+    for (size_t n = 0; n < sz; n++) {
+        auto val = list.get_any(n);
+        repl.list_insert(list, n, val, n);
+        if (val.is_type(type_List)) {
+            auto n_list = list.get_list({n});
+            add_list_to_repl(*n_list, *list.get_table()->get_repl(), nullptr);
+        }
+        else if (val.is_type(type_Dictionary)) {
+            auto n_dict = list.get_dictionary({n});
+            add_dictionary_to_repl(*n_dict, *list.get_table()->get_repl(), nullptr);
+        }
+        else if (update_embedded) {
+            update_embedded(val);
+        }
+    }
+}
+
 void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInfo& cols)
 {
     for (auto elem : cols) {
         auto col = elem.first;
         auto embedded_table = elem.second;
         auto cols_2 = get_col_info(embedded_table);
-        auto update_embedded = [&](Mixed val) {
-            if (val.is_null()) {
+        util::UniqueFunction<void(Mixed)> update_embedded = nullptr;
+        if (embedded_table) {
+            update_embedded = [&](Mixed val) {
+                if (val.is_null()) {
+                    return;
+                }
+                REALM_ASSERT(val.is_type(type_Link, type_TypedLink));
+                Obj embedded_obj = embedded_table->get_object(val.get<ObjKey>());
+                generate_properties_for_obj(repl, embedded_obj, cols_2);
                 return;
-            }
-            REALM_ASSERT(val.is_type(type_Link, type_TypedLink));
-            Obj embedded_obj = embedded_table->get_object(val.get<ObjKey>());
-            generate_properties_for_obj(repl, embedded_obj, cols_2);
-        };
+            };
+        }
 
         if (col.is_list()) {
             auto list = obj.get_listbase_ptr(col);
-            auto sz = list->size();
             repl.list_clear(*list);
-            for (size_t n = 0; n < sz; n++) {
-                auto val = list->get_any(n);
-                repl.list_insert(*list, n, val, n);
-                if (embedded_table) {
-                    update_embedded(val);
-                }
-            }
+            add_list_to_repl(*list, repl, std::move(update_embedded));
         }
         else if (col.is_set()) {
             auto set = obj.get_setbase_ptr(col);
@@ -82,19 +120,24 @@ void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInf
         }
         else if (col.is_dictionary()) {
             auto dict = obj.get_dictionary(col);
-            size_t n = 0;
-            for (auto [key, value] : dict) {
-                repl.dictionary_insert(dict, n++, key, value);
-                if (embedded_table) {
-                    update_embedded(value);
-                }
-            }
+            add_dictionary_to_repl(dict, repl, std::move(update_embedded));
         }
         else {
             auto val = obj.get_any(col);
-            repl.set(obj.get_table().unchecked_ptr(), col, obj.get_key(), val);
-            if (embedded_table) {
-                update_embedded(val);
+            if (val.is_type(type_List)) {
+                repl.set(obj.get_table().unchecked_ptr(), col, obj.get_key(), Mixed(0, CollectionType::List));
+                Lst<Mixed> list(obj, col);
+                add_list_to_repl(list, repl, std::move(update_embedded));
+            }
+            else if (val.is_type(type_Dictionary)) {
+                repl.set(obj.get_table().unchecked_ptr(), col, obj.get_key(), Mixed(0, CollectionType::Dictionary));
+                Dictionary dict(obj, col);
+                add_dictionary_to_repl(dict, repl, std::move(update_embedded));
+            }
+            else {
+                repl.set(obj.get_table().unchecked_ptr(), col, obj.get_key(), val);
+                if (update_embedded)
+                    update_embedded(val);
             }
         }
     }
@@ -477,7 +520,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 23, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 24, target_file_format_version);
 
     // DB::do_open() must ensure that only supported version are allowed.
     // It does that by asking backup if the current file format version is
@@ -486,125 +529,6 @@ void Transaction::upgrade_file_format(int target_file_format_version)
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
-
-    // Upgrade from version prior to 7 (new history schema version in top array)
-    if (current_file_format_version <= 6 && target_file_format_version >= 7) {
-        // If top array size is 9, then add the missing 10th element containing
-        // the history schema version.
-        std::size_t top_size = m_top.size();
-        REALM_ASSERT(top_size <= 9);
-        if (top_size == 9) {
-            int initial_history_schema_version = 0;
-            m_top.add(initial_history_schema_version); // Throws
-        }
-        set_file_format_version(7);
-        commit_and_continue_writing();
-    }
-
-    // Upgrade from version prior to 10 (Cluster based db)
-    if (current_file_format_version <= 9 && target_file_format_version >= 10) {
-        DisableReplication disable_replication(*this);
-
-        std::vector<TableRef> table_accessors;
-        TableRef pk_table;
-        TableRef progress_info;
-        ColKey col_objects;
-        ColKey col_links;
-        std::map<TableRef, ColKey> pk_cols;
-
-        // Use table lookup by name. The table keys are not generated yet
-        for (size_t t = 0; t < m_table_names.size(); t++) {
-            StringData name = m_table_names.get(t);
-            // In file format version 9 files, all names represent existing tables.
-            auto table = get_table(name);
-            if (name == "pk") {
-                pk_table = table;
-            }
-            else if (name == "!UPDATE_PROGRESS") {
-                progress_info = table;
-            }
-            else {
-                table_accessors.push_back(table);
-            }
-        }
-
-        if (!progress_info) {
-            // This is the first time. Prepare for moving objects in one go.
-            progress_info = this->add_table_with_primary_key("!UPDATE_PROGRESS", type_String, "table_name");
-            col_objects = progress_info->add_column(type_Bool, "objects_migrated");
-            col_links = progress_info->add_column(type_Bool, "links_migrated");
-
-
-            for (auto k : table_accessors) {
-                k->migrate_column_info();
-            }
-
-            if (pk_table) {
-                pk_table->migrate_column_info();
-                pk_table->migrate_indexes(ColKey());
-                pk_table->create_columns();
-                pk_table->migrate_objects();
-                pk_cols = get_primary_key_columns_from_pk_table(pk_table);
-            }
-
-            for (auto k : table_accessors) {
-                k->migrate_indexes(pk_cols[k]);
-            }
-            for (auto k : table_accessors) {
-                k->migrate_subspec();
-            }
-            for (auto k : table_accessors) {
-                k->create_columns();
-            }
-            commit_and_continue_writing();
-        }
-        else {
-            if (pk_table) {
-                pk_cols = get_primary_key_columns_from_pk_table(pk_table);
-            }
-            col_objects = progress_info->get_column_key("objects_migrated");
-            col_links = progress_info->get_column_key("links_migrated");
-        }
-
-        bool updates = false;
-        for (auto k : table_accessors) {
-            if (k->verify_column_keys()) {
-                updates = true;
-            }
-        }
-        if (updates) {
-            commit_and_continue_writing();
-        }
-
-        // Migrate objects
-        for (auto k : table_accessors) {
-            auto progress_status = progress_info->create_object_with_primary_key(k->get_name());
-            if (!progress_status.get<bool>(col_objects)) {
-                bool no_links = k->migrate_objects();
-                progress_status.set(col_objects, true);
-                progress_status.set(col_links, no_links);
-                commit_and_continue_writing();
-            }
-        }
-        for (auto k : table_accessors) {
-            auto progress_status = progress_info->create_object_with_primary_key(k->get_name());
-            if (!progress_status.get<bool>(col_links)) {
-                k->migrate_links();
-                progress_status.set(col_links, true);
-                commit_and_continue_writing();
-            }
-        }
-
-        // Final cleanup
-        for (auto k : table_accessors) {
-            k->finalize_migration(pk_cols[k]);
-        }
-
-        if (pk_table) {
-            remove_table("pk");
-        }
-        remove_table(progress_info->get_key());
-    }
 
     // Ensure we have search index on all primary key columns.
     auto table_keys = get_table_keys();
@@ -699,13 +623,11 @@ void Transaction::replicate(Transaction* dest, Replication& repl) const
         auto table = get_table(tk);
         if (table->is_embedded())
             continue;
-        // std::cout << "Table: " << table->get_name() << std::endl;
         auto pk_col = table->get_primary_key_column();
         auto cols = get_col_info(table.unchecked_ptr());
         for (auto o : *table) {
             auto obj_key = o.get_key();
             Mixed pk = o.get_any(pk_col);
-            // std::cout << "    Object: " << pk << std::endl;
             repl.create_object_with_primary_key(table.unchecked_ptr(), obj_key, pk);
             generate_properties_for_obj(repl, o, cols);
             if (--n == 0) {

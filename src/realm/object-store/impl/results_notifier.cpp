@@ -280,7 +280,7 @@ bool ListResultsNotifier::do_add_required_change_info(TransactionChangeInfo& inf
         return false; // origin row was deleted after the notification was added
 
     info.collections.push_back(
-        {m_list->get_table()->get_key(), m_list->get_owner_key(), m_list->get_col_key(), &m_change});
+        {m_list->get_table()->get_key(), m_list->get_owner_key(), m_list->get_stable_path(), &m_change});
 
     m_info = &info;
     return true;

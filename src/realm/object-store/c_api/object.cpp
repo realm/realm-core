@@ -337,6 +337,15 @@ RLM_API realm_object_t* realm_set_embedded(realm_object_t* obj, realm_property_k
     });
 }
 
+RLM_API bool realm_set_collection(realm_object_t* obj, realm_property_key_t col, realm_collection_type_e type)
+{
+    return wrap_err([&]() {
+        obj->verify_attached();
+        obj->obj().set_collection(ColKey(col), *from_capi(type));
+        return true;
+    });
+}
+
 RLM_API realm_object_t* realm_get_linked_object(realm_object_t* obj, realm_property_key_t col)
 {
     return wrap_err([&]() {
@@ -357,7 +366,7 @@ RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_property_key_
         auto col_key = ColKey(key);
         table->check_column(col_key);
 
-        if (!col_key.is_list()) {
+        if (!(col_key.is_list() || col_key.get_type() == col_type_Mixed)) {
             report_type_mismatch(object->get_realm(), *table, col_key);
         }
 
@@ -376,7 +385,7 @@ RLM_API realm_set_t* realm_get_set(realm_object_t* object, realm_property_key_t 
         auto col_key = ColKey(key);
         table->check_column(col_key);
 
-        if (!col_key.is_set()) {
+        if (!(col_key.is_set() || col_key.get_type() == col_type_Mixed)) {
             report_type_mismatch(object->get_realm(), *table, col_key);
         }
 
@@ -394,7 +403,7 @@ RLM_API realm_dictionary_t* realm_get_dictionary(realm_object_t* object, realm_p
         auto col_key = ColKey(key);
         table->check_column(col_key);
 
-        if (!col_key.is_dictionary()) {
+        if (!(col_key.is_dictionary() || col_key.get_type() == col_type_Mixed)) {
             report_type_mismatch(object->get_realm(), *table, col_key);
         }
 

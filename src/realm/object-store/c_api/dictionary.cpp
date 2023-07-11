@@ -98,6 +98,57 @@ RLM_API realm_object_t* realm_dictionary_insert_embedded(realm_dictionary_t* dic
     });
 }
 
+RLM_API bool realm_dictionary_insert_collection(realm_dictionary_t* dict, realm_value_t key,
+                                                realm_collection_type_e type)
+{
+    return wrap_err([&]() {
+        if (key.type != RLM_TYPE_STRING) {
+            throw InvalidArgument{"Only string keys are supported in dictionaries"};
+        }
+
+        StringData k{key.string.data, key.string.size};
+        dict->insert_collection(k, *from_capi(type));
+        return true;
+    });
+}
+
+
+RLM_API realm_list_t* realm_dictionary_get_list(realm_dictionary_t* dictionary, realm_value_t key)
+{
+    return wrap_err([&]() {
+        if (key.type != RLM_TYPE_STRING) {
+            throw InvalidArgument{"Only string keys are supported in dictionaries"};
+        }
+
+        StringData k{key.string.data, key.string.size};
+        return new realm_list_t{dictionary->get_list(k)};
+    });
+}
+
+RLM_API realm_dictionary_t* realm_dictionary_get_dictionary(realm_dictionary_t* dictionary, realm_value_t key)
+{
+    return wrap_err([&]() {
+        if (key.type != RLM_TYPE_STRING) {
+            throw InvalidArgument{"Only string keys are supported in dictionaries"};
+        }
+
+        StringData k{key.string.data, key.string.size};
+        return new realm_dictionary_t{dictionary->get_dictionary(k)};
+    });
+}
+
+RLM_API realm_set_t* realm_dictionary_get_set(realm_dictionary_t* dictionary, realm_value_t key)
+{
+    return wrap_err([&]() {
+        if (key.type != RLM_TYPE_STRING) {
+            throw InvalidArgument{"Only string keys are supported in dictionaries"};
+        }
+
+        StringData k{key.string.data, key.string.size};
+        return new realm_set_t{dictionary->get_set(k)};
+    });
+}
+
 RLM_API realm_object_t* realm_dictionary_get_linked_object(realm_dictionary_t* dict, realm_value_t key)
 {
     return wrap_err([&]() {

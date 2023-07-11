@@ -19,6 +19,7 @@
 #include <realm/replication.hpp>
 
 #include <realm/list.hpp>
+#include <iostream>
 
 using namespace realm;
 using namespace realm::util;
@@ -98,9 +99,10 @@ void Replication::do_select_collection(const CollectionBase& list)
     select_table(list.get_table().unchecked_ptr());
     ColKey col_key = list.get_col_key();
     ObjKey key = list.get_owner_key();
+    auto path = list.get_stable_path();
 
-    m_encoder.select_collection(col_key, key); // Throws
-    m_selected_list = CollectionId(list.get_table()->get_key(), key, col_key);
+    m_encoder.select_collection(col_key, key, path); // Throws
+    m_selected_list = CollectionId(list.get_table()->get_key(), key, std::move(path));
 }
 
 void Replication::list_clear(const CollectionBase& list)
@@ -131,4 +133,10 @@ void Replication::dictionary_erase(const CollectionBase& dict, size_t ndx, Mixed
 {
     select_collection(dict);
     m_encoder.collection_erase(ndx);
+}
+
+void Replication::dictionary_clear(const CollectionBase& dict)
+{
+    select_collection(dict);
+    m_encoder.collection_clear(dict.size());
 }

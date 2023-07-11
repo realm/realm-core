@@ -40,6 +40,12 @@
 
 namespace realm {
 
+enum JSONOutputMode {
+    output_mode_json,       // default / existing implementation for outputting realm to json
+    output_mode_xjson,      // extended json as described in the spec
+    output_mode_xjson_plus, // extended json as described in the spec with additional modifier used for sync
+};
+using ref_type = size_t;
 
 /// This class represents a polymorphic Realm value.
 ///
@@ -168,6 +174,13 @@ public:
     {
     }
 
+    Mixed(ref_type ref, CollectionType collection_type) noexcept
+        : m_type(int(collection_type) + 1)
+        , int_val(int64_t(ref))
+    {
+    }
+    ref_type get_ref() const noexcept;
+
     DataType get_type() const noexcept
     {
         REALM_ASSERT(m_type);
@@ -253,6 +266,8 @@ public:
     StringData get_index_data(std::array<char, 16>&) const noexcept;
     void use_buffer(std::string& buf) noexcept;
 
+    void to_json(std::ostream& out, JSONOutputMode output_mode) const noexcept;
+
 protected:
     friend std::ostream& operator<<(std::ostream& out, const Mixed& m);
 
@@ -298,6 +313,8 @@ private:
     {
         return _is_numeric(head) && _is_numeric(tail...);
     }
+    void to_xjson(std::ostream& out) const noexcept;
+    void to_xjson_plus(std::ostream& out) const noexcept;
 };
 static_assert(std::is_trivially_destructible_v<Mixed>);
 
@@ -585,6 +602,11 @@ inline int Mixed::get<int>() const noexcept
 inline int64_t Mixed::get_int() const noexcept
 {
     return get<int64_t>();
+}
+
+inline ref_type Mixed::get_ref() const noexcept
+{
+    return ref_type(int_val);
 }
 
 template <>

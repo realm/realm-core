@@ -617,15 +617,15 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
 
         r->begin_transaction();
         table->clear();
-        auto col_typed_link = table->add_column(type_TypedLink, "typed_link_col");
+        auto col_mixed = table->add_column(type_Mixed, "typed_link_col");
         auto linked = table->create_object();
-        table->create_object(ObjKey{}, {{col_typed_link, linked.get_link()}});
+        table->create_object(ObjKey{}, {{col_mixed, linked.get_link()}});
         r->commit_transaction();
 
         // Should throw on `type_TypedLink` being a section key.
         sr = sorted.sectioned_results([&](Mixed value, SharedRealm realm) {
             auto obj = Object(realm, value.get_link());
-            return Mixed(obj.obj().get<ObjLink>(col_typed_link));
+            return obj.obj().get<Mixed>(col_mixed);
         });
         REQUIRE_EXCEPTION(sr.size(), InvalidArgument,
                           "Links are not supported as section keys."); // Trigger calculation

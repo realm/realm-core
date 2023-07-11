@@ -98,6 +98,30 @@ DataType to_core_type(PropertyType type)
     }
 }
 
+std::vector<CollectionType> process_nested_collection(const Property& property)
+{
+    std::vector<CollectionType> collection_types;
+    // process the list of nested levels
+    for (const auto& prop_type : property.nested_types) {
+        collection_types.push_back(prop_type);
+    }
+
+    // check if the final type is itself a collection.
+    if (is_array(property.type)) {
+        collection_types.push_back(CollectionType::List);
+    }
+    else if (is_set(property.type)) {
+        collection_types.push_back(CollectionType::Set);
+    }
+    else if (is_dictionary(property.type)) {
+        collection_types.push_back(CollectionType::Dictionary);
+    }
+    else if (!collection_types.empty()) {
+        throw InvalidColumnKey("Not a valid nested collection type");
+    }
+    return collection_types;
+}
+
 ColKey add_column(Group& group, Table& table, Property const& property)
 {
     // Cannot directly insert a LinkingObjects column (a computed property).
@@ -110,37 +134,16 @@ ColKey add_column(Group& group, Table& table, Property const& property)
             return col;
         }
     }
+    auto collection_types = process_nested_collection(property);
     if (property.type == PropertyType::Object) {
         auto target_name = ObjectStore::table_name_for_object_type(property.object_type);
         TableRef link_table = group.get_table(target_name);
         REALM_ASSERT(link_table);
-        if (is_array(property.type)) {
-            return table.add_column_list(*link_table, property.name);
-        }
-        else if (is_set(property.type)) {
-            return table.add_column_set(*link_table, property.name);
-        }
-        else if (is_dictionary(property.type)) {
-            return table.add_column_dictionary(*link_table, property.name);
-        }
-        else {
-            return table.add_column(*link_table, property.name);
-        }
-    }
-    else if (is_array(property.type)) {
-        return table.add_column_list(to_core_type(property.type & ~PropertyType::Flags), property.name,
-                                     is_nullable(property.type));
-    }
-    else if (is_set(property.type)) {
-        return table.add_column_set(to_core_type(property.type & ~PropertyType::Flags), property.name,
-                                    is_nullable(property.type));
-    }
-    else if (is_dictionary(property.type)) {
-        return table.add_column_dictionary(to_core_type(property.type & ~PropertyType::Flags), property.name,
-                                           is_nullable(property.type));
+        return table.add_column(*link_table, property.name, collection_types);
     }
     else {
-        auto key = table.add_column(to_core_type(property.type), property.name, is_nullable(property.type));
+        auto key = table.add_column(to_core_type(property.type), property.name, is_nullable(property.type),
+                                    collection_types);
         if (property.requires_index())
             table.add_search_index(key);
         if (property.requires_fulltext_index())

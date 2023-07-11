@@ -34,14 +34,13 @@ using VersionList = BackupHandler::VersionList;
 using VersionTimeList = BackupHandler::VersionTimeList;
 
 // Note: accepted versions should have new versions added at front
-const VersionList BackupHandler::accepted_versions_ = {23, 22, 21, 20, 11, 10, 9, 8, 7, 6, 5, 0};
+const VersionList BackupHandler::accepted_versions_ = {24, 23, 22, 21, 20, 11, 10};
 
 // the pair is <version, age-in-seconds>
 // we keep backup files in 3 months.
 static constexpr int three_months = 3 * 31 * 24 * 60 * 60;
-const VersionTimeList BackupHandler::delete_versions_{
-    {22, three_months}, {21, three_months}, {20, three_months}, {11, three_months}, {10, three_months},
-    {9, three_months},  {8, three_months},  {7, three_months},  {6, three_months},  {5, three_months}};
+const VersionTimeList BackupHandler::delete_versions_{{23, three_months}, {22, three_months}, {21, three_months},
+                                                      {20, three_months}, {11, three_months}, {10, three_months}};
 
 
 // helper functions

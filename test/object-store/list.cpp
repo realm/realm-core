@@ -1280,6 +1280,112 @@ TEST_CASE("list") {
     }
 }
 
+TEST_CASE("nested List") {
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"table",
+         {{"pk", PropertyType::Int, Property::IsPrimary{true}},
+          {"any", PropertyType::Mixed | PropertyType::Nullable}}},
+    });
+
+    auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
+
+    auto table = r->read_group().get_table("class_table");
+    ColKey col_any = table->get_column_key("any");
+
+    r->begin_transaction();
+
+    Obj obj = table->create_object_with_primary_key(47);
+    obj.set_collection(col_any, CollectionType::List);
+    auto top_list = obj.get_list<Mixed>(col_any);
+    top_list.insert(0, "Hello");
+    top_list.insert_collection(1, CollectionType::List);
+    top_list.insert(2, "Godbye");
+    top_list.insert_collection(3, CollectionType::List);
+    auto l0 = obj.get_list_ptr<Mixed>(Path{"any", 1});
+    auto l1 = obj.get_list_ptr<Mixed>(Path{"any", 3});
+
+    r->commit_transaction();
+
+    auto r2 = coordinator.get_realm();
+
+    auto write = [&](auto&& f) {
+        r->begin_transaction();
+        f();
+        r->commit_transaction();
+        advance_and_notify(*r);
+    };
+
+    SECTION("add_notification_block()") {
+        CollectionChangeSet change;
+        List lst0(r, l0);
+        List lst1(r, l1);
+
+        auto require_change = [&] {
+            auto token = lst0.add_notification_callback([&](CollectionChangeSet c) {
+                change = c;
+            });
+            advance_and_notify(*r);
+            return token;
+        };
+
+        auto require_no_change = [&] {
+            bool first = true;
+            auto token = lst0.add_notification_callback([&, first](CollectionChangeSet) mutable {
+                REQUIRE(first);
+                first = false;
+            });
+            advance_and_notify(*r);
+            return token;
+        };
+
+        SECTION("modifying the list sends a change notifications") {
+            auto token = require_change();
+            write([&] {
+                lst0.add(Mixed(8));
+            });
+            REQUIRE_INDICES(change.insertions, 0);
+            REQUIRE(!change.collection_was_cleared);
+        }
+
+        SECTION("modifying another list does not send notifications") {
+            auto token = require_no_change();
+            write([&] {
+                lst1.add(Mixed(47));
+            });
+        }
+
+        SECTION("modifying the list sends a change notifications - even when index changes") {
+            auto token = require_change();
+            write([&] {
+                obj.get_collection_ptr(col_any)->insert_collection(0, CollectionType::List);
+                lst0.add(Mixed(8));
+            });
+            REQUIRE_INDICES(change.insertions, 0);
+            REQUIRE(!change.collection_was_cleared);
+        }
+
+        SECTION("a notifier can be attached in a different transaction") {
+            {
+                r2->begin_transaction();
+                auto t = r2->read_group().get_table("class_table");
+                auto l = t->get_object_with_primary_key(47).get_list<Mixed>("any");
+                l.remove(0);
+                r2->commit_transaction();
+            }
+
+            auto token = require_change();
+            write([&] {
+                lst0.add(Mixed(8));
+            });
+            REQUIRE_INDICES(change.insertions, 0);
+            REQUIRE(!change.collection_was_cleared);
+        }
+    }
+}
+
 TEST_CASE("embedded List") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
