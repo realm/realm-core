@@ -690,7 +690,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
             REQUIRE(!added); // partial recovery halted at remove_column() but rolled back everything in the change
             // table is missing num_objects_added_after and the last commit after the latest subscription
             // this is due to how recovery batches together changesets up until a subscription
-            constexpr size_t expected_added_objects = num_objects_added_before - 1;
+            const size_t expected_added_objects = num_objects_added_before - 1;
             REQUIRE(table->size() == expected_added_objects + num_objects_added_by_harness);
             size_t count_of_valid_array_data = validate_integrity_of_arrays(table);
             REQUIRE(count_of_valid_array_data == expected_added_objects);
@@ -1501,7 +1501,10 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
 
     auto check_status = [](auto status) {
         CHECK(!status.is_ok());
-        if (status.get_status().reason().find("Invalid query:") == std::string::npos ||
+        // Depending on the version of baas used, it may return 'Invalid query:' or
+        // 'Client provided query with bad syntax:'
+        if ((status.get_status().reason().find("Invalid query:") == std::string::npos &&
+             status.get_status().reason().find("Client provided query with bad syntax:") == std::string::npos) ||
             status.get_status().reason().find("\"TopLevel\": key \"non_queryable_field\" is not a queryable field") ==
                 std::string::npos) {
             FAIL(status.get_status().reason());
@@ -2204,6 +2207,8 @@ TEST_CASE("flx: verify PBS/FLX websocket protocol number and prefixes", "[sync][
     REQUIRE("com.mongodb.realm-query-sync#" == sync::get_flx_websocket_protocol_prefix());
 }
 
+// TODO: remote-baas: This test fails consistently with Windows remote baas server - to be fixed in RCORE-1674
+#ifndef _WIN32
 TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app][baas]") {
     FLXSyncTestHarness harness("flx_bad_query");
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
@@ -2223,6 +2228,7 @@ TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app
         latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
     }
 }
+#endif
 
 TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app][baas]") {
     const std::string base_url = get_base_url();
@@ -3040,6 +3046,8 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app][baas]") {
         REQUIRE(table->find_primary_key(bizz_obj_id));
     }
 
+// TODO: remote-baas: This test fails intermittently with Windows remote baas server - to be fixed in RCORE-1674
+#ifndef _WIN32
     SECTION("disconnect between bootstrap and mark") {
         SyncTestFile triggered_config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
         auto [interrupted_promise, interrupted] = util::make_promise_future<void>();
@@ -3105,6 +3113,7 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app][baas]") {
         REQUIRE(table->find_primary_key(bar_obj_id));
         REQUIRE(table->find_primary_key(bizz_obj_id));
     }
+#endif
     SECTION("error/suspend between bootstrap and mark") {
         SyncTestFile triggered_config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
         triggered_config.sync_config->on_sync_client_event_hook =

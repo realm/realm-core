@@ -16,7 +16,7 @@
 -----------
 
 ### Internals
-* None.
+* Run baas on remote ubuntu host for evergreen object-store-tests. ([PR #6757](https://github.com/realm/realm-core/pull/6757))
 
 ----------------------------------------------
 
