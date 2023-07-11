@@ -978,17 +978,6 @@ void GroupWriter::read_in_freelist()
                 }
             }
             free_in_file.emplace_back(ref, size, 0);
-            // try to provoke an error by zeroing the block:
-            if (m_alloc.is_in_memory()) {
-                // do nothing for now
-            }
-            else {
-                MapWindow* window = get_window(ref, size);
-                char* start_addr = window->translate(ref);
-                window->encryption_read_barrier(start_addr, size);
-                memset(start_addr, 0, size);
-                window->encryption_write_barrier(start_addr, size);
-            }
         }
 
         // This will imply a copy-on-write
@@ -1379,7 +1368,7 @@ void GroupWriter::write_array_at(T* translator, ref_type ref, const char* data, 
 {
     size_t pos = size_t(ref);
 
-    REALM_ASSERT_3(pos + size, <=, to_size_t(m_group.m_top.get(2) / 2));
+    REALM_ASSERT_RELEASE(pos + size <= to_size_t(m_group.m_top.get(2) / 2));
     // REALM_ASSERT_3(pos + size, <=, m_file_map.get_size());
     char* dest_addr = translator->translate(pos);
     REALM_ASSERT_RELEASE(is_aligned(dest_addr));
