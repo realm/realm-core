@@ -43,7 +43,7 @@ public:
 class PendingBootstrapStore {
 public:
     // Constructs from a DBRef. Constructing is destructive - since pending bootstraps are only valid for the
-    // session they occured in, this will drop/clear all data when the bootstrap store is constructed.
+    // session they occurred in, this will drop/clear all data when the bootstrap store is constructed.
     //
     // Underneath this creates a table which stores each download message's changesets.
     explicit PendingBootstrapStore(DBRef db, util::Logger& logger);

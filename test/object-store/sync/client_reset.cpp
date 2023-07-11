@@ -375,12 +375,12 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
     local_config.cache = false;
     local_config.automatic_change_notifications = false;
     const std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
-    size_t before_callback_invoctions = 0;
+    size_t before_callback_invocations = 0;
     size_t after_callback_invocations = 0;
     std::mutex mtx;
     local_config.sync_config->notify_before_client_reset = [&](SharedRealm before) {
         std::lock_guard<std::mutex> lock(mtx);
-        ++before_callback_invoctions;
+        ++before_callback_invocations;
         REQUIRE(before);
         REQUIRE(before->is_frozen());
         REQUIRE(before->read_group().get_table("class_object"));
@@ -441,7 +441,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 ->on_post_reset([&](SharedRealm realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
 
-                    CHECK(before_callback_invoctions == 1);
+                    CHECK(before_callback_invocations == 1);
                     CHECK(after_callback_invocations == 1);
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 4);
@@ -494,7 +494,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 })
                 ->on_post_reset([&](SharedRealm realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
-                    CHECK(before_callback_invoctions == 1);
+                    CHECK(before_callback_invocations == 1);
                     CHECK(after_callback_invocations == 1);
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 4);
@@ -531,7 +531,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 })
                 ->on_post_reset([&](SharedRealm realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
-                    CHECK(before_callback_invoctions == 1);
+                    CHECK(before_callback_invocations == 1);
                     CHECK(after_callback_invocations == 1);
                     CHECK(results.size() == 2);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 4);
@@ -692,7 +692,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
             wait_for_upload(*remote);
             wait_for_download(*remote);
             verify_changes(remote);
-            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 1);
         }
 
@@ -739,7 +739,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 ->run();
             REQUIRE(err);
             REQUIRE(err.value()->is_client_reset_requested());
-            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 0);
         }
     } // end recovery section
@@ -759,7 +759,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 ->on_post_reset([&](SharedRealm realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
 
-                    CHECK(before_callback_invoctions == 1);
+                    CHECK(before_callback_invocations == 1);
                     CHECK(after_callback_invocations == 1);
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 6);
@@ -812,7 +812,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                     })
                     ->on_post_reset([&](SharedRealm) {
                         REQUIRE_NOTHROW(advance_and_notify(*object.get_realm()));
-                        CHECK(before_callback_invoctions == 2);
+                        CHECK(before_callback_invocations == 2);
                         CHECK(after_callback_invocations == 2);
                         // 4 -> 6
                         CHECK(results.size() == 1);
@@ -833,7 +833,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
             local_config.sync_config->notify_before_client_reset = nullptr;
             local_config.sync_config->notify_after_client_reset = nullptr;
             make_reset(local_config, remote_config)->run();
-            REQUIRE(before_callback_invoctions == 0);
+            REQUIRE(before_callback_invocations == 0);
             REQUIRE(after_callback_invocations == 0);
         }
 
@@ -849,7 +849,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 ->run();
             auto local_coordinator = realm::_impl::RealmCoordinator::get_existing_coordinator(local_config.path);
             REQUIRE(!local_coordinator);
-            REQUIRE(before_callback_invoctions == 0);
+            REQUIRE(before_callback_invocations == 0);
             REQUIRE(after_callback_invocations == 0);
             timed_sleeping_wait_for(
                 [&]() -> bool {
@@ -858,13 +858,13 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 },
                 std::chrono::seconds(60));
             // this test also relies on the test config above to verify the Realm instances in the callbacks
-            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 1);
         }
 
         SECTION("notifiers work if the session instance changes") {
             // run this test with ASAN to check for use after free
-            size_t before_callback_invoctions_2 = 0;
+            size_t before_callback_invocations_2 = 0;
             size_t after_callback_invocations_2 = 0;
             std::shared_ptr<SyncSession> session;
             std::unique_ptr<SyncConfig> config_copy;
@@ -877,7 +877,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                     std::lock_guard<std::mutex> lock(mtx);
                     REQUIRE(before_realm);
                     REQUIRE(before_realm->schema_version() != ObjectStore::NotVersioned);
-                    ++before_callback_invoctions_2;
+                    ++before_callback_invocations_2;
                 };
                 config_copy->notify_after_client_reset = [&](SharedRealm, ThreadSafeReference, bool) {
                     std::lock_guard<std::mutex> lock(mtx);
@@ -886,7 +886,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
 
                 temp_config.sync_config->notify_before_client_reset = [&](SharedRealm before_realm) {
                     std::lock_guard<std::mutex> lock(mtx);
-                    ++before_callback_invoctions;
+                    ++before_callback_invocations;
                     REQUIRE(session);
                     REQUIRE(config_copy);
                     REQUIRE(before_realm);
@@ -909,13 +909,13 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
             timed_sleeping_wait_for(
                 [&]() -> bool {
                     std::lock_guard<std::mutex> lock(mtx);
-                    return before_callback_invoctions > 0;
+                    return before_callback_invocations > 0;
                 },
                 std::chrono::seconds(120));
             millisleep(500); // just make some space for the after callback to be attempted
-            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 0);
-            REQUIRE(before_callback_invoctions_2 == 0);
+            REQUIRE(before_callback_invocations_2 == 0);
             REQUIRE(after_callback_invocations_2 == 0);
         }
 
@@ -931,7 +931,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                     ->run();
             }
             catch (const SessionInterruption&) {
-                REQUIRE(before_callback_invoctions == 0);
+                REQUIRE(before_callback_invocations == 0);
                 REQUIRE(after_callback_invocations == 0);
                 test_reset.reset();
                 auto realm = Realm::get_shared_realm(local_config);
@@ -955,7 +955,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
             }
             {
                 std::lock_guard<std::mutex> lock(mtx);
-                REQUIRE(before_callback_invoctions == 1);
+                REQUIRE(before_callback_invocations == 1);
                 REQUIRE(after_callback_invocations == 1);
             }
         }
@@ -989,7 +989,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
 
             {
                 std::lock_guard<std::mutex> lock(mtx);
-                REQUIRE(before_callback_invoctions == 1);
+                REQUIRE(before_callback_invocations == 1);
                 REQUIRE(after_callback_invocations == 1);
             }
         }
@@ -1007,7 +1007,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
 
             make_reset(local_config, remote_config)->run();
             REQUIRE(!err);
-            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 1);
         }
 
@@ -1205,7 +1205,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 ->run();
             REQUIRE(err);
             REQUIRE(err.value()->is_client_reset_requested());
-            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 0);
         }
 
@@ -1241,7 +1241,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
 
             REQUIRE(err);
             REQUIRE(err.value()->is_client_reset_requested());
-            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 0);
         }
 
@@ -1598,7 +1598,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 auto flag = has_reset_cycle_flag(realm);
                 REQUIRE(!flag);
                 std::lock_guard<std::mutex> lock(mtx);
-                ++before_callback_invoctions;
+                ++before_callback_invocations;
             };
             local_config.sync_config->notify_after_client_reset = [&](SharedRealm, ThreadSafeReference realm_ref,
                                                                       bool did_recover) {
@@ -1617,7 +1617,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 })
                 ->run();
             REQUIRE(!err);
-            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 1);
         }
         SECTION("In DiscardLocal mode: a previous failed discard reset is detected and generates an error") {
@@ -2223,7 +2223,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                             expected_state[it.first] = it.second;
                         }
                         if (local_state.find(dict_key) == local_state.end()) {
-                            expected_state.erase(dict_key); // explict erasure of initial state occured
+                            expected_state.erase(dict_key); // explict erasure of initial state occurred
                         }
                     }
                     check_dictionary(results.get<Obj>(0), expected_state);
@@ -2335,7 +2335,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                             expected.insert(e);
                         }
                         if (do_erase_initial) {
-                            expected.erase(Mixed{values[0]}); // explicit erase of initial element occured
+                            expected.erase(Mixed{values[0]}); // explicit erase of initial element occurred
                         }
                     }
                     check_set(results.get<Obj>(0), expected);
