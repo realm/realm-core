@@ -1019,7 +1019,6 @@ void GroupWriter::read_in_freelist()
 
 std::vector<GroupWriter::AugmentedFreeSpaceEntry> GroupWriter::create_combined_freelist()
 {
-
     std::vector<AugmentedFreeSpaceEntry> free_in_file;
     auto& new_free_space = m_group.m_alloc.get_free_read_only(); // Throws
     auto nb_elements =
