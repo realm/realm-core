@@ -239,6 +239,6 @@ public:
         return num_bytes;
     }
 };
-}
+} // namespace realm
 
 #endif /* REALM_NODE_HEADER_HPP */

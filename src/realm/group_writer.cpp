@@ -658,7 +658,7 @@ ref_type GroupWriter::write_group()
     if (top.size() > Group::s_evacuation_point_ndx) {
         ref_type ref = top.get_as_ref(Group::s_evacuation_point_ndx);
         if (m_evacuation_limit || m_backoff) {
-            REALM_ASSERT(ref);
+            REALM_ASSERT_RELEASE(ref);
             Array arr(m_alloc);
             arr.init_from_ref(ref);
             arr.truncate(2);
@@ -744,6 +744,17 @@ ref_type GroupWriter::write_group()
     size_t reserve_size = reserve->first;
     verify_freelists();
 
+    // Beyond this point:
+    // * Any allocation of disk space (via write()) will modify the freelist and
+    //   potentially allocate (from) a block which makes it impossible to find the
+    //   reserve_ndx used to pick the block to finally hold the top array and freelist
+    //   itself.
+    // * Any release of disk space (side effect of copy on write, or explicit destroy)
+    //   may add a free block to the freelist. This is OK, because we only fuse free
+    //   blocks earlier, when loading the freelist. Had we fused later, we might
+    //   have changed the block chosen to hold the top array and freelists, such that
+    //   reserve_pos could not be found in recreate_freelist().
+
     // Now we can check, if we can reduce the logical file size. This can be done
     // when there is only one block in m_under_evacuation, which means that all
     // nodes in this range have been moved
@@ -758,7 +769,7 @@ ref_type GroupWriter::write_group()
                 m_under_evacuation.clear();
             top.set(Group::s_file_size_ndx, RefOrTagged::make_tagged(m_logical_size));
             auto ref = top.get_as_ref(Group::s_evacuation_point_ndx);
-            REALM_ASSERT(ref);
+            REALM_ASSERT_RELEASE(ref);
             Array::destroy(ref, m_alloc);
             top.set(Group::s_evacuation_point_ndx, 0);
             m_evacuation_limit = 0;
@@ -782,12 +793,26 @@ ref_type GroupWriter::write_group()
     REALM_ASSERT_RELEASE(reserve_size == m_free_lengths.get(reserve_ndx));
     ALLOC_DBG_COUT("  Freelist size after merge: " << m_free_positions.size() << "   freelist space required: "
                                                    << max_free_space_needed << std::endl);
+
+    // At this point the freelists are fixed, except for the special entry chosen
+    // by reserve_ndx. If allocation (through write()) happens after this point,
+    // it will not be reflected in the freelists saved to disk. If release happens
+    // after this point, released blocks will not enter the freelist but be lost.
+    // Manipulations to the freelist itself and to the top array is OK, because
+    // a) they've all been allocated from slab (see read_in_freelist()), so any
+    //    released block is not in the file
+    // b) the ultimate placement of these arrays is within the explicitly managed
+    //    freeblock at reserve_ndx. The size of the freeblock is computed below
+    //    and must be strictly larger than the worst case storage needed.
+    //    An assert checks that the total memory used for these arrays does not
+    //    exceed the space in said freeblock.
+    //
     // Before we calculate the actual sizes of the free-list arrays, we must
     // make sure that the final adjustments of the free lists (i.e., the
     // deduction of the actually used space from the reserved chunk,) will not
     // change the byte-size of those arrays.
     // size_t reserve_pos = to_size_t(m_free_positions.get(reserve_ndx));
-    REALM_ASSERT_3(reserve_size, >, max_free_space_needed);
+    REALM_ASSERT_RELEASE(reserve_size > max_free_space_needed);
     int_fast64_t value_4 = to_int64(reserve_pos + max_free_space_needed);
 
 #if REALM_ENABLE_MEMDEBUG
@@ -795,15 +820,16 @@ ref_type GroupWriter::write_group()
     m_free_lengths.m_no_relocation = true;
 #endif
 
-    // Ensure that this arrays does not reposition itself
+    // Ensure that this arrays does not expand later so that we can trust
+    // the use of get_byte_size() below:
     m_free_positions.ensure_minimum_width(value_4); // Throws
 
     // Get final sizes of free-list arrays
     size_t free_positions_size = m_free_positions.get_byte_size();
     size_t free_sizes_size = m_free_lengths.get_byte_size();
     size_t free_versions_size = m_free_versions.get_byte_size();
-    REALM_ASSERT(Array::get_wtype_from_header(Array::get_header_from_data(m_free_versions.m_data)) ==
-                 Array::wtype_Bits);
+    REALM_ASSERT_RELEASE(Array::get_wtype_from_header(Array::get_header_from_data(m_free_versions.m_data)) ==
+                         Array::wtype_Bits);
 
     // Calculate write positions
     ref_type reserve_ref = to_ref(reserve_pos);
@@ -826,7 +852,7 @@ ref_type GroupWriter::write_group()
         // for what will be free eventually. Also subtract the locked space as this is not
         // actually free.
         size_t free_space = m_free_space_size + reserve_size - max_free_space_needed - m_locked_space_size;
-        REALM_ASSERT(m_logical_size > free_space);
+        REALM_ASSERT_RELEASE(m_logical_size > free_space);
         size_t used_space = m_logical_size - free_space;
         if (free_space > 2 * used_space) {
             // Clean up potential
@@ -845,13 +871,10 @@ ref_type GroupWriter::write_group()
             // std::cout << "Evacuation point = " << std::hex << m_evacuation_limit << std::dec << std::endl;
         }
     }
-
-    REALM_ASSERT_RELEASE(reserve_pos == m_free_positions.get(reserve_ndx));
-    REALM_ASSERT_RELEASE(reserve_size == m_free_lengths.get(reserve_ndx));
     // Get final sizes
     size_t top_byte_size = top.get_byte_size();
     ref_type end_ref = top_ref + top_byte_size;
-    REALM_ASSERT_3(size_t(end_ref), <=, reserve_pos + max_free_space_needed);
+    REALM_ASSERT_RELEASE(size_t(end_ref) <= reserve_pos + max_free_space_needed);
 
     // Deduct the used space from the reserved chunk. Note that we have made
     // sure that the remaining size is never zero. Also, by the call to
@@ -860,14 +883,14 @@ ref_type GroupWriter::write_group()
     // reallocation.
     size_t rest = reserve_pos + reserve_size - size_t(end_ref);
     size_t used = size_t(end_ref) - reserve_pos;
-    REALM_ASSERT_3(rest, >, 0);
+    REALM_ASSERT_RELEASE(rest > 0);
     int_fast64_t value_8 = from_ref(end_ref);
     int_fast64_t value_9 = to_int64(rest);
 
     // value_9 is guaranteed to be smaller than the existing entry in the array and hence will not cause bit
     // expansion
-    REALM_ASSERT_3(value_8, <=, Array::ubound_for_width(m_free_positions.get_width()));
-    REALM_ASSERT_3(value_9, <=, Array::ubound_for_width(m_free_lengths.get_width()));
+    REALM_ASSERT_RELEASE(value_8 <= Array::ubound_for_width(m_free_positions.get_width()));
+    REALM_ASSERT_RELEASE(value_9 <= Array::ubound_for_width(m_free_lengths.get_width()));
 
     m_free_positions.set(reserve_ndx, value_8); // Throws
     m_free_lengths.set(reserve_ndx, value_9);   // Throws
@@ -981,7 +1004,10 @@ void GroupWriter::read_in_freelist()
         m_free_lengths.copy_on_write();
         m_free_versions.copy_on_write();
     }
-
+    // At this point the arrays holding the freelist (in the file) has
+    // been released and the arrays have been allocated in slab. This ensures
+    // that manipulation of the arrays at a later time will NOT trigger a
+    // release of free space in the file.
 #if REALM_ALLOC_DEBUG
     std::cout << "  Freelist (pinned): ";
     for (auto e : m_not_free_in_file) {
