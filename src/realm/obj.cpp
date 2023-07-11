@@ -922,7 +922,7 @@ void out_mixed_json(std::ostream& out, const Mixed& val)
         }
         case type_Timestamp:
             out << "\"";
-            out << val.get<Timestamp>();
+            out << util::serializer::print_value<Timestamp>(val.get_timestamp());
             out << "\"";
             break;
         case type_Decimal:
@@ -991,7 +991,9 @@ void out_mixed_xjson(std::ostream& out, const Mixed& val)
         }
         case type_Timestamp: {
             out << "{\"$date\": {\"$numberLong\": \"";
-            out << util::serializer::print_value(val.get<Timestamp>());
+            auto ts = val.get<Timestamp>();
+            int64_t timeMillis = ts.get_seconds() * 1000 + ts.get_nanoseconds() / 1000000;
+            out << timeMillis;
             out << "\"}}";
             break;
         }
