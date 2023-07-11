@@ -595,6 +595,14 @@ Timestamp State::read_timestamp()
     int64_t nanoseconds = read_int<int64_t>(); // Throws
     if (nanoseconds > std::numeric_limits<int32_t>::max())
         parser_error("timestamp out of range");
+
+    // TODO: Remove this workaround
+    // To deal with broken changesets, instead when the seconds are positive and the nanoseconds are negative,
+    // set the nanoseconds to zero.
+    if (seconds > 0 && nanoseconds < 0) {
+        nanoseconds = 0;
+    }
+
     return Timestamp{seconds, int32_t(nanoseconds)};
 }
 
