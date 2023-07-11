@@ -309,12 +309,12 @@ TEST(Utils_File_SystemErrorMessage)
     std::error_code err = std::make_error_code(std::errc::too_many_files_open);
     std::string_view message = "my message";
 #ifdef _WIN32
-    std::string expected = util::format("%1 (SystemError %2: %3)", message, err.value(), "too many files open");
+    const char* expected = "my message: too many files open (%1)";
 #else
-    std::string expected = util::format("%1 (SystemError %2: %3)", message, err.value(), "Too many open files");
+    const char* expected = "my message: Too many open files (%1)";
 #endif
-    CHECK_THROW_CONTAINING_MESSAGE(throw SystemError(err, message), expected);
-    CHECK_THROW_CONTAINING_MESSAGE(throw SystemError(err.value(), message), expected);
+    CHECK_THROW_CONTAINING_MESSAGE(throw SystemError(err, message), message);
+    CHECK_THROW_CONTAINING_MESSAGE(throw SystemError(err.value(), message), util::format(expected, err.value()));
 }
 
 #endif
