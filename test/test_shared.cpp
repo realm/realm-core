@@ -1396,6 +1396,9 @@ TEST(Many_ConcurrentReaders)
             for (int i = 0; i < 1000; ++i) {
                 DBRef sg_r = DB::create(path_str);
                 ReadTransaction rt(sg_r);
+                ConstTableRef t = rt.get_table("table");
+                auto col_key = t->get_column_key("column");
+                REALM_ASSERT(t->get_object(0).get<StringData>(col_key) == "string");
                 rt.get_group().verify();
             }
         }
@@ -1628,7 +1631,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 #endif // encryption enabled
 
 // not ios or android
-//#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
+// #endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
 
 
 TEST(Shared_SpaceOveruse)
