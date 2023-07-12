@@ -691,71 +691,70 @@ ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, T
     return col_key;
 }
 
+template <typename Type>
+void do_bulk_insert(Table* table, StringIndex* index, ColKey col_key, Allocator& alloc)
+{
+    using LeafType = typename ColumnTypeTraits<Type>::cluster_leaf_type;
+    LeafType leaf(alloc);
+
+    auto f = [&col_key, &index, &leaf](const Cluster* cluster) {
+        cluster->init_leaf(col_key, &leaf);
+        index->insert_bulk(cluster->get_key_array(), cluster->get_offset(), cluster->node_size(), leaf);
+        return IteratorControl::AdvanceToNext;
+    };
+
+    table->traverse_clusters(f);
+}
 
 void Table::populate_search_index(ColKey col_key)
 {
     auto col_ndx = col_key.get_index().val;
     StringIndex* index = m_index_accessors[col_ndx].get();
+    DataType type = get_column_type(col_key);
 
-    // Insert ref to index
-    for (auto o : *this) {
-        ObjKey key = o.get_key();
-        DataType type = get_column_type(col_key);
-
-        if (type == type_Int) {
-            if (is_nullable(col_key)) {
-                Optional<int64_t> value = o.get<Optional<int64_t>>(col_key);
-                index->insert(key, value); // Throws
-            }
-            else {
-                int64_t value = o.get<int64_t>(col_key);
-                index->insert(key, value); // Throws
-            }
-        }
-        else if (type == type_Bool) {
-            if (is_nullable(col_key)) {
-                Optional<bool> value = o.get<Optional<bool>>(col_key);
-                index->insert(key, value); // Throws
-            }
-            else {
-                bool value = o.get<bool>(col_key);
-                index->insert(key, value); // Throws
-            }
-        }
-        else if (type == type_String) {
-            StringData value = o.get<StringData>(col_key);
-            index->insert(key, value); // Throws
-        }
-        else if (type == type_Timestamp) {
-            Timestamp value = o.get<Timestamp>(col_key);
-            index->insert(key, value); // Throws
-        }
-        else if (type == type_ObjectId) {
-            if (is_nullable(col_key)) {
-                Optional<ObjectId> value = o.get<Optional<ObjectId>>(col_key);
-                index->insert(key, value); // Throws
-            }
-            else {
-                ObjectId value = o.get<ObjectId>(col_key);
-                index->insert(key, value); // Throws
-            }
-        }
-        else if (type == type_UUID) {
-            if (is_nullable(col_key)) {
-                Optional<UUID> value = o.get<Optional<UUID>>(col_key);
-                index->insert(key, value); // Throws
-            }
-            else {
-                UUID value = o.get<UUID>(col_key);
-                index->insert(key, value); // Throws
-            }
-        }
-        else if (type == type_Mixed) {
-            index->insert(key, o.get<Mixed>(col_key));
+    if (type == type_Int) {
+        if (is_nullable(col_key)) {
+            do_bulk_insert<Optional<int64_t>>(this, index, col_key, get_alloc());
         }
         else {
-            REALM_ASSERT_RELEASE(false && "Data type does not support search index");
+            do_bulk_insert<int64_t>(this, index, col_key, get_alloc());
         }
+    }
+    else if (type == type_Bool) {
+        if (is_nullable(col_key)) {
+            do_bulk_insert<Optional<bool>>(this, index, col_key, get_alloc());
+        }
+        else {
+            do_bulk_insert<bool>(this, index, col_key, get_alloc());
+        }
+    }
+    else if (type == type_String) {
+        do_bulk_insert<StringData>(this, index, col_key, get_alloc());
+    }
+    else if (type == type_Timestamp) {
+        do_bulk_insert<Timestamp>(this, index, col_key, get_alloc());
+    }
+    else if (type == type_ObjectId) {
+        if (is_nullable(col_key)) {
+            do_bulk_insert<Optional<ObjectId>>(this, index, col_key, get_alloc());
+        }
+        else {
+            do_bulk_insert<ObjectId>(this, index, col_key, get_alloc());
+        }
+    }
+    else if (type == type_UUID) {
+        if (is_nullable(col_key)) {
+            do_bulk_insert<Optional<UUID>>(this, index, col_key, get_alloc());
+        }
+        else {
+            do_bulk_insert<UUID>(this, index, col_key, get_alloc());
+        }
+    }
+    else if (type == type_Mixed) {
+        do_bulk_insert<Mixed>(this, index, col_key, get_alloc());
+    }
+    else {
+        REALM_ASSERT_RELEASE(false && "Data type does not support search index");
     }
 }
 
@@ -888,9 +887,9 @@ void Table::do_add_search_index(ColKey col_key, IndexType type)
     m_index_accessors[column_ndx] =
         std::make_unique<StringIndex>(ClusterColumn(&m_clusters, col_key, type), get_alloc()); // Throws
     StringIndex* index = m_index_accessors[column_ndx].get();
-
     // Insert ref to index
     index->set_parent(&m_index_refs, column_ndx);
+
     m_index_refs.set(column_ndx, index->get_ref()); // Throws
 
     populate_search_index(col_key);
@@ -1262,8 +1261,10 @@ Table::~Table() noexcept
 
 IndexType Table::search_index_type(ColKey col_key) const noexcept
 {
-    if (auto index = m_index_accessors[col_key.get_index().val].get()) {
-        return index->is_fulltext_index() ? IndexType::Fulltext : IndexType::General;
+    if (m_index_accessors[col_key.get_index().val].get()) {
+        auto attr = m_spec.get_column_attr(m_leaf_ndx2spec_ndx[col_key.get_index().val]);
+        bool fulltext = attr.test(col_attr_FullText_Indexed);
+        return fulltext ? IndexType::Fulltext : IndexType::General;
     }
     return IndexType::None;
 }
@@ -1621,6 +1622,13 @@ std::optional<Mixed> Table::min(ColKey col_key, ObjKey* return_ndx) const
 std::optional<Mixed> Table::max(ColKey col_key, ObjKey* return_ndx) const
 {
     return AggregateHelper<Table>::max(*this, *this, col_key, return_ndx);
+}
+
+
+StringIndex* Table::get_search_index(ColKey col) const noexcept
+{
+    check_column(col);
+    return dynamic_cast<StringIndex*>(m_index_accessors[col.get_index().val].get());
 }
 
 template <class T>
