@@ -2358,19 +2358,23 @@ TEST_CASE("C API", "[c_api]") {
             SECTION("realm_query_parse() errors") {
                 // Invalid class key
                 CHECK(!realm_query_parse(realm, 123123123, "string == $0", num_args, arg_list));
-                CHECK_ERR_CAT(RLM_ERR_NO_SUCH_TABLE, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
+                CHECK_ERR_CAT(RLM_ERR_NO_SUCH_TABLE,
+                              (RLM_ERR_CAT_RUNTIME | RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
 
                 // Invalid syntax
                 CHECK(!realm_query_parse(realm, class_foo.key, "lel", 0, nullptr));
-                CHECK_ERR_CAT(RLM_ERR_INVALID_QUERY_STRING, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
+                CHECK_ERR_CAT(RLM_ERR_INVALID_QUERY_STRING,
+                              (RLM_ERR_CAT_RUNTIME | RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
 
                 // Invalid property
                 CHECK(!realm_query_parse(realm, class_foo.key, "strong = 5", 0, nullptr));
-                CHECK_ERR_CAT(RLM_ERR_INVALID_QUERY, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
+                CHECK_ERR_CAT(RLM_ERR_INVALID_QUERY,
+                              (RLM_ERR_CAT_RUNTIME | RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
 
                 // Invalid number of arguments
                 CHECK(!realm_query_parse(realm, class_foo.key, "string == $0", 0, nullptr));
-                CHECK_ERR_CAT(RLM_ERR_INDEX_OUT_OF_BOUNDS, (RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
+                CHECK_ERR_CAT(RLM_ERR_INDEX_OUT_OF_BOUNDS,
+                              (RLM_ERR_CAT_RUNTIME | RLM_ERR_CAT_INVALID_ARG | RLM_ERR_CAT_LOGIC));
             }
 
             SECTION("string in list") {

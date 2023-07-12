@@ -88,7 +88,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case StaleAccessor:
         case WrongThread:
         case WrongTransactionState:
-            return ErrorCategory().set(ErrorCategory::logic_error);
+            return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::logic_error);
 
         case BadServerUrl:
         case IllegalCombination:
@@ -116,7 +116,10 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case TopLevelObject:
         case TypeMismatch:
         case UnexpectedPrimaryKey:
-            return ErrorCategory().set(ErrorCategory::invalid_argument).set(ErrorCategory::logic_error);
+            return ErrorCategory()
+                .set(ErrorCategory::runtime_error)
+                .set(ErrorCategory::invalid_argument)
+                .set(ErrorCategory::logic_error);
 
         case CustomError:
             return ErrorCategory()
@@ -153,6 +156,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case APIKeyNotFound:
         case AWSError:
         case AccountNameInUse:
+        case AppServerError:
         case AppUnknownError:
         case ArgumentsNotAllowed:
         case AuthError:
@@ -214,7 +218,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
             return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::websocket_error);
 
         case UnknownError:
-            break;
+            return ErrorCategory().set(ErrorCategory::runtime_error);
     }
     return {};
 }
@@ -232,6 +236,7 @@ static const MapElem string_to_error_code[] = {
     {"AWSError", ErrorCodes::AWSError},
     {"AccountNameInUse", ErrorCodes::AccountNameInUse},
     {"AddressSpaceExhausted", ErrorCodes::AddressSpaceExhausted},
+    {"AppServerError", ErrorCodes::AppServerError},
     {"AppUnknownError", ErrorCodes::AppUnknownError},
     {"ArgumentsNotAllowed", ErrorCodes::ArgumentsNotAllowed},
     {"AuthError", ErrorCodes::AuthError},

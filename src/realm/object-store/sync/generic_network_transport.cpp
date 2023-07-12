@@ -61,19 +61,29 @@ const char* httpmethod_to_string(HttpMethod method)
     return "UNKNOWN";
 }
 
-AppError::AppError(ErrorCodes::Error error_code, std::string message, std::string link,
+AppError::AppError(ErrorCodes::Error code, std::string message, std::string link,
                    util::Optional<int> additional_error_code)
-    : RuntimeError(error_code,
-                   error_code == ErrorCodes::HTTPError ? http_message(message, *additional_error_code) : message)
+    : RuntimeError(code, code == ErrorCodes::HTTPError ? http_message(message, *additional_error_code) : message)
     , additional_status_code(additional_error_code)
     , link_to_server_logs(link)
 {
-    REALM_ASSERT(ErrorCodes::error_categories(error_code).test(ErrorCategory::app_error));
+    REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::app_error));
+    error_code = ErrorCodes::error_string(code);
+}
+
+AppError::AppError(std::string error_code, std::string message, std::string link,
+                   util::Optional<int> additional_error_code, ErrorCodes::Error code)
+    : RuntimeError(code, code == ErrorCodes::HTTPError ? http_message(message, *additional_error_code) : message)
+    , additional_status_code(additional_error_code)
+    , link_to_server_logs(link)
+    , error_code(error_code)
+{
+    REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::app_error));
 }
 
 std::ostream& operator<<(std::ostream& os, AppError error)
 {
-    return os << ErrorCodes::error_string(error.code()) << ": " << error.what();
+    return os << error.error_code << ": " << error.what();
 }
 
 } // namespace realm::app

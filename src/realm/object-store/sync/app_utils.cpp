@@ -34,11 +34,13 @@ AppUtils::find_header(const std::string& key_name, const std::map<std::string, s
     for (auto&& current : search_map) {
 #ifdef _MSC_VER
         if (key_name.size() == current.first.size() && _stricmp(key_name.c_str(), current.first.c_str()) == 0) {
-#else
-        if (key_name.size() == current.first.size() && strcasecmp(key_name.c_str(), current.first.c_str()) == 0) {
-#endif
             return &current;
         }
+#else
+        if (key_name.size() == current.first.size() && strcasecmp(key_name.c_str(), current.first.c_str()) == 0) {
+            return &current;
+        }
+#endif
     }
     return nullptr;
 }
@@ -57,11 +59,16 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
             auto link = body.find("link");
             std::string parsed_link = link == body.end() ? "" : link->get<std::string>();
 
-            if (auto error_code = body.find("error_code");
-                error_code != body.end() && !error_code->get<std::string>().empty()) {
-                return AppError(ErrorCodes::from_string(body["error_code"].get<std::string>()),
-                                message != body.end() ? message->get<std::string>() : "no error message",
-                                std::move(parsed_link), response.http_status_code);
+            if (auto error = body.find("error_code"); error != body.end() && !error->get<std::string>().empty()) {
+                auto err_code = error->get<std::string>();
+                auto code = ErrorCodes::from_string(err_code);
+                auto err_string = message != body.end() ? message->get<std::string>() : "no error message";
+                // If the err_code is not found or not an app error, create a generic AppError of type AppServerError
+                if (code == ErrorCodes::UnknownError ||
+                    !ErrorCodes::error_categories(code).test(ErrorCategory::app_error)) {
+                    code = ErrorCodes::AppServerError;
+                }
+                return AppError(err_code, err_string, std::move(parsed_link), response.http_status_code, code);
             }
             else if (message != body.end()) {
                 return AppError(ErrorCodes::AppUnknownError, message->get<std::string>(), std::move(parsed_link),

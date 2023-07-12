@@ -35,9 +35,13 @@ struct AppError : public RuntimeError {
     util::Optional<int> additional_status_code;
 
     std::string link_to_server_logs;
+    std::string error_code;
 
     AppError(ErrorCodes::Error error_code, std::string message, std::string link = "",
              util::Optional<int> additional_error_code = util::none);
+
+    AppError(std::string error_code, std::string message, std::string link = "",
+             util::Optional<int> additional_error_code = util::none, ErrorCodes::Error = ErrorCodes::AppServerError);
 
     bool is_json_error() const
     {
