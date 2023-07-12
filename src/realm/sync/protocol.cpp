@@ -151,6 +151,117 @@ const char* get_protocol_error_message(int error_code) noexcept
     return nullptr;
 }
 
+
+Status protocol_error_to_status(int raw_error_code, std::string_view msg)
+{
+    auto err_code = [&] {
+        switch (ProtocolError(raw_error_code)) {
+            case ProtocolError::connection_closed:
+                return ErrorCodes::ConnectionClosed;
+            case ProtocolError::other_error:
+                return ErrorCodes::RuntimeError;
+            case ProtocolError::unknown_message:
+                return ErrorCodes::SyncProtocolInvariantFailed;
+            case ProtocolError::bad_syntax:
+                return ErrorCodes::SyncProtocolInvariantFailed;
+            case ProtocolError::limits_exceeded:
+                REALM_UNREACHABLE();
+            case ProtocolError::wrong_protocol_version:
+                return ErrorCodes::SyncProtocolNegotiationFailed;
+            case ProtocolError::bad_session_ident:
+                return ErrorCodes::SyncProtocolInvariantFailed;
+            case ProtocolError::reuse_of_session_ident:
+                return ErrorCodes::SyncProtocolInvariantFailed;
+            case ProtocolError::bound_in_other_session:
+                return ErrorCodes::SyncProtocolInvariantFailed;
+            case ProtocolError::bad_message_order:
+                return ErrorCodes::SyncProtocolInvariantFailed;
+            case ProtocolError::bad_decompression:
+                return ErrorCodes::RuntimeError;
+            case ProtocolError::bad_changeset_header_syntax:
+                return ErrorCodes::SyncProtocolInvariantFailed;
+            case ProtocolError::bad_changeset_size:
+                return ErrorCodes::SyncProtocolInvariantFailed;
+            case ProtocolError::switch_to_flx_sync:
+                return ErrorCodes::WrongSyncType;
+            case ProtocolError::switch_to_pbs:
+                return ErrorCodes::WrongSyncType;
+
+            case ProtocolError::session_closed:
+                REALM_UNREACHABLE();
+            case ProtocolError::other_session_error:
+                return ErrorCodes::RuntimeError;
+            case ProtocolError::token_expired:
+                REALM_UNREACHABLE();
+            case ProtocolError::bad_authentication:
+                REALM_UNREACHABLE();
+            case ProtocolError::illegal_realm_path:
+                return ErrorCodes::BadSyncPartitionValue;
+            case ProtocolError::no_such_realm:
+                REALM_UNREACHABLE();
+            case ProtocolError::permission_denied:
+                return ErrorCodes::SyncPermissionDenied;
+            case ProtocolError::bad_server_file_ident:
+                REALM_UNREACHABLE();
+            case ProtocolError::bad_client_file_ident:
+                return ErrorCodes::SyncClientResetRequired;
+            case ProtocolError::bad_server_version:
+                return ErrorCodes::SyncClientResetRequired;
+            case ProtocolError::bad_client_version:
+                return ErrorCodes::SyncClientResetRequired;
+            case ProtocolError::diverging_histories:
+                return ErrorCodes::SyncClientResetRequired;
+            case ProtocolError::bad_changeset:
+                return ErrorCodes::BadChangeset;
+            case ProtocolError::partial_sync_disabled:
+                REALM_UNREACHABLE();
+            case ProtocolError::unsupported_session_feature:
+                REALM_UNREACHABLE();
+            case ProtocolError::bad_origin_file_ident:
+                return ErrorCodes::SyncProtocolInvariantFailed;
+            case ProtocolError::bad_client_file:
+                return ErrorCodes::SyncClientResetRequired;
+            case ProtocolError::server_file_deleted:
+                REALM_UNREACHABLE();
+            case ProtocolError::client_file_blacklisted:
+                REALM_UNREACHABLE();
+            case ProtocolError::user_blacklisted:
+                REALM_UNREACHABLE();
+            case ProtocolError::transact_before_upload:
+                REALM_UNREACHABLE();
+            case ProtocolError::client_file_expired:
+                return ErrorCodes::SyncClientResetRequired;
+            case ProtocolError::user_mismatch:
+                return ErrorCodes::SyncUserMismatch;
+            case ProtocolError::too_many_sessions:
+                REALM_UNREACHABLE();
+            case ProtocolError::invalid_schema_change:
+                return ErrorCodes::InvalidSchemaChange;
+            case ProtocolError::bad_query:
+                return ErrorCodes::InvalidSubscriptionQuery;
+            case ProtocolError::object_already_exists:
+                return ErrorCodes::ObjectAlreadyExists;
+            case ProtocolError::server_permissions_changed:
+                return ErrorCodes::SyncServerPermissionsChanged;
+            case ProtocolError::initial_sync_not_completed:
+                return ErrorCodes::ConnectionClosed;
+            case ProtocolError::write_not_allowed:
+                return ErrorCodes::SyncWriteNotAllowed;
+            case ProtocolError::compensating_write:
+                return ErrorCodes::SyncCompensatingWrite;
+            case ProtocolError::migrate_to_flx:
+                return ErrorCodes::WrongSyncType;
+            case ProtocolError::bad_progress:
+                return ErrorCodes::SyncProtocolInvariantFailed;
+            case ProtocolError::revert_to_pbs:
+                return ErrorCodes::WrongSyncType;
+        }
+        return ErrorCodes::UnknownError;
+    }();
+
+    return {err_code, msg};
+}
+
 const std::error_category& protocol_error_category() noexcept
 {
     return g_error_category;

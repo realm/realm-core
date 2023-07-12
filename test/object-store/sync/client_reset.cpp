@@ -79,7 +79,7 @@ struct StringMaker<ThreadSafeSyncError> {
         if (!value) {
             return "No SyncError";
         }
-        return realm::util::format("SyncError(%1), is_fatal: %2, with message: '%3'", value->get_system_error(),
+        return realm::util::format("SyncError(%1), is_fatal: %2, with message: '%3'", value->code_string(),
                                    value->is_fatal, value->reason());
     }
 };
@@ -132,7 +132,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset][baas
     SyncTestFile realm_config(app->current_user(), partition.value, schema);
     realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        if (err.get_system_error() == util::make_error_code(util::MiscExtErrors::end_of_input)) {
+        if (err.code() == ErrorCodes::ConnectionClosed) {
             return;
         }
 
@@ -141,7 +141,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset][baas
             return;
         }
 
-        FAIL(util::format("got error from server: %1: %2", err.get_system_error().value(), err.what()));
+        FAIL(util::format("got error from server: %1", err.to_status()));
     };
 
     auto realm = Realm::get_shared_realm(realm_config);
@@ -227,7 +227,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
     SyncTestFile realm_config(app->current_user(), partition.value, schema);
     realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        if (err.get_system_error() == sync::websocket::WebSocketError::websocket_read_error) {
+        if (err.code() == ErrorCodes::ConnectionClosed) {
             return;
         }
 
@@ -236,7 +236,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
             return;
         }
 
-        FAIL(util::format("got error from server: %1: %2", err.get_system_error().value(), err.what()));
+        FAIL(util::format("got error from server: %1", err.to_status()));
     };
 
     auto realm = Realm::get_shared_realm(realm_config);
@@ -896,8 +896,10 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 session = test_app_session.app()->sync_manager()->get_existing_session(temp_config.path);
                 REQUIRE(session);
             }
-            sync::SessionErrorInfo synthetic(sync::make_error_code(sync::ProtocolError::bad_client_file),
-                                             "A fake client reset error", false);
+            sync::SessionErrorInfo synthetic(
+                sync::protocol_error_to_status(static_cast<int>(sync::ProtocolError::bad_client_file),
+                                               "A fake client reset error"),
+                false);
             synthetic.server_requests_action = sync::ProtocolErrorInfo::Action::ClientReset;
             SyncSession::OnlyForTesting::handle_error(*session, std::move(synthetic));
 
@@ -2408,8 +2410,7 @@ struct Remove {
     util::Optional<int64_t> pk;
 };
 
-struct Clear {
-};
+struct Clear {};
 
 struct RemoveObject {
     RemoveObject(std::string_view name, util::Optional<int64_t> key)

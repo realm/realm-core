@@ -483,6 +483,7 @@ public:
     void websocket_connected_handler(const std::string& protocol);
     bool websocket_binary_message_received(util::Span<const char> data);
     void websocket_error_handler();
+    bool websocket_closed_handler(bool, websocket::WebSocketError, std::string_view);
     bool websocket_closed_handler(bool, Status);
 
     connection_ident_type get_ident() const noexcept;
@@ -564,10 +565,10 @@ private:
     void initiate_disconnect_wait();
     void handle_disconnect_wait(Status status);
     void read_or_write_error(std::error_code ec, std::string_view msg);
-    void close_due_to_protocol_error(std::error_code, std::optional<std::string_view> msg = std::nullopt);
+    void close_due_to_protocol_error(Status status);
 
-    void close_due_to_client_side_error(std::error_code, std::optional<std::string_view> msg, IsFatal is_fatal,
-                                        ConnectionTerminationReason reason);
+    void close_due_to_network_error(Status, IsFatal, ConnectionTerminationReason, websocket::WebSocketError error);
+    void close_due_to_client_side_error(Status, IsFatal is_fatal, ConnectionTerminationReason reason);
     void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
     void involuntary_disconnect(const SessionErrorInfo& info, ConnectionTerminationReason reason);
     void disconnect(const SessionErrorInfo& info);
@@ -583,7 +584,6 @@ private:
     void receive_mark_message(session_ident_type, request_ident_type);
     void receive_unbound_message(session_ident_type);
     void receive_test_command_response(session_ident_type, request_ident_type, std::string_view body);
-    void handle_protocol_error(ClientProtocol::Error);
 
     // These are only called from Session class.
     void enlist_to_send(Session*);
@@ -1210,21 +1210,20 @@ private:
     void send_query_change_message();
     void send_json_error_message();
     void send_test_command_message();
-    std::error_code receive_ident_message(SaltedFileIdent);
+    Status receive_ident_message(SaltedFileIdent);
     void receive_download_message(const SyncProgress&, std::uint_fast64_t downloadable_bytes,
                                   DownloadBatchState last_in_batch, int64_t query_version, const ReceivedChangesets&);
-    std::error_code receive_mark_message(request_ident_type);
-    std::error_code receive_unbound_message();
-    std::error_code receive_error_message(const ProtocolErrorInfo& info);
-    std::error_code receive_query_error_message(int error_code, std::string_view message, int64_t query_version);
-    std::error_code receive_test_command_response(request_ident_type, std::string_view body);
+    Status receive_mark_message(request_ident_type);
+    Status receive_unbound_message();
+    Status receive_error_message(const ProtocolErrorInfo& info);
+    Status receive_query_error_message(int error_code, std::string_view message, int64_t query_version);
+    Status receive_test_command_response(request_ident_type, std::string_view body);
 
     void initiate_rebind();
     void reset_protocol_state() noexcept;
     void ensure_enlisted_to_send();
     void enlist_to_send();
-    bool check_received_sync_progress(const SyncProgress&) noexcept;
-    bool check_received_sync_progress(const SyncProgress&, int&) noexcept;
+    Status check_received_sync_progress(const SyncProgress&) noexcept;
     void check_for_upload_completion();
     void check_for_download_completion();
 
@@ -1311,7 +1310,8 @@ inline void ClientImpl::Connection::voluntary_disconnect()
 {
     m_reconnect_info.update(ConnectionTerminationReason::closed_voluntarily, std::nullopt);
     constexpr bool try_again = true;
-    disconnect(SessionErrorInfo{ClientError::connection_closed, try_again}); // Throws
+    disconnect(SessionErrorInfo{Status{ErrorCodes::ConnectionClosed, "Connection closed voluntarily"}, try_again,
+                                ProtocolError::connection_closed}); // Throws
 }
 
 inline void ClientImpl::Connection::involuntary_disconnect(const SessionErrorInfo& info,
@@ -1629,12 +1629,6 @@ inline void ClientImpl::Session::enlist_to_send()
     REALM_ASSERT(!m_enlisted_to_send);
     m_enlisted_to_send = true;
     m_conn.enlist_to_send(this); // Throws
-}
-
-inline bool ClientImpl::Session::check_received_sync_progress(const SyncProgress& progress) noexcept
-{
-    int error_code = 0; // Dummy
-    return check_received_sync_progress(progress, error_code);
 }
 
 } // namespace sync

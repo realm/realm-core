@@ -73,6 +73,11 @@ public:
     inline ErrorCodes::Error code() const noexcept;
     inline std::string_view code_string() const noexcept;
 
+    bool is_same_as(const Status& other) const noexcept
+    {
+        return m_error == other.m_error;
+    }
+
     /*
      * This class is marked nodiscard so that we always handle errors. If there is a place where we need
      * to explicitly ignore an error, you can call this function, which does nothing, to satisfy the compiler.

@@ -944,10 +944,10 @@ private:
         return true;
     }
 
-    std::pair<std::error_code, StringData> parse_close_message(const char* data, size_t size)
+    std::pair<WebSocketError, std::string_view> parse_close_message(const char* data, size_t size)
     {
         uint16_t error_code;
-        StringData error_message;
+        std::string_view error_message;
         if (size < 2) {
             // Error code 1005 is defined as
             //     1005 is a reserved value and MUST NOT be set as a status code in a
@@ -962,11 +962,36 @@ private:
             // network byte order. See https://tools.ietf.org/html/rfc6455#section-5.5.1 for more
             // details.
             error_code = ntohs((uint8_t(data[1]) << 8) | uint8_t(data[0]));
-            error_message = StringData(data + 2, size - 2);
+            error_message = std::string_view(data + 2, size - 2);
         }
 
-        std::error_code error_code_with_category{error_code, websocket::websocket_error_category()};
-        return std::make_pair(error_code_with_category, error_message);
+        switch (static_cast<WebSocketError>(error_code)) {
+            case WebSocketError::websocket_ok:
+            case WebSocketError::websocket_going_away:
+            case WebSocketError::websocket_protocol_error:
+            case WebSocketError::websocket_unsupported_data:
+            case WebSocketError::websocket_reserved:
+            case WebSocketError::websocket_no_status_received:
+            case WebSocketError::websocket_abnormal_closure:
+            case WebSocketError::websocket_invalid_payload_data:
+            case WebSocketError::websocket_policy_violation:
+            case WebSocketError::websocket_message_too_big:
+            case WebSocketError::websocket_invalid_extension:
+            case WebSocketError::websocket_internal_server_error:
+            case WebSocketError::websocket_tls_handshake_failed:
+
+            case WebSocketError::websocket_unauthorized:
+            case WebSocketError::websocket_forbidden:
+            case WebSocketError::websocket_moved_permanently:
+            case WebSocketError::websocket_client_too_old:
+            case WebSocketError::websocket_client_too_new:
+            case WebSocketError::websocket_protocol_mismatch:
+                break;
+            default:
+                error_code = 1008;
+        }
+
+        return std::make_pair(static_cast<WebSocketError>(error_code), error_message);
     }
 
     // frame_reader_loop() uses the frame_reader to read and process the incoming
@@ -1206,7 +1231,7 @@ bool websocket::Config::websocket_binary_message_received(const char*, size_t)
     return true;
 }
 
-bool websocket::Config::websocket_close_message_received(std::error_code, StringData)
+bool websocket::Config::websocket_close_message_received(WebSocketError, std::string_view)
 {
     return true;
 }

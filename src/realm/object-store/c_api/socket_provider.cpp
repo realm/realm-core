@@ -122,9 +122,9 @@ public:
         return m_observer->websocket_binary_message_received(data);
     }
 
-    bool websocket_closed_handler(bool was_clean, Status status) final
+    bool websocket_closed_handler(bool was_clean, sync::websocket::WebSocketError code, std::string_view msg) final
     {
-        return m_observer->websocket_closed_handler(was_clean, status);
+        return m_observer->websocket_closed_handler(was_clean, code, msg);
     }
 
 private:
@@ -249,11 +249,8 @@ RLM_API void realm_sync_socket_websocket_message(realm_websocket_observer_t* rea
 RLM_API void realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
                                                 realm_web_socket_errno_e code, const char* reason)
 {
-    auto status = sync::websocket::WebSocketError(code);
-    auto closed_status = code == realm_web_socket_errno_e::RLM_ERR_WEBSOCKET_OK
-                             ? Status::OK()
-                             : Status{sync::websocket::make_error_code(status), reason};
-    realm_websocket_observer->get()->websocket_closed_handler(was_clean, closed_status);
+    realm_websocket_observer->get()->websocket_closed_handler(
+        was_clean, static_cast<sync::websocket::WebSocketError>(code), reason);
 }
 
 RLM_API void realm_sync_client_config_set_sync_socket(realm_sync_client_config_t* config,

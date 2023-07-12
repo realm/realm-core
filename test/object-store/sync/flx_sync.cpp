@@ -634,8 +634,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
                 auto sync_error = wait_for_future(std::move(err_future)).get();
                 REQUIRE(before_reset_count == 1);
                 REQUIRE(after_reset_count == 0);
-                REQUIRE(sync_error.get_system_error() ==
-                        sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+                REQUIRE(sync_error.code() == ErrorCodes::AutoClientResetFailed);
                 REQUIRE(sync_error.is_client_reset_requested());
                 local_realm->refresh();
                 auto table = local_realm->read_group().get_table("class_TopLevel");
@@ -681,8 +680,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
             auto sync_error = wait_for_future(std::move(err_future)).get();
             REQUIRE(before_reset_count == 1);
             REQUIRE(after_reset_count == 0);
-            REQUIRE(sync_error.get_system_error() ==
-                    sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+            REQUIRE(sync_error.code() == ErrorCodes::AutoClientResetFailed);
             REQUIRE(sync_error.is_client_reset_requested());
             local_realm->refresh();
             auto table = local_realm->read_group().get_table("class_TopLevel");
@@ -709,8 +707,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
             auto sync_error = wait_for_future(std::move(error_future2)).get();
             REQUIRE(before_reset_count == 2);
             REQUIRE(after_reset_count == 0);
-            REQUIRE(sync_error.get_system_error() ==
-                    sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+            REQUIRE(sync_error.code() == ErrorCodes::AutoClientResetFailed);
             REQUIRE(sync_error.is_client_reset_requested());
         }
 
@@ -850,8 +847,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
             ->on_post_reset([&, err_future = std::move(error_future)](SharedRealm) mutable {
                 auto sync_error = wait_for_future(std::move(err_future)).get();
                 INFO(sync_error.reason());
-                CHECK(sync_error.get_system_error() ==
-                      sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+                REQUIRE(sync_error.code() == ErrorCodes::AutoClientResetFailed);
             })
             ->run();
     }
@@ -884,7 +880,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
 
         // Client reset fails due to sync client not being able to create the fresh realm.
         auto sync_error = wait_for_future(std::move(error_future)).get();
-        CHECK(sync_error.get_system_error() == sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+        REQUIRE(sync_error.code() == ErrorCodes::AutoClientResetFailed);
 
         // Open the realm again. This should not crash.
         {
@@ -894,8 +890,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
 
             auto realm_post_reset = Realm::get_shared_realm(config_copy);
             auto sync_error = wait_for_future(std::move(err_future)).get();
-            CHECK(sync_error.get_system_error() ==
-                  sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+            REQUIRE(sync_error.code() == ErrorCodes::AutoClientResetFailed);
         }
     }
 
@@ -1264,8 +1259,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
 
     auto validate_sync_error = [&](const SyncError& sync_error, Mixed expected_pk, const char* expected_object_name,
                                    const std::string& error_msg_fragment) {
-        CHECK(sync_error.get_system_error() == sync::make_error_code(sync::ProtocolError::compensating_write));
-        CHECK(sync_error.is_session_level_protocol_error());
+        CHECK(sync_error.code() == ErrorCodes::SyncCompensatingWrite);
         CHECK(!sync_error.is_client_reset_requested());
         CHECK(sync_error.compensating_writes_info.size() == 1);
         CHECK(sync_error.server_requests_action == sync::ProtocolErrorInfo::Action::Warning);
@@ -2255,7 +2249,7 @@ TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][app][baas]
         return static_cast<bool>(sync_error);
     });
 
-    CHECK(sync_error->get_system_error() == make_error_code(sync::ProtocolError::switch_to_flx_sync));
+    CHECK(sync_error->code() == ErrorCodes::WrongSyncType);
     CHECK(sync_error->server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
 }
 
@@ -2297,7 +2291,7 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app][baas]
         return static_cast<bool>(sync_error);
     });
 
-    CHECK(sync_error->get_system_error() == make_error_code(sync::ProtocolError::switch_to_pbs));
+    CHECK(sync_error->code() == ErrorCodes::WrongSyncType);
     CHECK(sync_error->server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
 }
 
@@ -2451,7 +2445,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
         auto realm = Realm::get_shared_realm(interrupted_realm_config);
         const auto& error = error_pf.future.get();
         REQUIRE(error.is_fatal);
-        REQUIRE(error.get_system_error() == make_error_code(sync::ClientError::bad_changeset));
+        REQUIRE(error.code() == ErrorCodes::BadChangeset);
     }
 
     SECTION("interrupted before final bootstrap message") {
@@ -2776,11 +2770,11 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app][baas]") {
                 ++error_count;
                 if (error_count == 1) {
                     // Bad changeset detected by the client.
-                    CHECK(err.get_system_error() == sync::make_error_code(sync::ClientError::bad_changeset));
+                    CHECK(err.code() == ErrorCodes::BadChangeset);
                 }
                 else if (error_count == 2) {
                     // Server asking for a client reset.
-                    CHECK(err.get_system_error() == sync::make_error_code(sync::ProtocolError::bad_client_file));
+                    CHECK(err.code() == ErrorCodes::SyncClientResetRequired);
                     CHECK(err.is_client_reset_requested());
                     promise.get_promise().emplace_value(std::move(err));
                 }
@@ -2895,10 +2889,8 @@ TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app][baas]") {
 
             CppContext c(realm);
             realm->begin_transaction();
-            Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
-            Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", bar_obj_id}, {"location", "bar"s}}));
+            Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
+            Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", bar_obj_id}, {"location", "bar"s}}));
             realm->commit_transaction();
 
             wait_for_upload(*realm);
@@ -2921,11 +2913,11 @@ TEST_CASE("flx: send client error", "[sync][flx][app][baas]") {
         ++error_count;
         if (error_count == 1) {
             // Bad changeset detected by the client.
-            CHECK(err.get_system_error() == sync::make_error_code(sync::ClientError::bad_changeset));
+            CHECK(err.code() == ErrorCodes::BadChangeset);
         }
         else if (error_count == 2) {
             // Server asking for a client reset.
-            CHECK(err.get_system_error() == sync::make_error_code(sync::ProtocolError::bad_client_file));
+            CHECK(err.code() == ErrorCodes::SyncClientResetRequired);
             CHECK(err.is_client_reset_requested());
             promise.get_promise().emplace_value(std::move(err));
         }
@@ -3440,7 +3432,7 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
 
     config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
         std::unique_lock<std::mutex> lk(errors_mutex);
-        REQUIRE(error.get_system_error() == make_error_code(sync::ProtocolError::compensating_write));
+        REQUIRE(error.code() == ErrorCodes::SyncCompensatingWrite);
         for (const auto& compensating_write : error.compensating_writes_info) {
             auto tracked_error = std::find_if(error_to_download_version.begin(), error_to_download_version.end(),
                                               [&](const auto& pair) {

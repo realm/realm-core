@@ -401,38 +401,23 @@ TEST_CASE("sync: error handling", "[sync]") {
     });
 
     SECTION("Doesn't treat unknown system errors as being fatal") {
-        std::error_code code = std::error_code{EBADF, std::generic_category()};
-        sync::SessionErrorInfo err{code, "Not a real error message", true};
+        sync::SessionErrorInfo err{Status{ErrorCodes::UnknownError, "unknown error"}, true};
         err.server_requests_action = ProtocolErrorInfo::Action::Transient;
         SyncSession::OnlyForTesting::handle_error(*session, std::move(err));
         CHECK(!sessions_are_inactive(*session));
     }
 
     SECTION("Properly handles a client reset error") {
-        int code = 0;
         util::Optional<SyncError> final_error;
         error_handler = [&](auto, SyncError error) {
             final_error = std::move(error);
         };
 
-        SECTION("for bad_server_file_ident") {
-            code = static_cast<int>(ProtocolError::bad_server_file_ident);
-        }
+        auto code =
+            static_cast<int>(GENERATE(ProtocolError::bad_server_file_ident, ProtocolError::bad_client_file_ident,
+                                      ProtocolError::bad_server_version, ProtocolError::diverging_histories));
 
-        SECTION("for bad_client_file_ident") {
-            code = static_cast<int>(ProtocolError::bad_client_file_ident);
-        }
-
-        SECTION("for bad_server_version") {
-            code = static_cast<int>(ProtocolError::bad_server_version);
-        }
-
-        SECTION("for diverging_histories") {
-            code = static_cast<int>(ProtocolError::diverging_histories);
-        }
-
-        sync::SessionErrorInfo initial_error{std::error_code{code, realm::sync::protocol_error_category()},
-                                             "Something bad happened", true};
+        sync::SessionErrorInfo initial_error{sync::protocol_error_to_status(code, "Something bad happened"), true};
         initial_error.server_requests_action = ProtocolErrorInfo::Action::ClientReset;
         std::time_t just_before_raw = std::time(nullptr);
         SyncSession::OnlyForTesting::handle_error(*session, std::move(initial_error));
@@ -477,7 +462,6 @@ struct RegularUser {
 
 TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
 {
-    using ProtocolError = realm::sync::ProtocolError;
     const std::string dummy_auth_url = "https://realm.example.org";
     if (!EventLoop::has_implementation())
         return;
@@ -552,9 +536,8 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
         }
 
         SECTION("transitions to Inactive if a fatal error occurs") {
-            std::error_code code =
-                std::error_code{static_cast<int>(ProtocolError::bad_syntax), realm::sync::protocol_error_category()};
-            sync::SessionErrorInfo err{code, "Not a real error message", false};
+            Status err_status(ErrorCodes::SyncProtocolInvariantFailed, "Not a real error message");
+            sync::SessionErrorInfo err{err_status, false};
             err.server_requests_action = realm::sync::ProtocolErrorInfo::Action::ProtocolViolation;
             SyncSession::OnlyForTesting::handle_error(*session, std::move(err));
             CHECK(sessions_are_inactive(*session));
@@ -564,9 +547,8 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
 
         SECTION("ignores non-fatal errors and does not transition to Inactive") {
             // Fire a simulated *non-fatal* error.
-            std::error_code code =
-                std::error_code{static_cast<int>(ProtocolError::other_error), realm::sync::protocol_error_category()};
-            sync::SessionErrorInfo err{code, "Not a real error message", true};
+            Status err_status(ErrorCodes::RuntimeError, "Not a real error message");
+            sync::SessionErrorInfo err{err_status, true};
             err.server_requests_action = realm::sync::ProtocolErrorInfo::Action::Transient;
             SyncSession::OnlyForTesting::handle_error(*session, std::move(err));
             REQUIRE(session->state() == SyncSession::State::Dying);

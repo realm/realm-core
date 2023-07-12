@@ -4,6 +4,7 @@
 #include <realm/db.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/sync/network/websocket_error.hpp>
 #include <realm/util/functional.hpp>
 
 namespace realm::sync {
@@ -305,22 +306,23 @@ struct ClientConfig {
 ///
 /// \sa set_connection_state_change_listener().
 struct SessionErrorInfo : public ProtocolErrorInfo {
-    SessionErrorInfo(const ProtocolErrorInfo& info, const std::error_code& ec)
+    SessionErrorInfo(const ProtocolErrorInfo& info)
         : ProtocolErrorInfo(info)
-        , error_code(ec)
+        , status(protocol_error_to_status(raw_error_code, message))
     {
     }
-    SessionErrorInfo(const std::error_code& ec, bool try_again)
-        : ProtocolErrorInfo(ec.value(), ec.message(), try_again)
-        , error_code(ec)
+
+    SessionErrorInfo(Status status, bool try_again, ProtocolError protocol_error = ProtocolError::other_session_error)
+        : ProtocolErrorInfo(static_cast<int>(protocol_error), status.reason(), try_again)
+        , status(std::move(status))
     {
     }
-    SessionErrorInfo(const std::error_code& ec, const std::string& msg, bool try_again)
-        : ProtocolErrorInfo(ec.value(), msg, try_again)
-        , error_code(ec)
-    {
-    }
-    std::error_code error_code;
+
+    Status status;
+
+    // If this error was created as a result of a network error, this will contain the closure code
+    // from the websocket close message.
+    websocket::WebSocketError websocket_error = websocket::WebSocketError::websocket_ok;
 };
 
 enum class ConnectionState { disconnected, connecting, connected };

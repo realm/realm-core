@@ -2472,7 +2472,7 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
         SyncTestFile r_config(user1, partition, schema);
         // Override the default
         r_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-            if (error.get_system_error() == sync::make_error_code(realm::sync::ProtocolError::bad_authentication)) {
+            if (error.code() == ErrorCodes::AuthError) {
                 util::format(std::cerr, "Websocket redirect test: User logged out\n");
                 std::unique_lock lk(logout_mutex);
                 logged_out = true;
@@ -2769,8 +2769,7 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
             std::atomic<bool> sync_error_handler_called{false};
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 sync_error_handler_called.store(true);
-                REQUIRE(error.get_system_error() ==
-                        sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
+                REQUIRE(error.code() == ErrorCodes::AuthError);
                 REQUIRE(error.reason() == "Unable to refresh the user access token.");
             };
             auto r = Realm::get_shared_realm(config);
@@ -2869,8 +2868,7 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 std::lock_guard<std::mutex> lock(mtx);
                 sync_error_handler_called.store(true);
-                REQUIRE(error.get_system_error() ==
-                        sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
+                REQUIRE(error.code() == ErrorCodes::AuthError);
                 REQUIRE(error.reason() == "Unable to refresh the user access token.");
             };
 
@@ -3100,7 +3098,7 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
         r->commit_transaction();
 
         auto error = wait_for_future(std::move(pf.future), std::chrono::minutes(5)).get();
-        REQUIRE(error.get_system_error() == make_error_code(sync::ProtocolError::limits_exceeded));
+        REQUIRE(error.code() == ErrorCodes::LimitExceeded);
         REQUIRE(error.reason() == "Sync websocket closed because the server received a message that was too large: "
                                   "read limited at 16777217 bytes");
         REQUIRE(error.is_client_reset_requested());

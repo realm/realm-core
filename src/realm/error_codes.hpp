@@ -108,6 +108,23 @@ public:
         BadVersion = RLM_ERR_BAD_VERSION,
         OperationAborted = RLM_ERR_OPERATION_ABORTED,
 
+        AutoClientResetFailed = RLM_ERR_AUTO_CLIENT_RESET_FAILED,
+        BadSyncPartitionValue = RLM_ERR_BAD_SYNC_PARTITION_VALUE,
+        ConnectionClosed = RLM_ERR_CONNECTION_CLOSED,
+        InvalidSubscriptionQuery = RLM_ERR_INVALID_SUBSCRIPTION_QUERY,
+        SyncClientResetRequired = RLM_ERR_SYNC_CLIENT_RESET_REQUIRED,
+        SyncCompensatingWrite = RLM_ERR_SYNC_COMPENSATING_WRITE,
+        SyncConnectFailed = RLM_ERR_SYNC_CONNECT_FAILED,
+        SyncInvalidSchemaChange = RLM_ERR_SYNC_INVALID_SCHEMA_CHANGE,
+        SyncPermissionDenied = RLM_ERR_SYNC_PERMISSION_DENIED,
+        SyncProtocolInvariantFailed = RLM_ERR_SYNC_PROTOCOL_INVARIANT_FAILED,
+        SyncProtocolNegotiationFailed = RLM_ERR_SYNC_PROTOCOL_NEGOTIATION_FAILED,
+        SyncServerPermissionsChanged = RLM_ERR_SYNC_SERVER_PERMISSIONS_CHANGED,
+        SyncUserMismatch = RLM_ERR_SYNC_USER_MISMATCH,
+        TlsHandshakeFailed = RLM_ERR_TLS_HANDSHAKE_FAILED,
+        WrongSyncType = RLM_ERR_WRONG_SYNC_TYPE,
+        SyncWriteNotAllowed = RLM_ERR_SYNC_WRITE_NOT_ALLOWED,
+
         SystemError = RLM_ERR_SYSTEM_ERROR,
 
         LogicError = RLM_ERR_LOGIC,

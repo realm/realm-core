@@ -31,6 +31,9 @@
 #include <realm/util/span.hpp>
 
 namespace realm::sync {
+namespace websocket {
+enum class WebSocketError;
+}
 
 struct WebSocketEndpoint;
 struct WebSocketInterface;
@@ -238,15 +241,16 @@ struct WebSocketObserver {
     ///
     /// @param was_clean Was the TCP connection closed after the WebSocket closing
     ///                  handshake was completed.
-    /// @param status A Status object containing the WebSocket status code and the
-    ///               reason string why the connection was closed.
+    /// @param code      Either a WebSocketError or the numeric code sent in the close frame.
+    /// @param message   Reason string why the connection was closed.
     ///
     /// @return bool designates whether the WebSocket object has been destroyed
     ///         during the execution of this function. The normal return value is
     ///         True to indicate the WebSocket object is no longer valid. If False
     ///         is returned, the WebSocket object will be destroyed at some point
     ///         in the future.
-    virtual bool websocket_closed_handler(bool was_clean, Status status) = 0;
+    virtual bool websocket_closed_handler(bool was_clean, websocket::WebSocketError code,
+                                          std::string_view message) = 0;
 };
 
 } // namespace realm::sync

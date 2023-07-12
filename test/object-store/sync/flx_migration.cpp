@@ -236,7 +236,7 @@ TEST_CASE("Test server migration and rollback", "[flx][migration][baas]") {
             };
         auto flx_realm = Realm::get_shared_realm(flx_config);
         auto err = wait_for_future(std::move(err_future), std::chrono::seconds(30)).get();
-        REQUIRE(err.get_system_error() == make_error_code(sync::ProtocolError::switch_to_pbs));
+        REQUIRE(err.code() == ErrorCodes::WrongSyncType);
         REQUIRE(err.server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
     }
 
@@ -695,7 +695,7 @@ TEST_CASE("Update to native FLX after migration", "[flx][migration][baas]") {
             };
         auto flx_realm = Realm::get_shared_realm(flx_config);
         auto err = wait_for_future(std::move(err_future), std::chrono::seconds(30)).get();
-        REQUIRE(err.get_system_error() == make_error_code(sync::ProtocolError::switch_to_pbs));
+        REQUIRE(err.code() == ErrorCodes::WrongSyncType);
         REQUIRE(err.server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
     }
 }

@@ -6183,9 +6183,10 @@ TEST_CASE("C API app: websocket provider", "[c_api][sync][app]") {
             return m_observer->websocket_binary_message_received(data);
         }
 
-        bool websocket_closed_handler(bool was_clean, Status status) override
+        bool websocket_closed_handler(bool was_clean, websocket::WebSocketError code,
+                                      std::string_view message) override
         {
-            return m_observer->websocket_closed_handler(was_clean, std::move(status));
+            return m_observer->websocket_closed_handler(was_clean, code, message);
         }
 
     private:
