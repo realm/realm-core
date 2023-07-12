@@ -6,7 +6,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Sync errors included the error message twice ([PR #6774](https://github.com/realm/realm-core/pull/6774), since v13.16.0).
-* Fix timestamp rapresentation when converting to json on different platforms. ([#5451](https://github.com/realm/realm-core/issues/5451)).
+* Fix timestamp representation when serializing to json on different platforms. ([#5451](https://github.com/realm/realm-core/issues/5451)).
 
 ### Breaking changes
 * None.
