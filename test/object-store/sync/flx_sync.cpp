@@ -1129,10 +1129,12 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
         async_open_realm(config_local, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
             REQUIRE(!ref);
             REQUIRE(error);
-            REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error),
-                                      "A fatal error occurred during client reset: 'The following changes cannot be "
-                                      "made in additive-only schema mode:\n"
-                                      "- Property 'TopLevel._id' has been changed from 'object id' to 'uuid'.'");
+            REQUIRE_THROWS_CONTAINING(
+                std::rethrow_exception(error),
+                "A fatal error occurred during client reset: 'The following changes cannot be "
+                "made in additive-only schema mode:\n"
+                "- Property 'TopLevel._id' has been changed from 'object id' to 'uuid'.\nIf your app is running in "
+                "development mode, you should delete the realm and restart the app.'");
         });
         error_future.get();
         CHECK(before_reset_count == 0); // we didn't even get this far because opening the frozen realm fails
