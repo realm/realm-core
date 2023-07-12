@@ -62,7 +62,7 @@ struct ClientReset {
     realm::ClientResyncMode mode;
     DBRef fresh_copy;
     bool recovery_is_allowed = true;
-    util::UniqueFunction<void(VersionID)> notify_before_client_reset;
+    util::UniqueFunction<VersionID()> notify_before_client_reset;
     util::UniqueFunction<void(VersionID before_version, bool did_recover)> notify_after_client_reset;
 };
 
@@ -235,6 +235,11 @@ struct ClientConfig {
     /// one immediately afterwards, the activation of the upload process
     /// will be delayed unconditionally.
     milliseconds_type fast_reconnect_limit = default_fast_reconnect_limit;
+
+    /// If a connection is disconnected because of an error that isn't a
+    /// sync protocol ERROR message, this parameter will be used to decide how
+    /// long to wait between each re-connect attempt.
+    ResumptionDelayInfo reconnect_backoff_info;
 
     /// Set to true to completely disable delaying of the upload process. In
     /// this mode, the upload process will be activated immediately, and the

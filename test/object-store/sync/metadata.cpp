@@ -341,7 +341,6 @@ TEST_CASE("sync_metadata: encryption", "[sync][local]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
-        keychain::delete_metadata_realm_encryption_key();
     });
 
     const auto identity0 = "identity0";
@@ -428,15 +427,18 @@ TEST_CASE("sync_metadata: encryption", "[sync][local]") {
     SECTION("enabled without custom encryption key") {
 #if REALM_PLATFORM_APPLE
         static bool can_access_keychain = [] {
-            bool can_acesss = keychain::create_new_metadata_realm_key() != none;
-            if (!can_acesss) {
+            bool can_access = keychain::create_new_metadata_realm_key() != none;
+            if (!can_access) {
                 std::cout << "Skipping keychain tests as the keychain is not accessible\n";
             }
-            return can_acesss;
+            return can_access;
         }();
         if (!can_access_keychain) {
             return;
         }
+        auto delete_key = util::make_scope_exit([=]() noexcept {
+            keychain::delete_metadata_realm_encryption_key();
+        });
 
         SECTION("automatically generates an encryption key for new files") {
             {

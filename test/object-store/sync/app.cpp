@@ -2470,7 +2470,7 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
         auto partition = random_string(100);
         auto user1 = test_session.app()->current_user();
         SyncTestFile r_config(user1, partition, schema);
-        // Overrride the default
+        // Override the default
         r_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
             if (error.get_system_error() == sync::make_error_code(realm::sync::ProtocolError::bad_authentication)) {
                 util::format(std::cerr, "Websocket redirect test: User logged out\n");
