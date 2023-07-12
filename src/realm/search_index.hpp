@@ -20,6 +20,7 @@
 #define REALM_SEARCH_INDEX_HPP
 
 #include <realm/cluster_tree.hpp>
+#include <realm/column_integer.hpp>
 
 namespace realm {
 
@@ -78,6 +79,32 @@ private:
     bool m_full_word;
 };
 
+class SortedListComparator {
+public:
+    SortedListComparator(const ClusterTree* cluster_tree, ColKey column_key, IndexType type)
+        : m_column(cluster_tree, column_key, type)
+    {
+    }
+    SortedListComparator(const ClusterColumn& column)
+        : m_column(column)
+    {
+    }
+
+    bool operator()(int64_t key_value, const Mixed& b);
+    bool operator()(const Mixed& a, int64_t key_value);
+
+    static void insert_to_existing_list(ObjKey key, Mixed value, IntegerColumn& list, const ClusterColumn& cluster);
+    static void insert_to_existing_list_at_lower(ObjKey key, Mixed value, IntegerColumn& list,
+                                                 const IntegerColumnIterator& lower, const ClusterColumn& cluster);
+    static bool contains_duplicate_values(const IntegerColumn& list, const ClusterColumn& cluster);
+
+    IntegerColumn::const_iterator find_start_of_unsorted(const Mixed& value, const IntegerColumn& key_values) const;
+    IntegerColumn::const_iterator find_end_of_unsorted(const Mixed& value, const IntegerColumn& key_values,
+                                                       IntegerColumn::const_iterator begin) const;
+
+private:
+    const ClusterColumn m_column;
+};
 
 class SearchIndex {
 public:
@@ -111,7 +138,7 @@ public:
 
     // Accessor concept:
     Allocator& get_alloc() const noexcept;
-    void destroy() noexcept;
+    virtual void destroy() noexcept;
     void detach();
     bool is_attached() const noexcept;
     void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept;
@@ -136,7 +163,6 @@ protected:
     ClusterColumn m_target_column;
     Array* m_root_array;
 };
-
 
 inline Allocator& SearchIndex::get_alloc() const noexcept
 {

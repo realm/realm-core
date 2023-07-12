@@ -191,6 +191,7 @@ public:
     RefOrTagged get_as_ref_or_tagged(size_t ndx) const noexcept;
     void set(size_t ndx, RefOrTagged);
     void add(RefOrTagged);
+    void insert(size_t ndx, RefOrTagged);
     void ensure_minimum_width(RefOrTagged);
 
     int64_t front() const noexcept;
@@ -775,6 +776,12 @@ inline void Array::add(RefOrTagged ref_or_tagged)
 {
     REALM_ASSERT(has_refs());
     add(ref_or_tagged.m_value); // Throws
+}
+
+inline void Array::insert(size_t ndx, RefOrTagged ref_or_tagged)
+{
+    REALM_ASSERT(has_refs());
+    insert(ndx, ref_or_tagged.m_value);
 }
 
 inline void Array::ensure_minimum_width(RefOrTagged ref_or_tagged)
