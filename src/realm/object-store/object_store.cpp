@@ -1057,7 +1057,7 @@ static void append_errors(std::string& message, std::vector<ObjectSchemaValidati
     }
 }
 
-static void append_line(std::string& message, const std::string& line)
+static void append_line(std::string& message, std::string_view line)
 {
     message += "\n";
     message += line;
