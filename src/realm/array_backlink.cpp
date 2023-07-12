@@ -76,7 +76,7 @@ void ArrayBacklink::add(size_t ndx, ObjKey key)
 
     // A backlink list of size 1 is stored as a single non-ref column value.
     if (value == 0) {
-        set(ndx, key.value << 1 | 1); // Throws
+        set(ndx, RefOrTagged::make_tagged(key.value)); // Throws
         return;
     }
 
@@ -138,7 +138,7 @@ bool ArrayBacklink::remove(size_t ndx, ObjKey key)
         uint64_t key_value = backlink_list.get(0);
         backlink_list.destroy();
 
-        set(ndx, key_value << 1 | 1);
+        set(ndx, RefOrTagged::make_tagged(key_value));
     }
 
     return false;

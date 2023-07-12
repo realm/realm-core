@@ -82,6 +82,10 @@ public:
             m_owner->m_table.add_search_index(m_owner->m_col_key);
             return m_owner->m_table.get_search_index(m_owner->m_col_key);
         }
+        void remove_search_index()
+        {
+            m_owner->m_table.remove_search_index(m_owner->m_col_key);
+        }
         ObjKey key(size_t ndx) const
         {
             return m_keys[ndx];
@@ -163,7 +167,7 @@ public:
         return m_column;
     }
 
-private:
+protected:
     Table m_table;
     ColKey m_col_key;
     ColumnTestType m_column;
@@ -229,6 +233,53 @@ public:
         return true;
     }
 };
+
+class radix_column : public column<String> {
+public:
+    radix_column()
+        : column(false, false)
+    {
+        m_table.set_index_maker([](ColKey, const ClusterColumn& cluster, Allocator& alloc, ref_type ref,
+                                   Array* parent, size_t col_ndx) -> std::unique_ptr<SearchIndex> {
+            if (parent) {
+                return std::make_unique<RadixTree<8>>(ref, parent, col_ndx, cluster, alloc);
+            }
+            return std::make_unique<RadixTree<8>>(cluster, alloc); // Throws
+        });
+    }
+    static bool is_nullable()
+    {
+        return false;
+    }
+    static bool is_enumerated()
+    {
+        return false;
+    }
+};
+
+class nullable_radix_column : public column<String> {
+public:
+    nullable_radix_column()
+        : column(true, false)
+    {
+        m_table.set_index_maker([](ColKey, const ClusterColumn& cluster, Allocator& alloc, ref_type ref,
+                                   Array* parent, size_t col_ndx) -> std::unique_ptr<SearchIndex> {
+            if (parent) {
+                return std::make_unique<RadixTree<8>>(ref, parent, col_ndx, cluster, alloc);
+            }
+            return std::make_unique<RadixTree<8>>(cluster, alloc); // Throws
+        });
+    }
+    static bool is_nullable()
+    {
+        return true;
+    }
+    static bool is_enumerated()
+    {
+        return false;
+    }
+};
+
 
 // disable to avoid warnings about not being used - enable when tests
 // needed them are enabled again
@@ -300,7 +351,8 @@ TEST(StringIndex_NonIndexable)
     }
 }
 
-TEST_TYPES(StringIndex_BuildIndex, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_BuildIndex, string_column, nullable_string_column, enum_column, nullable_enum_column,
+           radix_column, nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -331,7 +383,8 @@ TEST_TYPES(StringIndex_BuildIndex, string_column, nullable_string_column, enum_c
     CHECK_EQUAL(6, r6.value);
 }
 
-TEST_TYPES(StringIndex_DeleteAll, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_DeleteAll, string_column, nullable_string_column, enum_column, nullable_enum_column,
+           radix_column, nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -379,7 +432,8 @@ TEST_TYPES(StringIndex_DeleteAll, string_column, nullable_string_column, enum_co
     CHECK(ndx.is_empty());
 }
 
-TEST_TYPES(StringIndex_Delete, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_Delete, string_column, nullable_string_column, enum_column, nullable_enum_column, radix_column,
+           nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -424,7 +478,8 @@ TEST_TYPES(StringIndex_Delete, string_column, nullable_string_column, enum_colum
 }
 
 
-TEST_TYPES(StringIndex_ClearEmpty, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_ClearEmpty, string_column, nullable_string_column, enum_column, nullable_enum_column,
+           radix_column, nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -437,7 +492,8 @@ TEST_TYPES(StringIndex_ClearEmpty, string_column, nullable_string_column, enum_c
     CHECK(ndx.is_empty());
 }
 
-TEST_TYPES(StringIndex_Clear, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_Clear, string_column, nullable_string_column, enum_column, nullable_enum_column, radix_column,
+           nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -482,7 +538,8 @@ TEST_TYPES(StringIndex_Clear, string_column, nullable_string_column, enum_column
 }
 
 
-TEST_TYPES(StringIndex_Set, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_Set, string_column, nullable_string_column, enum_column, nullable_enum_column, radix_column,
+           nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -527,7 +584,8 @@ TEST_TYPES(StringIndex_Set, string_column, nullable_string_column, enum_column, 
     CHECK_EQUAL(4, col.find_first(s6));
 }
 
-TEST_TYPES(StringIndex_Count, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_Count, string_column, nullable_string_column, enum_column, nullable_enum_column, radix_column,
+           nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -559,7 +617,8 @@ TEST_TYPES(StringIndex_Count, string_column, nullable_string_column, enum_column
     CHECK_EQUAL(4, c4);
 }
 
-TEST_TYPES(StringIndex_Distinct, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_Distinct, string_column, nullable_string_column, enum_column, nullable_enum_column,
+           radix_column, nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -580,7 +639,8 @@ TEST_TYPES(StringIndex_Distinct, string_column, nullable_string_column, enum_col
     CHECK(ndx->has_duplicate_values());
 }
 
-TEST_TYPES(StringIndex_FindAllNoCopy, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_FindAllNoCopy, string_column, nullable_string_column, enum_column, nullable_enum_column,
+           radix_column, nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -707,7 +767,7 @@ TEST(StringIndex_FindAllNoCopy2_IntNull)
 }
 
 TEST_TYPES(StringIndex_FindAllNoCopyCommonPrefixStrings, string_column, nullable_string_column, enum_column,
-           nullable_enum_column)
+           nullable_enum_column, radix_column, nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -913,7 +973,8 @@ StringData create_string_with_nuls(const size_t bits, const size_t length, char*
 
 
 // Test for generated strings of length 1..16 with all combinations of embedded NUL bytes
-TEST_TYPES_IF(StringIndex_EmbeddedZeroesCombinations, TEST_DURATION > 1, string_column, nullable_string_column)
+TEST_TYPES_IF(StringIndex_EmbeddedZeroesCombinations, TEST_DURATION > 1, string_column, nullable_string_column,
+              radix_column, nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -951,13 +1012,13 @@ TEST_TYPES_IF(StringIndex_EmbeddedZeroesCombinations, TEST_DURATION > 1, string_
 }
 
 // Tests for a bug with strings containing zeroes
-TEST_TYPES(StringIndex_EmbeddedZeroes, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_EmbeddedZeroes, string_column, nullable_string_column, enum_column, nullable_enum_column,
+           radix_column, nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col2 = test_resources.get_column();
     const SearchIndex& ndx2 = *col2.create_search_index();
 
-    // FIXME: re-enable once embedded nuls work
     col2.add(StringData("\0", 1));
     col2.add(StringData("\1", 1));
     col2.add(StringData("\0\0", 2));
@@ -982,7 +1043,7 @@ TEST_TYPES(StringIndex_EmbeddedZeroes, string_column, nullable_string_column, en
     CHECK_EQUAL(f, null_key);
 }
 
-TEST_TYPES(StringIndex_Null, nullable_string_column, nullable_enum_column)
+TEST_TYPES(StringIndex_Null, nullable_string_column, nullable_enum_column, nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -996,55 +1057,42 @@ TEST_TYPES(StringIndex_Null, nullable_string_column, nullable_enum_column)
     CHECK_EQUAL(r1, col.key(1));
 }
 
-
-TEST_TYPES(StringIndex_Zero_Crash, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_Zero_Crash, string_column, nullable_string_column, enum_column, nullable_enum_column,
+           radix_column, nullable_radix_column)
 {
-    bool nullable = TEST_TYPE::is_nullable();
-
+    TEST_TYPE test_resources;
+    typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
     // StringIndex could crash if strings ended with one or more 0-bytes
-    Table table;
-    auto col = table.add_column(type_String, "strings", nullable);
+    StringData empty("");
+    StringData zero1("\0", 1);
+    StringData zero2("\0\0", 2);
+    col.add(empty);
+    col.add(zero1);
+    col.add(zero2);
+    col.create_search_index();
 
-    auto k0 = table.create_object().set(col, StringData("")).get_key();
-    auto k1 = table.create_object().set(col, StringData("\0", 1)).get_key();
-    auto k2 = table.create_object().set(col, StringData("\0\0", 2)).get_key();
-    table.add_search_index(col);
-
-    if (TEST_TYPE::is_enumerated())
-        table.enumerate_string_column(col);
-
-    ObjKey t;
-
-    t = table.find_first_string(col, StringData(""));
-    CHECK_EQUAL(k0, t);
-
-    t = table.find_first_string(col, StringData("\0", 1));
-    CHECK_EQUAL(k1, t);
-
-    t = table.find_first_string(col, StringData("\0\0", 2));
-    CHECK_EQUAL(k2, t);
+    CHECK_EQUAL(col.find_first(empty), 0);
+    CHECK_EQUAL(col.find_first(zero1), 1);
+    CHECK_EQUAL(col.find_first(zero2), 2);
 }
 
-TEST_TYPES(StringIndex_Zero_Crash2, std::true_type, std::false_type)
+template <typename TestType>
+void do_run_string_index_zero_crash2(TestContext& test_context, bool add_common_prefix)
 {
     Random random(random_int<unsigned long>());
-
-    constexpr bool add_common_prefix = TEST_TYPE::value;
-
     for (size_t iter = 0; iter < 10 + TEST_DURATION * 100; iter++) {
         // StringIndex could crash if strings ended with one or more 0-bytes
-        Table table;
-        auto col = table.add_column(type_String, "string", true);
-
-        table.add_search_index(col);
+        TestType test_resources;
+        typename TestType::ColumnTestType& col = test_resources.get_column();
+        col.create_search_index();
 
         for (size_t i = 0; i < 100 + TEST_DURATION * 1000; i++) {
             unsigned char action = static_cast<unsigned char>(random.draw_int_max<unsigned int>(100));
             if (action == 0) {
-                table.remove_search_index(col);
-                table.add_search_index(col);
+                col.remove_search_index();
+                col.create_search_index();
             }
-            else if (action > 48 && table.size() < 10) {
+            else if (action > 48 && col.size() < 10) {
                 // Generate string with equal probability of being empty, null, short, medium and long, and with
                 // their contents having equal proability of being either random or a duplicate of a previous
                 // string. When it's random, each char must have equal probability of being 0 or non-0e
@@ -1095,38 +1143,31 @@ TEST_TYPES(StringIndex_Zero_Crash2, std::true_type, std::false_type)
                     }
                     sd = StringData(copy2);
                 }
-
-                bool done = false;
-                do {
-                    int64_t key_val = random.draw_int_max<int64_t>(10000);
-                    try {
-                        table.create_object(ObjKey(key_val)).set(col, sd);
-                        done = true;
-                    }
-                    catch (...) {
-                    }
-                } while (!done);
-                table.verify();
+                col.add(sd);
             }
-            else if (table.size() > 0) {
+            else if (col.size() > 0) {
                 // delete
-                size_t row = random.draw_int_max<size_t>(table.size() - 1);
-                Obj obj = table.get_object(row);
-                obj.remove();
+                size_t row = random.draw_int_max<size_t>(col.size() - 1);
+                col.erase(row);
             }
 
             action = static_cast<unsigned char>(random.draw_int_max<unsigned int>(100));
-            if (table.size() > 0) {
+            if (col.size() > 0) {
                 // Search for value that exists
-                size_t row = random.draw_int_max<size_t>(table.size() - 1);
-                Obj obj = table.get_object(row);
-                StringData sd = obj.get<String>(col);
-                ObjKey t = table.find_first_string(col, sd);
-                StringData sd2 = table.get_object(t).get<String>(col);
-                CHECK_EQUAL(sd, sd2);
+                size_t row = random.draw_int_max<size_t>(col.size() - 1);
+                StringData sd = col.get(row);
+                size_t found = col.find_first(sd);
+                StringData found_sd = col.get(found);
+                CHECK_EQUAL(sd, found_sd);
             }
         }
     }
+}
+
+TEST_TYPES(StringIndex_Zero_Crash2, string_column, radix_column)
+{
+    do_run_string_index_zero_crash2<TEST_TYPE>(test_context, true);
+    do_run_string_index_zero_crash2<TEST_TYPE>(test_context, false);
 }
 
 TEST(StringIndex_Integer_Increasing)
@@ -1154,7 +1195,8 @@ TEST(StringIndex_Integer_Increasing)
     }
 }
 
-TEST_TYPES(StringIndex_Duplicate_Values, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_Duplicate_Values, string_column, nullable_string_column, enum_column, nullable_enum_column,
+           radix_column, nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -1222,17 +1264,20 @@ TEST_TYPES(StringIndex_Duplicate_Values, string_column, nullable_string_column, 
     CHECK(col.size() == 0);
 }
 
-TEST_TYPES(StringIndex_MaxBytes, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_MaxBytes, string_column, nullable_string_column, enum_column, nullable_enum_column,
+           radix_column, nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
 
-    std::string std_max(StringIndex::s_max_offset, 'a');
+    std::string std_max(StringIndex::s_max_offset, 'a'); // FIXME: + 4
     std::string std_over_max(std_max + "a");
     std::string std_under_max(StringIndex::s_max_offset >> 1, 'a');
+    std::string std_over_max_twice(std_max + "aaaaa");
     StringData max(std_max);
     StringData over_max(std_over_max);
     StringData under_max(std_under_max);
+    StringData over_max_twice(std_over_max_twice);
 
     const SearchIndex& ndx = *col.create_search_index();
 
@@ -1258,6 +1303,7 @@ TEST_TYPES(StringIndex_MaxBytes, string_column, nullable_string_column, enum_col
         duplicate_check(dups, under_max);
         duplicate_check(dups, max);
         duplicate_check(dups, over_max);
+        duplicate_check(dups, over_max_twice);
     }
 }
 
@@ -1267,7 +1313,8 @@ TEST_TYPES(StringIndex_MaxBytes, string_column, nullable_string_column, enum_col
 // for the characters at the end (they have an identical very
 // long prefix). This was causing a stack overflow because of
 // the recursive nature of the insert function.
-TEST_TYPES(StringIndex_InsertLongPrefix, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_InsertLongPrefix, string_column, nullable_string_column, enum_column, nullable_enum_column,
+           radix_column, nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -1347,7 +1394,7 @@ TEST_TYPES(StringIndex_InsertLongPrefix, string_column, nullable_string_column, 
 }
 
 TEST_TYPES(StringIndex_InsertLongPrefixAndQuery, string_column, nullable_string_column, enum_column,
-           nullable_enum_column)
+           nullable_enum_column, radix_column, nullable_radix_column)
 {
     constexpr int half_node_size = REALM_MAX_BPNODE_SIZE / 2;
     bool nullable_column = TEST_TYPE::is_nullable();
@@ -1514,7 +1561,8 @@ void check_result_order(const std::vector<ObjKey>& results, TestContext& test_co
 } // end anonymous namespace
 
 
-TEST_TYPES(StringIndex_Insensitive, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_Insensitive, string_column, nullable_string_column, enum_column, nullable_enum_column,
+           radix_column, nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -1681,7 +1729,8 @@ TEST_TYPES(StringIndex_Insensitive_Unicode, non_nullable, nullable)
 */
 
 
-TEST_TYPES(StringIndex_45, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_45, string_column, nullable_string_column, enum_column, nullable_enum_column, radix_column,
+           nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -1716,7 +1765,7 @@ std::string create_random_a_string(size_t max_len)
 
 // Excluded when run with valgrind because it takes a long time
 TEST_TYPES_IF(StringIndex_Insensitive_Fuzz, TEST_DURATION > 1, string_column, nullable_string_column, enum_column,
-              nullable_enum_column)
+              nullable_enum_column, radix_column, nullable_radix_column)
 {
     const size_t max_str_len = 9;
     const size_t iters = 3;
@@ -1764,7 +1813,7 @@ TEST_TYPES_IF(StringIndex_Insensitive_Fuzz, TEST_DURATION > 1, string_column, nu
 // Exercise the StringIndex case insensitive search for strings with very long, common prefixes
 // to cover the special case code paths where different strings are stored in a list.
 TEST_TYPES(StringIndex_Insensitive_VeryLongStrings, string_column, nullable_string_column, enum_column,
-           nullable_enum_column)
+           nullable_enum_column, radix_column, nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -1800,7 +1849,8 @@ TEST_TYPES(StringIndex_Insensitive_VeryLongStrings, string_column, nullable_stri
 
 
 // Bug with case insensitive search on numbers that gives duplicate results
-TEST_TYPES(StringIndex_Insensitive_Numbers, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_Insensitive_Numbers, string_column, nullable_string_column, enum_column, nullable_enum_column,
+           radix_column, nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -1819,7 +1869,8 @@ TEST_TYPES(StringIndex_Insensitive_Numbers, string_column, nullable_string_colum
 }
 
 
-TEST_TYPES(StringIndex_Rover, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_Rover, string_column, nullable_string_column, enum_column, nullable_enum_column, radix_column,
+           nullable_radix_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();

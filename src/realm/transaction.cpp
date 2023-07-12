@@ -543,13 +543,29 @@ void Transaction::upgrade_file_format(int target_file_format_version)
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
+    auto table_keys = get_table_keys();
+
+    // integer index has a new format
+    if (current_file_format_version < 24) {
+        for (auto k : table_keys) {
+            auto t = get_table(k);
+            t->for_each_public_column([&](ColKey col) {
+                if (col.get_type() == col_type_Int && t->has_search_index(col)) {
+                    // it is okay to remove the search index using the new instance because
+                    // both formats use destroy_deep() with a tagged_or_ref scheme
+                    t->remove_search_index(col);
+                    t->add_search_index(col);
+                }
+                return IteratorControl::AdvanceToNext;
+            });
+        }
+    }
 
     if (auto logger = get_logger()) {
         logger->info("Upgrading from file format version %1 to %2", current_file_format_version,
                      target_file_format_version);
     }
     // Ensure we have search index on all primary key columns.
-    auto table_keys = get_table_keys();
     if (current_file_format_version < 22) {
         for (auto k : table_keys) {
             auto t = get_table(k);

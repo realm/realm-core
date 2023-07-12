@@ -213,6 +213,50 @@ inline int ctz(size_t x)
 #endif
 }
 
+// as above: count trailing zeros (from least-significant bit)
+inline int ctz_64(uint64_t x)
+{
+    if (x == 0)
+        return sizeof(x) * 8;
+
+#if defined(__GNUC__)
+    return __builtin_ctzll(x); // returns int
+#elif defined(_WIN32)
+    unsigned long index = 0;
+    unsigned char c = _BitScanForward64(&index, x); // outputs unsigned long
+    return static_cast<int>(index);
+#else // not __GNUC__ and not _WIN32
+    int r = 0;
+    while (r < sizeof(x) * 8 && (x & 1) == 0) {
+        x >>= 1;
+        r++;
+    }
+    return r;
+#endif
+}
+
+inline size_t index_of_nth_bit(uint64_t population, size_t n)
+{
+    REALM_ASSERT_DEBUG_EX(n <= 64, n);
+    size_t index = ctz_64(population);
+    if (n == 0) {
+        return index;
+    }
+    while (n > 0 && index <= 64) {
+        --n;
+        ++index;
+        index += ctz_64(population >> index);
+    }
+    return index;
+}
+
+// TODO: the std provides a constexpr ceil in C++23
+constexpr int32_t constexpr_ceil(float num)
+{
+    return (static_cast<float>(static_cast<int32_t>(num)) == num) ? static_cast<int32_t>(num)
+                                                                  : static_cast<int32_t>(num) + ((num > 0) ? 1 : 0);
+}
+
 // Implementation:
 
 // Safe cast from 64 to 32 bits on 32 bit architecture. Differs from to_ref() by not testing alignment and

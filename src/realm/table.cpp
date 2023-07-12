@@ -871,6 +871,22 @@ void Table::clear_indexes()
     }
 }
 
+static std::unique_ptr<SearchIndex> make_index(ColKey col_key, const ClusterColumn& cluster, Allocator& alloc,
+                                               ref_type ref = 0, Array* parent = nullptr,
+                                               size_t col_ndx = realm::npos)
+{
+    if (parent) {
+        if (col_key.get_type() == col_type_Int || col_key.get_type() == col_type_Timestamp) {
+            return std::make_unique<IntegerIndex>(ref, parent, col_ndx, cluster, alloc);
+        }
+        return std::make_unique<StringIndex>(ref, parent, col_ndx, cluster, alloc);
+    }
+    if (col_key.get_type() == col_type_Int || col_key.get_type() == col_type_Timestamp) {
+        return std::make_unique<IntegerIndex>(cluster, alloc); // Throws
+    }
+    return std::make_unique<StringIndex>(cluster, alloc); // Throws
+}
+
 void Table::do_add_search_index(ColKey col_key, IndexType type)
 {
     size_t column_ndx = col_key.get_index().val;
@@ -893,15 +909,24 @@ void Table::do_add_search_index(ColKey col_key, IndexType type)
     REALM_ASSERT(m_index_accessors[column_ndx] == nullptr);
 
     // Create the index
-    m_index_accessors[column_ndx] =
-        std::make_unique<StringIndex>(ClusterColumn(&m_clusters, col_key, type), get_alloc()); // Throws
+    if (REALM_UNLIKELY(m_index_maker)) { // this path is for test hooks
+        m_index_accessors[column_ndx] =
+            m_index_maker(col_key, ClusterColumn(&m_clusters, col_key, type), m_alloc, 0, nullptr, realm::npos);
+    }
+    else {
+        m_index_accessors[column_ndx] = make_index(col_key, ClusterColumn(&m_clusters, col_key, type), m_alloc);
+    }
     SearchIndex* index = m_index_accessors[column_ndx].get();
     // Insert ref to index
     index->set_parent(&m_index_refs, column_ndx);
-
     m_index_refs.set(column_ndx, index->get_ref()); // Throws
 
     populate_search_index(col_key);
+}
+
+void Table::set_index_maker(IndexMaker hook)
+{
+    m_index_maker = std::move(hook);
 }
 
 void Table::add_search_index(ColKey col_key, IndexType type)
@@ -1709,6 +1734,12 @@ StringIndex* Table::get_string_index(ColKey col) const noexcept
     return dynamic_cast<StringIndex*>(m_index_accessors[col.get_index().val].get());
 }
 
+IntegerIndex* Table::get_int_index(ColKey col) const noexcept
+{
+    check_column(col);
+    return dynamic_cast<IntegerIndex*>(m_index_accessors[col.get_index().val].get());
+}
+
 template <class T>
 ObjKey Table::find_first(ColKey col_key, T value) const
 {
@@ -2177,9 +2208,13 @@ void Table::refresh_index_accessors()
             if (m_index_accessors[col_ndx]) { // still there, refresh:
                 m_index_accessors[col_ndx]->refresh_accessor_tree(virtual_col);
             }
-            else { // new index!
+            // new index!
+            if (REALM_UNLIKELY(m_index_maker)) { // this path is for test hooks
                 m_index_accessors[col_ndx] =
-                    std::make_unique<StringIndex>(ref, &m_index_refs, col_ndx, virtual_col, get_alloc());
+                    m_index_maker(col_key, virtual_col, m_alloc, ref, &m_index_refs, col_ndx);
+            }
+            else {
+                m_index_accessors[col_ndx] = make_index(col_key, virtual_col, m_alloc, ref, &m_index_refs, col_ndx);
             }
         }
     }

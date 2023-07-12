@@ -25,7 +25,6 @@
 #include <set>
 
 #include <realm/array.hpp>
-#include <realm/column_integer.hpp>
 #include <realm/search_index.hpp>
 
 /*
@@ -215,9 +214,6 @@ private:
 
     void insert_with_offset(ObjKey key, StringData index_data, const Mixed& value, size_t offset);
     void insert_row_list(size_t ref, size_t offset, StringData value);
-    void insert_to_existing_list(ObjKey key, Mixed value, IntegerColumn& list);
-    void insert_to_existing_list_at_lower(ObjKey key, Mixed value, IntegerColumn& list,
-                                          const IntegerColumnIterator& lower);
     key_type get_last_key() const;
 
     struct NodeChange {
@@ -255,29 +251,6 @@ private:
     static void dump_node_structure(const Array& node, std::ostream&, int level);
 #endif
 };
-
-class SortedListComparator {
-public:
-    SortedListComparator(const ClusterTree* cluster_tree, ColKey column_key, IndexType type)
-        : m_column(cluster_tree, column_key, type)
-    {
-    }
-    SortedListComparator(const ClusterColumn& column)
-        : m_column(column)
-    {
-    }
-
-    bool operator()(int64_t key_value, const Mixed& b);
-    bool operator()(const Mixed& a, int64_t key_value);
-
-    IntegerColumn::const_iterator find_start_of_unsorted(const Mixed& value, const IntegerColumn& key_values) const;
-    IntegerColumn::const_iterator find_end_of_unsorted(const Mixed& value, const IntegerColumn& key_values,
-                                                       IntegerColumn::const_iterator begin) const;
-
-private:
-    const ClusterColumn m_column;
-};
-
 
 // Implementation:
 inline StringIndex::StringIndex(const ClusterColumn& target_column, Allocator& alloc)
