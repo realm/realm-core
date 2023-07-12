@@ -792,9 +792,8 @@ struct ExpectChangesetError {
         REALM_ASSERT(error_info);
         CHECK_EQUAL(error_info->status, ErrorCodes::BadChangeset);
         CHECK(!error_info->is_fatal());
-        CHECK_EQUAL(error_info->message,
-                    "Bad changeset (DOWNLOAD): Failed to transform received changeset: Schema mismatch: " +
-                        expected_error);
+        CHECK_EQUAL(error_info->status.reason(),
+                    "Failed to transform received changeset: Schema mismatch: " + expected_error);
         fixture.stop();
     }
 };
@@ -1468,7 +1467,41 @@ TEST(Sync_Randomized)
     }
 }
 
+#ifdef REALM_DEBUG // Failure simulation only works in debug mode
 
+TEST(Sync_ReadFailureSimulation)
+{
+    TEST_DIR(server_dir);
+    TEST_CLIENT_DB(db);
+
+    // Check that read failure simulation works on the client-side
+    {
+        bool client_side_read_did_fail = false;
+        {
+            ClientServerFixture fixture(server_dir, test_context);
+            fixture.set_client_side_error_rate(1, 1); // 100% chance of failure
+            auto error_handler = [&](Status status, bool is_fatal) {
+                using sf = _impl::SimulatedFailure;
+                CHECK(status.has_extra_info<sf::ExtraInfo>());
+                CHECK_EQUAL(status.get_extra_info<sf::ExtraInfo>().failure_type,
+                            sf::FailureType::sync_client__read_head);
+                CHECK_NOT(is_fatal);
+                client_side_read_did_fail = true;
+                fixture.stop();
+            };
+            fixture.set_client_side_error_handler(error_handler);
+            Session session = fixture.make_bound_session(db, "/test");
+            fixture.start();
+            session.wait_for_download_complete_or_client_stopped();
+        }
+        CHECK(client_side_read_did_fail);
+    }
+
+    // FIXME: Figure out a way to check that read failure simulation works on
+    // the server-side
+}
+
+#endif // REALM_DEBUG
 TEST(Sync_FailingReadsOnClientSide)
 {
     TEST_CLIENT_DB(db_1);
@@ -1479,8 +1512,13 @@ TEST(Sync_FailingReadsOnClientSide)
         ClientServerFixture fixture{dir, test_context};
         fixture.set_client_side_error_rate(5, 100); // 5% chance of failure
         auto error_handler = [&](Status status, bool) {
-            if (CHECK_EQUAL(status, ErrorCodes::ConnectionClosed))
+            using sf = _impl::SimulatedFailure;
+            if (CHECK(status.has_extra_info<sf::ExtraInfo>())) {
+                CHECK_EQUAL(status.get_extra_info<sf::ExtraInfo>().failure_type,
+                            sf::FailureType::sync_client__read_head);
+                CHECK_EQUAL(status, ErrorCodes::ConnectionClosed);
                 fixture.cancel_reconnect_delay();
+            }
         };
         fixture.set_client_side_error_handler(error_handler);
         fixture.start();
@@ -1538,7 +1576,7 @@ TEST(Sync_FailingReadsOnServerSide)
         TEST_DIR(dir);
         ClientServerFixture fixture{dir, test_context};
         fixture.set_server_side_error_rate(5, 100); // 5% chance of failure
-        auto error_handler = [&](std::error_code, bool is_fatal, const std::string&) {
+        auto error_handler = [&](Status, bool is_fatal) {
             CHECK_NOT(is_fatal);
             fixture.cancel_reconnect_delay();
         };

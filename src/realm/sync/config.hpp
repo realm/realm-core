@@ -123,7 +123,6 @@ enum class SyncClientHookEvent {
     BootstrapMessageProcessed,
     BootstrapProcessed,
     ErrorMessageReceived,
-    BinaryMessageReceived,
 };
 
 enum class SyncClientHookAction {
@@ -131,7 +130,6 @@ enum class SyncClientHookAction {
     EarlyReturn,
     SuspendWithRetryableError,
     TriggerReconnect,
-    SimulateReadError, // Valid with BinaryMessageReceived
 };
 
 inline std::ostream& operator<<(std::ostream& os, SyncClientHookAction action)

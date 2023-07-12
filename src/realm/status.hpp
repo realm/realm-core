@@ -31,6 +31,11 @@ namespace realm {
 
 class REALM_NODISCARD Status {
 public:
+    class ExtraInfo {
+    public:
+        virtual ~ExtraInfo() = default;
+    };
+
     /*
      * This is the best way to construct a Status that represents a non-error condition.
      */
@@ -40,8 +45,13 @@ public:
      * You can construct a Status from anything that can construct a std::string_view.
      */
     template <typename Reason, std::enable_if_t<std::is_constructible_v<std::string_view, Reason>, int> = 0>
-    Status(ErrorCodes::Error code, Reason&& reason)
-        : m_error(ErrorInfo::create(code, std::string_view{reason}))
+    Status(ErrorCodes::Error code, Reason&& reason, std::unique_ptr<ExtraInfo> extra_info = nullptr)
+        : m_error(ErrorInfo::create(code, std::string{std::string_view{reason}}, std::move(extra_info)))
+    {
+    }
+
+    Status(ErrorCodes::Error code, std::string&& reason, std::unique_ptr<ExtraInfo> extra_info = nullptr)
+        : m_error(ErrorInfo::create(code, std::move(reason), std::move(extra_info)))
     {
     }
 
@@ -49,7 +59,7 @@ public:
     Status(std::error_code code, Reason&& reason)
     {
         if (code) {
-            m_error = ErrorInfo::create(ErrorCodes::SystemError, std::string_view{reason});
+            m_error = ErrorInfo::create(ErrorCodes::SystemError, std::string{std::string_view{reason}}, nullptr);
             m_error->m_std_error_code = code;
         }
     }
@@ -84,6 +94,25 @@ public:
      */
     void ignore() const noexcept {}
 
+    template <typename T>
+    bool has_extra_info() const noexcept
+    {
+        if (!m_error || !m_error->m_extra_info) {
+            return false;
+        }
+
+        return dynamic_cast<T*>(m_error->m_extra_info.get()) != nullptr;
+    }
+
+    template <typename T>
+    const T& get_extra_info() const noexcept
+    {
+        REALM_ASSERT(m_error);
+        REALM_ASSERT(m_error->m_extra_info);
+
+        return *dynamic_cast<T*>(m_error->m_extra_info.get());
+    }
+
 private:
     friend struct SystemError;
     void set_std_error_code(std::error_code code)
@@ -101,7 +130,10 @@ private:
         // std::error_code migrated to the unified exception system
         std::error_code m_std_error_code;
 
-        static util::bind_ptr<ErrorInfo> create(ErrorCodes::Error code, std::string_view reason);
+        std::unique_ptr<ExtraInfo> m_extra_info;
+
+        static util::bind_ptr<ErrorInfo> create(ErrorCodes::Error code, std::string&& reason,
+                                                std::unique_ptr<ExtraInfo>&& extra_info);
 
     protected:
         template <typename>
@@ -120,7 +152,7 @@ private:
         }
 
     private:
-        ErrorInfo(ErrorCodes::Error code, std::string_view reason);
+        ErrorInfo(ErrorCodes::Error code, std::string&& reason, std::unique_ptr<ExtraInfo>&& extra_info);
     };
 
     util::bind_ptr<ErrorInfo> m_error = {};

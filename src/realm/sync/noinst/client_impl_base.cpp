@@ -486,10 +486,12 @@ bool Connection::websocket_binary_message_received(util::Span<const char> data)
         return false;
     }
 
-    if (
     using sf = SimulatedFailure;
     if (sf::check_trigger(sf::sync_client__read_head)) {
-        read_or_write_error(sf::sync_server__read_head, "simulated read error");
+        close_due_to_client_side_error(
+            sf::make_simulated_failure_status(SimulatedFailure::FailureType::sync_client__read_head,
+                                              ErrorCodes::ConnectionClosed),
+            IsFatal{false}, ConnectionTerminationReason::read_or_write_error); // Throws
         return bool(m_websocket);
     }
 
@@ -1088,13 +1090,6 @@ void Connection::handle_disconnect_wait(Status status)
 }
 
 
-void Connection::read_or_write_error(std::error_code, std::string_view msg)
-{
-    close_due_to_client_side_error({ErrorCodes::ConnectionClosed, msg}, IsFatal{false},
-                                   ConnectionTerminationReason::read_or_write_error); // Throws
-}
-
-
 void Connection::close_due_to_protocol_error(Status status)
 {
     close_due_to_client_side_error(std::move(status), IsFatal{true},
@@ -1506,7 +1501,7 @@ void Session::on_integration_failure(const IntegrationException& error)
 {
     REALM_ASSERT_EX(m_state == Active, m_state);
     REALM_ASSERT(!m_client_error && !m_error_to_send);
-    logger.error("Failed to integrate downloaded changesets: %1", error.what());
+    logger.error("Failed to integrate downloaded changesets: %1", error.to_status());
 
     m_client_error = util::make_optional<IntegrationException>(error);
     m_error_to_send = true;

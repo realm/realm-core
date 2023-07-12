@@ -222,23 +222,12 @@ const std::error_category& http_error_category() noexcept;
 
 std::error_code make_error_code(HttpError) noexcept;
 
-const std::error_category& websocket_error_category() noexcept;
-
-std::error_code make_error_code(WebSocketError) noexcept;
-
-ErrorCodes::Error get_simplified_websocket_error(WebSocketError);
-
 } // namespace realm::sync::websocket
 
 namespace std {
 
 template <>
 struct is_error_code_enum<realm::sync::websocket::HttpError> {
-    static const bool value = true;
-};
-
-template <>
-struct is_error_code_enum<realm::sync::websocket::WebSocketError> {
     static const bool value = true;
 };
 

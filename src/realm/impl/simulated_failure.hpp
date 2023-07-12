@@ -24,6 +24,7 @@
 
 #include <realm/exceptions.hpp>
 #include <realm/util/features.h>
+#include <realm/exceptions.hpp>
 
 #ifdef REALM_DEBUG
 #define REALM_ENABLE_SIMULATED_FAILURE
@@ -32,7 +33,7 @@
 namespace realm {
 namespace _impl {
 
-class SimulatedFailure : public SystemError {
+class SimulatedFailure : public RuntimeError {
 public:
     enum FailureType {
         generic,
@@ -43,6 +44,16 @@ public:
         sync_client__read_head,
         sync_server__read_head,
         _num_failure_types
+    };
+
+    class ExtraInfo : public Status::ExtraInfo {
+    public:
+        ExtraInfo(FailureType failure_type)
+            : failure_type(failure_type)
+        {
+        }
+
+        FailureType failure_type;
     };
 
     class OneShotPrimeGuard;
@@ -65,6 +76,9 @@ public:
     /// not defined, this function always return false.
     static bool check_trigger(FailureType) noexcept;
 
+    static Status make_simulated_failure_status(FailureType failure_type,
+                                                ErrorCodes::Error error_code = ErrorCodes::RuntimeError);
+
     /// Throws SimulatedFailure if check_trigger() returns true. The exception
     /// will be constructed with an error code equal to
     /// `make_error_code(failure_type)`.
@@ -86,7 +100,7 @@ public:
     /// when turning this off.
     static void set_thread_local(bool);
 
-    SimulatedFailure(std::error_code);
+    SimulatedFailure(FailureType);
 
 private:
 #ifdef REALM_ENABLE_SIMULATED_FAILURE
@@ -128,7 +142,8 @@ std::error_code make_error_code(SimulatedFailure::FailureType) noexcept;
 
 namespace std {
 
-template<> struct is_error_code_enum<realm::_impl::SimulatedFailure::FailureType> {
+template <>
+struct is_error_code_enum<realm::_impl::SimulatedFailure::FailureType> {
     static const bool value = true;
 };
 
@@ -180,10 +195,15 @@ inline bool SimulatedFailure::check_trigger(FailureType failure_type) noexcept
 #endif
 }
 
+inline Status SimulatedFailure::make_simulated_failure_status(FailureType failure_type, ErrorCodes::Error error_code)
+{
+    return Status(error_code, "SimulatedFailure", std::make_unique<ExtraInfo>(failure_type));
+}
+
 inline void SimulatedFailure::trigger(FailureType failure_type)
 {
     if (check_trigger(failure_type))
-        throw SimulatedFailure(make_error_code(failure_type));
+        throw SimulatedFailure(failure_type);
 }
 
 inline constexpr bool SimulatedFailure::is_enabled()
@@ -204,8 +224,8 @@ inline void SimulatedFailure::set_thread_local(bool tl)
 #endif
 }
 
-inline SimulatedFailure::SimulatedFailure(std::error_code ec)
-    : SystemError(ec, {})
+inline SimulatedFailure::SimulatedFailure(FailureType type)
+    : RuntimeError(Status{ErrorCodes::RuntimeError, "SimulatedFailure", std::make_unique<ExtraInfo>(type)})
 {
 }
 

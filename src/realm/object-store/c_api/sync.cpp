@@ -128,10 +128,7 @@ realm_sync_error_code_t to_capi(const Status& status, std::string& message)
 
     auto error_code = status.get_std_error_code();
     const std::error_category& category = error_code.category();
-    if (category == realm::sync::client_error_category()) {
-        ret.category = RLM_SYNC_ERROR_CATEGORY_CLIENT;
-    }
-    else if (category == realm::sync::protocol_error_category()) {
+    if (category == realm::sync::protocol_error_category()) {
         if (realm::sync::is_session_level_error(realm::sync::ProtocolError(error_code.value()))) {
             ret.category = RLM_SYNC_ERROR_CATEGORY_SESSION;
         }
@@ -141,9 +138,6 @@ realm_sync_error_code_t to_capi(const Status& status, std::string& message)
     }
     else if (category == std::system_category() || category == realm::util::error::basic_system_error_category()) {
         ret.category = RLM_SYNC_ERROR_CATEGORY_SYSTEM;
-    }
-    else if (category == realm::sync::websocket::websocket_error_category()) {
-        ret.category = RLM_SYNC_ERROR_CATEGORY_WEBSOCKET;
     }
     else {
         ret.category = RLM_SYNC_ERROR_CATEGORY_UNKNOWN;
@@ -162,17 +156,11 @@ void sync_error_to_error_code(const realm_sync_error_code_t& sync_error_code, st
 {
     if (error_code_out) {
         const realm_sync_error_category_e category = sync_error_code.category;
-        if (category == RLM_SYNC_ERROR_CATEGORY_CLIENT) {
-            error_code_out->assign(sync_error_code.value, realm::sync::client_error_category());
-        }
-        else if (category == RLM_SYNC_ERROR_CATEGORY_SESSION || category == RLM_SYNC_ERROR_CATEGORY_CONNECTION) {
+        if (category == RLM_SYNC_ERROR_CATEGORY_SESSION || category == RLM_SYNC_ERROR_CATEGORY_CONNECTION) {
             error_code_out->assign(sync_error_code.value, realm::sync::protocol_error_category());
         }
         else if (category == RLM_SYNC_ERROR_CATEGORY_SYSTEM) {
             error_code_out->assign(sync_error_code.value, std::system_category());
-        }
-        else if (category == RLM_SYNC_ERROR_CATEGORY_WEBSOCKET) {
-            error_code_out->assign(sync_error_code.value, realm::sync::websocket::websocket_error_category());
         }
         else if (category == RLM_SYNC_ERROR_CATEGORY_UNKNOWN) {
             error_code_out->assign(sync_error_code.value, realm::util::error::basic_system_error_category());

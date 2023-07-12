@@ -221,10 +221,11 @@ RLM_API realm_sync_socket_t* realm_sync_socket_new(
 RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback* realm_callback,
                                                  realm_web_socket_errno_e code, const char* reason)
 {
-    auto status = sync::websocket::WebSocketError(code);
+    auto close_code = sync::websocket::WebSocketError(code);
+
     auto complete_status = code == realm_web_socket_errno_e::RLM_ERR_WEBSOCKET_OK
                                ? Status::OK()
-                               : Status{sync::websocket::make_error_code(status), reason};
+                               : Status{ErrorCodes::ConnectionClosed, reason};
     (*(realm_callback->get()))(complete_status);
     realm_release(realm_callback);
 }

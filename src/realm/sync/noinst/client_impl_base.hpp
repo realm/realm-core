@@ -564,7 +564,6 @@ private:
     void handle_message_received(util::Span<const char> data);
     void initiate_disconnect_wait();
     void handle_disconnect_wait(Status status);
-    void read_or_write_error(std::error_code ec, std::string_view msg);
     void close_due_to_protocol_error(Status status);
 
     void close_due_to_network_error(Status, IsFatal, ConnectionTerminationReason, websocket::WebSocketError error);

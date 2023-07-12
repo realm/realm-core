@@ -245,10 +245,6 @@ public:
         UserpassTokenInvalid = RLM_ERR_USERPASS_TOKEN_INVALID,
         InvalidServerResponse = RLM_ERR_INVALID_SERVER_RESPONSE,
 
-        WebSocketResolveFailedError = RLM_ERR_WEBSOCKET_RESOLVE_FAILED_ERROR,
-        WebSocketConnectionClosedClientError = RLM_ERR_WEBSOCKET_CONNECTION_CLOSED_CLIENT_ERROR,
-        WebSocketConnectionClosedServerError = RLM_ERR_WEBSOCKET_CONNECTION_CLOSED_SERVER_ERROR,
-
         CallbackFailed = RLM_ERR_CALLBACK,
         UnknownError = RLM_ERR_UNKNOWN,
     };

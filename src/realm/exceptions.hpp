@@ -355,6 +355,23 @@ private:
 };
 
 struct SystemError : RuntimeError {
+    class ExtraInfo : public Status::ExtraInfo {
+    public:
+        ExtraInfo(std::error_code ec)
+            : ec(ec)
+        {
+        }
+
+        std::error_code ec;
+    };
+
+    static Status make_status(std::error_code err, std::string_view msg, bool msg_is_prefix)
+    {
+        return Status(ErrorCodes::SystemError,
+                      msg_is_prefix ? util::format("%1: %2 (%3)", msg, err.message(), err.value()) : msg,
+                      std::make_unique<ExtraInfo>(err));
+    }
+
     SystemError(std::error_code err, std::string_view msg)
         : RuntimeError(make_status(err, msg, false))
     {
@@ -369,18 +386,12 @@ struct SystemError : RuntimeError {
 
     std::error_code get_system_error() const
     {
-        return to_status().get_std_error_code();
+        return to_status().get_extra_info<ExtraInfo>().ec;
     }
 
     const std::error_category& get_category() const
     {
         return get_system_error().category();
-    }
-
-private:
-    static Status make_status(std::error_code err, std::string_view msg, bool msg_is_prefix)
-    {
-        return Status(err, msg_is_prefix ? util::format("%1: %2 (%3)", msg, err.message(), err.value()) : msg);
     }
 };
 

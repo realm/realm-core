@@ -22,20 +22,22 @@
 
 namespace realm {
 
-Status::ErrorInfo::ErrorInfo(ErrorCodes::Error code, std::string_view reason)
+Status::ErrorInfo::ErrorInfo(ErrorCodes::Error code, std::string&& reason, std::unique_ptr<ExtraInfo>&& extra_info)
     : m_refs(0)
     , m_code(code)
-    , m_reason(reason)
+    , m_reason(std::move(reason))
+    , m_extra_info(std::move(extra_info))
 {
 }
 
-util::bind_ptr<Status::ErrorInfo> Status::ErrorInfo::create(ErrorCodes::Error code, std::string_view reason)
+util::bind_ptr<Status::ErrorInfo> Status::ErrorInfo::create(ErrorCodes::Error code, std::string&& reason,
+                                                            std::unique_ptr<ExtraInfo>&& extra_info)
 {
     // OK status should be created by calling Status::OK() - which is a special case that doesn't allocate
     // anything.
     REALM_ASSERT(code != ErrorCodes::OK);
 
-    return util::bind_ptr<Status::ErrorInfo>(new ErrorInfo(code, std::move(reason)));
+    return util::bind_ptr<Status::ErrorInfo>(new ErrorInfo(code, std::move(reason), std::move(extra_info)));
 }
 
 std::ostream& operator<<(std::ostream& out, const Status& val)
