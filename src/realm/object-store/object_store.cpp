@@ -46,7 +46,7 @@ const char* const c_versionColumnName = "version";
 const char c_object_table_prefix[] = "class_";
 
 const char* const c_development_mode_msg =
-    "If your app is running in development mode, you should delete the realm and restart the app.";
+    "If your app is running in development mode, you can delete the realm and restart the app to update your schema.";
 
 void create_metadata_tables(Group& group)
 {

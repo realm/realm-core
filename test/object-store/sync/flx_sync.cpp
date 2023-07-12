@@ -1134,7 +1134,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
                 "A fatal error occurred during client reset: 'The following changes cannot be "
                 "made in additive-only schema mode:\n"
                 "- Property 'TopLevel._id' has been changed from 'object id' to 'uuid'.\nIf your app is running in "
-                "development mode, you should delete the realm and restart the app.'");
+                "development mode, you can delete the realm and restart the app to update your schema.'");
         });
         error_future.get();
         CHECK(before_reset_count == 0); // we didn't even get this far because opening the frozen realm fails
