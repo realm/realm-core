@@ -68,22 +68,22 @@ AppError::AppError(ErrorCodes::Error code, std::string message, std::string link
     , link_to_server_logs(link)
 {
     REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::app_error));
-    error_code = ErrorCodes::error_string(code);
+    server_error = ErrorCodes::error_string(code);
 }
 
-AppError::AppError(std::string error_code, std::string message, std::string link,
+AppError::AppError(std::string server_err, std::string message, std::string link,
                    util::Optional<int> additional_error_code, ErrorCodes::Error code)
     : RuntimeError(code, code == ErrorCodes::HTTPError ? http_message(message, *additional_error_code) : message)
     , additional_status_code(additional_error_code)
     , link_to_server_logs(link)
-    , error_code(error_code)
+    , server_error(server_err)
 {
     REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::app_error));
 }
 
 std::ostream& operator<<(std::ostream& os, AppError error)
 {
-    return os << error.error_code << ": " << error.what();
+    return os << error.server_error << ": " << error.what();
 }
 
 } // namespace realm::app
