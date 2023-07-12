@@ -134,13 +134,13 @@ TEST_CASE("geospatial") {
         });
 
         {
-            TableRef table = obj.obj().get_table();
+            TableRef table = obj.get_obj().get_table();
             REQUIRE(!Geospatial::is_geospatial(table, table->get_column_key("_id")));
             REQUIRE(Geospatial::is_geospatial(table, table->get_column_key("location")));
         }
 
-        REQUIRE(obj.obj().get<int64_t>("_id") == 1);
-        auto linked_obj = util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "location")).obj();
+        REQUIRE(obj.get_obj().get<int64_t>("_id") == 1);
+        auto linked_obj = util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "location")).get_obj();
         REQUIRE(linked_obj.is_valid());
         REQUIRE(linked_obj.get<String>("type") == "Point");
         auto list = util::any_cast<List>(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "location"))
@@ -151,7 +151,7 @@ TEST_CASE("geospatial") {
         REQUIRE(list.get<double>(2) == 3.3);
 
         {
-            Geospatial geo = obj.obj().get<Geospatial>("location");
+            Geospatial geo = obj.get_obj().get<Geospatial>("location");
             REQUIRE(geo.get_type_string() == "Point");
             REQUIRE(geo.get_type() == Geospatial::Type::Point);
             auto&& point = geo.get<GeoPoint>();
@@ -167,7 +167,7 @@ TEST_CASE("geospatial") {
             obj.set_property_value(ctx, "location", std::any{geo});
             realm->commit_transaction();
             Geospatial fetched = Geospatial::from_link(
-                util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "location")).obj());
+                util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "location")).get_obj());
             REQUIRE(geo == fetched);
         }
     }
