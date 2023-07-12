@@ -445,7 +445,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                     CHECK(after_callback_invocations == 1);
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 4);
-                    CHECK(object.obj().get<Int>("value") == 4);
+                    CHECK(object.get_obj().get<Int>("value") == 4);
                     REQUIRE_INDICES(results_changes.modifications);
                     REQUIRE_INDICES(results_changes.insertions);
                     REQUIRE_INDICES(results_changes.deletions);
@@ -498,7 +498,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                     CHECK(after_callback_invocations == 1);
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 4);
-                    CHECK(object.obj().get<Int>("value") == 4);
+                    CHECK(object.get_obj().get<Int>("value") == 4);
                     REQUIRE_INDICES(results_changes.modifications);
                     REQUIRE_INDICES(results_changes.insertions);
                     REQUIRE_INDICES(results_changes.deletions, 1); // the deletion "wins"
@@ -536,7 +536,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                     CHECK(results.size() == 2);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 4);
                     CHECK(results.get<Obj>(1).get<Int>("value") == new_value);
-                    CHECK(object.obj().get<Int>("value") == 4);
+                    CHECK(object.get_obj().get<Int>("value") == 4);
                     REQUIRE_INDICES(results_changes.modifications);
                     REQUIRE_INDICES(results_changes.insertions);
                     REQUIRE_INDICES(results_changes.deletions);
@@ -763,7 +763,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                     CHECK(after_callback_invocations == 1);
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 6);
-                    CHECK(object.obj().get<Int>("value") == 6);
+                    CHECK(object.get_obj().get<Int>("value") == 6);
                     REQUIRE_INDICES(results_changes.modifications, 0);
                     REQUIRE_INDICES(results_changes.insertions);
                     REQUIRE_INDICES(results_changes.deletions);
@@ -790,7 +790,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                         REQUIRE(table->size() == 1);
                         REQUIRE(table->begin()->get<Int>("value") == 6);
                         REQUIRE_NOTHROW(advance_and_notify(*object.get_realm()));
-                        CHECK(object.obj().get<Int>("value") == 6);
+                        CHECK(object.get_obj().get<Int>("value") == 6);
                         object_changes = {};
                         results_changes = {};
                     })
@@ -800,7 +800,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                         // 6 -> 4
                         CHECK(results.size() == 1);
                         CHECK(results.get<Obj>(0).get<Int>("value") == 4);
-                        CHECK(object.obj().get<Int>("value") == 4);
+                        CHECK(object.get_obj().get<Int>("value") == 4);
                         REQUIRE_INDICES(results_changes.modifications, 0);
                         REQUIRE_INDICES(results_changes.insertions);
                         REQUIRE_INDICES(results_changes.deletions);
@@ -817,7 +817,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                         // 4 -> 6
                         CHECK(results.size() == 1);
                         CHECK(results.get<Obj>(0).get<Int>("value") == 6);
-                        CHECK(object.obj().get<Int>("value") == 6);
+                        CHECK(object.get_obj().get<Int>("value") == 6);
                         REQUIRE_INDICES(results_changes.modifications, 0);
                         REQUIRE_INDICES(results_changes.insertions);
                         REQUIRE_INDICES(results_changes.deletions);
@@ -1107,7 +1107,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == new_value);
                     CHECK(object.is_valid());
-                    CHECK(object.obj().get<Int>("value") == new_value);
+                    CHECK(object.get_obj().get<Int>("value") == new_value);
                     REQUIRE_INDICES(results_changes.modifications, 0);
                     REQUIRE_INDICES(results_changes.insertions);
                     REQUIRE_INDICES(results_changes.deletions);
@@ -1140,7 +1140,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 6);
                     CHECK(object.is_valid());
-                    CHECK(object.obj().get<Int>("value") == 6);
+                    CHECK(object.get_obj().get<Int>("value") == 6);
                     REQUIRE_INDICES(results_changes.modifications, 0);
                     REQUIRE_INDICES(results_changes.insertions);
                     REQUIRE_INDICES(results_changes.deletions, 1);
@@ -1778,7 +1778,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                     CHECK(results.size() == 1); // insert was discarded
                     CHECK(results.get<Obj>(0).get<Int>("value") == 6);
                     CHECK(object.is_valid());
-                    CHECK(object.obj().get<Int>("value") == 6);
+                    CHECK(object.get_obj().get<Int>("value") == 6);
                 })
                 ->run();
         }
@@ -2008,7 +2008,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                     CHECK(results.get<Obj>(0).get<Int>("_id") == pk_val);
                     CHECK(object.is_valid());
                     check_value(results.get<Obj>(0), local_state);
-                    check_value(object.obj(), local_state);
+                    check_value(object.get_obj(), local_state);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
@@ -2017,7 +2017,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                     CHECK(object.is_valid());
                     T expected_state = (test_mode == ClientResyncMode::DiscardLocal) ? remote_state : local_state;
                     check_value(results.get<Obj>(0), expected_state);
-                    check_value(object.obj(), expected_state);
+                    check_value(object.get_obj(), expected_state);
                     if (local_state == expected_state) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
@@ -2086,7 +2086,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                     CHECK(results.get<Obj>(0).get<Int>("_id") == pk_val);
                     CHECK(object.is_valid());
                     check_list(results.get<Obj>(0), local_state);
-                    check_list(object.obj(), local_state);
+                    check_list(object.get_obj(), local_state);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
@@ -2098,7 +2098,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                         expected_state = local_state;
                     }
                     check_list(results.get<Obj>(0), expected_state);
-                    check_list(object.obj(), expected_state);
+                    check_list(object.get_obj(), expected_state);
                     if (local_state == expected_state) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
@@ -2210,7 +2210,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                     CHECK(results.get<Obj>(0).get<Int>("_id") == pk_val);
                     CHECK(object.is_valid());
                     check_dictionary(results.get<Obj>(0), local_state);
-                    check_dictionary(object.obj(), local_state);
+                    check_dictionary(object.get_obj(), local_state);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
@@ -2227,7 +2227,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                         }
                     }
                     check_dictionary(results.get<Obj>(0), expected_state);
-                    check_dictionary(object.obj(), expected_state);
+                    check_dictionary(object.get_obj(), expected_state);
                     if (local_state == expected_state) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
@@ -2321,7 +2321,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                     CHECK(results.get<Obj>(0).get<Int>("_id") == pk_val);
                     CHECK(object.is_valid());
                     check_set(results.get<Obj>(0), local_state);
-                    check_set(object.obj(), local_state);
+                    check_set(object.get_obj(), local_state);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
@@ -2339,7 +2339,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                         }
                     }
                     check_set(results.get<Obj>(0), expected);
-                    check_set(object.obj(), expected);
+                    check_set(object.get_obj(), expected);
                     if (local_state == expected) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
@@ -2574,7 +2574,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
             CreatePolicy::ForceCreate);
 
         for (auto link : links) {
-            test_type.add_link(object.obj(), link);
+            test_type.add_link(object.get_obj(), link);
         }
     };
 
@@ -2587,7 +2587,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
             c, r, "dest",
             std::any(realm::AnyDict{{valid_pk_name, std::move(v)}, {"realm_id", std::string(partition)}}),
             CreatePolicy::ForceCreate);
-        return ObjLink{obj.obj().get_table()->get_key(), obj.obj().get_key()};
+        return ObjLink{obj.get_obj().get_table()->get_key(), obj.get_obj().get_key()};
     };
 
     auto require_links_to_match_ids = [&](std::vector<Obj>& links, std::vector<util::Optional<int64_t>>& expected,
