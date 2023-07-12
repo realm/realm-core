@@ -452,6 +452,15 @@ std::vector<std::string_view> ErrorCodes::get_all_names()
     return ret;
 }
 
+std::vector<std::pair<std::string_view, ErrorCodes::Error>> ErrorCodes::get_error_list()
+{
+    std::vector<std::pair<std::string_view, ErrorCodes::Error>> ret;
+    for (auto it : string_to_error_code) {
+        ret.emplace_back(std::make_pair(it.name, it.code));
+    }
+    return ret;
+}
+
 std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code)
 {
     return stream << ErrorCodes::error_string(code);

@@ -242,6 +242,7 @@ public:
     static Error from_string(std::string_view str);
     static std::vector<Error> get_all_codes();
     static std::vector<std::string_view> get_all_names();
+    static std::vector<std::pair<std::string_view, ErrorCodes::Error>> get_error_list();
 };
 
 std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code);

@@ -32,16 +32,17 @@
 namespace realm::app {
 
 struct AppError : public RuntimeError {
-    util::Optional<int> additional_status_code;
+    std::optional<int> additional_status_code;
 
     std::string link_to_server_logs;
     std::string server_error;
 
     AppError(ErrorCodes::Error error_code, std::string message, std::string link = "",
-             util::Optional<int> additional_error_code = util::none);
+             std::optional<int> additional_error_code = std::nullopt);
 
+    // Used for creating an AppError with the error_code from the server response
     AppError(std::string server_err, std::string message, std::string link = "",
-             util::Optional<int> additional_error_code = util::none, ErrorCodes::Error = ErrorCodes::AppServerError);
+             std::optional<int> additional_error_code = std::nullopt, ErrorCodes::Error = ErrorCodes::AppServerError);
 
     bool is_json_error() const
     {
