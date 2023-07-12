@@ -1392,9 +1392,15 @@ TEST(Many_ConcurrentReaders)
     sg_w->close();
 
     auto reader = [path_str]() {
+        std::stringstream logs;
         try {
+            auto logger = util::StreamLogger(logs);
+            DBOptions options;
+            options.logger = std::make_shared<util::StreamLogger>(logs);
+            options.logger->set_level_threshold(Logger::Level::all);
+            constexpr bool no_create = false;
             for (int i = 0; i < 1000; ++i) {
-                DBRef sg_r = DB::create(path_str);
+                DBRef sg_r = DB::create(path_str, no_create, options);
                 ReadTransaction rt(sg_r);
                 ConstTableRef t = rt.get_table("table");
                 auto col_key = t->get_column_key("column");
@@ -1402,8 +1408,12 @@ TEST(Many_ConcurrentReaders)
                 rt.get_group().verify();
             }
         }
-        catch (...) {
-            REALM_ASSERT(false);
+        catch (const std::exception& e) {
+            std::cerr << "Exception during Many_ConcurrentReaders:" << std::endl;
+            std::cerr << "Reason: '" << e.what() << "'" << std::endl;
+            std::cerr << logs.str();
+            constexpr bool unexpected_exception = false;
+            REALM_ASSERT_EX(unexpected_exception, e.what());
         }
     };
 
