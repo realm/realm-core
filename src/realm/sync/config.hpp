@@ -203,9 +203,12 @@ struct SyncConfig {
     // a client reset in ClientResyncMode::Manual mode
     util::Optional<std::string> recovery_directory;
     ClientResyncMode client_resync_mode = ClientResyncMode::Manual;
-    std::function<void(std::shared_ptr<Realm> before_frozen)> notify_before_client_reset;
-    std::function<void(std::shared_ptr<Realm> before_frozen, ThreadSafeReference after, bool did_recover)>
+    std::function<void(std::shared_ptr<Realm> before)> notify_before_client_reset;
+    std::function<void(std::shared_ptr<Realm> frozen_before, ThreadSafeReference after, bool did_recover)>
         notify_after_client_reset;
+    // If true, the Realm passed as the `before` argument to the before reset
+    // callbacks will be frozen
+    bool freeze_before_reset_realm = true;
 
     // Used by core testing to hook into the sync client when various events occur and maybe inject
     // errors/disconnects deterministically.

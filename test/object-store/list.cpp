@@ -1276,7 +1276,7 @@ TEST_CASE("list") {
         Object obj;
         REQUIRE_NOTHROW(obj = util::any_cast<Object&&>(list.get(ctx, 1)));
         REQUIRE(obj.is_valid());
-        REQUIRE(obj.obj().get_key() == target_keys[1]);
+        REQUIRE(obj.get_obj().get_key() == target_keys[1]);
     }
 }
 
@@ -1713,7 +1713,7 @@ TEST_CASE("embedded List") {
         Object obj;
         REQUIRE_NOTHROW(obj = util::any_cast<Object&&>(list.get(ctx, 1)));
         REQUIRE(obj.is_valid());
-        REQUIRE(obj.obj().get<int64_t>(col_value) == 1);
+        REQUIRE(obj.get_obj().get<int64_t>(col_value) == 1);
     }
 }
 

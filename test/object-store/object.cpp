@@ -1014,7 +1014,7 @@ TEST_CASE("object") {
 
                         // remove a backlink
                         write([&] {
-                            table_origin->remove_object(object_origin2.obj().get_key());
+                            table_origin->remove_object(object_origin2.get_obj().get_key());
                         });
                         REQUIRE_INDICES(change.modifications, 0);
                         REQUIRE(change.columns.size() == 1);
@@ -1067,7 +1067,7 @@ TEST_CASE("object") {
             {"dictionary", AnyDict{{"key", "value"s}}},
         });
 
-        Obj row = obj.obj();
+        Obj row = obj.get_obj();
         auto link_target = *r->read_group().get_table("class_link target")->begin();
         TableRef table = row.get_table();
         auto target_table = link_target.get_table();
@@ -1164,7 +1164,7 @@ TEST_CASE("object") {
             {"float", 6.6f},
         });
 
-        Obj row = obj.obj();
+        Obj row = obj.get_obj();
         TableRef table = row.get_table();
         REQUIRE(row.get<Int>(table->get_column_key("_id")) == 1);
         REQUIRE(row.get<Bool>(table->get_column_key("bool")) == true);
@@ -1212,7 +1212,7 @@ TEST_CASE("object") {
             {"dictionary", AnyDict{{"key", "value"s}}},
         });
 
-        auto row = obj.obj();
+        auto row = obj.get_obj();
         REQUIRE(row.get<Int>(row.get_table()->get_column_key("_id")) == 10);
     }
 
@@ -1311,7 +1311,7 @@ TEST_CASE("object") {
         REQUIRE(callback_called);
         REQUIRE_INDICES(change.modifications, 0);
 
-        auto row = obj.obj();
+        auto row = obj.get_obj();
         auto table = row.get_table();
         REQUIRE(row.get<Int>(table->get_column_key("_id")) == 1);
         REQUIRE(row.get<Bool>(table->get_column_key("bool")) == true);
@@ -1741,14 +1741,14 @@ TEST_CASE("object") {
         auto obj = create(AnyDict{{"_id", d.null_value()}}, "nullable int pk");
         auto col_pk_int = r->read_group().get_table("class_nullable int pk")->get_column_key("_id");
         auto col_pk_str = r->read_group().get_table("class_nullable string pk")->get_column_key("_id");
-        REQUIRE(obj.obj().is_null(col_pk_int));
+        REQUIRE(obj.get_obj().is_null(col_pk_int));
         obj = create(AnyDict{{"_id", d.null_value()}}, "nullable string pk");
-        REQUIRE(obj.obj().is_null(col_pk_str));
+        REQUIRE(obj.get_obj().is_null(col_pk_str));
 
         obj = create(AnyDict{{}}, "nullable int pk");
-        REQUIRE(obj.obj().get<util::Optional<Int>>(col_pk_int) == 10);
+        REQUIRE(obj.get_obj().get<util::Optional<Int>>(col_pk_int) == 10);
         obj = create(AnyDict{{}}, "nullable string pk");
-        REQUIRE(obj.obj().get<String>(col_pk_str) == "value");
+        REQUIRE(obj.get_obj().get<String>(col_pk_str) == "value");
     }
 
     SECTION("create null and 0 primary keys for Int types") {
@@ -1867,8 +1867,8 @@ TEST_CASE("object") {
 
         REQUIRE_FALSE(obj.get_property_value<std::any>(d, "object").has_value());
         obj.set_property_value(d, "object", std::any(linkobj));
-        REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(d, "object")).obj().get_key() ==
-                linkobj.obj().get_key());
+        REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(d, "object")).get_obj().get_key() ==
+                linkobj.get_obj().get_key());
 
         auto linking = util::any_cast<Results>(linkobj.get_property_value<std::any>(d, "origin"));
         REQUIRE(linking.size() == 1);
@@ -1985,12 +1985,12 @@ TEST_CASE("object") {
 
         REQUIRE_FALSE(obj.get_property_value<std::any>(d, "object").has_value());
         obj.set_property_value(d, "object", std::any(linkobj));
-        REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(d, "object")).obj().get_key() ==
-                linkobj.obj().get_key());
+        REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(d, "object")).get_obj().get_key() ==
+                linkobj.get_obj().get_key());
 
-        REQUIRE(!obj.obj().is_unresolved(link_col));
-        linkobj.obj().invalidate();
-        REQUIRE(obj.obj().is_unresolved(link_col));
+        REQUIRE(!obj.get_obj().is_unresolved(link_col));
+        linkobj.get_obj().invalidate();
+        REQUIRE(obj.get_obj().is_unresolved(link_col));
 
         CHECK_FALSE(obj.get_property_value<std::any>(d, "object").has_value());
 
@@ -2046,7 +2046,7 @@ TEST_CASE("object") {
             return r1->read_group().get_table("class_array target")->size() == 4;
         });
 
-        Obj obj = object1.obj();
+        Obj obj = object1.get_obj();
         REQUIRE(obj.get<Int>("_id") == 7); // pk
         REQUIRE(obj.get_linklist("array 1").size() == 2);
         REQUIRE(obj.get<Int>("int 1") == 1); // non-default from r1
@@ -2153,8 +2153,8 @@ TEST_CASE("Embedded Object") {
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(30)}}}},
         });
 
-        REQUIRE(obj.obj().get<int64_t>("_id") == 1);
-        auto linked_obj = util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object")).obj();
+        REQUIRE(obj.get_obj().get<int64_t>("_id") == 1);
+        auto linked_obj = util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object")).get_obj();
         REQUIRE(linked_obj.is_valid());
         REQUIRE(linked_obj.get<int64_t>("value") == 10);
         auto list = util::any_cast<List>(obj.get_property_value<std::any>(ctx, "array"));
@@ -2183,7 +2183,7 @@ TEST_CASE("Embedded Object") {
             obj.set_property_value(ctx, "object", std::any(AnyDict{{"value", INT64_C(40)}}));
             auto new_linked = util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object"));
             REQUIRE_FALSE(old_linked.is_valid());
-            REQUIRE(new_linked.obj().get<int64_t>("value") == 40);
+            REQUIRE(new_linked.get_obj().get<int64_t>("value") == 40);
             realm->cancel_transaction();
         }
 
@@ -2194,8 +2194,8 @@ TEST_CASE("Embedded Object") {
                                    CreatePolicy::UpdateModified);
             auto new_linked = util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object"));
             REQUIRE(old_linked.is_valid());
-            REQUIRE(old_linked.obj() == new_linked.obj());
-            REQUIRE(new_linked.obj().get<int64_t>("value") == 40);
+            REQUIRE(old_linked.get_obj() == new_linked.get_obj());
+            REQUIRE(new_linked.get_obj().get<int64_t>("value") == 40);
             realm->cancel_transaction();
         }
 
@@ -2215,12 +2215,12 @@ TEST_CASE("Embedded Object") {
             {"_id", INT64_C(1)},
             {"array", AnyVector{AnyDict{{"value", INT64_C(1)}}, AnyDict{{"value", INT64_C(2)}}}},
         });
-        List list(realm, obj.obj().get_linklist("array"));
+        List list(realm, obj.get_obj().get_linklist("array"));
         auto obj2 = create(AnyDict{
             {"_id", INT64_C(2)},
             {"array", AnyVector{AnyDict{{"value", INT64_C(1)}}, AnyDict{{"value", INT64_C(2)}}}},
         });
-        List list2(realm, obj2.obj().get_linklist("array"));
+        List list2(realm, obj2.get_obj().get_linklist("array"));
 
         SECTION("throws when given a managed object") {
             realm->begin_transaction();
@@ -2340,7 +2340,7 @@ TEST_CASE("Embedded Object") {
         REQUIRE(calls == 1);
 
         realm->begin_transaction();
-        parent.obj().remove();
+        parent.get_obj().remove();
         realm->commit_transaction();
         advance_and_notify(*realm);
         REQUIRE(calls == 2);
@@ -2385,7 +2385,7 @@ TEST_CASE("Asymmetric Object") {
     SECTION("Basic object creation") {
         auto obj = create(AnyDict{{"_id", INT64_C(1)}}, "asymmetric");
         // Object returned is not valid.
-        REQUIRE(!obj.obj().is_valid());
+        REQUIRE(!obj.get_obj().is_valid());
         // Object gets deleted immediately.
         REQUIRE(ObjectStore::is_empty(realm->read_group()));
     }
@@ -2396,7 +2396,7 @@ TEST_CASE("Asymmetric Object") {
         REQUIRE_EXCEPTION(create(
                               AnyDict{
                                   {"_id", INT64_C(1)},
-                                  {"location", Mixed(ObjLink{table->get_key(), obj.obj().get_key()})},
+                                  {"location", Mixed(ObjLink{table->get_key(), obj.get_obj().get_key()})},
                               },
                               "asymmetric_link"),
                           IllegalOperation, "Links not allowed in asymmetric tables");

@@ -1895,7 +1895,7 @@ TEST_CASE("C API", "[c_api]") {
 
         SECTION("native pointer mapping") {
             auto object = *static_cast<const realm::Object*>(_realm_object_get_native_ptr(obj1.get()));
-            auto obj = object.obj();
+            auto obj = object.get_obj();
             CHECK(obj.get<int64_t>(realm::ColKey(foo_int_key)) == int_val1.integer);
 
             auto obj1a = cptr_checked(_realm_object_from_native_copy(&object, sizeof(object)));
@@ -2391,7 +2391,7 @@ TEST_CASE("C API", "[c_api]") {
                 bool out_found;
                 CHECK(realm_query_find_first(q_decimal.get(), &out_value, &out_found));
                 CHECK(out_found);
-                auto link = obj1->obj().get_link();
+                auto link = obj1->get_obj().get_link();
                 realm_value_t expected;
                 expected.type = RLM_TYPE_LINK;
                 expected.link.target_table = link.get_table_key().value;
@@ -3807,8 +3807,8 @@ TEST_CASE("C API", "[c_api]") {
                     CHECK(!mixed_link.is_unresolved_link());
                     CHECK(mixed_link.is_type(type_TypedLink));
                     auto link = mixed_link.get_link();
-                    CHECK(link.get_obj_key() == obj1->obj().get_key());
-                    CHECK(link.get_table_key() == obj1->obj().get_table()->get_key());
+                    CHECK(link.get_obj_key() == obj1->get_obj().get_key());
+                    CHECK(link.get_table_key() == obj1->get_obj().get_table()->get_key());
                 });
 
                 SECTION("get") {

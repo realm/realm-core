@@ -2255,7 +2255,7 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
         did_client_reset = client_reset_if_needed();
     }
     catch (const std::exception& e) {
-        auto err_msg = util::format("A fatal error occured during client reset: '%1'", e.what());
+        auto err_msg = util::format("A fatal error occurred during client reset: '%1'", e.what());
         logger.error(err_msg.c_str());
         SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, std::move(err_msg)}, false);
         suspend(err_info);

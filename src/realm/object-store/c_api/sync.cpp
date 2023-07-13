@@ -214,7 +214,7 @@ RLM_API void realm_sync_client_config_set_fast_reconnect_limit(realm_sync_client
 /// @param config pointer to sync client config created by realm_sync_client_config_new()
 /// @param on_thread_create callback invoked when the object store thread is created
 /// @param on_thread_destroy callback invoked when the object store thread is destroyed
-/// @param on_error callback invoked to signal to the listener that some error has occured.
+/// @param on_error callback invoked to signal to the listener that some error has occurred.
 /// @param user_data pointer to user defined data that is provided to each of the callback functions
 /// @param free_userdata callback invoked when the user_data is to be freed
 RLM_API void realm_sync_client_config_set_default_binding_thread_observer(
