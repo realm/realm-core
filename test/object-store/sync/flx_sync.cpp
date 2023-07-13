@@ -129,7 +129,7 @@ std::vector<ObjectId> fill_large_array_schema(FLXSyncTestHarness& harness)
 
 } // namespace
 
-TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app][baas]") {
+TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][baas]") {
     FLXSyncTestHarness harness("basic_flx_connect");
 
     auto foo_obj_id = ObjectId::gen();
@@ -228,7 +228,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app][baas]") {
     });
 }
 
-TEST_CASE("flx: test commands work", "[baas]") {
+TEST_CASE("flx: test commands work", "[sync][flx][test command][baas]") {
     FLXSyncTestHarness harness("test_commands");
     harness.do_with_new_realm([&](const SharedRealm& realm) {
         wait_for_upload(*realm);
@@ -274,7 +274,7 @@ static auto make_client_reset_handler()
     return std::make_pair(std::move(reset_future), std::move(fn));
 }
 
-TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
+TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
     std::vector<ObjectSchema> schema{
         {"TopLevel",
          {
@@ -1186,7 +1186,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][baas][client reset]") {
     app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
 }
 
-TEST_CASE("flx: creating an object on a class with no subscription throws", "[sync][flx][app][baas]") {
+TEST_CASE("flx: creating an object on a class with no subscription throws", "[sync][flx[subscription][baas]") {
     FLXSyncTestHarness harness("flx_bad_query", {g_simple_embedded_obj_schema, {"queryable_str_field"}});
     harness.do_with_new_user([&](auto user) {
         SyncTestFile config(user, harness.schema(), SyncConfig::FLXSyncEnabled{});
@@ -1235,7 +1235,8 @@ TEST_CASE("flx: creating an object on a class with no subscription throws", "[sy
     });
 }
 
-TEST_CASE("flx: uploading an object that is out-of-view results in compensating write", "[sync][flx][app][baas]") {
+TEST_CASE("flx: uploading an object that is out-of-view results in compensating write",
+          "[sync][flx][compensating write][baas]") {
     static std::optional<FLXSyncTestHarness> harness;
     if (!harness) {
         Schema schema{{"TopLevel",
@@ -1520,7 +1521,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
     }
 }
 
-TEST_CASE("flx: query on non-queryable field results in query error message", "[sync][flx][app][baas]") {
+TEST_CASE("flx: query on non-queryable field results in query error message", "[sync][flx][query][baas]") {
     static std::optional<FLXSyncTestHarness> harness;
     if (!harness) {
         harness.emplace("flx_bad_query");
@@ -1601,7 +1602,7 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
 }
 
 #if REALM_ENABLE_GEOSPATIAL
-TEST_CASE("flx: geospatial", "[sync][flx][app][baas]") {
+TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
     static std::optional<FLXSyncTestHarness> harness;
     if (!harness) {
         Schema schema{
@@ -1865,7 +1866,7 @@ TEST_CASE("flx: geospatial", "[sync][flx][app][baas]") {
 }
 #endif // REALM_ENABLE_GEOSPATIAL
 
-TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][flx][app][baas]") {
+TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][flx][bootstrap][baas]") {
     FLXSyncTestHarness harness("flx_bootstrap_batching", {g_large_array_schema, {"queryable_int_field"}});
 
     std::vector<ObjectId> obj_ids_at_end = fill_large_array_schema(harness);
@@ -1953,7 +1954,7 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
     REQUIRE(active_subs.version() == int64_t(1));
 }
 
-TEST_CASE("flx: dev mode uploads schema before query change", "[sync][flx][app][baas]") {
+TEST_CASE("flx: dev mode uploads schema before query change", "[sync][flx][query][baas]") {
     FLXSyncTestHarness::ServerSchema server_schema;
     auto default_schema = FLXSyncTestHarness::default_server_schema();
     server_schema.queryable_fields = default_schema.queryable_fields;
@@ -2010,7 +2011,7 @@ TEST_CASE("flx: dev mode uploads schema before query change", "[sync][flx][app][
 }
 
 // This is a test case for the server's fix for RCORE-969
-TEST_CASE("flx: change-of-query history divergence", "[sync][flx][app][baas]") {
+TEST_CASE("flx: change-of-query history divergence", "[sync][flx][query][baas]") {
     FLXSyncTestHarness harness("flx_coq_divergence");
 
     // first we create an object on the server and upload it.
@@ -2077,7 +2078,7 @@ TEST_CASE("flx: change-of-query history divergence", "[sync][flx][app][baas]") {
     });
 }
 
-TEST_CASE("flx: writes work offline", "[sync][flx][app][baas]") {
+TEST_CASE("flx: writes work offline", "[sync][flx][baas]") {
     FLXSyncTestHarness harness("flx_offline_writes");
 
     harness.do_with_new_realm([&](SharedRealm realm) {
@@ -2157,7 +2158,7 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app][baas]") {
     });
 }
 
-TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app][baas]") {
+TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][baas]") {
     FLXSyncTestHarness harness("flx_offline_writes");
 
     harness.do_with_new_realm([&](SharedRealm realm) {
@@ -2233,7 +2234,7 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app][baas]")
     });
 }
 
-TEST_CASE("flx: verify PBS/FLX websocket protocol number and prefixes", "[sync][flx][local]") {
+TEST_CASE("flx: verify websocket protocol number and prefixes", "[sync][protocol]") {
     // Update the expected value whenever the protocol version is updated - this ensures
     // that the current protocol version does not change unexpectedly.
     REQUIRE(9 == sync::get_current_protocol_version());
@@ -2244,7 +2245,7 @@ TEST_CASE("flx: verify PBS/FLX websocket protocol number and prefixes", "[sync][
 
 // TODO: remote-baas: This test fails consistently with Windows remote baas server - to be fixed in RCORE-1674
 #ifndef _WIN32
-TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app][baas]") {
+TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][baas]") {
     FLXSyncTestHarness harness("flx_bad_query");
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
 
@@ -2265,7 +2266,7 @@ TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app
 }
 #endif
 
-TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app][baas]") {
+TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][baas]") {
     const std::string base_url = get_base_url();
     auto server_app_config = minimal_app_config(base_url, "flx_connect_as_pbs", g_minimal_schema);
     TestAppSession session(create_app(server_app_config));
@@ -2281,7 +2282,7 @@ TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app][ba
     CHECK_THROWS_AS(realm->get_latest_subscription_set(), IllegalOperation);
 }
 
-TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][app][baas]") {
+TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][baas]") {
     FLXSyncTestHarness harness("connect_to_flx_as_pbs");
     SyncTestFile config(harness.app(), bson::Bson{}, harness.schema());
     std::mutex sync_error_mutex;
@@ -2300,7 +2301,7 @@ TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][app][baas]
     CHECK(sync_error->server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
 }
 
-TEST_CASE("flx: connect to FLX with partition value returns an error", "[sync][flx][app][baas]") {
+TEST_CASE("flx: connect to FLX with partition value returns an error", "[sync][flx][protocol][baas]") {
     FLXSyncTestHarness harness("connect_to_flx_as_pbs");
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
     config.sync_config->partition_value = "\"foobar\"";
@@ -2309,7 +2310,7 @@ TEST_CASE("flx: connect to FLX with partition value returns an error", "[sync][f
                       "Cannot specify a partition value when flexible sync is enabled");
 }
 
-TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app][baas]") {
+TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][protocol][baas]") {
     const std::string base_url = get_base_url();
 
     auto server_app_config = minimal_app_config(base_url, "flx_connect_as_pbs", g_minimal_schema);
@@ -2342,7 +2343,7 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app][baas]
     CHECK(sync_error->server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
 }
 
-TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][flx][app][baas]") {
+TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][flx][token][baas]") {
     class HookedTransport : public SynchronousTestTransport {
     public:
         void send_request_to_server(const Request& request,
@@ -2393,7 +2394,7 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
     REQUIRE(seen_waiting_for_access_token);
 }
 
-TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app][baas]") {
+TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][bootstrap][baas]") {
     FLXSyncTestHarness harness("flx_bootstrap_batching", {g_large_array_schema, {"queryable_int_field"}});
 
     std::vector<ObjectId> obj_ids_at_end = fill_large_array_schema(harness);
@@ -2699,7 +2700,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
     }
 }
 
-TEST_CASE("flx: asymmetric sync", "[sync][flx][app][baas]") {
+TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
     static auto server_schema = [] {
         FLXSyncTestHarness::ServerSchema server_schema;
         server_schema.queryable_fields = {"queryable_str_field"};
@@ -2905,7 +2906,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app][baas]") {
 }
 
 // TODO this test has been failing very frequently. We need to fix it and re-enable it in RCORE-1149.
-TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app][baas]") {
+TEST_CASE("flx: data ingest - dev mode", "[sync][flx][data ingest][baas]") {
     FLXSyncTestHarness::ServerSchema server_schema;
     server_schema.dev_mode_enabled = true;
     server_schema.schema = Schema{};
@@ -2947,7 +2948,7 @@ TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app][baas]") {
         schema);
 }
 
-TEST_CASE("flx: send client error", "[sync][flx][app][baas]") {
+TEST_CASE("flx: send client error", "[sync][flx][baas]") {
     FLXSyncTestHarness harness("flx_client_error");
 
     // An integration error is simulated while bootstrapping.
@@ -2983,7 +2984,7 @@ TEST_CASE("flx: send client error", "[sync][flx][app][baas]") {
     CHECK(error_count == 2);
 }
 
-TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app][baas]") {
+TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][bootstrap][baas]") {
     FLXSyncTestHarness harness("bootstrap_full_sync");
 
     auto setup_subs = [](SharedRealm& realm) {
@@ -3205,7 +3206,7 @@ TEST_CASE("flx: bootstraps contain all changes", "[sync][flx][app][baas]") {
     }
 }
 
-TEST_CASE("flx: convert flx sync realm to bundled realm", "[app][flx][sync][baas]") {
+TEST_CASE("flx: convert flx sync realm to bundled realm", "[app][flx][baas]") {
     static auto foo_obj_id = ObjectId::gen();
     static auto bar_obj_id = ObjectId::gen();
     static auto bizz_obj_id = ObjectId::gen();
@@ -3364,7 +3365,7 @@ TEST_CASE("flx: convert flx sync realm to bundled realm", "[app][flx][sync][baas
     }
 }
 
-TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][flx][app][baas]") {
+TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][flx][compensting write][baas]") {
     AppCreateConfig::ServiceRole role;
     role.name = "compensating_write_perms";
 
@@ -3523,7 +3524,7 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
     REQUIRE(top_level_table->is_empty());
 }
 
-TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][app][baas]") {
+TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][bootstrap][baas]") {
     FLXSyncTestHarness harness("flx_bootstrap_batching", {g_large_array_schema, {"queryable_int_field"}});
     fill_large_array_schema(harness);
 
@@ -3605,7 +3606,8 @@ TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][app
     CHECK(user_commit_version == bootstrap_version + 1);
 }
 
-TEST_CASE("flx: open realm + register subscription callack while bootstrapping", "[sync][flx][async-open]") {
+TEST_CASE("flx: open realm + register subscription callack while bootstrapping",
+          "[sync][flx][bootstrap][async open][baas]") {
     FLXSyncTestHarness harness("flx_bootstrap_batching");
     auto foo_obj_id = ObjectId::gen();
     harness.load_initial_data([&](SharedRealm realm) {
@@ -3775,7 +3777,7 @@ TEST_CASE("flx: open realm + register subscription callack while bootstrapping",
         }
     }
 }
-TEST_CASE("flx sync: Client reset during async open", "[sync][flx][client-reset][async-open]") {
+TEST_CASE("flx sync: Client reset during async open", "[sync][flx][client reset][async open][baas]") {
     FLXSyncTestHarness harness("flx_bootstrap_batching");
     auto foo_obj_id = ObjectId::gen();
     std::atomic<bool> subscription_invoked = false;

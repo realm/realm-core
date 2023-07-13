@@ -1422,7 +1422,7 @@ TEST_CASE("notifications: TableView delivery") {
 
 
 #if REALM_ENABLE_SYNC
-TEST_CASE("notifications: sync") {
+TEST_CASE("notifications: sync", "[sync][pbs][notification]") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     TestSyncManager init_sync_manager({}, {false});

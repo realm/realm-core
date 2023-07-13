@@ -914,7 +914,7 @@ TEST_CASE("SharedRealm: schema_subset_mode") {
 }
 
 #if REALM_ENABLE_SYNC
-TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
+TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
     if (!util::EventLoop::has_implementation())
         return;
 
@@ -1335,7 +1335,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     }
 }
 
-TEST_CASE("SharedRealm: convert") {
+TEST_CASE("SharedRealm: convert", "[sync][pbs][convert]") {
     TestSyncManager tsm;
     ObjectSchema object_schema = {"object",
                                   {
@@ -1431,7 +1431,7 @@ TEST_CASE("SharedRealm: convert") {
     }
 }
 
-TEST_CASE("SharedRealm: convert - embedded objects") {
+TEST_CASE("SharedRealm: convert - embedded objects", "[sync][pbs][convert][embedded]") {
     TestSyncManager tsm;
     ObjectSchema object_schema = {"object",
                                   {

@@ -1162,7 +1162,7 @@ AppSession get_runtime_app_session(std::string base_url)
 
 
 #ifdef REALM_MONGODB_ENDPOINT
-TEST_CASE("app: baas admin api", "[sync][app]") {
+TEST_CASE("app: baas admin api", "[sync][app][admin api][baas]") {
     std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
     base_url.erase(std::remove(base_url.begin(), base_url.end(), '"'), base_url.end());
     SECTION("embedded objects") {

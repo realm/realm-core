@@ -282,7 +282,7 @@ struct TestClock {
 
 } // namespace
 
-TEST_CASE("audit object serialization") {
+TEST_CASE("audit object serialization", "[sync][pbs][audit][local]") {
     TestSyncManager test_session;
     SyncTestFile config(test_session.app(), "parent");
     config.cache = false;
@@ -1079,7 +1079,7 @@ TEST_CASE("audit object serialization") {
     }
 }
 
-TEST_CASE("audit management") {
+TEST_CASE("audit management", "[sync][pbs][audit][local]") {
     TestClock clock;
 
     TestSyncManager test_session;
@@ -1496,7 +1496,7 @@ TEST_CASE("audit management") {
 #endif
 }
 
-TEST_CASE("audit realm sharding") {
+TEST_CASE("audit realm sharding", "[sync][pbs][audit][local]") {
     // Don't start the server immediately so that we're forced to accumulate
     // a lot of local unuploaded data.
     TestSyncManager test_session{{}, {.start_immediately = false}};
@@ -1667,7 +1667,7 @@ static void generate_event(std::shared_ptr<Realm> realm, int call = 0)
     audit->end_scope(scope, assert_no_error);
 }
 
-TEST_CASE("audit integration tests") {
+TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
     // None of these tests need a deterministic clock, but the server rounding
     // timestamps to milliseconds can result in events not having monotonically
     // increasing timestamps with an actual clock.

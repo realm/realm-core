@@ -1401,7 +1401,7 @@ TEST_CASE("dictionary aggregate", "[dictionary]") {
     REQUIRE(*sum == 16);
 }
 
-TEST_CASE("callback with empty keypatharray") {
+TEST_CASE("callback with empty keypatharray", "[dictionary]") {
     InMemoryTestFile config;
     config.schema = Schema{
         {"object", {{"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
