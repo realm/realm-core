@@ -188,7 +188,7 @@ Status protocol_error_to_status(int raw_error_code, std::string_view msg)
                 return ErrorCodes::WrongSyncType;
 
             case ProtocolError::session_closed:
-                REALM_UNREACHABLE();
+                return ErrorCodes::ConnectionClosed;
             case ProtocolError::other_session_error:
                 return ErrorCodes::RuntimeError;
             case ProtocolError::token_expired:

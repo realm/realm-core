@@ -2098,14 +2098,28 @@ void Session::send_json_error_message()
     ClientProtocol& protocol = m_conn.get_client_protocol();
     OutputBuffer& out = m_conn.get_output_buffer();
     session_ident_type session_ident = get_ident();
-    auto protocol_error = ErrorCodes::RuntimeError;
+    auto protocol_error = ProtocolError::other_session_error;
+    switch (m_client_error->code()) {
+        case ErrorCodes::SyncProtocolInvariantFailed:
+            protocol_error = ProtocolError::bad_progress;
+            break;
+        case ErrorCodes::BadChangeset:
+            protocol_error = ProtocolError::bad_changeset;
+            break;
+        case ErrorCodes::LimitExceeded:
+            protocol_error = ProtocolError::bad_changeset_size;
+            break;
+        default:
+            protocol_error = ProtocolError::other_session_error;
+            break;
+    }
     auto message = m_client_error->what();
 
     logger.info("Sending: ERROR \"%1\" (error_code=%2, session_ident=%3)", message, static_cast<int>(protocol_error),
                 session_ident); // Throws
 
     nlohmann::json error_body_json;
-    error_body_json["message"] = message;
+    error_body_json["message"] = util::format("%1", m_client_error->to_status());
     protocol.make_json_error_message(out, session_ident, static_cast<int>(protocol_error),
                                      error_body_json.dump()); // Throws
     m_conn.initiate_write_message(out, this);                 // Throws

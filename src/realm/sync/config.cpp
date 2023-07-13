@@ -44,7 +44,7 @@ using ProtocolError = realm::sync::ProtocolError;
 
 SyncError::SyncError(Status status, bool is_fatal, std::optional<std::string_view> server_log,
                      std::vector<sync::CompensatingWriteErrorInfo> compensating_writes)
-    : RuntimeError(status.code(), format_sync_error_message(status, server_log))
+    : Exception(status.code(), format_sync_error_message(status, server_log))
     , is_fatal(is_fatal)
     , simple_message(std::string_view(reason()).substr(0, status.reason().size()))
     , compensating_writes_info(std::move(compensating_writes))

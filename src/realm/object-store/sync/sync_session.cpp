@@ -249,7 +249,7 @@ void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status 
     }
 
     if (auto error_handler = config(&SyncConfig::error_handler)) {
-        auto user_facing_error = SyncError(std::move(status), true);
+        auto user_facing_error = SyncError({ErrorCodes::AuthError, status.reason()}, true);
         error_handler(shared_from_this(), std::move(user_facing_error));
     }
 }

@@ -45,7 +45,7 @@ using port_type = std::uint_fast16_t;
 enum class ProtocolError;
 } // namespace sync
 
-struct SyncError : public RuntimeError {
+struct SyncError : public Exception {
     enum class ClientResetModeAllowed { DoNotClientReset, RecoveryPermitted, RecoveryNotPermitted };
 
     bool is_fatal;

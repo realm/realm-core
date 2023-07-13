@@ -5117,7 +5117,9 @@ TEST_CASE("C API - async_open", "[c_api][sync]") {
         });
         REQUIRE(userdata.called);
         REQUIRE(!userdata.realm_ref);
-        REQUIRE(userdata.error_message == "Bad user authentication (BIND)");
+        REQUIRE(userdata.error.error == RLM_ERR_AUTH_ERROR);
+        REQUIRE(userdata.error_message ==
+                "Unable to refresh the user access token: http error code considered fatal. Client Error: 403");
         realm_release(task);
         realm_release(config);
         realm_release(sync_config);
