@@ -218,14 +218,11 @@ RLM_API realm_sync_socket_t* realm_sync_socket_new(
     });
 }
 
-RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback* realm_callback,
-                                                 realm_web_socket_errno_e code, const char* reason)
+RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback* realm_callback, realm_errno_e code,
+                                                 const char* reason)
 {
-    auto close_code = sync::websocket::WebSocketError(code);
-
-    auto complete_status = code == realm_web_socket_errno_e::RLM_ERR_WEBSOCKET_OK
-                               ? Status::OK()
-                               : Status{ErrorCodes::ConnectionClosed, reason};
+    auto complete_status =
+        code == realm_errno_e::RLM_ERR_NONE ? Status::OK() : Status{static_cast<ErrorCodes::Error>(code), reason};
     (*(realm_callback->get()))(complete_status);
     realm_release(realm_callback);
 }

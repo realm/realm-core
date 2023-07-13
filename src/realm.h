@@ -3334,26 +3334,6 @@ typedef enum realm_sync_progress_direction {
     RLM_SYNC_PROGRESS_DIRECTION_DOWNLOAD,
 } realm_sync_progress_direction_e;
 
-/**
- * Possible error categories realm_sync_error_code_t can fall in.
- */
-typedef enum realm_sync_error_category {
-    RLM_SYNC_ERROR_CATEGORY_CLIENT,
-    RLM_SYNC_ERROR_CATEGORY_CONNECTION,
-    RLM_SYNC_ERROR_CATEGORY_SESSION,
-    RLM_SYNC_ERROR_CATEGORY_WEBSOCKET,
-
-    /**
-     * System error - POSIX errno, Win32 HRESULT, etc.
-     */
-    RLM_SYNC_ERROR_CATEGORY_SYSTEM,
-
-    /**
-     * Unknown source of error.
-     */
-    RLM_SYNC_ERROR_CATEGORY_UNKNOWN,
-} realm_sync_error_category_e;
-
 typedef enum realm_sync_error_action {
     RLM_SYNC_ERROR_ACTION_NO_ACTION,
     RLM_SYNC_ERROR_ACTION_PROTOCOL_VIOLATION,
@@ -3369,17 +3349,6 @@ typedef enum realm_sync_error_action {
 
 typedef struct realm_sync_session realm_sync_session_t;
 typedef struct realm_async_open_task realm_async_open_task_t;
-
-// This type should never be returned from a function.
-// It's only meant as an asynchronous callback argument.
-// Pointers to this struct and its pointer members are only valid inside the scope
-// of the callback they were passed to.
-typedef struct realm_sync_error_code {
-    realm_sync_error_category_e category;
-    int value;
-    const char* message;
-    const char* category_name;
-} realm_sync_error_code_t;
 
 typedef struct realm_sync_error_user_info {
     const char* key;
@@ -3397,8 +3366,7 @@ typedef struct realm_sync_error_compensating_write_info {
 // Pointers to this struct and its pointer members are only valid inside the scope
 // of the callback they were passed to.
 typedef struct realm_sync_error {
-    realm_sync_error_code_t error_code;
-    const char* detailed_message;
+    realm_error_t status;
     const char* c_original_file_path_key;
     const char* c_recovery_file_path_key;
     bool is_fatal;
@@ -3422,7 +3390,7 @@ typedef struct realm_sync_error {
  *
  * @param error Null, if the operation completed successfully.
  */
-typedef void (*realm_sync_wait_for_completion_func_t)(realm_userdata_t userdata, realm_sync_error_code_t* error);
+typedef void (*realm_sync_wait_for_completion_func_t)(realm_userdata_t userdata, realm_error_t* error);
 typedef void (*realm_sync_connection_state_changed_func_t)(realm_userdata_t userdata,
                                                            realm_sync_connection_state_e old_state,
                                                            realm_sync_connection_state_e new_state);
@@ -4106,8 +4074,8 @@ RLM_API realm_sync_socket_t* realm_sync_socket_new(
     realm_sync_socket_websocket_async_write_func_t websocket_write_func,
     realm_sync_socket_websocket_free_func_t websocket_free_func);
 
-RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback_t* realm_callback,
-                                                 realm_web_socket_errno_e status, const char* reason);
+RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback_t* realm_callback, realm_errno_e status,
+                                                 const char* reason);
 
 RLM_API void realm_sync_socket_websocket_connected(realm_websocket_observer_t* realm_websocket_observer,
                                                    const char* protocol);

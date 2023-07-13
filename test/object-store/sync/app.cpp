@@ -3057,9 +3057,9 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
                            CreatePolicy::ForceCreate);
             r->commit_transaction();
         }
-        r->sync_session()->wait_for_upload_completion([&](Status ec) {
+        r->sync_session()->wait_for_upload_completion([&](Status status) {
             std::lock_guard lk(mutex);
-            REQUIRE(!ec.get_std_error_code());
+            REQUIRE(status.is_ok());
             done = true;
         });
         r->sync_session()->resume();

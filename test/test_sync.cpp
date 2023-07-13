@@ -184,8 +184,8 @@ TEST(Sync_AsyncWaitForUploadCompletion)
 
     auto wait = [&] {
         BowlOfStonesSemaphore bowl;
-        auto handler = [&](std::error_code ec) {
-            if (CHECK_NOT(ec))
+        auto handler = [&](Status s) {
+            if (CHECK(s.is_ok()))
                 bowl.add_stone();
         };
         session.async_wait_for_upload_completion(handler);
@@ -227,8 +227,8 @@ TEST(Sync_AsyncWaitForUploadCompletionNoPendingLocalChanges)
 
     auto pf = util::make_promise_future<bool>();
     session.async_wait_for_upload_completion(
-        [promise = std::move(pf.promise), tr = db->start_read()](std::error_code ec) mutable {
-            REALM_ASSERT(!ec);
+        [promise = std::move(pf.promise), tr = db->start_read()](Status status) mutable {
+            REALM_ASSERT(status.is_ok());
             tr->advance_read();
             promise.emplace_value(tr->get_history()->no_pending_local_changes(tr->get_version()));
         });
@@ -246,8 +246,8 @@ TEST(Sync_AsyncWaitForDownloadCompletion)
 
     auto wait = [&](Session& session) {
         BowlOfStonesSemaphore bowl;
-        auto handler = [&](std::error_code ec) {
-            if (CHECK_NOT(ec))
+        auto handler = [&](Status s) {
+            if (CHECK(s.is_ok()))
                 bowl.add_stone();
         };
         session.async_wait_for_download_completion(handler);
@@ -308,8 +308,8 @@ TEST(Sync_AsyncWaitForSyncCompletion)
 
     auto wait = [&](Session& session) {
         BowlOfStonesSemaphore bowl;
-        auto handler = [&](std::error_code ec) {
-            if (CHECK_NOT(ec))
+        auto handler = [&](Status s) {
+            if (CHECK(s.is_ok()))
                 bowl.add_stone();
         };
         session.async_wait_for_sync_completion(handler);
@@ -354,23 +354,15 @@ TEST(Sync_AsyncWaitCancellation)
     ClientServerFixture fixture(dir, test_context);
 
     BowlOfStonesSemaphore bowl;
-    auto upload_completion_handler = [&](std::error_code ec) {
-        CHECK_EQUAL(util::error::operation_aborted, ec);
-        bowl.add_stone();
-    };
-    auto download_completion_handler = [&](std::error_code ec) {
-        CHECK_EQUAL(util::error::operation_aborted, ec);
-        bowl.add_stone();
-    };
-    auto sync_completion_handler = [&](std::error_code ec) {
-        CHECK_EQUAL(util::error::operation_aborted, ec);
+    auto completion_handler = [&](Status s) {
+        CHECK_EQUAL(s, ErrorCodes::OperationAborted);
         bowl.add_stone();
     };
     {
         Session session = fixture.make_bound_session(db, "/test");
-        session.async_wait_for_upload_completion(upload_completion_handler);
-        session.async_wait_for_download_completion(download_completion_handler);
-        session.async_wait_for_sync_completion(sync_completion_handler);
+        session.async_wait_for_upload_completion(completion_handler);
+        session.async_wait_for_download_completion(completion_handler);
+        session.async_wait_for_sync_completion(completion_handler);
         // Destruction of session cancels wait operations
     }
     fixture.start();
@@ -551,7 +543,7 @@ TEST(Sync_WaitForSessionTerminations)
     // Note: Atomicity would not be needed if
     // Session::async_wait_for_download_completion() was assumed to work.
     std::atomic<bool> called{false};
-    auto handler = [&](std::error_code) {
+    auto handler = [&](Status) {
         called = true;
     };
     session.async_wait_for_download_completion(std::move(handler));

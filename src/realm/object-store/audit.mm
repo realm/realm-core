@@ -783,8 +783,8 @@ void AuditRealmPool::wait_for_upload(std::shared_ptr<SyncSession> session)
             std::string path = session->path();
             session->close();
             m_open_paths.erase(path);
-            if (status.get_std_error_code()) {
-                m_logger->error("Events: Upload on '%1' failed with error '%2'.", path, status.reason());
+            if (!status.is_ok()) {
+                m_logger->error("Events: Upload on '%1' failed with error '%2'.", path, status);
                 if (m_error_handler) {
                     m_error_handler(SyncError(status, false));
                 }
