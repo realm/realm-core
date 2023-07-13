@@ -400,6 +400,8 @@ public:
     size_t find_first(int64_t value, size_t start = 0, size_t end = size_t(-1)) const
     {
         REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
+        // todo: fix use of this function, so that below assert cannot happen:
+        REALM_ASSERT_RELEASE(cond::condition >= 0);
         // todo, would be nice to avoid this in order to speed up find_first loops
         QueryStateFindFirst state;
         Finder finder = m_vtable->finder[cond::condition];
@@ -524,9 +526,9 @@ protected:
     Getter m_getter = nullptr; // cached to avoid indirection
     const VTable* m_vtable = nullptr;
 
-    uint_least8_t m_width = 0; // Size of an element (meaning depend on type of array).
-    int64_t m_lbound;          // min number that can be stored with current m_width
-    int64_t m_ubound;          // max number that can be stored with current m_width
+    uint_least8_t m_width = 0;   // Size of an element (meaning depend on type of array).
+    int64_t m_lbound;            // min number that can be stored with current m_width
+    int64_t m_ubound;            // max number that can be stored with current m_width
 
     bool m_is_inner_bptree_node; // This array is an inner node of B+-tree.
     bool m_has_refs;             // Elements whose first bit is zero are refs to subarrays.
@@ -827,7 +829,7 @@ inline ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_i
         return m_ref;
 
     if (!deep || !m_has_refs)
-        return do_write_shallow(out); // Throws
+        return do_write_shallow(out);            // Throws
 
     return do_write_deep(out, only_if_modified); // Throws
 }
@@ -841,7 +843,7 @@ inline ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterB
     array.init_from_ref(ref);
 
     if (!array.m_has_refs)
-        return array.do_write_shallow(out); // Throws
+        return array.do_write_shallow(out);            // Throws
 
     return array.do_write_deep(out, only_if_modified); // Throws
 }

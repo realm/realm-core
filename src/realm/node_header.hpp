@@ -52,6 +52,9 @@ public:
         wtype_Bits = 0,     // width indicates how many bits every element occupies
         wtype_Multiply = 1, // width indicates how many bytes every element occupies
         wtype_Ignore = 2,   // each element is 1 byte
+        wtype_Dynamic = 3,  // layout is determined by descendant of Node.
+        // ^ this layout requires knowing the runtime type to compute size and storage
+        // requirement. Getting size or wtype from the methods in this class will assert!
     };
 
     static const int header_size = 8; // Number of bytes used by header
@@ -104,6 +107,7 @@ public:
 
     static uint_least8_t get_width_from_header(const char* header) noexcept
     {
+        REALM_ASSERT_RELEASE(get_wtype_from_header(header) != wtype_Dynamic);
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
@@ -111,6 +115,7 @@ public:
 
     static size_t get_size_from_header(const char* header) noexcept
     {
+        REALM_ASSERT_RELEASE(get_wtype_from_header(header) != wtype_Dynamic);
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         return (size_t(h[5]) << 16) + (size_t(h[6]) << 8) + h[7];
@@ -159,6 +164,7 @@ public:
         // 0: bits      (width/8) * size
         // 1: multiply  width * size
         // 2: ignore    1 * size
+        // 3: dynamic   requirec knowledge of specific type
         typedef unsigned char uchar;
         uchar* h = reinterpret_cast<uchar*>(header);
         h[4] = uchar((int(h[4]) & ~0x18) | int(value) << 3);
@@ -166,6 +172,7 @@ public:
 
     static void set_width_in_header(int value, char* header) noexcept
     {
+        REALM_ASSERT_RELEASE(get_wtype_from_header(header) != wtype_Dynamic);
         // Pack width in 3 bits (log2)
         int w = 0;
         while (value) {
@@ -182,6 +189,7 @@ public:
     static void set_size_in_header(size_t value, char* header) noexcept
     {
         REALM_ASSERT_3(value, <=, max_array_size);
+        REALM_ASSERT_RELEASE(get_wtype_from_header(header) != wtype_Dynamic);
         typedef unsigned char uchar;
         uchar* h = reinterpret_cast<uchar*>(header);
         h[5] = uchar((value >> 16) & 0x000000FF);
@@ -226,9 +234,13 @@ public:
                 num_bytes = size * width;
                 break;
             }
-            case wtype_Ignore:
+            case wtype_Ignore: {
                 num_bytes = size;
                 break;
+            }
+            case wtype_Dynamic: {
+                REALM_ASSERT_RELEASE(wtype != wtype_Dynamic);
+            }
         }
 
         // Ensure 8-byte alignment
@@ -239,6 +251,6 @@ public:
         return num_bytes;
     }
 };
-}
+} // namespace realm
 
 #endif /* REALM_NODE_HEADER_HPP */

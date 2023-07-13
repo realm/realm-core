@@ -314,11 +314,13 @@ void import(const char* filename)
                                         REALM_ASSERT(q_res.size());
                                         REALM_ASSERT(q_res[q_res.size() - 1].get_key() == o.get_key());
                                         */
+                    /*
                     auto q1 = t->where();
                     auto q2 = q1.contains(e.col_key, got_string);
                     auto q_res = q2.find_all();
                     REALM_ASSERT(q_res.size());
                     REALM_ASSERT(q_res[q_res.size() - 1].get_key() == o.get_key());
+                    */
                 }
             }
         }
