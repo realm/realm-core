@@ -52,12 +52,14 @@ public:
         wtype_Bits = 0,     // width indicates how many bits every element occupies
         wtype_Multiply = 1, // width indicates how many bytes every element occupies
         wtype_Ignore = 2,   // each element is 1 byte
-        wtype_Dynamic = 3,  // layout is determined by descendant of Node.
-        // ^ this layout requires knowing the runtime type to compute size and storage
-        // requirement. Getting size or wtype from the methods in this class will assert!
+        // the following use the width field (bits 0-2) of byte 4 to specify layouts
+        wtype_Wide = 3,     // smaller arrays with wider elements
+        wtype_LocalDir = 4, // two combined arrays, second one indexes first one
+        wtype_Sparse = 5,   // sparse array controlled by a bitvector
+        // possibly more....
     };
-
-    static const int header_size = 8; // Number of bytes used by header
+    static const int wtype_extend = 3; // value held in wtype field for wtypes after wtype_Wide
+    static const int header_size = 8;  // Number of bytes used by header
 
     // The encryption layer relies on headers always fitting within a single page.
     static_assert(header_size == 8, "Header must always fit in entirely on a page");
@@ -102,15 +104,66 @@ public:
     {
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
-        return WidthType((int(h[4]) & 0x18) >> 3);
+        int h4 = h[4];
+        if ((h4 & 0x18) == 0x18) {
+            return WidthType(wtype_extend + (h4 & 0x18));
+        }
+        else
+            return WidthType((h4 & 0x18) >> 3);
+    }
+
+    // For wtype lower than wtype_extend, the element width is given by
+    // bits 0-2 in byte 4 of the header. For new wtypes these bits are already used to
+    // extend the wtype and the element width is instead placed in bits 0-4 of
+    // byte 3. These 5 bits encode the following element widths (all widths in bits)
+    // Encoding:    Sizes: (in bits)
+    // 0         -> 0
+    // 1-4       -> 1,2,3,4
+    // 5-8       -> 5,6,7,8
+    // 9-12      -> 10,12,14,16
+    // 13-16     -> 20,24,28,32
+    // 17-20     -> 40,48,56,64
+    // 21-24     -> 80,96,112,128
+    // 25-28     -> 160,192,224,256
+    // 29-31     reserved
+    // Some layouts may not support all sizes. Or may support them without packing them.
+    static int width_encoding_to_num_bits(int encoding)
+    {
+        int factor = 1;
+        while (encoding >= 9) {
+            factor <<= 1;
+            encoding -= 4;
+        }
+        return factor * encoding;
+    }
+    static int num_bits_to_width_encoding(int num_bits)
+    {
+        int encoding_offset = 0;
+        bool bit_lost = false;
+        while (num_bits >= 9) {
+            if (num_bits & 1)
+                bit_lost = true;
+            num_bits >>= 1;
+            encoding_offset += 4;
+        }
+        int encoding_guess = encoding_offset + num_bits;
+        // if a set bit was lost, pick the next higher encoding:
+        return encoding_guess + bit_lost ? 1 : 0;
     }
 
     static uint_least8_t get_width_from_header(const char* header) noexcept
     {
-        REALM_ASSERT_RELEASE(get_wtype_from_header(header) != wtype_Dynamic);
+        auto wtype = get_wtype_from_header(header);
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
-        return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
+        if (wtype < wtype_extend) {
+            return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
+        }
+        else {
+            // handle new layouts, simply return the encoded width, caller can
+            // map it to number of bits as desired
+            return h[5] & 0x1F;
+        }
     }
 
     static size_t get_size_from_header(const char* header) noexcept
