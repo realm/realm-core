@@ -740,6 +740,7 @@ ref_type GroupWriter::write_group()
     // using the maximum size possible, we still do not end up with a zero size
     // free-space chunk as we deduct the actually used size from it.
     auto reserve = reserve_free_space(max_free_space_needed + 8); // Throws
+    m_allocation_allowed = false;
     size_t reserve_pos = reserve->second;
     size_t reserve_size = reserve->first;
     verify_freelists();
@@ -812,7 +813,7 @@ ref_type GroupWriter::write_group()
     // deduction of the actually used space from the reserved chunk,) will not
     // change the byte-size of those arrays.
     // size_t reserve_pos = to_size_t(m_free_positions.get(reserve_ndx));
-    REALM_ASSERT_RELEASE(reserve_size > max_free_space_needed);
+    REALM_ASSERT_RELEASE(reserve_size >= max_free_space_needed + 8);
     int_fast64_t value_4 = to_int64(reserve_pos + max_free_space_needed);
 
 #if REALM_ENABLE_MEMDEBUG
@@ -1237,6 +1238,7 @@ GroupWriter::FreeListElement GroupWriter::search_free_space_in_part_of_freelist(
 
 GroupWriter::FreeListElement GroupWriter::reserve_free_space(size_t size)
 {
+    REALM_ASSERT_RELEASE(m_allocation_allowed);
     auto chunk = search_free_space_in_part_of_freelist(size);
     while (chunk == m_size_map.end()) {
         if (!m_under_evacuation.empty()) {

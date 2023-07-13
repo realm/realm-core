@@ -212,6 +212,7 @@ private:
     std::multimap<size_t, size_t> m_size_map;
     std::vector<size_t> m_evacuation_progress;
     using FreeListElement = std::multimap<size_t, size_t>::iterator;
+    bool m_allocation_allowed = true;
 
     void read_in_freelist();
     size_t recreate_freelist(size_t reserve_pos);
