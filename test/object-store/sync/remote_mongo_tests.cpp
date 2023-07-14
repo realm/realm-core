@@ -61,7 +61,7 @@ std::string operator""_nows(const char* str, size_t len)
 }
 } // namespace
 
-TEST_CASE("Validate _nows helper", "[mongo]") {
+TEST_CASE("Validate _nows helper", "[sync][mongo]") {
     // WARNING: if you are debugging this test, be aware that catch can be inconsistent with leading whitespace when
     // printing mulit-line strings. You may want to do your own printing.
 
@@ -87,7 +87,7 @@ TEST_CASE("Validate _nows helper", "[mongo]") {
              mr bob)"_nows == "hello\nmr bob");
 }
 
-TEST_CASE("WatchStream SSE processing", "[mongo]") {
+TEST_CASE("WatchStream SSE processing", "[sync][mongo]") {
     WatchStream ws;
 
     SECTION("successes") {
@@ -248,7 +248,7 @@ TEST_CASE("WatchStream SSE processing", "[mongo]") {
 // Defining a shorthand so that it is less disruptive to put this after every line.
 #define REQ_ND REQUIRE(ws.state() == WatchStream::NEED_DATA)
 
-TEST_CASE("WatchStream line processing", "[mongo]") {
+TEST_CASE("WatchStream line processing", "[sync][mongo]") {
     WatchStream ws;
 
     SECTION("simple") {
@@ -508,7 +508,7 @@ TEST_CASE("WatchStream line processing", "[mongo]") {
     }
 }
 
-TEST_CASE("WatchStream buffer processing", "[mongo]") {
+TEST_CASE("WatchStream buffer processing", "[sync][mongo]") {
     WatchStream ws;
 
     SECTION("simple") {

@@ -33,7 +33,7 @@
 
 using namespace realm;
 
-TEST_CASE("Benchmark results", "[benchmark]") {
+TEST_CASE("Benchmark results", "[benchmark][results]") {
     InMemoryTestFile config;
     config.schema = Schema{
         {"object",
@@ -159,7 +159,7 @@ TEST_CASE("Benchmark results", "[benchmark]") {
     }
 }
 
-TEST_CASE("Benchmark results notifier", "[benchmark]") {
+TEST_CASE("Benchmark results notifier", "[benchmark][results]") {
     InMemoryTestFile config;
 
     SECTION("100 strongly connected tables") {
@@ -335,7 +335,7 @@ TEST_CASE("Benchmark results notifier", "[benchmark]") {
     }
 }
 
-TEST_CASE("aggregates") {
+TEST_CASE("aggregates", "[benchmark][aggregate]") {
     InMemoryTestFile config;
     config.schema = Schema{
         {"object",
@@ -420,7 +420,7 @@ TEST_CASE("aggregates") {
     };
 }
 
-TEST_CASE("Benchmark sectioned results", "[benchmark]") {
+TEST_CASE("Benchmark sectioned results", "[benchmark][results]") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
