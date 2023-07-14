@@ -1880,8 +1880,8 @@ TEST_CASE("sync: Client reset during async open", "[sync][pbs][client reset][baa
 #endif // REALM_ENABLE_AUTH_TESTS
 
 namespace cf = realm::collection_fixtures;
-TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset][local]", cf::MixedVal, cf::Int, cf::Bool,
-                   cf::Float, cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
+TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
+                   cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
                    cf::BoxedOptional<cf::Int>, cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>,
                    cf::BoxedOptional<cf::Double>, cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>,
                    cf::UnboxedOptional<cf::String>, cf::UnboxedOptional<cf::Binary>, cf::UnboxedOptional<cf::Date>,

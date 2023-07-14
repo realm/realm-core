@@ -282,7 +282,7 @@ struct TestClock {
 
 } // namespace
 
-TEST_CASE("audit object serialization", "[sync][pbs][audit][local]") {
+TEST_CASE("audit object serialization", "[sync][pbs][audit]") {
     TestSyncManager test_session;
     SyncTestFile config(test_session.app(), "parent");
     config.cache = false;
@@ -1079,7 +1079,7 @@ TEST_CASE("audit object serialization", "[sync][pbs][audit][local]") {
     }
 }
 
-TEST_CASE("audit management", "[sync][pbs][audit][local]") {
+TEST_CASE("audit management", "[sync][pbs][audit]") {
     TestClock clock;
 
     TestSyncManager test_session;
@@ -1496,7 +1496,7 @@ TEST_CASE("audit management", "[sync][pbs][audit][local]") {
 #endif
 }
 
-TEST_CASE("audit realm sharding", "[sync][pbs][audit][local]") {
+TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
     // Don't start the server immediately so that we're forced to accumulate
     // a lot of local unuploaded data.
     TestSyncManager test_session{{}, {.start_immediately = false}};

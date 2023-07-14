@@ -5099,7 +5099,7 @@ static void sync_error_handler(void* p, realm_sync_session_t*, const realm_sync_
     userdata_p->error_catagory = error.error_code.category_name;
 }
 
-TEST_CASE("C API - async_open", "[sync][pbs][c_api][local]") {
+TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
     TestSyncManager init_sync_manager;
     SyncTestFile test_config(init_sync_manager.app(), "default");
     test_config.cache = false;
