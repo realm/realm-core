@@ -48,13 +48,6 @@ bool results_contains_user(SyncUserMetadataResults& results, const std::string& 
                            const std::string& auth_server);
 bool results_contains_original_name(SyncFileActionMetadataResults& results, const std::string& original_name);
 
-void timed_wait_for(util::FunctionRef<bool()> condition,
-                    std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000));
-
-void timed_sleeping_wait_for(util::FunctionRef<bool()> condition,
-                             std::chrono::milliseconds max_ms = std::chrono::seconds(30),
-                             std::chrono::milliseconds sleep_ms = std::chrono::milliseconds(1));
-
 class ReturnsTrueWithinTimeLimit : public Catch::Matchers::MatcherGenericBase {
 public:
     ReturnsTrueWithinTimeLimit(std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000))

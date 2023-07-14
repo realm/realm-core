@@ -761,9 +761,18 @@ void Realm::check_pending_write_requests()
             run_writes_on_proper_thread();
         }
         else {
-            m_coordinator->async_request_write_mutex(*this);
+            async_request_write_mutex();
         }
     }
+}
+
+void Realm::async_request_write_mutex()
+{
+    transaction().async_request_write_mutex([scheduler = m_scheduler, realm = shared_from_this()]() mutable {
+        scheduler->invoke([realm = std::move(realm)] {
+            realm->run_writes();
+        });
+    });
 }
 
 void Realm::end_current_write(bool check_pending)
@@ -889,7 +898,7 @@ auto Realm::async_begin_transaction(util::UniqueFunction<void()>&& the_write_blo
 
     if (!m_is_running_async_writes && !m_transaction->is_async() &&
         m_transaction->get_transact_stage() != DB::transact_Writing) {
-        m_coordinator->async_request_write_mutex(*this);
+        async_request_write_mutex();
     }
     return handle;
 }
@@ -968,6 +977,9 @@ bool Realm::async_cancel_transaction(AsyncHandle handle)
     auto it1 = std::find_if(m_async_write_q.begin(), m_async_write_q.end(), compare);
     if (it1 != m_async_write_q.end()) {
         m_async_write_q.erase(it1);
+        if (m_async_write_q.empty()) {
+            m_transaction->cancel_async_request_write_mutex();
+        }
         return true;
     }
     auto it2 = std::find_if(m_async_commit_q.begin(), m_async_commit_q.end(), compare);

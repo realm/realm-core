@@ -88,29 +88,6 @@ bool ReturnsTrueWithinTimeLimit::match(util::FunctionRef<bool()> condition) cons
     return predicate_returned_true;
 }
 
-void timed_wait_for(util::FunctionRef<bool()> condition, std::chrono::milliseconds max_ms)
-{
-    const auto wait_start = std::chrono::steady_clock::now();
-    util::EventLoop::main().run_until([&] {
-        if (std::chrono::steady_clock::now() - wait_start > max_ms) {
-            throw std::runtime_error(util::format("timed_wait_for exceeded %1 ms", max_ms.count()));
-        }
-        return condition();
-    });
-}
-
-void timed_sleeping_wait_for(util::FunctionRef<bool()> condition, std::chrono::milliseconds max_ms,
-                             std::chrono::milliseconds sleep_ms)
-{
-    const auto wait_start = std::chrono::steady_clock::now();
-    while (!condition()) {
-        if (std::chrono::steady_clock::now() - wait_start > max_ms) {
-            throw std::runtime_error(util::format("timed_sleeping_wait_for exceeded %1 ms", max_ms.count()));
-        }
-        std::this_thread::sleep_for(sleep_ms);
-    }
-}
-
 auto do_hash = [](const std::string& name) -> std::string {
     std::array<unsigned char, 32> hash;
     util::sha256(name.data(), name.size(), hash.data());

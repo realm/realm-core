@@ -467,11 +467,6 @@ public:
             return realm.transaction_ref();
         }
 
-        static void run_writes(Realm& realm)
-        {
-            realm.run_writes();
-        }
-
         static void copy_schema(Realm& target_realm, const Realm& source_realm)
         {
             target_realm.copy_schema_from(source_realm);
@@ -568,6 +563,7 @@ private:
     void call_completion_callbacks();
     void run_writes();
     void run_async_completions();
+    void async_request_write_mutex();
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;

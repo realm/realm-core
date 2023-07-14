@@ -142,12 +142,12 @@ TEST(ClientReset_NoLocalChanges)
     // Start the server from dir_2 and connect with the client 2.
     // We expect an error of type 209, "Bad server version".
     {
+        BowlOfStonesSemaphore bowl;
         ClientServerFixture fixture(dir_2, test_context);
         fixture.start();
 
         // The session that receives an error.
         {
-            BowlOfStonesSemaphore bowl;
             auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
                 if (state != ConnectionState::disconnected)
                     return;
@@ -553,6 +553,7 @@ TEST(ClientReset_ThreeClients)
     {
         // client 1 and 2 will receive session errors.
 
+        BowlOfStonesSemaphore bowl;
         ClientServerFixture fixture(dir_2, test_context);
         fixture.start();
 
@@ -596,7 +597,6 @@ TEST(ClientReset_ThreeClients)
 
         // The clients get session errors.
         {
-            BowlOfStonesSemaphore bowl;
             auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
                 if (state != ConnectionState::disconnected)
                     return;
@@ -722,6 +722,7 @@ TEST(ClientReset_DoNotRecoverSchema)
     const std::string server_path_1 = "/data_1";
     const std::string server_path_2 = "/data_2";
 
+    BowlOfStonesSemaphore bowl;
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
@@ -769,7 +770,6 @@ TEST(ClientReset_DoNotRecoverSchema)
             session_config.client_reset_config = std::move(client_reset_config);
         }
         Session session = fixture.make_session(path_1, server_path_2, std::move(session_config));
-        BowlOfStonesSemaphore bowl;
         session.set_connection_state_change_listener(
             [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
                 if (state != ConnectionState::disconnected)

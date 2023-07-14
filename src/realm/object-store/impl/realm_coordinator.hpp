@@ -218,8 +218,6 @@ public:
         return std::move(util::CheckedUniqueLock(m_running_notifiers_mutex).native_handle());
     }
 
-    void async_request_write_mutex(Realm& realm);
-
     AuditInterface* audit_context() const noexcept
     {
         return m_audit_context.get();

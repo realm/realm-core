@@ -1862,27 +1862,35 @@ public:
     ~AsyncCommitHelper()
     {
         {
-            std::unique_lock lg(m_mutex);
-            if (!m_running) {
+            util::CheckedLockGuard lg(m_mutex);
+            if (!std::exchange(m_running, false)) {
                 return;
             }
-            m_running = false;
-            m_cv_worker.notify_one();
         }
+        m_cv_worker.notify_one();
         m_thread.join();
     }
 
-    void begin_write(util::UniqueFunction<void()> fn)
+    void begin_write(Transaction* tr) REQUIRES(!m_mutex)
     {
-        std::unique_lock lg(m_mutex);
-        start_thread();
-        m_pending_writes.emplace_back(std::move(fn));
-        m_cv_worker.notify_one();
+        util::CheckedLockGuard lg(m_mutex);
+        m_pending_writes.push_back(tr);
+        wake_up_thread();
     }
 
-    void blocking_begin_write()
+    bool cancel_begin_write(Transaction* tr) REQUIRES(!m_mutex)
     {
-        std::unique_lock lg(m_mutex);
+        util::CheckedLockGuard lg(m_mutex);
+        if (auto it = std::find(m_pending_writes.begin(), m_pending_writes.end(), tr); it != m_pending_writes.end()) {
+            m_pending_writes.erase(it);
+            return true;
+        }
+        return false;
+    }
+
+    void blocking_begin_write() REQUIRES(!m_mutex)
+    {
+        util::CheckedUniqueLock lg(m_mutex);
 
         // If we support unlocking InterprocessMutex from a different thread
         // than it was locked on, we can sometimes just begin the write on
@@ -1890,8 +1898,7 @@ public:
         // for the worker thread to acquire the write lock, as we'll deadlock
         // if we try to async commit while the worker is waiting for the lock.
         bool can_lock_on_caller =
-            !InterprocessMutex::is_thread_confined && (!m_owns_write_mutex && m_pending_writes.empty() &&
-                                                       m_write_lock_claim_ticket == m_write_lock_claim_fulfilled);
+            !InterprocessMutex::is_thread_confined && (!m_owns_write_mutex && !has_pending_write_requests());
 
         // If we support cross-thread unlocking and m_running is false,
         // can_lock_on_caller should always be true or we forgot to launch the thread
@@ -1911,17 +1918,16 @@ public:
 
         // Otherwise we have to ask the worker thread to acquire it and wait
         // for that
-        start_thread();
         size_t ticket = ++m_write_lock_claim_ticket;
-        m_cv_worker.notify_one();
-        m_cv_callers.wait(lg, [this, ticket] {
+        wake_up_thread();
+        m_cv_callers.wait(lg.native_handle(), [this, ticket]() REQUIRES(m_mutex) {
             return ticket == m_write_lock_claim_fulfilled;
         });
     }
 
-    void end_write()
+    void end_write() REQUIRES(!m_mutex)
     {
-        std::unique_lock lg(m_mutex);
+        util::CheckedLockGuard lg(m_mutex);
         REALM_ASSERT(m_has_write_mutex);
         REALM_ASSERT(m_owns_write_mutex || !InterprocessMutex::is_thread_confined);
 
@@ -1937,9 +1943,9 @@ public:
         }
     }
 
-    bool blocking_end_write()
+    bool blocking_end_write() REQUIRES(!m_mutex)
     {
-        std::unique_lock lg(m_mutex);
+        util::CheckedUniqueLock lg(m_mutex);
         if (!m_has_write_mutex) {
             return false;
         }
@@ -1950,7 +1956,7 @@ public:
         if (m_owns_write_mutex) {
             m_pending_mx_release = true;
             m_cv_worker.notify_one();
-            m_cv_callers.wait(lg, [this] {
+            m_cv_callers.wait(lg.native_handle(), [this]() REQUIRES(m_mutex) {
                 return !m_pending_mx_release;
             });
         }
@@ -1969,46 +1975,64 @@ public:
     }
 
 
-    void sync_to_disk(util::UniqueFunction<void()> fn)
+    void sync_to_disk(Transaction* tr) REQUIRES(!m_mutex)
     {
-        REALM_ASSERT(fn);
-        std::unique_lock lg(m_mutex);
+        REALM_ASSERT(tr);
+        util::CheckedLockGuard lg(m_mutex);
         REALM_ASSERT(!m_pending_sync);
-        start_thread();
-        m_pending_sync = std::move(fn);
-        m_cv_worker.notify_one();
+        REALM_ASSERT(m_has_write_mutex);
+        m_pending_sync = tr;
+        wake_up_thread();
     }
 
 private:
     DB* m_db;
     std::thread m_thread;
-    std::mutex m_mutex;
+    // A mutex which guards most of the members in this class
+    util::CheckedMutex m_mutex;
+    // CV which the worker thread waits on to await work
     std::condition_variable m_cv_worker;
+    // CV which other threads wait on to await the worker thread completing work
     std::condition_variable m_cv_callers;
-    std::deque<util::UniqueFunction<void()>> m_pending_writes;
-    util::UniqueFunction<void()> m_pending_sync;
-    size_t m_write_lock_claim_ticket = 0;
-    size_t m_write_lock_claim_fulfilled = 0;
-    bool m_pending_mx_release = false;
+    // Transactions which are waiting for their turn to write. These are non-owning
+    // pointers to avoid a retain cycle. Weak pointers would result in the
+    // Transaction sometimes being destroyed on the worker thread, which results
+    // in complicated teardown. The non-owning pointers are safe because
+    // Transaction will unregister itself and/or wait for operations to complete
+    // before closing.
+    std::deque<Transaction*> m_pending_writes GUARDED_BY(m_mutex);
+    // The Transaction which has commits to write to disk.
+    Transaction* m_pending_sync GUARDED_BY(m_mutex) = nullptr;
+    // Ticketing system for blocking write transactions. Blocking writes increment
+    // claim_ticket and then wait on m_cv_callers until claim_fulfilled is equal
+    // to the value of claim_ticket they saw at the start of the wait. The worker
+    // thread increments claim_fulfilled instead of calling an async callback
+    // if it is below claim_ticket, as sync writes take priority over async.
+    size_t m_write_lock_claim_ticket GUARDED_BY(m_mutex) = 0;
+    size_t m_write_lock_claim_fulfilled GUARDED_BY(m_mutex) = 0;
+    bool m_pending_mx_release GUARDED_BY(m_mutex) = false;
     bool m_running = false;
-    bool m_has_write_mutex = false;
-    bool m_owns_write_mutex = false;
-    bool m_waiting_for_write_mutex = false;
+    bool m_has_write_mutex GUARDED_BY(m_mutex) = false;
+    // True if the worker thread specifically owns the write mutex. May be false
+    // while `m_has_write_mutex` is true if the write mutex was acquired via
+    // a blocking begin and the mutex supports cross-thread unlocks.
+    bool m_owns_write_mutex GUARDED_BY(m_mutex) = false;
+    bool m_waiting_for_write_mutex GUARDED_BY(m_mutex) = false;
 
-    void main();
+    void main() REQUIRES(!m_mutex);
 
-    void start_thread()
+    void wake_up_thread() REQUIRES(m_mutex)
     {
-        if (m_running) {
+        if (std::exchange(m_running, true)) {
+            m_cv_worker.notify_one();
             return;
         }
-        m_running = true;
         m_thread = std::thread([this]() {
             main();
         });
     }
 
-    bool has_pending_write_requests()
+    bool has_pending_write_requests() REQUIRES(m_mutex)
     {
         return m_write_lock_claim_fulfilled < m_write_lock_claim_ticket || !m_pending_writes.empty();
     }
@@ -2016,20 +2040,22 @@ private:
 
 void DB::AsyncCommitHelper::main()
 {
-    std::unique_lock lg(m_mutex);
+    util::CheckedUniqueLock lg(m_mutex);
     while (m_running) {
 #if 0 // Enable for testing purposes
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 #endif
         if (m_has_write_mutex) {
-            if (auto cb = std::move(m_pending_sync)) {
+            if (auto tr = m_pending_sync) {
+                m_pending_sync = nullptr;
                 // Only one of sync_to_disk(), end_write(), or blocking_end_write()
                 // should be called, so we should never have both a pending sync
                 // and pending release.
                 REALM_ASSERT(!m_pending_mx_release);
                 lg.unlock();
-                cb();
-                cb = nullptr; // Release things captured by the callback before reacquiring the lock
+                // Release the lock while calling this as it performs the actual
+                // i/o and we need to not block other threads.
+                tr->sync_async_commit();
                 lg.lock();
                 m_pending_mx_release = true;
             }
@@ -2069,18 +2095,27 @@ void DB::AsyncCommitHelper::main()
                     continue;
                 }
 
-                REALM_ASSERT(!m_pending_writes.empty());
-                auto callback = std::move(m_pending_writes.front());
+                // The request could have been cancelled while we were waiting
+                // for the lock
+                if (m_pending_writes.empty()) {
+                    m_pending_mx_release = true;
+                    continue;
+                }
+
+                auto writer = m_pending_writes.front();
                 m_pending_writes.pop_front();
-                lg.unlock();
-                callback();
-                // Release things captured by the callback before reacquiring the lock
-                callback = nullptr;
-                lg.lock();
+                // Call with lock held: this is safe to do because the function
+                // does very little work before dispatching the main work to the
+                // scheduler (and importantly will never call back into us), and
+                // it's required for Transaction teardown to be safe. We don't
+                // hold a strong reference to the Transaction to ensure that we
+                // will never destroy the DB on this thread, so we have to block
+                // closing the Transaction until we're done with the unowned pointer.
+                writer->async_write_began();
                 continue;
             }
         }
-        m_cv_worker.wait(lg);
+        m_cv_worker.wait(lg.native_handle());
     }
     if (m_has_write_mutex && m_owns_write_mutex) {
         m_db->do_end_write();
@@ -2088,10 +2123,16 @@ void DB::AsyncCommitHelper::main()
 }
 
 
-void DB::async_begin_write(util::UniqueFunction<void()> fn)
+void DB::async_begin_write(Transaction* tr)
 {
     REALM_ASSERT(m_commit_helper);
-    m_commit_helper->begin_write(std::move(fn));
+    m_commit_helper->begin_write(tr);
+}
+
+bool DB::cancel_async_begin_write(Transaction* tr)
+{
+    REALM_ASSERT(m_commit_helper);
+    return m_commit_helper->cancel_begin_write(tr);
 }
 
 void DB::async_end_write()
@@ -2100,10 +2141,10 @@ void DB::async_end_write()
     m_commit_helper->end_write();
 }
 
-void DB::async_sync_to_disk(util::UniqueFunction<void()> fn)
+void DB::async_sync_to_disk(Transaction* tr)
 {
     REALM_ASSERT(m_commit_helper);
-    m_commit_helper->sync_to_disk(std::move(fn));
+    m_commit_helper->sync_to_disk(tr);
 }
 
 bool DB::has_changed(TransactionRef& tr)
@@ -2687,44 +2728,6 @@ TransactionRef DB::start_write(bool nonblocking)
     return tr;
 }
 
-void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void()>&& when_acquired)
-{
-    {
-        util::CheckedLockGuard lck(tr->m_async_mutex);
-        REALM_ASSERT(tr->m_async_stage == Transaction::AsyncState::Idle);
-        tr->m_async_stage = Transaction::AsyncState::Requesting;
-        tr->m_request_time_point = std::chrono::steady_clock::now();
-        if (tr->db->m_logger) {
-            tr->db->m_logger->log(util::Logger::Level::trace, "Async request write lock");
-        }
-    }
-    std::weak_ptr<Transaction> weak_tr = tr;
-    async_begin_write([weak_tr, cb = std::move(when_acquired)]() {
-        if (auto tr = weak_tr.lock()) {
-            util::CheckedLockGuard lck(tr->m_async_mutex);
-            // If a synchronous transaction happened while we were pending
-            // we may be in HasCommits
-            if (tr->m_async_stage == Transaction::AsyncState::Requesting) {
-                tr->m_async_stage = Transaction::AsyncState::HasLock;
-            }
-            if (tr->db->m_logger) {
-                auto t2 = std::chrono::steady_clock::now();
-                tr->db->m_logger->log(
-                    util::Logger::Level::trace, "Got write lock in %1 us",
-                    std::chrono::duration_cast<std::chrono::microseconds>(t2 - tr->m_request_time_point).count());
-            }
-            if (tr->m_waiting_for_write_lock) {
-                tr->m_waiting_for_write_lock = false;
-                tr->m_async_cv.notify_one();
-            }
-            else if (cb) {
-                cb();
-            }
-            tr.reset(); // Release pointer while lock is held
-        }
-    });
-}
-
 inline DB::DB(const DBOptions& options)
     : m_upgrade_callback(std::move(options.upgrade_callback))
 {
@@ -2826,7 +2829,6 @@ void DB::do_begin_possibly_async_write()
 
 void DB::end_write_on_correct_thread() noexcept
 {
-    //    m_local_write_mutex.unlock();
     if (!m_commit_helper || !m_commit_helper->blocking_end_write()) {
         do_end_write();
     }

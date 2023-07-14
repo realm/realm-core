@@ -262,11 +262,6 @@ public:
     // an invalid TransactionRef is returned.
     TransactionRef start_write(bool nonblocking = false) REQUIRES(!m_mutex);
 
-    // ask for write mutex. Callback takes place when mutex has been acquired.
-    // callback may occur on ANOTHER THREAD. Must not be called if write mutex
-    // has already been acquired.
-    void async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void()>&& when_acquired);
-
     // report statistics of last commit done on THIS DB.
     // The free space reported is what can be expected to be freed
     // by compact(). This may not correspond to the space which is free
@@ -616,9 +611,10 @@ private:
     void close_internal(std::unique_lock<util::InterprocessMutex>, bool allow_open_read_transactions)
         REQUIRES(!m_mutex);
 
-    void async_begin_write(util::UniqueFunction<void()> fn);
+    void async_begin_write(Transaction* tr);
+    bool cancel_async_begin_write(Transaction* tr);
     void async_end_write();
-    void async_sync_to_disk(util::UniqueFunction<void()> fn);
+    void async_sync_to_disk(Transaction*);
 
     friend class SlabAlloc;
     friend class Transaction;
