@@ -625,7 +625,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         // Should throw on `type_TypedLink` being a section key.
         sr = sorted.sectioned_results([&](Mixed value, SharedRealm realm) {
             auto obj = Object(realm, value.get_link());
-            return obj.obj().get<Mixed>(col_mixed);
+            return obj.get_obj().get<Mixed>(col_mixed);
         });
         REQUIRE_EXCEPTION(sr.size(), InvalidArgument,
                           "Links are not supported as section keys."); // Trigger calculation

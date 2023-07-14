@@ -1596,7 +1596,7 @@ TEST_CASE("app: mixed lists with object links", "[sync][app][baas]") {
         realm->begin_transaction();
         auto target_obj = Object::create(
             c, realm, "Target", std::any(AnyDict{{valid_pk_name, target_id}, {"value", static_cast<int64_t>(1234)}}));
-        mixed_list_values.push_back(Mixed(target_obj.obj().get_link()));
+        mixed_list_values.push_back(Mixed(target_obj.get_obj().get_link()));
 
         Object::create(c, realm, "TopLevel",
                        std::any(AnyDict{
@@ -3322,7 +3322,8 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][baas][c
             CreatePolicy::ForceCreate);
 
         for (auto link : links) {
-            test_type.add_link(object.obj(), link);
+            auto& obj = object.get_obj();
+            test_type.add_link(obj, link);
         }
         r->commit_transaction();
         return object;
@@ -3335,7 +3336,7 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][baas][c
             std::any(realm::AnyDict{{valid_pk_name, std::any(val)}, {"realm_id", std::string(partition)}}),
             CreatePolicy::ForceCreate);
         r->commit_transaction();
-        return ObjLink{obj.obj().get_table()->get_key(), obj.obj().get_key()};
+        return ObjLink{obj.get_obj().get_table()->get_key(), obj.get_obj().get_key()};
     };
 
     auto require_links_to_match_ids = [&](std::vector<Obj> links, std::vector<int64_t> expected) {
@@ -3405,7 +3406,8 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][baas][c
             auto linked_objects = test_type.get_links(r1_source_objs.get(0));
             require_links_to_match_ids(linked_objects, remaining_dest_object_ids);
             r1->begin_transaction();
-            test_type.remove_link(r1_source_objs.get(0),
+            auto obj = r1_source_objs.get(0);
+            test_type.remove_link(obj,
                                   ObjLink{linked_objects[0].get_table()->get_key(), linked_objects[0].get_key()});
             r1->commit_transaction();
             --expected_coll_size;
