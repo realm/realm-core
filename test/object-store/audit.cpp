@@ -16,13 +16,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
+#include <util/baas_admin_api.hpp>
+#include <util/event_loop.hpp>
+#include <util/flx_sync_harness.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
 
-#include "sync/flx_sync_harness.hpp"
-#include "util/event_loop.hpp"
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
-#include "util/baas_admin_api.hpp"
+#include <realm/set.hpp>
+#include <realm/list.hpp>
+#include <realm/dictionary.hpp>
 
 #include <realm/object-store/audit.hpp>
 #include <realm/object-store/audit_serializer.hpp>
@@ -32,7 +34,6 @@
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/shared_realm.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
-
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
@@ -40,9 +41,7 @@
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 
-#include <realm/set.hpp>
-#include <realm/list.hpp>
-#include <realm/dictionary.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <external/json/json.hpp>
 

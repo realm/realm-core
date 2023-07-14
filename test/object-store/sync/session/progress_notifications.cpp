@@ -16,11 +16,11 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
-
 #include <realm/object-store/sync/sync_session.hpp>
 
 #include <realm/util/scope_exit.hpp>
+
+#include <catch2/catch_all.hpp>
 
 using namespace realm;
 

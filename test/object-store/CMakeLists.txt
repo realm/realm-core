@@ -53,9 +53,9 @@ endif()
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
-        sync/flx_sync_harness.hpp
-        sync/session/session_util.hpp
-        sync/sync_test_utils.hpp
+        util/flx_sync_harness.hpp
+        util/session_util.hpp
+        util/sync_test_utils.hpp
         util/baas_admin_api.hpp
     )
     list(APPEND SOURCES
@@ -72,9 +72,9 @@ if(REALM_ENABLE_SYNC)
         sync/session/session.cpp
         sync/session/wait_for_completion.cpp
         sync/sync_manager.cpp
-        sync/sync_test_utils.cpp
         sync/user.cpp
         sync/app.cpp
+        util/sync_test_utils.cpp
     )
     if(APPLE)
         list(APPEND SOURCES audit.cpp)

@@ -16,11 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
+#include <util/event_loop.hpp>
+#include <util/index_helpers.hpp>
+#include <util/test_file.hpp>
 
-#include "util/event_loop.hpp"
-#include "util/index_helpers.hpp"
-#include "util/test_file.hpp"
+#include <realm/geospatial.hpp>
+#include <realm/group.hpp>
 
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/collection_notifications.hpp>
@@ -28,18 +29,17 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/object.hpp>
-#include <realm/object-store/util/scheduler.hpp>
-
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
-#include <realm/geospatial.hpp>
-#include <realm/group.hpp>
 #include <realm/util/any.hpp>
 
 #if REALM_ENABLE_AUTH_TESTS
-#include "sync/flx_sync_harness.hpp"
+#include <util/flx_sync_harness.hpp>
 #endif // REALM_ENABLE_AUTH_TESTS
+
+#include <catch2/catch_all.hpp>
 
 #include <cstdint>
 

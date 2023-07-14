@@ -16,7 +16,13 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
+#include <collection_fixtures.hpp>
+#include <util/sync_test_utils.hpp>
+#include <util/baas_admin_api.hpp>
+#include <util/event_loop.hpp>
+#include <util/test_utils.hpp>
+#include <util/test_file.hpp>
+
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/sync/app.hpp>
@@ -30,24 +36,21 @@
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
+
 #include <realm/sync/network/default_socket.hpp>
-
-#include "collection_fixtures.hpp"
-#include "sync_test_utils.hpp"
-#include "util/baas_admin_api.hpp"
-#include "util/event_loop.hpp"
-#include "util/test_utils.hpp"
-#include "util/test_file.hpp"
-
-#include <external/json/json.hpp>
-#include <external/mpark/variant.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/server/access_token.hpp>
+
 #include <realm/util/base64.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/overload.hpp>
 #include <realm/util/platform_info.hpp>
 #include <realm/util/uri.hpp>
-#include <realm/sync/network/websocket.hpp>
+
+#include <catch2/catch_all.hpp>
+
+#include <external/json/json.hpp>
+#include <external/mpark/variant.hpp>
 
 #include <chrono>
 #include <condition_variable>

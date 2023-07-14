@@ -16,12 +16,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
-#include "sync/session/session_util.hpp"
-#include "util/event_loop.hpp"
-#include "util/test_utils.hpp"
+#include <util/event_loop.hpp>
+#include <util/session_util.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
 
 #include <realm/util/scope_exit.hpp>
+
+#include <catch2/catch_all.hpp>
 
 using namespace realm;
 using namespace realm::util;

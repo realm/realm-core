@@ -16,22 +16,25 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <sync/flx_sync_harness.hpp>
-#include <sync/sync_test_utils.hpp>
 #include <util/baas_admin_api.hpp>
 #include <util/crypt_key.hpp>
+#include <util/flx_sync_harness.hpp>
+#include <util/sync_test_utils.hpp>
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/util/scheduler.hpp>
+
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
+
 #include <realm/util/future.hpp>
 
 #include <catch2/catch_all.hpp>
+
 #include <chrono>
 
 #if REALM_ENABLE_SYNC
