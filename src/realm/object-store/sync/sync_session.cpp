@@ -224,7 +224,7 @@ void SyncSession::do_become_inactive(util::CheckedUniqueLock lock, Status status
         m_connection_change_notifier.invoke_callbacks(old_state, connection_state());
     }
 
-    if (!status.get_std_error_code())
+    if (!SystemError::get_system_error_from_status(status))
         status = Status(ErrorCodes::OperationAborted, "Sync session became inactive");
 
     // Inform any queued-up completion handlers that they were cancelled.
@@ -1263,7 +1263,7 @@ void SyncSession::add_completion_callback(util::UniqueFunction<void(Status)> cal
         auto callback_node = self->m_completion_callbacks.extract(id);
         lock.unlock();
         if (callback_node) {
-            callback_node.mapped().second(Status(ec, ""));
+            callback_node.mapped().second(SystemError::make_status(ec, ""));
         }
     });
 }

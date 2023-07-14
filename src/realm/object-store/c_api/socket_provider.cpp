@@ -224,7 +224,7 @@ RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback* rea
     auto status = sync::websocket::WebSocketError(code);
     auto complete_status = code == realm_web_socket_errno_e::RLM_ERR_WEBSOCKET_OK
                                ? Status::OK()
-                               : Status{sync::websocket::make_error_code(status), reason};
+                               : SystemError::make_status(sync::websocket::make_error_code(status), reason);
     (*(realm_callback->get()))(complete_status);
     realm_release(realm_callback);
 }
@@ -252,7 +252,7 @@ RLM_API void realm_sync_socket_websocket_closed(realm_websocket_observer_t* real
     auto status = sync::websocket::WebSocketError(code);
     auto closed_status = code == realm_web_socket_errno_e::RLM_ERR_WEBSOCKET_OK
                              ? Status::OK()
-                             : Status{sync::websocket::make_error_code(status), reason};
+                             : SystemError::make_status(sync::websocket::make_error_code(status), reason);
     realm_websocket_observer->get()->websocket_closed_handler(was_clean, closed_status);
 }
 

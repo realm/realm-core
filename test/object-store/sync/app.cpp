@@ -3061,7 +3061,7 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
         }
         r->sync_session()->wait_for_upload_completion([&](Status ec) {
             std::lock_guard lk(mutex);
-            REQUIRE(!ec.get_std_error_code());
+            REQUIRE(!SystemError::get_system_error_from_status(ec));
             done = true;
         });
         r->sync_session()->resume();

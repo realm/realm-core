@@ -126,7 +126,7 @@ realm_sync_error_code_t to_capi(const Status& status, std::string& message)
 {
     auto ret = realm_sync_error_code_t();
 
-    auto error_code = status.get_std_error_code();
+    auto error_code = SystemError::get_system_error_from_status(status);
     const std::error_category& category = error_code.category();
     if (category == realm::sync::client_error_category()) {
         ret.category = RLM_SYNC_ERROR_CATEGORY_CLIENT;
@@ -855,7 +855,7 @@ RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_
 {
     util::UniqueFunction<void(Status)> cb =
         [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](Status s) {
-            if (s.get_std_error_code()) {
+            if (SystemError::get_system_error_from_status(s)) {
                 std::string error_code_message;
                 realm_sync_error_code_t error = to_capi(s, error_code_message);
                 done(userdata.get(), &error);
@@ -874,7 +874,7 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
 {
     util::UniqueFunction<void(Status)> cb =
         [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](Status s) {
-            if (s.get_std_error_code()) {
+            if (SystemError::get_system_error_from_status(s)) {
                 std::string error_code_message;
                 realm_sync_error_code_t error = to_capi(s, error_code_message);
                 done(userdata.get(), &error);

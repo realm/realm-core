@@ -143,6 +143,14 @@ FileAccessError::FileAccessError(ErrorCodes::Error code, std::string_view msg, s
 }
 FileAccessError::~FileAccessError() noexcept = default;
 
+std::error_code SystemError::get_system_error_from_status(Status status)
+{
+    if (status != ErrorCodes::SystemError || !status.has_extra_info<ExtraInfo>()) {
+        return {};
+    }
+    return status.get_extra_info<ExtraInfo>().ec;
+}
+
 // Out-of-line virtual destructors for each of the exception types "anchors"
 // the vtable and makes it so that it doesn't have to be emitted into each TU
 // which uses the exception type

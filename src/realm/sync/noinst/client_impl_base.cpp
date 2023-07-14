@@ -506,7 +506,7 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         return false;
     }
     logger.info("Closing the websocket with status='%1', was_clean='%2'", status, was_clean);
-    auto error_code = status.get_std_error_code();
+    auto error_code = SystemError::get_system_error_from_status(status);
 
     switch (static_cast<WebSocketError>(error_code.value())) {
         case WebSocketError::websocket_ok:

@@ -783,10 +783,10 @@ void AuditRealmPool::wait_for_upload(std::shared_ptr<SyncSession> session)
             std::string path = session->path();
             session->close();
             m_open_paths.erase(path);
-            if (status.get_std_error_code()) {
+            if (auto code = SystemError::get_system_error_from_status(status)) {
                 m_logger->error("Events: Upload on '%1' failed with error '%2'.", path, status.reason());
                 if (m_error_handler) {
-                    m_error_handler(SyncError(status.get_std_error_code(), status.reason(), false));
+                    m_error_handler(SyncError(code, status.reason(), false));
                 }
             }
             else {
@@ -874,7 +874,7 @@ void AuditRealmPool::open_new_realm()
                                                                                                  SyncError error) {
         if (auto self = weak_self.lock()) {
             self->m_logger->error("Events: Received sync error: %1 (ec=%2)", error.what(),
-                                  error.get_system_error().value());
+                                  SystemError::get_system_error_from_status(error.to_status()).value());
         }
         if (error_handler) {
             error_handler(error);
