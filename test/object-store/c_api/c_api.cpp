@@ -6156,7 +6156,7 @@ TEST_CASE("app: flx-sync basic tests", "[sync][flx][c_api][baas]") {
     });
 }
 
-TEST_CASE("C API app: websocket provider", "[sync][app][c_api]") {
+TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
     using namespace realm::app;
     using namespace realm::sync;
     using namespace realm::sync::websocket;
