@@ -18,6 +18,7 @@
 
 #include <realm/sort_descriptor.hpp>
 #include <realm/table.hpp>
+#include <realm/table_view.hpp>
 #include <realm/db.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/list.hpp>
@@ -333,7 +334,6 @@ void LimitDescriptor::execute(IndexPairs& v, const Sorter&, const BaseDescriptor
     }
 }
 
-
 // This function must conform to 'is less' predicate - that is:
 // return true if i is strictly smaller than j
 bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ordering) const
@@ -472,6 +472,13 @@ void DescriptorOrdering::append_limit(LimitDescriptor limit)
     }
 }
 
+void DescriptorOrdering::append_knn(SemanticSearchDescriptor knn)
+{
+    if (knn.is_valid()) {
+        m_descriptors.emplace_back(new SemanticSearchDescriptor(std::move(knn)));
+    }
+}
+
 void DescriptorOrdering::append(const DescriptorOrdering& other)
 {
     for (const auto& d : other.m_descriptors) {
@@ -520,6 +527,14 @@ bool DescriptorOrdering::will_apply_limit() const
     return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
         REALM_ASSERT(desc->is_valid());
         return desc->get_type() == DescriptorType::Limit;
+    });
+}
+
+bool DescriptorOrdering::will_apply_knn() const
+{
+    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
+        REALM_ASSERT(desc->is_valid());
+        return desc->get_type() == DescriptorType::Knn;
     });
 }
 
@@ -589,5 +604,49 @@ void DescriptorOrdering::get_versions(const Group* group, TableVersions& version
     for (auto table_key : m_dependencies) {
         REALM_ASSERT_DEBUG(group);
         versions.emplace_back(table_key, group->get_table(table_key)->get_content_version());
+    }
+}
+
+std::string SemanticSearchDescriptor::get_description(ConstTableRef) const
+{
+    return "KNN()";
+}
+
+void SemanticSearchDescriptor::execute(const Table& table, KeyValues& key_values) const
+{
+    if (m_k >= key_values.size()) return; // all entries already match as closest
+    
+    std::priority_queue<std::pair<float, ObjKey>> topResults;
+    
+    // Collect the k closest matches by distance
+    size_t n = std::min(m_k, key_values.size());
+    for (size_t i = 0; i < n; i++) {
+        ObjKey r = key_values.get(i);
+        float dist = table.dist_knn(m_query_data, m_column, r, m_sp);
+        topResults.push(std::pair<float, ObjKey>(dist, r));
+    }
+    float lastdist = topResults.empty() ? std::numeric_limits<float>::max() : topResults.top().first;
+    for (size_t i = m_k; i < key_values.size(); i++) {
+        ObjKey r = key_values.get(i);
+        if (!table.is_valid(r)) continue;
+        
+        float dist = table.dist_knn(m_query_data, m_column, r, m_sp);
+        if (dist <= lastdist) {
+            topResults.push(std::pair<float, ObjKey>(dist, r));
+            if (topResults.size() > m_k)
+                topResults.pop();
+            
+            if (!topResults.empty()) {
+                lastdist = topResults.top().first;
+            }
+        }
+    }
+
+    // set result to the matches, in order of closest match first
+    key_values.clear();
+    while(!topResults.empty()) {
+        const std::pair<float, ObjKey>& tr = topResults.top();
+        key_values.insert(0, tr.second);
+        topResults.pop();
     }
 }
