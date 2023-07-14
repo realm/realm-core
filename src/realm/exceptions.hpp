@@ -365,13 +365,7 @@ struct SystemError : RuntimeError {
 
     ~SystemError() noexcept override;
 
-    static Status make_status(std::error_code err, std::string_view msg, bool msg_is_prefix = false)
-    {
-        return Status(ErrorCodes::SystemError,
-                      msg_is_prefix ? util::format("%1: %2 (%3)", msg, err.message(), err.value()) : msg,
-                      std::make_unique<ExtraInfo>(err));
-    }
-
+    static Status make_status(std::error_code err, std::string_view msg, bool msg_is_prefix = false);
     static std::error_code get_system_error_from_status(Status status);
 
     SystemError(std::error_code err, std::string_view msg)

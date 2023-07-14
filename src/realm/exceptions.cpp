@@ -143,9 +143,18 @@ FileAccessError::FileAccessError(ErrorCodes::Error code, std::string_view msg, s
 }
 FileAccessError::~FileAccessError() noexcept = default;
 
+Status SystemError::make_status(std::error_code err, std::string_view msg, bool msg_is_prefix)
+{
+    if (!err) {
+        return Status::OK();
+    }
+    return Status(ErrorCodes::SystemError,
+                  msg_is_prefix ? util::format("%1: %2 (%3)", msg, err.message(), err.value()) : msg,
+                  std::make_unique<ExtraInfo>(err));
+}
 std::error_code SystemError::get_system_error_from_status(Status status)
 {
-    if (status != ErrorCodes::SystemError || !status.has_extra_info<ExtraInfo>()) {
+    if (status.is_ok() || status != ErrorCodes::SystemError || !status.has_extra_info<ExtraInfo>()) {
         return {};
     }
     return status.get_extra_info<ExtraInfo>().ec;
