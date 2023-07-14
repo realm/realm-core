@@ -19,6 +19,7 @@
 
 ### Internals
 * Run baas on remote ubuntu host for evergreen object-store-tests. ([PR #6757](https://github.com/realm/realm-core/pull/6757))
+* Consolidate object store sync util files into util/ directory. ([PR #6789](https://github.com/realm/realm-core/pull/6789))
 
 ----------------------------------------------
 
