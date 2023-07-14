@@ -774,7 +774,7 @@ TEST_CASE("Benchmark object", "[benchmark][object]") {
     }
 }
 
-TEST_CASE("Benchmark object notification delivery", "[benchmark][notification]") {
+TEST_CASE("Benchmark object notification delivery", "[benchmark][notifications]") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;

@@ -1431,7 +1431,7 @@ TEST_CASE("SharedRealm: convert", "[sync][pbs][convert]") {
     }
 }
 
-TEST_CASE("SharedRealm: convert - embedded objects", "[sync][pbs][convert][embedded]") {
+TEST_CASE("SharedRealm: convert - embedded objects", "[sync][pbs][convert][embedded objects]") {
     TestSyncManager tsm;
     ObjectSchema object_schema = {"object",
                                   {
@@ -3734,7 +3734,7 @@ struct ModeHardResetFile {
     static constexpr bool should_call_init_on_version_bump = true;
 };
 
-TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function", "[init][update_schema]", ModeAutomatic,
+TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function", "[init][update schema]", ModeAutomatic,
                    ModeAdditive, ModeManual, ModeSoftResetFile, ModeHardResetFile)
 {
     TestFile config;

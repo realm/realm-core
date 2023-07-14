@@ -1186,7 +1186,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
     app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
 }
 
-TEST_CASE("flx: creating an object on a class with no subscription throws", "[sync][flx[subscription][baas]") {
+TEST_CASE("flx: creating an object on a class with no subscription throws", "[sync][flx][subscription][baas]") {
     FLXSyncTestHarness harness("flx_bad_query", {g_simple_embedded_obj_schema, {"queryable_str_field"}});
     harness.do_with_new_user([&](auto user) {
         SyncTestFile config(user, harness.schema(), SyncConfig::FLXSyncEnabled{});
@@ -3365,7 +3365,7 @@ TEST_CASE("flx: convert flx sync realm to bundled realm", "[app][flx][baas]") {
     }
 }
 
-TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][flx][compensting write][baas]") {
+TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][flx][compensating write][baas]") {
     AppCreateConfig::ServiceRole role;
     role.name = "compensating_write_perms";
 

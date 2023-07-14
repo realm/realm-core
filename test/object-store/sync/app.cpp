@@ -1444,7 +1444,7 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
 
 // MARK: - Push Notifications Tests
 
-TEST_CASE("app: push notifications", "[sync][app][notification][baas]") {
+TEST_CASE("app: push notifications", "[sync][app][notifications][baas]") {
     TestAppSession session;
     auto app = session.app();
     std::shared_ptr<SyncUser> sync_user = app->current_user();

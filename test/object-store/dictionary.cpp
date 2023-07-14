@@ -1375,7 +1375,7 @@ TEST_CASE("dictionary snapshot null", "[dictionary]") {
     REQUIRE(snapshot.get_any(0) == Mixed{});
 }
 
-TEST_CASE("dictionary aggregate", "[dictionary]") {
+TEST_CASE("dictionary aggregate", "[dictionary][aggregate]") {
     InMemoryTestFile config;
     config.schema = Schema{
         {"DictionaryObject",
