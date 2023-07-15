@@ -184,8 +184,8 @@ TEST(Sync_AsyncWaitForUploadCompletion)
 
     auto wait = [&] {
         BowlOfStonesSemaphore bowl;
-        auto handler = [&](Status s) {
-            if (CHECK(s.is_ok()))
+        auto handler = [&](Status status) {
+            if (CHECK(status.is_ok()))
                 bowl.add_stone();
         };
         session.async_wait_for_upload_completion(handler);
@@ -246,8 +246,8 @@ TEST(Sync_AsyncWaitForDownloadCompletion)
 
     auto wait = [&](Session& session) {
         BowlOfStonesSemaphore bowl;
-        auto handler = [&](Status s) {
-            if (CHECK(s.is_ok()))
+        auto handler = [&](Status status) {
+            if (CHECK(status.is_ok()))
                 bowl.add_stone();
         };
         session.async_wait_for_download_completion(handler);
@@ -308,8 +308,8 @@ TEST(Sync_AsyncWaitForSyncCompletion)
 
     auto wait = [&](Session& session) {
         BowlOfStonesSemaphore bowl;
-        auto handler = [&](Status s) {
-            if (CHECK(s.is_ok()))
+        auto handler = [&](Status status) {
+            if (CHECK(status.is_ok()))
                 bowl.add_stone();
         };
         session.async_wait_for_sync_completion(handler);
@@ -354,8 +354,8 @@ TEST(Sync_AsyncWaitCancellation)
     ClientServerFixture fixture(dir, test_context);
 
     BowlOfStonesSemaphore bowl;
-    auto completion_handler = [&](Status s) {
-        CHECK_EQUAL(s, ErrorCodes::OperationAborted);
+    auto completion_handler = [&](Status status) {
+        CHECK_EQUAL(status, ErrorCodes::OperationAborted);
         bowl.add_stone();
     };
     {

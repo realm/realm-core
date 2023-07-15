@@ -1210,7 +1210,7 @@ void SyncSession::add_completion_callback(util::UniqueFunction<void(Status)> cal
         auto callback_node = self->m_completion_callbacks.extract(id);
         lock.unlock();
         if (callback_node) {
-            callback_node.mapped().second(status);
+            callback_node.mapped().second(std::move(status));
         }
     });
 }
