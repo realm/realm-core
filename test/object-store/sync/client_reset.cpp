@@ -110,7 +110,7 @@ TableRef get_table(Realm& realm, StringData object_type)
 namespace cf = realm::collection_fixtures;
 using reset_utils::create_object;
 
-TEST_CASE("sync: large reset with recovery is restartable", "[client reset][baas]") {
+TEST_CASE("sync: large reset with recovery is restartable", "[sync][pbs][client reset][baas]") {
     const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
@@ -205,7 +205,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset][baas
     REQUIRE(expected_obj_ids == found_object_ids);
 }
 
-TEST_CASE("sync: pending client resets are cleared when downloads are complete", "[client reset][baas]") {
+TEST_CASE("sync: pending client resets are cleared when downloads are complete", "[sync][pbs][client reset][baas]") {
     const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
@@ -262,7 +262,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
     wait_for_download(*realm, std::chrono::minutes(10));
 }
 
-TEST_CASE("sync: client reset", "[client reset][baas]") {
+TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
     if (!util::EventLoop::has_implementation())
         return;
 
@@ -1786,7 +1786,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
     } // end: The server can prohibit recovery
 }
 
-TEST_CASE("sync: Client reset during async open", "[client reset][baas]") {
+TEST_CASE("sync: Client reset during async open", "[sync][pbs][client reset][baas]") {
     const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
@@ -1881,7 +1881,7 @@ TEST_CASE("sync: Client reset during async open", "[client reset][baas]") {
 #endif // REALM_ENABLE_AUTH_TESTS
 
 namespace cf = realm::collection_fixtures;
-TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
+TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
                    cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
                    cf::BoxedOptional<cf::Int>, cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>,
                    cf::BoxedOptional<cf::Double>, cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>,
@@ -2521,7 +2521,7 @@ private:
 
 } // namespace test_instructions
 
-TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][links][collections]",
+TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client reset][links][collections]",
                    cf::ListOfObjects, cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,
                    cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks)
 {
@@ -2949,7 +2949,7 @@ void combine_array_values(std::vector<T>& from, const std::vector<T>& to)
     }
 }
 
-TEST_CASE("client reset with embedded object", "[client reset][local][embedded objects]") {
+TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedded objects]") {
     if (!util::EventLoop::has_implementation())
         return;
 

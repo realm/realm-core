@@ -160,7 +160,7 @@ struct BenchmarkLocalClientReset : public reset_utils::TestClientReset {
     ClientResyncMode m_mode;
 };
 
-TEST_CASE("client reset", "[benchmark]") {
+TEST_CASE("client reset", "[sync][pbs][benchmark][client reset]") {
     const std::string valid_pk_name = "_id";
     const std::string partition_value = "partition_foo";
     Property partition_prop = {"realm_id", PropertyType::String | PropertyType::Nullable};

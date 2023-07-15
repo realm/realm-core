@@ -918,7 +918,7 @@ TEST_CASE("SharedRealm: schema_subset_mode") {
 }
 
 #if REALM_ENABLE_SYNC
-TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
+TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
     if (!util::EventLoop::has_implementation())
         return;
 
@@ -1339,7 +1339,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     }
 }
 
-TEST_CASE("SharedRealm: convert") {
+TEST_CASE("SharedRealm: convert", "[sync][pbs][convert]") {
     TestSyncManager tsm;
     ObjectSchema object_schema = {"object",
                                   {
@@ -1435,7 +1435,7 @@ TEST_CASE("SharedRealm: convert") {
     }
 }
 
-TEST_CASE("SharedRealm: convert - embedded objects") {
+TEST_CASE("SharedRealm: convert - embedded objects", "[sync][pbs][convert][embedded objects]") {
     TestSyncManager tsm;
     ObjectSchema object_schema = {"object",
                                   {
@@ -3738,7 +3738,7 @@ struct ModeHardResetFile {
     static constexpr bool should_call_init_on_version_bump = true;
 };
 
-TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function", "[init][update_schema]", ModeAutomatic,
+TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function", "[init][update schema]", ModeAutomatic,
                    ModeAdditive, ModeManual, ModeSoftResetFile, ModeHardResetFile)
 {
     TestFile config;

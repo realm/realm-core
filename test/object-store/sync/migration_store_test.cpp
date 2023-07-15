@@ -133,7 +133,7 @@ static void check_subscription(const sync::SubscriptionSet& sub_set, const std::
     REQUIRE(table_sub->name == sub_name);
 }
 
-TEST_CASE("Migration store", "[flx][migration][local]") {
+TEST_CASE("Migration store", "[sync][flx migration]") {
     std::string file_path = util::make_temp_dir() + "/migration_store.realm";
     auto mig_db = DB::create(sync::make_client_replication(), file_path);
     auto migration_store = sync::MigrationStore::create(mig_db);

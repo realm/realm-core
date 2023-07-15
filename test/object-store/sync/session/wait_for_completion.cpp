@@ -28,7 +28,7 @@
 using namespace realm;
 using namespace realm::util;
 
-TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
+TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync][pbs][session][completion]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -119,7 +119,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
     }
 }
 
-TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
+TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync][pbs][session][completion]") {
     if (!EventLoop::has_implementation())
         return;
 
