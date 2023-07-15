@@ -45,7 +45,7 @@ using namespace realm::util;
 static const std::string dummy_auth_url = "https://realm.example.org";
 static const std::string dummy_device_id = "123400000000000000000000";
 
-TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
+TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -195,7 +195,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
     }
 }
 
-TEST_CASE("sync: log-in", "[sync]") {
+TEST_CASE("sync: log-in", "[sync][session]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -225,7 +225,7 @@ TEST_CASE("sync: log-in", "[sync]") {
     // TODO: write tests that check that a Session properly handles various types of errors reported via its callback.
 }
 
-TEST_CASE("SyncSession: close() API", "[sync]") {
+TEST_CASE("SyncSession: close() API", "[sync][session]") {
     TestSyncManager init_sync_manager;
     auto app = init_sync_manager.app();
     auto user = app->sync_manager()->get_user("close-api-tests-user", ENCODE_FAKE_JWT("fake_refresh_token"),
@@ -257,7 +257,7 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
     }
 }
 
-TEST_CASE("SyncSession: pause()/resume() API", "[sync]") {
+TEST_CASE("SyncSession: pause()/resume() API", "[sync][session]") {
     TestSyncManager init_sync_manager;
     auto app = init_sync_manager.app();
     auto user = app->sync_manager()->get_user("close-api-tests-user", ENCODE_FAKE_JWT("fake_refresh_token"),
@@ -313,7 +313,7 @@ TEST_CASE("SyncSession: pause()/resume() API", "[sync]") {
     REQUIRE(sessions_are_active(*session));
 }
 
-TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync]") {
+TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync][session]") {
     TestSyncManager init_sync_manager;
     auto app = init_sync_manager.app();
     auto user = app->sync_manager()->get_user("close-api-tests-user", ENCODE_FAKE_JWT("fake_refresh_token"),
@@ -339,7 +339,7 @@ TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync]") {
     }
 }
 
-TEST_CASE("SyncSession: update_configuration()", "[sync]") {
+TEST_CASE("SyncSession: update_configuration()", "[sync][session]") {
     TestSyncManager init_sync_manager({}, {false});
     auto app = init_sync_manager.app();
     auto user = app->sync_manager()->get_user("userid", ENCODE_FAKE_JWT("fake_refresh_token"),
@@ -375,7 +375,7 @@ TEST_CASE("SyncSession: update_configuration()", "[sync]") {
     }
 }
 
-TEST_CASE("sync: error handling", "[sync]") {
+TEST_CASE("sync: error handling", "[sync][session]") {
     using ProtocolError = realm::sync::ProtocolError;
     using ProtocolErrorInfo = realm::sync::ProtocolErrorInfo;
     TestSyncManager init_sync_manager;
@@ -459,7 +459,7 @@ struct RegularUser {
     }
 };
 
-TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
+TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync][session]", RegularUser)
 {
     const std::string dummy_auth_url = "https://realm.example.org";
     if (!EventLoop::has_implementation())
@@ -568,7 +568,7 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
     }
 }
 
-TEST_CASE("session restart", "[sync]") {
+TEST_CASE("session restart", "[sync][session]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -611,7 +611,7 @@ TEST_CASE("session restart", "[sync]") {
     REQUIRE(!wait_for_upload(*realm));
 }
 
-TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema changes", "[sync]") {
+TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema changes", "[sync][session]") {
     if (!EventLoop::has_implementation())
         return;
 
