@@ -95,7 +95,7 @@ struct TestContext : CppContext {
     }
 };
 
-TEST_CASE("geospatial") {
+TEST_CASE("geospatial", "[geospatial]") {
     using namespace std::string_literals;
 
     Schema schema{

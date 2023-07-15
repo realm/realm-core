@@ -73,7 +73,7 @@ struct TestContext : CppContext {
     }
 };
 
-TEST_CASE("Benchmark index change calculations", "[benchmark]") {
+TEST_CASE("Benchmark index change calculations", "[benchmark][index]") {
     _impl::CollectionChangeBuilder c;
 
     auto all_modified = [](ObjKey) {
@@ -147,7 +147,7 @@ TEST_CASE("Benchmark index change calculations", "[benchmark]") {
     }
 }
 
-TEST_CASE("Benchmark object", "[benchmark]") {
+TEST_CASE("Benchmark object", "[benchmark][object]") {
     using namespace std::string_literals;
     using AnyVec = std::vector<std::any>;
     using AnyDict = std::map<std::string, std::any>;
@@ -774,7 +774,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
     }
 }
 
-TEST_CASE("Benchmark object notification delivery", "[benchmark]") {
+TEST_CASE("Benchmark object notification delivery", "[benchmark][notifications]") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
