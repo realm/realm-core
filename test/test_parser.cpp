@@ -5176,7 +5176,7 @@ TEST(Parser_NestedListDictionary)
     verify_query(test_context, persons, "properties[0][*] == 5", 2);
 }
 
-ONLY(Parser_NestedMixedDictionaryList)
+TEST(Parser_NestedMixedDictionaryList)
 {
     Group g;
     auto persons = g.add_table_with_primary_key("table", type_String, "name");

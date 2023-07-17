@@ -20,6 +20,51 @@
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
 
 ----------------------------------------------
+# 13.16.1 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Fix an error during async open and client reset if properties have been added to the schema. This fix applies to PBS to FLX migration if async open is used. ([#6707](https://github.com/realm/realm-core/issues/6707), since v12.3.0)
+* Fixed a double move (undefined behaviour) if an async open resulted in an error. ([#6768](https://github.com/realm/realm-core/pull/6768), since v13.16.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.16.0 Release notes
+
+### Enhancements
+* Add visionOS binaries to the Cocoa release package ([PR #6746](https://github.com/realm/realm-core/pull/6746)).
+* Added support for running initial subscription callback when opening realm, both for synchronous and asynchronous flows. Sync Config contains `subscription_initializer` and `rerun_init_subscription_on_open` in order to setup the subscription callback, and select whether rerun this the first time the file is opened or not. ([#5962](https://github.com/realm/realm-core/issues/5962))
+
+### Fixed
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Prebuilt binaries for non-Apple platforms are no longer published as nothing was using them ([PR #6746](https://github.com/realm/realm-core/pull/6746)).
+* SystemError exceptions now have a more detailed error message. ([#6739](https://github.com/realm/realm-core/issues/6739))
+
+----------------------------------------------
+
 # 13.15.2 Release notes
 
 ### Enhancements

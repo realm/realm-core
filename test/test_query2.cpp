@@ -1341,7 +1341,7 @@ TEST(Query_DeepCopyTest)
 
 TEST(Query_StringIndexCrash)
 {
-    // Test for a crash which occured when a query testing for equality on a
+    // Test for a crash which occurred when a query testing for equality on a
     // string index was deep-copied after being run
     Table table;
     auto col = table.add_column(type_String, "s", true);

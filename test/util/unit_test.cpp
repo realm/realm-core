@@ -1034,7 +1034,7 @@ void SimpleReporter::fail(const TestContext& context, const char* file, long lin
     if (m_report_progress) {
         m_error_messages.push_back(msg);
     }
-    context.thread_context.report_logger.info(msg.c_str());
+    context.thread_context.report_logger.info("%1", msg.c_str());
 }
 
 void SimpleReporter::thread_end(const ThreadContext& context)

@@ -47,7 +47,7 @@ int main(int argc, char* argv[])
         DBRef async_committer = DB::create(file);
     }
     else if (pid > 0) {
-        // in parent, fork was ok, so return succes
+        // in parent, fork was ok, so return success
         _Exit(0);
     }
     else {
