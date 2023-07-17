@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix failed assertion for unknown app server errors ([#6758](https://github.com/realm/realm-core/issues/6758), since v12.9.0).
 
 ### Breaking changes
 * None.
@@ -30,7 +30,6 @@
 ### Fixed
 * Sync errors included the error message twice ([PR #6774](https://github.com/realm/realm-core/pull/6774), since v13.16.0).
 * Fix timestamp representation when serializing to json on different platforms. ([#5451](https://github.com/realm/realm-core/issues/5451)).
-* Fix failed assertion for unknown app server errors ([#6758](https://github.com/realm/realm-core/issues/6758), since v12.9.0).
 
 ### Breaking changes
 * Deprecate `Object::obj()` in favour of `Object::get_obj()` in order to provide better cache efficiency and keep `Obj` up to date when writes happened after then object instance is obtained.
