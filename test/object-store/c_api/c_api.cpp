@@ -5101,7 +5101,7 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         REQUIRE(size == 1);
         realm_list_insert(n_list.get(), 0, rlm_str_val("Test1"));
         realm_list_set_collection(list.get(), 0, RLM_COLLECTION_TYPE_DICTIONARY);
-        // the accessor has become invalid. trying to use for inserting into the list should fail.
+        // accessor has become invalid
         REQUIRE(!realm_list_insert(n_list.get(), 1, rlm_str_val("Test2")));
         CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
         // try to get a dictionary should work
@@ -5113,6 +5113,27 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         REQUIRE(realm_dictionary_insert(n_dict.get(), key, val, &ndx, &inserted));
         REQUIRE(ndx == 0);
         REQUIRE(inserted);
+        realm_list_set_collection(list.get(), 0, RLM_COLLECTION_TYPE_SET);
+        // accessor invalid
+        REQUIRE(!realm_dictionary_insert(n_dict.get(), key, val, &ndx, &inserted));
+        CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
+        auto n_set = cptr_checked(realm_list_get_set(list.get(), 0));
+        REQUIRE(realm_set_insert(n_set.get(), val, &ndx, &inserted));
+        REQUIRE(ndx == 0);
+        REQUIRE(inserted);
+        realm_list_set_collection(list.get(), 0, RLM_COLLECTION_TYPE_LIST);
+        // accessor invalid
+        REQUIRE(!realm_set_insert(n_set.get(), val, &ndx, &inserted));
+        CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
+        // get a list should work
+        n_list = cptr_checked(realm_list_get_list(list.get(), 0));
+        REQUIRE(realm_list_insert(n_list.get(), 0, rlm_str_val("Test1")));
+        // reset the collection type to the same type (nop)
+        realm_list_set_collection(list.get(), 0, RLM_COLLECTION_TYPE_LIST);
+        // accessor is still valid
+        REQUIRE(realm_list_insert(n_list.get(), 0, rlm_str_val("Test2")));
+        checked(realm_list_size(n_list.get(), &size));
+        REQUIRE(size == 2);
     }
 
     SECTION("set") {

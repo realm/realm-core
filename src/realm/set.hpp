@@ -195,8 +195,10 @@ public:
     {
         if (Base::should_update() || !(m_tree && m_tree->is_attached())) {
             bool attached = init_from_parent(true);
+            if (!attached) {
+                throw IllegalOperation("This is an ex-set");
+            }
             Base::update_content_version();
-            REALM_ASSERT(attached);
         }
     }
 
@@ -223,19 +225,28 @@ private:
             const ArrayParent* parent = this;
             m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
         }
-
-        if (m_tree->init_from_parent()) {
-            // All is well
-            return true;
+        try {
+            auto ref = Base::get_collection_ref();
+            if (ref) {
+                m_tree->init_from_ref(ref);
+            }
+            else {
+                if (m_tree->init_from_parent()) {
+                    // All is well
+                    return true;
+                }
+                if (!allow_create) {
+                    return false;
+                }
+                // The ref in the column was NULL, create the tree in place.
+                m_tree->create();
+                REALM_ASSERT(m_tree->is_attached());
+            }
         }
-
-        if (!allow_create) {
+        catch (...) {
+            m_tree->detach();
             return false;
         }
-
-        // The ref in the column was NULL, create the tree in place.
-        m_tree->create();
-        REALM_ASSERT(m_tree->is_attached());
         return true;
     }
 
@@ -665,13 +676,13 @@ REALM_NOINLINE auto Set<T>::find_impl(const T& value) const -> iterator
 template <class T>
 std::pair<size_t, bool> Set<T>::insert(T value)
 {
+    ensure_created();
     update();
 
     if (value_is_null(value) && !m_nullable)
         throw InvalidArgument(ErrorCodes::PropertyNotNullable,
                               util::format("Set: %1", CollectionBase::get_property_name()));
 
-    ensure_created();
     auto it = find_impl(value);
 
     if (it != this->end() && SetElementEquals<T>{}(*it, value)) {
