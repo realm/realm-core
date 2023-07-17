@@ -5088,6 +5088,33 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         REQUIRE(size == 5);
     }
 
+    SECTION("set list for collection in mixed, verify that previous reference is invalid") {
+        REQUIRE(realm_set_collection(obj1.get(), foo_any_col_key, RLM_COLLECTION_TYPE_LIST));
+        realm_value_t value;
+        realm_get_value(obj1.get(), foo_any_col_key, &value);
+        REQUIRE(value.type == RLM_TYPE_LIST);
+        auto list = cptr_checked(realm_get_list(obj1.get(), foo_any_col_key));
+        realm_list_insert_collection(list.get(), 0, RLM_COLLECTION_TYPE_LIST);
+        auto n_list = cptr_checked(realm_list_get_list(list.get(), 0));
+        size_t size;
+        checked(realm_list_size(list.get(), &size));
+        REQUIRE(size == 1);
+        realm_list_insert(n_list.get(), 0, rlm_str_val("Test1"));
+        realm_list_set_collection(list.get(), 0, RLM_COLLECTION_TYPE_DICTIONARY);
+        // the accessor has become invalid. trying to use for inserting into the list should fail.
+        REQUIRE(!realm_list_insert(n_list.get(), 1, rlm_str_val("Test2")));
+        CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
+        // try to get a dictionary should work
+        auto n_dict = cptr_checked(realm_list_get_dictionary(list.get(), 0));
+        bool inserted = false;
+        size_t ndx;
+        realm_value_t key = rlm_str_val("key");
+        realm_value_t val = rlm_str_val("value");
+        REQUIRE(realm_dictionary_insert(n_dict.get(), key, val, &ndx, &inserted));
+        REQUIRE(ndx == 0);
+        REQUIRE(inserted);
+    }
+
     SECTION("set") {
         REQUIRE(realm_set_collection(obj1.get(), foo_any_col_key, RLM_COLLECTION_TYPE_SET));
         realm_value_t value;
