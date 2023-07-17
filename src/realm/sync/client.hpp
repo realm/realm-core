@@ -177,7 +177,7 @@ public:
     using ProgressHandler = void(std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
                                  std::uint_fast64_t uploaded_bytes, std::uint_fast64_t uploadable_bytes,
                                  std::uint_fast64_t progress_version, std::uint_fast64_t snapshot_version);
-    using WaitOperCompletionHandler = util::UniqueFunction<void(std::error_code)>;
+    using WaitOperCompletionHandler = util::UniqueFunction<void(Status)>;
     using SSLVerifyCallback = bool(const std::string& server_address, port_type server_port, const char* pem_data,
                                    size_t pem_size, int preverify_ok, int depth);
 
@@ -661,10 +661,10 @@ public:
     /// If incomplete wait operations exist when the session is terminated,
     /// those wait operations will be canceled. Session termination is an event
     /// that happens in the context of the client's event loop thread shortly
-    /// after the destruction of the session object. The std::error_code
+    /// after the destruction of the session object. The Status
     /// argument passed to the completion handler of a canceled wait operation
-    /// will be `util::error::operation_aborted`. For uncanceled wait operations
-    /// it will be `std::error_code{}`. Note that as long as the client's event
+    /// will be `ErrorCodes::OperationAborted`. For uncanceled wait operations
+    /// it will be `Status::OK()`. Note that as long as the client's event
     /// loop thread is running, all completion handlers will be called
     /// regardless of whether the operations get canceled or not.
     ///
