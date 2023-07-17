@@ -338,7 +338,7 @@ TEST_CASE("app: verify app error codes", "[sync][app][local]") {
 
 // MARK: - Login with Credentials Tests
 
-TEST_CASE("app: login_with_credentials integration", "[sync][app][baas]") {
+TEST_CASE("app: login_with_credentials integration", "[sync][app][user][baas]") {
     SECTION("login") {
         TestAppSession session;
         auto app = session.app();
@@ -375,7 +375,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app][baas]") {
 
 // MARK: - UsernamePasswordProviderClient Tests
 
-TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][baas]") {
+TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][user][baas]") {
     const std::string base_url = get_base_url();
     AutoVerifiedEmailCredentials creds;
     auto email = creds.email;
@@ -553,7 +553,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][baas]"
 
 // MARK: - UserAPIKeyProviderClient Tests
 
-TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app][baas]") {
+TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app][api key][baas]") {
     TestAppSession session;
     auto app = session.app();
     auto client = app->provider_client<App::UserAPIKeyProviderClient>();
@@ -815,7 +815,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app][baas]") {
 
 // MARK: - Auth Providers Function Tests
 
-TEST_CASE("app: auth providers function integration", "[sync][app][baas]") {
+TEST_CASE("app: auth providers function integration", "[sync][app][user][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -829,7 +829,7 @@ TEST_CASE("app: auth providers function integration", "[sync][app][baas]") {
 
 // MARK: - Link User Tests
 
-TEST_CASE("app: link_user integration", "[sync][app][baas]") {
+TEST_CASE("app: link_user integration", "[sync][app][user][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -862,7 +862,7 @@ TEST_CASE("app: link_user integration", "[sync][app][baas]") {
 
 // MARK: - Delete User Tests
 
-TEST_CASE("app: delete anonymous user integration", "[sync][app][baas]") {
+TEST_CASE("app: delete anonymous user integration", "[sync][app][user][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -904,7 +904,7 @@ TEST_CASE("app: delete anonymous user integration", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: delete user with credentials integration", "[sync][app][baas]") {
+TEST_CASE("app: delete user with credentials integration", "[sync][app][user][baas]") {
     TestAppSession session;
     auto app = session.app();
     app->remove_user(app->current_user(), [](auto) {});
@@ -945,7 +945,7 @@ TEST_CASE("app: delete user with credentials integration", "[sync][app][baas]") 
 
 // MARK: - Call Function Tests
 
-TEST_CASE("app: call function", "[sync][app][baas]") {
+TEST_CASE("app: call function", "[sync][app][function][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -961,7 +961,7 @@ TEST_CASE("app: call function", "[sync][app][baas]") {
 
 // MARK: - Remote Mongo Client Tests
 
-TEST_CASE("app: remote mongo client", "[sync][app][baas]") {
+TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -1629,7 +1629,7 @@ TEST_CASE("app: remote mongo client", "[sync][app][baas]") {
 
 // MARK: - Push Notifications Tests
 
-TEST_CASE("app: push notifications", "[sync][app][baas]") {
+TEST_CASE("app: push notifications", "[sync][app][notifications][baas]") {
     TestAppSession session;
     auto app = session.app();
     std::shared_ptr<SyncUser> sync_user = app->current_user();
@@ -1743,7 +1743,7 @@ TEST_CASE("app: token refresh", "[sync][app][token][baas]") {
 
 // MARK: - Sync Tests
 
-TEST_CASE("app: mixed lists with object links", "[sync][app][baas]") {
+TEST_CASE("app: mixed lists with object links", "[sync][pbs][app][links][baas]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
@@ -1819,7 +1819,7 @@ TEST_CASE("app: mixed lists with object links", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: roundtrip values", "[sync][app][baas]") {
+TEST_CASE("app: roundtrip values", "[sync][pbs][app][baas]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
@@ -1868,7 +1868,7 @@ TEST_CASE("app: roundtrip values", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: upgrade from local to synced realm", "[sync][app][baas]") {
+TEST_CASE("app: upgrade from local to synced realm", "[sync][pbs][app][upgrade][baas]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
@@ -1970,7 +1970,7 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app][baas]") {
     // r1->read_group().to_json(std::cout);
 }
 
-TEST_CASE("app: set new embedded object", "[sync][app][baas]") {
+TEST_CASE("app: set new embedded object", "[sync][pbs][app][baas]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
@@ -2108,7 +2108,7 @@ TEST_CASE("app: set new embedded object", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: make distributable client file", "[sync][app][baas]") {
+TEST_CASE("app: make distributable client file", "[sync][pbs][app][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -2182,7 +2182,7 @@ TEST_CASE("app: make distributable client file", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: sync integration", "[sync][app][baas]") {
+TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     auto logger = std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
     const auto schema = default_app_config("").schema;
@@ -3406,7 +3406,7 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: custom user data integration tests", "[sync][app][baas]") {
+TEST_CASE("app: custom user data integration tests", "[sync][app][user][function][baas]") {
     TestAppSession session;
     auto app = session.app();
     auto user = app->current_user();
@@ -3431,7 +3431,7 @@ TEST_CASE("app: custom user data integration tests", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: jwt login and metadata tests", "[sync][app][baas]") {
+TEST_CASE("app: jwt login and metadata tests", "[sync][app][user][metadata][function][baas]") {
     TestAppSession session;
     auto app = session.app();
     auto jwt = create_jwt(session.app()->config().app_id);
@@ -3462,7 +3462,7 @@ TEST_CASE("app: jwt login and metadata tests", "[sync][app][baas]") {
 }
 
 namespace cf = realm::collection_fixtures;
-TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][baas][collections]", cf::ListOfObjects,
+TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][pbs][app][collections][baas]", cf::ListOfObjects,
                    cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks, cf::DictionaryOfObjects,
                    cf::DictionaryOfMixedLinks)
 {
@@ -3615,8 +3615,8 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][baas][c
     }
 }
 
-TEMPLATE_TEST_CASE("app: partition types", "[sync][app][baas][partition]", cf::Int, cf::String, cf::OID, cf::UUID,
-                   cf::BoxedOptional<cf::Int>, cf::UnboxedOptional<cf::String>, cf::BoxedOptional<cf::OID>,
+TEMPLATE_TEST_CASE("app: partition types", "[sync][pbs][app][partition][baas]", cf::Int, cf::String, cf::OID,
+                   cf::UUID, cf::BoxedOptional<cf::Int>, cf::UnboxedOptional<cf::String>, cf::BoxedOptional<cf::OID>,
                    cf::BoxedOptional<cf::UUID>)
 {
     std::string base_url = get_base_url();
@@ -3704,7 +3704,7 @@ TEMPLATE_TEST_CASE("app: partition types", "[sync][app][baas][partition]", cf::I
 
 #endif // REALM_ENABLE_AUTH_TESTS
 
-TEST_CASE("app: custom error handling", "[sync][app][baas][custom_errors]") {
+TEST_CASE("app: custom error handling", "[sync][app][custom errors][baas]") {
     class CustomErrorTransport : public GenericNetworkTransport {
     public:
         CustomErrorTransport(int code, const std::string& message)
@@ -3998,7 +3998,7 @@ const std::string UnitTestTransport::user_id = "Ailuropoda melanoleuca";
 const std::string UnitTestTransport::identity_0_id = "Ursus arctos isabellinus";
 const std::string UnitTestTransport::identity_1_id = "Ursus arctos horribilis";
 
-TEST_CASE("subscribable unit tests", "[sync][app][local]") {
+TEST_CASE("subscribable unit tests", "[sync][app]") {
     struct Foo : public Subscribable<Foo> {
         void event()
         {
@@ -4067,7 +4067,7 @@ TEST_CASE("subscribable unit tests", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][local]") {
+TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
     auto config = get_config();
 
     SECTION("login_anonymous good") {
@@ -4155,7 +4155,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app][local]") {
+TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app][user][api key]") {
     TestSyncManager sync_manager(get_config(), {});
     auto app = sync_manager.app();
     auto client = app->provider_client<App::UserAPIKeyProviderClient>();
@@ -4202,7 +4202,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app][local]") {
 }
 
 
-TEST_CASE("app: user_semantics", "[app][local]") {
+TEST_CASE("app: user_semantics", "[sync][app][user]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4347,7 +4347,7 @@ private:
     Response* m_response;
 };
 
-TEST_CASE("app: response error handling", "[sync][app][local]") {
+TEST_CASE("app: response error handling", "[sync][app]") {
     std::string response_body = nlohmann::json({{"access_token", good_access_token},
                                                 {"refresh_token", good_access_token},
                                                 {"user_id", "Brown Bear"},
@@ -4430,7 +4430,7 @@ TEST_CASE("app: response error handling", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: switch user", "[sync][app][local]") {
+TEST_CASE("app: switch user", "[sync][app][user]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4486,7 +4486,7 @@ TEST_CASE("app: switch user", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: remove anonymous user", "[sync][app][local]") {
+TEST_CASE("app: remove anonymous user", "[sync][app][user]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4528,7 +4528,7 @@ TEST_CASE("app: remove anonymous user", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: remove user with credentials", "[sync][app][local]") {
+TEST_CASE("app: remove user with credentials", "[sync][app][user]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4561,7 +4561,7 @@ TEST_CASE("app: remove user with credentials", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: link_user", "[sync][app][local]") {
+TEST_CASE("app: link_user", "[sync][app][user]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4600,7 +4600,7 @@ TEST_CASE("app: link_user", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: auth providers", "[sync][app][local]") {
+TEST_CASE("app: auth providers", "[sync][app][user]") {
     SECTION("auth providers facebook") {
         auto credentials = AppCredentials::facebook("a_token");
         CHECK(credentials.provider() == AuthProvider::FACEBOOK);
@@ -4680,7 +4680,7 @@ TEST_CASE("app: auth providers", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: refresh access token unit tests", "[sync][app][local]") {
+TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
     auto setup_user = [](std::shared_ptr<App> app) {
         if (app->sync_manager()->get_current_user()) {
             return;
@@ -4901,7 +4901,7 @@ private:
 
 } // namespace
 
-TEST_CASE("app: app destroyed during token refresh", "[sync][app][local]") {
+TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, profile_1, profile_2, refresh_1, refresh_2, refresh_3 };
     struct TestStateBundle {
@@ -5051,7 +5051,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][local]") {
     mock_transport_worker.mark_complete();
 }
 
-TEST_CASE("app: metadata is persisted between sessions", "[sync][app][local]") {
+TEST_CASE("app: metadata is persisted between sessions", "[sync][app][metadata]") {
     static const auto test_hostname = "proto://host:1234";
     static const auto test_ws_hostname = "wsproto://host:1234";
 
@@ -5105,7 +5105,7 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: make_streaming_request", "[sync][app][local]") {
+TEST_CASE("app: make_streaming_request", "[sync][app][streaming]") {
     UnitTestTransport::access_token = good_access_token;
 
     constexpr uint64_t timeout_ms = 60000;
@@ -5179,7 +5179,7 @@ TEST_CASE("app: make_streaming_request", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: sync_user_profile unit tests", "[sync][app][local]") {
+TEST_CASE("app: sync_user_profile unit tests", "[sync][app][user]") {
     SECTION("with empty map") {
         auto profile = SyncUserProfile(bson::BsonDocument());
         CHECK(profile.name() == util::none);
@@ -5217,7 +5217,7 @@ TEST_CASE("app: sync_user_profile unit tests", "[sync][app][local]") {
 }
 
 #if 0
-TEST_CASE("app: app cannot get deallocated during log in", "[sync][app][local]") {
+TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, app_deallocated, profile };
     struct TestStateBundle {
@@ -5309,7 +5309,7 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app][local]")
 }
 #endif
 
-TEST_CASE("app: user logs out while profile is fetched", "[sync][app][local]") {
+TEST_CASE("app: user logs out while profile is fetched", "[sync][app][user]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, profile };
     struct TestStateBundle {
@@ -5406,7 +5406,7 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app][local]") {
     mock_transport_worker.mark_complete();
 }
 
-TEST_CASE("app: shared instances", "[sync][app][local]") {
+TEST_CASE("app: shared instances", "[sync][app]") {
     App::Config base_config;
     set_app_config_defaults(base_config, instance_of<UnitTestTransport>);
 

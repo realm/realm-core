@@ -46,7 +46,7 @@
 using namespace realm;
 using util::any_cast;
 
-TEST_CASE("Construct frozen Realm") {
+TEST_CASE("Construct frozen Realm", "[frozen]") {
     TestFile config;
     config.schema_version = 1;
     config.schema = Schema{
@@ -62,7 +62,7 @@ TEST_CASE("Construct frozen Realm") {
     }
 }
 
-TEST_CASE("Freeze Realm", "[freeze_realm]") {
+TEST_CASE("Freeze Realm", "[frozen]") {
     TestFile config;
     config.schema_version = 1;
     config.schema = Schema{
@@ -112,7 +112,7 @@ TEST_CASE("Freeze Realm", "[freeze_realm]") {
     }
 }
 
-TEST_CASE("Freeze Results", "[freeze_results]") {
+TEST_CASE("Freeze Results", "[frozen]") {
     TestFile config;
     config.schema_version = 1;
     config.schema = Schema{{"object",
@@ -400,7 +400,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     }
 }
 
-TEST_CASE("Freeze List", "[freeze_list]") {
+TEST_CASE("Freeze List", "[frozen]") {
 
     TestFile config;
     config.schema_version = 1;
@@ -476,7 +476,7 @@ TEST_CASE("Freeze List", "[freeze_list]") {
     }
 }
 
-TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
+TEST_CASE("Reclaim Frozen", "[frozen]") {
 
 #ifdef REALM_DEBUG
     constexpr int num_pending_transactions = 10;
@@ -589,7 +589,7 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
     realm->commit_transaction();
 }
 
-TEST_CASE("Freeze Object", "[freeze_object]") {
+TEST_CASE("Freeze Object", "[frozen]") {
 
     TestFile config;
     config.schema_version = 1;
@@ -654,7 +654,7 @@ TEST_CASE("Freeze Object", "[freeze_object]") {
     }
 }
 
-TEST_CASE("Freeze dictionary", "[freeze_dictionary]") {
+TEST_CASE("Freeze dictionary", "[frozen]") {
 
     TestFile config;
     config.schema_version = 1;
