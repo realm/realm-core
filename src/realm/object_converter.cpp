@@ -15,7 +15,6 @@
  * limitations under the License.
  *
  **************************************************************************/
-#include <iostream>
 
 #include <realm/object_converter.hpp>
 
@@ -349,14 +348,7 @@ void InterRealmValueConverter::handle_list_in_mixed(const Lst<Mixed>& src_list, 
             handle_dict_copy(i);
         }
         else {
-            // copy single element
-            InterRealmValueConverter::ConversionResult converted_src;
-            auto dst_obj = dst_list.get_obj();
-            auto dst_col = dst_list.get_col_key();
-            auto dst_mixed = dst_obj.get_any(dst_col);
-            if (cmp_src_to_dst(any, dst_mixed, &converted_src, update_out)) {
-                dst_list.insert(i, converted_src.converted_value);
-            }
+            dst_list.insert(i, any);
         }
     }
 }
@@ -410,14 +402,7 @@ void InterRealmValueConverter::handle_dictionary_in_mixed(const Dictionary& src_
             handle_dict_copy(key.get_string());
         }
         else {
-            // copy single element
-            InterRealmValueConverter::ConversionResult converted_src;
-            auto dst_obj = dst_dict.get_obj();
-            auto dst_col = dst_dict.get_col_key();
-            auto dst_mixed = dst_obj.get_any(dst_col);
-            if (cmp_src_to_dst(any, dst_mixed, &converted_src, update_out)) {
-                dst_dict.insert(key, converted_src.converted_value);
-            }
+            dst_dict.insert(key, any);
         }
     }
 }
