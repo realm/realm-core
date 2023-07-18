@@ -626,6 +626,7 @@ size_t Mixed::hash() const
         case type_Mixed:
         case type_Link:
         case type_LinkList:
+        case type_EnumString:
             REALM_ASSERT_RELEASE(false && "Hash not supported for this column type");
             break;
     }
@@ -720,6 +721,7 @@ StringData Mixed::get_index_data(std::array<char, 16>& buffer) const noexcept
         case type_Mixed:
         case type_Link:
         case type_LinkList:
+        case type_EnumString:
             break;
     }
     REALM_ASSERT_RELEASE(false && "Index not supported for this column type");
@@ -789,6 +791,7 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
             case type_UUID:
                 out << util::serializer::print_value(m.uuid_val);
                 break;
+            case type_EnumString:
             case type_Mixed:
             case type_LinkList:
                 REALM_ASSERT(false);

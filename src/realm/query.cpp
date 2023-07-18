@@ -274,6 +274,12 @@ struct MakeConditionNode {
         return std::unique_ptr<ParentNode>{new Node(std::move(value), col_key)};
     }
 
+    // a bit inelegant, it explicitly sets the type of value instead of deriving it.
+    static std::unique_ptr<ParentNode> make(const Table& table, ColKey col_key, StringData value)
+    {
+        return std::unique_ptr<ParentNode>{new Node(table, std::move(value), col_key)};
+    }
+
     static std::unique_ptr<ParentNode> make(ColKey col_key, null)
     {
         return std::unique_ptr<ParentNode>{new Node(null{}, col_key)};
@@ -358,6 +364,14 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
         }
         case type_Double: {
             return MakeConditionNode<FloatDoubleNode<ArrayDouble, Cond>>::make(column_key, value);
+        }
+        case type_EnumString: {
+            if constexpr (realm::is_any_v<T, StringData>) {
+                return MakeConditionNode<EnumStringNode<Cond>>::make(table, column_key, value);
+            }
+            else {
+                return {};
+            }
         }
         case type_String: {
             return MakeConditionNode<StringNode<Cond>>::make(column_key, value);

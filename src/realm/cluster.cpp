@@ -152,15 +152,9 @@ void Cluster::create()
             case col_type_Double:
                 do_create<ArrayDoubleNull>(col_key);
                 break;
-            case col_type_String: {
-                if (m_tree_top.is_string_enum_type(col_ndx)) {
-                    do_create<ArrayInteger>(col_key);
-                }
-                else {
-                    do_create<ArrayString>(col_key);
-                }
+            case col_type_String:
+                do_create<ArrayString>(col_key);
                 break;
-            }
             case col_type_Binary:
                 do_create<ArrayBinary>(col_key);
                 break;
@@ -178,6 +172,9 @@ void Cluster::create()
                 break;
             case col_type_UUID:
                 do_create<ArrayUUIDNull>(col_key);
+                break;
+            case col_type_EnumString:
+                do_create<ArrayInteger>(col_key);
                 break;
             case col_type_Link:
                 do_create<ArrayKey>(col_key);
@@ -250,17 +247,6 @@ size_t Cluster::node_size_from_header(Allocator& alloc, const char* header)
 }
 
 template <class T>
-inline void Cluster::set_spec(T&, ColKey::Idx) const
-{
-}
-
-template <>
-inline void Cluster::set_spec(ArrayString& arr, ColKey::Idx col_ndx) const
-{
-    m_tree_top.set_spec(arr, col_ndx);
-}
-
-template <class T>
 inline void Cluster::do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool nullable)
 {
     using U = typename util::RemoveOptional<typename T::value_type>::type;
@@ -268,7 +254,6 @@ inline void Cluster::do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool 
     T arr(m_alloc);
     auto col_ndx = col.get_index();
     arr.set_parent(this, col_ndx.val + s_first_col_index);
-    set_spec<T>(arr, col_ndx);
     arr.init_from_parent();
     if (init_val.is_null()) {
         arr.insert(ndx, T::default_value(nullable));
@@ -416,6 +401,9 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
             case col_type_UUID:
                 do_insert_row<ArrayUUIDNull>(ndx, col_key, init_value, nullable);
                 break;
+            case col_type_EnumString:
+                do_insert_row<ArrayInteger>(ndx, col_key, init_value, nullable);
+                break;
             case col_type_Link:
                 do_insert_key(ndx, col_key, init_value, ObjKey(k.value + get_offset()));
                 break;
@@ -484,13 +472,9 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
             case col_type_Double:
                 do_move<ArrayDouble>(ndx, col_key, new_leaf);
                 break;
-            case col_type_String: {
-                if (m_tree_top.is_string_enum_type(col_key.get_index()))
-                    do_move<ArrayInteger>(ndx, col_key, new_leaf);
-                else
-                    do_move<ArrayString>(ndx, col_key, new_leaf);
+            case col_type_String:
+                do_move<ArrayString>(ndx, col_key, new_leaf);
                 break;
-            }
             case col_type_Binary:
                 do_move<ArrayBinary>(ndx, col_key, new_leaf);
                 break;
@@ -643,6 +627,9 @@ void Cluster::insert_column(ColKey col_key)
         case col_type_BackLink:
             do_insert_column<ArrayBacklink>(col_key, nullable);
             break;
+        case col_type_EnumString:
+            do_insert_column<ArrayInteger>(col_key, nullable);
+            break;
         default:
             REALM_UNREACHABLE();
             break;
@@ -729,6 +716,102 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
     return ret;
 }
 
+template <class T>
+void Cluster::do_insert_rows(ColKey col, ValueIterator begin, size_t to_insert, int index)
+{
+    using U = typename util::RemoveOptional<typename T::value_type>::type;
+
+    T arr(m_alloc);
+    auto col_ndx = col.get_index();
+    arr.set_parent(this, col_ndx.val + s_first_col_index);
+    arr.init_from_parent();
+    auto it = begin;
+    for (size_t i = 0; i < to_insert; ++i, ++it) {
+        arr.add((*it)[index].value.get<U>());
+    }
+}
+
+ref_type Cluster::bulk_insert(ValueIterator begin, ValueIterator end, State& state)
+{
+    // Ensure the cluster array is big enough to hold 64 bit values.
+    copy_on_write(m_size * 8);
+    size_t to_insert = size_t(end - begin);
+    if (to_insert + node_size() > cluster_node_size) {
+        to_insert = cluster_node_size - node_size();
+    }
+    if (to_insert) {
+        if (m_keys.is_attached()) {
+            auto last_key = m_keys.get(m_keys.size() - 1);
+            for (size_t i = 0; i < to_insert; i++) {
+                m_keys.add(++last_key);
+            }
+        }
+        else {
+            Array::set(s_key_ref_or_size_index,
+                       Array::get(s_key_ref_or_size_index) + (to_insert << 1)); // Increments size by to_insert
+        }
+
+        const FieldValues& first_row = *begin;
+        size_t index = 0;
+        for (auto& val : first_row) {
+            auto col_key = val.col_key;
+            auto col_ndx = col_key.get_index().val;
+            REALM_ASSERT(index == col_ndx);
+            index++;
+            if (col_key.is_collection()) {
+                ArrayRef arr(m_alloc);
+                arr.set_parent(this, col_ndx + s_first_col_index);
+                arr.init_from_parent();
+                for (size_t i = 0; i < to_insert; i++) {
+                    arr.add(0);
+                }
+                continue;
+            }
+
+            switch (col_key.get_type()) {
+                case col_type_Int:
+                    if (col_key.is_nullable()) {
+                        do_insert_rows<ArrayIntNull>(col_key, begin, to_insert, col_ndx);
+                    }
+                    else {
+                        do_insert_rows<ArrayInteger>(col_key, begin, to_insert, col_ndx);
+                    }
+                    break;
+                case col_type_String:
+                    do_insert_rows<ArrayString>(col_key, begin, to_insert, col_ndx);
+                    break;
+                case col_type_Timestamp:
+                    do_insert_rows<ArrayTimestamp>(col_key, begin, to_insert, col_ndx);
+                    break;
+                default:
+                    REALM_ASSERT_RELEASE(false);
+                    break;
+            }
+        }
+        size_t sz = size();
+        while (index < sz - s_first_col_index) {
+            ArrayBacklink arr(m_alloc);
+            arr.set_parent(this, index++ + s_first_col_index);
+            arr.init_from_parent();
+            for (size_t i = 0; i < to_insert; i++) {
+                arr.add(0);
+            }
+        }
+
+        begin += to_insert;
+    }
+    if (begin == end) {
+        return 0;
+    }
+    Cluster new_leaf(0, m_alloc, m_tree_top);
+    new_leaf.create();
+    new_leaf.bulk_insert(begin, end, state);
+    state.split_key = m_keys.is_attached() ? m_keys.get(cluster_node_size - 1) : cluster_node_size;
+    state.mem = new_leaf.get_mem();
+    state.index = 0;
+    return new_leaf.get_ref();
+}
+
 bool Cluster::try_get(ObjKey k, ClusterNode::State& state) const noexcept
 {
     state.mem = get_mem();
@@ -758,7 +841,6 @@ inline void Cluster::do_erase(size_t ndx, ColKey col_key)
     auto col_ndx = col_key.get_index();
     T values(m_alloc);
     values.set_parent(this, col_ndx.val + s_first_col_index);
-    set_spec<T>(values, col_ndx);
     values.init_from_parent();
     ObjLink link;
     if constexpr (std::is_same_v<T, ArrayTypedLink>) {
@@ -1036,9 +1118,6 @@ void Cluster::init_leaf(ColKey col_key, ArrayPayload* leaf) const
     if (auto t = m_tree_top.get_owning_table())
         t->check_column(col_key);
     ref_type ref = to_ref(Array::get(col_ndx.val + 1));
-    if (leaf->need_spec()) {
-        m_tree_top.set_spec(*leaf, col_ndx);
-    }
     leaf->init_from_ref(ref);
     leaf->set_parent(const_cast<Cluster*>(this), col_ndx.val + 1);
 }
@@ -1054,7 +1133,6 @@ template <typename ArrayType>
 void Cluster::verify(ref_type ref, size_t index, util::Optional<size_t>& sz) const
 {
     ArrayType arr(get_alloc());
-    set_spec(arr, ColKey::Idx{unsigned(index) - 1});
     arr.set_parent(const_cast<Cluster*>(this), index);
     arr.init_from_ref(ref);
     arr.verify();

@@ -66,15 +66,6 @@ public:
     {
         m_arr->set_parent(p, n);
     }
-    bool need_spec() const override
-    {
-        return true;
-    }
-    void set_spec(Spec* spec, size_t col_ndx) const override
-    {
-        m_spec = spec;
-        m_col_ndx = col_ndx;
-    }
 
     void update_parent()
     {
@@ -128,18 +119,16 @@ private:
         std::aligned_storage<sizeof(ArrayBigBlobs), alignof(ArrayBigBlobs)>::type m_big_blobs;
         std::aligned_storage<sizeof(Array), alignof(Array)>::type m_enum;
     };
-    enum class Type { small_strings, medium_strings, big_strings, enum_strings };
+    enum class Type { small_strings, medium_strings, big_strings };
 
     Type m_type = Type::small_strings;
 
     Allocator& m_alloc;
     Storage m_storage;
     Array* m_arr;
-    mutable Spec* m_spec = nullptr;
-    mutable size_t m_col_ndx = realm::npos;
     bool m_nullable = true;
 
-    std::unique_ptr<ArrayString> m_string_enum_values;
+    // std::unique_ptr<ArrayString> m_string_enum_values;
 
     Type upgrade_leaf(size_t value_size);
 };
@@ -161,6 +150,6 @@ inline StringData ArrayString::get(const char* header, size_t ndx, Allocator& al
     }
 }
 
-}
+} // namespace realm
 
 #endif /* REALM_ARRAY_STRING_HPP */

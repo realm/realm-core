@@ -67,10 +67,9 @@ public:
 
     // Auto Enumerated string columns
     void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref);
-    size_t _get_enumkeys_ndx(size_t column_ndx) const noexcept;
+    // size_t _get_enumkeys_ndx(size_t column_ndx) const noexcept;
     bool is_string_enum_type(size_t column_ndx) const noexcept;
-    ref_type get_enumkeys_ref(size_t column_ndx, ArrayParent*& keys_parent) noexcept;
-
+    // ref_type get_enumkeys_ref(size_t column_ndx, ArrayParent*& keys_parent) noexcept;
     //@{
     /// Compare two table specs for equality.
     bool operator==(const Spec&) const noexcept;
@@ -154,22 +153,6 @@ private:
 inline Allocator& Spec::get_alloc() const noexcept
 {
     return m_top.get_alloc();
-}
-
-// Uninitialized Spec (call init() to init)
-inline Spec::Spec(Allocator& alloc) noexcept
-    : m_top(alloc)
-    , m_types(alloc)
-    , m_names(alloc)
-    , m_attr(alloc)
-    , m_enumkeys(alloc)
-    , m_keys(alloc)
-{
-    m_types.set_parent(&m_top, 0);
-    m_names.set_parent(&m_top, 1);
-    m_attr.set_parent(&m_top, 2);
-    m_enumkeys.set_parent(&m_top, 4);
-    m_keys.set_parent(&m_top, 5);
 }
 
 inline bool Spec::init_from_parent() noexcept

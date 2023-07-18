@@ -21,7 +21,26 @@
 #include <realm/replication.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/group.hpp>
+#include <iostream>
+
 using namespace realm;
+
+// Uninitialized Spec (call init() to init)
+Spec::Spec(Allocator& alloc) noexcept
+    : m_top(alloc)
+    , m_types(alloc)
+    , m_names(alloc)
+    , m_attr(alloc)
+    , m_enumkeys(alloc)
+    , m_keys(alloc)
+{
+    m_types.set_parent(&m_top, 0);
+    m_names.set_parent(&m_top, 1);
+    m_attr.set_parent(&m_top, 2);
+    m_enumkeys.set_parent(&m_top, 4);
+    m_keys.set_parent(&m_top, 5);
+}
+
 
 Spec::~Spec() noexcept {}
 
@@ -314,7 +333,6 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
     if (m_enumkeys.is_attached() && type != col_type_BackLink) {
         m_enumkeys.insert(column_ndx, 0);
     }
-
     update_internals();
 }
 
@@ -322,38 +340,10 @@ void Spec::erase_column(size_t column_ndx)
 {
     REALM_ASSERT(column_ndx < m_types.size());
 
-    if (ColumnType(int(m_types.get(column_ndx))) != col_type_BackLink) {
-        if (is_string_enum_type(column_ndx)) {
-            // Enum columns do also have a separate key list
-            ref_type keys_ref = m_enumkeys.get_as_ref(column_ndx);
-            Array::destroy_deep(keys_ref, m_top.get_alloc());
-            m_enumkeys.set(column_ndx, 0);
-        }
-
-        // Remove this column from the enum keys lookup and clean it up if it's now empty
-        if (m_enumkeys.is_attached()) {
-            m_enumkeys.erase(column_ndx); // Throws
-            bool all_empty = true;
-            for (size_t i = 0; i < m_enumkeys.size(); i++) {
-                if (m_enumkeys.get(i) != 0) {
-                    all_empty = false;
-                    break;
-                }
-            }
-            if (all_empty) {
-                m_enumkeys.destroy_deep();
-                m_top.set(4, 0);
-            }
-        }
-        m_num_public_columns--;
-        m_names.erase(column_ndx); // Throws
-    }
-
     // Delete the entries common for all columns
     m_types.erase(column_ndx); // Throws
     m_attr.erase(column_ndx);  // Throws
     m_keys.erase(column_ndx);
-
     update_internals();
 }
 
@@ -398,19 +388,6 @@ void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref)
 
     // Insert the new key list
     m_enumkeys.set(column_ndx, keys_ref);
-}
-
-bool Spec::is_string_enum_type(size_t column_ndx) const noexcept
-{
-    return m_enumkeys.is_attached() ? (m_enumkeys.get(column_ndx) != 0) : false;
-}
-
-ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent*& keys_parent) noexcept
-{
-    // We also need to return parent info
-    keys_parent = &m_enumkeys;
-
-    return m_enumkeys.get_as_ref(column_ndx);
 }
 
 TableKey Spec::get_opposite_link_table_key(size_t column_ndx) const noexcept
@@ -525,6 +502,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
             case col_type_BackLink:
             case col_type_ObjectId:
             case col_type_UUID:
+            case col_type_EnumString:
                 // All other column types are compared as before
                 if (m_types.get(col_ndx) != spec.m_types.get(col_ndx))
                     return false;

@@ -400,6 +400,8 @@ public:
     size_t find_first(int64_t value, size_t start = 0, size_t end = size_t(-1)) const
     {
         REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
+        // todo: fix use of this function, so that below assert cannot happen:
+        REALM_ASSERT_RELEASE(cond::condition >= 0);
         // todo, would be nice to avoid this in order to speed up find_first loops
         QueryStateFindFirst state;
         Finder finder = m_vtable->finder[cond::condition];

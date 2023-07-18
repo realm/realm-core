@@ -62,8 +62,7 @@ class LinkChain;
 class Subexpr;
 class StringIndex;
 
-struct Link {
-};
+struct Link {};
 typedef Link BackLink;
 
 
@@ -226,7 +225,7 @@ public:
     /// this function returns the number of unique values currently
     /// stored. Otherwise it returns zero. This function is mainly intended for
     /// debugging purposes.
-    size_t get_num_unique_values(ColKey col_key) const;
+    void dump_interning_stats();
 
     template <class T>
     Columns<T> column(ColKey col_key, util::Optional<ExpressionComparisonType> = util::none) const;
@@ -290,7 +289,7 @@ public:
     /// Create a number of objects and add corresponding keys to a vector
     void create_objects(size_t number, std::vector<ObjKey>& keys);
     /// Create a number of objects with keys supplied
-    void create_objects(const std::vector<ObjKey>& keys);
+    void create_objects(const std::vector<FieldValues>& values);
     /// Does the key refer to an object within the table?
     bool is_valid(ObjKey key) const noexcept
     {
@@ -690,13 +689,13 @@ private:
     {
         m_alloc.refresh_ref_translation();
     }
-    Spec m_spec;                                    // 1st slot in m_top
-    ClusterTree m_clusters;                         // 3rd slot in m_top
-    std::unique_ptr<ClusterTree> m_tombstones;      // 13th slot in m_top
-    TableKey m_key;                                 // 4th slot in m_top
-    Array m_index_refs;                             // 5th slot in m_top
-    Array m_opposite_table;                         // 7th slot in m_top
-    Array m_opposite_column;                        // 8th slot in m_top
+    Spec m_spec;                               // 1st slot in m_top
+    ClusterTree m_clusters;                    // 3rd slot in m_top
+    std::unique_ptr<ClusterTree> m_tombstones; // 13th slot in m_top
+    TableKey m_key;                            // 4th slot in m_top
+    Array m_index_refs;                        // 5th slot in m_top
+    Array m_opposite_table;                    // 7th slot in m_top
+    Array m_opposite_column;                   // 8th slot in m_top
     std::vector<std::unique_ptr<StringIndex>> m_index_accessors;
     ColKey m_primary_key_col;
     Replication* const* m_repl;
@@ -712,7 +711,16 @@ private:
     void erase_from_search_indexes(ObjKey key);
     void update_indexes(ObjKey key, const FieldValues& values);
     void clear_indexes();
+    // Interning/Enumeration and compression
+    size_t add_insert_enum_string(ColKey col_key, StringData value);
 
+public:
+    size_t search_enum_string(ColKey col_key, StringData value) const;
+    size_t get_num_unique_values(ColKey col_key) const;
+    StringData get_enum_string(ColKey col_key, size_t id) const;
+    bool is_null_enum_string(ColKey col_key, size_t id);
+
+private:
     // Migration support
     void migrate_column_info();
     bool verify_column_keys();
@@ -829,6 +837,10 @@ private:
     Type m_table_type = Type::TopLevel;
     uint64_t m_in_file_version_at_transaction_boundary = 0;
     AtomicLifeCycleCookie m_cookie;
+    // in-memory support for string interning (temporary)
+    class string_interner;
+    std::vector<std::unique_ptr<string_interner>> m_interners;
+
 
     static constexpr int top_position_for_spec = 0;
     static constexpr int top_position_for_columns = 1;
