@@ -195,7 +195,9 @@ functions:
               export DEVELOPER_DIR="${xcode_developer_dir}"
           fi
 
-          if [[ -n "${test_filter}" ]]; then
+          if [[ -n "${test_label}" ]]; then
+              TEST_FLAGS="-L ${test_label}"
+          elif [[ -n "${test_filter}" ]]; then
               TEST_FLAGS="-R ${test_filter}"
           fi
 
@@ -218,19 +220,25 @@ functions:
               [[ -d coverage_data ]] || mkdir coverage_data
               [[ -d coverage_binaries ]] || mkdir coverage_binaries
               export LLVM_PROFILE_FILE="$(pwd)/coverage_data/${task_name}-%p.profraw"
-              EXECUTABLE_PATH=$(find build -name ${test_executable_name} -type f)
-              EXECUTABLE_PATH=$(./evergreen/abspath.sh $EXECUTABLE_PATH)
+              EXECUTABLE_FILE="$(find build -name "${test_executable_name}" -type f)"
+              EXECUTABLE_PATH="$(./evergreen/abspath.sh "$EXECUTABLE_FILE")"
               if [[ -z "$EXECUTABLE_PATH" || ! -f "$EXECUTABLE_PATH" ]]; then
                 echo "Invalid executable path $EXECUTABLE_PATH"
                 exit 1
               fi
-              ln -s $EXECUTABLE_PATH coverage_binaries/${test_executable_name}
+              # The sym link may have been created by a previous task run
+              if [[ ! -f "coverage_binaries/${test_executable_name}" ]]; then
+                ln -s "$EXECUTABLE_PATH" "coverage_binaries/${test_executable_name}"
+              fi
           fi
 
           export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
+          if [[ -n "$UNITTEST_EVERGREEN_TEST_RESULTS" && -f "$UNITTEST_EVERGREEN_TEST_RESULTS" ]]; then
+              rm "$UNITTEST_EVERGREEN_TEST_RESULTS"
+          fi
           export UNITTEST_PROGRESS=1
           if [[ -n "${report_test_progress|}" ]]; then
-              export UNITTEST_PROGRESS=${report_test_progress|}
+              export UNITTEST_PROGRESS="${report_test_progress|}"
           fi
 
           if [[ -n "${run_with_encryption}" ]]; then
@@ -819,6 +827,19 @@ tasks:
       test_filter: SyncTests
       test_executable_name: "realm-sync-tests"
 
+- name: object-store-tests-local
+  tags: [ "test_suite_local_baas", "test_suite_remote_baas", "for_pull_requests" ]
+  exec_timeout_secs: 3600
+  commands:
+  - func: "compile"
+    vars:
+      target_to_build: ObjectStoreTests
+  - func: "run tests"
+    vars:
+      test_label: objstore-local
+      test_executable_name: "realm-object-store-tests"
+      verbose_test_output: true
+
 - name: object-store-tests-local-baas
   tags: [ "test_suite_local_baas", "for_pull_requests" ]
   exec_timeout_secs: 3600
@@ -832,12 +853,12 @@ tasks:
   - func: "wait for baas to start"
   - func: "run tests"
     vars:
-      test_filter: ObjectStoreTests
+      test_label: objstore-baas
       test_executable_name: "realm-object-store-tests"
       verbose_test_output: true
 
 # Default object store tests will use a remote host for baas
-- name: object-store-tests
+- name: object-store-tests-baas
   tags: [ "test_suite_remote_baas", "for_pull_requests" ]
   exec_timeout_secs: 3600
   commands:
@@ -850,7 +871,7 @@ tasks:
   - func: "wait for baas to start"
   - func: "run tests"
     vars:
-      test_filter: ObjectStoreTests
+      test_label: objstore-baas
       test_executable_name: "realm-object-store-tests"
       verbose_test_output: true
 
