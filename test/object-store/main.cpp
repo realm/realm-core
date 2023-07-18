@@ -169,6 +169,7 @@ public:
         try {
             if (!json_file.empty() && std::filesystem::exists(json_file)) {
                 std::ifstream f(json_file);
+                // Make sure the file was successfully opened and is not empty
                 if (f.is_open() && !f.eof()) {
                     nlohmann::json existing_data = nlohmann::json::parse(f);
                     auto results = existing_data.find("results");
@@ -183,7 +184,7 @@ public:
             // json parse error, ignore the entries
         }
         catch (std::exception) {
-            // unable to open/read file, overwrite if it exists
+            // unable to open/read file
         }
         for (const auto& [test_name, cur_result] : m_results) {
             auto to_millis = [](const auto& tp) -> double {
@@ -204,7 +205,7 @@ public:
         }
         auto result_file_obj = nlohmann::json{{"results", std::move(results_arr)}};
         m_stream << result_file_obj << std::endl;
-        if (!json_file.empty()) {
+        if (!json_file.empty() && std::filesystem::exists(json_file)) {
             // Delete the old results file
             std::filesystem::remove(json_file);
         }
