@@ -677,7 +677,6 @@ template <class T>
 std::pair<size_t, bool> Set<T>::insert(T value)
 {
     ensure_created();
-    update();
 
     if (value_is_null(value) && !m_nullable)
         throw InvalidArgument(ErrorCodes::PropertyNotNullable,
