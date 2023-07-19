@@ -212,8 +212,8 @@ public:
     {
         if (Base::should_update() || !(m_tree && m_tree->is_attached())) {
             bool attached = init_from_parent(true);
-            Base::update_content_version();
             REALM_ASSERT(attached);
+            Base::update_content_version();
         }
     }
 
@@ -1215,9 +1215,7 @@ void Lst<T>::insert(size_t ndx, T value)
 
     auto sz = size();
     CollectionBase::validate_index("insert()", ndx, sz + 1);
-
     ensure_created();
-
     if (Replication* repl = Base::get_replication()) {
         repl->list_insert(*this, ndx, value, sz);
     }

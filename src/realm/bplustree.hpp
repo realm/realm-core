@@ -190,7 +190,6 @@ public:
 
     bool init_from_parent()
     {
-        ;
         if (ref_type ref = m_parent->get_child_ref(m_ndx_in_parent)) {
             init_from_ref(ref);
             return true;
