@@ -1473,10 +1473,8 @@ TEST(Sync_ReadFailureSimulation)
             ClientServerFixture fixture(server_dir, test_context);
             fixture.set_client_side_error_rate(1, 1); // 100% chance of failure
             auto error_handler = [&](Status status, bool is_fatal) {
-                using sf = _impl::SimulatedFailure;
-                CHECK(status.has_extra_info<sf::ExtraInfo>());
-                CHECK_EQUAL(status.get_extra_info<sf::ExtraInfo>().failure_type,
-                            sf::FailureType::sync_client__read_head);
+                CHECK_EQUAL(status, ErrorCodes::RuntimeError);
+                CHECK_EQUAL(status.reason(), "Simulated failure during sync client websocket read");
                 CHECK_NOT(is_fatal);
                 client_side_read_did_fail = true;
                 fixture.stop();
@@ -1503,12 +1501,10 @@ TEST(Sync_FailingReadsOnClientSide)
         TEST_DIR(dir);
         ClientServerFixture fixture{dir, test_context};
         fixture.set_client_side_error_rate(5, 100); // 5% chance of failure
-        auto error_handler = [&](Status status, bool) {
-            using sf = _impl::SimulatedFailure;
-            if (CHECK(status.has_extra_info<sf::ExtraInfo>())) {
-                CHECK_EQUAL(status.get_extra_info<sf::ExtraInfo>().failure_type,
-                            sf::FailureType::sync_client__read_head);
-                CHECK_EQUAL(status, ErrorCodes::ConnectionClosed);
+        auto error_handler = [&](Status status, bool is_fatal) {
+            if (CHECK_EQUAL(status.reason(), "Simulated failure during sync client websocket read")) {
+                CHECK_EQUAL(status, ErrorCodes::RuntimeError);
+                CHECK_NOT(is_fatal);
                 fixture.cancel_reconnect_delay();
             }
         };

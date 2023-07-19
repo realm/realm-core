@@ -31,11 +31,6 @@ namespace realm {
 
 class REALM_NODISCARD Status {
 public:
-    class ExtraInfo {
-    public:
-        virtual ~ExtraInfo() = default;
-    };
-
     /*
      * This is the best way to construct a Status that represents a non-error condition.
      */
@@ -45,13 +40,13 @@ public:
      * You can construct a Status from anything that can construct a std::string_view.
      */
     template <typename Reason, std::enable_if_t<std::is_constructible_v<std::string_view, Reason>, int> = 0>
-    Status(ErrorCodes::Error code, Reason&& reason, std::unique_ptr<ExtraInfo> extra_info = nullptr)
-        : m_error(ErrorInfo::create(code, std::string{std::string_view{reason}}, std::move(extra_info)))
+    Status(ErrorCodes::Error code, Reason&& reason)
+        : m_error(ErrorInfo::create(code, std::string{std::string_view{reason}}))
     {
     }
 
-    Status(ErrorCodes::Error code, std::string&& reason, std::unique_ptr<ExtraInfo> extra_info = nullptr)
-        : m_error(ErrorInfo::create(code, std::move(reason), std::move(extra_info)))
+    Status(ErrorCodes::Error code, std::string&& reason)
+        : m_error(ErrorInfo::create(code, std::move(reason)))
     {
     }
 
@@ -69,35 +64,11 @@ public:
     inline ErrorCodes::Error code() const noexcept;
     inline std::string_view code_string() const noexcept;
 
-    bool is_same_as(const Status& other) const noexcept
-    {
-        return m_error == other.m_error;
-    }
-
     /*
      * This class is marked nodiscard so that we always handle errors. If there is a place where we need
      * to explicitly ignore an error, you can call this function, which does nothing, to satisfy the compiler.
      */
     void ignore() const noexcept {}
-
-    template <typename T>
-    bool has_extra_info() const noexcept
-    {
-        if (!m_error || !m_error->m_extra_info) {
-            return false;
-        }
-
-        return dynamic_cast<T*>(m_error->m_extra_info.get()) != nullptr;
-    }
-
-    template <typename T>
-    const T& get_extra_info() const noexcept
-    {
-        REALM_ASSERT(m_error);
-        REALM_ASSERT(m_error->m_extra_info);
-
-        return *dynamic_cast<T*>(m_error->m_extra_info.get());
-    }
 
 private:
     Status() = default;
@@ -107,10 +78,7 @@ private:
         const ErrorCodes::Error m_code;
         const std::string m_reason;
 
-        std::unique_ptr<ExtraInfo> m_extra_info;
-
-        static util::bind_ptr<ErrorInfo> create(ErrorCodes::Error code, std::string&& reason,
-                                                std::unique_ptr<ExtraInfo>&& extra_info);
+        static util::bind_ptr<ErrorInfo> create(ErrorCodes::Error code, std::string&& reason);
 
     protected:
         template <typename>
@@ -129,7 +97,7 @@ private:
         }
 
     private:
-        ErrorInfo(ErrorCodes::Error code, std::string&& reason, std::unique_ptr<ExtraInfo>&& extra_info);
+        ErrorInfo(ErrorCodes::Error code, std::string&& reason);
     };
 
     util::bind_ptr<ErrorInfo> m_error = {};

@@ -489,9 +489,8 @@ bool Connection::websocket_binary_message_received(util::Span<const char> data)
     using sf = SimulatedFailure;
     if (sf::check_trigger(sf::sync_client__read_head)) {
         close_due_to_client_side_error(
-            sf::make_simulated_failure_status(SimulatedFailure::FailureType::sync_client__read_head,
-                                              ErrorCodes::ConnectionClosed),
-            IsFatal{false}, ConnectionTerminationReason::read_or_write_error); // Throws
+            {ErrorCodes::RuntimeError, "Simulated failure during sync client websocket read"}, IsFatal{false},
+            ConnectionTerminationReason::read_or_write_error);
         return bool(m_websocket);
     }
 

@@ -46,16 +46,6 @@ public:
         _num_failure_types
     };
 
-    class ExtraInfo : public Status::ExtraInfo {
-    public:
-        ExtraInfo(FailureType failure_type)
-            : failure_type(failure_type)
-        {
-        }
-
-        FailureType failure_type;
-    };
-
     class OneShotPrimeGuard;
     class RandomPrimeGuard;
 
@@ -75,9 +65,6 @@ public:
     /// was defined during compilation. If REALM_ENABLE_SIMULATED_FAILURE was
     /// not defined, this function always return false.
     static bool check_trigger(FailureType) noexcept;
-
-    static Status make_simulated_failure_status(FailureType failure_type,
-                                                ErrorCodes::Error error_code = ErrorCodes::RuntimeError);
 
     /// Throws SimulatedFailure if check_trigger() returns true. The exception
     /// will be constructed with an error code equal to
@@ -195,11 +182,6 @@ inline bool SimulatedFailure::check_trigger(FailureType failure_type) noexcept
 #endif
 }
 
-inline Status SimulatedFailure::make_simulated_failure_status(FailureType failure_type, ErrorCodes::Error error_code)
-{
-    return Status(error_code, "SimulatedFailure", std::make_unique<ExtraInfo>(failure_type));
-}
-
 inline void SimulatedFailure::trigger(FailureType failure_type)
 {
     if (check_trigger(failure_type))
@@ -224,8 +206,8 @@ inline void SimulatedFailure::set_thread_local(bool tl)
 #endif
 }
 
-inline SimulatedFailure::SimulatedFailure(FailureType type)
-    : RuntimeError(Status{ErrorCodes::RuntimeError, "SimulatedFailure", std::make_unique<ExtraInfo>(type)})
+inline SimulatedFailure::SimulatedFailure(FailureType)
+    : RuntimeError(Status{ErrorCodes::RuntimeError, "SimulatedFailure"})
 {
 }
 
