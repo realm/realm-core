@@ -97,23 +97,27 @@ create_coverage_target(generate-coverage ObjectStoreTests)
 # add_bundled_test(ObjectStoreTests)
 add_labeled_test(ObjectStoreTests-local objstore-local ObjectStoreTests "~[baas]")
 
-# Keep the OBJ_STORE_TESTS variable in the block scope
-set(OBJSTORE_TESTS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/object-store-tests.lst")
-# Rebuild cmake config if the tests file changes
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${OBJSTORE_TESTS_FILE})
-# Extract the list of entries from the tests file
-parse_list_file("${OBJSTORE_TESTS_FILE}" OBJSTORE_TEST_LIST)
-# Convert the list from tests file, if any, to object store tests for each line
-if (OBJSTORE_TEST_LIST)
-    set(_test_cnt 1)
-    foreach(_test_item ${OBJSTORE_TEST_LIST})
-        message(STATUS "Adding ObjectStoreTests-${_test_cnt}: 'realm-object-store-tests ${_test_item}'")
-        separate_arguments(_test_args NATIVE_COMMAND "${_test_item}")
-        add_labeled_test("ObjectStoreTests-${_test_cnt}" "objstore-baas" ObjectStoreTests ${_test_args})
-        MATH(EXPR _test_cnt "${_test_cnt}+1")
-    endforeach()
-else()
-    add_labeled_test(ObjectStoreTests-baas objstore-baas ObjectStoreTests "[baas]")
+# Baas server and custom tests are only allowed when REALM_ENABLE_AUTH_TESTS is set
+if(REALM_ENABLE_SYNC)
+    if(REALM_ENABLE_AUTH_TESTS)
+        set(OBJSTORE_TESTS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/object-store-tests.lst")
+        # Rebuild cmake config if the tests file changes
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${OBJSTORE_TESTS_FILE})
+        # Extract the list of entries from the tests file
+        parse_list_file("${OBJSTORE_TESTS_FILE}" OBJSTORE_TEST_LIST)
+        # Convert the list from tests file, if any, to object store tests for each line
+        if (OBJSTORE_TEST_LIST)
+            set(_test_cnt 1)
+            foreach(_test_item ${OBJSTORE_TEST_LIST})
+                message(STATUS "Adding ObjectStoreTests-${_test_cnt}: 'realm-object-store-tests ${_test_item}'")
+                separate_arguments(_test_args NATIVE_COMMAND "${_test_item}")
+                add_labeled_test("ObjectStoreTests-${_test_cnt}" "objstore-baas" ObjectStoreTests ${_test_args})
+                MATH(EXPR _test_cnt "${_test_cnt}+1")
+            endforeach()
+        else()
+            add_labeled_test(ObjectStoreTests-baas objstore-baas ObjectStoreTests "[baas]")
+        endif()
+    endif()
 endif()
 
 if(REALM_ENABLE_SYNC)

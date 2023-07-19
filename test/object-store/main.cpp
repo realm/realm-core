@@ -180,10 +180,10 @@ public:
                 }
             }
         }
-        catch (nlohmann::json::exception) {
+        catch (nlohmann::json::exception&) {
             // json parse error, ignore the entries
         }
-        catch (std::exception) {
+        catch (std::exception&) {
             // unable to open/read file
         }
         for (const auto& [test_name, cur_result] : m_results) {
