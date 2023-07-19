@@ -119,8 +119,7 @@ public:
         const char* encryption_key = nullptr;
     };
 
-    struct Retry {
-    };
+    struct Retry {};
 
     /// \brief Attach this allocator to the specified file.
     ///
@@ -152,6 +151,12 @@ public:
     /// \throw FileAccessError
     /// \throw SlabAlloc::Retry
     ref_type attach_file(const std::string& file_path, Config& cfg, util::WriteObserver* write_observer = nullptr);
+
+    /// @brief Expand or contract file
+    /// @param ref_type ref to the top array
+    /// @param cfg configuration, see attach_file
+    /// \return true if the file size was changed
+    bool align_filesize_for_mmap(size_t ref_type, Config& cfg);
 
     /// If the attached file is in streaming form, convert it to normal form.
     ///

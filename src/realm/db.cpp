@@ -383,8 +383,8 @@ struct alignas(8) DB::SharedInfo {
     /// compromize version agreement checking.
     uint16_t shared_info_version = g_shared_info_version; // Offset 6
 
-    uint16_t durability;           // Offset 8
-    uint16_t free_write_slots = 0; // Offset 10
+    uint16_t durability;                                  // Offset 8
+    uint16_t free_write_slots = 0;                        // Offset 10
 
     /// Number of participating shared groups
     uint32_t num_participants = 0; // Offset 12
@@ -396,7 +396,7 @@ struct alignas(8) DB::SharedInfo {
     /// Pid of process initiating the session, but only if that process runs
     /// with encryption enabled, zero otherwise. This was used to prevent
     /// multiprocess encryption until support for that was added.
-    uint64_t session_initiator_pid = 0; // Offset 24
+    uint64_t session_initiator_pid = 0;       // Offset 24
 
     std::atomic<uint64_t> number_of_versions; // Offset 32
 
@@ -418,14 +418,14 @@ struct alignas(8) DB::SharedInfo {
     /// Cleared by the daemon when it decides to exit.
     uint8_t daemon_ready = 0; // Offset 42
 
-    uint8_t filler_1; // Offset 43
+    uint8_t filler_1;         // Offset 43
 
     /// Stores a history schema version (as returned by
     /// Replication::get_history_schema_version()). Must match across all
     /// session participants.
-    uint16_t history_schema_version; // Offset 44
+    uint16_t history_schema_version;                 // Offset 44
 
-    uint16_t filler_2; // Offset 46
+    uint16_t filler_2;                               // Offset 46
 
     InterprocessMutex::SharedPart shared_writemutex; // Offset 48
     InterprocessMutex::SharedPart shared_controlmutex;
@@ -457,8 +457,8 @@ struct alignas(8) DB::SharedInfo {
 DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv)
     : size_of_mutex(sizeof(shared_writemutex))
     , size_of_condvar(sizeof(room_to_write))
-    , shared_writemutex()   // Throws
-    , shared_controlmutex() // Throws
+    , shared_writemutex()                     // Throws
+    , shared_controlmutex()                   // Throws
 {
     durability = static_cast<uint16_t>(dura); // durability level is fixed from creation
     REALM_ASSERT(!util::int_cast_has_overflow<decltype(history_type)>(ht + 0));
@@ -945,7 +945,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
     int target_file_format_version;
     int stored_hist_schema_version = -1; // Signals undetermined
 
-    int retries_left = 10; // number of times to retry before throwing exceptions
+    int retries_left = 10;               // number of times to retry before throwing exceptions
     // in case there is something wrong with the .lock file... the retries allows
     // us to pick a new lockfile initializer in case the first one crashes without
     // completing the initialization
@@ -1306,7 +1306,18 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                 }
 
                 alloc.convert_from_streaming_form(top_ref);
-
+                try {
+                    bool file_changed_size = alloc.align_filesize_for_mmap(top_ref, cfg);
+                    if (file_changed_size) {
+                        // we need to re-establish proper mappings after file size change.
+                        // we do this simply by aborting and starting all over:
+                        continue;
+                    }
+                }
+                // something went wrong. Retry.
+                catch (SlabAlloc::Retry&) {
+                    continue;
+                }
                 if (options.encryption_key) {
 #ifdef _WIN32
                     uint64_t pid = GetCurrentProcessId();
@@ -1401,7 +1412,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
             fug_1.release(); // Do not unmap
             fcg.release();   // Do not close
         }
-        ulg.release(); // Do not release shared lock
+        ulg.release();       // Do not release shared lock
         break;
     }
 
@@ -2457,7 +2468,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     REALM_ASSERT(oldest_version <= new_version);
 #if REALM_METRICS
     transaction.update_num_objects();
-#endif // REALM_METRICS
+#endif                                                                                   // REALM_METRICS
 
     GroupWriter out(transaction, Durability(info->durability), m_marker_observer.get()); // Throws
     out.set_versions(new_version, top_refs, any_new_unreachables);

@@ -1112,6 +1112,8 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
                 top.add(RefOrTagged::make_tagged(history_info.version));
                 top.add(RefOrTagged::make_tagged(history_info.sync_file_id));
                 top_size = s_group_max_size;
+                // ^ this is too large, since the evacuation point entry is not there:
+                // (but the code below is self correcting)
             }
         }
         top_ref = out_2.get_ref_of_next_array();
@@ -1142,6 +1144,8 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
     // footer is aligned to the end of a page
     if (pad_for_encryption) {
 #if REALM_ENABLE_ENCRYPTION
+        // this seems wrong - it aligns the START of the footer to the page boundary,
+        // but what is needed is to align the END of the footer to the page boundary?
         size_t unrounded_size = final_file_size + sizeof(SlabAlloc::StreamingFooter);
         size_t rounded_size = round_up_to_page_size(unrounded_size);
         if (rounded_size != unrounded_size) {
