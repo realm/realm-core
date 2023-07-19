@@ -4187,6 +4187,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(init_sync_manager.app(), "default");
         config2.schema = Schema{shared_class};
+
         auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
         test_reset->make_local_changes([&](SharedRealm local) {
             advance_and_notify(*local);
@@ -5171,6 +5172,12 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
             ->run();
     }
     SECTION("Verify copy logic for collections in mixed that contain nested collections and scalar types.") {
+        Results results;
+        Object object;
+        List list_listener, nlist_setup_listener, nlist_local_listener;
+        CollectionChangeSet list_changes, nlist_setup_changes, nlist_local_changes;
+        NotificationToken list_token, nlist_setup_token, nlist_local_token;
+
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(init_sync_manager.app(), "default");
         config2.schema = config.schema;
@@ -5199,6 +5206,31 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 list.add(Mixed{"Local"});
                 auto nlist = list.get_list(0);
                 nlist.add(Mixed{"Local"});
+            })
+            ->on_post_local_changes([&](SharedRealm realm) {
+                TableRef table = get_table(*realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any_mixed");
+                list_listener = List{realm, obj, col};
+                REQUIRE(list_listener.size() == 4);
+                list_token = list_listener.add_notification_callback([&](CollectionChangeSet changes) {
+                    list_changes = std::move(changes);
+                });
+                auto nlist_setup = list_listener.get_list(1);
+                REQUIRE(nlist_setup.size() == 1);
+                REQUIRE(nlist_setup.get_any(0) == Mixed{"Setup"});
+                nlist_setup_listener = nlist_setup;
+                nlist_setup_listener.add_notification_callback([&](CollectionChangeSet changes) {
+                    nlist_setup_changes = std::move(changes);
+                });
+                auto nlist_local = list_listener.get_list(0);
+                REQUIRE(nlist_local.size() == 1);
+                REQUIRE(nlist_local.get_any(0) == Mixed{"Local"});
+                nlist_local_listener = nlist_local;
+                nlist_local_listener.add_notification_callback([&](CollectionChangeSet changes) {
+                    nlist_local_changes = std::move(changes);
+                });
             })
             ->make_remote_changes([&](SharedRealm remote_realm) {
                 advance_and_notify(*remote_realm);
@@ -5233,6 +5265,14 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     REQUIRE(mixed_remote.get_string() == "Remote");
                     REQUIRE(nlist_remote.get_any(0).get_string() == "Remote");
                     REQUIRE(nlist_setup.get_any(0).get_string() == "Setup");
+                    // notifications
+                    REQUIRE(list_listener.is_valid());
+                    REQUIRE_INDICES(list_changes.deletions, 0, 3);  // removed local nlist and "Local"
+                    REQUIRE_INDICES(list_changes.insertions, 0, 3); // inserted remote nlist "Remote"
+                    REQUIRE(nlist_local_changes.collection_root_was_deleted);
+                    REQUIRE(!nlist_setup_changes.collection_root_was_deleted);
+                    REQUIRE_INDICES(nlist_setup_changes.insertions);
+                    REQUIRE_INDICES(nlist_setup_changes.deletions);
                 }
                 else {
                     List list{local_realm, obj, col};
@@ -5253,6 +5293,16 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     REQUIRE(nlist_remote.get_any(0).get_string() == "Remote");
                     REQUIRE(nlist_local.get_any(0).get_string() == "Local");
                     REQUIRE(nlist_setup.get_any(0).get_string() == "Setup");
+                    // notifications
+                    REQUIRE(list_listener.is_valid());
+                    REQUIRE_INDICES(list_changes.deletions);        // nothing deleted
+                    REQUIRE_INDICES(list_changes.insertions, 1, 5); // inserted remote nlist and "Remote"
+                    REQUIRE(!nlist_local_changes.collection_root_was_deleted);
+                    REQUIRE_INDICES(nlist_local_changes.insertions);
+                    REQUIRE_INDICES(nlist_local_changes.deletions);
+                    REQUIRE(!nlist_setup_changes.collection_root_was_deleted);
+                    REQUIRE_INDICES(nlist_setup_changes.insertions);
+                    REQUIRE_INDICES(nlist_setup_changes.deletions);
                 }
             })
             ->run();

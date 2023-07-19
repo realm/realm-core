@@ -2129,11 +2129,15 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
             if (collection->get_collection_type() == CollectionType::List) {
                 auto list_of_mixed = dynamic_cast<Lst<Mixed>*>(collection.get());
                 size_t ndx = list_of_mixed->find_key(mpark::get<int64_t>(index));
+                if (ndx == realm::not_found) {
+                    return {Mixed{}, PathElement{}}; // FIXME: test this
+                }
                 return {list_of_mixed->get(ndx), PathElement(ndx)};
             }
             else {
                 std::string key = mpark::get<std::string>(index);
                 auto ref = dynamic_cast<Dictionary*>(collection.get())->get(key);
+                // FIXME: what happens if Dictionary::get(key) is not found and throws?
                 return {ref, key};
             }
         };
