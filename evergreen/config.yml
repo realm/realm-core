@@ -827,7 +827,8 @@ tasks:
       test_filter: SyncTests
       test_executable_name: "realm-sync-tests"
 
-- name: object-store-tests-local
+# These are local object store tests; baas is not started, however some use the sync server
+- name: object-store-tests
   tags: [ "test_suite_local_baas", "test_suite_remote_baas", "for_pull_requests" ]
   exec_timeout_secs: 3600
   commands:
@@ -840,7 +841,8 @@ tasks:
       test_executable_name: "realm-object-store-tests"
       verbose_test_output: true
 
-- name: object-store-tests-local-baas
+# These are baas object store tests that run against baas running locally
+- name: local-baas-integration-tests
   tags: [ "test_suite_local_baas", "for_pull_requests" ]
   exec_timeout_secs: 3600
   commands:
@@ -857,8 +859,8 @@ tasks:
       test_executable_name: "realm-object-store-tests"
       verbose_test_output: true
 
-# Default object store tests will use a remote host for baas
-- name: object-store-tests-baas
+# These are baas object store tests that run against baas running on a remote host
+- name: baas-integration-tests
   tags: [ "test_suite_remote_baas", "for_pull_requests" ]
   exec_timeout_secs: 3600
   commands:
