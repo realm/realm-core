@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <vector>
+#include <set>
 
 #include <realm/array_integer_tpl.hpp>
 #include <realm/impl/destroy_guard.hpp>
@@ -27,6 +28,149 @@ using namespace realm;
 Mixed ArrayInteger::get_any(size_t ndx) const
 {
     return Mixed(get(ndx));
+}
+
+bool ArrayInteger::try_compress()
+{
+    std::vector<int64_t> values;
+    std::vector<size_t> indices;
+    if (!m_is_compressed && try_to_compress_array(values, indices)) {
+        m_is_compressed = true;
+        size_t i{0};
+        // array of values
+        for (auto& value : values)
+            write_compressed_value(m_compressed_value_width, m_compressed_values, i++, value);
+        i = 0;
+        // array of indices
+        for (auto& index : indices)
+            write_compressed_value(m_compressed_index_width, m_compressed_indices, i++, index);
+
+        return true;
+    }
+    return false;
+}
+
+bool ArrayInteger::try_to_compress_array(std::vector<int64_t>& values, std::vector<size_t>& indices)
+{
+    std::set<int64_t> s;
+    const auto sz = size();
+    indices.reserve(sz);
+    for (size_t i = 0; i < sz; ++i) {
+        auto item = get(i);
+        indices.push_back(item);
+        s.insert(item);
+    }
+    values.reserve(s.size());
+    for (const auto& v : s) {
+        values.push_back(v);
+    }
+    for (auto& v : indices) {
+        auto pos = std::lower_bound(values.begin(), values.end(), v);
+        v = std::distance(values.begin(), pos);
+    }
+    auto max = std::max_element(values.begin(), values.end());
+    auto compressed_value_width = bit_width(*max);
+    auto compressed_index_width = bit_width(indices.size() - 1);
+    auto compressed_values_size = compressed_value_width * values.size();
+    auto compressed_indices_size = compressed_index_width * indices.size();
+    // auto total_compressed_size = compressed_values_size + compressed_indices_size;
+    // comment this check for now in order to force compression (needed for testing)
+    // if(total_compressed_size < bit_width(*max)*size() )
+    {
+        m_compressed_value_width = compressed_value_width;
+        m_compressed_index_width = compressed_index_width;
+        m_compressed_values_size = compressed_values_size;
+        m_compressed_indices_size = compressed_indices_size;
+        m_compressed_values = m_alloc.alloc(m_compressed_values_size);
+        m_compressed_indices = m_alloc.alloc(m_compressed_indices_size);
+        return true;
+    }
+    return false;
+}
+
+bool ArrayInteger::decompress()
+{
+    if (m_is_compressed) {
+        // decompress
+
+        // this is needed right now because I am keeping the elements underneath in the array
+        // since I need to verify that all the APIs for finding and in general querying are
+        // working
+        clear();
+        const auto sz = m_compressed_indices_size / m_compressed_index_width;
+        for (size_t i = 0; i < sz; ++i) {
+            auto index = read_compressed_value(m_compressed_index_width, m_compressed_indices, i);
+            auto value = read_compressed_value(m_compressed_value_width, m_compressed_values, index);
+            Array::insert(i, value);
+        }
+        m_is_compressed = false;
+
+        return true;
+    }
+    return false;
+}
+
+int64_t ArrayInteger::get_compressed_value(size_t ndx) const
+{
+    const auto sz = m_compressed_indices_size / m_compressed_index_width;
+    for (size_t i = 0; i < sz; ++i) {
+        // this can be improved, doing binary search.
+        auto index = read_compressed_value(m_compressed_index_width, m_compressed_indices, i);
+        if (ndx == i) {
+            return read_compressed_value(m_compressed_value_width, m_compressed_values, index);
+        }
+    }
+    return realm::not_found;
+}
+
+void ArrayInteger::write_compressed_value(size_t width, MemRef mem_ref, size_t i, int_fast64_t value)
+{
+    auto addr = mem_ref.get_addr();
+    if (width == 1)
+        set_direct<1>(addr, i, value);
+
+    else if (width == 2)
+        set_direct<2>(addr, i, value);
+
+    else if (width == 4)
+        set_direct<4>(addr, i, value);
+
+    else if (width == 8)
+        set_direct<8>(addr, i, value);
+
+    else if (width == 16)
+        set_direct<16>(addr, i, value);
+
+    else if (width == 32)
+        set_direct<32>(addr, i, value);
+
+    else if (width == 64)
+        set_direct<64>(addr, i, value);
+}
+
+int64_t ArrayInteger::read_compressed_value(size_t width, MemRef mem_ref, size_t i) const
+{
+    auto addr = mem_ref.get_addr();
+    if (width == 1)
+        return get_direct<1>(addr, i++);
+
+    else if (width == 2)
+        return get_direct<2>(addr, i++);
+
+    else if (width == 4)
+        return get_direct<4>(addr, i++);
+
+    else if (width == 8)
+        return get_direct<8>(addr, i++);
+
+    else if (width == 16)
+        return get_direct<16>(addr, i++);
+
+    else if (width == 32)
+        return get_direct<32>(addr, i++);
+
+    REALM_ASSERT(width == 64);
+    return get_direct<64>(addr, i++);
 }
 
 Mixed ArrayIntNull::get_any(size_t ndx) const

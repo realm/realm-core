@@ -29,16 +29,25 @@ namespace realm {
 class ArrayInteger : public Array, public ArrayPayload {
 public:
     using value_type = int64_t;
-
-    using Array::add;
     using Array::find_first;
-    using Array::get;
-    using Array::insert;
-    using Array::move;
-    using Array::set;
 
     explicit ArrayInteger(Allocator&) noexcept;
     ~ArrayInteger() noexcept override {}
+
+    // this should not be here.
+    void destroy_deep() noexcept
+    {
+        if (m_is_compressed) {
+            Array::destroy(m_compressed_values, m_alloc);
+            Array::destroy(m_compressed_indices, m_alloc);
+            m_compressed_values_size = 0;
+            m_compressed_indices_size = 0;
+            m_compressed_value_width = 0;
+            m_compressed_index_width = 0;
+            m_is_compressed = false;
+        }
+        Array::destroy_deep();
+    }
 
     static value_type default_value(bool)
     {
@@ -64,12 +73,66 @@ public:
     }
     Mixed get_any(size_t ndx) const override;
 
+    bool try_compress();
+    bool decompress();
+
+    // implement parent interface in order to deal with compressed arrays
+    inline int64_t get(size_t ndx) const noexcept
+    {
+        if (m_is_compressed) {
+            return get_compressed_value(ndx);
+        }
+        return Array::get(ndx);
+    }
+    inline void set(size_t ndx, int64_t value)
+    {
+        if (m_is_compressed)
+            decompress();
+        Array::set(ndx, value);
+    }
+    inline void insert(size_t ndx, int_fast64_t value)
+    {
+        if (m_is_compressed)
+            decompress();
+        Array::insert(ndx, value);
+    }
+    inline void add(int_fast64_t value)
+    {
+        if (m_is_compressed)
+            decompress();
+        Array::add(value);
+    }
+    inline void move(Array& dst, size_t ndx)
+    {
+        if (m_is_compressed)
+            decompress();
+        Array::move(dst, ndx);
+    }
+
     bool is_null(size_t) const
     {
         return false;
     }
     template <class cond, class Callback>
     bool find(value_type value, size_t start, size_t end, QueryStateBase* state, Callback callback) const;
+
+private:
+    void write_compressed_value(size_t, MemRef, size_t, int_fast64_t);
+    int64_t read_compressed_value(size_t, MemRef, size_t) const;
+    int64_t get_compressed_value(size_t ndx) const;
+    // return true or false whether the compression is actually going to shrink the
+    // memory footprint for this array or no.
+    bool try_to_compress_array(std::vector<int64_t>&, std::vector<size_t>&);
+
+    // TODO this should be moved inside the Node class and only populated by ArrayInteger
+    //  and ArrayIntNull
+    bool m_is_compressed{false};
+    MemRef m_compressed_values;
+    MemRef m_compressed_indices;
+    size_t m_compressed_value_width{0};
+    size_t m_compressed_index_width{0};
+    size_t m_compressed_values_size{0};
+    size_t m_compressed_indices_size{0};
 };
 
 class ArrayIntNull : public Array, public ArrayPayload {
