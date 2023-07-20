@@ -209,13 +209,18 @@ public:
 
     /// Detach from a previously attached file or buffer.
     ///
+    /// if 'keep_file_attached' is set, only memory mappings will
+    /// be closed, but the file descriptor remains valid for further
+    /// operations on the file. Caller must close the file explicitly
+    /// to bring the allocator to a fully detached state.
+    ///
     /// This function does not reset free space tracking. To
     /// completely reset the allocator, you must also call
     /// reset_free_space_tracking().
     ///
     /// This function has no effect if the allocator is already in the
     /// detached state (idempotency).
-    void detach() noexcept;
+    void detach(bool keep_file_attached = false) noexcept;
 
     class DetachGuard;
 

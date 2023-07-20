@@ -130,7 +130,7 @@ SlabAlloc::Slab::~Slab()
         delete[] addr;
 }
 
-void SlabAlloc::detach() noexcept
+void SlabAlloc::detach(bool keep_file_open) noexcept
 {
     delete[] m_ref_translation_ptr;
     m_ref_translation_ptr.store(nullptr);
@@ -150,7 +150,8 @@ void SlabAlloc::detach() noexcept
             m_data = 0;
             m_mappings.clear();
             m_youngest_live_version = 0;
-            m_file.close();
+            if (!keep_file_open)
+                m_file.close();
             break;
         case attach_Heap:
             m_data = 0;
@@ -710,6 +711,12 @@ bool SlabAlloc::align_filesize_for_mmap(ref_type top_ref, Config& cfg)
     }
     size_t expected_size = (size_t)-1;
     size_t size = m_file.get_size();
+
+    // It is not safe to change the size of a file on streaming form, since the footer
+    // must remain available and remain at the very end of the file.
+    REALM_ASSERT(!is_file_on_streaming_form());
+
+    // check if online compaction allows us to shrink the file:
     if (top_ref) {
         // Get the expected file size by looking up logical file size stored in top array
         constexpr size_t max_top_size = (Group::s_file_size_ndx + 1) * 8 + sizeof(Header);
@@ -729,7 +736,9 @@ bool SlabAlloc::align_filesize_for_mmap(ref_type top_ref, Config& cfg)
 
     // Check if we can shrink the file
     if (cfg.session_initiator && expected_size < size && !cfg.read_only) {
+        detach(true); // keep m_file open
         m_file.resize(expected_size);
+        m_file.close();
         size = expected_size;
         return true;
     }
@@ -747,7 +756,9 @@ bool SlabAlloc::align_filesize_for_mmap(ref_type top_ref, Config& cfg)
             // done to ensure well defined behavior for memory mappings. It does not matter,
             // that the free space management isn't informed
             size = round_up_to_page_size(size);
+            detach(true); // keep m_file open
             m_file.prealloc(size);
+            m_file.close();
             return true;
         }
         else {
@@ -836,7 +847,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
         note_reader_end(this);
     });
 
-    size_t expected_size = size_t(-1);
     try {
         // we'll read header and (potentially) footer
         File::Map<char> map_header(m_file, File::access_ReadOnly, sizeof(Header), 0, m_write_observer);
