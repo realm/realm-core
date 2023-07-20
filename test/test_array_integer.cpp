@@ -31,6 +31,33 @@
 using namespace realm;
 using namespace realm::test_util;
 
+ONLY(Test_ArrayInt_compression)
+{
+    ArrayInteger a(Allocator::get_default());
+    a.create();
+
+    a.add(10);
+    a.add(5);
+    a.add(5);
+    a.add(10);
+    a.add(15);
+    CHECK(a.try_compress());
+    CHECK(a.get(0) == 10);
+    CHECK(a.get(1) == 5);
+    CHECK(a.get(2) == 5);
+    CHECK(a.get(3) == 10);
+    CHECK(a.get(4) == 15);
+    a.add(20); // this decompresses all
+    CHECK(a.get(5) == 20);
+    CHECK(a.try_compress());
+    CHECK(a.get(0) == 10);
+    CHECK(a.get(1) == 5);
+    CHECK(a.get(2) == 5);
+    CHECK(a.get(3) == 10);
+    CHECK(a.get(4) == 15);
+    CHECK(a.get(5) == 20);
+    a.destroy_deep();
+}
 
 TEST(ArrayIntNull_SetNull)
 {
