@@ -38,7 +38,7 @@ while getopts "w:u:d:b:vh" opt; do
         u) BAAS_USER="${OPTARG}";;
         d) FILE_DEST_DIR="${OPTARG}";;
         b) BAAS_BRANCH="${OPTARG}";;
-        v) VERBOSE="-v";;
+        v) VERBOSE="yes";;
         h) usage 0;;
         *) usage 1;;
     esac
@@ -155,12 +155,15 @@ scp "${SSH_OPTIONS[@]}" "${EVERGREEN_PATH}/setup_baas_host.sh" "${SSH_USER}:${FI
 scp "${SSH_OPTIONS[@]}" "${EVERGREEN_PATH}/install_baas.sh" "${SSH_USER}:${FILE_DEST_DIR}/"
 
 echo "Starting remote baas with branch/commit: '${BAAS_BRANCH}'"
-OPT_BAAS_BRANCH=
+SETUP_BAAS_OPTS=()
 if [[ -n "${BAAS_BRANCH}" ]]; then
-    OPT_BAAS_BRANCH=("-b" "${BAAS_BRANCH}")
+    SETUP_BAAS_OPTS=("-b" "${BAAS_BRANCH}")
+fi
+if [[ -n "${VERBOSE}" ]]; then
+    SETUP_BAAS_OPTS+=("-v")
 fi
 
 # Run the setup baas host script and provide the location of the baas host vars script
 # Also sets up a forward tunnel for port 9090 through the ssh connection to the baas remote host
 echo "Running setup script (with forward tunnel to 127.0.0.1:9090)"
-ssh "${SSH_OPTIONS[@]}" -L 9090:127.0.0.1:9090 "${SSH_USER}" "${FILE_DEST_DIR}/setup_baas_host.sh" "${VERBOSE}" "${OPT_BAAS_BRANCH[@]}" "${FILE_DEST_DIR}/baas_host_vars.sh"
+ssh "${SSH_OPTIONS[@]}" -L 9090:127.0.0.1:9090 "${SSH_USER}" "${FILE_DEST_DIR}/setup_baas_host.sh" "${SETUP_BAAS_OPTS[@]}" "${FILE_DEST_DIR}/baas_host_vars.sh"

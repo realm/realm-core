@@ -108,7 +108,7 @@ if(REALM_ENABLE_SYNC)
         # Convert the list from tests file, if any, to object store tests for each line
         if (OBJSTORE_TEST_LIST)
             # Copy the tests file to the build directory to indicate custom tests are set
-            file(COPY ${OBJSTORE_TESTS_FILE} DESTINATION "${CMAKE_BINARY_DIR}/objstore-tests.do-not-commit")
+            file(COPY ${OBJSTORE_TESTS_FILE} DESTINATION ${CMAKE_BINARY_DIR})
             set(_test_cnt 1)
             foreach(_test_item ${OBJSTORE_TEST_LIST})
                 message(STATUS "Adding ObjectStoreTests-${_test_cnt}: 'realm-object-store-tests ${_test_item}'")

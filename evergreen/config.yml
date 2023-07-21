@@ -147,12 +147,12 @@ functions:
           # Fail the test if local object store tests are defined and this is not a patch build
           if [[ -f "build/objstore-tests.do-not-commit" ]]; then
               if [[ -z "${is_patch}" ]]; then
-                echo "ERROR: Found custom object store tests for non-patch build" 1>&2
-                echo "- Revert test/object-store/objstore-tests.do-not-commit and recommit" 1>&2
+                echo "ERROR: Found custom object store tests for non-patch build"
+                echo "- Revert test/object-store/objstore-tests.do-not-commit and recommit"
                 exit 1
               else
-                echo "WARNING: Custom object store tests are configured for this patch build" 1>&2
-                echo "- Revert test/object-store/objstore-tests.do-not-commit before merging PR" 1>&2
+                echo "WARNING: Custom object store tests are configured for this patch build"
+                echo "- Revert test/object-store/objstore-tests.do-not-commit before merging PR"
               fi
           fi
 
@@ -529,7 +529,8 @@ functions:
         fi
 
         # Run the setup_baas_host_local.sh script to configure and run baas on the remote host
-        ./evergreen/setup_baas_host_local.sh -v -w ./baas-work-dir -u $BAAS_USER $OPT_BAAS_BRANCH ./baas_host_vars.sh ./.baas_ssh_key 2>&1 | tee install_baas_output.log
+        # Add -v to this command for verbose script logging
+        ./evergreen/setup_baas_host_local.sh -w ./baas-work-dir -u $BAAS_USER $OPT_BAAS_BRANCH ./baas_host_vars.sh ./.baas_ssh_key 2>&1 | tee install_baas_output.log
 
   "launch local baas":
   - command: shell.exec
