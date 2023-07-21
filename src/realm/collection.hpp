@@ -97,16 +97,18 @@ public:
     virtual StablePath get_stable_path() const = 0;
 
     struct QueryCtrlBlock {
-        QueryCtrlBlock(Path& p, Allocator& a, bool is_from_list)
+        QueryCtrlBlock(Path& p, const Table& table, bool is_from_list)
             : path(p)
             , from_list(is_from_list)
-            , alloc(a)
+            , alloc(table.get_alloc())
+            , group(table.get_parent_group())
         {
         }
         Path& path;
         std::set<Mixed> matches;
         bool from_list;
         Allocator& alloc;
+        Group* group;
     };
     static void get_any(QueryCtrlBlock&, Mixed, size_t);
 };

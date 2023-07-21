@@ -330,7 +330,7 @@ SizeOperator<int64_t> Columns<Dictionary>::size()
 
 void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
 {
-    Collection::QueryCtrlBlock ctrl(m_path, get_base_table()->get_alloc(), !m_path_only_unary_keys);
+    Collection::QueryCtrlBlock ctrl(m_path, *get_base_table(), !m_path_only_unary_keys);
 
     if (links_exist()) {
         REALM_ASSERT(!m_leaf);

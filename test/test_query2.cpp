@@ -5737,7 +5737,6 @@ TEST(Query_Dictionary)
     CHECK_EQUAL(tv.size(), 5);
 }
 
-#if 0 // Reenable when we get support for indexes in collections
 TEST(Query_DictionaryTypedLinks)
 {
     Group g;
@@ -5775,7 +5774,6 @@ TEST(Query_DictionaryTypedLinks)
     cnt = person->query("data.Pet.Parent.Name == 'Fido'").count();
     CHECK_EQUAL(cnt, 1);
 }
-#endif
 
 TEST(Query_TypeOfValue)
 {
