@@ -9,7 +9,7 @@
 * None.
 
 ### Breaking changes
-* None.
+* Remove App::Config::local_app_[name|version] parameters. They were not used by the server and were not needed internally also.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.

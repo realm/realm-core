@@ -307,8 +307,6 @@ void set_app_config_defaults(app::App::Config& app_config,
         app_config.device_info.bundle_id = "Bundle Id";
     if (app_config.app_id.empty())
         app_config.app_id = "app_id";
-    if (!app_config.local_app_version)
-        app_config.local_app_version.emplace("A Local App Version");
 }
 
 // MARK: - TestAppSession
