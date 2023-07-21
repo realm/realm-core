@@ -219,6 +219,13 @@ SharedApp App::get_shared_app(const Config& config, const SyncClientConfig& sync
         app = std::make_shared<App>(config);
         app->configure(sync_client_config);
     }
+    else {
+        auto&& scc = app->sync_manager()->config();
+        if (scc.metadata_mode != sync_client_config.metadata_mode)
+            throw InvalidArgument("Metadata mode doesn't match the one in cached app");
+        if (scc.base_file_path != sync_client_config.base_file_path)
+            throw InvalidArgument("Base file path doesn't match the one in cached app");
+    }
     return app;
 }
 

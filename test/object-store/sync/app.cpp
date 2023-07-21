@@ -5251,6 +5251,7 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     auto app1_4 = App::get_shared_app(config2, sync_config);
     auto app1_5 = App::get_cached_app(config1.app_id);
 
+    CHECK(app1_1);
     CHECK(app1_1 == app1_2);
     CHECK(app1_1 == app1_3);
     CHECK(app1_1 == app1_4);
@@ -5261,14 +5262,25 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     auto app2_2 = App::get_cached_app(config3.app_id, config3.base_url);
     auto app2_3 = App::get_shared_app(config4, sync_config);
     auto app2_4 = App::get_cached_app(config3.app_id);
+
     auto app2_5 = App::get_cached_app(config4.app_id, "https://some.different.url");
+
+    CHECK(app2_1);
 
     CHECK(app2_1 == app2_2);
     CHECK(app2_1 != app2_3);
     CHECK(app2_4 != nullptr);
+    CHECK((app2_4 == app2_1 || app2_4 == app2_3)); // random with same app_id
     CHECK(app2_5 == nullptr);
 
     CHECK(app1_1 != app2_1);
     CHECK(app1_1 != app2_3);
     CHECK(app1_1 != app2_4);
+
+    auto other_sync_config = sync_config;
+    other_sync_config.metadata_mode = SyncClientConfig::MetadataMode::Encryption;
+    CHECK_THROWS_AS(App::get_shared_app(config3, other_sync_config), InvalidArgument);
+    other_sync_config = sync_config;
+    other_sync_config.base_file_path = util::make_temp_dir() + random_string(10);
+    CHECK_THROWS_AS(App::get_shared_app(config3, other_sync_config), InvalidArgument);
 }
