@@ -314,8 +314,8 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         auto c_error = realm_sync_error_t();
 
         std::string error_code_message;
-        c_error.error_code = to_capi(error.to_status(), error_code_message);
-        c_error.detailed_message = error.what();
+        c_error.error_code = to_capi(error.status, error_code_message);
+        c_error.detailed_message = error.status.reason().c_str();
         c_error.is_fatal = error.is_fatal;
         c_error.is_unrecognized_by_client = error.is_unrecognized_by_client;
         c_error.is_client_reset_requested = error.is_client_reset_requested();
@@ -894,7 +894,8 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
                                        error_message};
     std::error_code err;
     sync_error_to_error_code(sync_error, &err);
-    SyncSession::OnlyForTesting::handle_error(*session->get(), sync::SessionErrorInfo{err, error_message, !is_fatal});
+    SyncSession::OnlyForTesting::handle_error(*session->get(),
+                                              sync::SessionErrorInfo{Status{err, error_message}, !is_fatal});
 }
 
 } // namespace realm::c_api

@@ -566,6 +566,7 @@ private:
     void read_or_write_error(std::error_code ec, std::string_view msg);
     void close_due_to_protocol_error(std::error_code, std::optional<std::string_view> msg = std::nullopt);
 
+    void close_due_to_client_side_error(Status status, IsFatal is_fatal, ConnectionTerminationReason reason);
     void close_due_to_client_side_error(std::error_code, std::optional<std::string_view> msg, IsFatal is_fatal,
                                         ConnectionTerminationReason reason);
     void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
@@ -1311,7 +1312,7 @@ inline void ClientImpl::Connection::voluntary_disconnect()
 {
     m_reconnect_info.update(ConnectionTerminationReason::closed_voluntarily, std::nullopt);
     constexpr bool try_again = true;
-    disconnect(SessionErrorInfo{ClientError::connection_closed, try_again}); // Throws
+    disconnect(SessionErrorInfo{Status{ClientError::connection_closed, "Connection closed"}, try_again}); // Throws
 }
 
 inline void ClientImpl::Connection::involuntary_disconnect(const SessionErrorInfo& info,

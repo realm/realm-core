@@ -152,7 +152,7 @@ TEST(ClientReset_NoLocalChanges)
                 if (state != ConnectionState::disconnected)
                     return;
                 REALM_ASSERT(error_info);
-                std::error_code ec = error_info->error_code;
+                std::error_code ec = error_info->status.get_std_error_code();
                 CHECK_EQUAL(ec, sync::ProtocolError::bad_server_version);
                 bowl.add_stone();
             };
@@ -601,7 +601,7 @@ TEST(ClientReset_ThreeClients)
                 if (state != ConnectionState::disconnected)
                     return;
                 REALM_ASSERT(error_info);
-                std::error_code ec = error_info->error_code;
+                std::error_code ec = error_info->status.get_std_error_code();
                 CHECK_EQUAL(ec, sync::ProtocolError::bad_server_version);
                 bowl.add_stone();
             };
@@ -775,7 +775,7 @@ TEST(ClientReset_DoNotRecoverSchema)
                 if (state != ConnectionState::disconnected)
                     return;
                 REALM_ASSERT(error_info);
-                std::error_code ec = error_info->error_code;
+                std::error_code ec = error_info->status.get_std_error_code();
                 CHECK_EQUAL(ec, sync::Client::Error::auto_client_reset_failure);
                 bowl.add_stone();
             });

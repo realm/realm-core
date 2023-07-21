@@ -146,7 +146,7 @@ TEST(Sync_BadVirtualPath)
         if (state != ConnectionState::disconnected)
             return;
         REALM_ASSERT(error_info);
-        std::error_code ec = error_info->error_code;
+        std::error_code ec = error_info->status.get_std_error_code();
         bool is_fatal = error_info->is_fatal();
         CHECK_EQUAL(sync::ProtocolError::illegal_realm_path, ec);
         CHECK(is_fatal);
@@ -572,7 +572,7 @@ TEST(Sync_TokenWithoutExpirationAllowed)
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
-            std::error_code ec = error_info->error_code;
+            std::error_code ec = error_info->status.get_std_error_code();
             CHECK(ec == sync::ProtocolError::token_expired || ec == sync::ProtocolError::bad_authentication ||
                   ec == sync::ProtocolError::permission_denied);
             did_fail = true;
@@ -785,7 +785,7 @@ struct ExpectChangesetError {
         if (!error_info)
             return;
         REALM_ASSERT(error_info);
-        std::error_code ec = error_info->error_code;
+        std::error_code ec = error_info->status.get_std_error_code();
         CHECK_EQUAL(ec, sync::Client::Error::bad_changeset);
         CHECK(ec.category() == client_error_category());
         CHECK(!error_info->is_fatal());
@@ -3884,7 +3884,7 @@ TEST(Sync_CancelReconnectDelay)
 
         BowlOfStonesSemaphore bowl;
         auto handler = [&](const SessionErrorInfo& info) {
-            if (CHECK_EQUAL(info.error_code, ProtocolError::connection_closed))
+            if (CHECK_EQUAL(info.status.get_std_error_code(), ProtocolError::connection_closed))
                 bowl.add_stone();
         };
         Session session = fixture.make_session(db, "/test");
@@ -3906,7 +3906,7 @@ TEST(Sync_CancelReconnectDelay)
 
         BowlOfStonesSemaphore bowl;
         auto handler = [&](const SessionErrorInfo& info) {
-            if (CHECK_EQUAL(info.error_code, ProtocolError::connection_closed))
+            if (CHECK_EQUAL(info.status.get_std_error_code(), ProtocolError::connection_closed))
                 bowl.add_stone();
         };
         Session session = fixture.make_session(db, "/test");
@@ -3929,7 +3929,7 @@ TEST(Sync_CancelReconnectDelay)
         {
             BowlOfStonesSemaphore bowl;
             auto handler = [&](const SessionErrorInfo& info) {
-                if (CHECK_EQUAL(info.error_code, ProtocolError::connection_closed))
+                if (CHECK_EQUAL(info.status.get_std_error_code(), ProtocolError::connection_closed))
                     bowl.add_stone();
             };
             Session session = fixture.make_session(db, "/test");
@@ -3965,7 +3965,7 @@ TEST(Sync_CancelReconnectDelay)
 
         BowlOfStonesSemaphore bowl;
         auto handler = [&](const SessionErrorInfo& info) {
-            if (CHECK_EQUAL(info.error_code, ProtocolError::illegal_realm_path))
+            if (CHECK_EQUAL(info.status.get_std_error_code(), ProtocolError::illegal_realm_path))
                 bowl.add_stone();
         };
         Session session = fixture.make_session(db, "/..");
@@ -3988,7 +3988,7 @@ TEST(Sync_CancelReconnectDelay)
 
         BowlOfStonesSemaphore bowl;
         auto handler = [&](const SessionErrorInfo& info) {
-            if (CHECK_EQUAL(info.error_code, ProtocolError::illegal_realm_path))
+            if (CHECK_EQUAL(info.status.get_std_error_code(), ProtocolError::illegal_realm_path))
                 bowl.add_stone();
         };
         Session session = fixture.make_session(db, "/..");
@@ -5172,9 +5172,9 @@ TEST_IF(Sync_SSL_Certificates, false)
                 CHECK(error_info);
                 client_logger->debug(
                     "State change: disconnected, error_code = %1, is_fatal = %2, detailed_message = %3",
-                    error_info->error_code, error_info->is_fatal(), error_info->message);
+                    error_info->status.get_std_error_code(), error_info->is_fatal(), error_info->message);
                 // We expect to get through the SSL handshake but will hit an error due to the wrong token.
-                CHECK_NOT_EQUAL(error_info->error_code, Client::Error::ssl_server_cert_rejected);
+                CHECK_NOT_EQUAL(error_info->status.get_std_error_code(), Client::Error::ssl_server_cert_rejected);
                 client.shutdown();
             }
         };
@@ -5248,7 +5248,7 @@ TEST(Sync_BadChangeset)
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
-            std::error_code ec = error_info->error_code;
+            std::error_code ec = error_info->status.get_std_error_code();
             bool is_fatal = error_info->is_fatal();
             CHECK_EQUAL(sync::ProtocolError::bad_changeset, ec);
             CHECK(is_fatal);

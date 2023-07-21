@@ -724,7 +724,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
             auto config_copy = config_local;
             auto&& [client_reset_future, reset_handler] = make_client_reset_handler();
             config_copy.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError err) {
-                REALM_ASSERT_EX(!err.is_fatal, err.what());
+                REALM_ASSERT_EX(!err.is_fatal, err.status);
                 CHECK(err.server_requests_action == sync::ProtocolErrorInfo::Action::Transient);
             };
             config_copy.sync_config->notify_after_client_reset = reset_handler;
@@ -849,7 +849,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
             })
             ->on_post_reset([&, err_future = std::move(error_future)](SharedRealm) mutable {
                 auto sync_error = wait_for_future(std::move(err_future)).get();
-                INFO(sync_error.reason());
+                INFO(sync_error.status);
                 CHECK(sync_error.get_system_error() ==
                       sync::make_error_code(sync::ClientError::auto_client_reset_failure));
             })
@@ -903,7 +903,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
     auto seed_realm = [&harness, &subscribe_to_and_add_objects](RealmConfig config, ResetMode reset_mode) {
         config.sync_config->error_handler = [path = config.path](std::shared_ptr<SyncSession>, SyncError err) {
             // ignore spurious failures on this instance
-            util::format(std::cout, "spurious error while seeding a Realm at '%1': %2\n", path, err.what());
+            util::format(std::cout, "spurious error while seeding a Realm at '%1': %2\n", path, err.status);
         };
         SharedRealm realm = Realm::get_shared_realm(config);
         subscribe_to_and_add_objects(realm, 1);
@@ -920,7 +920,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         [&before_reset_count, &after_reset_count](RealmConfig& config, Schema expected_schema) {
             auto& sync_config = *config.sync_config;
             sync_config.error_handler = [](std::shared_ptr<SyncSession>, SyncError err) {
-                FAIL(err);
+                FAIL(err.status);
             };
             sync_config.notify_before_client_reset = [&before_reset_count,
                                                       expected = expected_schema](SharedRealm frozen_before) {
@@ -1176,8 +1176,8 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
             std::string class_err = "Invalid schema change (UPLOAD): non-breaking schema change: adding schema "
                                     "for Realm table \"AddedClass\", schema changes from clients are restricted when "
                                     "developer mode is disabled";
-            REQUIRE_THAT(std::string(err.reason()), Catch::Matchers::ContainsSubstring(property_err) ||
-                                                        Catch::Matchers::ContainsSubstring(class_err));
+            REQUIRE_THAT(err.status.reason(), Catch::Matchers::ContainsSubstring(property_err) ||
+                                                  Catch::Matchers::ContainsSubstring(class_err));
             CHECK(before_reset_count == 1);
             CHECK(after_reset_count == 1);
         }
@@ -1290,7 +1290,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             if (!error_promise) {
                 util::format(std::cerr,
                              "An unexpected sync error was caught by the default SyncTestFile handler: '%1'\n",
-                             err.what());
+                             err.status);
                 abort();
             }
             error_promise->emplace_value(std::move(err));
@@ -1303,7 +1303,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
     auto validate_sync_error = [&](const SyncError& sync_error, Mixed expected_pk, const char* expected_object_name,
                                    const std::string& error_msg_fragment) {
         CHECK(sync_error.get_system_error() == sync::make_error_code(sync::ProtocolError::compensating_write));
-        CHECK(sync_error.is_session_level_protocol_error());
         CHECK(!sync_error.is_client_reset_requested());
         CHECK(sync_error.compensating_writes_info.size() == 1);
         CHECK(sync_error.server_requests_action == sync::ProtocolErrorInfo::Action::Warning);
@@ -2938,10 +2937,8 @@ TEST_CASE("flx: data ingest - dev mode", "[sync][flx][data ingest][baas]") {
 
             CppContext c(realm);
             realm->begin_transaction();
-            Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
-            Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", bar_obj_id}, {"location", "bar"s}}));
+            Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
+            Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", bar_obj_id}, {"location", "bar"s}}));
             realm->commit_transaction();
 
             wait_for_upload(*realm);

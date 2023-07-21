@@ -515,7 +515,7 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
             [[fallthrough]];
         case WebSocketError::websocket_connection_failed: {
             constexpr bool try_again = true;
-            involuntary_disconnect(SessionErrorInfo{error_code, status.reason(), try_again},
+            involuntary_disconnect(SessionErrorInfo{std::move(status), try_again},
                                    ConnectionTerminationReason::connect_operation_failed); // Throws
             break;
         }
@@ -541,7 +541,7 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
             [[fallthrough]];
         case WebSocketError::websocket_invalid_extension: {
             constexpr bool try_again = true;
-            SessionErrorInfo error_info{error_code, status.reason(), try_again};
+            SessionErrorInfo error_info{std::move(status), try_again};
             involuntary_disconnect(std::move(error_info),
                                    ConnectionTerminationReason::websocket_protocol_violation); // Throws
             break;
@@ -552,7 +552,7 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
             auto message =
                 util::format("Sync websocket closed because the server received a message that was too large: %1",
                              status.reason());
-            SessionErrorInfo error_info(ec, message, try_again);
+            SessionErrorInfo error_info(Status{ec, message}, try_again);
             error_info.server_requests_action = ProtocolErrorInfo::Action::ClientReset;
             involuntary_disconnect(std::move(error_info),
                                    ConnectionTerminationReason::websocket_protocol_violation); // Throws
@@ -560,32 +560,32 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         }
         case WebSocketError::websocket_tls_handshake_failed: {
             error_code = ClientError::ssl_server_cert_rejected;
-            close_due_to_client_side_error(error_code, status.reason(), IsFatal{false},
+            close_due_to_client_side_error(std::move(status), IsFatal{false},
                                            ConnectionTerminationReason::ssl_certificate_rejected); // Throws
             break;
         }
         case WebSocketError::websocket_client_too_old: {
             error_code = ClientError::client_too_old_for_server;
-            close_due_to_client_side_error(error_code, status.reason(), IsFatal{true},
+            close_due_to_client_side_error(std::move(status), IsFatal{true},
                                            ConnectionTerminationReason::http_response_says_fatal_error); // Throws
             break;
         }
         case WebSocketError::websocket_client_too_new: {
             error_code = ClientError::client_too_new_for_server;
-            close_due_to_client_side_error(error_code, status.reason(), IsFatal{true},
+            close_due_to_client_side_error(std::move(status), IsFatal{true},
                                            ConnectionTerminationReason::http_response_says_fatal_error); // Throws
             break;
         }
         case WebSocketError::websocket_protocol_mismatch: {
             error_code = ClientError::protocol_mismatch;
-            close_due_to_client_side_error(error_code, status.reason(), IsFatal{true},
+            close_due_to_client_side_error(std::move(status), IsFatal{true},
                                            ConnectionTerminationReason::http_response_says_fatal_error); // Throws
             break;
         }
         case WebSocketError::websocket_fatal_error:
             [[fallthrough]];
         case WebSocketError::websocket_forbidden: {
-            close_due_to_client_side_error(error_code, status.reason(), IsFatal{true},
+            close_due_to_client_side_error(std::move(status), IsFatal{true},
                                            ConnectionTerminationReason::http_response_says_fatal_error); // Throws
             break;
         }
@@ -788,7 +788,7 @@ void Connection::handle_connect_wait(Status status)
     REALM_ASSERT_EX(m_state == ConnectionState::connecting, m_state);
     logger.info("Connect timeout"); // Throws
     constexpr bool try_again = true;
-    involuntary_disconnect(SessionErrorInfo{ClientError::connect_timeout, try_again},
+    involuntary_disconnect(SessionErrorInfo{Status{ClientError::connect_timeout, status.reason()}, try_again},
                            ConnectionTerminationReason::sync_connect_timeout); // Throws
 }
 
@@ -1111,16 +1111,21 @@ void Connection::close_due_to_protocol_error(std::error_code ec, std::optional<s
 void Connection::close_due_to_client_side_error(std::error_code ec, std::optional<std::string_view> msg,
                                                 IsFatal is_fatal, ConnectionTerminationReason reason)
 {
-    logger.info("Connection closed due to error"); // Throws
-    const bool try_again = !is_fatal;
     std::string message = ec.message();
     if (msg) {
         message += ": ";
         message += *msg;
     }
-    involuntary_disconnect(SessionErrorInfo{ec, message, try_again}, reason); // Throws
+    close_due_to_client_side_error(Status{ec, std::move(message)}, is_fatal, reason);
 }
 
+void Connection::close_due_to_client_side_error(Status status, IsFatal is_fatal, ConnectionTerminationReason reason)
+{
+    logger.info("Connection closed due to error"); // Throws
+    const bool try_again = !is_fatal;
+
+    involuntary_disconnect(SessionErrorInfo{std::move(status), try_again}, reason); // Throw
+}
 
 // Close connection due to error discovered on the server-side, and then
 // reported to the client by way of a connection-level ERROR message.
@@ -1132,7 +1137,7 @@ void Connection::close_due_to_server_side_error(ProtocolError error_code, const 
     std::error_code ec = make_error_code(error_code);
     const auto reason = info.try_again ? ConnectionTerminationReason::server_said_try_again_later
                                        : ConnectionTerminationReason::server_said_do_not_reconnect;
-    involuntary_disconnect(SessionErrorInfo{info, ec}, reason); // Throws
+    involuntary_disconnect(SessionErrorInfo{info, Status(ec, info.message)}, reason); // Throws
 }
 
 
@@ -1530,8 +1535,9 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
                     pending_error.compensating_write_server_version, pending_error.message);
         try {
             ProtocolError error_code = ProtocolError(pending_error.raw_error_code);
-            on_connection_state_changed(m_conn.get_state(),
-                                        SessionErrorInfo{pending_error, make_error_code(error_code)});
+            on_connection_state_changed(
+                m_conn.get_state(),
+                SessionErrorInfo{pending_error, Status{make_error_code(error_code), pending_error.message}});
         }
         catch (...) {
             logger.error("Exception thrown while reporting compensating write: %1", exception_to_status());
@@ -1553,7 +1559,8 @@ void Session::on_integration_failure(const IntegrationException& error)
     std::error_code error_code = error.code();
     auto msg = error_code.message() + ": " + error.what();
     // Surface the error to the user otherwise is lost.
-    on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{error.code(), std::move(msg), try_again});
+    on_connection_state_changed(m_conn.get_state(),
+                                SessionErrorInfo{Status{error.code(), std::move(msg)}, try_again});
 
     // Since the deactivation process has not been initiated, the UNBIND
     // message cannot have been sent unless an ERROR message was received.
@@ -1677,7 +1684,7 @@ void Session::activate()
         logger.error("Error integrating bootstrap changesets: %1", error.what());
         m_suspended = true;
         m_conn.one_less_active_unsuspended_session(); // Throws
-        on_suspended(SessionErrorInfo{error.code(), false});
+        on_suspended(SessionErrorInfo{Status{error.code(), error.what()}, false});
     }
 
     if (has_pending_client_reset) {
@@ -2289,7 +2296,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
     catch (const std::exception& e) {
         auto err_msg = util::format("A fatal error occurred during client reset: '%1'", e.what());
         logger.error(err_msg.c_str());
-        SessionErrorInfo err_info(make_error_code(ClientError::auto_client_reset_failure), err_msg, false);
+        SessionErrorInfo err_info(Status{make_error_code(ClientError::auto_client_reset_failure), err_msg}, false);
         suspend(err_info);
         return {};
     }
@@ -2532,7 +2539,7 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     }
 
     m_error_message_received = true;
-    suspend(SessionErrorInfo{info, make_error_code(error_code)});
+    suspend(SessionErrorInfo{info, Status{make_error_code(error_code), info.message}});
     return {};
 }
 
