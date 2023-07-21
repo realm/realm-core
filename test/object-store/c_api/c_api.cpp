@@ -349,7 +349,6 @@ private:
         CHECK(nlohmann::json::parse(request.body)["options"] ==
               nlohmann::json({{"device",
                                {{"appId", "app_id_123"},
-                                {"appVersion", "some_app_version"},
                                 {"platform", util::get_library_platform()},
                                 {"platformVersion", "some_platform_version"},
                                 {"sdk", "some_sdk_name"},
