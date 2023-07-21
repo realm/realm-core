@@ -5275,6 +5275,7 @@ TEST(Parser_NestedDictionaryDeep)
     auto col_self = persons->add_column(*persons, "self");
 
     Obj paul = persons->create_object_with_primary_key("Paul");
+    Obj john = persons->create_object_with_primary_key("John");
     paul.set(col_self, paul.get_key());
     paul.set_collection(col, CollectionType::Dictionary);
     auto dict1 = paul.get_dictionary(col);
@@ -5291,6 +5292,7 @@ TEST(Parser_NestedDictionaryDeep)
     list2->insert_collection(1, CollectionType::Dictionary);
     auto dict2 = list2->get_dictionary(1);
     dict2->insert("Hello", 5);
+    dict2->insert("friend", john);
     bool thrown = false;
     try {
         for (int i = 0; i < 100; i++) {
@@ -5326,6 +5328,7 @@ TEST(Parser_NestedDictionaryDeep)
     verify_query(test_context, persons, "properties.two[1].Hello == 5", 0);
     verify_query(test_context, persons, "properties.three[0].Hello == 5", 0);
     verify_query(test_context, persons, "properties.three[1].Hello == 5", 1);
+    verify_query(test_context, persons, "properties.three[1].friend.name == 'John'", 1);
 }
 
 TEST(Parser_NestedDictionaryMultipleLinks)

@@ -1997,7 +1997,7 @@ public:
         SimpleQuerySupport::evaluate(index, destination);
         if (m_path.size() > 0) {
             if (auto sz = destination.size()) {
-                Collection::QueryCtrlBlock ctrl(m_path, get_base_table()->get_alloc(),
+                Collection::QueryCtrlBlock ctrl(m_path, *get_base_table(),
                                                 destination.m_from_list || !m_path_only_unary_keys);
                 for (size_t i = 0; i < sz; i++) {
                     Collection::get_any(ctrl, destination.get(i), 0);
@@ -3170,7 +3170,7 @@ public:
         ColumnsCollection<Mixed>::evaluate<Mixed>(index, destination);
         if (m_path.size() > 1) {
             if (auto sz = destination.size()) {
-                Collection::QueryCtrlBlock ctrl(m_path, get_alloc(), destination.m_from_list);
+                Collection::QueryCtrlBlock ctrl(m_path, *get_base_table(), destination.m_from_list);
                 for (size_t i = 0; i < sz; i++) {
                     Collection::get_any(ctrl, destination.get(i), 1);
                 }

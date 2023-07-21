@@ -1,3 +1,22 @@
+/*************************************************************************
+ *
+ * Copyright 2023 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
+#include <realm/group.hpp>
 #include <realm/collection.hpp>
 #include <realm/bplustree.hpp>
 #include <realm/array_key.hpp>
@@ -161,6 +180,23 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
                 else {
                     ctrl.matches.insert(val);
                 }
+            }
+        }
+    }
+    else if (val.is_type(type_TypedLink) && pe.is_key()) {
+        auto link = val.get_link();
+        Obj obj = ctrl.group->get_object(link);
+        auto col = obj.get_table()->get_column_key(pe.get_key());
+        if (col) {
+            val = obj.get_any(col);
+            if (path_size > 1) {
+                if (val.is_type(type_Link)) {
+                    val = ObjLink(obj.get_target_table(col)->get_key(), val.get<ObjKey>());
+                }
+                Collection::get_any(ctrl, val, index + 1);
+            }
+            else {
+                ctrl.matches.insert(val);
             }
         }
     }
