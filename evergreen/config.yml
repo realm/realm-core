@@ -144,6 +144,18 @@ functions:
             -C cmake_vars.txt ${extra_flags} \
             -G "$GENERATOR"
 
+          # Fail the test if local object store tests are defined and this is not a patch build
+          if [[ -f "build/objstore-tests.do-not-commit" ]]; then
+              if [[ -z "${is_patch}" ]]; then
+                echo "ERROR: Found custom object store tests for non-patch build" 1>&2
+                echo "- Revert test/object-store/objstore-tests.do-not-commit and recommit" 1>&2
+                exit 1
+              else
+                echo "WARNING: Custom object store tests are configured for this patch build" 1>&2
+                echo "- Revert test/object-store/objstore-tests.do-not-commit before merging PR" 1>&2
+              fi
+          fi
+
           if [[ -n "${target_to_build|}" ]]; then
               target="--target ${target_to_build|}"
           fi

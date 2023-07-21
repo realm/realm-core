@@ -100,13 +100,15 @@ add_labeled_test(ObjectStoreTests-local objstore-local ObjectStoreTests "~[baas]
 # Baas server and custom tests are only allowed when REALM_ENABLE_AUTH_TESTS is set
 if(REALM_ENABLE_SYNC)
     if(REALM_ENABLE_AUTH_TESTS)
-        set(OBJSTORE_TESTS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/object-store-tests.lst")
+        set(OBJSTORE_TESTS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/objstore-tests.do-not-commit")
         # Rebuild cmake config if the tests file changes
         set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${OBJSTORE_TESTS_FILE})
         # Extract the list of entries from the tests file
         parse_list_file("${OBJSTORE_TESTS_FILE}" OBJSTORE_TEST_LIST)
         # Convert the list from tests file, if any, to object store tests for each line
         if (OBJSTORE_TEST_LIST)
+            # Copy the tests file to the build directory to indicate custom tests are set
+            file(COPY ${OBJSTORE_TESTS_FILE} DESTINATION "${CMAKE_BINARY_DIR}/objstore-tests.do-not-commit")
             set(_test_cnt 1)
             foreach(_test_item ${OBJSTORE_TEST_LIST})
                 message(STATUS "Adding ObjectStoreTests-${_test_cnt}: 'realm-object-store-tests ${_test_item}'")
