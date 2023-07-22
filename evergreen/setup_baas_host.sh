@@ -97,10 +97,10 @@ fi
 
 if [[ -n "${GITHUB_KNOWN_HOSTS}" ]]; then
     KNOWN_HOSTS_FILE="${HOME}/.ssh/known_hosts"
-    if [[ -f "${KNOWN_HOSTS_FILE}" ]] && ! grep -q "${GITHUB_KNOWN_HOSTS}" "${KNOWN_HOSTS_FILE}"; then
-        echo "${GITHUB_KNOWN_HOSTS}" | tee -a "${KNOWN_HOSTS_FILE}"
-    else
+    if [[ -f "${KNOWN_HOSTS_FILE}" ]] && grep "${GITHUB_KNOWN_HOSTS}" < "${KNOWN_HOSTS_FILE}"; then
         echo "Github known hosts entry found - skipping known_hosts update"
+    else
+        echo "${GITHUB_KNOWN_HOSTS}" | tee -a "${KNOWN_HOSTS_FILE}"
     fi
 else
     echo "Warning: GITHUB_KNOWN_HOSTS not defined in baas host vars script - 'github clone' may hang or fail during setup"
@@ -272,6 +272,7 @@ echo $! > "${SERVER_PID_FILE}"
 if [[ -n "${PROXY_PORT}" ]]; then
     start_baas_proxy "${PROXY_PORT}"
 fi
+wait # Wait for scripts to be exited...
 
 popd > /dev/null  # realm-core
 popd > /dev/null  # /data/baas-remote

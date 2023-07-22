@@ -152,47 +152,51 @@ esac
 # If a baas path was provided look for go (or wait up to 10 seconds for it
 # to become available)
 GOROOT=
-if [[ -n "${BAAS_PATH}" ]]; then
-    WAIT_COUNTER=0
-    RETRY_COUNT=10
-    WAIT_START=$(date -u +'%s')
-    FOUND_GO="yes"
-    BAAS_GO_DIR="${BAAS_PATH}/go"
-    BAAS_STOPPED_FILE="${BAAS_PATH}/baas_stopped"
-    until [[ -x "${BAAS_GO_DIR}/bin/go" ]]; do
-        if [[ -n "${BAAS_STOPPED_FILE}" && -f "${BAAS_STOPPED_FILE}" ]]; then
-            echo "Error: Baas server failed to start (found baas_stopped file)"
-            exit 1
+if [[ ! -x ${WORK_PATH}/go/bin/go ]]; then
+    # If the baas work path is set, check there first and wait 
+    if [[ -n "${BAAS_PATH}" && -d "${BAAS_PATH}" ]]; then
+        WAIT_COUNTER=0
+        RETRY_COUNT=10
+        WAIT_START=$(date -u +'%s')
+        FOUND_GO="yes"
+        BAAS_GO_DIR="${BAAS_PATH}/go"
+        BAAS_STOPPED_FILE="${BAAS_PATH}/baas_stopped"
+        echo "Looking for go in baas work path for 20 secs in case both are starting concurrently"
+        until [[ -x "${BAAS_GO_DIR}/bin/go" ]]; do
+            if [[ -n "${BAAS_STOPPED_FILE}" && -f "${BAAS_STOPPED_FILE}" ]]; then
+                echo "Error: Baas server failed to start (found baas_stopped file)"
+                exit 1
+            fi
+            if [[ ${WAIT_COUNTER} -ge ${RETRY_COUNT} ]]; then
+                FOUND_GO=
+                secs_spent_waiting=$(($(date -u +'%s') - WAIT_START))
+                echo "Error: Stopped after waiting ${secs_spent_waiting} seconds for baas go to become available"
+                break
+            fi
+            ((++WAIT_COUNTER))
+            sleep 2
+        done
+        if [[ -n "${FOUND_GO}" ]]; then
+            echo "Found go in baas working directory"
+            GOROOT="${BAAS_GO_DIR}"
         fi
-        ((++WAIT_COUNTER))
-        if [[ ${WAIT_COUNTER} -ge ${RETRY_COUNT} ]]; then
-            FOUND_GO=
-            secs_spent_waiting=$(($(date -u +'%s') - WAIT_START))
-            echo "Error: Stopped after waiting ${secs_spent_waiting} seconds for baas go to become available"
-            break
-        fi
-        sleep 2
-    done
-    if [[ -n "${FOUND_GO}" ]]; then
-        echo "Found go in baas working directory"
-        GOROOT="${BAAS_GO_DIR}"
     fi
-fi
 
-# If GOROOT is not set, then baas path was nor provided or go was not found
-if [[ -z "${GOROOT}" ]]; then
-    # Download go if it's not found in the working directory
-    if [[ ! -x ${WORK_PATH}/go/bin/go ]]; then
+    # If GOROOT is not set, then baas path was nor provided or go was not found
+    if [[ -z "${GOROOT}" ]]; then
+        # Download go since it wasn't found in the working directory
         if [[ -z "${GO_URL}" ]]; then
             echo "Error: go url not defined for current OS architecture"
             uname -a
             exit 1
         fi
-        echo "Downloading go to build Toxiproxy"
-        "${CURL}" -sL "${GO_URL}" | tar -xz
-    else
-        echo "Found go in baas proxy working directory"
+        echo "Downloading go to baas proxy working directory"
+        ${CURL} -sL "${GO_URL}" | tar -xz
+        # Set up the GOROOT for building/running baas
+        export GOROOT="${WORK_PATH}/go"
     fi
+else
+    echo "Found go in baas proxy working directory"
     # Set up the GOROOT for building/running baas
     export GOROOT="${WORK_PATH}/go"
 fi
@@ -212,8 +216,6 @@ else
     git fetch
 fi
 
-pushd toxiproxy > /dev/null
-
 echo "Checking out Toxiproxy version '${TOXIPROXY_VERSION}'"
 git checkout "${TOXIPROXY_VERSION}"
 echo "Using Toxiproxy commit: $(git rev-parse HEAD)"
@@ -229,6 +231,7 @@ fi
 if [[ -n "${VERBOSE}" ]]; then
     OPT_WAIT_BAAS+=("-v")
 fi
+
 "${BASE_PATH}/wait_for_baas.sh" "${OPT_WAIT_BAAS[@]}"
 
 cat >"${PROXY_CFG_FILE}" <<EOF
@@ -240,6 +243,7 @@ cat >"${PROXY_CFG_FILE}" <<EOF
 }]
 EOF
 
+echo "Starting baas proxy: 127.0.0.1:${REMOTE_PORT} => 127.0.0.1:${BAAS_PORT}"
 ./dist/toxiproxy-server -config "${PROXY_CFG_FILE}" > "${PROXY_LOG}" 2>&1 &
 echo $! > "${PROXY_PID_FILE}"
 

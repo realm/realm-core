@@ -277,14 +277,14 @@ echo "Installing node and go to build baas and its dependencies"
 # Download node if it's not found
 if [[ ! -x "${NODE_BINARIES_DIR}/bin/node" ]]; then
     pushd "${NODE_BINARIES_DIR}" > /dev/null
-    "${CURL}" -LsS "${NODE_URL}" | tar -xz --strip-components=1
+    ${CURL} -LsS "${NODE_URL}" | tar -xz --strip-components=1
     popd > /dev/null  # node_binaries
 fi
 export PATH="${NODE_BINARIES_DIR}/bin":${PATH}
 echo "Node version: $(node --version)"
 
 # Download go if it's not found and set up the GOROOT for building/running baas
-[[ -x ${WORK_PATH}/go/bin/go ]] || ("${CURL}" -sL $GO_URL | tar -xz)
+[[ -x ${WORK_PATH}/go/bin/go ]] || (${CURL} -sL $GO_URL | tar -xz)
 export GOROOT="${WORK_PATH}/go"
 export PATH="${GOROOT}/bin":${PATH}
 echo "Go version: $(go version)"
@@ -296,7 +296,7 @@ export PATH="${BAAS_DEPS_DIR}":${PATH}
 # Download jq (used for parsing json files) if it's not found
 if [[ ! -x "${BAAS_DEPS_DIR}/jq" ]]; then
     pushd "${BAAS_DEPS_DIR}" > /dev/null
-    which jq || ("${CURL}" -LsS "${JQ_DOWNLOAD_URL}" > jq && chmod +x jq)
+    which jq || (${CURL} -LsS "${JQ_DOWNLOAD_URL}" > jq && chmod +x jq)
     popd > /dev/null  # baas_dep_binaries
 fi
 
@@ -305,7 +305,7 @@ git config --global url."git@github.com:".insteadOf "https://github.com/"
 
 # If a baas branch or commit version was not provided, retrieve the latest release version
 if [[ -z "${BAAS_VERSION}" ]]; then
-    BAAS_VERSION=$("${CURL}" -LsS "https://realm.mongodb.com/api/private/v1.0/version" | jq -r '.backend.git_hash')
+    BAAS_VERSION=$(${CURL} -LsS "https://realm.mongodb.com/api/private/v1.0/version" | jq -r '.backend.git_hash')
 fi
 
 # Clone the baas repo and check out the specified version
@@ -332,7 +332,7 @@ if [[ ! -d "${DYLIB_DIR}" ]]; then
         echo "Downloading baas support library"
         mkdir -p "${DYLIB_DIR}"
         pushd "${DYLIB_DIR}" > /dev/null
-        "${CURL}" -LsS "${STITCH_SUPPORT_LIB_URL}" | tar -xz --strip-components=1
+        ${CURL} -LsS "${STITCH_SUPPORT_LIB_URL}" | tar -xz --strip-components=1
         popd > /dev/null  # baas/etc/dylib
     fi
 fi
@@ -349,7 +349,7 @@ if [[ ! -x "${LIBMONGO_LIB}" ]]; then
     elif [[ -n "${STITCH_ASSISTED_AGG_LIB_URL}" ]]; then
         echo "Downloading assisted agg library (libmongo.so)"
         pushd "${BAAS_DEPS_DIR}" > /dev/null
-        "${CURL}" -LsS "${STITCH_ASSISTED_AGG_LIB_URL}" > libmongo.so
+        ${CURL} -LsS "${STITCH_ASSISTED_AGG_LIB_URL}" > libmongo.so
         chmod 755 libmongo.so
         popd > /dev/null  # baas_dep_binaries
     fi
@@ -359,7 +359,7 @@ fi
 if [[ ! -x "${BAAS_DEPS_DIR}/assisted_agg" && -n "${STITCH_ASSISTED_AGG_URL}" ]]; then
     echo "Downloading assisted agg binary (assisted_agg)"
     pushd "${BAAS_DEPS_DIR}" > /dev/null
-    "${CURL}" -LsS "${STITCH_ASSISTED_AGG_URL}" > assisted_agg
+    ${CURL} -LsS "${STITCH_ASSISTED_AGG_URL}" > assisted_agg
     chmod 755 assisted_agg
     popd > /dev/null  # baas_dep_binaries
 fi
@@ -369,7 +369,7 @@ YARN="${WORK_PATH}/yarn/bin/yarn"
 if [[ ! -x "${YARN}" ]]; then
     echo "Getting yarn"
     mkdir -p yarn && pushd yarn > /dev/null
-    "${CURL}" -LsS https://yarnpkg.com/latest.tar.gz | tar -xz --strip-components=1
+    ${CURL} -LsS https://yarnpkg.com/latest.tar.gz | tar -xz --strip-components=1
     popd > /dev/null  # yarn
     mkdir "${WORK_PATH}/yarn_cache"
 fi
@@ -388,7 +388,7 @@ fi
 # Download mongod (daemon) and mongosh (shell) binaries
 if [ ! -x "${MONGO_BINARIES_DIR}/bin/mongod" ]; then
     echo "Downloading mongodb"
-    "${CURL}" -sLS "${MONGODB_DOWNLOAD_URL}" --output mongodb-binaries.tgz
+    ${CURL} -sLS "${MONGODB_DOWNLOAD_URL}" --output mongodb-binaries.tgz
 
     tar -xzf mongodb-binaries.tgz
     rm mongodb-binaries.tgz
@@ -398,7 +398,7 @@ fi
 
 if [[ -n "${MONGOSH_DOWNLOAD_URL}" ]] && [[ ! -x "${MONGO_BINARIES_DIR}/bin/mongosh" ]]; then
     echo "Downloading mongosh"
-    "${CURL}" -sLS "${MONGOSH_DOWNLOAD_URL}" --output mongosh-binaries.zip
+    ${CURL} -sLS "${MONGOSH_DOWNLOAD_URL}" --output mongosh-binaries.zip
     unzip -jnqq mongosh-binaries.zip '*/bin/*' -d "${MONGO_BINARIES_DIR}/bin/"
     rm mongosh-binaries.zip
 fi
@@ -476,11 +476,12 @@ OPT_WAIT_BAAS=("-w" "{$WORK_PATH}")
 if [[ -n "${VERBOSE}" ]]; then
     OPT_WAIT_BAAS+=("-v")
 fi
+
 "${BASE_PATH}/wait_for_baas.sh" "${OPT_WAIT_BAAS[@]}"
 
 # Create the admin user and set up the allowed roles
-echo "Adding roles to admi n user"
-"${CURL}" 'http://localhost:9090/api/admin/v3.0/auth/providers/local-userpass/login' \
+echo "Adding roles to admin user"
+${CURL} 'http://localhost:9090/api/admin/v3.0/auth/providers/local-userpass/login' \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
   --silent \

@@ -67,6 +67,7 @@ function output_log_tail()
     fi
 }
 
+echo "Waiting for baas server to start..."
 until $CURL --output /dev/null --head --fail http://localhost:9090 --silent ; do
     if [[ -n "${BAAS_STOPPED_FILE}" && -f "${BAAS_STOPPED_FILE}" ]]; then
         echo "Baas server failed to start (found baas_stopped file)"
