@@ -2,10 +2,11 @@
 # The script to be run on the ubuntu host that will run baas for the evergreen windows tests
 #
 # Usage:
-# ./evergreen/setup_baas_host_local.sh -f FILE [-i FILE] [-w PATH] [-u USER] [-d PATH] [-b BRANCH] [-v] [-h]
+# ./evergreen/setup_baas_host_local.sh -f FILE [-i FILE] [-w PATH] [-u USER] [-d PATH] [-b BRANCH] [-t] [-p PORT] [-c PORT] [-v] [-h]
 #
 
 set -o errexit
+set -o errtrace
 set -o pipefail
 
 function usage()
@@ -20,6 +21,10 @@ function usage()
     echo -e "\t-b BRANCH\tOptional branch or git spec of baas to checkout/build"
     echo -e "\t-v\t\tEnable verbose script debugging"
     echo -e "\t-h\t\tShow this usage summary and exit"
+    echo "Baas Proxy Options:"
+    echo -e "\t-t\t\tEnable baas proxy support (proxy between baas on :9090 and remote port)"
+    echo -e "\t-p PORT\t\Baas proxy listen port on remote host (default 9092)"
+    echo -e "\t-c PORT\t\tLocal configuration port for proxy HTTP API (default 8474)"
     # Default to 0 if exit code not provided
     exit "${1:0}"
 }
@@ -31,51 +36,97 @@ BAAS_USER=ubuntu
 BAAS_BRANCH=
 FILE_DEST_DIR=
 VERBOSE=
+BAAS_PROXY=
+REMOTE_PORT=9092
+CONFIG_PORT=8474
 
-while getopts "w:u:d:b:vh" opt; do
+while getopts "w:u:d:b:tp:c:vh" opt; do
     case "${opt}" in
         w) BAAS_WORK_PATH="${OPTARG}";;
         u) BAAS_USER="${OPTARG}";;
         d) FILE_DEST_DIR="${OPTARG}";;
         b) BAAS_BRANCH="${OPTARG}";;
+<<<<<<< HEAD
         v) VERBOSE="yes";;
+=======
+        t) BAAS_PROXY="yes";;
+        p) REMOTE_PORT="${OPTARG}";;
+        c) CONFIG_PORT="${OPTARG}";;
+        v) VERBOSE="-v";;
+>>>>>>> 261ea6389 (Added support for starting baas proxy)
         h) usage 0;;
         *) usage 1;;
     esac
 done
 
 shift $((OPTIND - 1))
+
+if [[ $# -lt 1 ]]; then
+    echo "Error: Baas host vars script not provided"
+    usage 1
+fi
 BAAS_HOST_VARS="${1}"; shift;
-BAAS_HOST_KEY="${1}"; shift;
 
 if [[ -z "${BAAS_HOST_VARS}" ]]; then
-    echo "Baas host vars script not provided"
+    echo "Error: Baas host vars script value was empty"
     usage 1
 elif [[ ! -f "${BAAS_HOST_VARS}" ]]; then
-    echo "Baas host vars script not found: ${BAAS_HOST_VARS}"
+    echo "Error: Baas host vars script not found: ${BAAS_HOST_VARS}"
     usage 1
 fi
+
+if [[ $# -lt 1 ]]; then
+    echo "Error: Baas host private key not provided"
+    usage 1
+fi
+BAAS_HOST_KEY="${1}"; shift;
 
 if [[ -z "${BAAS_HOST_KEY}" ]]; then
-    echo "Baas host private key not provided"
+    echo "Error: Baas host private key value was empty"
     usage 1
 elif [[ ! -f "${BAAS_HOST_KEY}" ]]; then
-    echo "Baas host private key not found: ${BAAS_HOST_KEY}"
+    echo "Error: Baas host private key not found: ${BAAS_HOST_KEY}"
     usage 1
 fi
 
-trap 'catch $? ${LINENO}' EXIT
+function check_port()
+{
+    # Usage check_port PORT
+    port=${1}
+    if [[ -n "${port}" && ${port} -gt 0 && ${port} -lt 65536 ]]; then
+        return 0
+    fi
+    return 1
+}
+
+if [[ -n "${BAAS_PROXY}" ]]; then
+    if ! check_port "${CONFIG_PORT}"; then
+        echo "Error: Baas proxy local HTTP API config port was invalid: '${CONFIG_PORT}'"
+        usage 1
+    elif ! check_port "${REMOTE_PORT}"; then
+        echo "Error: Baas proxy listen port was invalid: '${REMOTE_PORT}'"
+        usage 1
+    fi
+fi
+
+trap 'catch $? ${LINENO}' ERR
+trap 'on_exit' INT TERM EXIT
+
+# Set up catch function that runs when an error occurs
 function catch()
 {
-  if [ "$1" != "0" ]; then
-    echo "Error $1 occurred while starting baas (local) at line $2"
-  fi
+    # Usage: catch EXIT_CODE LINE_NUM
+    echo "${BASH_SOURCE[0]}: $2: Error $1 occurred while starting baas (local)"
+}
 
-  if [[ -n "${BAAS_WORK_PATH}" ]]; then
-      # Create the baas_stopped file so wait_for_baas can exit early
-      [[ -d "${BAAS_WORK_PATH}" ]] || mkdir -p "${BAAS_WORK_PATH}"
-      touch "${BAAS_WORK_PATH}/baas_stopped"
-  fi
+function on_exit()
+{
+    # Usage: on_exit
+    if [[ -n "${BAAS_WORK_PATH}" ]]; then
+        # Create the baas_stopped file so wait_for_baas can exit early
+        [[ -d "${BAAS_WORK_PATH}" ]] || mkdir -p "${BAAS_WORK_PATH}"
+        touch "${BAAS_WORK_PATH}/baas_stopped"
+    fi
 }
 
 # shellcheck disable=SC1090
@@ -88,19 +139,12 @@ if [[ -n "${VERBOSE}" ]]; then
 fi
 
 if [[ -z "${BAAS_HOST_NAME}" ]]; then
-    echo "Baas hostname not found in baas host vars script: ${BAAS_HOST_VARS}"
+    echo "Error: BAAS_HOST_NAME was not exported by baas host vars script"
     usage 1
 fi
 
-if [[ -z "${BAAS_HOST_KEY}" ]]; then
-    echo "Baas host private key not provided"
-    usage 1
-elif [[ ! -f "${BAAS_HOST_KEY}" ]]; then
-    echo "Baas host private key not found: ${BAAS_HOST_KEY}"
-    usage 1
-fi
 if [[ -z "${BAAS_USER}" ]]; then
-    echo "Baas host username not provided"
+    echo "Error: Baas host username was empty"
     usage 1
 fi
 
@@ -154,16 +198,40 @@ scp "${SSH_OPTIONS[@]}" "${BAAS_HOST_VARS}" "${SSH_USER}:${FILE_DEST_DIR}/"
 scp "${SSH_OPTIONS[@]}" "${EVERGREEN_PATH}/setup_baas_host.sh" "${SSH_USER}:${FILE_DEST_DIR}/"
 scp "${SSH_OPTIONS[@]}" "${EVERGREEN_PATH}/install_baas.sh" "${SSH_USER}:${FILE_DEST_DIR}/"
 
-echo "Starting remote baas with branch/commit: '${BAAS_BRANCH}'"
-SETUP_BAAS_OPTS=()
-if [[ -n "${BAAS_BRANCH}" ]]; then
-    SETUP_BAAS_OPTS=("-b" "${BAAS_BRANCH}")
-fi
+BAAS_TUNNELS=()
+EXTRA_OPTIONS=()
+
 if [[ -n "${VERBOSE}" ]]; then
-    SETUP_BAAS_OPTS+=("-v")
+    EXTRA_OPTIONS+=("-v")
 fi
 
+if [[ -n "${BAAS_PROXY}" ]]; then
+    echo "Transferring baas proxy setup script to ${SSH_USER}:${FILE_DEST_DIR}"
+    scp "${SSH_OPTIONS[@]}" "${EVERGREEN_PATH}/setup_baas_proxy.sh" "${SSH_USER}:${FILE_DEST_DIR}/"
+
+    # Add extra tunnel for baas proxy HTTP API config interface
+    BAAS_TUNNELS=("-L" "${CONFIG_PORT}:127.0.0.1:8474")
+    # Enable baas proxy and use ${REMOTE_PORT} as the proxy listen port
+    EXTRA_OPTIONS+=("-t" "${REMOTE_PORT}")
+else
+    # Force remote port to 9090 if baas proxy is not used - connect directly to baas
+    REMOTE_PORT=9090
+fi
+
+BAAS_TUNNELS+=("-L" "9090:127.0.0.1:${REMOTE_PORT}")
+
 # Run the setup baas host script and provide the location of the baas host vars script
-# Also sets up a forward tunnel for port 9090 through the ssh connection to the baas remote host
-echo "Running setup script (with forward tunnel to 127.0.0.1:9090)"
-ssh "${SSH_OPTIONS[@]}" -L 9090:127.0.0.1:9090 "${SSH_USER}" "${FILE_DEST_DIR}/setup_baas_host.sh" "${SETUP_BAAS_OPTS[@]}" "${FILE_DEST_DIR}/baas_host_vars.sh"
+# Also sets up a forward tunnel for local port 9090 through the ssh connection to the baas remote host
+# If baas proxy is enabled, a second forward tunnel is added for the HTTP API config interface
+echo "Running setup script (with forward tunnel on :9090 to 127.0.0.1:${REMOTE_PORT})"
+if [[ -n "${BAAS_BRANCH}" ]]; then
+    echo "- Starting remote baas with branch/commit: '${BAAS_BRANCH}'"
+    EXTRA_OPTIONS+=("-b" "${BAAS_BRANCH}")
+fi
+if [[ -n "${BAAS_PROXY}" ]]; then
+    echo "- Baas proxy enabled - local HTTP API config port 127.0.0.1:${CONFIG_PORT}"
+fi
+
+# shellcheck disable=SC2029
+ssh "${SSH_OPTIONS[@]}" "${BAAS_TUNNELS[@]}" "${SSH_USER}" \
+    "${FILE_DEST_DIR}/setup_baas_host.sh" "${EXTRA_OPTIONS[@]}" "${FILE_DEST_DIR}/baas_host_vars.sh"

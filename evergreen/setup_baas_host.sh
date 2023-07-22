@@ -2,38 +2,58 @@
 # The script to be run on the ubuntu host that will run baas for the evergreen windows tests
 #
 # Usage:
-# ./evergreen/setup_baas_host.sh [-f FILE] [-b BRANCH] [-v] [-h]
+# ./evergreen/setup_baas_host.sh [-b BRANCH] [-d PATH] [-t PORT] [-v] [-h] HOST_VARS
 #
 
 set -o errexit
+set -o errtrace
 set -o pipefail
 
-trap 'catch $? ${LINENO}' EXIT
+trap 'catch $? ${LINENO}' ERR
+trap "exit" INT TERM
+
+# Set up catch function that runs when an error occurs
 function catch()
 {
-  if [ "$1" != "0" ]; then
-    echo "Error $1 occurred while starting remote baas at line $2"
-  fi
+    # Usage: catch EXIT_CODE LINE_NUM
+    echo "${BASH_SOURCE[0]}: $2: Error $1 occurred while starting remote baas"
 }
 
 function usage()
 {
-    echo "Usage: setup_baas_host.sh [-b BRANCH] [-v] [-h] HOST_VARS"
+    # Usage: usage [EXIT_CODE]
+    echo "Usage: setup_baas_host.sh [-b BRANCH] [-d PATH] [-t PORT] [-v] [-h] HOST_VARS"
     echo -e "\tHOST_VARS\t\tPath to baas host vars script file"
     echo "Options:"
     echo -e "\t-b BRANCH\tOptional branch or git spec of baas to checkout/build"
+    echo -e "\t-d PATH\t\tSkip setting up the data device and use alternate data path"
     echo -e "\t-v\t\tEnable verbose script debugging"
     echo -e "\t-h\t\tShow this usage summary and exit"
+    echo "ToxiProxy Options:"
+    echo -e "\t-t PORT\t\tEnable Toxiproxy support (proxy between baas on :9090 and PORT)"
     # Default to 0 if exit code not provided
     exit "${1:0}"
 }
 
 BAAS_BRANCH=
+OPT_DATA_DIR=
+PROXY_PORT=
 VERBOSE=
 
-while getopts "b:vh" opt; do
+while getopts "b:d:t:vh" opt; do
     case "${opt}" in
         b) BAAS_BRANCH="${OPTARG}";;
+<<<<<<< HEAD
+=======
+        d) if [[ -z "${OPTARG}" ]]; then
+               echo "Error: Alternate data directory was empty"
+               usage 1
+           fi; OPT_DATA_DIR="${OPTARG}";;
+        t) if [[ -z "${OPTARG}" ]]; then
+               echo "Error: Baas proxy port was empty";
+               usage 1
+           fi; PROXY_PORT="${OPTARG}";;
+>>>>>>> 261ea6389 (Added support for starting baas proxy)
         v) VERBOSE="yes";;
         h) usage 0;;
         *) usage 1;;
@@ -41,36 +61,58 @@ while getopts "b:vh" opt; do
 done
 
 shift $((OPTIND - 1))
+
+if [[ $# -lt 1 ]]; then
+    echo "Error: Baas host vars script not provided"
+    usage 1
+fi
+
 BAAS_HOST_VARS="${1}"; shift;
 
 if [[ -z "${BAAS_HOST_VARS}" ]]; then
-    echo "Baas host vars script not provided"
+    echo "Error: Baas host vars script value was empty"
     usage 1
 elif [[ ! -f "${BAAS_HOST_VARS}" ]]; then
-    echo "Baas host vars script not found: ${BAAS_HOST_VARS}"
+    echo "Error: Baas host vars script not found: ${BAAS_HOST_VARS}"
     usage 1
 fi
 
 # shellcheck disable=SC1090
 source "${BAAS_HOST_VARS}"
 
-if [[ -n "${GITHUB_KNOWN_HOSTS}" ]]; then
-    echo "${GITHUB_KNOWN_HOSTS}" | tee -a "${HOME}/.ssh/known_hosts"
-else
-    echo "Warning: GITHUB_KNOWN_HOSTS not defined in baas host vars script - github clone may hang or fail during setup"
+if [[ -z "${AWS_ACCESS_KEY_ID}" ]]; then
+    echo "Error: AWS_ACCESS_KEY_ID was not provided by baas host vars script"
+    exit 1
 fi
 
-DATA_DIR=/data
-DATA_TEMP_DIR="${DATA_DIR}/tmp"
-BAAS_REMOTE_DIR="${DATA_DIR}/baas-remote"
-BAAS_WORK_DIR="${BAAS_REMOTE_DIR}/baas-work-dir"
+if [[ -z "${AWS_SECRET_ACCESS_KEY}" ]]; then
+    echo "Error: AWS_SECRET_ACCESS_KEY was not provided by baas host vars script"
+    exit 1
+fi
 
-function setup_data_dir()
+if [[ -z "${REALM_CORE_REVISION}" ]]; then
+    echo "REALM_CORE_REVISION was not provided by baas host vars script, using 'master'"
+    REALM_CORE_REVISION='master'
+fi
+
+if [[ -n "${GITHUB_KNOWN_HOSTS}" ]]; then
+    KNOWN_HOSTS_FILE="${HOME}/.ssh/known_hosts"
+    if [[ -f "${KNOWN_HOSTS_FILE}" ]] && ! grep -q "${GITHUB_KNOWN_HOSTS}" "${KNOWN_HOSTS_FILE}"; then
+        echo "${GITHUB_KNOWN_HOSTS}" | tee -a "${KNOWN_HOSTS_FILE}"
+    else
+        echo "Github known hosts entry found - skipping known_hosts update"
+    fi
+else
+    echo "Warning: GITHUB_KNOWN_HOSTS not defined in baas host vars script - 'github clone' may hang or fail during setup"
+fi
+
+function init_data_device()
 {
+    #Usage: init_data_device
     data_device=
 
     # Find /data ebs device to be mounted
-    devices=$(sudo lsblk | grep disk| awk '{print $1}')
+    devices=$(sudo lsblk | grep disk | awk '{print $1}')
     for device in ${devices}; do
         is_data=$(sudo file -s "/dev/${device}" | awk '{print $2}')
         if [ "${is_data}" == "data" ]; then
@@ -96,7 +138,12 @@ function setup_data_dir()
     fi
 
     sudo chmod 777 "${DATA_DIR}"
+}
 
+function setup_data_dir()
+{
+    # Usage: setup_data_dir
+    # Data directory is expected to be set in DATA_DIR variable
     # Delete /data/baas-remote/ dir if is already exists
     [[ -d "${BAAS_REMOTE_DIR}" ]] && sudo rm -rf "${BAAS_REMOTE_DIR}"
 
@@ -112,9 +159,58 @@ function setup_data_dir()
     # Set up the temp directory
     mkdir -p "${DATA_TEMP_DIR}"
     chmod 1777 "${DATA_TEMP_DIR}"
-    echo "original TMP=${TMPDIR}"
     export TMPDIR="${DATA_TEMP_DIR}"
 }
+
+function on_exit()
+{
+    # Usage: on_exit
+    baas_pid=
+    proxy_pid=
+    if [[ -f "${PROXY_PID_FILE}" ]]; then
+        proxy_pid="$(< "${PROXY_PID_FILE}")"
+    fi
+
+    if [[ -f "${SERVER_PID_FILE}" ]]; then
+        baas_pid="$(< "${SERVER_PID_FILE}")"
+    fi
+
+    if [[ -n "${proxy_pid}" ]]; then
+        echo "Stopping baas proxy ${proxy_pid}"
+        kill "${proxy_pid}"
+    fi
+
+    if [[ -n "${baas_pid}" ]]; then
+        echo "Stopping baas server ${baas_pid}"
+        kill "${baas_pid}"
+    fi
+
+    echo "Waiting for processes to exit"
+    wait
+}
+
+function start_baas_proxy()
+{
+    # Usage: start_baas_proxy PORT
+    # Delete the toxiproxy working directory if it currently exists
+    if [[ -n "${BAAS_PROXY_DIR}" && -d "${BAAS_PROXY_DIR}" ]]; then
+        rm -rf "${BAAS_PROXY_DIR}"
+    fi
+
+    if [[ -f "${HOME}/setup_baas_proxy.sh" ]]; then
+        cp "${HOME}/setup_baas_proxy.sh" evergreen/
+    fi
+
+    proxy_options=
+    if [[ -n "${VERBOSE}" ]]; then
+        proxy_options=("-v")
+    fi
+
+    # Pass the baas work directory to the toxiproxy script for the go executable
+    ./evergreen/setup_baas_proxy.sh "${proxy_options[@]}" -b "${BAAS_WORK_DIR}" -w "${BAAS_PROXY_DIR}" -p "${1}" 2>&1 &
+    echo $! > "${PROXY_PID_FILE}"
+}
+
 
 # Wait until after the BAAS_HOST_VARS file is loaded to enable verbose tracing
 if [[ -n "${VERBOSE}" ]]; then
@@ -124,27 +220,58 @@ fi
 
 sudo chmod 600 "${HOME}/.ssh"/*
 
+# Should an alternate data directory location be used? If so, dont init the data device
+if [[ -z "${OPT_DATA_DIR}" ]]; then
+    DATA_DIR=/data
+    init_data_device
+else
+    DATA_DIR="${OPT_DATA_DIR}"
+fi
+
+DATA_TEMP_DIR="${DATA_DIR}/tmp"
+BAAS_REMOTE_DIR="${DATA_DIR}/baas-remote"
+BAAS_WORK_DIR="${BAAS_REMOTE_DIR}/baas-work-dir"
+SERVER_PID_FILE="${BAAS_REMOTE_DIR}/baas-server.pid"
+BAAS_PROXY_DIR="${BAAS_REMOTE_DIR}/baas-proxy-dir"
+PROXY_PID_FILE="${BAAS_REMOTE_DIR}/baas-proxy.pid"
+
 setup_data_dir
 
 pushd "${BAAS_REMOTE_DIR}" > /dev/null
-git clone git@github.com:realm/realm-core.git realm-core
-pushd realm-core > /dev/null
+
+# Clone the realm core repo and check out the specified version
+if [[ ! -d "realm-core/.git" ]]; then
+    git clone git@github.com:realm/realm-core.git realm-core
+    pushd realm-core > /dev/null
+else
+    pushd realm-core > /dev/null
+    git fetch
+fi
 
 git checkout "${REALM_CORE_REVISION}"
 git submodule update --init --recursive
+
 if [[ -f "${HOME}/install_baas.sh" ]]; then
     cp "${HOME}/install_baas.sh" evergreen/
 fi
 
-INSTALL_BAAS_OPTS=()
+# Set up the cleanup function that runs at exit and stops baas server and proxy (if run)
+trap 'on_exit' EXIT
+
+BAAS_OPTIONS=
 if [[ -n "${BAAS_BRANCH}" ]]; then
-    INSTALL_BAAS_OPTS=("-b" "${BAAS_BRANCH}")
+    BAAS_OPTIONS=("-b" "${BAAS_BRANCH}")
 fi
 if [[ -n "${VERBOSE}" ]]; then
-    INSTALL_BAAS_OPTS+=("-v")
+    BAAS_OPTIONS+=("-v")
 fi
 
-./evergreen/install_baas.sh -w "${BAAS_WORK_DIR}" "${INSTALL_BAAS_OPTS[@]}" 2>&1
+./evergreen/install_baas.sh "${BAAS_OPTIONS[@]}" -w "${BAAS_WORK_DIR}" 2>&1 &
+echo $! > "${SERVER_PID_FILE}"
+
+if [[ -n "${PROXY_PORT}" ]]; then
+    start_baas_proxy "${PROXY_PORT}"
+fi
 
 popd > /dev/null  # realm-core
 popd > /dev/null  # /data/baas-remote
