@@ -560,6 +560,7 @@ static void apply_non_migration_changes(Group& group, std::vector<SchemaChange> 
         }
         void operator()(AddIndex op)
         {
+
             table(op.object).add_search_index(op.property->column_key, op.type);
         }
         void operator()(RemoveIndex op)
@@ -633,7 +634,16 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         }
         void operator()(AddIndex op)
         {
-            add_search_index(table(op.object), *op.property, op.type);
+            switch (op.type) {
+                case IndexType::General:
+                    table(op.object).add_search_index(op.property->column_key);
+                    break;
+                case IndexType::Fulltext:
+                    table(op.object).add_fulltext_index(op.property->column_key);
+                    break;
+                case IndexType::None:
+                    REALM_UNREACHABLE();
+            }
         }
         void operator()(RemoveIndex op)
         {
@@ -680,8 +690,18 @@ void ObjectStore::apply_additive_changes(Group& group, std::vector<SchemaChange>
         }
         void operator()(AddIndex op)
         {
-            if (update_indexes)
-                table(op.object).add_search_index(op.property->column_key);
+            if (update_indexes) {
+                switch (op.type) {
+                    case IndexType::General:
+                        table(op.object).add_search_index(op.property->column_key);
+                        break;
+                    case IndexType::Fulltext:
+                        table(op.object).add_fulltext_index(op.property->column_key);
+                        break;
+                    case IndexType::None:
+                        REALM_UNREACHABLE();
+                }
+            }
         }
         void operator()(RemoveIndex op)
         {
@@ -752,7 +772,16 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
         }
         void operator()(AddIndex op)
         {
-            add_search_index(table(op.object), *op.property, op.type);
+            switch (op.type) {
+                case IndexType::General:
+                    table(op.object).add_search_index(op.property->column_key);
+                    break;
+                case IndexType::Fulltext:
+                    table(op.object).add_fulltext_index(op.property->column_key);
+                    break;
+                case IndexType::None:
+                    REALM_UNREACHABLE();
+            }
         }
         void operator()(RemoveIndex op)
         {

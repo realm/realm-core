@@ -64,6 +64,7 @@ using util::any_cast;
 using util::Optional;
 
 using namespace std::string_view_literals;
+using namespace std::literals::string_literals;
 
 namespace {
 std::shared_ptr<SyncUser> log_in(std::shared_ptr<App> app, AppCredentials credentials = AppCredentials::anonymous())
@@ -5271,4 +5272,65 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     CHECK(app1_1 != app2_1);
     CHECK(app1_1 != app2_3);
     CHECK(app1_1 != app2_4);
+}
+
+
+TEST_CASE("app: full-text compatible with sync", "[sync][app]") {
+    std::string base_url = get_base_url();
+    const std::string valid_pk_name = "_id";
+    REQUIRE(!base_url.empty());
+
+    Schema schema{
+        {"TopLevel",
+         {
+             {valid_pk_name, PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"full_text", Property::IsFulltextIndexed{true}},
+         }},
+    };
+
+    auto server_app_config = minimal_app_config(base_url, "full_text", schema);
+    auto app_session = create_app(server_app_config);
+    const auto partition = random_string(100);
+    TestAppSession test_session(app_session, nullptr);
+    SyncTestFile config(test_session.app(), partition, schema);
+    SharedRealm realm;
+    SECTION("sync open") {
+        INFO("realm opened without async open");
+        realm = Realm::get_shared_realm(config);
+    }
+    SECTION("async open") {
+        INFO("realm opened with async open");
+        auto async_open_task = Realm::get_synchronized_realm(config);
+
+        auto [realm_promise, realm_future] = util::make_promise_future<ThreadSafeReference>();
+        async_open_task->start(
+            [promise = std::move(realm_promise)](ThreadSafeReference ref, std::exception_ptr ouch) mutable {
+                if (ouch) {
+                    try {
+                        std::rethrow_exception(ouch);
+                    }
+                    catch (...) {
+                        promise.set_error(exception_to_status());
+                    }
+                }
+                else {
+                    promise.emplace_value(std::move(ref));
+                }
+            });
+
+        realm = Realm::get_shared_realm(std::move(realm_future.get()));
+    }
+
+    CppContext c(realm);
+    auto obj_id_1 = ObjectId::gen();
+    auto obj_id_2 = ObjectId::gen();
+    realm->begin_transaction();
+    Object::create(c, realm, "TopLevel", std::any(AnyDict{{"_id", obj_id_1}, {"full_text", "Hello, world!"s}}));
+    Object::create(c, realm, "TopLevel", std::any(AnyDict{{"_id", obj_id_2}, {"full_text", "Hello, everyone!"s}}));
+    realm->commit_transaction();
+
+    auto table = realm->read_group().get_table("class_TopLevel");
+    Results world_results(realm, Query(table).fulltext(table->get_column_key("full_text"), "world"));
+    REQUIRE(world_results.size() == 1);
+    REQUIRE(world_results.get<Obj>(0).get_primary_key() == Mixed{obj_id_1});
 }
