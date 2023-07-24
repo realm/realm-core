@@ -5334,6 +5334,3 @@ TEST_CASE("app: shared instances", "[sync][app]") {
     CHECK(app1_1 != app2_3);
     CHECK(app1_1 != app2_4);
 }
-
-
-
