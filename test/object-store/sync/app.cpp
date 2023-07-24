@@ -5330,6 +5330,7 @@ TEST_CASE("app: full-text compatible with sync", "[sync][app]") {
     realm->commit_transaction();
 
     auto table = realm->read_group().get_table("class_TopLevel");
+    REQUIRE(table->search_index_type(table->get_column_key("full_text")) == IndexType::Fulltext);
     Results world_results(realm, Query(table).fulltext(table->get_column_key("full_text"), "world"));
     REQUIRE(world_results.size() == 1);
     REQUIRE(world_results.get<Obj>(0).get_primary_key() == Mixed{obj_id_1});
