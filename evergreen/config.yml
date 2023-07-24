@@ -144,18 +144,6 @@ functions:
             -C cmake_vars.txt ${extra_flags} \
             -G "$GENERATOR"
 
-          # Fail the test if local object store tests are defined and this is not a patch build
-          if [[ -f "build/objstore-tests.do-not-commit" ]]; then
-              if [[ -z "${is_patch}" ]]; then
-                echo "ERROR: Found custom object store tests for non-patch build"
-                echo "- Revert test/object-store/objstore-tests.do-not-commit and recommit"
-                exit 1
-              else
-                echo "WARNING: Custom object store tests are configured for this patch build"
-                echo "- Revert test/object-store/objstore-tests.do-not-commit before merging PR"
-              fi
-          fi
-
           if [[ -n "${target_to_build|}" ]]; then
               target="--target ${target_to_build|}"
           fi
@@ -207,10 +195,13 @@ functions:
               export DEVELOPER_DIR="${xcode_developer_dir}"
           fi
 
+          # NOTE: These two values will be ANDed together for matching tests
+          TEST_FLAGS=
           if [[ -n "${test_label}" ]]; then
-              TEST_FLAGS="-L ${test_label}"
-          elif [[ -n "${test_filter}" ]]; then
-              TEST_FLAGS="-R ${test_filter}"
+              TEST_FLAGS="-L ${test_label} "
+          fi
+          if [[ -n "${test_filter}" ]]; then
+              TEST_FLAGS+="-R ${test_filter} "
           fi
 
           if [[ -n "${verbose_test_output}" ]]; then
@@ -273,7 +264,7 @@ functions:
   - command: attach.results
     params:
       file_location: realm-core/${task_name}_results.json
-  - command: "shell.exec"
+  - command: shell.exec
     params:
       working_dir: realm-core
       shell: bash
@@ -491,6 +482,11 @@ functions:
         set -o errexit
         set -o pipefail
 
+        if [[ -n "${disable_tests_against_baas|}" ]]; then
+          echo "Should not be using remote baas if the tests are not being used"
+          exit 0
+        fi
+
         # Save the remote host ssh key and details to files
         echo "${__project_aws_ssh_key_value}" > .baas_ssh_key
         chmod 600 .baas_ssh_key
@@ -520,6 +516,10 @@ functions:
         set -o errexit
         set -o pipefail
         set -o verbose
+
+        if [[ -n "${disable_tests_against_baas|}" ]]; then
+          exit 0
+        fi
 
         BAAS_USER=ubuntu
 
@@ -586,6 +586,33 @@ functions:
         ./evergreen/wait_for_baas.sh -s -w ./baas-work-dir -l ""
 
         echo "Baas is started!"
+
+  "check branch state":
+  - command: shell.exec
+    type: setup
+    params:
+      working_dir: realm-core
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o pipefail
+        set -o verbose
+
+        if [[ -n "${disable_tests_against_baas|}" ]]; then
+          exit 0
+        fi
+
+        # Fail the test if local/evergreen object store tests are defined and this is not a patch build
+        if [[ -f "build/objstore-tests.do-not-commit" ]]; then
+            if [[ -z "${is_patch}" ]]; then
+              echo "ERROR: Found custom object store tests for non-patch build"
+              echo "- Revert test/object-store/objstore-tests.do-not-commit and recommit"
+              exit 1
+            else
+              echo "WARNING: Custom object store tests are configured for this patch build"
+              echo "- Revert test/object-store/objstore-tests.do-not-commit before merging PR"
+            fi
+        fi
 
 timeout:
   - func: "run hang analyzer"
@@ -853,6 +880,7 @@ tasks:
       test_label: objstore-local
       test_executable_name: "realm-object-store-tests"
       verbose_test_output: true
+  - func: "check branch state"
 
 # These are baas object store tests that run against baas running locally
 - name: local-baas-integration-tests
@@ -871,6 +899,7 @@ tasks:
       test_label: objstore-baas
       test_executable_name: "realm-object-store-tests"
       verbose_test_output: true
+  - func: "check branch state"
 
 # These are baas object store tests that run against baas running on a remote host
 - name: baas-integration-tests
@@ -889,6 +918,7 @@ tasks:
       test_label: objstore-baas
       test_executable_name: "realm-object-store-tests"
       verbose_test_output: true
+  - func: "check branch state"
 
 - name: process_coverage_data
   tags: [ "for_pull_requests" ]
