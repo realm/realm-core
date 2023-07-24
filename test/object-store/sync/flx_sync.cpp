@@ -2905,7 +2905,6 @@ TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
     }
 }
 
-// TODO this test has been failing very frequently. We need to fix it and re-enable it in RCORE-1149.
 TEST_CASE("flx: data ingest - dev mode", "[sync][flx][data ingest][baas]") {
     FLXSyncTestHarness::ServerSchema server_schema;
     server_schema.dev_mode_enabled = true;
