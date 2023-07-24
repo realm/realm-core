@@ -532,43 +532,6 @@ functions:
         # Add -v to this command for verbose script logging
         ./evergreen/setup_baas_host_local.sh -w ./baas-work-dir -u $BAAS_USER $OPT_BAAS_BRANCH ./baas_host_vars.sh ./.baas_ssh_key 2>&1 | tee install_baas_output.log
 
-  "launch local baas":
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      shell: bash
-      background: true
-      # Do NOT use verbose for this script since it would reveal the values of secrets
-      script: |-
-        set -o errexit
-        set -o pipefail
-
-        export CURL=${curl|curl}
-
-        if [[ -n "${disable_tests_against_baas|}" ]]; then
-          exit 0
-        fi
-
-        if [[ -z "${baas_secrets_aws_access_key|}" || -z "${baas_secrets_aws_secret_key|}" ]]; then
-            echo "Must supply baas secrets AWS key info to start baas server"
-            exit 1
-        fi
-
-        export AWS_ACCESS_KEY_ID="${baas_secrets_aws_access_key}"
-        export AWS_SECRET_ACCESS_KEY="${baas_secrets_aws_secret_key}"
-
-        if [ -n "${xcode_developer_dir}" ]; then
-            export DEVELOPER_DIR="${xcode_developer_dir}"
-        fi
-
-        OPT_BAAS_BRANCH=
-        if [ -n "${baas_branch}" ]; then
-            OPT_BAAS_BRANCH="-b ${baas_branch}"
-        fi
-
-        # Run the install_baas.sh script to run baas locally
-        ./evergreen/install_baas.sh -w ./baas-work-dir $OPT_BAAS_BRANCH 2>&1 | tee install_baas_output.log
-
   "wait for baas to start":
   - command: shell.exec
     params:
@@ -869,7 +832,7 @@ tasks:
 
 # These are local object store tests; baas is not started, however some use the sync server
 - name: object-store-tests
-  tags: [ "test_suite_local_baas", "test_suite_remote_baas", "for_pull_requests" ]
+  tags: [ "test_suite_remote_baas", "for_pull_requests" ]
   exec_timeout_secs: 3600
   commands:
   - func: "compile"
@@ -878,25 +841,6 @@ tasks:
   - func: "run tests"
     vars:
       test_label: objstore-local
-      test_executable_name: "realm-object-store-tests"
-      verbose_test_output: true
-  - func: "check branch state"
-
-# These are baas object store tests that run against baas running locally
-- name: local-baas-integration-tests
-  tags: [ "test_suite_local_baas", "for_pull_requests" ]
-  exec_timeout_secs: 3600
-  commands:
-  - func: "compile"
-    vars:
-      target_to_build: ObjectStoreTests
-  - func: "launch local baas"
-    vars:
-      baas_branch: 1a0d1c021460d2215b21bc4f7c7f668714ce81c7
-  - func: "wait for baas to start"
-  - func: "run tests"
-    vars:
-      test_label: objstore-baas
       test_executable_name: "realm-object-store-tests"
       verbose_test_output: true
   - func: "check branch state"
@@ -1092,23 +1036,6 @@ task_groups:
   - compile
   - .test_suite
 
-# Runs object-store-tests against baas running locally
-- name: compile_test_and_package_local_baas
-  max_hosts: 1
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  teardown_task:
-  - func: "upload test results"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - compile
-  - .test_suite
-  - .test_suite_local_baas
-  - package
-
 # Runs object-store-tests against baas running on remote host
 - name: compile_test_and_package
   max_hosts: 1
@@ -1126,22 +1053,6 @@ task_groups:
   - .test_suite_remote_baas
   - package
 
-# Runs object-store-tests against baas running locally
-- name: compile_test_local_baas
-  max_hosts: 1
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  teardown_task:
-  - func: "upload test results"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - compile
-  - .test_suite
-  - .test_suite_local_baas
-
 # Runs object-store-tests against baas running on remote host
 - name: compile_test
   max_hosts: 1
@@ -1157,23 +1068,6 @@ task_groups:
   - compile
   - .test_suite
   - .test_suite_remote_baas
-
-# Runs object-store-tests against baas running locally
-- name: compile_test_coverage_local_baas
-  max_hosts: 1
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  teardown_task:
-  - func: "upload test results"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - compile
-  - .test_suite
-  - .test_suite_local_baas
-  - process_coverage_data
 
 # Runs object-store-tests against baas running on remote host
 - name: compile_test_coverage
