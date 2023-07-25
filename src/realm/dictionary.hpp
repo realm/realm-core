@@ -104,6 +104,9 @@ public:
     std::pair<Iterator, bool> insert(Mixed key, Mixed value);
     std::pair<Iterator, bool> insert(Mixed key, const Obj& obj);
 
+    template <typename T>
+    void insert_json(const std::string&, const T&);
+
     Obj create_and_insert_linked_object(Mixed key);
 
     void insert_collection(const PathElement&, CollectionType dict_or_list) override;
@@ -128,6 +131,8 @@ public:
     bool try_erase(Mixed key);
 
     void nullify(size_t);
+    bool nullify(ObjLink target_link);
+    bool replace_link(ObjLink old_link, ObjLink replace_link);
     void remove_backlinks(CascadeState& state) const;
     size_t find_first(Mixed value) const;
 

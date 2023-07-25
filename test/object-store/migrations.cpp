@@ -1235,7 +1235,7 @@ TEST_CASE("migration: Automatic") {
                 auto list = util::any_cast<List>(obj.get_property_value<std::any>(ctx, "array"));
                 REQUIRE(list.size() == 1);
 
-                CppContext list_ctx(ctx, obj.obj(), *obj.get_object_schema().property_for_name("array"));
+                CppContext list_ctx(ctx, obj.get_obj(), *obj.get_object_schema().property_for_name("array"));
                 link = util::any_cast<Object>(list.get(list_ctx, 0));
                 REQUIRE(link.is_valid());
                 REQUIRE(util::any_cast<int64_t>(link.get_property_value<std::any>(list_ctx, "value")) == 20);
@@ -1290,7 +1290,7 @@ TEST_CASE("migration: Automatic") {
                 auto list = util::any_cast<List>(obj.get_property_value<std::any>(ctx, "array"));
                 REQUIRE(list.size() == 1);
 
-                CppContext list_ctx(ctx, obj.obj(), *obj.get_object_schema().property_for_name("array"));
+                CppContext list_ctx(ctx, obj.get_obj(), *obj.get_object_schema().property_for_name("array"));
                 link = util::any_cast<Object>(list.get(list_ctx, 0));
                 REQUIRE(link.is_valid());
                 REQUIRE(util::any_cast<int64_t>(link.get_property_value<std::any>(list_ctx, "value")) == 20);
@@ -1350,11 +1350,11 @@ TEST_CASE("migration: Automatic") {
                 auto linking = util::any_cast<Results>(linked_obj.get_property_value<std::any>(ctx, "origin"));
                 REQUIRE(linking.size() == 1);
 
-                REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object")).obj().get_key() ==
-                        linked_obj.obj().get_key());
+                REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object")).get_obj().get_key() ==
+                        linked_obj.get_obj().get_key());
                 obj.set_property_value(ctx, "object", std::any(new_obj));
-                REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object")).obj().get_key() ==
-                        new_obj.obj().get_key());
+                REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object")).get_obj().get_key() ==
+                        new_obj.get_obj().get_key());
 
                 REQUIRE(linking.size() == 0);
             });
@@ -2712,7 +2712,7 @@ TEST_CASE("migration nested collection automatic") {
         Schema new_schema = {
             {"nested_object",
              {{"nested_list",
-               PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable,
+               PropertyType::Array | PropertyType::String | PropertyType::Nullable,
                {CollectionType::List}}}},
         };
         REQUIRE_UPDATE_SUCCEEDS(*realm, new_schema, 1);
@@ -2722,7 +2722,7 @@ TEST_CASE("migration nested collection automatic") {
         Schema new_schema = {
             {"nested_object",
              {{"nested_list",
-               PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable,
+               PropertyType::Array | PropertyType::Int | PropertyType::Nullable,
                {CollectionType::Dictionary}}}},
         };
         REQUIRE_UPDATE_SUCCEEDS(*realm, new_schema, 1);
@@ -2756,12 +2756,12 @@ TEST_CASE("migration nested collection additive") {
         Schema new_schema = {
             {"nested_object",
              {{"nested_list",
-               PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable,
+               PropertyType::Array | PropertyType::String | PropertyType::Nullable,
                {CollectionType::List}}}},
         };
         INVALID_SCHEMA_CHANGE(*realm, new_schema,
                               "Property 'nested_object.nested_list' has been changed from 'array<array<int>>' to "
-                              "'array<array<mixed>>'");
+                              "'array<array<string>>'");
     }
 
     SECTION("Change type of nested collection") {

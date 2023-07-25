@@ -114,16 +114,16 @@ static void check_subscription(const sync::SubscriptionSet& sub_set, const std::
     REQUIRE(table_sub->name == sub_name);
 }
 
-TEST_CASE("Migration store", "[flx][migration]") {
+TEST_CASE("Migration store", "[flx][migration][local]") {
     std::string file_path = util::make_temp_dir() + "/migration_store.realm";
     auto mig_db = DB::create(sync::make_client_replication(), file_path);
     auto migration_store = sync::MigrationStore::create(mig_db);
 
-    SECTION("Migration store default", "[flx][migration]") {
+    SECTION("Migration store default") {
         check_not_migrated(migration_store);
     }
 
-    SECTION("Migration store complete and cancel", "[flx][migration]") {
+    SECTION("Migration store complete and cancel") {
         // Start the migration and check the state
         migration_store->migrate_to_flx(rql_string, migrated_partition);
         check_migration_in_progress(migration_store);
@@ -141,7 +141,7 @@ TEST_CASE("Migration store", "[flx][migration]") {
         check_not_migrated(migration_store);
     }
 
-    SECTION("Migration store complete and rollback", "[flx][migration]") {
+    SECTION("Migration store complete and rollback") {
         // Start the migration and check the state
         migration_store->migrate_to_flx(rql_string, migrated_partition);
         check_migration_in_progress(migration_store);
@@ -167,7 +167,7 @@ TEST_CASE("Migration store", "[flx][migration]") {
         check_not_migrated(migration_store);
     }
 
-    SECTION("Migration store complete without in progress", "[flx][migration]") {
+    SECTION("Migration store complete without in progress") {
         check_not_migrated(migration_store);
 
         // Complete the migration and check the state - should be not migrated
@@ -175,7 +175,7 @@ TEST_CASE("Migration store", "[flx][migration]") {
         check_not_migrated(migration_store);
     }
 
-    SECTION("Migration store subscriptions", "[flx][migration]") {
+    SECTION("Migration store subscriptions") {
         auto sub_store = sync::SubscriptionStore::create(mig_db, [](int64_t) {});
         auto orig_version = sub_store->get_latest().version();
 

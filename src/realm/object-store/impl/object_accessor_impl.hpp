@@ -323,14 +323,14 @@ template <>
 inline Obj CppContext::unbox(std::any& v, CreatePolicy policy, ObjKey current_obj) const
 {
     if (auto object = std::any_cast<Object>(&v))
-        return object->obj();
+        return object->get_obj();
     if (auto obj = std::any_cast<Obj>(&v))
         return *obj;
     if (!policy.create)
         return Obj();
 
     REALM_ASSERT(object_schema);
-    return Object::create(const_cast<CppContext&>(*this), realm, *object_schema, v, policy, current_obj).obj();
+    return Object::create(const_cast<CppContext&>(*this), realm, *object_schema, v, policy, current_obj).get_obj();
 }
 
 template <>

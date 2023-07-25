@@ -1392,15 +1392,28 @@ TEST(Many_ConcurrentReaders)
     sg_w->close();
 
     auto reader = [path_str]() {
+        std::stringstream logs;
         try {
+            auto logger = util::StreamLogger(logs);
+            DBOptions options;
+            options.logger = std::make_shared<util::StreamLogger>(logs);
+            options.logger->set_level_threshold(Logger::Level::all);
+            constexpr bool no_create = false;
             for (int i = 0; i < 1000; ++i) {
-                DBRef sg_r = DB::create(path_str);
+                DBRef sg_r = DB::create(path_str, no_create, options);
                 ReadTransaction rt(sg_r);
+                ConstTableRef t = rt.get_table("table");
+                auto col_key = t->get_column_key("column");
+                REALM_ASSERT(t->get_object(0).get<StringData>(col_key) == "string");
                 rt.get_group().verify();
             }
         }
-        catch (...) {
-            REALM_ASSERT(false);
+        catch (const std::exception& e) {
+            std::cerr << "Exception during Many_ConcurrentReaders:" << std::endl;
+            std::cerr << "Reason: '" << e.what() << "'" << std::endl;
+            std::cerr << logs.str();
+            constexpr bool unexpected_exception = false;
+            REALM_ASSERT_EX(unexpected_exception, e.what());
         }
     };
 
@@ -1628,7 +1641,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 #endif // encryption enabled
 
 // not ios or android
-//#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
+// #endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
 
 
 TEST(Shared_SpaceOveruse)
@@ -4173,6 +4186,10 @@ TEST(Shared_WriteTo)
         baas->add_column(type_Mixed, "any", true);
         baas->add_column(*foos, "link");
 
+        // collections in mixed
+        baas->add_column(type_Mixed, "mixed_nested_list", true);
+        baas->add_column(type_Mixed, "mixed_nested_dictionary", true);
+
         auto col_str = foos->add_column(type_String, "str");
         foos->add_search_index(col_str);
         foos->add_column_list(*embedded, "list_of_embedded");
@@ -4210,6 +4227,43 @@ TEST(Shared_WriteTo)
         dict.insert("key7", 7);
         dict.insert("key8", 8);
         dict.insert("key9", 9);
+
+        // nested collections
+        // nested list
+        auto col_key_mixed_list = baas->get_column_key("mixed_nested_list");
+        baa.set_collection(col_key_mixed_list, CollectionType::List);
+        auto any_nested_list = baa.get_collection_ptr(col_key_mixed_list);
+        any_nested_list->insert_collection(0, CollectionType::List);
+        any_nested_list->insert_collection(1, CollectionType::Dictionary);
+        any_nested_list->insert_collection(2, CollectionType::Set);
+        auto nested_list1 = any_nested_list->get_list(0);
+        nested_list1->add(1);
+        nested_list1->add(2);
+        nested_list1->add(3);
+        auto nested_dict1 = any_nested_list->get_dictionary(1);
+        nested_dict1->insert("test", 10);
+        nested_dict1->insert("test", "test");
+        auto nested_set1 = any_nested_list->get_set(2);
+        nested_set1->insert(10);
+        nested_set1->insert(12);
+
+        // nested dictionary
+        auto col_key_mixed_dict = baas->get_column_key("mixed_nested_dictionary");
+        baa.set_collection(col_key_mixed_dict, CollectionType::Dictionary);
+        auto any_nested_dict = baa.get_collection_ptr(col_key_mixed_dict);
+        any_nested_dict->insert_collection("List", CollectionType::List);
+        any_nested_dict->insert_collection("Dict", CollectionType::Dictionary);
+        any_nested_dict->insert_collection("Set", CollectionType::Set);
+        auto nested_list2 = any_nested_dict->get_list("List");
+        nested_list2->add(1);
+        nested_list2->add(2);
+        nested_list2->add(3);
+        auto nested_dict2 = any_nested_dict->get_dictionary("Dict");
+        nested_dict2->insert("test", 10);
+        nested_dict2->insert("test", "test");
+        auto nested_set2 = any_nested_dict->get_set("Set");
+        nested_set2->insert(10);
+        nested_set2->insert(12);
 
         auto baa1 = baas->create_object_with_primary_key(666).set("link", foo.get_key());
         obj = baa1.create_and_set_linked_object(baas->get_column_key("embedded"));

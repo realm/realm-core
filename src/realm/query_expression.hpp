@@ -262,7 +262,7 @@ public:
 
     ValueBase& operator=(const ValueBase& other)
     {
-        m_from_list = other.m_from_list;
+        init(other.m_from_list, other.size());
         set(other.begin(), other.end());
         return *this;
     }
@@ -310,8 +310,6 @@ public:
     template <class T>
     void set(T b, T e)
     {
-        size_t sz = e - b;
-        resize(sz);
         size_t i = 0;
         for (auto from = b; from != e; ++from) {
             set(i, *from);
@@ -1714,6 +1712,11 @@ public:
         return m_column_key;
     }
 
+    virtual bool has_path() const noexcept
+    {
+        return false;
+    }
+
 protected:
     LinkMap m_link_map;
     // Column index of payload column of m_table
@@ -1986,7 +1989,46 @@ class Columns<Decimal128> : public SimpleQuerySupport<Decimal128> {
 
 template <>
 class Columns<Mixed> : public SimpleQuerySupport<Mixed> {
+public:
     using SimpleQuerySupport::SimpleQuerySupport;
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        destination.init(false, 1); // Size of 1 is expected by SimpleQuerySupport
+        SimpleQuerySupport::evaluate(index, destination);
+        if (m_path.size() > 0) {
+            if (auto sz = destination.size()) {
+                Collection::QueryCtrlBlock ctrl(m_path, *get_base_table(),
+                                                destination.m_from_list || !m_path_only_unary_keys);
+                for (size_t i = 0; i < sz; i++) {
+                    Collection::get_any(ctrl, destination.get(i), 0);
+                }
+                sz = ctrl.matches.size();
+                destination.init(ctrl.from_list || sz == 0, sz);
+                destination.set(ctrl.matches.begin(), ctrl.matches.end());
+            }
+        }
+    }
+    std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return ObjPropertyExpr::description(state) + util::to_string(m_path);
+    }
+    void path(const Path& path)
+    {
+        for (auto& elem : path) {
+            if (elem.is_all()) {
+                m_path_only_unary_keys = false;
+            }
+            m_path.emplace_back(elem);
+        }
+    }
+    bool has_path() const noexcept override
+    {
+        return !m_path.empty();
+    }
+
+private:
+    Path m_path;
+    bool m_path_only_unary_keys = true;
 };
 
 template <>
@@ -2290,8 +2332,7 @@ public:
             m_link_map.set_cluster(cluster);
         }
         else {
-            m_keys = cluster->get_key_array();
-            m_offset = cluster->get_offset();
+            m_cluster = cluster;
         }
     }
 
@@ -2307,8 +2348,7 @@ public:
             count = m_link_map.count_all_backlinks(index);
         }
         else {
-            ObjKey key(m_keys->get(index) + m_offset);
-            const Obj obj = m_link_map.get_base_table()->get_object(key);
+            const Obj obj = m_link_map.get_base_table()->get_object(m_cluster->get_real_key(index));
             count = obj.get_backlink_count();
         }
         destination = Value<int64_t>(count);
@@ -2325,8 +2365,7 @@ public:
     }
 
 private:
-    const ClusterKeyArray* m_keys = nullptr;
-    uint64_t m_offset = 0;
+    const Cluster* m_cluster = nullptr;
     LinkMap m_link_map;
 };
 
@@ -2823,6 +2862,8 @@ public:
     virtual std::unique_ptr<Subexpr> sum_of() = 0;
     virtual std::unique_ptr<Subexpr> avg_of() = 0;
 
+    virtual bool index(const PathElement&) = 0;
+
     mutable ColKey m_column_key;
     LinkMap m_link_map;
     std::optional<ArrayInteger> m_leaf;
@@ -2849,6 +2890,7 @@ public:
         : Subexpr2<T>(other)
         , ColumnListBase(other)
         , m_is_nullable_storage(this->m_column_key.get_attrs().test(col_attr_Nullable))
+        , m_index(other.m_index)
     {
     }
 
@@ -2899,7 +2941,12 @@ public:
 
     std::string description(util::serializer::SerialisationState& state) const override
     {
-        return ColumnListBase::description(state);
+        std::string index_string;
+        if (m_index) {
+            PathElement p(*m_index);
+            index_string = "[" + util::to_string(p) + "]";
+        }
+        return ColumnListBase::description(state) + index_string;
     }
 
     util::Optional<ExpressionComparisonType> get_comparison_type() const final
@@ -2990,9 +3037,22 @@ public:
     {
         return std::unique_ptr<Subexpr>(new ColumnsCollection(*this));
     }
-    const bool m_is_nullable_storage;
 
-private:
+    bool index(const PathElement& ndx) override
+    {
+        if (ndx.is_ndx()) {
+            m_index = ndx.get_ndx();
+            return true;
+        }
+        else if (ndx.is_all()) {
+            return true;
+        }
+        return false;
+    }
+    const bool m_is_nullable_storage;
+    std::optional<size_t> m_index;
+
+protected:
     template <typename StorageType>
     void evaluate(size_t index, ValueBase& destination)
     {
@@ -3007,9 +3067,20 @@ private:
             if (list_ref) {
                 BPlusTree<StorageType> list(alloc);
                 list.init_from_ref(list_ref);
-                size_t s = list.size();
-                for (size_t j = 0; j < s; j++) {
-                    values.push_back(list.get(j));
+                if (size_t s = list.size()) {
+                    if (m_index) {
+                        if (*m_index < s) {
+                            values.push_back(list.get(*m_index));
+                        }
+                        else if (*m_index == size_t(-1)) {
+                            values.push_back(list.get(s - 1));
+                        }
+                    }
+                    else {
+                        for (size_t j = 0; j < s; j++) {
+                            values.push_back(list.get(j));
+                        }
+                    }
                 }
             }
         }
@@ -3038,6 +3109,10 @@ public:
     {
         return make_subexpr<Columns<Set<T>>>(*this);
     }
+    bool index(const PathElement&) override
+    {
+        return false;
+    }
 };
 
 
@@ -3063,6 +3138,52 @@ public:
     }
 };
 
+template <>
+class Columns<Lst<Mixed>> : public ColumnsCollection<Mixed> {
+public:
+    using ColumnsCollection<Mixed>::ColumnsCollection;
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<Columns<Lst<Mixed>>>(*this);
+    }
+    friend class Table;
+    friend class LinkChain;
+    bool indexes(const Path& path)
+    {
+        REALM_ASSERT(!path.empty());
+        if (ColumnsCollection<Mixed>::index(path[0])) {
+            for (auto& elem : path) {
+                m_path.emplace_back(elem);
+            }
+            return true;
+        }
+        return false;
+    }
+    std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return ColumnListBase::description(state) + util::to_string(m_path);
+    }
+
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        // Base class will handle path[0] and return result in destination
+        ColumnsCollection<Mixed>::evaluate<Mixed>(index, destination);
+        if (m_path.size() > 1) {
+            if (auto sz = destination.size()) {
+                Collection::QueryCtrlBlock ctrl(m_path, *get_base_table(), destination.m_from_list);
+                for (size_t i = 0; i < sz; i++) {
+                    Collection::get_any(ctrl, destination.get(i), 1);
+                }
+                destination.init(ctrl.from_list, ctrl.matches.size());
+                destination.set(ctrl.matches.begin(), ctrl.matches.end());
+            }
+        }
+    }
+
+private:
+    Path m_path;
+};
+
 // Returns the keys
 class ColumnDictionaryKeys;
 
@@ -3074,13 +3195,37 @@ public:
             util::Optional<ExpressionComparisonType> type = util::none)
         : ColumnsCollection<Mixed>(column, table, std::move(links), type)
     {
-        m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(column);
+        m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(m_column_key);
+        m_path.push_back(PathElement::AllTag());
+        m_path_only_unary_keys = false;
+    }
+
+    Columns(const Path& path, ConstTableRef table, std::vector<ColKey> links = {},
+            util::Optional<ExpressionComparisonType> type = util::none)
+        : ColumnsCollection<Mixed>(path[0].get_col_key(), table, std::move(links), type)
+    {
+        size_t path_size = path.size();
+        REALM_ASSERT(path_size > 0);
+        if (path_size == 1) {
+            m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(m_column_key);
+        }
+        init_path(&path[1], &path[1] + path_size - 1);
     }
 
     // Change the node to handle a specific key value only
-    Columns<Dictionary>& key(const Mixed& key_value)
+    Columns<Dictionary>& key(StringData key)
     {
-        init_key(key_value);
+        PathElement p(key);
+        init_path(&p, &p + 1);
+        return *this;
+    }
+
+    // Change the node to handle a specific key value only
+    Columns<Dictionary>& key(const Path& path)
+    {
+        auto sz = path.size();
+        const PathElement* first = &path[0];
+        init_path(first, first + sz);
         return *this;
     }
 
@@ -3102,11 +3247,7 @@ public:
 
     std::string description(util::serializer::SerialisationState& state) const override
     {
-        std::string key_string;
-        if (m_key) {
-            key_string = "['" + *m_key + "']";
-        }
-        return ColumnListBase::description(state) + key_string;
+        return ColumnListBase::description(state) + util::to_string(m_path);
     }
 
     std::unique_ptr<Subexpr> clone() const override
@@ -3114,18 +3255,25 @@ public:
         return make_subexpr<Columns<Dictionary>>(*this);
     }
 
+    bool index(const PathElement&) override
+    {
+        return false;
+    }
+
     Columns(Columns const& other)
         : ColumnsCollection<Mixed>(other)
         , m_key_type(other.m_key_type)
-        , m_key(other.m_key)
+        , m_path(other.m_path)
+        , m_path_only_unary_keys(other.m_path_only_unary_keys)
     {
     }
 
 protected:
-    DataType m_key_type;
-    util::Optional<std::string> m_key;
+    DataType m_key_type = type_String;
+    Path m_path;
+    bool m_path_only_unary_keys;
 
-    void init_key(Mixed key_value);
+    void init_path(const PathElement* begin, const PathElement* end);
 };
 
 // Returns the keys
@@ -3623,6 +3771,7 @@ public:
 
                 int64_t res[ValueBase::chunk_size];
                 static_cast<const Array*>(leaf)->get_chunk(index, res);
+                destination.init(false, rows);
                 destination.set(res, res + rows);
                 return;
             }

@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "13.14.0"
+let versionStr = "13.17.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -130,6 +130,7 @@ let notSyncServerSources: [String] = [
     "realm/table_ref.cpp",
     "realm/table_view.cpp",
     "realm/tokenizer.cpp",
+    "realm/to_json.cpp",
     "realm/transaction.cpp",
     "realm/unicode.cpp",
     "realm/util",
@@ -349,21 +350,12 @@ let bidExcludes: [String] = [
     "wcstod64.c",
 ]
 
-#if swift(>=5.7)
 let platforms: [SupportedPlatform] = [
     .macOS(.v10_13),
     .iOS(.v11),
     .tvOS(.v11),
     .watchOS(.v4)
 ]
-#else
-let platforms: [SupportedPlatform] = [
-    .macOS(.v10_10),
-    .iOS(.v11),
-    .tvOS(.v9),
-    .watchOS(.v2)
-]
-#endif
 
 let package = Package(
     name: "RealmDatabase",

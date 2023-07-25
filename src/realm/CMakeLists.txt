@@ -62,6 +62,7 @@ set(REALM_SOURCES
     object_id.cpp
     table_view.cpp
     tokenizer.cpp
+    to_json.cpp
     transaction.cpp
     sort_descriptor.cpp
     status.cpp
@@ -417,4 +418,5 @@ if (REALM_ENABLE_SYNC)
 endif()
 if(NOT REALM_BUILD_LIB_ONLY AND NOT WINDOWS_STORE)
     add_subdirectory(exec)
+    set_macos_only(exec)
 endif()

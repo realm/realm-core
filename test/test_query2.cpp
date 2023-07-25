@@ -1341,7 +1341,7 @@ TEST(Query_DeepCopyTest)
 
 TEST(Query_StringIndexCrash)
 {
-    // Test for a crash which occured when a query testing for equality on a
+    // Test for a crash which occurred when a query testing for equality on a
     // string index was deep-copied after being run
     Table table;
     auto col = table.add_column(type_String, "s", true);
@@ -5711,6 +5711,9 @@ TEST(Query_Dictionary)
             dict.insert("Value", str);
             incr = false;
         }
+        if (i == 76) {
+            dict.insert("Value", Mixed());
+        }
         dict.insert("Dummy", i);
         if (incr) {
             expected++;
@@ -5743,7 +5746,7 @@ TEST(Query_Dictionary)
     tv = (origin->link(col_links).column<Dictionary>(col_dict) > 50).find_all();
     CHECK_EQUAL(tv.size(), 6);
     tv = (origin->link(col_links).column<Dictionary>(col_dict).key("Value") == null()).find_all();
-    CHECK_EQUAL(tv.size(), 7);
+    CHECK_EQUAL(tv.size(), 1);
 
     tv = (foo->column<Dictionary>(col_dict).keys().begins_with("F")).find_all();
     CHECK_EQUAL(tv.size(), 5);
@@ -5751,7 +5754,6 @@ TEST(Query_Dictionary)
     CHECK_EQUAL(tv.size(), 5);
 }
 
-#if 0 // Reenable when we get support for indexes in collections
 TEST(Query_DictionaryTypedLinks)
 {
     Group g;
@@ -5789,7 +5791,6 @@ TEST(Query_DictionaryTypedLinks)
     cnt = person->query("data.Pet.Parent.Name == 'Fido'").count();
     CHECK_EQUAL(cnt, 1);
 }
-#endif
 
 TEST(Query_TypeOfValue)
 {

@@ -142,6 +142,21 @@ enum class SyncClientHookAction {
     TriggerReconnect,
 };
 
+inline std::ostream& operator<<(std::ostream& os, SyncClientHookAction action)
+{
+    switch (action) {
+        case SyncClientHookAction::NoAction:
+            return os << "NoAction";
+        case SyncClientHookAction::EarlyReturn:
+            return os << "EarlyReturn";
+        case SyncClientHookAction::SuspendWithRetryableError:
+            return os << "SuspendWithRetryableError";
+        case SyncClientHookAction::TriggerReconnect:
+            return os << "TriggerReconnect";
+    }
+    REALM_TERMINATE("Invalid SyncClientHookAction value");
+}
+
 struct SyncClientHookData {
     SyncClientHookEvent event;
     sync::SyncProgress progress;
@@ -198,9 +213,12 @@ struct SyncConfig {
     // a client reset in ClientResyncMode::Manual mode
     util::Optional<std::string> recovery_directory;
     ClientResyncMode client_resync_mode = ClientResyncMode::Manual;
-    std::function<void(std::shared_ptr<Realm> before_frozen)> notify_before_client_reset;
-    std::function<void(std::shared_ptr<Realm> before_frozen, ThreadSafeReference after, bool did_recover)>
+    std::function<void(std::shared_ptr<Realm> before)> notify_before_client_reset;
+    std::function<void(std::shared_ptr<Realm> frozen_before, ThreadSafeReference after, bool did_recover)>
         notify_after_client_reset;
+    // If true, the Realm passed as the `before` argument to the before reset
+    // callbacks will be frozen
+    bool freeze_before_reset_realm = true;
 
     // Used by core testing to hook into the sync client when various events occur and maybe inject
     // errors/disconnects deterministically.
@@ -208,6 +226,15 @@ struct SyncConfig {
         on_sync_client_event_hook;
 
     bool simulate_integration_error = false;
+
+    // callback invoked right after DataInitializationFunction. It is used in order to setup an initial subscription.
+    using SubscriptionInitializerCallback = std::function<void(std::shared_ptr<Realm>)>;
+    SubscriptionInitializerCallback subscription_initializer;
+
+    // in case the initial subscription contains a dynamic query, the user may want to force
+    // the query to be run again every time the realm is opened. This flag should be set to true
+    // in this case.
+    bool rerun_init_subscription_on_open{false};
 
     SyncConfig() = default;
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);

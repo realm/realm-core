@@ -29,6 +29,7 @@
 #include <realm/group.hpp>
 #include <realm/table.hpp>
 #include <realm/query_expression.hpp>
+#include <realm/table_view.hpp>
 
 #include <ostream>
 #include <sstream>
@@ -110,6 +111,7 @@ TEST(Geospatial_Assignment)
     CHECK_EQUAL(obj.get<Geospatial>(location_column_key), geo_without_altitude);
 
     Geospatial geo_box(GeoBox{GeoPoint{1.1, 2.2}, GeoPoint{3.3, 4.4}});
+    CHECK(*GeoBox::from_polygon(geo_box.get<GeoBox>().to_polygon()) == geo_box.get<GeoBox>());
     std::string_view err_msg = "The only Geospatial type currently supported for storage is 'point'";
     CHECK_THROW_CONTAINING_MESSAGE(obj.set(location_column_key, geo_box), err_msg);
     Geospatial geo_circle(GeoCircle{10, GeoPoint{1.1, 2.2}});
@@ -149,11 +151,19 @@ TEST(Query_GeoWithinBasics)
     auto&& location = table->column<Link>(location_column_key);
 
     CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}}).count(), 1);
-    CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{-2, -1.5}, GeoPoint{0.7, 0.5}}).count(), 3);
+    CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{-2, -1.5}, GeoPoint{0.7, 0.5}}).count(), 2);
+    CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{0, 0}, GeoPoint{0.5, 0.5}}).count(), 0);
+    CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{0, 0}, GeoPoint{0.5, 1}}).count(), 1);
+    CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{0, -0.5}, GeoPoint{0.5, 1}}).count(), 0);
+    CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{-2, -1.5}, GeoPoint{0.7, 0.5}}).count(), 2);
+    CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{-2, -1}, GeoPoint{1, 0.5}}).count(), 2);
+    CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{-2, -2}, GeoPoint{1, 1}}).count(), 4);
+    CHECK_EQUAL(location.geo_within(GeoBox{GeoPoint{-2, -2}, GeoPoint{0.5, 1}}).count(), 4);
 
-    GeoPolygon p{{GeoPoint{-0.5, -0.5}, GeoPoint{1.0, 2.5}, GeoPoint{2.5, -0.5}, GeoPoint{-0.5, -0.5}}};
+    GeoPolygon p{{{GeoPoint{-0.5, -0.5}, GeoPoint{1.0, 2.5}, GeoPoint{2.5, -0.5}, GeoPoint{-0.5, -0.5}}}};
+    CHECK(!GeoBox::from_polygon(p).has_value());
     CHECK_EQUAL(location.geo_within(p).count(), 3);
-    p = {{{-3.0, -1.0}, {-2.0, -2.0}, {-1.0, -1.0}, {1.5, -1.0}, {-1.0, 1.5}, {-3.0, -1.0}}};
+    p = {{{{-3.0, -1.0}, {-2.0, -2.0}, {-1.0, -1.0}, {1.5, -1.0}, {-1.0, 1.5}, {-3.0, -1.0}}}};
     CHECK_EQUAL(location.geo_within(p).count(), 2);
 
     CHECK_EQUAL(location.geo_within(GeoCircle::from_kms(150.0, GeoPoint{1.0, 0.5})).count(), 3);
@@ -226,7 +236,7 @@ TEST(Geospatial_MeridianQuery)
     TableRef table = setup_with_points(g, points);
     ColKey location_column_key = table->get_column_key("location");
     Geospatial meridianCrossingPoly{
-        GeoPolygon{{{-178.0, 10.0}, {178.0, 10.0}, {178.0, -10.0}, {-178.0, -10.0}, {-178.0, 10.0}}}};
+        GeoPolygon{{{{-178.0, 10.0}, {178.0, 10.0}, {178.0, -10.0}, {-178.0, -10.0}, {-178.0, 10.0}}}}};
     size_t num_results = table->column<Link>(location_column_key).geo_within(meridianCrossingPoly).count();
     CHECK_EQUAL(num_results, 3);
 }
@@ -239,7 +249,7 @@ TEST(Geospatial_EquatorQuery)
                                       GeoPoint{179.0, 1.0}};
     TableRef table = setup_with_points(g, points);
     ColKey location_column_key = table->get_column_key("location");
-    Geospatial horizontalPoly{GeoPolygon{{{30.0, 1.0}, {-30.0, 1.0}, {-30.0, -1.0}, {30.0, -1.0}, {30.0, 1.0}}}};
+    Geospatial horizontalPoly{GeoPolygon{{{{30.0, 1.0}, {-30.0, 1.0}, {-30.0, -1.0}, {30.0, -1.0}, {30.0, 1.0}}}}};
     size_t num_results = table->column<Link>(location_column_key).geo_within(horizontalPoly).count();
     CHECK_EQUAL(num_results, 1);
 }
@@ -271,7 +281,7 @@ TEST(Geospatial_GeoWithinShapes)
     std::vector<Geospatial> shapes = {
         Geospatial{GeoCircle{1, GeoPoint{0, 0}}},
         Geospatial{GeoBox{GeoPoint{-5, -5}, GeoPoint{5, 5}}},
-        Geospatial{GeoPolygon{{{-5, -5}, {5, -5}, {5, 5}, {-5, 5}, {-5, -5}}}},
+        Geospatial{GeoPolygon{{{{-5, -5}, {5, -5}, {5, 5}, {-5, 5}, {-5, -5}}}}},
     };
     for (auto& shape : shapes) {
         Query query = table->column<Link>(location_column_key).geo_within(shape);
@@ -290,28 +300,28 @@ TEST(Geospatial_PolygonValidation)
                                       GeoPoint{55.6280, 12.0826}};
     TableRef table = setup_with_points(g, points);
     ColKey location_column_key = table->get_column_key("location");
-    Geospatial geo_poly{GeoPolygon{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683}, GeoPoint{55.628, 12.0826},
-                                    GeoPoint{40.7128, -74.006}}}};
+    Geospatial geo_poly{GeoPolygon{{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683},
+                                     GeoPoint{55.628, 12.0826}, GeoPoint{40.7128, -74.006}}}}};
     CHECK(geo_poly.is_valid().is_ok());
     Query query = table->column<Link>(location_column_key).geo_within(geo_poly);
     CHECK_EQUAL(query.count(), 1);
 
     // same as above because the normalized polygon inverts when covering more than a hemisphere
-    Geospatial geo_poly_reversed{GeoPolygon{{GeoPoint{40.7128, -74.006}, GeoPoint{55.628, 12.0826},
-                                             GeoPoint{55.6761, 12.5683}, GeoPoint{40.7128, -74.006}}}};
+    Geospatial geo_poly_reversed{GeoPolygon{{{GeoPoint{40.7128, -74.006}, GeoPoint{55.628, 12.0826},
+                                              GeoPoint{55.6761, 12.5683}, GeoPoint{40.7128, -74.006}}}}};
     CHECK(geo_poly_reversed.is_valid().is_ok());
     query = table->column<Link>(location_column_key).geo_within(geo_poly_reversed);
     CHECK_EQUAL(query.count(), 1);
 
-    Geospatial poly_mismatch_loop{GeoPolygon{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683},
-                                              GeoPoint{55.628, 12.0826}, GeoPoint{40.7128, -74.000}}}};
+    Geospatial poly_mismatch_loop{GeoPolygon{{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683},
+                                               GeoPoint{55.628, 12.0826}, GeoPoint{40.7128, -74.000}}}}};
     Status status = poly_mismatch_loop.is_valid();
     CHECK(!status.is_ok());
     CHECK_EQUAL(status.reason(), "Ring is not closed, first vertex 'GeoPoint([40.7128, -74.006])' does not equal "
                                  "last vertex 'GeoPoint([40.7128, -74])'");
 
     Geospatial poly_three_point{
-        GeoPolygon{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683}, GeoPoint{40.7128, -74.006}}}};
+        GeoPolygon{{{GeoPoint{40.7128, -74.006}, GeoPoint{55.6761, 12.5683}, GeoPoint{40.7128, -74.006}}}}};
     status = poly_three_point.is_valid();
     CHECK(!status.is_ok());
     CHECK_EQUAL(status.reason(), "Ring 0 must have at least 3 different vertices, 2 unique vertices were provided");
@@ -351,13 +361,13 @@ TEST(Geospatial_PolygonValidation)
     CHECK(!status.is_ok());
     CHECK_EQUAL(status.reason(), "Polygon has no rings.");
 
-    Geospatial poly_duplicates{
-        GeoPolygon{{GeoPoint{0, 0}, GeoPoint{0, 1}, GeoPoint{0, 1}, GeoPoint{0, 1}, GeoPoint{1, 1}, GeoPoint{0, 0}}}};
+    Geospatial poly_duplicates{GeoPolygon{
+        {{GeoPoint{0, 0}, GeoPoint{0, 1}, GeoPoint{0, 1}, GeoPoint{0, 1}, GeoPoint{1, 1}, GeoPoint{0, 0}}}}};
     status = poly_duplicates.is_valid();
     CHECK(status.is_ok()); // adjacent duplicates are removed
 
     Geospatial poly_intersect{
-        GeoPolygon{{GeoPoint{0, 0}, GeoPoint{0, 1}, GeoPoint{2, 1}, GeoPoint{2, 2}, GeoPoint{0, 0}}}};
+        GeoPolygon{{{GeoPoint{0, 0}, GeoPoint{0, 1}, GeoPoint{2, 1}, GeoPoint{2, 2}, GeoPoint{0, 0}}}}};
     status = poly_intersect.is_valid();
     CHECK(!status.is_ok());
     CHECK_EQUAL(status.reason(),
@@ -365,7 +375,7 @@ TEST(Geospatial_PolygonValidation)
                 "0.0000000]-[1.0000000, 2.0000000] and [2.0000000, 2.0000000]-[0.0000000, 0.0000000]'");
 
     // this appears to be a line, but because the points are mapped to a sphere, it is not
-    Geospatial poly_line{GeoPolygon{{GeoPoint{0, 0}, GeoPoint{1, 1}, GeoPoint{2, 2}, GeoPoint{0, 0}}}};
+    Geospatial poly_line{GeoPolygon{{{GeoPoint{0, 0}, GeoPoint{1, 1}, GeoPoint{2, 2}, GeoPoint{0, 0}}}}};
     status = poly_line.is_valid();
     CHECK(status.is_ok());
 }

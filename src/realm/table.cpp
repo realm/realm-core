@@ -336,21 +336,17 @@ std::ostream& operator<<(std::ostream& o, Table::Type table_type)
 }
 } // namespace realm
 
-void LinkChain::add(ColKey ck)
+bool LinkChain::add(ColKey ck)
 {
     // Link column can be a single Link, LinkList, or BackLink.
     REALM_ASSERT(m_current_table->valid_column(ck));
     ColumnType type = ck.get_type();
     if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
         m_current_table = m_current_table->get_opposite_table(ck);
+        m_link_cols.push_back(ck);
+        return true;
     }
-    else {
-        // Only last column in link chain is allowed to be non-link
-        throw LogicError(ErrorCodes::TypeMismatch,
-                         util::format("Property '%1.%2' is not an object reference",
-                                      m_current_table->get_class_name(), m_current_table->get_column_name(ck)));
-    }
-    m_link_cols.push_back(ck);
+    return false;
 }
 
 // -- Table ---------------------------------------------------------------------------------
@@ -399,6 +395,9 @@ ColKey Table::add_column(DataType type, StringData name, bool nullable, std::vec
                          DataType key_type)
 {
     REALM_ASSERT(!is_link_type(ColumnType(type)));
+    if (type == type_TypedLink) {
+        throw IllegalOperation("TypedLink properties not yet supported");
+    }
 
     ColumnAttrMask attr;
     if (!collection_types.empty()) {
@@ -421,6 +420,9 @@ ColKey Table::add_column(DataType type, StringData name, bool nullable, std::vec
     Table* invalid_link = nullptr;
     col_key = do_insert_column(col_key, type, name, invalid_link, key_type); // Throws
     if (collection_types.size() > 1) {
+        if (type == type_Mixed) {
+            throw IllegalOperation("Collections of Mixed cannot be statically nested");
+        }
         collection_types.pop_back();
         m_spec.set_nested_column_types(m_leaf_ndx2spec_ndx[col_key.get_index().val], collection_types);
     }
@@ -901,6 +903,9 @@ void Table::add_search_index(ColKey col_key, IndexType type)
     // Check spec
     auto spec_ndx = leaf_ndx2spec_ndx(col_key.get_index());
     auto attr = m_spec.get_column_attr(spec_ndx);
+
+    if (col_key == m_primary_key_col && type == IndexType::Fulltext)
+        throw InvalidColumnKey("primary key cannot have a full text index");
 
     switch (type) {
         case IndexType::None:
@@ -1963,27 +1968,6 @@ void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::s
     out << "]}";
 }
 
-void Table::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
-                    JSONOutputMode output_mode) const
-{
-    // Represent table as list of objects
-    out << "[";
-    bool first = true;
-
-    for (auto& obj : *this) {
-        if (first) {
-            first = false;
-        }
-        else {
-            out << ",";
-        }
-        obj.to_json(out, link_depth, renames, output_mode);
-    }
-
-    out << "]";
-}
-
-
 bool Table::operator==(const Table& t) const
 {
     if (size() != t.size()) {
@@ -2855,6 +2839,14 @@ void Table::set_primary_key_column(ColKey col_key)
 
 void Table::do_set_primary_key_column(ColKey col_key)
 {
+    if (col_key) {
+        auto spec_ndx = leaf_ndx2spec_ndx(col_key.get_index());
+        auto attr = m_spec.get_column_attr(spec_ndx);
+        if (attr.test(col_attr_FullText_Indexed)) {
+            throw InvalidColumnKey("primary key cannot have a full text index");
+        }
+    }
+
     if (m_primary_key_col) {
         // If the search index has not been set explicitly on current pk col, we remove it again
         auto spec_ndx = leaf_ndx2spec_ndx(m_primary_key_col.get_index());

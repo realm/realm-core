@@ -33,7 +33,16 @@ namespace realm {
 std::ostream& operator<<(std::ostream& ostr, const PathElement& elem)
 {
     if (elem.is_ndx()) {
-        ostr << elem.get_ndx();
+        size_t ndx = elem.get_ndx();
+        if (ndx == 0) {
+            ostr << "FIRST";
+        }
+        else if (ndx == size_t(-1)) {
+            ostr << "LAST";
+        }
+        else {
+            ostr << elem.get_ndx();
+        }
     }
     else if (elem.is_col_key()) {
         ostr << elem.get_col_key();
@@ -41,7 +50,18 @@ std::ostream& operator<<(std::ostream& ostr, const PathElement& elem)
     else if (elem.is_key()) {
         ostr << "'" << elem.get_key() << "'";
     }
+    else if (elem.is_all()) {
+        ostr << '*';
+    }
 
+    return ostr;
+}
+
+std::ostream& operator<<(std::ostream& ostr, const Path& path)
+{
+    for (auto& elem : path) {
+        ostr << '[' << elem << ']';
+    }
     return ostr;
 }
 
@@ -49,6 +69,12 @@ std::ostream& operator<<(std::ostream& ostr, const PathElement& elem)
 
 CollectionParent::~CollectionParent() {}
 
+void CollectionParent::check_level() const
+{
+    if (m_level + 1 > s_max_level) {
+        throw LogicError(ErrorCodes::LimitExceeded, "Max nesting level reached");
+    }
+}
 void CollectionParent::set_backlink(ColKey col_key, ObjLink new_link) const
 {
     if (new_link && new_link.get_obj_key()) {
@@ -126,7 +152,7 @@ LstBasePtr CollectionParent::get_listbase_ptr(ColKey col_key) const
 {
     auto table = get_table();
     auto attr = table->get_column_attr(col_key);
-    REALM_ASSERT(attr.test(col_attr_List));
+    REALM_ASSERT(attr.test(col_attr_List) || attr.test(col_attr_Nullable));
     bool nullable = attr.test(col_attr_Nullable);
 
     switch (table->get_column_type(col_key)) {

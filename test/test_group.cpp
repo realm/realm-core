@@ -1092,6 +1092,30 @@ TEST(Group_IndexString)
     CHECK_EQUAL(k6, m8);
 }
 
+TEST(Group_verify_pk_constraints)
+{
+
+    Group to_mem;
+    TableRef table = to_mem.add_table("test");
+    auto col = table->add_column(type_String, "pk", true);
+    auto col2 = table->add_column(type_String, "text");
+    table->set_primary_key_column(col);
+    auto obj = table->create_object_with_primary_key({"a"});
+    obj.set(col2, "Text Text Text");
+
+    // throw when trying to add a full text search for col
+    CHECK_THROW(table->add_fulltext_index(col), InvalidColumnKey);
+
+    // nothrow and remove search index for pk
+    CHECK_NOTHROW(table->remove_search_index(col));
+    auto pk = table->get_primary_key(obj.get_key());
+    CHECK_EQUAL(pk.get_string(), "a");
+
+    // throw when trying to set a col with a full text search as pk
+    table->add_fulltext_index(col2);
+    CHECK_THROW(table->set_primary_key_column(col2), InvalidColumnKey);
+}
+
 TEST(Group_CascadeNotify_SimpleWeak)
 {
     Group g;

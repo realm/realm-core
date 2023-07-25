@@ -81,7 +81,8 @@ struct PathElement {
         std::string string_val;
         int64_t int_val;
     };
-    enum Type { column, key, index } m_type;
+    enum Type { column, key, index, all } m_type;
+    struct AllTag {};
 
     PathElement()
         : int_val(-1)
@@ -112,6 +113,11 @@ struct PathElement {
     PathElement(const char* str)
         : string_val(str)
         , m_type(Type::key)
+    {
+    }
+    PathElement(AllTag)
+        : int_val(0)
+        , m_type(Type::all)
     {
     }
     PathElement(const std::string& str)
@@ -159,6 +165,10 @@ struct PathElement {
     {
         return m_type == Type::key;
     }
+    bool is_all() const noexcept
+    {
+        return m_type == Type::all;
+    }
 
     ColKey get_col_key() const noexcept
     {
@@ -199,9 +209,10 @@ struct PathElement {
     }
 };
 
-std::ostream& operator<<(std::ostream& ostr, const PathElement& elem);
-
 using Path = std::vector<PathElement>;
+
+std::ostream& operator<<(std::ostream& ostr, const PathElement& elem);
+std::ostream& operator<<(std::ostream& ostr, const Path& path);
 
 // Path from the group level.
 struct FullPath {
@@ -222,6 +233,7 @@ public:
     {
         return m_level;
     }
+    void check_level() const;
     // Return the path to this object. The path is calculated from
     // the topmost Obj - which must be an Obj with a primary key.
     virtual FullPath get_path() const = 0;
@@ -240,6 +252,11 @@ protected:
     friend class CollectionBaseImpl;
     friend class CollectionList;
 
+#ifdef REALM_DEBUG
+    static constexpr size_t s_max_level = 4;
+#else
+    static constexpr size_t s_max_level = 100;
+#endif
     size_t m_level = 0;
 
     constexpr CollectionParent(size_t level = 0)

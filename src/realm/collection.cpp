@@ -1,6 +1,27 @@
+/*************************************************************************
+ *
+ * Copyright 2023 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
+#include <realm/group.hpp>
 #include <realm/collection.hpp>
 #include <realm/bplustree.hpp>
 #include <realm/array_key.hpp>
+#include <realm/array_string.hpp>
+#include <realm/array_mixed.hpp>
 
 namespace realm {
 
@@ -90,6 +111,96 @@ void check_for_last_unresolved(BPlusTree<ObjKey>* tree)
 } // namespace _impl
 
 Collection::~Collection() {}
+
+void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
+{
+    auto path_size = ctrl.path.size() - index;
+    PathElement& pe = ctrl.path[index];
+    if (val.is_type(type_Dictionary) && (pe.is_key() || pe.is_all())) {
+        auto ref = val.get_ref();
+        if (!ref)
+            return;
+        Array top(ctrl.alloc);
+        top.init_from_ref(ref);
+
+        BPlusTree<StringData> keys(ctrl.alloc);
+        keys.set_parent(&top, 0);
+        keys.init_from_parent();
+        size_t start = 0;
+        if (size_t finish = keys.size()) {
+            if (pe.is_key()) {
+                start = keys.find_first(StringData(pe.get_key()));
+                if (start == realm::not_found) {
+                    if (pe.get_key() == "@keys") {
+                        keys.for_all([&](const auto& k) {
+                            ctrl.matches.insert(k);
+                        });
+                    }
+                    return;
+                }
+                finish = start + 1;
+            }
+            BPlusTree<Mixed> values(ctrl.alloc);
+            values.set_parent(&top, 1);
+            values.init_from_parent();
+            for (; start < finish; start++) {
+                val = values.get(start);
+                if (path_size > 1) {
+                    Collection::get_any(ctrl, val, index + 1);
+                }
+                else {
+                    ctrl.matches.insert(val);
+                }
+            }
+        }
+    }
+    else if (val.is_type(type_List) && (pe.is_ndx() || pe.is_all())) {
+        auto ref = val.get_ref();
+        if (!ref)
+            return;
+        ArrayMixed list(ctrl.alloc);
+        list.init_from_ref(ref);
+        if (size_t sz = list.size()) {
+            size_t start = 0;
+            size_t finish = sz;
+            if (pe.is_ndx()) {
+                start = pe.get_ndx();
+                if (start == size_t(-1)) {
+                    start = sz - 1;
+                }
+                if (start < sz) {
+                    finish = start + 1;
+                }
+            }
+            for (; start < finish; start++) {
+                val = list.get(start);
+                if (path_size > 1) {
+                    Collection::get_any(ctrl, val, index + 1);
+                }
+                else {
+                    ctrl.matches.insert(val);
+                }
+            }
+        }
+    }
+    else if (val.is_type(type_TypedLink) && pe.is_key()) {
+        auto link = val.get_link();
+        Obj obj = ctrl.group->get_object(link);
+        auto col = obj.get_table()->get_column_key(pe.get_key());
+        if (col) {
+            val = obj.get_any(col);
+            if (path_size > 1) {
+                if (val.is_type(type_Link)) {
+                    val = ObjLink(obj.get_target_table(col)->get_key(), val.get<ObjKey>());
+                }
+                Collection::get_any(ctrl, val, index + 1);
+            }
+            else {
+                ctrl.matches.insert(val);
+            }
+        }
+    }
+}
 
 std::pair<std::string, std::string> CollectionBase::get_open_close_strings(size_t link_depth,
                                                                            JSONOutputMode output_mode) const

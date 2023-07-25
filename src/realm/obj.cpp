@@ -233,40 +233,109 @@ Replication* Obj::get_replication() const
     return m_table->get_repl();
 }
 
+bool Obj::compare_values(Mixed val1, Mixed val2, ColKey ck, Obj other, StringData col_name) const
+{
+    if (val1.is_null()) {
+        if (!val2.is_null())
+            return false;
+    }
+    else {
+        if (val1.get_type() != val2.get_type())
+            return false;
+        if (val1.is_type(type_Link, type_TypedLink)) {
+            auto o1 = _get_linked_object(ck, val1);
+            auto o2 = other._get_linked_object(col_name, val2);
+            if (o1.m_table->is_embedded()) {
+                return o1 == o2;
+            }
+            else {
+                return o1.get_primary_key() == o2.get_primary_key();
+            }
+        }
+        else {
+            const auto type = val1.get_type();
+            if (type == type_List) {
+                Lst<Mixed> lst1(*this, ck);
+                Lst<Mixed> lst2(other, other.get_column_key(col_name));
+                return compare_list_in_mixed(lst1, lst2, ck, other, col_name);
+            }
+            else if (type == type_Dictionary) {
+                Dictionary dict1(*this, ck);
+                Dictionary dict2(other, other.get_column_key(col_name));
+                return compare_dict_in_mixed(dict1, dict2, ck, other, col_name);
+            }
+            return val1 == val2;
+        }
+    }
+    return true;
+}
+
+bool Obj::compare_list_in_mixed(Lst<Mixed>& val1, Lst<Mixed>& val2, ColKey ck, Obj other, StringData col_name) const
+{
+    if (val1.size() != val2.size())
+        return false;
+
+    for (size_t i = 0; i < val1.size(); ++i) {
+
+        auto m1 = val1.get_any(i);
+        auto m2 = val2.get_any(i);
+
+        if (m1.is_type(type_List) && m2.is_type(type_List)) {
+            DummyParent parent(get_table(), m2.get_ref());
+            Lst<Mixed> list(parent, 0);
+            return compare_list_in_mixed(*val1.get_list(i), list, ck, other, col_name);
+        }
+        else if (m1.is_type(type_Dictionary) && m2.is_type(type_Dictionary)) {
+            DummyParent parent(get_table(), m2.get_ref());
+            Dictionary dict(parent, 0);
+            return compare_dict_in_mixed(*val1.get_dictionary(i), dict, ck, other, col_name);
+        }
+        else if (!compare_values(m1, m2, ck, other, col_name)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool Obj::compare_dict_in_mixed(Dictionary& val1, Dictionary& val2, ColKey ck, Obj other, StringData col_name) const
+{
+    if (val1.size() != val2.size())
+        return false;
+
+    for (size_t i = 0; i < val1.size(); ++i) {
+
+        auto [k1, m1] = val1.get_pair(i);
+        auto [k2, m2] = val2.get_pair(i);
+        if (k1 != k2)
+            return false;
+
+        if (m1.is_type(type_List) && m2.is_type(type_List)) {
+            DummyParent parent(get_table(), m2.get_ref());
+            Lst<Mixed> list(parent, 0);
+            return compare_list_in_mixed(*val1.get_list(k1.get_string()), list, ck, other, col_name);
+        }
+        else if (m1.is_type(type_Dictionary) && m2.is_type(type_Dictionary)) {
+            DummyParent parent(get_table(), m2.get_ref());
+            Dictionary dict(parent, 0);
+            return compare_dict_in_mixed(*val1.get_dictionary(k1.get_string()), dict, ck, other, col_name);
+        }
+        else if (!compare_values(m1, m2, ck, other, col_name)) {
+            return false;
+        }
+    }
+    return true;
+}
 
 bool Obj::operator==(const Obj& other) const
 {
     for (auto ck : m_table->get_column_keys()) {
         StringData col_name = m_table->get_column_name(ck);
-
-        auto compare_values = [&](Mixed val1, Mixed val2) {
-            if (val1.is_null()) {
-                if (!val2.is_null())
-                    return false;
-            }
-            else {
-                if (val1.get_type() != val2.get_type())
-                    return false;
-                if (val1.is_type(type_Link, type_TypedLink)) {
-                    auto o1 = _get_linked_object(ck, val1);
-                    auto o2 = other._get_linked_object(col_name, val2);
-                    if (o1.m_table->is_embedded()) {
-                        return o1 == o2;
-                    }
-                    else {
-                        return o1.get_primary_key() == o2.get_primary_key();
-                    }
-                }
-                else {
-                    if (val1 != val2)
-                        return false;
-                }
-            }
-            return true;
+        auto compare = [&](Mixed m1, Mixed m2) {
+            return compare_values(m1, m2, ck, other, col_name);
         };
 
         if (!ck.is_collection()) {
-            if (!compare_values(get_any(ck), other.get_any(col_name)))
+            if (!compare(get_any(ck), other.get_any(col_name)))
                 return false;
         }
         else {
@@ -277,7 +346,7 @@ bool Obj::operator==(const Obj& other) const
                 return false;
             if (ck.is_list() || ck.is_set()) {
                 for (size_t i = 0; i < sz; i++) {
-                    if (!compare_values(coll1->get_any(i), coll2->get_any(i)))
+                    if (!compare(coll1->get_any(i), coll2->get_any(i)))
                         return false;
                 }
             }
@@ -289,7 +358,7 @@ bool Obj::operator==(const Obj& other) const
                     auto val2 = dict2->try_get(key);
                     if (!val2)
                         return false;
-                    if (!compare_values(value, *val2))
+                    if (!compare(value, *val2))
                         return false;
                 }
             }
@@ -906,10 +975,6 @@ void Obj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
         {
             REALM_UNREACHABLE(); // we don't support Mixed link to embedded object yet
         }
-        void on_list_of_typedlink(Lst<ObjLink>&) final
-        {
-            REALM_UNREACHABLE(); // we don't support TypedLink to embedded object yet
-        }
         void on_set_of_links(LnkSet&) final
         {
             REALM_UNREACHABLE(); // sets of embedded objects are not allowed at the schema level
@@ -918,13 +983,8 @@ void Obj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
         {
             REALM_UNREACHABLE(); // we don't support Mixed link to embedded object yet
         }
-        void on_set_of_typedlink(Set<ObjLink>&) final
-        {
-            REALM_UNREACHABLE(); // we don't support TypedLink to embedded object yet
-        }
         void on_link_property(ColKey) final {}
         void on_mixed_property(ColKey) final {}
-        void on_typedlink_property(ColKey) final {}
         Mixed result()
         {
             return m_index;
@@ -1044,151 +1104,6 @@ void Obj::add_index(Path& path, Index index) const
     }
 }
 
-void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
-                  std::vector<ObjLink>& followed, JSONOutputMode output_mode) const
-{
-    followed.push_back(get_link());
-    size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-    StringData name = "_key";
-    bool prefixComma = false;
-    if (renames.count(name))
-        name = renames.at(name);
-    out << "{";
-    if (output_mode == output_mode_json) {
-        prefixComma = true;
-        out << "\"" << name << "\":" << this->m_key.value;
-    }
-
-    auto col_keys = m_table->get_column_keys();
-    for (auto ck : col_keys) {
-        name = m_table->get_column_name(ck);
-        auto type = ck.get_type();
-        if (type == col_type_LinkList)
-            type = col_type_Link;
-        if (renames.count(name))
-            name = renames.at(name);
-
-        if (prefixComma)
-            out << ",";
-        out << "\"" << name << "\":";
-        prefixComma = true;
-
-        TableRef target_table;
-        ColKey pk_col_key;
-        if (type == col_type_Link) {
-            target_table = get_target_table(ck);
-            pk_col_key = target_table->get_primary_key_column();
-        }
-
-        auto print_link = [&](const Mixed& val) {
-            REALM_ASSERT(val.is_type(type_Link, type_TypedLink));
-            TableRef tt = target_table;
-            auto obj_key = val.get<ObjKey>();
-            std::string table_info;
-            std::string table_info_close;
-            if (!tt) {
-                // It must be a typed link
-                tt = m_table->get_parent_group()->get_table(val.get_link().get_table_key());
-                pk_col_key = tt->get_primary_key_column();
-                if (output_mode == output_mode_xjson_plus) {
-                    table_info = std::string("{ \"$link\": ");
-                    table_info_close = " }";
-                }
-
-                table_info += std::string("{ \"table\": \"") + std::string(tt->get_name()) + "\", \"key\": ";
-                table_info_close += " }";
-            }
-            if (pk_col_key && output_mode != output_mode_json) {
-                out << table_info;
-                tt->get_primary_key(obj_key).to_json(out, output_mode_xjson);
-                out << table_info_close;
-            }
-            else {
-                ObjLink link(tt->get_key(), obj_key);
-                if (obj_key.is_unresolved()) {
-                    out << "null";
-                    return;
-                }
-                if (!tt->is_embedded()) {
-                    if (link_depth == 0) {
-                        out << table_info << obj_key.value << table_info_close;
-                        return;
-                    }
-                    if ((link_depth == realm::npos &&
-                         std::find(followed.begin(), followed.end(), link) != followed.end())) {
-                        // We have detected a cycle in links
-                        out << "{ \"table\": \"" << tt->get_name() << "\", \"key\": " << obj_key.value << " }";
-                        return;
-                    }
-                }
-
-                tt->get_object(obj_key).to_json(out, new_depth, renames, followed, output_mode);
-            }
-        };
-
-        if (ck.is_collection()) {
-            if (m_table->get_nesting_levels(ck)) {
-                auto collection_list = get_collection_list(ck);
-                collection_list->to_json(out, link_depth, output_mode, print_link);
-            }
-            else {
-                auto collection = get_collection_ptr(ck);
-                collection->to_json(out, link_depth, output_mode, print_link);
-            }
-        }
-        else {
-            auto val = get_any(ck);
-            if (!val.is_null()) {
-                if (type == col_type_Link) {
-                    std::string close_string;
-                    bool is_embedded = target_table->is_embedded();
-                    bool link_depth_reached = !is_embedded && (link_depth == 0);
-
-                    if (output_mode == output_mode_xjson_plus) {
-                        out << "{ " << (is_embedded ? "\"$embedded" : "\"$link") << "\": ";
-                        close_string += "}";
-                    }
-                    if ((link_depth_reached && output_mode == output_mode_json) ||
-                        output_mode == output_mode_xjson_plus) {
-                        out << "{ \"table\": \"" << target_table->get_name() << "\", "
-                            << (is_embedded ? "\"value" : "\"key") << "\": ";
-                        close_string += "}";
-                    }
-
-                    print_link(val);
-                    out << close_string;
-                }
-                else if (val.is_type(type_TypedLink)) {
-                    print_link(val);
-                }
-                else if (val.is_type(type_Dictionary)) {
-                    DummyParent parent(m_table, val.get_ref());
-                    Dictionary dict(parent, 0);
-                    dict.to_json(out, link_depth, output_mode, print_link);
-                }
-                else if (val.is_type(type_Set)) {
-                    DummyParent parent(this->get_table(), val.get_ref());
-                    Set<Mixed> set(parent, 0);
-                    set.to_json(out, link_depth, output_mode, print_link);
-                }
-                else if (val.is_type(type_List)) {
-                    DummyParent parent(m_table, val.get_ref());
-                    Lst<Mixed> list(parent, 0);
-                    list.to_json(out, link_depth, output_mode, print_link);
-                }
-                else {
-                    val.to_json(out, output_mode);
-                }
-            }
-            else {
-                out << "null";
-            }
-        }
-    }
-    out << "}";
-    followed.pop_back();
-}
-
 std::string Obj::to_string() const
 {
     std::ostringstream ostr;
@@ -1251,6 +1166,15 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
     ObjLink new_link{};
     if (old_value.is_type(type_TypedLink)) {
         old_link = old_value.get<ObjLink>();
+        recurse = remove_backlink(col_key, old_link, state);
+    }
+    else if (old_value.is_type(type_Dictionary)) {
+        Dictionary dict(*this, col_key);
+        dict.remove_backlinks(state);
+    }
+    else if (old_value.is_type(type_List)) {
+        Lst<Mixed> list(*this, col_key);
+        list.remove_backlinks(state);
     }
 
     if (value.is_type(type_TypedLink)) {
@@ -1261,8 +1185,8 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
         m_table->get_parent_group()->validate(new_link);
         if (new_link == old_link)
             return *this;
+        set_backlink(col_key, new_link);
     }
-    recurse = replace_backlink(col_key, old_link, new_link, state);
 
     StringIndex* index = m_table->get_search_index(col_key);
     // The following check on unresolved is just a precaution as it should not
@@ -1867,6 +1791,40 @@ inline void Obj::nullify_single_link(ColKey col, ValueType target)
                            m_key); // Throws
 }
 
+template <>
+inline void Obj::nullify_single_link<Mixed>(ColKey col, Mixed target)
+{
+    ColKey::Idx origin_col_ndx = col.get_index();
+    Allocator& alloc = get_alloc();
+    Array fallback(alloc);
+    Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
+    ArrayMixed mixed(alloc);
+    mixed.set_parent(&fields, origin_col_ndx.val + 1);
+    mixed.init_from_parent();
+    auto val = mixed.get(m_row_ndx);
+    bool result = false;
+    if (val.is_type(type_TypedLink)) {
+        // Ensure we are nullifying correct link
+        result = (val == target);
+        mixed.set(m_row_ndx, Mixed{});
+        sync(fields);
+
+        if (Replication* repl = get_replication())
+            repl->nullify_link(m_table.unchecked_ptr(), col,
+                               m_key); // Throws
+    }
+    else if (val.is_type(type_Dictionary)) {
+        Dictionary dict(*this, col);
+        result = dict.nullify(target.get_link());
+    }
+    else if (val.is_type(type_List)) {
+        Lst<Mixed> list(*this, col);
+        result = list.nullify(target.get_link());
+    }
+    REALM_ASSERT(result);
+    static_cast<void>(result);
+}
+
 void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
 {
     REALM_ASSERT(get_alloc().get_storage_version() == m_storage_version);
@@ -1881,13 +1839,9 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
         {
             nullify_linklist(m_origin_obj, m_origin_col_key, m_target_link.get_obj_key());
         }
-        void on_list_of_mixed(Lst<Mixed>&) final
+        void on_list_of_mixed(Lst<Mixed>& list) final
         {
-            nullify_linklist(m_origin_obj, m_origin_col_key, Mixed(m_target_link));
-        }
-        void on_list_of_typedlink(Lst<ObjLink>&) final
-        {
-            nullify_linklist(m_origin_obj, m_origin_col_key, m_target_link);
+            list.nullify(m_target_link);
         }
         void on_set_of_links(LnkSet&) final
         {
@@ -1897,13 +1851,14 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
         {
             nullify_set(m_origin_obj, m_origin_col_key, Mixed(m_target_link));
         }
-        void on_set_of_typedlink(Set<ObjLink>&) final
+        void on_dictionary(Dictionary& dict) final
         {
-            nullify_set(m_origin_obj, m_origin_col_key, m_target_link);
-        }
-        void on_dictionary(Dictionary&) final
-        {
-            nullify_dictionary(m_origin_obj, m_origin_col_key, m_target_link);
+            if (m_origin_obj.get_table()->get_nesting_levels(m_origin_col_key)) {
+                nullify_dictionary(m_origin_obj, m_origin_col_key, m_target_link);
+            }
+            else {
+                dict.nullify(m_target_link);
+            }
         }
         void on_link_property(ColKey origin_col_key) final
         {
@@ -1912,10 +1867,6 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
         void on_mixed_property(ColKey origin_col_key) final
         {
             m_origin_obj.nullify_single_link<Mixed>(origin_col_key, Mixed{m_target_link});
-        }
-        void on_typedlink_property(ColKey origin_col_key) final
-        {
-            m_origin_obj.nullify_single_link<ObjLink>(origin_col_key, m_target_link);
         }
 
     private:
@@ -1966,19 +1917,7 @@ struct EmbeddedObjectLinkMigrator : public LinkTranslator {
         REALM_ASSERT(did_erase_pair.second);
         set.insert(m_dest_replace.get_link());
     }
-    void on_set_of_typedlink(Set<ObjLink>& set) final
-    {
-        auto did_erase_pair = set.erase(m_dest_orig.get_link());
-        REALM_ASSERT(did_erase_pair.second);
-        set.insert(m_dest_replace.get_link());
-    }
     void on_list_of_mixed(Lst<Mixed>& list) final
-    {
-        auto n = list.find_any(m_dest_orig.get_link());
-        REALM_ASSERT(n != realm::npos);
-        list.insert_any(n, m_dest_replace.get_link());
-    }
-    void on_list_of_typedlink(Lst<ObjLink>& list) final
     {
         auto n = list.find_any(m_dest_orig.get_link());
         REALM_ASSERT(n != realm::npos);
@@ -1989,12 +1928,6 @@ struct EmbeddedObjectLinkMigrator : public LinkTranslator {
         REALM_ASSERT(m_origin_obj.get<Mixed>(col).is_null() ||
                      m_origin_obj.get<Mixed>(col) == m_dest_orig.get_link());
         m_origin_obj.set_any(col, m_dest_replace.get_link());
-    }
-    void on_typedlink_property(ColKey col) final
-    {
-        REALM_ASSERT(m_origin_obj.get<ObjLink>(col).is_null() ||
-                     m_origin_obj.get<ObjLink>(col) == m_dest_orig.get_link());
-        m_origin_obj.set(col, m_dest_replace.get_link());
     }
 
 private:
@@ -2308,14 +2241,9 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
         {
             replace_in_linklist(m_origin_obj, m_origin_col_key, m_dest_orig.get_key(), m_dest_replace.get_key());
         }
-        void on_list_of_mixed(Lst<Mixed>&) final
+        void on_list_of_mixed(Lst<Mixed>& list) final
         {
-            replace_in_linklist<Mixed>(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(),
-                                       m_dest_replace.get_link());
-        }
-        void on_list_of_typedlink(Lst<ObjLink>&) final
-        {
-            replace_in_linklist(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(), m_dest_replace.get_link());
+            list.replace_link(m_dest_orig.get_link(), m_dest_replace.get_link());
         }
         void on_set_of_links(LnkSet&) final
         {
@@ -2326,13 +2254,15 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
             replace_in_linkset<Mixed>(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(),
                                       m_dest_replace.get_link());
         }
-        void on_set_of_typedlink(Set<ObjLink>&) final
+        void on_dictionary(Dictionary& dict) final
         {
-            replace_in_linkset(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(), m_dest_replace.get_link());
-        }
-        void on_dictionary(Dictionary&) final
-        {
-            replace_in_dictionary(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(), m_dest_replace.get_link());
+            if (m_origin_obj.get_table()->get_nesting_levels(m_origin_col_key)) {
+                replace_in_dictionary(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(),
+                                      m_dest_replace.get_link());
+            }
+            else {
+                dict.replace_link(m_dest_orig.get_link(), m_dest_replace.get_link());
+            }
         }
         void on_link_property(ColKey col) final
         {
@@ -2341,15 +2271,22 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
         }
         void on_mixed_property(ColKey col) final
         {
-            REALM_ASSERT(m_origin_obj.get_any(col).is_null() ||
-                         m_origin_obj.get_any(col).get_link().get_obj_key() == m_dest_orig.get_key());
-            m_origin_obj.set(col, Mixed{m_dest_replace.get_link()});
-        }
-        void on_typedlink_property(ColKey col) final
-        {
-            REALM_ASSERT(m_origin_obj.get_any(col).is_null() ||
-                         m_origin_obj.get_any(col).get_link().get_obj_key() == m_dest_orig.get_key());
-            m_origin_obj.set(col, m_dest_replace.get_link());
+            auto val = m_origin_obj.get_any(col);
+            if (val.is_type(type_TypedLink)) {
+                REALM_ASSERT(val.get_link() == m_dest_orig.get_link());
+                m_origin_obj.set(col, Mixed{m_dest_replace.get_link()});
+            }
+            else if (val.is_type(type_Dictionary)) {
+                Dictionary dict(m_origin_obj, m_origin_col_key);
+                dict.replace_link(m_dest_orig.get_link(), m_dest_replace.get_link());
+            }
+            else if (val.is_type(type_List)) {
+                Lst<Mixed> list(m_origin_obj, m_origin_col_key);
+                list.replace_link(m_dest_orig.get_link(), m_dest_replace.get_link());
+            }
+            else {
+                REALM_UNREACHABLE();
+            }
         }
 
     private:

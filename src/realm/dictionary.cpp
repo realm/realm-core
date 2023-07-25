@@ -428,6 +428,7 @@ Obj Dictionary::create_and_insert_linked_object(Mixed key)
 
 void Dictionary::insert_collection(const PathElement& path_elem, CollectionType dict_or_list)
 {
+    check_level();
     insert(path_elem.get_key(), Mixed(0, dict_or_list));
 }
 
@@ -514,6 +515,10 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
             }
             else if (m_col_key.get_type() != col_type_Mixed && value.get_type() != DataType(m_col_key.get_type())) {
                 throw InvalidArgument(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Wrong value type");
+            }
+            else if (value.is_type(type_Link) && m_col_key.get_type() != col_type_Link) {
+                throw InvalidArgument(ErrorCodes::InvalidDictionaryValue,
+                                      "Dictionary::insert: No target table for link");
             }
         }
     }
@@ -659,8 +664,9 @@ UpdateStatus Dictionary::update_if_needed_with_status() const noexcept
 void Dictionary::ensure_created()
 {
     if (Base::should_update() || !(m_dictionary_top && m_dictionary_top->is_attached())) {
-        bool attached = init_from_parent(true);
-        REALM_ASSERT(attached);
+        if (!init_from_parent(true)) {
+            throw IllegalOperation("This is an ex-dictionary");
+        }
     }
 }
 
@@ -712,12 +718,83 @@ void Dictionary::nullify(size_t ndx)
     m_values->set(ndx, Mixed());
 }
 
+bool Dictionary::nullify(ObjLink target_link)
+{
+    size_t ndx = find_first(target_link);
+    if (ndx != realm::not_found) {
+        nullify(ndx);
+        return true;
+    }
+    else {
+        // There must be a link in a nested collection
+        size_t sz = size();
+        for (size_t ndx = 0; ndx < sz; ndx++) {
+            auto val = m_values->get(ndx);
+            auto key = do_get_key(ndx);
+            if (val.is_type(type_Dictionary)) {
+                auto dict = get_dictionary(key.get_string());
+                if (dict->nullify(target_link)) {
+                    return true;
+                }
+            }
+            if (val.is_type(type_List)) {
+                auto list = get_list(key.get_string());
+                if (list->nullify(target_link)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+bool Dictionary::replace_link(ObjLink old_link, ObjLink replace_link)
+{
+    size_t ndx = find_first(old_link);
+    if (ndx != realm::not_found) {
+        auto key = do_get_key(ndx);
+        insert(key, replace_link);
+        return true;
+    }
+    else {
+        // There must be a link in a nested collection
+        size_t sz = size();
+        for (size_t ndx = 0; ndx < sz; ndx++) {
+            auto val = m_values->get(ndx);
+            auto key = do_get_key(ndx);
+            if (val.is_type(type_Dictionary)) {
+                auto dict = get_dictionary(key.get_string());
+                if (dict->replace_link(old_link, replace_link)) {
+                    return true;
+                }
+            }
+            if (val.is_type(type_List)) {
+                auto list = get_list(key.get_string());
+                if (list->replace_link(old_link, replace_link)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 void Dictionary::remove_backlinks(CascadeState& state) const
 {
-    if (size() > 0) {
-        m_values->for_all([&](Mixed val) {
-            clear_backlink(val, state);
-        });
+    size_t sz = size();
+    for (size_t ndx = 0; ndx < sz; ndx++) {
+        auto val = m_values->get(ndx);
+        if (val.is_type(type_TypedLink)) {
+            Base::remove_backlink(m_col_key, val.get_link(), state);
+        }
+        else if (val.is_type(type_Dictionary)) {
+            auto key = do_get_key(ndx);
+            get_dictionary(key.get_string())->remove_backlinks(state);
+        }
+        else if (val.is_type(type_List)) {
+            auto key = do_get_key(ndx);
+            get_list(key.get_string())->remove_backlinks(state);
+        }
     }
 }
 
@@ -752,49 +829,54 @@ void Dictionary::clear()
 
 bool Dictionary::init_from_parent(bool allow_create) const
 {
-    auto ref = Base::get_collection_ref();
-
-    if ((ref || allow_create) && !m_dictionary_top) {
-        Allocator& alloc = get_alloc();
-        m_dictionary_top.reset(new Array(alloc));
-        m_dictionary_top->set_parent(const_cast<Dictionary*>(this), 0);
-        switch (m_key_type) {
-            case type_String: {
-                m_keys.reset(new BPlusTree<StringData>(alloc));
-                break;
+    try {
+        auto ref = Base::get_collection_ref();
+        if ((ref || allow_create) && !m_dictionary_top) {
+            Allocator& alloc = get_alloc();
+            m_dictionary_top.reset(new Array(alloc));
+            m_dictionary_top->set_parent(const_cast<Dictionary*>(this), 0);
+            switch (m_key_type) {
+                case type_String: {
+                    m_keys.reset(new BPlusTree<StringData>(alloc));
+                    break;
+                }
+                case type_Int: {
+                    m_keys.reset(new BPlusTree<Int>(alloc));
+                    break;
+                }
+                default:
+                    break;
             }
-            case type_Int: {
-                m_keys.reset(new BPlusTree<Int>(alloc));
-                break;
-            }
-            default:
-                break;
-        }
-        m_keys->set_parent(m_dictionary_top.get(), 0);
-        m_values.reset(new BPlusTree<Mixed>(alloc));
-        m_values->set_parent(m_dictionary_top.get(), 1);
-    }
-
-    if (ref) {
-        m_dictionary_top->init_from_ref(ref);
-        m_keys->init_from_parent();
-        m_values->init_from_parent();
-    }
-    else {
-        // dictionary detached
-        if (!allow_create) {
-            m_dictionary_top.reset();
-            return false;
+            m_keys->set_parent(m_dictionary_top.get(), 0);
+            m_values.reset(new BPlusTree<Mixed>(alloc));
+            m_values->set_parent(m_dictionary_top.get(), 1);
         }
 
-        // Create dictionary
-        m_dictionary_top->create(Array::type_HasRefs, false, 2, 0);
-        m_values->create();
-        m_keys->create();
-        m_dictionary_top->update_parent();
-    }
+        if (ref) {
+            m_dictionary_top->init_from_ref(ref);
+            m_keys->init_from_parent();
+            m_values->init_from_parent();
+        }
+        else {
+            // dictionary detached
+            if (!allow_create) {
+                m_dictionary_top.reset();
+                return false;
+            }
 
-    return true;
+            // Create dictionary
+            m_dictionary_top->create(Array::type_HasRefs, false, 2, 0);
+            m_values->create();
+            m_keys->create();
+            m_dictionary_top->update_parent();
+        }
+
+        return true;
+    }
+    catch (...) {
+        m_dictionary_top.reset();
+        return false;
+    }
 }
 
 size_t Dictionary::do_find_key(Mixed key) const noexcept

@@ -72,10 +72,12 @@ blank   [ \t\r]
 "@min"                      return yy::parser::make_MIN    ();
 "@sum"                      return yy::parser::make_SUM    ();
 "@avg"                      return yy::parser::make_AVG    ();
-"@links"                    return yy::parser::make_BACKLINK();
+"@links"                    return yy::parser::make_BACKLINK(yytext);
 "@type"                     return yy::parser::make_TYPE    (yytext);
 "@keys"                     return yy::parser::make_KEY_VAL (yytext);
 "@values"                   return yy::parser::make_KEY_VAL (yytext);
+("FIRST"|"first")           return yy::parser::make_INDEX_FIRST (yytext);
+("LAST"|"last")             return yy::parser::make_INDEX_LAST (yytext);
 "[c]"                       return yy::parser::make_CASE    ();
 (true|TRUE)                 return yy::parser::make_TRUE    ();
 (false|FALSE)               return yy::parser::make_FALSE    ();
