@@ -680,8 +680,9 @@ void ObjectStore::apply_additive_changes(Group& group, std::vector<SchemaChange>
         }
         void operator()(AddIndex op)
         {
-            if (update_indexes)
-                table(op.object).add_search_index(op.property->column_key);
+            if (update_indexes) {
+                add_search_index(table(op.object), *op.property, op.type);
+            }
         }
         void operator()(RemoveIndex op)
         {
