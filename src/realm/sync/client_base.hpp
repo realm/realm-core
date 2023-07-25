@@ -312,7 +312,7 @@ struct SessionErrorInfo : public ProtocolErrorInfo {
     }
 
     SessionErrorInfo(Status status, bool try_again)
-        : ProtocolErrorInfo(0, {}, try_again)
+        : ProtocolErrorInfo(status.get_std_error_code().value(), status.reason(), try_again)
         , status(std::move(status))
     {
     }

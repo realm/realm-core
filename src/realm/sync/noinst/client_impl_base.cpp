@@ -560,7 +560,8 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         }
         case WebSocketError::websocket_tls_handshake_failed: {
             error_code = ClientError::ssl_server_cert_rejected;
-            close_due_to_client_side_error(std::move(status), IsFatal{false},
+            close_due_to_client_side_error(Status(ClientError::ssl_server_cert_rejected, status.reason()),
+                                           IsFatal{false},
                                            ConnectionTerminationReason::ssl_certificate_rejected); // Throws
             break;
         }
