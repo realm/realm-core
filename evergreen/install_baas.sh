@@ -139,7 +139,7 @@ while getopts "w:b:vh" opt; do
     case "${opt}" in
         w) WORK_PATH="$($REALPATH "${OPTARG}")";;
         b) BAAS_VERSION="${OPTARG}";;
-        v) VERBOSE="-v"; set -o verbose; set -o xtrace;;
+        v) VERBOSE="yes"; set -o verbose; set -o xtrace;;
         h) usage 0;;
         *) usage 1;;
     esac
@@ -450,7 +450,13 @@ echo "Starting baas app server"
 "${WORK_PATH}/baas_server" \
     --configFile=etc/configs/test_config.json --configFile="${BASE_PATH}/config_overrides.json" > "${BAAS_SERVER_LOG}" 2>&1 &
 echo $! > "${BAAS_PID_FILE}"
-"${BASE_PATH}/wait_for_baas.sh" "${VERBOSE}" -w "${WORK_PATH}"
+
+WAIT_BAAS_OPTS=()
+if [[ -n "${VERBOSE}" ]]; then
+    WAIT_BAAS_OPTS=("-v")
+fi
+
+"${BASE_PATH}/wait_for_baas.sh" "${WAIT_BAAS_OPTS[@]}" -w "${WORK_PATH}"
 
 # Create the admin user and set up the allowed roles
 echo "Adding roles to admin user"
