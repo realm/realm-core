@@ -118,6 +118,7 @@ using namespace realm::query_parser;
 %token <std::string> SORT "sort"
 %token <std::string> DISTINCT "distinct"
 %token <std::string> LIMIT "limit"
+%token <std::string> BINARY "binary"
 %token <std::string> ASCENDING "ascending"
 %token <std::string> DESCENDING "descending"
 %token <std::string> INDEX_FIRST "FIRST"
@@ -297,7 +298,7 @@ constant
     : primary_key               { $$ = $1; }
     | INFINITY                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::INFINITY_VAL, $1); }
     | NAN                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NAN_VAL, $1); }
-    | BASE64                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BASE64, $1); }
+    | BASE64                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::STRING_BASE64, $1); }
     | FLOAT                     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FLOAT, $1); }
     | TIMESTAMP                 { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TIMESTAMP, $1); }
     | LINK                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::LINK, $1); }
@@ -313,6 +314,8 @@ constant
                                     tmp->add_table($3);
                                     $$ = tmp;
                                 }
+    | BINARY '(' STRING ')'     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BINARY_STR, $3); }
+    | BINARY '(' BASE64 ')'     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BINARY_BASE64, $3); }
 
 primary_key
     : NATURAL0                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, $1); }
@@ -384,6 +387,7 @@ id
     | DESCENDING                { $$ = $1; }
     | IN                        { $$ = $1; }
     | TEXT                      { $$ = $1; }
+    | BINARY                    { $$ = $1; }
     | INDEX_FIRST               { $$ = $1; }
     | INDEX_LAST                { $$ = $1; }
 %%

@@ -1326,7 +1326,7 @@ protected:
     void get_ownership()
     {
         if (m_value.is_type(type_String, type_Binary)) {
-            auto bin = m_value.get_binary();
+            auto bin = m_value.export_to_type<BinaryData>();
             m_buffer = OwnedBinaryData(bin.data(), bin.size());
             auto tmp = m_buffer.get();
             if (m_value.is_type(type_String)) {

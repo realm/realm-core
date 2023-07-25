@@ -35,24 +35,24 @@ static const int sorting_rank[] = {
     0,  // type_Bool = 1,
     2,  // type_String = 2,
     -1,
-    2,  // type_Binary = 4,
+    3,  // type_Binary = 4,
     -1, // type_OldTable = 5,
     -1, // type_Mixed = 6,
     -1, // type_OldDateTime = 7,
-    3,  // type_Timestamp = 8,
+    4,  // type_Timestamp = 8,
     1,  // type_Float = 9,
     1,  // type_Double = 10,
     1,  // type_Decimal = 11,
-    7,  // type_Link = 12,
+    8,  // type_Link = 12,
     -1, // type_LinkList = 13,
     -1,
-    4,  // type_ObjectId = 15,
-    6,  // type_TypedLink = 16
-    5,  // type_UUID = 17
-    7,  // type_TypeOfValue = 18
-    8,  // type_List = 19
-    9,  // type_Set = 20
-    10, // type_Dictionary = 21
+    5,  // type_ObjectId = 15,
+    7,  // type_TypedLink = 16
+    6,  // type_UUID = 17
+    8,  // type_TypeOfValue = 18
+    9,  // type_List = 19
+    10, // type_Set = 20
+    11, // type_Dictionary = 21
 
     // Observe! Changing these values breaks the file format for Set<Mixed>
 };
@@ -185,9 +185,6 @@ bool Mixed::data_types_are_comparable(DataType l_type, DataType r_type)
     if (is_numeric(l_type, r_type)) {
         return true;
     }
-    if ((l_type == type_String && r_type == type_Binary) || (r_type == type_String && l_type == type_Binary)) {
-        return true;
-    }
     if (l_type == type_Mixed || r_type == type_Mixed) {
         return true; // Mixed is comparable with any type
     }
@@ -262,9 +259,9 @@ int Mixed::compare(const Mixed& b) const noexcept
         case type_String:
             if (b.get_type() == type_String)
                 return compare_string(get<StringData>(), b.get<StringData>());
-            [[fallthrough]];
+            break;
         case type_Binary:
-            if (b.get_type() == type_String || b.get_type() == type_Binary)
+            if (b.get_type() == type_Binary)
                 return compare_binary(get<BinaryData>(), b.get<BinaryData>());
             break;
         case type_Float:
@@ -423,6 +420,32 @@ Decimal128 Mixed::export_to_type() const noexcept
         default:
             REALM_ASSERT(false);
             break;
+    }
+    return {};
+}
+
+template <>
+StringData Mixed::export_to_type() const noexcept
+{
+    REALM_ASSERT(m_type);
+    if (is_type(type_String)) {
+        return string_val;
+    }
+    if (is_type(type_Binary)) {
+        return StringData(binary_val.data(), binary_val.size());
+    }
+    return {};
+}
+
+template <>
+BinaryData Mixed::export_to_type() const noexcept
+{
+    REALM_ASSERT(m_type);
+    if (is_type(type_String)) {
+        return BinaryData(string_val.data(), string_val.size());
+    }
+    if (is_type(type_Binary)) {
+        return binary_val;
     }
     return {};
 }

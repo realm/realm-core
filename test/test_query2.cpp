@@ -5454,6 +5454,8 @@ TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
         }
     }
     std::string str2bin("String2Binary");
+    std::string str2bin_lowered = "string2binary";
+
     table->get_object(15).set(col_any, Mixed());
     table->get_object(75).set(col_any, Mixed(75.));
     table->get_object(28).set(col_any, Mixed(BinaryData(str2bin)));
@@ -5510,19 +5512,19 @@ TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
     tv = table->where().not_equal(col_any, null()).find_all();
     CHECK_EQUAL(tv.size(), 99);
 
-    tv = table->where().begins_with(col_any, StringData("String2")).find_all(); // 20, 24, 28
-    CHECK_EQUAL(tv.size(), 3);
-    tv = table->where().begins_with(col_any, BinaryData("String2", 7)).find_all(); // 20, 24, 28
-    CHECK_EQUAL(tv.size(), 3);
+    tv = table->where().begins_with(col_any, StringData("String2")).find_all(); // 20, 24
+    CHECK_EQUAL(tv.size(), 2);
+    tv = table->where().begins_with(col_any, BinaryData("String2", 7)).find_all(); // 28
+    CHECK_EQUAL(tv.size(), 1);
     tv = table->where().begins_with(col_any, Mixed(75.), exact_match).find_all();
     CHECK_EQUAL(tv.size(), 0);
     tv = table->where().begins_with(col_any, Mixed(75.), insensitive_match).find_all();
     CHECK_EQUAL(tv.size(), 0);
 
     tv = table->where().contains(col_any, StringData("TRIN"), insensitive_match).find_all();
-    CHECK_EQUAL(tv.size(), 24);
+    CHECK_EQUAL(tv.size(), 23);
     tv = table->where().contains(col_any, Mixed("TRIN"), insensitive_match).find_all();
-    CHECK_EQUAL(tv.size(), 24);
+    CHECK_EQUAL(tv.size(), 23);
     tv = table->where().contains(col_any, Mixed("TRIN"), exact_match).find_all();
     CHECK_EQUAL(tv.size(), 0);
     tv = table->where().contains(col_any, Mixed(75.), exact_match).find_all();
@@ -5531,7 +5533,7 @@ TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
     CHECK_EQUAL(tv.size(), 0);
 
     tv = table->where().like(col_any, StringData("Strin*")).find_all();
-    CHECK_EQUAL(tv.size(), 24);
+    CHECK_EQUAL(tv.size(), 23);
     tv = table->where().like(col_any, Mixed(75.), exact_match).find_all();
     CHECK_EQUAL(tv.size(), 0);
     tv = table->where().like(col_any, Mixed(75.), insensitive_match).find_all();
@@ -5540,20 +5542,31 @@ TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
     tv = table->where().ends_with(col_any, StringData("4")).find_all(); // 4, 24, 44, 64, 84
     CHECK_EQUAL(tv.size(), 5);
     char bin[1] = {0x34};
-    tv = table->where().ends_with(col_any, BinaryData(bin)).find_all(); // 4, 24, 44, 64, 84
-    CHECK_EQUAL(tv.size(), 5);
+    tv = table->where().ends_with(col_any, BinaryData(bin)).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    bin[0] = 'y';
+    tv = table->where().ends_with(col_any, BinaryData(bin)).find_all(); // 28
+    CHECK_EQUAL(tv.size(), 1);
     tv = table->where().ends_with(col_any, Mixed(75.), exact_match).find_all();
     CHECK_EQUAL(tv.size(), 0);
     tv = table->where().ends_with(col_any, Mixed(75.), insensitive_match).find_all();
     CHECK_EQUAL(tv.size(), 0);
 
-    tv = table->where().equal(col_any, "String2Binary", exact_match).find_all();
-    CHECK_EQUAL(tv.size(), 1);
-    tv = table->where().equal(col_any, "string2binary", exact_match).find_all();
+    tv = table->where().equal(col_any, StringData(str2bin), exact_match).find_all();
     CHECK_EQUAL(tv.size(), 0);
-    tv = table->where().equal(col_any, "string2binary", insensitive_match).find_all();
+    tv = table->where().equal(col_any, BinaryData(str2bin), exact_match).find_all();
     CHECK_EQUAL(tv.size(), 1);
-    tv = table->where().not_equal(col_any, "string2binary", insensitive_match).find_all();
+    tv = table->where().equal(col_any, Mixed{BinaryData(str2bin)}, exact_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+
+    tv = table->where().equal(col_any, Mixed{str2bin_lowered}, insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = table->where().equal(col_any, Mixed{BinaryData(str2bin_lowered)}, insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+
+    tv = table->where().not_equal(col_any, Mixed{str2bin_lowered}, insensitive_match).find_all();
+    CHECK_EQUAL(tv.size(), 100);
+    tv = table->where().not_equal(col_any, Mixed{BinaryData(str2bin_lowered)}, insensitive_match).find_all();
     CHECK_EQUAL(tv.size(), 99);
 
     tv = table->where().equal(col_any, StringData(), insensitive_match).find_all();
@@ -5603,7 +5616,11 @@ TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
     CHECK_EQUAL(tv.size(), 5);
     tv = (origin->link(col_link).column<Mixed>(col_any) > 50).find_all();
     CHECK_EQUAL(tv.size(), 2);
-    tv = (origin->link(col_links).column<Mixed>(col_any).contains("string2bin", insensitive_match)).find_all();
+    std::string bin2str_truncated = str2bin_lowered.substr(0, 10);
+    tv = (origin->link(col_links).column<Mixed>(col_any).contains(bin2str_truncated, insensitive_match)).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    tv = (origin->link(col_links).column<Mixed>(col_any).contains(BinaryData(bin2str_truncated), insensitive_match))
+             .find_all();
     CHECK_EQUAL(tv.size(), 1);
     tv = (origin->link(col_links).column<Mixed>(col_any).like("*ring*", insensitive_match)).find_all();
     CHECK_EQUAL(tv.size(), 10);

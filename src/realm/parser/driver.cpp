@@ -1089,6 +1089,21 @@ std::unique_ptr<Subexpr> AggrNode::aggregate(Subexpr* subexpr)
     return agg;
 }
 
+void ConstantNode::decode_b64(util::FunctionRef<void(StringData)> callback)
+{
+    const size_t encoded_size = text.size() - 5;
+    size_t buffer_size = util::base64_decoded_size(encoded_size);
+    std::string decode_buffer(buffer_size, char(0));
+    StringData window(text.c_str() + 4, encoded_size);
+    util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer.data(), buffer_size);
+    if (!decoded_size) {
+        throw SyntaxError("Invalid base64 value");
+    }
+    REALM_ASSERT_DEBUG_EX(*decoded_size <= encoded_size, *decoded_size, encoded_size);
+    decode_buffer.resize(*decoded_size); // truncate
+    callback(StringData(decode_buffer.data(), decode_buffer.size()));
+}
+
 std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
 {
     std::unique_ptr<Subexpr> ret;
@@ -1200,26 +1215,10 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             }
             break;
         }
-        case Type::BASE64: {
-            const size_t encoded_size = text.size() - 5;
-            size_t buffer_size = util::base64_decoded_size(encoded_size);
-            std::string decode_buffer(buffer_size, char(0));
-            StringData window(text.c_str() + 4, encoded_size);
-            util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer.data(), buffer_size);
-            if (!decoded_size) {
-                throw SyntaxError("Invalid base64 value");
-            }
-            REALM_ASSERT_DEBUG_EX(*decoded_size <= encoded_size, *decoded_size, encoded_size);
-            decode_buffer.resize(*decoded_size); // truncate
-            if (hint == type_String) {
-                ret = std::make_unique<ConstantStringValue>(StringData(decode_buffer.data(), decode_buffer.size()));
-            }
-            if (hint == type_Binary) {
-                ret = std::make_unique<ConstantBinaryValue>(BinaryData(decode_buffer.data(), decode_buffer.size()));
-            }
-            if (hint == type_Mixed) {
-                ret = std::make_unique<ConstantBinaryValue>(BinaryData(decode_buffer.data(), decode_buffer.size()));
-            }
+        case Type::STRING_BASE64: {
+            decode_b64([&](StringData decoded) {
+                ret = std::make_unique<ConstantStringValue>(decoded);
+            });
             break;
         }
         case Type::TIMESTAMP: {
@@ -1321,6 +1320,16 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             }
             break;
         }
+        case BINARY_STR: {
+            std::string str = text.substr(1, text.size() - 2);
+            ret = std::make_unique<ConstantBinaryValue>(BinaryData(str.data(), str.size()));
+            break;
+        }
+        case BINARY_BASE64:
+            decode_b64([&](StringData decoded) {
+                ret = std::make_unique<ConstantBinaryValue>(BinaryData(decoded.data(), decoded.size()));
+            });
+            break;
     }
     if (!ret) {
         throw InvalidQueryError(
