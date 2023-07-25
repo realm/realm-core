@@ -3581,7 +3581,7 @@ TEST_CASE("app: full-text compatible with sync", "[sync][app]") {
 
 #endif // REALM_ENABLE_AUTH_TESTS
 
-TEST_CASE("app: custom error handling", "[sync][app][custom errors][baas]") {
+TEST_CASE("app: custom error handling", "[sync][app][custom errors]") {
     class CustomErrorTransport : public GenericNetworkTransport {
     public:
         CustomErrorTransport(int code, const std::string& message)
