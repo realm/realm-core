@@ -2353,8 +2353,11 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
     for (const Transformer::RemoteChangeset& changeset : received_changesets) {
         // Check that per-changeset server version is strictly increasing, except in FLX sync where the server version
         // must be increasing, but can stay the same during bootstraps.
-        bool good_server_version = m_is_flx_sync_session ? (changeset.remote_version >= server_version)
-                                                         : (changeset.remote_version > server_version);
+        bool good_server_version = m_is_flx_sync_session
+                                       ? (changeset.remote_version >= server_version &&
+                                          changeset.remote_version <= progress.download.server_version)
+                                       : (changeset.remote_version > server_version &&
+                                          changeset.remote_version < progress.download.server_version);
         if (!good_server_version) {
             logger.error("Bad server version in changeset header (DOWNLOAD) (%1, %2, %3)", changeset.remote_version,
                          server_version, progress.download.server_version);
