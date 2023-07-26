@@ -2294,10 +2294,12 @@ TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][baas]") {
         sync_error = std::move(error);
     };
     auto realm = Realm::get_shared_realm(config);
-    timed_wait_for([&] {
-        std::lock_guard<std::mutex> lk(sync_error_mutex);
-        return static_cast<bool>(sync_error);
-    });
+    REQUIRE_THAT(
+        [&] {
+            std::lock_guard<std::mutex> lk(sync_error_mutex);
+            return static_cast<bool>(sync_error);
+        },
+        ReturnsTrueWithinTimeLimit{});
 
     CHECK(sync_error->get_system_error() == make_error_code(sync::ProtocolError::switch_to_flx_sync));
     CHECK(sync_error->server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
@@ -2336,10 +2338,12 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][protocol][
     latest_subs.insert_or_assign(std::move(new_query_a));
     latest_subs.commit();
 
-    timed_wait_for([&] {
-        std::lock_guard<std::mutex> lk(sync_error_mutex);
-        return static_cast<bool>(sync_error);
-    });
+    REQUIRE_THAT(
+        [&] {
+            std::lock_guard<std::mutex> lk(sync_error_mutex);
+            return static_cast<bool>(sync_error);
+        },
+        ReturnsTrueWithinTimeLimit{});
 
     CHECK(sync_error->get_system_error() == make_error_code(sync::ProtocolError::switch_to_pbs));
     CHECK(sync_error->server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);

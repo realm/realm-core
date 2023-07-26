@@ -88,27 +88,16 @@ bool ReturnsTrueWithinTimeLimit::match(util::FunctionRef<bool()> condition) cons
     return predicate_returned_true;
 }
 
-void timed_wait_for(util::FunctionRef<bool()> condition, std::chrono::milliseconds max_ms)
-{
-    const auto wait_start = std::chrono::steady_clock::now();
-    util::EventLoop::main().run_until([&] {
-        if (std::chrono::steady_clock::now() - wait_start > max_ms) {
-            throw std::runtime_error(util::format("timed_wait_for exceeded %1 ms", max_ms.count()));
-        }
-        return condition();
-    });
-}
-
-void timed_sleeping_wait_for(util::FunctionRef<bool()> condition, std::chrono::milliseconds max_ms,
-                             std::chrono::milliseconds sleep_ms)
+bool ReturnsTrueWithinTimeLimitWithSleeps::match(util::FunctionRef<bool()> condition) const
 {
     const auto wait_start = std::chrono::steady_clock::now();
     while (!condition()) {
-        if (std::chrono::steady_clock::now() - wait_start > max_ms) {
-            throw std::runtime_error(util::format("timed_sleeping_wait_for exceeded %1 ms", max_ms.count()));
+        if (std::chrono::steady_clock::now() - wait_start > m_max_ms) {
+            return false;
         }
-        std::this_thread::sleep_for(sleep_ms);
+        std::this_thread::sleep_for(m_sleep_ms);
     }
+    return true;
 }
 
 auto do_hash = [](const std::string& name) -> std::string {
@@ -230,9 +219,11 @@ void wait_for_advance(Realm& realm)
 
     bool done = false;
     realm.m_binding_context = std::make_unique<Context>(realm, done);
-    timed_wait_for([&] {
-        return done;
-    });
+    REQUIRE_THAT(
+        [&] {
+            return done;
+        },
+        ReturnsTrueWithinTimeLimit{});
     realm.m_binding_context = nullptr;
 }
 
@@ -410,7 +401,7 @@ void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const A
     app::MongoDatabase db = remote_client.db(app_session.config.mongo_dbname);
     app::MongoCollection object_coll = db[schema_name];
 
-    timed_sleeping_wait_for(
+    REQUIRE_THAT(
         [&]() -> bool {
             auto pf = util::make_promise_future<uint64_t>();
             object_coll.count(filter_bson, [promise = std::move(pf.promise)](
@@ -425,7 +416,7 @@ void wait_for_object_to_persist_to_atlas(std::shared_ptr<SyncUser> user, const A
             });
             return pf.future.get() > 0;
         },
-        std::chrono::minutes(15), std::chrono::milliseconds(500));
+        ReturnsTrueWithinTimeLimitWithSleeps(std::chrono::minutes(15), std::chrono::milliseconds(500)));
 }
 
 void wait_for_num_objects_in_atlas(std::shared_ptr<SyncUser> user, const AppSession& app_session,
@@ -463,9 +454,11 @@ void trigger_client_reset(const AppSession& app_session)
 
     REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
     app_session.admin_api.disable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
-    timed_sleeping_wait_for([&] {
-        return app_session.admin_api.is_sync_terminated(app_session.server_app_id);
-    });
+    REQUIRE_THAT(
+        [&] {
+            return app_session.admin_api.is_sync_terminated(app_session.server_app_id);
+        },
+        ReturnsTrueWithinTimeLimitWithSleeps{});
     app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
     REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
     if (app_session.config.dev_mode_enabled) { // dev mode is not sticky across a reset
@@ -476,9 +469,11 @@ void trigger_client_reset(const AppSession& app_session)
     // to make sure we've actually copied all the data from atlas into the realm history before we do any of
     // our remote changes.
     if (!app_session.config.flx_sync_config) {
-        timed_sleeping_wait_for([&] {
-            return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
-        });
+        REQUIRE_THAT(
+            [&] {
+                return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
+            },
+            ReturnsTrueWithinTimeLimitWithSleeps{});
     }
 }
 
@@ -515,9 +510,11 @@ struct BaasClientReset : public TestClientReset {
         //
         // So just don't try to do anything until initial sync is done and we're sure the server is in a stable
         // state.
-        timed_sleeping_wait_for([&] {
-            return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
-        });
+        REQUIRE_THAT(
+            [&] {
+                return app_session.admin_api.is_initial_sync_complete(app_session.server_app_id);
+            },
+            ReturnsTrueWithinTimeLimitWithSleeps{});
 
         auto realm = Realm::get_shared_realm(m_local_config);
         auto session = sync_manager->get_existing_session(realm->config().path);
@@ -558,7 +555,7 @@ struct BaasClientReset : public TestClientReset {
             auto realm2 = Realm::get_shared_realm(m_remote_config);
             wait_for_download(*realm2);
 
-            timed_sleeping_wait_for(
+            REQUIRE_THAT(
                 [&]() -> bool {
                     realm2->begin_transaction();
                     auto table = get_table(*realm2, object_schema_name);
@@ -566,7 +563,7 @@ struct BaasClientReset : public TestClientReset {
                     realm2->cancel_transaction();
                     return bool(objkey);
                 },
-                std::chrono::seconds(60));
+                ReturnsTrueWithinTimeLimitWithSleeps{std::chrono::seconds(60)});
 
             // expect the last sync'd object to be in place
             realm2->begin_transaction();
@@ -657,7 +654,7 @@ struct BaasFLXClientReset : public TestClientReset {
             wait_for_download(*realm2);
             load_initial_data(realm2);
 
-            timed_sleeping_wait_for(
+            REQUIRE_THAT(
                 [&]() -> bool {
                     realm2->begin_transaction();
                     auto table = get_table(*realm2, c_object_schema_name);
@@ -665,7 +662,7 @@ struct BaasFLXClientReset : public TestClientReset {
                     realm2->cancel_transaction();
                     return bool(objkey);
                 },
-                std::chrono::seconds(60));
+                ReturnsTrueWithinTimeLimitWithSleeps{std::chrono::seconds(60)});
 
             // expect the last sync'd object to be in place
             realm2->begin_transaction();
