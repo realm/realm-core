@@ -63,7 +63,7 @@ const char* httpmethod_to_string(HttpMethod method)
 
 AppError::AppError(ErrorCodes::Error code, std::string message, std::string link,
                    std::optional<int> additional_error_code)
-    : RuntimeError(code, code == ErrorCodes::HTTPError ? http_message(message, *additional_error_code) : message)
+    : Exception(code, code == ErrorCodes::HTTPError ? http_message(message, *additional_error_code) : message)
     , additional_status_code(additional_error_code)
     , link_to_server_logs(link)
 {
@@ -73,7 +73,7 @@ AppError::AppError(ErrorCodes::Error code, std::string message, std::string link
 
 AppError::AppError(std::string server_err, std::string message, std::string link,
                    std::optional<int> additional_error_code, ErrorCodes::Error code)
-    : RuntimeError(code, code == ErrorCodes::HTTPError ? http_message(message, *additional_error_code) : message)
+    : Exception(code, code == ErrorCodes::HTTPError ? http_message(message, *additional_error_code) : message)
     , additional_status_code(additional_error_code)
     , link_to_server_logs(link)
     , server_error(server_err)

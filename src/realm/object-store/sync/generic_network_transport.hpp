@@ -31,7 +31,7 @@
 
 namespace realm::app {
 
-struct AppError : public RuntimeError {
+struct AppError : public Exception {
     std::optional<int> additional_status_code;
 
     std::string link_to_server_logs;
