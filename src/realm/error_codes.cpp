@@ -218,6 +218,7 @@ static const MapElem string_to_error_code[] = {
     {"AWSError", ErrorCodes::AWSError},
     {"AccountNameInUse", ErrorCodes::AccountNameInUse},
     {"AddressSpaceExhausted", ErrorCodes::AddressSpaceExhausted},
+    {"AppServerError", ErrorCodes::AppServerError},
     {"AppUnknownError", ErrorCodes::AppUnknownError},
     {"ArgumentsNotAllowed", ErrorCodes::ArgumentsNotAllowed},
     {"AuthError", ErrorCodes::AuthError},
