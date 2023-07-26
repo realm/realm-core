@@ -1980,7 +1980,7 @@ void Session::send_upload_message()
                 m_last_sent_flx_query_version, m_upload_progress.client_version);
         }
         if (m_pending_flx_sub_set && m_pending_flx_sub_set->snapshot_version < m_upload_target_version) {
-            logger.trace("Limiting UPLOAD message up to version %1 to send QUERY version %2",
+            logger.debug("Limiting UPLOAD message up to version %1 to send QUERY version %2",
                          m_pending_flx_sub_set->snapshot_version, m_pending_flx_sub_set->query_version);
             target_upload_version = m_pending_flx_sub_set->snapshot_version;
         }
@@ -2256,7 +2256,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         REALM_ASSERT_EX(m_progress.upload.client_version == 0, m_progress.upload.client_version);
         REALM_ASSERT_EX(m_progress.upload.last_integrated_server_version == 0,
                         m_progress.upload.last_integrated_server_version);
-        logger.trace("last_version_available  = %1", m_last_version_available); // Throws
+        logger.debug("last_version_available  = %1", m_last_version_available); // Throws
 
         m_upload_target_version = m_last_version_available;
         m_upload_progress = m_progress.upload;
