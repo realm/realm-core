@@ -181,8 +181,7 @@ public:
     // Get a sync user for a given identity, or create one if none exists yet, and set its token.
     // If a logged-out user exists, it will marked as logged back in.
     std::shared_ptr<SyncUser> get_user(const std::string& id, std::string refresh_token, std::string access_token,
-                                       const std::string provider_type, std::string device_id)
-        REQUIRES(!m_user_mutex, !m_file_system_mutex);
+                                       std::string device_id) REQUIRES(!m_user_mutex, !m_file_system_mutex);
 
     // Get an existing user for a given identifier, if one exists and is logged in.
     std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& user_id) const REQUIRES(!m_user_mutex);

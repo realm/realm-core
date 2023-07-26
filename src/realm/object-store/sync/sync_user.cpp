@@ -84,17 +84,15 @@ SyncUserIdentity::SyncUserIdentity(const std::string& id, const std::string& pro
 SyncUserContextFactory SyncUser::s_binding_context_factory;
 std::mutex SyncUser::s_binding_context_factory_mutex;
 
-SyncUser::SyncUser(std::string refresh_token, const std::string identity, const std::string provider_type,
-                   std::string access_token, SyncUser::State state, const std::string device_id,
-                   SyncManager* sync_manager)
-    : m_provider_type(provider_type)
+SyncUser::SyncUser(std::string refresh_token, std::string identity, std::string access_token, SyncUser::State state,
+                   std::string device_id, SyncManager* sync_manager)
+    : m_state(state)
     , m_identity(std::move(identity))
     , m_refresh_token(RealmJWT(std::move(refresh_token)))
     , m_access_token(RealmJWT(std::move(access_token)))
-    , m_device_id(device_id)
+    , m_device_id(std::move(device_id))
     , m_sync_manager(sync_manager)
 {
-    m_state.store(state);
     {
         std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
         if (s_binding_context_factory) {
@@ -102,18 +100,14 @@ SyncUser::SyncUser(std::string refresh_token, const std::string identity, const 
         }
     }
 
-    bool updated = m_sync_manager->perform_metadata_update([&](const auto& manager) NO_THREAD_SAFETY_ANALYSIS {
-        auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
+    m_sync_manager->perform_metadata_update([&](const auto& manager) NO_THREAD_SAFETY_ANALYSIS {
+        auto metadata = manager.get_or_make_user_metadata(m_identity);
         metadata->set_state_and_tokens(state, m_access_token.token, m_refresh_token.token);
         metadata->set_device_id(m_device_id);
-        m_local_identity = metadata->local_uuid();
+        m_legacy_identities = metadata->legacy_identities();
         this->m_user_profile = metadata->profile();
     });
-    if (!updated)
-        m_local_identity = m_identity;
 }
-
-SyncUser::~SyncUser() {}
 
 std::shared_ptr<SyncManager> SyncUser::sync_manager() const
 {
@@ -195,8 +189,8 @@ void SyncUser::update_state_and_tokens(SyncUser::State state, const std::string&
             }
         }
 
-        m_sync_manager->perform_metadata_update([&, state = m_state.load()](const auto& manager) {
-            auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
+        m_sync_manager->perform_metadata_update([&](const auto& manager) {
+            auto metadata = manager.get_or_make_user_metadata(m_identity);
             metadata->set_state_and_tokens(state, access_token, refresh_token);
         });
     }
@@ -245,7 +239,7 @@ void SyncUser::update_refresh_token(std::string&& token)
         }
 
         m_sync_manager->perform_metadata_update([&, raw_refresh_token = m_refresh_token.token](const auto& manager) {
-            auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
+            auto metadata = manager.get_or_make_user_metadata(m_identity);
             metadata->set_refresh_token(raw_refresh_token);
         });
     }
@@ -280,7 +274,7 @@ void SyncUser::update_access_token(std::string&& token)
         }
 
         m_sync_manager->perform_metadata_update([&, raw_access_token = m_access_token.token](const auto& manager) {
-            auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
+            auto metadata = manager.get_or_make_user_metadata(m_identity);
             metadata->set_access_token(raw_access_token);
         });
     }
@@ -312,7 +306,7 @@ void SyncUser::update_identities(std::vector<SyncUserIdentity> identities)
     m_user_identities = identities;
 
     m_sync_manager->perform_metadata_update([&](const auto& manager) {
-        auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
+        auto metadata = manager.get_or_make_user_metadata(m_identity);
         metadata->set_identities(identities);
     });
 }
@@ -324,29 +318,31 @@ void SyncUser::log_out()
     std::shared_ptr<SyncManager> sync_manager_shared;
     {
         util::CheckedLockGuard lock(m_mutex);
+        bool is_anonymous = false;
         {
             util::CheckedLockGuard lock2(m_tokens_mutex);
             if (m_state != State::LoggedIn) {
                 return;
             }
+            is_anonymous = do_is_anonymous();
             m_state = State::LoggedOut;
             m_access_token = RealmJWT{};
             m_refresh_token = RealmJWT{};
         }
 
-        if (this->m_provider_type == app::IdentityProviderAnonymous) {
+        if (is_anonymous) {
             // An Anonymous user can not log back in.
             // Mark the user as 'dead' in the persisted metadata Realm.
             m_state = State::Removed;
             m_sync_manager->perform_metadata_update([&](const auto& manager) {
-                auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type, false);
+                auto metadata = manager.get_or_make_user_metadata(m_identity, false);
                 if (metadata)
                     metadata->remove();
             });
         }
         else {
             m_sync_manager->perform_metadata_update([&](const auto& manager) {
-                auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
+                auto metadata = manager.get_or_make_user_metadata(m_identity);
                 metadata->set_state_and_tokens(State::LoggedOut, "", "");
             });
         }
@@ -375,7 +371,20 @@ bool SyncUser::is_logged_in() const
 
 bool SyncUser::do_is_logged_in() const
 {
-    return !m_access_token.token.empty() && !m_refresh_token.token.empty() && state() == State::LoggedIn;
+    return !m_access_token.token.empty() && !m_refresh_token.token.empty() && m_state == State::LoggedIn;
+}
+
+bool SyncUser::is_anonymous() const
+{
+    util::CheckedLockGuard lock(m_mutex);
+    util::CheckedLockGuard lock2(m_tokens_mutex);
+    return do_is_anonymous();
+}
+
+bool SyncUser::do_is_anonymous() const
+{
+    return do_is_logged_in() && m_user_identities.size() == 1 &&
+           m_user_identities[0].provider_type == app::IdentityProviderAnonymous;
 }
 
 void SyncUser::invalidate()
@@ -407,8 +416,9 @@ bool SyncUser::has_device_id() const
     return !m_device_id.empty() && m_device_id != "000000000000000000000000";
 }
 
-SyncUser::State SyncUser::state() const NO_THREAD_SAFETY_ANALYSIS
+SyncUser::State SyncUser::state() const
 {
+    util::CheckedLockGuard lock(m_mutex);
     return m_state;
 }
 
@@ -419,7 +429,7 @@ void SyncUser::set_state(SyncUser::State state)
 
     REALM_ASSERT(m_sync_manager);
     m_sync_manager->perform_metadata_update([&](const auto& manager) {
-        auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
+        auto metadata = manager.get_or_make_user_metadata(m_identity);
         metadata->set_state(state);
     });
 }
@@ -446,7 +456,7 @@ void SyncUser::update_user_profile(const SyncUserProfile& profile)
     m_user_profile = profile;
 
     m_sync_manager->perform_metadata_update([&](const auto& manager) {
-        auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
+        auto metadata = manager.get_or_make_user_metadata(m_identity);
         metadata->set_user_profile(profile);
     });
 }
@@ -526,7 +536,8 @@ bool SyncUser::access_token_refresh_required() const
 {
     using namespace std::chrono;
     constexpr size_t buffer_seconds = 5; // arbitrary
-    util::CheckedLockGuard lock(m_tokens_mutex);
+    util::CheckedLockGuard lock(m_mutex);
+    util::CheckedLockGuard lock2(m_tokens_mutex);
     const auto now = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() +
                      m_seconds_to_adjust_time_for_testing.load(std::memory_order_relaxed);
     const auto threshold = now - buffer_seconds;

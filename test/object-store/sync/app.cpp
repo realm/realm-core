@@ -16,50 +16,40 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <collection_fixtures.hpp>
-#include <util/event_loop.hpp>
-#include <util/test_utils.hpp>
-#include <util/test_file.hpp>
-#include <util/sync/baas_admin_api.hpp>
-#include <util/sync/sync_test_utils.hpp>
+#include "collection_fixtures.hpp"
+#include "util/sync/baas_admin_api.hpp"
+#include "util/sync/sync_test_utils.hpp"
+#include "util/unit_test_transport.hpp"
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
-#include <realm/object-store/property.hpp>
-#include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/app_credentials.hpp>
 #include <realm/object-store/sync/app_utils.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
-#include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
+#include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
-
+#include <realm/object-store/util/uuid.hpp>
 #include <realm/sync/network/default_socket.hpp>
 #include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/server/access_token.hpp>
-
 #include <realm/util/base64.hpp>
-#include <realm/util/logger.hpp>
 #include <realm/util/overload.hpp>
 #include <realm/util/platform_info.hpp>
 #include <realm/util/uri.hpp>
 
 #include <catch2/catch_all.hpp>
-
 #include <external/json/json.hpp>
 #include <external/mpark/variant.hpp>
 
-#include <chrono>
 #include <condition_variable>
 #include <future>
-#include <thread>
 #include <iostream>
 #include <list>
 #include <mutex>
-#include <thread>
 
 using namespace realm;
 using namespace realm::app;
@@ -72,6 +62,9 @@ using namespace std::literals::string_literals;
 namespace {
 std::shared_ptr<SyncUser> log_in(std::shared_ptr<App> app, AppCredentials credentials = AppCredentials::anonymous())
 {
+    if (auto transport = dynamic_cast<UnitTestTransport*>(app->config().transport.get())) {
+        transport->set_provider_type(credentials.provider_as_string());
+    }
     std::shared_ptr<SyncUser> user;
     app->log_in_with_credentials(credentials, [&](std::shared_ptr<SyncUser> user_arg, Optional<AppError> error) {
         REQUIRE_FALSE(error);
@@ -827,40 +820,60 @@ TEST_CASE("app: auth providers function integration", "[sync][app][user][baas]")
         bson::BsonDocument function_params{{"realmCustomAuthFuncUserId", "123456"}};
         auto credentials = AppCredentials::function(function_params);
         auto user = log_in(app, credentials);
-        REQUIRE(user->provider_type() == IdentityProviderFunction);
+        REQUIRE(user->identities()[0].provider_type == IdentityProviderFunction);
     }
 }
 
 // MARK: - Link User Tests
 
-TEST_CASE("app: link_user integration", "[sync][app][user][baas]") {
+TEST_CASE("app: Linking user identities", "[sync][app][user][baas]") {
     TestAppSession session;
     auto app = session.app();
+    auto user = log_in(app);
 
-    SECTION("link_user integration") {
-        AutoVerifiedEmailCredentials creds;
-        bool processed = false;
-        std::shared_ptr<SyncUser> sync_user;
+    AutoVerifiedEmailCredentials creds;
+    app->provider_client<App::UsernamePasswordProviderClient>().register_email(creds.email, creds.password,
+                                                                               [&](Optional<AppError> error) {
+                                                                                   REQUIRE_FALSE(error);
+                                                                               });
 
-        app->provider_client<App::UsernamePasswordProviderClient>().register_email(
-            creds.email, creds.password, [&](Optional<AppError> error) {
-                CAPTURE(creds.email);
-                CAPTURE(creds.password);
-                REQUIRE_FALSE(error); // first registration success
-            });
+    SECTION("anonymous users are reused before they are linked to an identity") {
+        REQUIRE(user == log_in(app));
+    }
 
-        sync_user = log_in(app);
-        CHECK(sync_user->provider_type() == IdentityProviderAnonymous);
+    SECTION("linking a user adds that identity to the user") {
+        REQUIRE(user->identities().size() == 1);
+        CHECK(user->identities()[0].provider_type == IdentityProviderAnonymous);
 
-        app->link_user(sync_user, creds, [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
+        app->link_user(user, creds, [&](std::shared_ptr<SyncUser> user2, Optional<AppError> error) {
             REQUIRE_FALSE(error);
-            REQUIRE(user);
-            CHECK(user->identity() == sync_user->identity());
-            CHECK(user->identities().size() == 2);
-            processed = true;
+            REQUIRE(user == user2);
+            REQUIRE(user->identities().size() == 2);
+            CHECK(user->identities()[0].provider_type == IdentityProviderAnonymous);
+            CHECK(user->identities()[1].provider_type == IdentityProviderUsernamePassword);
         });
+    }
 
-        CHECK(processed);
+    SECTION("linking an identity makes the user no longer returned by anonymous logins") {
+        app->link_user(user, creds, [&](std::shared_ptr<SyncUser>, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+        });
+        auto user2 = log_in(app);
+        REQUIRE(user != user2);
+    }
+
+    SECTION("existing users are reused when logging in via linked identities") {
+        app->link_user(user, creds, [](std::shared_ptr<SyncUser>, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+        });
+        app->log_out([](auto error) {
+            REQUIRE_FALSE(error);
+        });
+        REQUIRE(user->state() == SyncUser::State::LoggedOut);
+        // Should give us the same user instance despite logging in with a
+        // different identity
+        REQUIRE(user == log_in(app, creds));
+        REQUIRE(user->state() == SyncUser::State::LoggedIn);
     }
 }
 
@@ -3801,7 +3814,6 @@ TEST_CASE("app: custom error handling", "[sync][app][custom errors]") {
     }
 }
 
-
 static const std::string profile_0_name = "Ursus americanus Ursus boeckhi";
 static const std::string profile_0_first_name = "Ursus americanus";
 static const std::string profile_0_last_name = "Ursus boeckhi";
@@ -3832,207 +3844,12 @@ static nlohmann::json user_profile_json(std::string user_id = random_string(15),
 {
     return {{"user_id", user_id},
             {"identities",
-             {{{"id", identity_0_id}, {"provider_type", provider_type}, {"provider_id", "lol"}},
-              {{"id", identity_1_id}, {"provider_type", "lol_wut"}, {"provider_id", "nah_dawg"}}}},
+             {{{"id", identity_0_id}, {"provider_type", provider_type}},
+              {{"id", identity_1_id}, {"provider_type", "lol_wut"}}}},
             {"data", profile_0}};
 }
 
 // MARK: - Unit Tests
-
-class UnitTestTransport : public GenericNetworkTransport {
-    std::string m_provider_type;
-
-public:
-    UnitTestTransport(const std::string& provider_type = "anon-user")
-        : m_provider_type(provider_type)
-    {
-    }
-
-    static std::string access_token;
-
-    static const std::string api_key;
-    static const std::string api_key_id;
-    static const std::string api_key_name;
-    static const std::string auth_route;
-    static const std::string user_id;
-    static const std::string identity_0_id;
-    static const std::string identity_1_id;
-
-    void set_provider_type(const std::string& provider_type)
-    {
-        m_provider_type = provider_type;
-    }
-
-private:
-    void handle_profile(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
-    {
-        CHECK(request.method == HttpMethod::get);
-        auto content_type = AppUtils::find_header("Content-Type", request.headers);
-        CHECK(content_type);
-        CHECK(content_type->second == "application/json;charset=utf-8");
-        auto authorization = AppUtils::find_header("Authorization", request.headers);
-        CHECK(authorization);
-        CHECK(authorization->second == "Bearer " + access_token);
-        CHECK(request.body.empty());
-        CHECK(request.timeout_ms == 60000);
-
-        std::string response =
-            nlohmann::json({{"user_id", user_id},
-                            {"identities",
-                             {{{"id", identity_0_id}, {"provider_type", m_provider_type}, {"provider_id", "lol"}},
-                              {{"id", identity_1_id}, {"provider_type", "lol_wut"}, {"provider_id", "nah_dawg"}}}},
-                            {"data", profile_0}})
-                .dump();
-
-        completion(Response{200, 0, {}, response});
-    }
-
-    void handle_login(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
-    {
-        CHECK(request.method == HttpMethod::post);
-        auto item = AppUtils::find_header("Content-Type", request.headers);
-        CHECK(item);
-        CHECK(item->second == "application/json;charset=utf-8");
-        CHECK(nlohmann::json::parse(request.body)["options"] ==
-              nlohmann::json({{"device",
-                               {{"appId", "app_id"},
-                                {"platform", util::get_library_platform()},
-                                {"platformVersion", "Object Store Test Platform Version"},
-                                {"sdk", "SDK Name"},
-                                {"sdkVersion", "SDK Version"},
-                                {"cpuArch", util::get_library_cpu_arch()},
-                                {"deviceName", "Device Name"},
-                                {"deviceVersion", "Device Version"},
-                                {"frameworkName", "Framework Name"},
-                                {"frameworkVersion", "Framework Version"},
-                                {"coreVersion", REALM_VERSION_STRING},
-                                {"bundleId", "Bundle Id"}}}}));
-
-        CHECK(request.timeout_ms == 60000);
-
-        std::string response = nlohmann::json({{"access_token", access_token},
-                                               {"refresh_token", access_token},
-                                               {"user_id", random_string(15)},
-                                               {"device_id", "Panda Bear"}})
-                                   .dump();
-
-        completion(Response{200, 0, {}, response});
-    }
-
-    void handle_location(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
-    {
-        CHECK(request.method == HttpMethod::get);
-        CHECK(request.timeout_ms == 60000);
-
-        std::string response = nlohmann::json({{"deployment_model", "this"},
-                                               {"hostname", "field"},
-                                               {"ws_hostname", "shouldn't"},
-                                               {"location", "matter"}})
-                                   .dump();
-
-        completion(Response{200, 0, {}, response});
-    }
-
-    void handle_create_api_key(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
-    {
-        CHECK(request.method == HttpMethod::post);
-        auto item = AppUtils::find_header("Content-Type", request.headers);
-        CHECK(item);
-        CHECK(item->second == "application/json;charset=utf-8");
-        CHECK(nlohmann::json::parse(request.body) == nlohmann::json({{"name", api_key_name}}));
-        CHECK(request.timeout_ms == 60000);
-
-        std::string response =
-            nlohmann::json({{"_id", api_key_id}, {"key", api_key}, {"name", api_key_name}, {"disabled", false}})
-                .dump();
-
-        completion(Response{200, 0, {}, response});
-    }
-
-    void handle_fetch_api_key(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
-    {
-        CHECK(request.method == HttpMethod::get);
-        auto item = AppUtils::find_header("Content-Type", request.headers);
-        CHECK(item);
-        CHECK(item->second == "application/json;charset=utf-8");
-
-        CHECK(request.body == "");
-        CHECK(request.timeout_ms == 60000);
-
-        std::string response =
-            nlohmann::json({{"_id", api_key_id}, {"name", api_key_name}, {"disabled", false}}).dump();
-
-        completion(Response{200, 0, {}, response});
-    }
-
-    void handle_fetch_api_keys(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
-    {
-        CHECK(request.method == HttpMethod::get);
-        auto item = AppUtils::find_header("Content-Type", request.headers);
-        CHECK(item);
-        CHECK(item->second == "application/json;charset=utf-8");
-
-        CHECK(request.body == "");
-        CHECK(request.timeout_ms == 60000);
-
-        auto elements = std::vector<nlohmann::json>();
-        for (int i = 0; i < 2; i++) {
-            elements.push_back({{"_id", api_key_id}, {"name", api_key_name}, {"disabled", false}});
-        }
-
-        completion(Response{200, 0, {}, nlohmann::json(elements).dump()});
-    }
-
-    void handle_token_refresh(const Request& request, util::UniqueFunction<void(const Response&)>&& completion)
-    {
-        CHECK(request.method == HttpMethod::post);
-        auto item = AppUtils::find_header("Content-Type", request.headers);
-        CHECK(item);
-        CHECK(item->second == "application/json;charset=utf-8");
-
-        CHECK(request.body == "");
-        CHECK(request.timeout_ms == 60000);
-
-        auto elements = std::vector<nlohmann::json>();
-        nlohmann::json json{{"access_token", access_token}};
-
-        completion(Response{200, 0, {}, json.dump()});
-    }
-
-public:
-    void send_request_to_server(const Request& request,
-                                util::UniqueFunction<void(const Response&)>&& completion) override
-    {
-        if (request.url.find("/login") != std::string::npos) {
-            handle_login(request, std::move(completion));
-        }
-        else if (request.url.find("/profile") != std::string::npos) {
-            handle_profile(request, std::move(completion));
-        }
-        else if (request.url.find("/session") != std::string::npos && request.method != HttpMethod::post) {
-            completion(Response{200, 0, {}, ""});
-        }
-        else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::post) {
-            handle_create_api_key(request, std::move(completion));
-        }
-        else if (request.url.find(util::format("/api_keys/%1", api_key_id)) != std::string::npos &&
-                 request.method == HttpMethod::get) {
-            handle_fetch_api_key(request, std::move(completion));
-        }
-        else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::get) {
-            handle_fetch_api_keys(request, std::move(completion));
-        }
-        else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
-            handle_token_refresh(request, std::move(completion));
-        }
-        else if (request.url.find("/location") != std::string::npos && request.method == HttpMethod::get) {
-            handle_location(request, std::move(completion));
-        }
-        else {
-            completion(Response{200, 0, {}, "something arbitrary"});
-        }
-    }
-};
 
 static TestSyncManager::Config get_config()
 {
@@ -4051,18 +3868,8 @@ static const std::string good_access_token2 =
     "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU2YmJi"
     "YzBhNmI3ZGZkM2UyNTA0OGIzIiwidHlwIjoiYWNjZXNzIn0.eSX4QMjIOLbdOYOPzQrD_racwLUk1HGFgxtx2a34k80";
 
-std::string UnitTestTransport::access_token = good_access_token;
-
 static const std::string bad_access_token = "lolwut";
 static const std::string dummy_device_id = "123400000000000000000000";
-
-const std::string UnitTestTransport::api_key = "lVRPQVYBJSIbGos2ZZn0mGaIq1SIOsGaZ5lrcp8bxlR5jg4OGuGwQq1GkektNQ3i";
-const std::string UnitTestTransport::api_key_id = "5e5e6f0abe4ae2a2c2c2d329";
-const std::string UnitTestTransport::api_key_name = "some_api_key_name";
-const std::string UnitTestTransport::auth_route = "https://mongodb.com/unittests";
-const std::string UnitTestTransport::user_id = "Ailuropoda melanoleuca";
-const std::string UnitTestTransport::identity_0_id = "Ursus arctos isabellinus";
-const std::string UnitTestTransport::identity_1_id = "Ursus arctos horribilis";
 
 TEST_CASE("subscribable unit tests", "[sync][app]") {
     struct Foo : public Subscribable<Foo> {
@@ -4135,6 +3942,7 @@ TEST_CASE("subscribable unit tests", "[sync][app]") {
 
 TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
     auto config = get_config();
+    static_cast<UnitTestTransport*>(config.transport.get())->set_profile(profile_0);
 
     SECTION("login_anonymous good") {
         UnitTestTransport::access_token = good_access_token;
@@ -4146,9 +3954,8 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
 
             auto user = log_in(app);
 
-            CHECK(user->identities().size() == 2);
+            REQUIRE(user->identities().size() == 1);
             CHECK(user->identities()[0].id == UnitTestTransport::identity_0_id);
-            CHECK(user->identities()[1].id == UnitTestTransport::identity_1_id);
             SyncUserProfile user_profile = user->user_profile();
 
             CHECK(user_profile.name() == profile_0_name);
@@ -4168,9 +3975,8 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
             auto app = tsm.app();
             REQUIRE(app->all_users().size() == 1);
             auto user = app->all_users()[0];
-            CHECK(user->identities().size() == 2);
+            REQUIRE(user->identities().size() == 1);
             CHECK(user->identities()[0].id == UnitTestTransport::identity_0_id);
-            CHECK(user->identities()[1].id == UnitTestTransport::identity_1_id);
             SyncUserProfile user_profile = user->user_profile();
 
             CHECK(user_profile.name() == profile_0_name);
@@ -4226,8 +4032,8 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app][user][api key
     auto app = sync_manager.app();
     auto client = app->provider_client<App::UserAPIKeyProviderClient>();
 
-    std::shared_ptr<SyncUser> logged_in_user = app->sync_manager()->get_user(
-        UnitTestTransport::user_id, good_access_token, good_access_token, "anon-user", dummy_device_id);
+    std::shared_ptr<SyncUser> logged_in_user =
+        app->sync_manager()->get_user("userid", good_access_token, good_access_token, dummy_device_id);
     bool processed = false;
     ObjectId obj_id(UnitTestTransport::api_key_id.c_str());
 
@@ -4310,11 +4116,11 @@ TEST_CASE("app: user_semantics", "[sync][app][user]") {
         CHECK(app->all_users()[0]->state() == SyncUser::State::LoggedIn);
         CHECK(app->all_users()[1]->state() == SyncUser::State::LoggedIn);
         CHECK(app->current_user()->identity() == user2->identity());
-        CHECK(user1->identity() != user2->identity());
+        CHECK(user1 != user2);
 
-        // shuold reuse existing session
+        // should reuse existing session
         const auto user3 = login_user_anonymous();
-        CHECK(user3->identity() == user1->identity());
+        CHECK(user3 == user1);
 
         auto user_events_processed = 0;
         auto _ = user3->subscribe([&user_events_processed](auto&) {
@@ -4638,7 +4444,8 @@ TEST_CASE("app: link_user", "[sync][app][user]") {
     auto email_pass_credentials = AppCredentials::username_password(email, password);
 
     auto sync_user = log_in(app, email_pass_credentials);
-    CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
+    REQUIRE(sync_user->identities().size() == 2);
+    CHECK(sync_user->identities()[0].provider_type == IdentityProviderUsernamePassword);
 
     SECTION("successful link") {
         bool processed = false;
@@ -4751,8 +4558,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
         if (app->sync_manager()->get_current_user()) {
             return;
         }
-        app->sync_manager()->get_user("a_user_id", good_access_token, good_access_token, "anon-user",
-                                      dummy_device_id);
+        app->sync_manager()->get_user("a_user_id", good_access_token, good_access_token, dummy_device_id);
     };
 
     SECTION("refresh custom data happy path") {
@@ -5457,8 +5263,7 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app][user]") {
     TestSyncManager sync_manager(get_config(transporter));
     auto app = sync_manager.app();
 
-    logged_in_user = app->sync_manager()->get_user(UnitTestTransport::user_id, good_access_token, good_access_token,
-                                                   "anon-user", dummy_device_id);
+    logged_in_user = app->sync_manager()->get_user("userid", good_access_token, good_access_token, dummy_device_id);
     auto custom_credentials = AppCredentials::facebook("a_token");
     auto [cur_user_promise, cur_user_future] = util::make_promise_future<std::shared_ptr<SyncUser>>();
 

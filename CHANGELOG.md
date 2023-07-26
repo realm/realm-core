@@ -5,13 +5,21 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Logging into a single user using multiple auth providers created a separate SyncUser per auth provider. This mostly worked, but had some quirks:
+  - Sync sessions would not necessarily be associated with the specific SyncUser used to create them. As a result, querying a user for its sessions could give incorrect results, and logging one user out could close the wrong sessions.
+  - Existing local synchronized Realm files created using version of Realm from August - November 2020 would sometimes not be opened correctly and would instead be redownloaded.
+  - Removing one of the SyncUsers would delete all local Realm files for all SyncUsers for that user.
+  - Deleting the server-side user via one of the SyncUsers left the other SyncUsers in an invalid state.
+  - A SyncUser which was originally created via anonymous login and then linked to an identity would still be treated as an anonymous users and removed entirely on logout.
+  (since v10.0.0)
 
 ### Breaking changes
-* None.
+* SyncUser::provider_type() and realm_user_get_auth_provider() have been removed. Users don't have provider types; identities do.
+* SyncUser no longer has a `local_identity()`. `identity()` has been guaranteed to be unique per App ever since v10.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+* The metadata Realm used to store sync users has had its schema version bumped. It is automatically migrated to the new version on first open. Downgrading to older version of Realm after upgrading will discard stored user tokens and require logging back in.
 
 -----------
 

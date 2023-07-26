@@ -180,10 +180,8 @@ public:
     };
 
     // Don't use this directly; use the `SyncManager` APIs. Public for use with `make_shared`.
-    SyncUser(std::string refresh_token, const std::string id, const std::string provider_type,
-             std::string access_token, SyncUser::State state, const std::string device_id, SyncManager* sync_manager);
-
-    ~SyncUser();
+    SyncUser(std::string refresh_token, std::string id, std::string access_token, SyncUser::State state,
+             std::string device_id, SyncManager* sync_manager);
 
     // Return a list of all sessions belonging to this user.
     std::vector<std::shared_ptr<SyncSession>> all_sessions() REQUIRES(!m_mutex);
@@ -219,22 +217,20 @@ public:
     // Log the user out and mark it as such. This will also close its associated Sessions.
     void log_out() REQUIRES(!m_mutex, !m_tokens_mutex);
 
-    /// Returns true id the users access_token and refresh_token are set.
+    /// Returns true if the users access_token and refresh_token are set.
     bool is_logged_in() const REQUIRES(!m_mutex, !m_tokens_mutex);
+
+    /// Returns true if the user's only identity is anonymous.
+    bool is_anonymous() const REQUIRES(!m_mutex, !m_tokens_mutex);
 
     const std::string& identity() const noexcept
     {
         return m_identity;
     }
 
-    const std::string& provider_type() const noexcept
+    const std::vector<std::string>& legacy_identities() const noexcept
     {
-        return m_provider_type;
-    }
-
-    const std::string& local_identity() const noexcept
-    {
-        return m_local_identity;
+        return m_legacy_identities;
     }
 
     std::string access_token() const REQUIRES(!m_tokens_mutex);
@@ -252,7 +248,7 @@ public:
     // Custom user data embedded in the access token.
     util::Optional<bson::BsonDocument> custom_data() const REQUIRES(!m_tokens_mutex);
 
-    State state() const;
+    State state() const REQUIRES(!m_mutex);
     void set_state(SyncUser::State state) REQUIRES(!m_mutex);
 
     std::shared_ptr<SyncUserContext> binding_context() const
@@ -276,7 +272,7 @@ public:
 
     /// Checks the expiry on the access token against the local time and if it is invalid or expires soon, returns
     /// true.
-    bool access_token_refresh_required() const REQUIRES(!m_tokens_mutex);
+    bool access_token_refresh_required() const REQUIRES(!m_mutex, !m_tokens_mutex);
 
     // Optionally set a context factory. If so, must be set before any sessions are created.
     static void set_binding_context_factory(SyncUserContextFactory factory);
@@ -311,19 +307,18 @@ private:
     static SyncUserContextFactory s_binding_context_factory;
     static std::mutex s_binding_context_factory_mutex;
 
-    bool do_is_logged_in() const REQUIRES(m_tokens_mutex);
+    bool do_is_logged_in() const REQUIRES(m_tokens_mutex, m_mutex);
+    bool do_is_anonymous() const REQUIRES(m_tokens_mutex, m_mutex);
 
     std::vector<std::shared_ptr<SyncSession>> revive_sessions() REQUIRES(m_mutex);
 
-    std::atomic<State> m_state GUARDED_BY(m_mutex);
+    State m_state GUARDED_BY(m_mutex);
 
     util::AtomicSharedPtr<SyncUserContext> m_binding_context;
 
-    // A locally assigned UUID intended to provide a level of indirection for various features.
-    std::string m_local_identity;
-
-    // The auth provider used to login this user.
-    const std::string m_provider_type;
+    // UUIDs which used to be used to generate local Realm file paths. Now only
+    // used to locate existing files.
+    std::vector<std::string> m_legacy_identities;
 
     // Mark the user as invalid, since a fatal user-related error was encountered.
     void invalidate() REQUIRES(!m_mutex);

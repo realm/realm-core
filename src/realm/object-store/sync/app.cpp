@@ -644,7 +644,7 @@ void App::log_in_with_credentials(
     // is already an anonymous session active, reuse it
     if (credentials.provider() == AuthProvider::ANONYMOUS) {
         for (auto&& user : m_sync_manager->all_users()) {
-            if (user->provider_type() == credentials.provider_as_string() && user->is_logged_in()) {
+            if (user->is_anonymous()) {
                 completion(switch_user(user), util::none);
                 return;
             }
@@ -686,8 +686,7 @@ void App::log_in_with_credentials(
                 else {
                     sync_user = self->m_sync_manager->get_user(
                         get<std::string>(json, "user_id"), get<std::string>(json, "refresh_token"),
-                        get<std::string>(json, "access_token"), credentials.provider_as_string(),
-                        get<std::string>(json, "device_id"));
+                        get<std::string>(json, "access_token"), get<std::string>(json, "device_id"));
                 }
             }
             catch (const AppError& e) {
@@ -758,11 +757,7 @@ std::shared_ptr<SyncUser> App::switch_user(const std::shared_ptr<SyncUser>& user
     if (!user || user->state() != SyncUser::State::LoggedIn) {
         throw AppError(ErrorCodes::ClientUserNotLoggedIn, "User is no longer valid or is logged out");
     }
-
-    auto users = m_sync_manager->all_users();
-    auto it = std::find(users.begin(), users.end(), user);
-
-    if (it == users.end()) {
+    if (!verify_user_present(user)) {
         throw AppError(ErrorCodes::ClientUserNotFound, "User does not exist");
     }
 

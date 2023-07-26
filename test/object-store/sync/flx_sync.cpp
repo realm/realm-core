@@ -3735,7 +3735,7 @@ TEST_CASE("flx: bootstrap changesets are applied continuously", "[sync][flx][boo
     CHECK(user_commit_version == bootstrap_version + 1);
 }
 
-TEST_CASE("flx: open realm + register subscription callack while bootstrapping",
+TEST_CASE("flx: open realm + register subscription callback while bootstrapping",
           "[sync][flx][bootstrap][async open][baas]") {
     FLXSyncTestHarness harness("flx_bootstrap_batching");
     auto foo_obj_id = ObjectId::gen();
