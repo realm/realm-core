@@ -46,14 +46,10 @@ while getopts "w:u:d:b:tp:c:vh" opt; do
         u) BAAS_USER="${OPTARG}";;
         d) FILE_DEST_DIR="${OPTARG}";;
         b) BAAS_BRANCH="${OPTARG}";;
-<<<<<<< HEAD
-        v) VERBOSE="yes";;
-=======
         t) BAAS_PROXY="yes";;
         p) REMOTE_PORT="${OPTARG}";;
         c) CONFIG_PORT="${OPTARG}";;
-        v) VERBOSE="-v";;
->>>>>>> 261ea6389 (Added support for starting baas proxy)
+        v) VERBOSE="yes";;
         h) usage 0;;
         *) usage 1;;
     esac

@@ -43,8 +43,6 @@ VERBOSE=
 while getopts "b:d:t:vh" opt; do
     case "${opt}" in
         b) BAAS_BRANCH="${OPTARG}";;
-<<<<<<< HEAD
-=======
         d) if [[ -z "${OPTARG}" ]]; then
                echo "Error: Alternate data directory was empty"
                usage 1
@@ -53,7 +51,6 @@ while getopts "b:d:t:vh" opt; do
                echo "Error: Baas proxy port was empty";
                usage 1
            fi; PROXY_PORT="${OPTARG}";;
->>>>>>> 261ea6389 (Added support for starting baas proxy)
         v) VERBOSE="yes";;
         h) usage 0;;
         *) usage 1;;
