@@ -3703,7 +3703,7 @@ TEMPLATE_TEST_CASE("app: partition types", "[sync][pbs][app][partition][baas]", 
     }
 }
 
-TEST_CASE("app: full-text compatible with sync", "[sync][app]") {
+TEST_CASE("app: full-text compatible with sync", "[sync][app][baas]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
