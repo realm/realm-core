@@ -37,7 +37,7 @@
 #endif
 
 #if REALM_ENABLE_AUTH_TESTS
-#include <util/flx_sync_harness.hpp>
+#include <util/sync/flx_sync_harness.hpp>
 #endif // REALM_ENABLE_AUTH_TESTS
 
 using namespace realm;

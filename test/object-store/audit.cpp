@@ -16,11 +16,11 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <util/baas_admin_api.hpp>
 #include <util/event_loop.hpp>
-#include <util/flx_sync_harness.hpp>
 #include <util/test_file.hpp>
 #include <util/test_utils.hpp>
+#include <util/sync/baas_admin_api.hpp>
+#include <util/sync/flx_sync_harness.hpp>
 
 #include <realm/set.hpp>
 #include <realm/list.hpp>

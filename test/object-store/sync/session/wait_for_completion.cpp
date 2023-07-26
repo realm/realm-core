@@ -17,9 +17,9 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <util/event_loop.hpp>
-#include <util/session_util.hpp>
 #include <util/test_file.hpp>
 #include <util/test_utils.hpp>
+#include <util/sync/session_util.hpp>
 
 #include <realm/util/scope_exit.hpp>
 

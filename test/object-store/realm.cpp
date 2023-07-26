@@ -43,7 +43,7 @@
 #include <realm/util/scope_exit.hpp>
 
 #if REALM_ENABLE_SYNC
-#include <util/flx_sync_harness.hpp>
+#include <util/sync/flx_sync_harness.hpp>
 
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>

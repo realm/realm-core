@@ -18,9 +18,9 @@
 
 #define CATCH_CONFIG_ENABLE_BENCHMARKING
 
-#include <util/sync_test_utils.hpp>
 #include <util/test_file.hpp>
 #include <util/test_utils.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>

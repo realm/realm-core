@@ -17,8 +17,8 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <util/event_loop.hpp>
-#include <util/session_util.hpp>
 #include <util/test_utils.hpp>
+#include <util/sync/session_util.hpp>
 
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/object_schema.hpp>

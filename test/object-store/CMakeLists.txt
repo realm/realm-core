@@ -48,15 +48,15 @@ file(GLOB RESOURCES RELATIVE ${CMAKE_CURRENT_BINARY_DIR}
      "*.realm")
 
 if(REALM_ENABLE_AUTH_TESTS)
-    list(APPEND SOURCES util/baas_admin_api.cpp)
+    list(APPEND SOURCES util/sync/baas_admin_api.cpp)
 endif()
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
-        util/flx_sync_harness.hpp
-        util/session_util.hpp
-        util/sync_test_utils.hpp
-        util/baas_admin_api.hpp
+        util/sync/flx_sync_harness.hpp
+        util/sync/session_util.hpp
+        util/sync/sync_test_utils.hpp
+        util/sync/baas_admin_api.hpp
     )
     list(APPEND SOURCES
         bson.cpp
@@ -74,7 +74,7 @@ if(REALM_ENABLE_SYNC)
         sync/sync_manager.cpp
         sync/user.cpp
         sync/app.cpp
-        util/sync_test_utils.cpp
+        util/sync/sync_test_utils.cpp
     )
     if(APPLE)
         list(APPEND SOURCES audit.cpp)

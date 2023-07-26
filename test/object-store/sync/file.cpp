@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <util/sync_test_utils.hpp>
 #include <util/test_utils.hpp>
 #include <util/test_file.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
 #include <realm/object-store/shared_realm.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>

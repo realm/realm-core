@@ -17,9 +17,9 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <util/event_loop.hpp>
-#include <util/session_util.hpp>
-#include <util/sync_test_utils.hpp>
 #include <util/test_utils.hpp>
+#include <util/sync/session_util.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_user.hpp>

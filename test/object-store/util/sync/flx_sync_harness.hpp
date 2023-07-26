@@ -20,8 +20,8 @@
 
 #ifdef REALM_ENABLE_AUTH_TESTS
 
-#include <util/baas_admin_api.hpp>
-#include <util/sync_test_utils.hpp>
+#include <util/sync/baas_admin_api.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
 #include <vector>
 

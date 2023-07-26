@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <util/flx_sync_harness.hpp>
-#include <util/test_file.hpp>
 #include <util/event_loop.hpp>
+#include <util/test_file.hpp>
+#include <util/sync/flx_sync_harness.hpp>
 
 #include <realm.h>
 
@@ -48,8 +48,8 @@
 #endif
 
 #if REALM_ENABLE_AUTH_TESTS
-#include <util/baas_admin_api.hpp>
-#include <util/sync_test_utils.hpp>
+#include <util/sync/baas_admin_api.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
 #include <realm/object-store/sync/app_utils.hpp>
 

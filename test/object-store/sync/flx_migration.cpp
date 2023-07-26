@@ -16,10 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <util/baas_admin_api.hpp>
 #include <util/crypt_key.hpp>
-#include <util/flx_sync_harness.hpp>
-#include <util/sync_test_utils.hpp>
+#include <util/sync/baas_admin_api.hpp>
+#include <util/sync/flx_sync_harness.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>

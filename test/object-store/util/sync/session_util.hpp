@@ -18,8 +18,8 @@
 #pragma once
 
 #include <util/event_loop.hpp>
-#include <util/sync_test_utils.hpp>
 #include <util/test_file.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>

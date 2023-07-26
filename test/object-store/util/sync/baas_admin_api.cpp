@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <util/baas_admin_api.hpp>
+#include <util/sync/baas_admin_api.hpp>
 
 #include <realm/object-store/sync/app_credentials.hpp>
 

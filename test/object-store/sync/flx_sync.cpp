@@ -20,10 +20,10 @@
 
 #include <catch2/catch_all.hpp>
 
-#include <util/flx_sync_harness.hpp>
-#include <util/sync_test_utils.hpp>
 #include <util/test_file.hpp>
 #include <util/crypt_key.hpp>
+#include <util/sync/flx_sync_harness.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
 #include <realm/object_id.hpp>
 #include <realm/query_expression.hpp>

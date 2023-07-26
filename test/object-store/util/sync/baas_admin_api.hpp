@@ -21,7 +21,7 @@
 #ifdef REALM_ENABLE_SYNC
 #ifdef REALM_ENABLE_AUTH_TESTS
 
-#include <util/sync_test_utils.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/object_schema.hpp>

@@ -16,8 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <util/sync_test_utils.hpp>
-#include <util/baas_admin_api.hpp>
+#include <util/sync/sync_test_utils.hpp>
+
+#include <util/sync/baas_admin_api.hpp>
 
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_store.hpp>
