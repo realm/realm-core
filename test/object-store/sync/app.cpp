@@ -2481,7 +2481,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 return;
             }
             util::format(std::cerr, "An unexpected sync error was caught by the default SyncTestFile handler: '%1'\n",
-                         error.what());
+                         error.status);
             abort();
         };
 
@@ -2772,7 +2772,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 sync_error_handler_called.store(true);
                 REQUIRE(error.get_system_error() ==
                         sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                REQUIRE(error.reason() == "Unable to refresh the user access token.");
+                REQUIRE(error.status.reason() == "Unable to refresh the user access token.");
             };
             auto r = Realm::get_shared_realm(config);
             timed_wait_for([&] {
@@ -2872,7 +2872,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 sync_error_handler_called.store(true);
                 REQUIRE(error.get_system_error() ==
                         sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                REQUIRE(error.reason() == "Unable to refresh the user access token.");
+                REQUIRE(error.status.reason() == "Unable to refresh the user access token.");
             };
 
             auto transport = static_cast<SynchronousTestTransport*>(session.transport());
@@ -3102,8 +3102,9 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
 
         auto error = wait_for_future(std::move(pf.future), std::chrono::minutes(5)).get();
         REQUIRE(error.get_system_error() == make_error_code(sync::ProtocolError::limits_exceeded));
-        REQUIRE(error.reason() == "Sync websocket closed because the server received a message that was too large: "
-                                  "read limited at 16777217 bytes");
+        REQUIRE(error.status.reason() ==
+                "Sync websocket closed because the server received a message that was too large: "
+                "read limited at 16777217 bytes");
         REQUIRE(error.is_client_reset_requested());
         REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ClientReset);
     }
@@ -3183,8 +3184,9 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             config.sync_config->partition_value = "not a bson serialized string";
             std::atomic<bool> error_did_occur = false;
             config.sync_config->error_handler = [&error_did_occur](std::shared_ptr<SyncSession>, SyncError error) {
-                CHECK(error.reason().find("Illegal Realm path (BIND): serialized partition 'not a bson serialized "
-                                          "string' is invalid") != std::string::npos);
+                CHECK(error.status.reason().find(
+                          "Illegal Realm path (BIND): serialized partition 'not a bson serialized "
+                          "string' is invalid") != std::string::npos);
                 error_did_occur.store(true);
             };
             auto r = Realm::get_shared_realm(config);
@@ -4895,18 +4897,18 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]")
         // Ignore websocket errors, since sometimes a websocket connection gets started during the test
         config.sync_config->error_handler = [](std::shared_ptr<SyncSession> session, SyncError error) mutable {
             // Ignore websocket errors, since there's not really an app out there...
-            if (error.reason().find("Bad WebSocket") != std::string::npos ||
-                error.reason().find("Connection Failed") != std::string::npos ||
-                error.reason().find("user has been removed") != std::string::npos) {
+            if (error.status.reason().find("Bad WebSocket") != std::string::npos ||
+                error.status.reason().find("Connection Failed") != std::string::npos ||
+                error.status.reason().find("user has been removed") != std::string::npos) {
                 util::format(std::cerr,
                              "An expected possible WebSocket error was caught during test: 'app destroyed during "
                              "token refresh': '%1' for '%2'",
-                             error.what(), session->path());
+                             error.status, session->path());
             }
             else {
                 std::string err_msg(util::format("An unexpected sync error was caught during test: 'app destroyed "
                                                  "during token refresh': '%1' for '%2'",
-                                                 error.what(), session->path()));
+                                                 error.status, session->path()));
                 std::cerr << err_msg << std::endl;
                 throw std::runtime_error(err_msg);
             }

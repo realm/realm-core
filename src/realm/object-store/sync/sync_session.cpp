@@ -250,7 +250,8 @@ void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status 
     }
 
     if (auto error_handler = config(&SyncConfig::error_handler)) {
-        auto user_facing_error = SyncError(realm::sync::ProtocolError::bad_authentication, context_message, true);
+        auto user_facing_error =
+            SyncError(Status{realm::sync::ProtocolError::bad_authentication, context_message}, true);
         error_handler(shared_from_this(), std::move(user_facing_error));
     }
 }
@@ -580,8 +581,9 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
 
         const bool try_again = false;
         sync::SessionErrorInfo synthetic(
-            make_error_code(sync::Client::Error::auto_client_reset_failure),
-            util::format("A fatal error occurred during client reset: '%1'", status.reason()), try_again);
+            Status{make_error_code(sync::Client::Error::auto_client_reset_failure),
+                   util::format("A fatal error occurred during client reset: '%1'", status.reason())},
+            try_again);
         handle_error(synthetic);
         return;
     }
@@ -632,7 +634,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
 {
     enum class NextStateAfterError { none, inactive, error };
     auto next_state = error.is_fatal() ? NextStateAfterError::error : NextStateAfterError::none;
-    auto error_code = error.error_code;
+    auto error_code = error.status.get_std_error_code();
     util::Optional<ShouldBackup> delete_file;
     bool log_out_user = false;
     bool unrecognized_by_client = false;
@@ -782,7 +784,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
         // Surface a simplified websocket error to the user.
         auto simplified_error = sync::websocket::get_simplified_websocket_error(websocket_error);
         std::error_code new_error_code(simplified_error, sync::websocket::websocket_error_category());
-        error = sync::SessionErrorInfo(new_error_code, error.message, error.try_again);
+        error = sync::SessionErrorInfo(Status{new_error_code, error.message}, error.try_again);
     }
     else {
         // Unrecognized error code.
@@ -790,8 +792,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     }
 
     util::CheckedUniqueLock lock(m_state_mutex);
-    SyncError sync_error{error.error_code, std::string(error.message), error.is_fatal(), error.log_url,
-                         std::move(error.compensating_writes)};
+    SyncError sync_error{error.status, error.is_fatal(), error.log_url, std::move(error.compensating_writes)};
     // `action` is used over `shouldClientReset` and `isRecoveryModeDisabled`.
     sync_error.server_requests_action = error.server_requests_action;
     sync_error.is_unrecognized_by_client = unrecognized_by_client;
@@ -813,15 +814,15 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     switch (next_state) {
         case NextStateAfterError::none:
             if (config(&SyncConfig::cancel_waits_on_nonfatal_error)) {
-                cancel_pending_waits(std::move(lock), sync_error.to_status()); // unlocks the mutex
+                cancel_pending_waits(std::move(lock), sync_error.status); // unlocks the mutex
             }
             break;
         case NextStateAfterError::inactive: {
-            become_inactive(std::move(lock), sync_error.to_status());
+            become_inactive(std::move(lock), sync_error.status);
             break;
         }
         case NextStateAfterError::error: {
-            auto error = sync_error.to_status();
+            auto error = sync_error.status;
             cancel_pending_waits(std::move(lock), error);
             break;
         }

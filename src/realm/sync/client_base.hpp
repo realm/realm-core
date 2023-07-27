@@ -305,22 +305,19 @@ struct ClientConfig {
 ///
 /// \sa set_connection_state_change_listener().
 struct SessionErrorInfo : public ProtocolErrorInfo {
-    SessionErrorInfo(const ProtocolErrorInfo& info, const std::error_code& ec)
+    SessionErrorInfo(const ProtocolErrorInfo& info, Status status)
         : ProtocolErrorInfo(info)
-        , error_code(ec)
+        , status(std::move(status))
     {
     }
-    SessionErrorInfo(const std::error_code& ec, bool try_again)
-        : ProtocolErrorInfo(ec.value(), ec.message(), try_again)
-        , error_code(ec)
+
+    SessionErrorInfo(Status status, bool try_again)
+        : ProtocolErrorInfo(status.get_std_error_code().value(), status.reason(), try_again)
+        , status(std::move(status))
     {
     }
-    SessionErrorInfo(const std::error_code& ec, const std::string& msg, bool try_again)
-        : ProtocolErrorInfo(ec.value(), msg, try_again)
-        , error_code(ec)
-    {
-    }
-    std::error_code error_code;
+
+    Status status;
 };
 
 enum class ConnectionState { disconnected, connecting, connected };
