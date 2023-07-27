@@ -61,24 +61,15 @@ const char* httpmethod_to_string(HttpMethod method)
     return "UNKNOWN";
 }
 
-AppError::AppError(ErrorCodes::Error code, std::string message, std::string link,
-                   std::optional<int> additional_error_code)
-    : Exception(code, code == ErrorCodes::HTTPError ? http_message(message, *additional_error_code) : message)
+AppError::AppError(ErrorCodes::Error ec, std::string message, std::string link,
+                   std::optional<int> additional_error_code, std::optional<std::string> server_err)
+    : Exception(ec, ec == ErrorCodes::HTTPError ? http_message(message, *additional_error_code) : message)
     , additional_status_code(additional_error_code)
     , link_to_server_logs(link)
+    , server_error(server_err ? *server_err : "")
 {
     // For these errors, the server_error string is empty
-    REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::app_error));
-}
-
-AppError::AppError(std::string server_err, std::string message, std::string link,
-                   std::optional<int> additional_error_code, ErrorCodes::Error code)
-    : Exception(code, code == ErrorCodes::HTTPError ? http_message(message, *additional_error_code) : message)
-    , additional_status_code(additional_error_code)
-    , link_to_server_logs(link)
-    , server_error(server_err)
-{
-    REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::app_error));
+    REALM_ASSERT(ErrorCodes::error_categories(ec).test(ErrorCategory::app_error));
 }
 
 std::ostream& operator<<(std::ostream& os, AppError error)

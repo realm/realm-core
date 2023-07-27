@@ -71,8 +71,8 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
                     !ErrorCodes::error_categories(code).test(ErrorCategory::app_error)) {
                     code = ErrorCodes::AppServerError;
                 }
-                return AppError(std::move(server_error), std::move(error_stg), std::move(parsed_link),
-                                response.http_status_code, code);
+                return AppError(code, std::move(error_stg), std::move(parsed_link), response.http_status_code,
+                                std::move(server_error));
             }
             // If the response only contains an error string, create a generic AppError with
             // ErrorCodes::AppUnknownError

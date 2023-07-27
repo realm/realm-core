@@ -37,12 +37,9 @@ struct AppError : public Exception {
     std::string link_to_server_logs;
     std::string server_error;
 
-    AppError(ErrorCodes::Error error_code, std::string message, std::string link = "",
-             std::optional<int> additional_error_code = std::nullopt);
-
-    // Used for creating an AppError with the error_code from the server response
-    AppError(std::string server_err, std::string message, std::string link = "",
-             std::optional<int> additional_error_code = std::nullopt, ErrorCodes::Error = ErrorCodes::AppServerError);
+    AppError(ErrorCodes::Error ec, std::string message, std::string link = "",
+             std::optional<int> additional_error_code = std::nullopt,
+             std::optional<std::string> server_err = std::nullopt);
 
     bool is_json_error() const
     {
