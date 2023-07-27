@@ -1,6 +1,23 @@
 # Some tests take up to 4 hours to run, so give a very generous timeout project-wide, but generally try to complete tasks within 30 minutes.
 exec_timeout_secs: 14400
 
+github_pr_aliases:
+  - variant: ".*"
+    task_tags: [ "for_pull_requests" ]
+
+commit_queue_aliases:
+  - variant: ".*"
+    task_tags: [ "!nightly" ]
+
+patch_aliases:
+  - alias: "nightly_tests"
+    variant: ".*"
+    task: ".*"
+
+  - alias: "benchmark_tests"
+    variant: ".*"
+    task_tags: [ "benchmark" ]
+
 functions:
   "fetch binaries":
     - command: shell.exec
@@ -773,6 +790,7 @@ tasks:
       display_name: bloaty-results
 
 - name: long-running-core-tests
+  tags: [ "nightly" ]
   commands:
   - func: "run tests"
     # The long-running tests can take a really long time on Windows, so we give the test up to 4
@@ -1002,6 +1020,7 @@ tasks:
         exit 1
 
 - name: fuzzer
+  tags: [ "nightly" ]
   commands:
   - command: shell.exec
     params:
