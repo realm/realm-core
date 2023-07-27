@@ -51,6 +51,10 @@ struct SyncError {
     Status status;
 
     bool is_fatal;
+
+    // The following two string_view's are views into the reason string of the status member. Users of
+    // SyncError should take care not to modify the status if they are going to access these views into
+    // the reason string.
     // Just the minimal error message, without any log URL.
     std::string_view simple_message;
     // The URL to the associated server log if any. If not supplied by the server, this will be `empty()`.
