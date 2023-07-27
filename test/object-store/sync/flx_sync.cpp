@@ -20,35 +20,40 @@
 
 #include <catch2/catch_all.hpp>
 
-#include "flx_sync_harness.hpp"
-#include "sync/sync_test_utils.hpp"
-#include "util/test_file.hpp"
-#include "util/crypt_key.hpp"
+#include <util/test_file.hpp>
+#include <util/crypt_key.hpp>
+#include <util/sync/flx_sync_harness.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
-#include "realm/object-store/binding_context.hpp"
-#include "realm/object-store/impl/object_accessor_impl.hpp"
-#include "realm/object-store/impl/realm_coordinator.hpp"
-#include "realm/object-store/schema.hpp"
-#include "realm/object-store/sync/generic_network_transport.hpp"
+#include <realm/object_id.hpp>
+#include <realm/query_expression.hpp>
+
+#include <realm/object-store/binding_context.hpp>
+#include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/schema.hpp>
+#include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/util/bson/bson.hpp>
-#include "realm/object-store/sync/sync_session.hpp"
-#include "realm/object_id.hpp"
-#include "realm/query_expression.hpp"
-#include "realm/sync/client_base.hpp"
-#include "realm/sync/config.hpp"
-#include "realm/sync/noinst/client_history_impl.hpp"
+#include <realm/object-store/sync/sync_session.hpp>
+
+#include <realm/sync/client_base.hpp>
+#include <realm/sync/config.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
-#include "realm/sync/noinst/pending_bootstrap_store.hpp"
-#include "realm/sync/noinst/server/access_token.hpp"
-#include "realm/sync/protocol.hpp"
-#include "realm/sync/subscriptions.hpp"
-#include "realm/util/future.hpp"
-#include "realm/util/logger.hpp"
+#include <realm/sync/noinst/pending_bootstrap_store.hpp>
+#include <realm/sync/noinst/server/access_token.hpp>
+#include <realm/sync/protocol.hpp>
+#include <realm/sync/subscriptions.hpp>
+
+#include <realm/util/future.hpp>
+#include <realm/util/logger.hpp>
+
+#include <catch2/catch_all.hpp>
 
 #include <filesystem>
 #include <iostream>
