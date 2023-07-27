@@ -557,7 +557,7 @@ void SlabAlloc::do_free(ref_type ref, char* addr)
                 // We can do that just by adding the size
                 if (prev->first + prev->second == ref) {
                     prev->second += size;
-                    return; // Done!
+                    return;                                     // Done!
                 }
                 m_free_read_only.emplace_hint(next, ref, size); // Throws
             }
@@ -767,6 +767,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
 
         size = initial_size;
     }
+    // Size must be non-zero here!
     ref_type top_ref;
     note_reader_start(this);
     util::ScopeExit reader_end_guard([this]() noexcept {
@@ -794,7 +795,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
 
         top_ref = validate_header(header, footer, size, path, cfg.encryption_key != nullptr); // Throws
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
-        m_data = map_header.get_addr(); // <-- needed below
+        m_data = map_header.get_addr();                                                       // <-- needed below
 
         if (cfg.session_initiator && is_file_on_streaming_form(*header)) {
             // Don't compare file format version fields as they are allowed to differ.
@@ -828,6 +829,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
             auto w = NodeHeader::get_width_from_header(top_header);
             auto logical_size = size_t(get_direct(top_data, w, Group::s_file_size_ndx)) >> 1;
             expected_size = round_up_to_page_size(logical_size);
+            // expected_size is non-zero!
         }
     }
     catch (const InvalidDatabase&) {
@@ -855,6 +857,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
         m_file.resize(expected_size);
         size = expected_size;
     }
+    REALM_ASSERT(size);
     // We can only safely mmap the file, if its size matches a page boundary. If not,
     // we must change the size to match before mmaping it.
     if (size != round_up_to_page_size(size)) {
@@ -890,6 +893,11 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
     }
 
     reset_free_space_tracking();
+    // ways for update_reader_view to yield an empty m_mappings.
+    // 1) size <= m_baseline
+    // --> implies size == 0. How?
+    // 2) size == 0 ... but that should be impossible?
+    // 3) a bug in the m_mapping manipulations in update_reader_view()
     update_reader_view(size);
     REALM_ASSERT(m_mappings.size());
     m_data = m_mappings[0].primary_mapping.get_addr();
@@ -1267,7 +1275,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
             REALM_ASSERT(!cur_entry.xover_mapping.is_attached());
             // save the old mapping/keep it open
             m_old_mappings.push_back({m_youngest_live_version, std::move(cur_entry.primary_mapping)});
-            m_mappings.pop_back();
+            m_mappings.pop_back(); // <-- could temporarily cause m_mappings to be empty
             m_mapping_version++;
         }
 
