@@ -395,16 +395,21 @@ if [ ! -x "${MONGO_BINARIES_DIR}/bin/mongod" ]; then
     mv mongodb* mongodb-binaries
     chmod +x "${MONGO_BINARIES_DIR}/bin"/*
 fi
+echo "mongod version: $("${MONGO_BINARIES_DIR}/bin/mongod" --version --quiet | sed 1q)"
 
-if [[ -n "${MONGOSH_DOWNLOAD_URL}" ]] && [[ ! -x "${MONGO_BINARIES_DIR}/bin/mongosh" ]]; then
-    echo "Downloading mongosh"
-    ${CURL} -sLS "${MONGOSH_DOWNLOAD_URL}" --output mongosh-binaries.zip
-    unzip -jnqq mongosh-binaries.zip '*/bin/*' -d "${MONGO_BINARIES_DIR}/bin/"
-    rm mongosh-binaries.zip
+if [[ -n "${MONGOSH_DOWNLOAD_URL}" ]]; then
+    if [[ ! -x "${MONGO_BINARIES_DIR}/bin/mongosh" ]]; then
+        echo "Downloading mongosh"
+        ${CURL} -sLS "${MONGOSH_DOWNLOAD_URL}" --output mongosh-binaries.zip
+        unzip -jnqq mongosh-binaries.zip '*/bin/*' -d "${MONGO_BINARIES_DIR}/bin/"
+        rm mongosh-binaries.zip
+        MONGOSH="mongosh"
+    fi
+else
+    # Use the mongo shell provided with mongod
+    MONGOSH="mongo"
 fi
-
-[[ -n "${MONGOSH_DOWNLOAD_URL}" ]] && MONGOSH="mongosh" || MONGOSH="mongo"
-
+echo "${MONGOSH} version: $("${MONGO_BINARIES_DIR}/bin/${MONGOSH}" --version)"
 
 # Start mongod on port 26000 and listening on all network interfaces
 echo "Starting mongodb"
