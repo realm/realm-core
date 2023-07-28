@@ -155,6 +155,191 @@ static std::string create_jwt(const std::string& appId)
     return jwtPayload + "." + signature;
 }
 
+// MARK: - Verify AppError with all error codes
+TEST_CASE("app: verify app error codes", "[sync][app][local]") {
+    auto error_codes = ErrorCodes::get_error_list();
+    std::vector<std::pair<int, std::string>> http_status_codes = {
+        {0, ""},
+        {100, "http error code considered fatal: some http error. Informational: 100"},
+        {200, ""},
+        {300, "http error code considered fatal: some http error. Redirection: 300"},
+        {400, "http error code considered fatal: some http error. Client Error: 400"},
+        {500, "http error code considered fatal: some http error. Server Error: 500"},
+        {600, "http error code considered fatal: some http error. Unknown HTTP Error: 600"}};
+
+    auto make_http_error = [](std::optional<std::string_view> error_code, int http_status = 500,
+                              std::optional<std::string_view> error = "some error",
+                              std::optional<std::string_view> link = "http://dummy-link/") -> app::Response {
+        nlohmann::json body;
+        if (error_code) {
+            body["error_code"] = *error_code;
+        }
+        if (error) {
+            body["error"] = *error;
+        }
+        if (link) {
+            body["link"] = *link;
+        }
+
+        return {
+            http_status,
+            0,
+            {{"Content-Type", "application/json"}},
+            body.empty() ? "{}" : body.dump(),
+        };
+    };
+
+    // Success response
+    app::Response response = {200, 0, {}, ""};
+    auto app_error = AppUtils::check_for_errors(response);
+    REQUIRE(!app_error);
+
+    // Empty error code
+    response = make_http_error("");
+    app_error = AppUtils::check_for_errors(response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::AppUnknownError);
+    REQUIRE(app_error->code_string() == "AppUnknownError");
+    REQUIRE(app_error->server_error.empty());
+    REQUIRE(app_error->reason() == "some error");
+    REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
+    REQUIRE(*app_error->additional_status_code == 500);
+
+    // Missing error code
+    response = make_http_error(std::nullopt);
+    app_error = AppUtils::check_for_errors(response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::AppUnknownError);
+    REQUIRE(app_error->code_string() == "AppUnknownError");
+    REQUIRE(app_error->server_error.empty());
+    REQUIRE(app_error->reason() == "some error");
+    REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
+    REQUIRE(*app_error->additional_status_code == 500);
+
+    // Missing error code and error message with success http status
+    response = make_http_error(std::nullopt, 200, std::nullopt);
+    app_error = AppUtils::check_for_errors(response);
+    REQUIRE(!app_error);
+
+    for (auto [name, error] : error_codes) {
+        // All error codes should not cause an exception
+        if (error != ErrorCodes::HTTPError && error != ErrorCodes::OK) {
+            response = make_http_error(name);
+            app_error = AppUtils::check_for_errors(response);
+            REQUIRE(app_error);
+            if (ErrorCodes::error_categories(error).test(ErrorCategory::app_error)) {
+                REQUIRE(app_error->code() == error);
+                REQUIRE(app_error->code_string() == name);
+            }
+            else {
+                REQUIRE(app_error->code() == ErrorCodes::AppServerError);
+                REQUIRE(app_error->code_string() == "AppServerError");
+            }
+            REQUIRE(app_error->server_error == name);
+            REQUIRE(app_error->reason() == "some error");
+            REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
+            REQUIRE(app_error->additional_status_code);
+            REQUIRE(*app_error->additional_status_code == 500);
+        }
+    }
+
+    response = make_http_error("AppErrorMissing", 404);
+    app_error = AppUtils::check_for_errors(response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::AppServerError);
+    REQUIRE(app_error->code_string() == "AppServerError");
+    REQUIRE(app_error->server_error == "AppErrorMissing");
+    REQUIRE(app_error->reason() == "some error");
+    REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
+    REQUIRE(app_error->additional_status_code);
+    REQUIRE(*app_error->additional_status_code == 404);
+
+    // HTTPError with different status values
+    for (auto [status, message] : http_status_codes) {
+        response = {
+            status,
+            0,
+            {},
+            "some http error",
+        };
+        app_error = AppUtils::check_for_errors(response);
+        if (message.empty()) {
+            REQUIRE(!app_error);
+            continue;
+        }
+        REQUIRE(app_error);
+        REQUIRE(app_error->code() == ErrorCodes::HTTPError);
+        REQUIRE(app_error->code_string() == "HTTPError");
+        REQUIRE(app_error->server_error.empty());
+        REQUIRE(app_error->reason() == message);
+        REQUIRE(app_error->link_to_server_logs.empty());
+        REQUIRE(app_error->additional_status_code);
+        REQUIRE(*app_error->additional_status_code == status);
+    }
+
+    // Missing error code and error message with fatal http status
+    response = {
+        501,
+        0,
+        {},
+        "",
+    };
+    app_error = AppUtils::check_for_errors(response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::HTTPError);
+    REQUIRE(app_error->code_string() == "HTTPError");
+    REQUIRE(app_error->server_error.empty());
+    REQUIRE(app_error->reason() == "http error code considered fatal. Server Error: 501");
+    REQUIRE(app_error->link_to_server_logs.empty());
+    REQUIRE(app_error->additional_status_code);
+    REQUIRE(*app_error->additional_status_code == 501);
+
+    // Valid client error code, with body, but no json
+    app::Response client_response = {
+        501,
+        0,
+        {},
+        "Some error occurred",
+        ErrorCodes::BadBsonParse, // client_error_code
+    };
+    app_error = AppUtils::check_for_errors(client_response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::BadBsonParse);
+    REQUIRE(app_error->code_string() == "BadBsonParse");
+    REQUIRE(app_error->server_error.empty());
+    REQUIRE(app_error->reason() == "Some error occurred");
+    REQUIRE(app_error->link_to_server_logs.empty());
+    REQUIRE(app_error->additional_status_code);
+    REQUIRE(*app_error->additional_status_code == 501);
+
+    // Same response with client error code, but no body
+    client_response.body = "";
+    app_error = AppUtils::check_for_errors(client_response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->reason() == "client error code value considered fatal");
+
+    // Valid custom status code, with body, but no json
+    app::Response custom_response = {501,
+                                     4999, // custom_status_code
+                                     {},
+                                     "Some custom error occurred"};
+    app_error = AppUtils::check_for_errors(custom_response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::CustomError);
+    REQUIRE(app_error->code_string() == "CustomError");
+    REQUIRE(app_error->server_error.empty());
+    REQUIRE(app_error->reason() == "Some custom error occurred");
+    REQUIRE(app_error->link_to_server_logs.empty());
+    REQUIRE(app_error->additional_status_code);
+    REQUIRE(*app_error->additional_status_code == 4999);
+
+    // Same response with custom status code, but no body
+    custom_response.body = "";
+    app_error = AppUtils::check_for_errors(custom_response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->reason() == "non-zero custom status code considered fatal");
+}
+
 // MARK: - Login with Credentials Tests
 
 TEST_CASE("app: login_with_credentials integration", "[sync][app][user][baas]") {
@@ -4897,10 +5082,15 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]")
         SyncTestFile config(app->current_user(), bson::Bson("foo"));
         // Ignore websocket errors, since sometimes a websocket connection gets started during the test
         config.sync_config->error_handler = [](std::shared_ptr<SyncSession> session, SyncError error) mutable {
-            // Ignore websocket errors, since there's not really an app out there...
-            if (error.reason().find("Bad WebSocket") != std::string::npos ||
-                error.reason().find("Connection Failed") != std::string::npos ||
-                error.reason().find("user has been removed") != std::string::npos) {
+            // Ignore these errors, since there's not really an app out there...
+            // Primarily make sure we don't crash unexpectedly
+            std::vector<const char*> expected_errors = {"Bad WebSocket", "Connection Failed", "user has been removed",
+                                                        "Connection refused"};
+            auto expected =
+                std::find_if(expected_errors.begin(), expected_errors.end(), [error](const char* err_msg) {
+                    return error.reason().find(err_msg) != std::string::npos;
+                });
+            if (expected != expected_errors.end()) {
                 util::format(std::cerr,
                              "An expected possible WebSocket error was caught during test: 'app destroyed during "
                              "token refresh': '%1' for '%2'",
