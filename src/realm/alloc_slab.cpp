@@ -558,7 +558,7 @@ void SlabAlloc::do_free(ref_type ref, char* addr)
                 // We can do that just by adding the size
                 if (prev->first + prev->second == ref) {
                     prev->second += size;
-                    return;                                     // Done!
+                    return; // Done!
                 }
                 m_free_read_only.emplace_hint(next, ref, size); // Throws
             }
@@ -867,7 +867,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
 
         top_ref = validate_header(header, footer, size, path, cfg.encryption_key != nullptr); // Throws
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
-        m_data = map_header.get_addr();                                                       // <-- needed below
+        m_data = map_header.get_addr(); // <-- needed below
 
         if (cfg.session_initiator && is_file_on_streaming_form(*header)) {
             // Don't compare file format version fields as they are allowed to differ.
