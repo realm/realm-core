@@ -1306,7 +1306,18 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                 }
 
                 alloc.convert_from_streaming_form(top_ref);
-
+                try {
+                    bool file_changed_size = alloc.align_filesize_for_mmap(top_ref, cfg);
+                    if (file_changed_size) {
+                        // we need to re-establish proper mappings after file size change.
+                        // we do this simply by aborting and starting all over:
+                        continue;
+                    }
+                }
+                // something went wrong. Retry.
+                catch (SlabAlloc::Retry&) {
+                    continue;
+                }
                 if (options.encryption_key) {
 #ifdef _WIN32
                     uint64_t pid = GetCurrentProcessId();
