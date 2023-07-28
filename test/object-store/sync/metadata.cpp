@@ -504,14 +504,74 @@ TEST_CASE("sync metadata: can open old metadata realms", "[sync][metadata]") {
     const auto identity = "metadata migration test";
     const std::string sample_token = "metadata migration token";
 
+    const auto access_token_1 = encode_fake_jwt("access token 1", 456, 123);
+    const auto access_token_2 = encode_fake_jwt("access token 2", 456, 124);
+    const auto refresh_token_1 = encode_fake_jwt("refresh token 1", 456, 123);
+    const auto refresh_token_2 = encode_fake_jwt("refresh token 2", 456, 124);
+
     // change to true to create a test file for the current schema version
     // this will only work on unix-like systems
     if ((false)) {
+#if true
+        // Code to generate the v6 metadata Realm used to test the 6 -> 7 migration
+        {
+            using State = SyncUser::State;
+            SyncMetadataManager manager(metadata_path, false);
+
+            auto user = manager.get_or_make_user_metadata("removed user", "");
+            user->set_state(State::Removed);
+
+            auto make_user_pair = [&](const char* name, State state1, State state2, const std::string& token_1,
+                                      const std::string& token_2) {
+                auto user = manager.get_or_make_user_metadata(name, "a");
+                user->set_state_and_tokens(state1, token_1, refresh_token_1);
+                user->set_identities({{"identity 1", "a"}, {"shared identity", "shared"}});
+                user->add_realm_file_path("file 1");
+                user->add_realm_file_path("file 2");
+
+                user = manager.get_or_make_user_metadata(name, "b");
+                user->set_state_and_tokens(state2, token_2, refresh_token_2);
+                user->set_identities({{"identity 2", "b"}, {"shared identity", "shared"}});
+                user->add_realm_file_path("file 2");
+                user->add_realm_file_path("file 3");
+            };
+
+            make_user_pair("first logged in, second logged out", State::LoggedIn, State::LoggedOut, access_token_1,
+                           access_token_2);
+            make_user_pair("first logged in, second removed", State::LoggedIn, State::Removed, access_token_1,
+                           access_token_2);
+            make_user_pair("second logged in, first logged out", State::LoggedOut, State::LoggedIn, access_token_1,
+                           access_token_2);
+            make_user_pair("second logged in, first removed", State::Removed, State::LoggedIn, access_token_1,
+                           access_token_2);
+            make_user_pair("both logged in, first newer", State::LoggedIn, State::LoggedIn, access_token_2,
+                           access_token_1);
+            make_user_pair("both logged in, second newer", State::LoggedIn, State::LoggedIn, access_token_1,
+                           access_token_2);
+        }
+
+        // Replace the randomly generated UUIDs with deterministic values
+        {
+            Realm::Config config;
+            config.path = metadata_path;
+            auto realm = Realm::get_shared_realm(config);
+            realm->begin_transaction();
+            auto& group = realm->read_group();
+            auto table = group.get_table("class_UserMetadata");
+            auto col = table->get_column_key("local_uuid");
+            size_t i = 0;
+            for (auto& obj : *table) {
+                obj.set(col, util::to_string(i++));
+            }
+            realm->commit_transaction();
+        }
+#else
         { // Create a metadata Realm with a test user
             SyncMetadataManager manager(metadata_path, false);
             auto user_metadata = manager.get_or_make_user_metadata(identity, provider_type);
             user_metadata->set_access_token(sample_token);
         }
+#endif
 
         // Open the metadata Realm directly and grab the schema version from it
         Realm::Config config;
