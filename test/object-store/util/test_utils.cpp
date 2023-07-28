@@ -16,18 +16,19 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/object-store/impl/realm_coordinator.hpp>
-#include "test_utils.hpp"
+#include <util/test_utils.hpp>
 
+#include <realm/string_data.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/demangle.hpp>
 #include <realm/util/file.hpp>
-#include <realm/string_data.hpp>
 
 #include <external/json/json.hpp>
 
 #include <iostream>
 #include <sys/stat.h>
+
 #ifndef _WIN32
 #include <unistd.h>
 #include <sys/types.h>

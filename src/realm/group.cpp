@@ -1112,6 +1112,8 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
                 top.add(RefOrTagged::make_tagged(history_info.version));
                 top.add(RefOrTagged::make_tagged(history_info.sync_file_id));
                 top_size = s_group_max_size;
+                // ^ this is too large, since the evacuation point entry is not there:
+                // (but the code below is self correcting)
             }
         }
         top_ref = out_2.get_ref_of_next_array();

@@ -5,7 +5,30 @@
 * None.
 
 ### Fixed
-* Trying to search a full-text indexes created as a result of an additive schema change (i.e. applying the differences between the local schema and a synchronized realm's schema) could have resulted in an IllegalOperation error with the error code `Column has no fulltext index`. ([PR #6823](https://github.com/realm/realm-core/pull/6823)).
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.17.1 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Rare corruption of files on streaming format (often following compact, convert or copying to a new file). ([#6807](https://github.com/realm/realm-core/pull/6807), since v12.12.0)
+* Trying to search a full-text indexes created as a result of an additive schema change (i.e. applying the differences between the local schema and a synchronized realm's schema) could have resulted in an IllegalOperation error with the error code `Column has no fulltext index`. ([PR #6823](https://github.com/realm/realm-core/pull/6823), since v13.2.0).
 * Sync progress for DOWNLOAD messages from server state was updated wrongly. This may have resulted in an extra round-trip to the server. ([#6827](https://github.com/realm/realm-core/issues/6827), since v12.9.0)
 
 ### Breaking changes
@@ -19,6 +42,7 @@
 ### Internals
 * `wait_for_upload_completion`/`wait_for_download_completion` internal API was changed to use `Status`'s instead of `std::error_code`. The SDK-facing was already `Status` oriented, so this change should only result in better error messages. ([PR #6796](https://github.com/realm/realm-core/pull/6796))
 * Separate local and baas object store tests into separate evergreen tasks and allow custom test specification. ([PR #6805](https://github.com/realm/realm-core/pull/6805))
+* Consolidate object store sync util files into test/object-store/util/sync/ directory. ([PR #6789](https://github.com/realm/realm-core/pull/6789))
 
 ----------------------------------------------
 

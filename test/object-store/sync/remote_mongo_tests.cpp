@@ -16,17 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_ENABLE_MONGO_CLIENT_TESTS
-#define REALM_ENABLE_MONGO_CLIENT_TESTS 1
-#endif
-
-#if REALM_ENABLE_MONGO_CLIENT_TESTS
-
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 
-#include <sstream>
 #include <catch2/catch_all.hpp>
+
+#include <sstream>
 
 namespace realm::app {
 using bson::Bson;
@@ -612,6 +607,5 @@ TEST_CASE("WatchStream buffer processing", "[sync][mongo]") {
 #endif
     }
 }
-} // namespace realm::app
 
-#endif
+} // namespace realm::app
