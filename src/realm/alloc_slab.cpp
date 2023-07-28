@@ -709,8 +709,8 @@ bool SlabAlloc::align_filesize_for_mmap(ref_type top_ref, Config& cfg)
         // Currently, there is no way to detect if this assumption is violated.
         return false;
     }
-    size_t expected_size = (size_t)-1;
-    size_t size = m_file.get_size();
+    size_t expected_size = size_t(-1);
+    size_t size = static_cast<size_t>(m_file.get_size());
 
     // It is not safe to change the size of a file on streaming form, since the footer
     // must remain available and remain at the very end of the file.
