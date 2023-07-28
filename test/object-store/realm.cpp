@@ -4173,3 +4173,56 @@ TEST_CASE("KeyPathMapping generation") {
         REQUIRE(q.count() == 0);
     }
 }
+
+TEST_CASE("Concurrent commits") {
+    TestFile config;
+    config.schema_version = 1;
+    config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
+
+    auto func = [&config] {
+        auto realm = Realm::get_shared_realm(config);
+        auto table = realm->read_group().get_table("class_object");
+        for (int i = 0; i < 1000; i++) {
+            realm->begin_transaction();
+            table->create_object().set("value", i);
+            realm->commit_transaction();
+            realm->begin_transaction();
+            realm->commit_transaction();
+        }
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_object");
+    int changed = 0;
+    Results res(realm, table->query("value == 5"));
+    auto token = res.add_notification_callback([&changed](CollectionChangeSet const&) {
+        changed++;
+    });
+
+    config.scheduler = util::Scheduler::make_dummy();
+    std::thread t0(func);
+    std::thread t1(func);
+    std::thread t2(func);
+
+
+    for (int j = 0; j < 100; j++) {
+        int commit_nr = 0;
+        for (int i = 0; i < 10; i++) {
+            realm->async_begin_transaction([val = i, table, realm, &commit_nr]() {
+                table->create_object().set("value", val);
+                realm->async_commit_transaction(
+                    [&commit_nr](auto) {
+                        commit_nr++;
+                    },
+                    true);
+            });
+        }
+        util::EventLoop::main().run_until([&] {
+            return commit_nr == 10;
+        });
+    }
+
+    t2.join();
+    t1.join();
+    t0.join();
+}
