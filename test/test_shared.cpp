@@ -1377,7 +1377,7 @@ TEST_IF(Shared_ManyReaders, TEST_DURATION > 0)
 #endif
 
 // This test is a minimal repro. of core issue #842.
-TEST(Many_ConcurrentReaders)
+ONLY(Many_ConcurrentReaders)
 {
     SHARED_GROUP_TEST_PATH(path);
     const std::string path_str = path;
@@ -1399,7 +1399,7 @@ TEST(Many_ConcurrentReaders)
             options.logger = std::make_shared<util::StreamLogger>(logs);
             options.logger->set_level_threshold(Logger::Level::all);
             constexpr bool no_create = false;
-            for (int i = 0; i < 1000; ++i) {
+            for (int i = 0; i < 100000; ++i) {
                 DBRef sg_r = DB::create(path_str, no_create, options);
                 ReadTransaction rt(sg_r);
                 ConstTableRef t = rt.get_table("table");
@@ -1417,7 +1417,7 @@ TEST(Many_ConcurrentReaders)
         }
     };
 
-    constexpr int num_threads = 4;
+    constexpr int num_threads = 8;
     Thread threads[num_threads];
     for (int i = 0; i < num_threads; ++i) {
         threads[i].start(reader);
