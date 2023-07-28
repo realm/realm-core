@@ -1,23 +1,6 @@
 # Some tests take up to 4 hours to run, so give a very generous timeout project-wide, but generally try to complete tasks within 30 minutes.
 exec_timeout_secs: 14400
 
-github_pr_aliases:
-  - variant: ".*"
-    task_tags: [ "for_pull_requests" ]
-
-commit_queue_aliases:
-  - variant: ".*"
-    task_tags: [ "!nightly" ]
-
-patch_aliases:
-  - alias: "nightly_tests"
-    variant: ".*"
-    task: ".*"
-
-  - alias: "benchmark_tests"
-    variant: ".*"
-    task_tags: [ "benchmark" ]
-
 functions:
   "fetch binaries":
     - command: shell.exec
@@ -671,7 +654,8 @@ tasks:
       script: ../tools/run-tests-on-exfat.sh
 
 - name: valgrind
-  exec_timeout_secs: 18000
+  exec_timeout_secs: 14400
+  tags: [ "for_nightly_tests" ]
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -790,7 +774,7 @@ tasks:
       display_name: bloaty-results
 
 - name: long-running-core-tests
-  tags: [ "nightly" ]
+  tags: [ "for_nightly_tests" ]
   commands:
   - func: "run tests"
     # The long-running tests can take a really long time on Windows, so we give the test up to 4
@@ -1020,7 +1004,7 @@ tasks:
         exit 1
 
 - name: fuzzer
-  tags: [ "nightly" ]
+  tags: [ "for_nightly_tests" ]
   commands:
   - command: shell.exec
     params:
@@ -1315,7 +1299,6 @@ buildvariants:
     enable_fuzzer: On
   tasks:
   - name: fuzzer-tests
-    cron: "@daily"
     patchable: true
 
 - name: rhel70
@@ -1334,7 +1317,7 @@ buildvariants:
   - name: compile_test_and_package
 
 - name: ubuntu-valgrind
-  display_name: "Ubuntu 2204 Valgrind"
+  display_name: "Ubuntu 22.04 x86_64 (Valgrind)"
   run_on: ubuntu2204-large
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
