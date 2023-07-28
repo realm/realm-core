@@ -3,7 +3,7 @@
 # for simulating network error conditions for testing.
 #
 # Usage:
-# ./evergreen/setup_baas_proxy.sh -w PATH [-p PORT] [-b PATH] [-c BRANCH] [-v] [-h]
+# ./evergreen/setup_baas_proxy.sh -w PATH [-p PORT] [-s PATH] [-b BRANCH] [-d] [-v] [-h]
 #
 
 set -o errexit
@@ -21,18 +21,19 @@ function catch()
 WORK_PATH=
 BAAS_PATH=
 TOXIPROXY_VERSION="v2.5.0"
-REMOTE_PORT=9092
+LISTEN_PORT=9092
 BAAS_PORT=9090
-VERBOSE=
+SKIP_BAAS_WAIT=
 
 function usage()
 {
-    echo "Usage: setup_baas_proxy.sh -w PATH [-p PORT] [-b PATH] [-c BRANCH] [-v] [-h]"
+    echo "Usage: setup_baas_proxy.sh -w PATH [-p PORT] [-s PATH] [-b BRANCH] [-d] [-v] [-h]"
     echo "Options:"
     echo -e "\t-w PATH\t\tPath to baas proxy working directory"
-    echo -e "\t-p PORT\t\tRemote port for proxy connected to baas (default: ${REMOTE_PORT})"
-    echo -e "\t-b PATH\t\tOptional path to baas working directory (for go binary)"
-    echo -e "\t-c BRANCH\tOptional branch or git spec to checkout/build (default: ${TOXIPROXY_VERSION})"
+    echo -e "\t-p PORT\t\tListen port for proxy connected to baas (default: ${LISTEN_PORT})"
+    echo -e "\t-s PATH\t\tOptional path to baas server working directory (for go binary)"
+    echo -e "\t-b BRANCH\tOptional branch or git spec to checkout/build (default: ${TOXIPROXY_VERSION})"
+    echo -e "\t-d\t\tDon't wait for baas to start before starting proxy"
     echo -e "\t-v\t\tEnable verbose script debugging"
     echo -e "\t-h\t\tShow this usage summary and exit"
     # Default to 0 if exit code not provided
@@ -44,13 +45,14 @@ BASE_PATH="$(cd "$(dirname "$0")"; pwd)"
 # Allow path to CURL to be overloaded by an environment variable
 CURL="${CURL:=$LAUNCHER curl}"
 
-while getopts "w:p:b:c:vh" opt; do
+while getopts "w:p:s:b:dvh" opt; do
     case "${opt}" in
         w) WORK_PATH="${OPTARG}";;
-        p) REMOTE_PORT="${OPTARG}";;
-        b) BAAS_PATH="${OPTARG}";;
-        c) TOXIPROXY_VERSION="${OPTARG}";;
-        v) VERBOSE="-v"; set -o verbose; set -o xtrace;;
+        p) LISTEN_PORT="${OPTARG}";;
+        s) BAAS_PATH="${OPTARG}";;
+        b) TOXIPROXY_VERSION="${OPTARG}";;
+        d) SKIP_BAAS_WAIT="yes";;
+        v) set -o verbose; set -o xtrace;;
         h) usage 0;;
         *) usage 1;;
     esac
@@ -60,7 +62,7 @@ if [[ -z "${WORK_PATH}" ]]; then
     echo "Baas proxy work path was not provided"
     usage 1
 fi
-if [[ -z "${REMOTE_PORT}" ]]; then
+if [[ -z "${LISTEN_PORT}" ]]; then
     echo "Baas proxy remote port was empty"
     usage 1
 fi
@@ -68,17 +70,17 @@ fi
 function check_port()
 {
     # Usage: check_port PORT PORT_NAME
-    port_check=$(lsof -P "-i:${1}" | grep "LISTEN" || true)
+    port_num="${1}"
+    port_check=$(lsof -P "-i:${port_num}" | grep "LISTEN" || true)
     if [[ -n "${port_check}" ]]; then
-        echo "Error: ${2} port (${1}) is already in use"
+        echo "Error: ${2} port (${port_num}) is already in use"
         echo -e "${port_check}"
         exit 1
     fi
 }
 
 # Check the mongodb and baas_server port availability first
-check_port "${REMOTE_PORT}" "baas proxy"
-
+check_port "${LISTEN_PORT}" "baas proxy"
 
 [[ -d "${WORK_PATH}" ]] || mkdir -p "${WORK_PATH}"
 pushd "${WORK_PATH}" > /dev/null
@@ -87,20 +89,21 @@ PROXY_CFG_FILE="${WORK_PATH}/baas_proxy.json"
 PROXY_LOG="${WORK_PATH}/baas_proxy.log"
 PROXY_PID_FILE="${WORK_PATH}/baas_proxy.pid"
 PROXY_STOPPED_FILE="${WORK_PATH}/baas_proxy_stopped"
+BAAS_STOPPED_FILE="${BAAS_PATH}/baas_stopped"
 
 # Remove some files from a previous run if they exist
 if [[ -f "${CONFIG_FILE}" ]]; then
-    rm "${CONFIG_FILE}"
+    rm -f "${CONFIG_FILE}"
 fi
 if [[ -f "${PROXY_LOG}" ]]; then
-    rm "${PROXY_LOG}"
+    rm -f "${PROXY_LOG}"
 fi
 if [[ -f "${PROXY_PID_FILE}" ]]; then
-    rm "${PROXY_PID_FILE}"
+    rm -f "${PROXY_PID_FILE}"
 fi
 
 if [[ -f "${PROXY_STOPPED}" ]]; then
-    rm "${PROXY_STOPPED}"
+    rm -f "${PROXY_STOPPED}"
 fi
 
 # Set up the cleanup function that runs at exit and stops the toxiproxy server
@@ -110,7 +113,7 @@ function on_exit()
 {
     # Usage: on_exit
     # Toxiproxy is being stopped (or never started), create a 'baas-proxy-stopped' file
-    touch "${PROXY_STOPPED_FILE}"
+    touch "${PROXY_STOPPED_FILE}" || true
 
     proxy_pid=
     if [[ -f "${PROXY_PID_FILE}" ]]; then
@@ -118,10 +121,11 @@ function on_exit()
     fi
 
     if [[ -n "${proxy_pid}" ]]; then
-        echo "Stopping toxiproxy server ${proxy_pid}"
-        kill "${proxy_pid}"
-        echo "Waiting for toxiproxy to stop"
+        echo "Stopping baas proxy ${proxy_pid}"
+        kill "${proxy_pid}" || true
+        echo "Waiting for baas proxy to stop"
         wait
+        rm -f "${PROXY_PID_FILE}" || true
     fi
 }
 
@@ -149,9 +153,10 @@ case $(uname -s) in
     ;;
 esac
 
-# If a baas path was provided look for go (or wait up to 10 seconds for it
-# to become available)
+# Looking for go - first in the work path, then in the baas path (if provided), or
+# download go into the work path
 GOROOT=
+# Was it found in the work path?
 if [[ ! -x ${WORK_PATH}/go/bin/go ]]; then
     # If the baas work path is set, check there first and wait 
     if [[ -n "${BAAS_PATH}" && -d "${BAAS_PATH}" ]]; then
@@ -159,10 +164,10 @@ if [[ ! -x ${WORK_PATH}/go/bin/go ]]; then
         RETRY_COUNT=10
         WAIT_START=$(date -u +'%s')
         FOUND_GO="yes"
-        BAAS_GO_DIR="${BAAS_PATH}/go"
-        BAAS_STOPPED_FILE="${BAAS_PATH}/baas_stopped"
+        GO_ROOT_FILE="${BAAS_PATH}/go_root"
+        # Bass may be initializing at the same time, allow a bit of time for the two to sync
         echo "Looking for go in baas work path for 20 secs in case both are starting concurrently"
-        until [[ -x "${BAAS_GO_DIR}/bin/go" ]]; do
+        until [[ -f "${GO_ROOT_FILE}" ]]; do
             if [[ -n "${BAAS_STOPPED_FILE}" && -f "${BAAS_STOPPED_FILE}" ]]; then
                 echo "Error: Baas server failed to start (found baas_stopped file)"
                 exit 1
@@ -177,8 +182,9 @@ if [[ ! -x ${WORK_PATH}/go/bin/go ]]; then
             sleep 2
         done
         if [[ -n "${FOUND_GO}" ]]; then
-            echo "Found go in baas working directory"
-            GOROOT="${BAAS_GO_DIR}"
+            GOROOT="$(cat "${GO_ROOT_FILE}")"
+            echo "Found go in baas working directory: ${GOROOT}"
+            export GOROOT
         fi
     fi
 
@@ -223,27 +229,26 @@ echo "Using Toxiproxy commit: $(git rev-parse HEAD)"
 # Build toxiproxy
 make build
 
-# Wait for baas to start before starting Toxiproxy
-OPT_WAIT_BAAS=()
-if [[ -n "${BAAS_PATH}" ]]; then
-    OPT_WAIT_BAAS=("-w" "{$BAAS_PATH}")
-fi
-if [[ -n "${VERBOSE}" ]]; then
-    OPT_WAIT_BAAS+=("-v")
-fi
+if [[ -z "${SKIP_BAAS_WAIT}" ]]; then
+    # Wait for baas to start before starting Toxiproxy
+    OPT_WAIT_BAAS=()
+    if [[ -n "${BAAS_PATH}" ]]; then
+        OPT_WAIT_BAAS=("-w" "{$BAAS_PATH}")
+    fi
 
-"${BASE_PATH}/wait_for_baas.sh" "${OPT_WAIT_BAAS[@]}"
+    "${BASE_PATH}/wait_for_baas.sh" "${OPT_WAIT_BAAS[@]}"
+fi
 
 cat >"${PROXY_CFG_FILE}" <<EOF
 [{
     "name": "baas_frontend",
-    "listen": "127.0.0.1:${REMOTE_PORT}",
+    "listen": "127.0.0.1:${LISTEN_PORT}",
     "upstream": "127.0.0.1:${BAAS_PORT}",
     "enabled": true
 }]
 EOF
 
-echo "Starting baas proxy: 127.0.0.1:${REMOTE_PORT} => 127.0.0.1:${BAAS_PORT}"
+echo "Starting baas proxy: 127.0.0.1:${LISTEN_PORT} => 127.0.0.1:${BAAS_PORT}"
 ./dist/toxiproxy-server -config "${PROXY_CFG_FILE}" > "${PROXY_LOG}" 2>&1 &
 echo $! > "${PROXY_PID_FILE}"
 

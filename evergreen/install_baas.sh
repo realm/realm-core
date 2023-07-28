@@ -168,9 +168,10 @@ fi
 function check_port()
 {
     # Usage: check_port PORT PORT_NAME
-    port_check=$(lsof -P "-i:${1}" | grep "LISTEN" || true)
+    port_num="${1}"
+    port_check=$(lsof -P "-i:${port_num}" | grep "LISTEN" || true)
     if [[ -n "${port_check}" ]]; then
-        echo "Error: ${2} port (${1}) is already in use"
+        echo "Error: ${2} port (${port_num}) is already in use"
         echo -e "${port_check}"
         exit 1
     fi
@@ -212,6 +213,7 @@ BAAS_STOPPED_FILE="${WORK_PATH}/baas_stopped"
 BAAS_PID_FILE="${WORK_PATH}/baas_server.pid"
 MONGOD_PID_FILE="${WORK_PATH}/mongod.pid"
 MONGOD_LOG="${MONGODB_PATH}/mongod.log"
+GO_ROOT_FILE="${WORK_PATH}/go_root"
 
 # Delete the mongod working directory if it exists from a previous run
 # Wait to create this directory until just before mongod is started
@@ -221,19 +223,19 @@ fi
 
 # Remove some files from a previous run if they exist
 if [[ -f "${BAAS_SERVER_LOG}" ]]; then
-    rm "${BAAS_SERVER_LOG}"
+    rm -f "${BAAS_SERVER_LOG}"
 fi
 if [[ -f "${BAAS_READY_FILE}" ]]; then
-    rm "${BAAS_READY_FILE}"
+    rm -f "${BAAS_READY_FILE}"
 fi
 if [[ -f "${BAAS_STOPPED_FILE}" ]]; then
-    rm "${BAAS_STOPPED_FILE}"
+    rm -f "${BAAS_STOPPED_FILE}"
 fi
 if [[ -f "${BAAS_PID_FILE}" ]]; then
-    rm "${BAAS_PID_FILE}"
+    rm -f "${BAAS_PID_FILE}"
 fi
 if [[ -f "${MONGOD_PID_FILE}" ]]; then
-    rm "${MONGOD_PID_FILE}"
+    rm -f "${MONGOD_PID_FILE}"
 fi
 
 # Set up the cleanup function that runs at exit and stops mongod and the baas server
@@ -243,7 +245,7 @@ function on_exit()
 {
     # Usage: on_exit
     # The baas server is being stopped (or never started), create a 'baas_stopped' file
-    touch "${BAAS_STOPPED_FILE}"
+    touch "${BAAS_STOPPED_FILE}" || true
 
     baas_pid=
     mongod_pid=
@@ -257,16 +259,18 @@ function on_exit()
 
     if [[ -n "${baas_pid}" ]]; then
         echo "Stopping baas ${baas_pid}"
-        kill "${baas_pid}"
+        kill "${baas_pid}" || true
         echo "Waiting for baas to stop"
         wait "${baas_pid}"
+        rm -f "${BAAS_PID_FILE}" || true
     fi
 
     if [[ -n "${mongod_pid}" ]]; then
         echo "Stopping mongod ${mongod_pid}"
-        kill "${mongod_pid}"
+        kill "${mongod_pid}" || true
         echo "Waiting for processes to exit"
         wait
+        rm -f "${MONGOD_PID_FILE}" || true
     fi
 }
 
@@ -287,6 +291,9 @@ echo "Node version: $(node --version)"
 [[ -x ${WORK_PATH}/go/bin/go ]] || (${CURL} -sL $GO_URL | tar -xz)
 export GOROOT="${WORK_PATH}/go"
 export PATH="${GOROOT}/bin":${PATH}
+# Write the GOROOT to a file after the download completes so the baas proxy
+# can use the same path.
+echo "${GOROOT}" > "${GO_ROOT_FILE}"
 echo "Go version: $(go version)"
 
 # Create the <work_path>/baas_dep_binaries/ directory
@@ -477,12 +484,7 @@ echo "Starting baas app server"
     --configFile=etc/configs/test_config.json --configFile="${BASE_PATH}/config_overrides.json" > "${BAAS_SERVER_LOG}" 2>&1 &
 echo $! > "${BAAS_PID_FILE}"
 
-OPT_WAIT_BAAS=("-w" "{$WORK_PATH}")
-if [[ -n "${VERBOSE}" ]]; then
-    OPT_WAIT_BAAS+=("-v")
-fi
-
-"${BASE_PATH}/wait_for_baas.sh" "${OPT_WAIT_BAAS[@]}"
+"${BASE_PATH}/wait_for_baas.sh" -w "${WORK_PATH}"
 
 # Create the admin user and set up the allowed roles
 echo "Adding roles to admin user"
@@ -503,4 +505,5 @@ echo "---------------------------------------------"
 echo "Baas server ready"
 echo "---------------------------------------------"
 wait
+
 popd > /dev/null  # baas

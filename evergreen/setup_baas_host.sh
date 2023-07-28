@@ -112,7 +112,7 @@ function init_data_device()
     devices=$(sudo lsblk | grep disk | awk '{print $1}')
     for device in ${devices}; do
         is_data=$(sudo file -s "/dev/${device}" | awk '{print $2}')
-        if [ "${is_data}" == "data" ]; then
+        if [[ "${is_data}" == "data" ]]; then
             data_device="/dev/${device}"
         fi
     done
@@ -153,9 +153,13 @@ function setup_data_dir()
     mkdir -p "${BAAS_WORK_DIR}"
     chmod -R 755 "${BAAS_WORK_DIR}"
 
-    # Set up the temp directory
-    mkdir -p "${DATA_TEMP_DIR}"
-    chmod 1777 "${DATA_TEMP_DIR}"
+    # Set up the temp directory - it may already exist on evergreen spawn hosts
+    if [[ -d "${DATA_TEMP_DIR}" ]]; then
+        sudo chmod 1777 "${DATA_TEMP_DIR}"
+    else
+        mkdir -p "${DATA_TEMP_DIR}"
+        chmod 1777 "${DATA_TEMP_DIR}"
+    fi
     export TMPDIR="${DATA_TEMP_DIR}"
 }
 
@@ -174,12 +178,14 @@ function on_exit()
 
     if [[ -n "${proxy_pid}" ]]; then
         echo "Stopping baas proxy ${proxy_pid}"
-        kill "${proxy_pid}"
+        kill "${proxy_pid}" || true
+        rm -f "${PROXY_PID_FILE}" || true
     fi
 
     if [[ -n "${baas_pid}" ]]; then
         echo "Stopping baas server ${baas_pid}"
-        kill "${baas_pid}"
+        kill "${baas_pid}" || true
+        rm -f "${SERVER_PID_FILE}" || true
     fi
 
     echo "Waiting for processes to exit"
@@ -189,6 +195,7 @@ function on_exit()
 function start_baas_proxy()
 {
     # Usage: start_baas_proxy PORT
+    listen_port="${1}"
     # Delete the toxiproxy working directory if it currently exists
     if [[ -n "${BAAS_PROXY_DIR}" && -d "${BAAS_PROXY_DIR}" ]]; then
         rm -rf "${BAAS_PROXY_DIR}"
@@ -198,13 +205,14 @@ function start_baas_proxy()
         cp "${HOME}/setup_baas_proxy.sh" evergreen/
     fi
 
-    proxy_options=
+    proxy_options=("-w" "${BAAS_PROXY_DIR}" "-s" "${BAAS_WORK_DIR}" "-p" "${listen_port}")
     if [[ -n "${VERBOSE}" ]]; then
         proxy_options=("-v")
     fi
 
     # Pass the baas work directory to the toxiproxy script for the go executable
-    ./evergreen/setup_baas_proxy.sh "${proxy_options[@]}" -b "${BAAS_WORK_DIR}" -w "${BAAS_PROXY_DIR}" -p "${1}" 2>&1 &
+    echo "Staring baas proxy with listen port :${listen_port}"
+    ./evergreen/setup_baas_proxy.sh "${proxy_options[@]}" 2>&1 &
     echo $! > "${PROXY_PID_FILE}"
 }
 
@@ -229,8 +237,11 @@ DATA_TEMP_DIR="${DATA_DIR}/tmp"
 BAAS_REMOTE_DIR="${DATA_DIR}/baas-remote"
 BAAS_WORK_DIR="${BAAS_REMOTE_DIR}/baas-work-dir"
 SERVER_PID_FILE="${BAAS_REMOTE_DIR}/baas-server.pid"
+BAAS_STOPPED_FILE="${BAAS_WORK_DIR}/baas_stopped"
+
 BAAS_PROXY_DIR="${BAAS_REMOTE_DIR}/baas-proxy-dir"
 PROXY_PID_FILE="${BAAS_REMOTE_DIR}/baas-proxy.pid"
+PROXY_STOPPED_FILE="${BAAS_PROXY_DIR}/baas_proxy_stopped"
 
 setup_data_dir
 
@@ -263,13 +274,20 @@ if [[ -n "${VERBOSE}" ]]; then
     BAAS_OPTIONS+=("-v")
 fi
 
+echo "Staring baas server..."
 ./evergreen/install_baas.sh "${BAAS_OPTIONS[@]}" -w "${BAAS_WORK_DIR}" 2>&1 &
 echo $! > "${SERVER_PID_FILE}"
 
 if [[ -n "${PROXY_PORT}" ]]; then
     start_baas_proxy "${PROXY_PORT}"
 fi
-wait # Wait for scripts to be exited...
+
+# Turn off verbose logging since it's so noisy
+set +o verbose
+set +o xtrace
+until [[ -f "${BAAS_STOPPED_FILE}" || -f "${PROXY_STOPPED_FILE}" ]]; do
+    sleep 1
+done
 
 popd > /dev/null  # realm-core
 popd > /dev/null  # /data/baas-remote
