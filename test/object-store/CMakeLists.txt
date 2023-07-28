@@ -48,15 +48,15 @@ file(GLOB RESOURCES RELATIVE ${CMAKE_CURRENT_BINARY_DIR}
      "*.realm")
 
 if(REALM_ENABLE_AUTH_TESTS)
-    list(APPEND SOURCES util/baas_admin_api.cpp)
+    list(APPEND SOURCES util/sync/baas_admin_api.cpp)
 endif()
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
-        sync/flx_sync_harness.hpp
-        sync/session/session_util.hpp
-        sync/sync_test_utils.hpp
-        util/baas_admin_api.hpp
+        util/sync/flx_sync_harness.hpp
+        util/sync/session_util.hpp
+        util/sync/sync_test_utils.hpp
+        util/sync/baas_admin_api.hpp
     )
     list(APPEND SOURCES
         bson.cpp
@@ -72,9 +72,9 @@ if(REALM_ENABLE_SYNC)
         sync/session/session.cpp
         sync/session/wait_for_completion.cpp
         sync/sync_manager.cpp
-        sync/sync_test_utils.cpp
         sync/user.cpp
         sync/app.cpp
+        util/sync/sync_test_utils.cpp
     )
     if(APPLE)
         list(APPEND SOURCES audit.cpp)
@@ -93,7 +93,34 @@ endif()
 target_link_libraries(ObjectStoreTests Catch2::Catch2 ObjectStore RealmFFIStatic)
 enable_stdfilesystem(ObjectStoreTests)
 create_coverage_target(generate-coverage ObjectStoreTests)
-add_bundled_test(ObjectStoreTests)
+
+# add_bundled_test(ObjectStoreTests)
+add_labeled_test(ObjectStoreTests-local objstore-local ObjectStoreTests "~[baas]")
+
+# Baas server and custom tests are only allowed when REALM_ENABLE_AUTH_TESTS is set
+if(REALM_ENABLE_SYNC)
+    if(REALM_ENABLE_AUTH_TESTS)
+        set(OBJSTORE_TESTS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/objstore-tests.do-not-commit")
+        # Rebuild cmake config if the tests file changes
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${OBJSTORE_TESTS_FILE})
+        # Extract the list of entries from the tests file
+        parse_list_file("${OBJSTORE_TESTS_FILE}" OBJSTORE_TEST_LIST)
+        # Convert the list from tests file, if any, to object store tests for each line
+        if (OBJSTORE_TEST_LIST)
+            # Copy the tests file to the build directory to indicate custom tests are set
+            file(COPY ${OBJSTORE_TESTS_FILE} DESTINATION ${CMAKE_BINARY_DIR})
+            set(_test_cnt 1)
+            foreach(_test_item ${OBJSTORE_TEST_LIST})
+                message(STATUS "Adding ObjectStoreTests-${_test_cnt}: 'realm-object-store-tests ${_test_item}'")
+                separate_arguments(_test_args NATIVE_COMMAND "${_test_item}")
+                add_labeled_test("ObjectStoreTests-${_test_cnt}" "objstore-baas" ObjectStoreTests ${_test_args})
+                MATH(EXPR _test_cnt "${_test_cnt}+1")
+            endforeach()
+        else()
+            add_labeled_test(ObjectStoreTests-baas objstore-baas ObjectStoreTests "[baas]")
+        endif()
+    endif()
+endif()
 
 if(REALM_ENABLE_SYNC)
     target_link_libraries(ObjectStoreTests SyncServer)

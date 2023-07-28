@@ -18,21 +18,21 @@
 
 #define CATCH_CONFIG_ENABLE_BENCHMARKING
 
-#include "util/index_helpers.hpp"
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
+#include <util/index_helpers.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
 
-#include <realm/object-store/impl/object_accessor_impl.hpp>
-#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/db.hpp>
+#include <realm/query_expression.hpp>
+
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/util/scheduler.hpp>
-
-#include <realm/db.hpp>
-#include <realm/query_expression.hpp>
 
 #include <memory>
 #include <vector>

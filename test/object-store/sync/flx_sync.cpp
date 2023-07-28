@@ -20,35 +20,40 @@
 
 #include <catch2/catch_all.hpp>
 
-#include "flx_sync_harness.hpp"
-#include "sync/sync_test_utils.hpp"
-#include "util/test_file.hpp"
-#include "util/crypt_key.hpp"
+#include <util/test_file.hpp>
+#include <util/crypt_key.hpp>
+#include <util/sync/flx_sync_harness.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
-#include "realm/object-store/binding_context.hpp"
-#include "realm/object-store/impl/object_accessor_impl.hpp"
-#include "realm/object-store/impl/realm_coordinator.hpp"
-#include "realm/object-store/schema.hpp"
-#include "realm/object-store/sync/generic_network_transport.hpp"
+#include <realm/object_id.hpp>
+#include <realm/query_expression.hpp>
+
+#include <realm/object-store/binding_context.hpp>
+#include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/schema.hpp>
+#include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/util/bson/bson.hpp>
-#include "realm/object-store/sync/sync_session.hpp"
-#include "realm/object_id.hpp"
-#include "realm/query_expression.hpp"
-#include "realm/sync/client_base.hpp"
-#include "realm/sync/config.hpp"
-#include "realm/sync/noinst/client_history_impl.hpp"
+#include <realm/object-store/sync/sync_session.hpp>
+
+#include <realm/sync/client_base.hpp>
+#include <realm/sync/config.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
-#include "realm/sync/noinst/pending_bootstrap_store.hpp"
-#include "realm/sync/noinst/server/access_token.hpp"
-#include "realm/sync/protocol.hpp"
-#include "realm/sync/subscriptions.hpp"
-#include "realm/util/future.hpp"
-#include "realm/util/logger.hpp"
+#include <realm/sync/noinst/pending_bootstrap_store.hpp>
+#include <realm/sync/noinst/server/access_token.hpp>
+#include <realm/sync/protocol.hpp>
+#include <realm/sync/subscriptions.hpp>
+
+#include <realm/util/future.hpp>
+#include <realm/util/logger.hpp>
+
+#include <catch2/catch_all.hpp>
 
 #include <filesystem>
 #include <iostream>
@@ -1129,10 +1134,12 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         async_open_realm(config_local, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
             REQUIRE(!ref);
             REQUIRE(error);
-            REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error),
-                                      "A fatal error occurred during client reset: 'The following changes cannot be "
-                                      "made in additive-only schema mode:\n"
-                                      "- Property 'TopLevel._id' has been changed from 'object id' to 'uuid'.'");
+            REQUIRE_THROWS_CONTAINING(
+                std::rethrow_exception(error),
+                "A fatal error occurred during client reset: 'The following changes cannot be "
+                "made in additive-only schema mode:\n"
+                "- Property 'TopLevel._id' has been changed from 'object id' to 'uuid'.\nIf your app is running in "
+                "development mode, you can delete the realm and restart the app to update your schema.'");
         });
         error_future.get();
         CHECK(before_reset_count == 0); // we didn't even get this far because opening the frozen realm fails
@@ -2905,7 +2912,6 @@ TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
     }
 }
 
-// TODO this test has been failing very frequently. We need to fix it and re-enable it in RCORE-1149.
 TEST_CASE("flx: data ingest - dev mode", "[sync][flx][data ingest][baas]") {
     FLXSyncTestHarness::ServerSchema server_schema;
     server_schema.dev_mode_enabled = true;

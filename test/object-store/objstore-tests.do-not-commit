@@ -1,0 +1,12 @@
+# This file can be used to specify specific tests to run during the
+# object-store-tests Evergreen task. These tests will be assigned
+# the 'ObjectStoreTests-<num>' ctest name and the 'objstore-baas' label.
+#
+# Only enter the arguments provided for each test case/section to run,
+# one per line. Comments using '#' are supported.
+# Examples:
+# -c "subscriber can unsubscribe" "subscribable unit tests" # first command
+# -c "login_anonymous bad" "app: login_with_credentials unit_tests"
+#
+# DO NOT COMMIT THIS FILE - it is for local or evergreen patch testing only
+#

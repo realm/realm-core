@@ -16,7 +16,13 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
+#include <collection_fixtures.hpp>
+#include <util/event_loop.hpp>
+#include <util/test_utils.hpp>
+#include <util/test_file.hpp>
+#include <util/sync/baas_admin_api.hpp>
+#include <util/sync/sync_test_utils.hpp>
+
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/sync/app.hpp>
@@ -30,24 +36,21 @@
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
+
 #include <realm/sync/network/default_socket.hpp>
-
-#include "collection_fixtures.hpp"
-#include "sync_test_utils.hpp"
-#include "util/baas_admin_api.hpp"
-#include "util/event_loop.hpp"
-#include "util/test_utils.hpp"
-#include "util/test_file.hpp"
-
-#include <external/json/json.hpp>
-#include <external/mpark/variant.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/server/access_token.hpp>
+
 #include <realm/util/base64.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/overload.hpp>
 #include <realm/util/platform_info.hpp>
 #include <realm/util/uri.hpp>
-#include <realm/sync/network/websocket.hpp>
+
+#include <catch2/catch_all.hpp>
+
+#include <external/json/json.hpp>
+#include <external/mpark/variant.hpp>
 
 #include <chrono>
 #include <condition_variable>
@@ -64,6 +67,7 @@ using util::any_cast;
 using util::Optional;
 
 using namespace std::string_view_literals;
+using namespace std::literals::string_literals;
 
 namespace {
 std::shared_ptr<SyncUser> log_in(std::shared_ptr<App> app, AppCredentials credentials = AppCredentials::anonymous())
@@ -3517,9 +3521,70 @@ TEMPLATE_TEST_CASE("app: partition types", "[sync][pbs][app][partition][baas]", 
     }
 }
 
+TEST_CASE("app: full-text compatible with sync", "[sync][app][baas]") {
+    std::string base_url = get_base_url();
+    const std::string valid_pk_name = "_id";
+    REQUIRE(!base_url.empty());
+
+    Schema schema{
+        {"TopLevel",
+         {
+             {valid_pk_name, PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"full_text", Property::IsFulltextIndexed{true}},
+         }},
+    };
+
+    auto server_app_config = minimal_app_config(base_url, "full_text", schema);
+    auto app_session = create_app(server_app_config);
+    const auto partition = random_string(100);
+    TestAppSession test_session(app_session, nullptr);
+    SyncTestFile config(test_session.app(), partition, schema);
+    SharedRealm realm;
+    SECTION("sync open") {
+        INFO("realm opened without async open");
+        realm = Realm::get_shared_realm(config);
+    }
+    SECTION("async open") {
+        INFO("realm opened with async open");
+        auto async_open_task = Realm::get_synchronized_realm(config);
+
+        auto [realm_promise, realm_future] = util::make_promise_future<ThreadSafeReference>();
+        async_open_task->start(
+            [promise = std::move(realm_promise)](ThreadSafeReference ref, std::exception_ptr ouch) mutable {
+                if (ouch) {
+                    try {
+                        std::rethrow_exception(ouch);
+                    }
+                    catch (...) {
+                        promise.set_error(exception_to_status());
+                    }
+                }
+                else {
+                    promise.emplace_value(std::move(ref));
+                }
+            });
+
+        realm = Realm::get_shared_realm(std::move(realm_future.get()));
+    }
+
+    CppContext c(realm);
+    auto obj_id_1 = ObjectId::gen();
+    auto obj_id_2 = ObjectId::gen();
+    realm->begin_transaction();
+    Object::create(c, realm, "TopLevel", std::any(AnyDict{{"_id", obj_id_1}, {"full_text", "Hello, world!"s}}));
+    Object::create(c, realm, "TopLevel", std::any(AnyDict{{"_id", obj_id_2}, {"full_text", "Hello, everyone!"s}}));
+    realm->commit_transaction();
+
+    auto table = realm->read_group().get_table("class_TopLevel");
+    REQUIRE(table->search_index_type(table->get_column_key("full_text")) == IndexType::Fulltext);
+    Results world_results(realm, Query(table).fulltext(table->get_column_key("full_text"), "world"));
+    REQUIRE(world_results.size() == 1);
+    REQUIRE(world_results.get<Obj>(0).get_primary_key() == Mixed{obj_id_1});
+}
+
 #endif // REALM_ENABLE_AUTH_TESTS
 
-TEST_CASE("app: custom error handling", "[sync][app][custom errors][baas]") {
+TEST_CASE("app: custom error handling", "[sync][app][custom errors]") {
     class CustomErrorTransport : public GenericNetworkTransport {
     public:
         CustomErrorTransport(int code, const std::string& message)
