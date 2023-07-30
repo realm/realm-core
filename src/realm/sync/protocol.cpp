@@ -27,6 +27,11 @@ ErrorCategoryImpl g_error_category;
 namespace realm {
 namespace sync {
 
+Status protocol_error_to_status(ProtocolError error_code, std::string_view msg)
+{
+    return SystemError(make_error_code(error_code), msg).to_status();
+}
+
 const char* get_protocol_error_message(int error_code) noexcept
 {
     // FIXME: These human-readable messages are phrased from the perspective of the client, but they may occur on the

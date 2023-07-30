@@ -224,8 +224,8 @@ public:
     {
         util::Logger& logger = connection.logger;
         auto report_error = [&](Error err, const auto fmt, auto&&... args) {
-            logger.error(fmt, std::forward<decltype(args)>(args)...);
-            connection.handle_protocol_error(err);
+            auto msg = util::format(fmt, std::forward<decltype(args)>(args)...);
+            connection.handle_protocol_error(err, std::move(msg));
         };
 
         HeaderLineParser msg(msg_data);
@@ -389,8 +389,8 @@ private:
     {
         util::Logger& logger = connection.logger;
         auto report_error = [&](Error err, const auto fmt, auto&&... args) {
-            logger.error(fmt, std::forward<decltype(args)>(args)...);
-            connection.handle_protocol_error(err);
+            auto msg = util::format(fmt, std::forward<decltype(args)>(args)...);
+            connection.handle_protocol_error(err, std::move(msg));
         };
 
         auto msg_with_header = msg.remaining();
@@ -601,8 +601,8 @@ public:
             connection.receive_ping(timestamp, rtt);
         }
         catch (const ProtocolCodecException& e) {
-            connection.logger.error("Bad syntax in ping message: %1", e.what());
-            connection.handle_protocol_error(Error::bad_syntax);
+            connection.handle_protocol_error(Error::bad_syntax,
+                                             util::format("Bad syntax in PING message: %1", e.what()));
         }
     }
 
@@ -624,8 +624,8 @@ public:
         auto& logger = connection.logger;
 
         auto report_error = [&](Error err, const auto fmt, auto&&... args) {
-            logger.error(fmt, std::forward<decltype(args)>(args)...);
-            connection.handle_protocol_error(err);
+            auto msg = util::format(fmt, std::forward<decltype(args)>(args)...);
+            connection.handle_protocol_error(err, std::move(msg));
         };
 
         HeaderLineParser msg(msg_data);

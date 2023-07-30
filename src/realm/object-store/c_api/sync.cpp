@@ -128,7 +128,9 @@ realm_sync_error_code_t to_capi(const Status& status, std::string& message)
 
     auto error_code = status.get_std_error_code();
     const std::error_category& category = error_code.category();
-    if (category == realm::sync::client_error_category()) {
+    if (status != ErrorCodes::SystemError) {
+        // TODO this will all go away when the unify error handling project is done, but for now just treat the
+        // ErrorCodes enum as client errors.
         ret.category = RLM_SYNC_ERROR_CATEGORY_CLIENT;
     }
     else if (category == realm::sync::protocol_error_category()) {
@@ -149,11 +151,16 @@ realm_sync_error_code_t to_capi(const Status& status, std::string& message)
         ret.category = RLM_SYNC_ERROR_CATEGORY_UNKNOWN;
     }
 
-    ret.value = error_code.value();
-    message = error_code.message(); // pass the string to the caller for lifetime purposes
+    if (status == ErrorCodes::SystemError) {
+        ret.value = error_code.value();
+        message = error_code.message();
+    }
+    else {
+        ret.value = status.code();
+        message = status.reason();
+    }
     ret.message = message.c_str();
     ret.category_name = category.name();
-
 
     return ret;
 }
@@ -163,7 +170,7 @@ void sync_error_to_error_code(const realm_sync_error_code_t& sync_error_code, st
     if (error_code_out) {
         const realm_sync_error_category_e category = sync_error_code.category;
         if (category == RLM_SYNC_ERROR_CATEGORY_CLIENT) {
-            error_code_out->assign(sync_error_code.value, realm::sync::client_error_category());
+            error_code_out->assign(sync_error_code.value, std::generic_category());
         }
         else if (category == RLM_SYNC_ERROR_CATEGORY_SESSION || category == RLM_SYNC_ERROR_CATEGORY_CONNECTION) {
             error_code_out->assign(sync_error_code.value, realm::sync::protocol_error_category());

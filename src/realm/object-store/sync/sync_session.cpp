@@ -223,7 +223,7 @@ void SyncSession::do_become_inactive(util::CheckedUniqueLock lock, Status status
         m_connection_change_notifier.invoke_callbacks(old_state, connection_state());
     }
 
-    if (!status.get_std_error_code())
+    if (status.is_ok())
         status = Status(ErrorCodes::OperationAborted, "Sync session became inactive");
 
     // Inform any queued-up completion handlers that they were cancelled.
@@ -581,7 +581,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
 
         const bool try_again = false;
         sync::SessionErrorInfo synthetic(
-            Status{make_error_code(sync::Client::Error::auto_client_reset_failure),
+            Status{ErrorCodes::AutoClientResetFailed,
                    util::format("A fatal error occurred during client reset: '%1'", status.reason())},
             try_again);
         handle_error(synthetic);
@@ -639,22 +639,19 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     bool log_out_user = false;
     bool unrecognized_by_client = false;
 
-    if (error_code == make_error_code(sync::Client::Error::auto_client_reset_failure)) {
+    if (error.status == ErrorCodes::AutoClientResetFailed) {
         // At this point, automatic recovery has been attempted but it failed.
         // Fallback to a manual reset and let the user try to handle it.
         next_state = NextStateAfterError::inactive;
         delete_file = ShouldBackup::yes;
     }
-    else if (error_code.category() == realm::sync::protocol_error_category()) {
+    else if (error_code == realm::sync::ProtocolError::bad_authentication) {
+        next_state = NextStateAfterError::inactive;
+        log_out_user = true;
+    }
+    else if (error.server_requests_action != sync::ProtocolErrorInfo::Action::NoAction) {
         switch (error.server_requests_action) {
             case sync::ProtocolErrorInfo::Action::NoAction:
-                // Although a protocol error, this is not sent by the server.
-                // Therefore, there is no action.
-                if (error_code == realm::sync::ProtocolError::bad_authentication) {
-                    next_state = NextStateAfterError::inactive;
-                    log_out_user = true;
-                    break;
-                }
                 REALM_UNREACHABLE(); // This is not sent by the MongoDB server
             case sync::ProtocolErrorInfo::Action::ApplicationBug:
                 [[fallthrough]];
@@ -713,48 +710,6 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                 return;
         }
     }
-    else if (error_code.category() == realm::sync::client_error_category()) {
-        using ClientError = realm::sync::ClientError;
-        switch (static_cast<ClientError>(error_code.value())) {
-            case ClientError::connection_closed:
-            case ClientError::pong_timeout:
-                // Not real errors, don't need to be reported to the SDK.
-                return;
-            case ClientError::bad_changeset:
-            case ClientError::bad_changeset_header_syntax:
-            case ClientError::bad_changeset_size:
-            case ClientError::bad_client_file_ident:
-            case ClientError::bad_client_file_ident_salt:
-            case ClientError::bad_client_version:
-            case ClientError::bad_compression:
-            case ClientError::bad_error_code:
-            case ClientError::bad_file_ident:
-            case ClientError::bad_message_order:
-            case ClientError::bad_origin_file_ident:
-            case ClientError::bad_progress:
-            case ClientError::bad_protocol_from_server:
-            case ClientError::bad_request_ident:
-            case ClientError::bad_server_version:
-            case ClientError::bad_session_ident:
-            case ClientError::bad_state_message:
-            case ClientError::bad_syntax:
-            case ClientError::bad_timestamp:
-            case ClientError::client_too_new_for_server:
-            case ClientError::client_too_old_for_server:
-            case ClientError::connect_timeout:
-            case ClientError::limits_exceeded:
-            case ClientError::protocol_mismatch:
-            case ClientError::ssl_server_cert_rejected:
-            case ClientError::missing_protocol_feature:
-            case ClientError::unknown_message:
-            case ClientError::http_tunnel_failed:
-            case ClientError::auto_client_reset_failure:
-                // Don't do anything special for these errors.
-                // Future functionality may require special-case handling for existing
-                // errors, or newly introduced error codes.
-                break;
-        }
-    }
     else if (error_code.category() == sync::websocket::websocket_error_category()) {
         using WebSocketError = sync::websocket::WebSocketError;
         auto websocket_error = static_cast<WebSocketError>(error_code.value());
@@ -801,7 +756,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
         update_error_and_mark_file_for_deletion(sync_error, *delete_file);
 
     if (m_state == State::Dying && error.is_fatal()) {
-        become_inactive(std::move(lock));
+        become_inactive(std::move(lock), error.status);
         return;
     }
 
@@ -822,8 +777,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
             break;
         }
         case NextStateAfterError::error: {
-            auto error = sync_error.status;
-            cancel_pending_waits(std::move(lock), error);
+            cancel_pending_waits(std::move(lock), sync_error.status);
             break;
         }
     }

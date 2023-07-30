@@ -900,9 +900,8 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 session = test_app_session.app()->sync_manager()->get_existing_session(temp_config.path);
                 REQUIRE(session);
             }
-            sync::SessionErrorInfo synthetic(
-                Status{sync::make_error_code(sync::ProtocolError::bad_client_file), "A fake client reset error"},
-                false);
+            sync::SessionErrorInfo synthetic(Status{ErrorCodes::SyncClientResetRequired, "A fake client reset error"},
+                                             false);
             synthetic.server_requests_action = sync::ProtocolErrorInfo::Action::ClientReset;
             SyncSession::OnlyForTesting::handle_error(*session, std::move(synthetic));
 

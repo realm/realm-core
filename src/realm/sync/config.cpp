@@ -71,7 +71,7 @@ bool SyncError::is_client_reset_requested() const
         server_requests_action == sync::ProtocolErrorInfo::Action::ClientResetNoRecovery) {
         return true;
     }
-    if (status.get_std_error_code() == make_error_code(sync::Client::Error::auto_client_reset_failure)) {
+    if (status == ErrorCodes::AutoClientResetFailed) {
         return true;
     }
     return false;

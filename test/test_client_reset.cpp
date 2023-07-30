@@ -775,8 +775,7 @@ TEST(ClientReset_DoNotRecoverSchema)
                 if (state != ConnectionState::disconnected)
                     return;
                 REALM_ASSERT(error_info);
-                std::error_code ec = error_info->status.get_std_error_code();
-                CHECK_EQUAL(ec, sync::Client::Error::auto_client_reset_failure);
+                CHECK_EQUAL(error_info->status, ErrorCodes::AutoClientResetFailed);
                 bowl.add_stone();
             });
         session.bind();
