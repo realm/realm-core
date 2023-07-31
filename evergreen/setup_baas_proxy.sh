@@ -241,7 +241,7 @@ fi
 
 cat >"${PROXY_CFG_FILE}" <<EOF
 [{
-    "name": "baas_frontend",
+    "name": "baas_proxy",
     "listen": "127.0.0.1:${LISTEN_PORT}",
     "upstream": "127.0.0.1:${BAAS_PORT}",
     "enabled": true

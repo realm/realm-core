@@ -160,7 +160,7 @@ echo "running ssh with ${SSH_OPTIONS[*]}"
 RETRY_COUNT=25
 WAIT_COUNTER=0
 WAIT_START=$(date -u +'%s')
-CONNECT_COUNT=2
+CONNECT_COUNT=4
 
 # Check for remote connectivity - try to connect twice to verify server is "really" ready
 # The tests failed one time due to this ssh command passing, but the next scp command failed
