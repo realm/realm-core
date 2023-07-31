@@ -2125,6 +2125,10 @@ bool Client::wait_for_session_terminations_or_client_stopped()
     return m_impl.get()->wait_for_session_terminations_or_client_stopped();
 }
 
+void Client::post(realm::sync::SyncSocketProvider::FunctionHandler&& handler)
+{
+    m_impl.get()->post(std::move(handler));
+}
 
 bool Client::decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
                                   port_type& port, std::string& path) const

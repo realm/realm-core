@@ -118,11 +118,11 @@ public:
         Connected,
     };
 
-    using StateChangeCallback = void(State old_state, State new_state);
     using ConnectionStateChangeCallback = void(ConnectionState old_state, ConnectionState new_state);
     using TransactionCallback = void(VersionID old_version, VersionID new_version);
     using ProgressNotifierCallback = _impl::SyncProgressNotifier::ProgressNotifierCallback;
     using ProgressDirection = _impl::SyncProgressNotifier::NotifierType;
+    using CloseCallback = util::UniqueFunction<void()>;
 
     ~SyncSession();
     State state() const REQUIRES(!m_state_mutex);
@@ -215,6 +215,10 @@ public:
     // Shut down the synchronization session (sync::Session) and wait for the Realm file to no
     // longer be open on behalf of it.
     void shutdown_and_wait() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
+
+    // Get notified asynchronously when the synchronization session (sync::Session) is shut down and
+    // the Realm file is no longer open on behalf of it.
+    void shutdown(CloseCallback&&) REQUIRES(!m_state_mutex, !m_connection_state_mutex);
 
     // DO NOT CALL OUTSIDE OF TESTING CODE.
     void detach_from_sync_manager() REQUIRES(!m_state_mutex, !m_connection_state_mutex);

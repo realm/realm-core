@@ -132,6 +132,18 @@ struct SyncClient {
         m_client.wait_for_session_terminations_or_client_stopped();
     }
 
+    void notify_session_terminated(util::UniqueFunction<void()> callback)
+    {
+        m_client.post([callback = std::move(callback)](Status status) {
+            if (status == ErrorCodes::OperationAborted)
+                return;
+            else if (!status.is_ok())
+                throw Exception(status);
+
+            callback();
+        });
+    }
+
     ~SyncClient() {}
 
 private:

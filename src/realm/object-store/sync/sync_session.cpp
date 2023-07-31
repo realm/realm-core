@@ -1184,7 +1184,7 @@ void SyncSession::close(util::CheckedUniqueLock lock)
             break;
         case State::Paused:
         case State::Inactive: {
-            // We need to register from the sync manager if it still exists so that we don't end up
+            // We need to unregister from the sync manager if it still exists so that we don't end up
             // holding the DBRef open after the session is closed. Otherwise we can end up preventing
             // the user from deleting the realm when it's in the paused/inactive state.
             if (m_sync_manager) {
@@ -1203,7 +1203,7 @@ void SyncSession::close(util::CheckedUniqueLock lock)
 void SyncSession::shutdown_and_wait()
 {
     {
-        // Transition immediately to `inactive` state. Calling this function must gurantee that any
+        // Transition immediately to `inactive` state. Calling this function must guarantee that any
         // sync::Session object in SyncSession::m_session that existed prior to the time of invocation
         // must have been destroyed upon return. This allows the caller to follow up with a call to
         // sync::Client::wait_for_session_terminations_or_client_stopped() in order to wait for the
@@ -1215,6 +1215,17 @@ void SyncSession::shutdown_and_wait()
         }
     }
     m_client.wait_for_session_terminations();
+}
+
+void SyncSession::shutdown(CloseCallback&& callback)
+{
+    {
+        util::CheckedUniqueLock lock(m_state_mutex);
+        if (m_state != State::Inactive && m_state != State::Paused) {
+            become_inactive(std::move(lock));
+        }
+    }
+    m_client.notify_session_terminated(std::move(callback));
 }
 
 void SyncSession::update_access_token(const std::string& signed_token)

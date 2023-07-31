@@ -338,6 +338,27 @@ TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync][session]") {
     }
 }
 
+TEST_CASE("SyncSession: shutdown() API", "[sync][session]") {
+    TestSyncManager init_sync_manager;
+    auto app = init_sync_manager.app();
+    auto user = app->sync_manager()->get_user("close-api-tests-user", ENCODE_FAKE_JWT("fake_refresh_token"),
+                                              ENCODE_FAKE_JWT("fake_access_token"), "https://realm.example.org",
+                                              dummy_device_id);
+
+    auto session = sync_session(
+        user, "/test-close-for-active", [](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded);
+    EventLoop::main().run_until([&] {
+        return sessions_are_active(*session);
+    });
+    REQUIRE(sessions_are_active(*session));
+    auto done_pf = util::make_promise_future<void>();
+    SyncSession::CloseCallback cb = [promise = std::move(done_pf.promise)]() mutable {
+        promise.emplace_value();
+    };
+    session->shutdown(std::move(cb));
+    done_pf.future.get();
+}
+
 TEST_CASE("SyncSession: update_configuration()", "[sync][session]") {
     TestSyncManager init_sync_manager({}, {false});
     auto app = init_sync_manager.app();
