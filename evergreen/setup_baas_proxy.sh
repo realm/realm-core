@@ -28,8 +28,8 @@ SKIP_BAAS_WAIT=
 function usage()
 {
     echo "Usage: setup_baas_proxy.sh -w PATH [-p PORT] [-s PATH] [-b BRANCH] [-d] [-v] [-h]"
-    echo "Options:"
     echo -e "\t-w PATH\t\tPath to baas proxy working directory"
+    echo "Options:"
     echo -e "\t-p PORT\t\tListen port for proxy connected to baas (default: ${LISTEN_PORT})"
     echo -e "\t-s PATH\t\tOptional path to baas server working directory (for go binary)"
     echo -e "\t-b BRANCH\tOptional branch or git spec to checkout/build (default: ${TOXIPROXY_VERSION})"

@@ -12,7 +12,7 @@ set -o pipefail
 function usage()
 {
     echo "Usage: setup_baas_host_local.sh [-w PATH] [-u USER] [-b BRANCH] [-v] [-h] [-t] [-l PORT] [-c PORT] HOST_VARS SSH_KEY"
-    echo -e "\tHOST_VARS\t\tPath to baas host vars script file"
+    echo -e "\tHOST_VARS\tPath to baas host vars script file"
     echo -e "\tSSH_KEY\t\tPath to baas host private key file"
     echo "Options:"
     echo -e "\t-w PATH\t\tPath to local baas server working directory (default ./baas-work-dir)"
@@ -22,7 +22,7 @@ function usage()
     echo -e "\t-h\t\tShow this usage summary and exit"
     echo "Baas Proxy Options:"
     echo -e "\t-t\t\tEnable baas proxy support (proxy between baas on :9090 and remote port)"
-    echo -e "\t-l PORT\t\Baas proxy listen port on remote host (default 9092)"
+    echo -e "\t-l PORT\t\tBaas proxy listen port on remote host (default 9092)"
     echo -e "\t-c PORT\t\tLocal configuration port for proxy HTTP API (default 8474)"
     # Default to 0 if exit code not provided
     exit "${1:0}"

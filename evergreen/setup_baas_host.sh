@@ -23,7 +23,7 @@ function usage()
 {
     # Usage: usage [EXIT_CODE]
     echo "Usage: setup_baas_host.sh [-b BRANCH] [-d PATH] [-t PORT] [-v] [-h] HOST_VARS"
-    echo -e "\tHOST_VARS\t\tPath to baas host vars script file"
+    echo -e "\tHOST_VARS\tPath to baas host vars script file"
     echo "Options:"
     echo -e "\t-b BRANCH\tOptional branch or git spec of baas to checkout/build"
     echo -e "\t-d PATH\t\tSkip setting up the data device and use alternate data path"

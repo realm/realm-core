@@ -24,6 +24,7 @@ STATUS_OUT=
 function usage()
 {
     echo "Usage: wait_for_baas.sh [-w PATH] [-p FILE] [-r COUNT] [-l FILE] [-s] [-v] [-h]"
+    echo "Options:"
     echo -e "\t-w PATH\t\tPath to baas server working directory"
     echo -e "\t-p FILE\t\tPath to baas server pid file (also set by -w option)"
     echo -e "\t-r COUNT\tNumber of attempts to check for baas server (default 120)"

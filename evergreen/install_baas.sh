@@ -134,6 +134,7 @@ function usage()
 {
     echo "Usage: install_baas.sh -w PATH [-b BRANCH] [-v] [-h]"
     echo -e "\t-w PATH\t\tPath to working directory"
+    echo "Options:"
     echo -e "\t-b BRANCH\tOptional branch or git spec of baas to checkout/build"
     echo -e "\t-v\t\tEnable verbose script debugging"
     echo -e "\t-h\t\tShow this usage summary and exit"
