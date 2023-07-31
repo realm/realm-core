@@ -1460,7 +1460,7 @@ TEST_CASE("dictionary snapshot null", "[dictionary]") {
     REQUIRE(snapshot.get_any(0) == Mixed{});
 }
 
-TEST_CASE("dictionary aggregate", "[dictionary]") {
+TEST_CASE("dictionary aggregate", "[dictionary][aggregate]") {
     InMemoryTestFile config;
     config.schema = Schema{
         {"DictionaryObject",
@@ -1486,7 +1486,7 @@ TEST_CASE("dictionary aggregate", "[dictionary]") {
     REQUIRE(*sum == 16);
 }
 
-TEST_CASE("callback with empty keypatharray") {
+TEST_CASE("callback with empty keypatharray", "[dictionary]") {
     InMemoryTestFile config;
     config.schema = Schema{
         {"object", {{"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},

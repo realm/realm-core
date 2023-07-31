@@ -1,19 +1,40 @@
-#include <catch2/catch_all.hpp>
+////////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2019 Realm Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+////////////////////////////////////////////////////////////////////////////
+
+#include <util/event_loop.hpp>
+#include <util/test_file.hpp>
+#include <util/sync/flx_sync_harness.hpp>
 
 #include <realm.h>
+
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/c_api/conversion.hpp>
 #include <realm/object-store/c_api/realm.hpp>
 #include <realm/object-store/c_api/types.hpp>
+#include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
-#include <realm/sync/binding_callback_thread_observer.hpp>
-#include <realm/util/base64.hpp>
 
-#include "sync/flx_sync_harness.hpp"
-#include "util/test_file.hpp"
-#include "util/event_loop.hpp"
-#include "realm/util/logger.hpp"
-#include "realm/object-store/impl/object_accessor_impl.hpp"
+#include <realm/sync/binding_callback_thread_observer.hpp>
+
+#include <realm/util/base64.hpp>
+#include <realm/util/logger.hpp>
+
+#include <catch2/catch_all.hpp>
 
 #include <cstring>
 #include <numeric>
@@ -22,16 +43,20 @@
 
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/sync_user.hpp>
+
 #include <external/json/json.hpp>
 #endif
 
 #if REALM_ENABLE_AUTH_TESTS
+#include <util/sync/baas_admin_api.hpp>
+#include <util/sync/sync_test_utils.hpp>
+
 #include <realm/object-store/sync/app_utils.hpp>
+
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/network/websocket.hpp>
+
 #include <realm/util/misc_errors.hpp>
-#include "sync/sync_test_utils.hpp"
-#include "util/baas_admin_api.hpp"
 #endif
 
 using namespace realm;
@@ -5280,7 +5305,7 @@ static void sync_error_handler(void* p, realm_sync_session_t*, const realm_sync_
     userdata_p->error_catagory = error.error_code.category_name;
 }
 
-TEST_CASE("C API - async_open", "[c_api][sync]") {
+TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
     TestSyncManager init_sync_manager;
     SyncTestFile test_config(init_sync_manager.app(), "default");
     test_config.cache = false;
@@ -5374,7 +5399,7 @@ struct BCTOState {
 };
 
 
-TEST_CASE("C API - binding callback thread observer", "[c_api][sync]") {
+TEST_CASE("C API - binding callback thread observer", "[sync][c_api]") {
     auto bcto_user_data = BCTOState();
 
     auto bcto_free_userdata = [](realm_userdata_t userdata) {
@@ -5474,7 +5499,7 @@ std::atomic<std::size_t> error_handler_counter{0};
 std::atomic<std::size_t> before_client_reset_counter{0};
 std::atomic<std::size_t> after_client_reset_counter{0};
 
-TEST_CASE("C API - client reset", "[c_api][client-reset]") {
+TEST_CASE("C API - client reset", "[sync][pbs][c_api][client reset][baas]") {
     reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
@@ -5656,7 +5681,7 @@ static void realm_app_user2(void* p, realm_user_t* user, const realm_app_error_t
     }
 }
 
-TEST_CASE("C API app: link_user integration w/c_api transport", "[c_api][sync][app]") {
+TEST_CASE("C API app: link_user integration w/c_api transport", "[sync][app][c_api][baas]") {
     struct TestTransportUserData {
         TestTransportUserData()
             : logger(std::make_unique<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL))
@@ -5883,7 +5908,7 @@ TEST_CASE("C API app: link_user integration w/c_api transport", "[c_api][sync][a
     realm_release(http_transport);
 }
 
-TEST_CASE("app: flx-sync compensating writes C API support", "[c_api][flx][sync]") {
+TEST_CASE("app: flx-sync compensating writes C API support", "[sync][flx][c_api][baas]") {
     using namespace realm::app;
     FLXSyncTestHarness harness("c_api_comp_writes");
     create_user_and_log_in(harness.app());
@@ -5964,7 +5989,7 @@ TEST_CASE("app: flx-sync compensating writes C API support", "[c_api][flx][sync]
     REQUIRE_THAT(errors[1].reason, Catch::Matchers::ContainsSubstring("object is outside of the current query view"));
 }
 
-TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
+TEST_CASE("app: flx-sync basic tests", "[sync][flx][c_api][baas]") {
     using namespace realm::app;
 
     auto make_schema = [] {
@@ -6337,7 +6362,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
     });
 }
 
-TEST_CASE("C API app: websocket provider", "[c_api][sync][app]") {
+TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
     using namespace realm::app;
     using namespace realm::sync;
     using namespace realm::sync::websocket;

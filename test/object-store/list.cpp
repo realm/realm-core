@@ -42,7 +42,7 @@
 using namespace realm;
 using util::any_cast;
 
-TEST_CASE("list") {
+TEST_CASE("list", "[list]") {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -1386,7 +1386,7 @@ TEST_CASE("nested List") {
     }
 }
 
-TEST_CASE("embedded List") {
+TEST_CASE("embedded List", "[list]") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
@@ -1824,7 +1824,7 @@ TEST_CASE("embedded List") {
 }
 
 
-TEST_CASE("list of embedded objects") {
+TEST_CASE("list of embedded objects", "[list]") {
     Schema schema{
         {"parent",
          {
@@ -1944,7 +1944,7 @@ TEST_CASE("list of embedded objects") {
 
 #if REALM_ENABLE_SYNC
 
-TEST_CASE("list with unresolved links") {
+TEST_CASE("list with unresolved links", "[list]") {
     TestSyncManager init_sync_manager({}, {false});
     auto& server = init_sync_manager.sync_server();
 

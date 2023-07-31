@@ -16,28 +16,28 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
 
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
+#include <realm/group.hpp>
+#include <realm/table.hpp>
 
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
-
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 
-#include <realm/group.hpp>
-#include <realm/table.hpp>
 #include <realm/util/scope_exit.hpp>
+
+#include <catch2/catch_all.hpp>
 
 #ifdef _WIN32
 #include <Windows.h>
 #endif
 
 #if REALM_ENABLE_AUTH_TESTS
-#include "sync/flx_sync_harness.hpp"
+#include <util/sync/flx_sync_harness.hpp>
 #endif // REALM_ENABLE_AUTH_TESTS
 
 using namespace realm;
@@ -217,7 +217,7 @@ auto create_objects(Table& table, size_t count)
 }
 } // anonymous namespace
 
-TEST_CASE("migration: Automatic") {
+TEST_CASE("migration: Automatic", "[migration]") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
 
@@ -1804,7 +1804,7 @@ TEST_CASE("migration: Automatic") {
     }
 }
 
-TEST_CASE("migration: Immutable") {
+TEST_CASE("migration: Immutable", "[migration]") {
     TestFile config;
 
     auto realm_with_schema = [&](Schema schema) {
@@ -1920,7 +1920,7 @@ TEST_CASE("migration: Immutable") {
     }
 }
 
-TEST_CASE("migration: ReadOnly") {
+TEST_CASE("migration: ReadOnly", "[migration]") {
     TestFile config;
 
     auto realm_with_schema = [&](Schema schema) {
@@ -2022,7 +2022,7 @@ TEST_CASE("migration: ReadOnly") {
     }
 }
 
-TEST_CASE("migration: SoftResetFile") {
+TEST_CASE("migration: SoftResetFile", "[migration]") {
     TestFile config;
     config.schema_mode = SchemaMode::SoftResetFile;
 
@@ -2096,7 +2096,7 @@ TEST_CASE("migration: SoftResetFile") {
     }
 }
 
-TEST_CASE("migration: HardResetFile") {
+TEST_CASE("migration: HardResetFile", "[migration]") {
     TestFile config;
 
     Schema schema = {
@@ -2145,7 +2145,7 @@ TEST_CASE("migration: HardResetFile") {
     }
 }
 
-TEST_CASE("migration: Additive") {
+TEST_CASE("migration: Additive", "[migration]") {
     Schema schema = {
         {"object",
          {
@@ -2470,7 +2470,7 @@ TEST_CASE("migration: Additive") {
     }
 }
 
-TEST_CASE("migration: Manual") {
+TEST_CASE("migration: Manual", "[migration]") {
     TestFile config;
     config.schema_mode = SchemaMode::Manual;
     auto realm = Realm::get_shared_realm(config);

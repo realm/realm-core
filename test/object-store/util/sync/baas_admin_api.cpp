@@ -16,22 +16,24 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <util/baas_admin_api.hpp>
+#include <util/sync/baas_admin_api.hpp>
+
+#include <realm/object-store/sync/app_credentials.hpp>
 
 #include <external/mpark/variant.hpp>
-#include <realm/object-store/sync/app_credentials.hpp>
 
 #if REALM_ENABLE_AUTH_TESTS
 
-#include <iostream>
-#include <mutex>
+#include <realm/exceptions.hpp>
+#include <realm/object_id.hpp>
+
+#include <realm/util/scope_exit.hpp>
 
 #include <catch2/catch_all.hpp>
 #include <curl/curl.h>
 
-#include <realm/exceptions.hpp>
-#include <realm/object_id.hpp>
-#include <realm/util/scope_exit.hpp>
+#include <iostream>
+#include <mutex>
 
 namespace realm {
 namespace {
@@ -1162,7 +1164,7 @@ AppSession get_runtime_app_session(std::string base_url)
 
 
 #ifdef REALM_MONGODB_ENDPOINT
-TEST_CASE("app: baas admin api", "[sync][app]") {
+TEST_CASE("app: baas admin api", "[sync][app][admin api][baas]") {
     std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
     base_url.erase(std::remove(base_url.begin(), base_url.end(), '"'), base_url.end());
     SECTION("embedded objects") {

@@ -18,21 +18,21 @@
 
 #define CATCH_CONFIG_ENABLE_BENCHMARKING
 
-#include "util/index_helpers.hpp"
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
+#include <util/index_helpers.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
 
-#include <realm/object-store/impl/object_accessor_impl.hpp>
-#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/db.hpp>
+#include <realm/query_expression.hpp>
+
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/util/scheduler.hpp>
-
-#include <realm/db.hpp>
-#include <realm/query_expression.hpp>
 
 #include <memory>
 #include <vector>
@@ -73,7 +73,7 @@ struct TestContext : CppContext {
     }
 };
 
-TEST_CASE("Benchmark index change calculations", "[benchmark]") {
+TEST_CASE("Benchmark index change calculations", "[benchmark][index]") {
     _impl::CollectionChangeBuilder c;
 
     auto all_modified = [](ObjKey) {
@@ -147,7 +147,7 @@ TEST_CASE("Benchmark index change calculations", "[benchmark]") {
     }
 }
 
-TEST_CASE("Benchmark object", "[benchmark]") {
+TEST_CASE("Benchmark object", "[benchmark][object]") {
     using namespace std::string_literals;
     using AnyVec = std::vector<std::any>;
     using AnyDict = std::map<std::string, std::any>;
@@ -774,7 +774,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
     }
 }
 
-TEST_CASE("Benchmark object notification delivery", "[benchmark]") {
+TEST_CASE("Benchmark object notification delivery", "[benchmark][notifications]") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;

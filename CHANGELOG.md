@@ -13,6 +13,7 @@
 * If you have more than 8388606 links pointing to one specific object, the program will crash. ([#6577](https://github.com/realm/realm-core/issues/6577), since v6.0.0)
 * Query for NULL value in Dictionary<Mixed> would give wrong results ([6748])(https://github.com/realm/realm-core/issues/6748), since v10.0.0)
  
+
 ### Breaking changes
 * Support for upgrading from Realm files produced by RealmCore v5.23.9 or earlier is no longer supported.
 * Remove `set_string_compare_method`, only one sort method is now supported which was previously called `STRING_COMPARE_CORE`.
@@ -22,6 +23,32 @@
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
 
 ----------------------------------------------
+
+# 13.17.1 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Rare corruption of files on streaming format (often following compact, convert or copying to a new file). ([#6807](https://github.com/realm/realm-core/pull/6807), since v12.12.0)
+* Trying to search a full-text indexes created as a result of an additive schema change (i.e. applying the differences between the local schema and a synchronized realm's schema) could have resulted in an IllegalOperation error with the error code `Column has no fulltext index`. ([PR #6823](https://github.com/realm/realm-core/pull/6823), since v13.2.0).
+* Sync progress for DOWNLOAD messages from server state was updated wrongly. This may have resulted in an extra round-trip to the server. ([#6827](https://github.com/realm/realm-core/issues/6827), since v12.9.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* `wait_for_upload_completion`/`wait_for_download_completion` internal API was changed to use `Status`'s instead of `std::error_code`. The SDK-facing was already `Status` oriented, so this change should only result in better error messages. ([PR #6796](https://github.com/realm/realm-core/pull/6796))
+* Separate local and baas object store tests into separate evergreen tasks and allow custom test specification. ([PR #6805](https://github.com/realm/realm-core/pull/6805))
+* Consolidate object store sync util files into test/object-store/util/sync/ directory. ([PR #6789](https://github.com/realm/realm-core/pull/6789))
+
+----------------------------------------------
+
 # 13.17.0 Release notes
 
 ### Enhancements
