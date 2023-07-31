@@ -158,7 +158,7 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
         auto ref = val.get_ref();
         if (!ref)
             return;
-        ArrayMixed list(ctrl.alloc);
+        BPlusTree<Mixed> list(ctrl.alloc);
         list.init_from_ref(ref);
         if (size_t sz = list.size()) {
             size_t start = 0;
