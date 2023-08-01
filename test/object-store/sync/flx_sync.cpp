@@ -612,7 +612,8 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         util::try_remove_dir_recursive(fresh_path);
 
         auto config_copy = config_local;
-        config_local.sync_config->error_handler = nullptr;
+        config_copy.sync_config = std::make_shared<SyncConfig>(*config_copy.sync_config);
+        config_copy.sync_config->error_handler = nullptr;
         auto&& [reset_future, reset_handler] = make_client_reset_handler();
         config_copy.sync_config->notify_after_client_reset = reset_handler;
 
