@@ -39,6 +39,9 @@ struct EventLoop {
     // Schedule execution of the given function on the event loop.
     void perform(util::UniqueFunction<void()>);
 
+    // Run the event loop until all currently pending work has been run.
+    void run_pending();
+
     EventLoop(EventLoop&&) = default;
     EventLoop& operator=(EventLoop&&) = default;
     ~EventLoop();

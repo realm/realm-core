@@ -771,9 +771,15 @@ Query GeoWithinNode::visit(ParserDriver* drv)
                                                  get_data_type_name(right_type)));
         }
         Geospatial geo = drv->m_args.geospatial_for_argument(arg_no);
-        if (!geo.is_valid()) {
+
+        if (geo.get_type() == Geospatial::Type::Invalid) {
             throw InvalidQueryError(
                 util::format("The right hand side of 'geoWithin' must be a valid Geospatial value, got '%1'", geo));
+        }
+        Status geo_status = geo.is_valid();
+        if (!geo_status.is_ok()) {
+            throw InvalidQueryError(
+                util::format("The Geospatial query argument region is invalid: '%1'", geo_status.reason()));
         }
         return link_column->geo_within(geo);
     }
@@ -1355,8 +1361,8 @@ GeospatialNode::GeospatialNode(GeospatialNode::Box, GeoPoint& p1, GeoPoint& p2)
 {
 }
 
-GeospatialNode::GeospatialNode(Sphere, GeoPoint& p, double radius)
-    : m_geo{Geospatial{GeoCenterSphere{radius, p}}}
+GeospatialNode::GeospatialNode(Circle, GeoPoint& p, double radius)
+    : m_geo{Geospatial{GeoCircle{radius, p}}}
 {
 }
 
@@ -1383,7 +1389,7 @@ void GeospatialNode::add_loop_to_polygon(GeospatialNode* node)
 std::unique_ptr<Subexpr> GeospatialNode::visit(ParserDriver*, DataType)
 {
     std::unique_ptr<Subexpr> ret;
-    if (m_geo.is_valid()) {
+    if (m_geo.get_type() != Geospatial::Type::Invalid) {
         ret = std::make_unique<ConstantGeospatialValue>(m_geo);
     }
     else {
@@ -1569,7 +1575,7 @@ ParserDriver::~ParserDriver()
     yylex_destroy(m_yyscanner);
 }
 
-Mixed ParserDriver::get_arg_for_index(std::string i)
+Mixed ParserDriver::get_arg_for_index(const std::string& i)
 {
     REALM_ASSERT(i[0] == '$');
     size_t arg_no = size_t(strtol(i.substr(1).c_str(), nullptr, 10));
@@ -1580,12 +1586,35 @@ Mixed ParserDriver::get_arg_for_index(std::string i)
     switch (type) {
         case type_Int:
             return int64_t(m_args.long_for_argument(arg_no));
-            break;
         case type_String:
             return m_args.string_for_argument(arg_no);
-            break;
         default:
             throw InvalidQueryError("Invalid index type");
+    }
+}
+
+double ParserDriver::get_arg_for_coordinate(const std::string& str)
+{
+    REALM_ASSERT(str[0] == '$');
+    size_t arg_no = size_t(strtol(str.substr(1).c_str(), nullptr, 10));
+    if (m_args.is_argument_null(arg_no)) {
+        throw InvalidQueryError(util::format("NULL cannot be used in coordinate at argument '%1'", str));
+    }
+    if (m_args.is_argument_list(arg_no)) {
+        throw InvalidQueryError(util::format("A list cannot be used in a coordinate at argument '%1'", str));
+    }
+
+    auto type = m_args.type_for_argument(arg_no);
+    switch (type) {
+        case type_Int:
+            return double(m_args.long_for_argument(arg_no));
+        case type_Double:
+            return m_args.double_for_argument(arg_no);
+        case type_Float:
+            return double(m_args.float_for_argument(arg_no));
+        default:
+            throw InvalidQueryError(util::format("Invalid parameter '%1' used in coordinate at argument '%2'",
+                                                 get_data_type_name(type), str));
     }
 }
 
