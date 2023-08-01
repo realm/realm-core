@@ -21,8 +21,58 @@
 #include <realm/db.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/list.hpp>
+#include <realm/dictionary.hpp>
 
 using namespace realm;
+
+ConstTableRef ExtendedColumnKey::get_target_table(const Table* table) const
+{
+    return (m_colkey.get_type() == col_type_Link) ? table->get_link_target(m_colkey) : ConstTableRef{};
+}
+
+std::string ExtendedColumnKey::get_description(const Table* table) const
+{
+    std::string description = table->get_column_name(m_colkey);
+    if (!m_index.is_null()) {
+        description += util::format("[%1]", util::serializer::print_value(m_index));
+    }
+    return description;
+}
+
+bool ExtendedColumnKey::is_collection() const
+{
+    return m_colkey.is_collection() && m_index.is_null();
+}
+
+ObjKey ExtendedColumnKey::get_link_target(const Obj& obj) const
+{
+    if (m_index.is_null()) {
+        return obj.get<ObjKey>(m_colkey);
+    }
+    else if (m_colkey.is_dictionary()) {
+        const auto dictionary = obj.get_dictionary(m_colkey);
+        auto val = dictionary.try_get(m_index);
+        if (val && val->is_type(type_TypedLink)) {
+            return val->get<ObjKey>();
+        }
+    }
+    return {};
+}
+
+Mixed ExtendedColumnKey::get_value(const Obj& obj) const
+{
+    if (m_index.is_null()) {
+        return obj.get_any(m_colkey);
+    }
+    else if (m_colkey.is_dictionary()) {
+        const auto dictionary = obj.get_dictionary(m_colkey);
+        auto val = dictionary.try_get(m_index);
+        if (val) {
+            return *val;
+        }
+    }
+    return {};
+}
 
 LinkPathPart::LinkPathPart(ColKey col_key, ConstTableRef source)
     : column_key(col_key)
@@ -31,7 +81,7 @@ LinkPathPart::LinkPathPart(ColKey col_key, ConstTableRef source)
 }
 
 
-ColumnsDescriptor::ColumnsDescriptor(std::vector<std::vector<ColKey>> column_keys)
+ColumnsDescriptor::ColumnsDescriptor(std::vector<std::vector<ExtendedColumnKey>> column_keys)
     : m_column_keys(std::move(column_keys))
 {
 }
@@ -49,11 +99,8 @@ void ColumnsDescriptor::collect_dependencies(const Table* table, std::vector<Tab
         if (sz > 1) {
             const Table* t = table;
             for (size_t i = 0; i < sz - 1; i++) {
-                ColKey col = columns[i];
-                ConstTableRef target_table;
-                if (t->get_column_type(col) == type_Link) {
-                    target_table = t->get_link_target(col);
-                }
+                const auto& col = columns[i];
+                ConstTableRef target_table = col.get_target_table(t);
                 if (!target_table)
                     return;
                 table_keys.push_back(target_table->get_key());
@@ -70,12 +117,11 @@ std::string DistinctDescriptor::get_description(ConstTableRef attached_table) co
         const size_t chain_size = m_column_keys[i].size();
         ConstTableRef cur_link_table = attached_table;
         for (size_t j = 0; j < chain_size; ++j) {
-            ColKey col_key = m_column_keys[i][j];
-            StringData col_name = cur_link_table->get_column_name(col_key);
-            description += std::string(col_name);
+            const auto& col_key = m_column_keys[i][j];
+            description += col_key.get_description(cur_link_table.unchecked_ptr());
             if (j < chain_size - 1) {
                 description += ".";
-                cur_link_table = cur_link_table->get_link_target(col_key);
+                cur_link_table = col_key.get_target_table(cur_link_table.unchecked_ptr());
             }
         }
         if (i < m_column_keys.size() - 1) {
@@ -93,12 +139,11 @@ std::string SortDescriptor::get_description(ConstTableRef attached_table) const
         const size_t chain_size = m_column_keys[i].size();
         ConstTableRef cur_link_table = attached_table;
         for (size_t j = 0; j < chain_size; ++j) {
-            ColKey col_key = m_column_keys[i][j];
-            StringData col_name = cur_link_table->get_column_name(col_key);
-            description += std::string(col_name);
+            const auto& col_key = m_column_keys[i][j];
+            description += col_key.get_description(cur_link_table.unchecked_ptr());
             if (j < chain_size - 1) {
                 description += ".";
-                cur_link_table = cur_link_table->get_link_target(col_key);
+                cur_link_table = col_key.get_target_table(cur_link_table.unchecked_ptr());
             }
         }
         description += " ";
@@ -118,7 +163,7 @@ std::string SortDescriptor::get_description(ConstTableRef attached_table) const
     return description;
 }
 
-SortDescriptor::SortDescriptor(std::vector<std::vector<ColKey>> column_keys, std::vector<bool> ascending)
+SortDescriptor::SortDescriptor(std::vector<std::vector<ExtendedColumnKey>> column_keys, std::vector<bool> ascending)
     : ColumnsDescriptor(std::move(column_keys))
     , m_ascending(std::move(ascending))
 {
@@ -149,7 +194,7 @@ void SortDescriptor::merge(SortDescriptor&& other, MergeMode mode)
                        other.m_ascending.begin(), other.m_ascending.end());
 }
 
-BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_lists,
+BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ExtendedColumnKey>> const& column_lists,
                                std::vector<bool> const& ascending, Table const& root_table, const IndexPairs& indexes)
 {
     REALM_ASSERT(!column_lists.empty());
@@ -177,14 +222,15 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_li
         std::vector<const Table*> tables = {&root_table};
         tables.resize(sz);
         for (size_t j = 0; j + 1 < sz; ++j) {
-            if (!tables[j]->valid_column(columns[j])) {
+            ColKey col = columns[j].get_col_key();
+            if (!tables[j]->valid_column(col)) {
                 throw InvalidArgument(ErrorCodes::InvalidSortDescriptor, "Invalid property");
             }
-            if (columns[j].get_type() != col_type_Link) {
+            if (col.get_type() != col_type_Link) {
                 // Only last column in link chain is allowed to be non-link
                 throw InvalidArgument(ErrorCodes::InvalidSortDescriptor, "All but last property must be a link");
             }
-            tables[j + 1] = tables[j]->get_link_target(columns[j]).unchecked_ptr();
+            tables[j + 1] = tables[j]->get_link_target(col).unchecked_ptr();
         }
 
         m_columns.emplace_back(tables.back(), columns.back(), ascending[i]);
@@ -198,7 +244,7 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_li
             for (size_t j = 0; j + 1 < sz; ++j) {
                 const Obj obj = tables[j]->get_object(translated_key);
                 // type was checked when creating the ColumnsDescriptor
-                translated_key = obj.get<ObjKey>(columns[j]);
+                translated_key = columns[j].get_link_target(obj);
                 if (!translated_key || translated_key.is_unresolved()) {
                     translated_key = null_key; // normalize unresolve to null
                     break;
@@ -328,13 +374,19 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
             ObjCache& cache_j = m_cache[t - 1][key_j.value & 0xFF];
 
             if (cache_i.key != key_i) {
-                cache_i.value = m_columns[t].table->get_object(key_i).get_any(m_columns[t].col_key);
+                const auto& obj = m_columns[t].table->get_object(key_i);
+                const auto& col_key = m_columns[t].col_key;
+
+                cache_i.value = col_key.get_value(obj);
                 cache_i.key = key_i;
             }
             Mixed val_i = cache_i.value;
 
             if (cache_j.key != key_j) {
-                cache_j.value = m_columns[t].table->get_object(key_j).get_any(m_columns[t].col_key);
+                const auto& obj = m_columns[t].table->get_object(key_j);
+                const auto& col_key = m_columns[t].col_key;
+
+                cache_j.value = col_key.get_value(obj);
                 cache_j.key = key_j;
             }
 
@@ -355,7 +407,7 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
         return;
 
     auto& col = m_columns[0];
-    ColKey ck = col.col_key;
+    const auto& ck = col.col_key;
     for (size_t i = 0; i < v.size(); i++) {
         IndexPair& index = v[i];
         ObjKey key = index.key_for_object;
@@ -368,7 +420,8 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
             }
         }
 
-        index.cached_value = col.table->get_object(key).get_any(ck);
+        const auto obj = col.table->get_object(key);
+        index.cached_value = ck.get_value(obj);
     }
 }
 

@@ -535,6 +535,7 @@ private:
 
     OutputBuffer& get_output_buffer() noexcept;
     Session* get_session(session_ident_type) const noexcept;
+    Session* find_and_validate_session(session_ident_type session_ident, std::string_view message) noexcept;
     static bool was_voluntary(ConnectionTerminationReason) noexcept;
 
     static std::string make_logger_prefix(connection_ident_type);
@@ -628,6 +629,9 @@ private:
     // The set of sessions associated with this connection. A session becomes
     // associated with a connection when it is activated.
     std::map<session_ident_type, std::unique_ptr<Session>> m_sessions;
+    // Keep track of previously used sessions idents to see if a stale message was
+    // received for a closed session
+    std::unordered_set<session_ident_type> m_session_history;
 
     // A queue of sessions that have enlisted for an opportunity to send a
     // message to the server. Sessions will be served in the order that they
@@ -1017,7 +1021,7 @@ private:
     // message. See struct SyncProgress for a description. The values stored in
     // `m_progress` either are persisted, or are about to be.
     //
-    // Initialized by way of ClientReplication::get_status() at session
+    // Initialized by way of ClientHistory::get_status() at session
     // activation time.
     //
     // `m_progress.upload.client_version` is the client-side sync version

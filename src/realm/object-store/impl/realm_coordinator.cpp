@@ -448,7 +448,7 @@ void RealmCoordinator::open_db()
             // Force the DB to be created in memory-only mode, ignoring the filesystem path supplied in the config.
             // This is so we can run an SDK on top without having to solve the browser persistence problem yet,
             // or teach RealmConfig and SDKs about pure in-memory realms.
-            m_db = DB::create(std::move(history), options);
+            m_db = DB::create_in_memory(std::move(history), m_config.path, options);
 #else
             if (m_config.path.size()) {
                 m_db = DB::create(std::move(history), m_config.path, options);

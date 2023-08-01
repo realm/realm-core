@@ -819,19 +819,39 @@ ExpressionNode::ExpressionNode(const ExpressionNode& from)
 template <>
 size_t LinksToNode<Equal>::find_first_local(size_t start, size_t end)
 {
-    if (m_column_type == col_type_LinkList || m_condition_column_key.is_set()) {
-        // LinkLists never contain null
-        if (!m_target_keys[0] && m_target_keys.size() == 1 && start != end)
-            return not_found;
-
-        BPlusTree<ObjKey> links(m_table.unchecked_ptr()->get_alloc());
-        for (size_t i = start; i < end; i++) {
-            if (ref_type ref = get_ref(i)) {
-                links.init_from_ref(ref);
-                for (auto& key : m_target_keys) {
-                    if (key) {
-                        if (links.find_first(key) != not_found)
+    if (m_condition_column_key.is_collection()) {
+        Allocator& alloc = m_table.unchecked_ptr()->get_alloc();
+        if (m_condition_column_key.is_dictionary()) {
+            auto target_table_key = m_table->get_opposite_table(m_condition_column_key)->get_key();
+            Array top(alloc);
+            for (size_t i = start; i < end; i++) {
+                if (ref_type ref = get_ref(i)) {
+                    top.init_from_ref(ref);
+                    BPlusTree<Mixed> values(alloc);
+                    values.set_parent(&top, 1);
+                    values.init_from_parent();
+                    for (auto& key : m_target_keys) {
+                        ObjLink link(target_table_key, key);
+                        if (values.find_first(link) != not_found)
                             return i;
+                    }
+                }
+            }
+        }
+        else {
+            // LinkLists never contain null
+            if (!m_target_keys[0] && m_target_keys.size() == 1 && start != end)
+                return not_found;
+
+            BPlusTree<ObjKey> links(alloc);
+            for (size_t i = start; i < end; i++) {
+                if (ref_type ref = get_ref(i)) {
+                    links.init_from_ref(ref);
+                    for (auto& key : m_target_keys) {
+                        if (key) {
+                            if (links.find_first(key) != not_found)
+                                return i;
+                        }
                     }
                 }
             }
@@ -856,15 +876,41 @@ size_t LinksToNode<NotEqual>::find_first_local(size_t start, size_t end)
     REALM_ASSERT(m_target_keys.size() == 1);
     ObjKey key = m_target_keys[0];
 
-    if (m_column_type == col_type_LinkList || m_condition_column_key.is_set()) {
-        BPlusTree<ObjKey> links(m_table.unchecked_ptr()->get_alloc());
-        for (size_t i = start; i < end; i++) {
-            if (ref_type ref = get_ref(i)) {
-                links.init_from_ref(ref);
-                auto sz = links.size();
-                for (size_t j = 0; j < sz; j++) {
-                    if (links.get(j) != key) {
+    if (m_condition_column_key.is_collection()) {
+        Allocator& alloc = m_table.unchecked_ptr()->get_alloc();
+        if (m_condition_column_key.is_dictionary()) {
+            auto target_table_key = m_table->get_opposite_table(m_condition_column_key)->get_key();
+            Array top(alloc);
+            for (size_t i = start; i < end; i++) {
+                if (ref_type ref = get_ref(i)) {
+                    top.init_from_ref(ref);
+                    BPlusTree<Mixed> values(alloc);
+                    values.set_parent(&top, 1);
+                    values.init_from_parent();
+
+                    ObjLink link(target_table_key, key);
+                    bool found = false;
+                    values.for_all([&](const Mixed& val) {
+                        if (val != link) {
+                            found = true;
+                        }
+                        return !found;
+                    });
+                    if (found)
                         return i;
+                }
+            }
+        }
+        else {
+            BPlusTree<ObjKey> links(alloc);
+            for (size_t i = start; i < end; i++) {
+                if (ref_type ref = get_ref(i)) {
+                    links.init_from_ref(ref);
+                    auto sz = links.size();
+                    for (size_t j = 0; j < sz; j++) {
+                        if (links.get(j) != key) {
+                            return i;
+                        }
                     }
                 }
             }
