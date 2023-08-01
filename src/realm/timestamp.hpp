@@ -80,8 +80,7 @@ public:
     constexpr Timestamp(const Timestamp&) = default;
     constexpr Timestamp& operator=(const Timestamp&) = default;
 
-    template <typename C = std::chrono::system_clock, typename D = typename C::duration>
-    constexpr Timestamp(std::chrono::time_point<C, D> tp)
+    constexpr Timestamp(std::chrono::time_point<std::chrono::system_clock, std::chrono::system_clock::duration> tp)
         : m_is_null(false)
     {
         int64_t native_nano = std::chrono::duration_cast<std::chrono::nanoseconds>(tp.time_since_epoch()).count();
