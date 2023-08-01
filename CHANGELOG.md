@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Timestamp objects can now only be created from a system clock timepoint. ([#6112](https://github.com/realm/realm-core/issues/6112))
 
 ----------------------------------------------
 
