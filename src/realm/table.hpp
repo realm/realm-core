@@ -1075,7 +1075,7 @@ public:
         auto backlink_col_key = origin.get_opposite_column(origin_col_key);
         m_link_cols.push_back(backlink_col_key);
 
-        return Columns<T>(backlink_col_key, m_base_table, std::move(m_link_cols));
+        return Columns<T>(backlink_col_key, m_base_table, m_link_cols);
     }
     template <class T>
     SubQuery<T> column(ColKey col_key, Query subquery)
@@ -1101,7 +1101,7 @@ private:
     friend class Table;
     friend class query_parser::ParserDriver;
 
-    std::vector<ColKey> m_link_cols;
+    std::vector<ExtendedColumnKey> m_link_cols;
     ConstTableRef m_current_table;
     ConstTableRef m_base_table;
     util::Optional<ExpressionComparisonType> m_comparison_type;

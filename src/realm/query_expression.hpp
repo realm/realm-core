@@ -1498,7 +1498,7 @@ iterator pattern. First solution can't exit, second solution requires internal s
 class LinkMap final {
 public:
     LinkMap() = default;
-    LinkMap(ConstTableRef table, std::vector<ColKey> columns)
+    LinkMap(ConstTableRef table, std::vector<ExtendedColumnKey> columns)
         : m_link_column_keys(std::move(columns))
     {
         set_base_table(table);
@@ -1577,7 +1577,7 @@ public:
         return res;
     }
 
-    std::vector<ObjKey> get_origin_ndxs(ObjKey key, size_t column = 0) const;
+    std::vector<ObjKey> get_origin_objkeys(ObjKey key, size_t column = 0) const;
 
     size_t count_links(size_t row) const
     {
@@ -1638,7 +1638,7 @@ private:
         });
     }
 
-    mutable std::vector<ColKey> m_link_column_keys;
+    mutable std::vector<ExtendedColumnKey> m_link_column_keys;
     std::vector<ColumnType> m_link_types;
     std::vector<ConstTableRef> m_tables;
     bool m_only_unary_links = true;
@@ -1667,7 +1667,7 @@ Value<T> make_value_for_link(bool only_unary_links, size_t size)
 // This class can be used as untyped base for expressions that handle object properties
 class ObjPropertyBase {
 public:
-    ObjPropertyBase(ColKey column, ConstTableRef table, std::vector<ColKey> links,
+    ObjPropertyBase(ColKey column, ConstTableRef table, std::vector<ExtendedColumnKey> links,
                     util::Optional<ExpressionComparisonType> type)
         : m_link_map(table, std::move(links))
         , m_column_key(column)
@@ -1781,7 +1781,7 @@ public:
         }
 
         for (ObjKey k : result) {
-            auto ndxs = m_link_map.get_origin_ndxs(k);
+            auto ndxs = m_link_map.get_origin_objkeys(k);
             ret.insert(ret.end(), ndxs.begin(), ndxs.end());
         }
 
@@ -1821,9 +1821,9 @@ class SimpleQuerySupport : public ObjPropertyExpr<T> {
 public:
     using ObjPropertyExpr<T>::links_exist;
 
-    SimpleQuerySupport(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+    SimpleQuerySupport(ColKey column, ConstTableRef table, const std::vector<ExtendedColumnKey>& links = {},
                        util::Optional<ExpressionComparisonType> type = util::none)
-        : ObjPropertyExpr<T>(column, table, std::move(links), type)
+        : ObjPropertyExpr<T>(column, table, links, type)
     {
     }
 
@@ -2066,7 +2066,7 @@ Query string_compare(const Subexpr2<StringData>& left, const Subexpr2<StringData
 template <>
 class Columns<StringData> : public SimpleQuerySupport<StringData> {
 public:
-    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+    Columns(ColKey column, ConstTableRef table, const std::vector<ExtendedColumnKey>& links = {},
             util::Optional<ExpressionComparisonType> type = util::none)
         : SimpleQuerySupport(column, table, links, type)
     {
@@ -2301,7 +2301,7 @@ public:
         : m_link_map(std::move(link_map))
     {
     }
-    BacklinkCount(ConstTableRef table, std::vector<ColKey> links = {})
+    BacklinkCount(ConstTableRef table, std::vector<ExtendedColumnKey> links = {})
         : m_link_map(table, std::move(links))
     {
     }
@@ -2690,7 +2690,7 @@ public:
     {
     }
 
-    Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
+    Columns(ColKey column_key, ConstTableRef table, const std::vector<ExtendedColumnKey>& links = {},
             util::Optional<ExpressionComparisonType> type = util::none)
         : m_link_map(table, links)
         , m_comparison_type(type)
@@ -2826,7 +2826,7 @@ class Average;
 
 class ColumnListBase {
 public:
-    ColumnListBase(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links,
+    ColumnListBase(ColKey column_key, ConstTableRef table, const std::vector<ExtendedColumnKey>& links,
                    util::Optional<ExpressionComparisonType> type = util::none)
         : m_column_key(column_key)
         , m_link_map(table, links)
@@ -2879,7 +2879,7 @@ class ColumnListElementLength;
 template <typename T>
 class ColumnsCollection : public Subexpr2<T>, public ColumnListBase {
 public:
-    ColumnsCollection(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
+    ColumnsCollection(ColKey column_key, ConstTableRef table, const std::vector<ExtendedColumnKey>& links = {},
                       util::Optional<ExpressionComparisonType> type = util::none)
         : ColumnListBase(column_key, table, links, type)
         , m_is_nullable_storage(this->m_column_key.get_attrs().test(col_attr_Nullable))
@@ -3191,18 +3191,18 @@ class ColumnDictionaryKeys;
 template <>
 class Columns<Dictionary> : public ColumnsCollection<Mixed> {
 public:
-    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+    Columns(ColKey column, ConstTableRef table, const std::vector<ExtendedColumnKey>& links = {},
             util::Optional<ExpressionComparisonType> type = util::none)
-        : ColumnsCollection<Mixed>(column, table, std::move(links), type)
+        : ColumnsCollection<Mixed>(column, table, links, type)
     {
         m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(m_column_key);
         m_path.push_back(PathElement::AllTag());
         m_path_only_unary_keys = false;
     }
 
-    Columns(const Path& path, ConstTableRef table, std::vector<ColKey> links = {},
+    Columns(const Path& path, ConstTableRef table, const std::vector<ExtendedColumnKey>& links = {},
             util::Optional<ExpressionComparisonType> type = util::none)
-        : ColumnsCollection<Mixed>(path[0].get_col_key(), table, std::move(links), type)
+        : ColumnsCollection<Mixed>(path[0].get_col_key(), table, links, type)
     {
         size_t path_size = path.size();
         REALM_ASSERT(path_size > 0);
@@ -3698,9 +3698,9 @@ public:
     using ObjPropertyExpr<T>::links_exist;
     using ObjPropertyBase::is_nullable;
 
-    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+    Columns(ColKey column, ConstTableRef table, const std::vector<ExtendedColumnKey>& links = {},
             util::Optional<ExpressionComparisonType> type = util::none)
-        : ObjPropertyExpr<T>(column, table, std::move(links), type)
+        : ObjPropertyExpr<T>(column, table, links, type)
     {
     }
 

@@ -174,12 +174,12 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction lm) const
     }
 }
 
-std::vector<ObjKey> LinkMap::get_origin_ndxs(ObjKey key, size_t column) const
+std::vector<ObjKey> LinkMap::get_origin_objkeys(ObjKey key, size_t column) const
 {
     if (column == m_link_types.size()) {
         return {key};
     }
-    std::vector<ObjKey> keys = get_origin_ndxs(key, column + 1);
+    std::vector<ObjKey> keys = get_origin_objkeys(key, column + 1);
     std::vector<ObjKey> ret;
     auto origin_col = m_link_column_keys[column];
     auto origin = m_tables[column];

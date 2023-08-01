@@ -33,7 +33,7 @@ ConstTableRef ExtendedColumnKey::get_target_table(const Table* table) const
 std::string ExtendedColumnKey::get_description(const Table* table) const
 {
     std::string description = table->get_column_name(m_colkey);
-    if (!m_index.is_null()) {
+    if (has_index()) {
         description += util::format("[%1]", util::serializer::print_value(m_index));
     }
     return description;
@@ -41,17 +41,17 @@ std::string ExtendedColumnKey::get_description(const Table* table) const
 
 bool ExtendedColumnKey::is_collection() const
 {
-    return m_colkey.is_collection() && m_index.is_null();
+    return m_colkey.is_collection() && !has_index();
 }
 
 ObjKey ExtendedColumnKey::get_link_target(const Obj& obj) const
 {
-    if (m_index.is_null()) {
+    if (!has_index()) {
         return obj.get<ObjKey>(m_colkey);
     }
     else if (m_colkey.is_dictionary()) {
         const auto dictionary = obj.get_dictionary(m_colkey);
-        auto val = dictionary.try_get(m_index);
+        auto val = dictionary.try_get(m_index.get_key());
         if (val && val->is_type(type_TypedLink)) {
             return val->get<ObjKey>();
         }
@@ -61,12 +61,12 @@ ObjKey ExtendedColumnKey::get_link_target(const Obj& obj) const
 
 Mixed ExtendedColumnKey::get_value(const Obj& obj) const
 {
-    if (m_index.is_null()) {
+    if (!has_index()) {
         return obj.get_any(m_colkey);
     }
     else if (m_colkey.is_dictionary()) {
         const auto dictionary = obj.get_dictionary(m_colkey);
-        auto val = dictionary.try_get(m_index);
+        auto val = dictionary.try_get(m_index.get_key());
         if (val) {
             return *val;
         }
