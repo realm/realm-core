@@ -537,10 +537,14 @@ functions:
         if [ -n "${baas_branch}" ]; then
             OPT_BAAS_BRANCH="-b ${baas_branch}"
         fi
+        if [ -n "${baas_proxy}" ]; then
+            OPT_BAAS_PROXY="-t"
+        fi
 
         # Run the setup_baas_host_local.sh script to configure and run baas on the remote host
         # Add -v to this command for verbose script logging
-        ./evergreen/setup_baas_host_local.sh -w ./baas-work-dir -u $BAAS_USER $OPT_BAAS_BRANCH ./baas_host_vars.sh ./.baas_ssh_key 2>&1 | tee install_baas_output.log
+        ./evergreen/setup_baas_host_local.sh -w ./baas-work-dir -u $BAAS_USER $OPT_BAAS_BRANCH $OPT_BAAS_PROXY \
+            ./baas_host_vars.sh ./.baas_ssh_key 2>&1 | tee install_baas_output.log
 
   "wait for baas to start":
   - command: shell.exec
@@ -844,7 +848,7 @@ tasks:
 
 # These are local object store tests; baas is not started, however some use the sync server
 - name: object-store-tests
-  tags: [ "test_suite_remote_baas", "for_pull_requests" ]
+  tags: [ "object_store_test_suite", "for_pull_requests" ]
   exec_timeout_secs: 3600
   commands:
   - func: "compile"
@@ -859,12 +863,31 @@ tasks:
 
 # These are baas object store tests that run against baas running on a remote host
 - name: baas-integration-tests
-  tags: [ "test_suite_remote_baas", "for_pull_requests" ]
+  tags: [ "object_store_test_suite", "for_pull_requests" ]
   exec_timeout_secs: 3600
   commands:
   - func: "launch remote baas"
     vars:
       baas_branch: 1a0d1c021460d2215b21bc4f7c7f668714ce81c7
+  - func: "compile"
+    vars:
+      target_to_build: ObjectStoreTests
+  - func: "wait for baas to start"
+  - func: "run tests"
+    vars:
+      test_label: objstore-baas
+      test_executable_name: "realm-object-store-tests"
+      verbose_test_output: true
+  - func: "check branch state"
+
+- name: baas-network-tests
+  tags: [ "for_nightly_tests" ]
+  exec_timeout_secs: 14400
+  commands:
+  - func: "launch remote baas"
+    vars:
+      baas_branch: 1a0d1c021460d2215b21bc4f7c7f668714ce81c7
+      baas_proxy: On
   - func: "compile"
     vars:
       target_to_build: ObjectStoreTests
@@ -1050,7 +1073,7 @@ task_groups:
   tasks:
   - compile
   - .test_suite
-  - .test_suite_remote_baas
+  - .object_store_test_suite
   - package
 
 # Runs object-store-tests against baas running on remote host
@@ -1067,7 +1090,25 @@ task_groups:
   tasks:
   - compile
   - .test_suite
-  - .test_suite_remote_baas
+  - .object_store_test_suite
+
+# Runs object-store-tests against baas running on remote host and runs
+# the network simulation tests as a separate task for nightly builds
+- name: compile_test_network
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
+  tasks:
+  - compile
+  - .test_suite
+  - .object_store_test_suite
+  - baas-network-tests
 
 # Runs object-store-tests against baas running on remote host
 - name: compile_test_coverage
@@ -1083,7 +1124,7 @@ task_groups:
   tasks:
   - compile
   - .test_suite
-  - .test_suite_remote_baas
+  - .object_store_test_suite
   - process_coverage_data
 
 - name: benchmarks
@@ -1141,7 +1182,7 @@ buildvariants:
     cxx_compiler: "./clang_binaries/bin/clang++"
     extra_flags: -DREALM_ENABLE_GEOSPATIAL=OFF # can be removed once SDKs pick this feature up
   tasks:
-  - name: compile_test
+  - name: compile_test_network
 
 
 - name: ubuntu2204
@@ -1172,7 +1213,7 @@ buildvariants:
     cxx_compiler: "./clang_binaries/bin/clang++"
     disable_sync_multiplexing: On
   tasks:
-  - name: compile_test
+  - name: compile_test_network
 
 - name: ubuntu2004-encryption-tsan
   display_name: "Ubuntu 20.04 x86_64 (Clang 11 Encryption Enabled w/TSAN)"
@@ -1401,7 +1442,7 @@ buildvariants:
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64 -DREALM_ENABLE_GEOSPATIAL=OFF
   tasks:
-  - name: compile_test
+  - name: compile_test_network
   - name: swift-build-and-test
 
 - name: macos-1100-arm64-release
@@ -1469,8 +1510,7 @@ buildvariants:
     curl_base: "/cygdrive/c/curl"
     python3: "/cygdrive/c/python/python37/python.exe"
   tasks:
-  - name: compile_test_and_package
-  - name: long-running-tests
+  - name: compile_test_network
 
 - name: windows-64-encryption
   display_name: "Windows x86_64 (Encryption enabled)"
@@ -1502,4 +1542,5 @@ buildvariants:
     curl_base: "/cygdrive/c/curl"
     python3: "/cygdrive/c/python/python37/python.exe"
   tasks:
-  - name: compile_test
+  - name: compile_test_and_package
+  - name: long-running-tests
