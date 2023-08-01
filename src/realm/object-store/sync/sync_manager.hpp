@@ -193,7 +193,7 @@ public:
     std::shared_ptr<SyncUser> get_current_user() const REQUIRES(!m_user_mutex, !m_file_system_mutex);
 
     // Log out a given user
-    void log_out_user(const std::string& user_id) REQUIRES(!m_user_mutex, !m_file_system_mutex);
+    void log_out_user(const SyncUser& user) REQUIRES(!m_user_mutex, !m_file_system_mutex);
 
     // Sets the currently active user.
     void set_current_user(const std::string& user_id) REQUIRES(!m_user_mutex, !m_file_system_mutex);

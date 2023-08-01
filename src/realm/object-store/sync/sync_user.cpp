@@ -358,7 +358,7 @@ void SyncUser::log_out()
         m_sessions.clear();
     }
 
-    sync_manager_shared->log_out_user(m_identity);
+    sync_manager_shared->log_out_user(*this);
     emit_change_to_subscribers(*this);
 }
 

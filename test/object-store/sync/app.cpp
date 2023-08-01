@@ -344,13 +344,12 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app][user][baas]") 
         int subscribe_processed = 0;
         auto token = app->subscribe([&subscribe_processed](auto& app) {
             if (!subscribe_processed) {
-                subscribe_processed++;
-                REQUIRE(static_cast<bool>(app.current_user()));
+                REQUIRE(app.current_user());
             }
             else {
-                subscribe_processed++;
-                REQUIRE(!static_cast<bool>(app.current_user()));
+                REQUIRE_FALSE(app.current_user());
             }
+            subscribe_processed++;
         });
 
         auto user = log_in(app);

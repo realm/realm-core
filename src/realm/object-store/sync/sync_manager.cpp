@@ -417,39 +417,36 @@ std::shared_ptr<SyncUser> SyncManager::get_current_user() const
     return cur_user_ident ? get_user_for_identity(*cur_user_ident) : nullptr;
 }
 
-void SyncManager::log_out_user(const std::string& user_id)
+void SyncManager::log_out_user(const SyncUser& user)
 {
     util::CheckedLockGuard lock(m_user_mutex);
 
     // Move this user to the end of the vector
-    if (m_users.size() > 1) {
-        auto it = std::find_if(m_users.begin(), m_users.end(), [user_id](const auto& user) {
-            return user->identity() == user_id;
-        });
+    auto user_pos = std::partition(m_users.begin(), m_users.end(), [&](auto& u) {
+        return u.get() != &user;
+    });
 
-        if (it != m_users.end())
-            std::rotate(it, it + 1, m_users.end());
-    }
+    auto active_user = std::find_if(m_users.begin(), user_pos, [](auto& u) {
+        return u->state() == SyncUser::State::LoggedIn;
+    });
 
     util::CheckedLockGuard fs_lock(m_file_system_mutex);
-    bool was_active = (m_current_user && m_current_user->identity() == user_id) ||
-                      (m_metadata_manager && m_metadata_manager->get_current_user_identity() == user_id);
+    bool was_active = m_current_user.get() == &user ||
+                      (m_metadata_manager && m_metadata_manager->get_current_user_identity() == user.identity());
     if (!was_active)
         return;
 
     // Set the current active user to the next logged in user, or null if none
-    for (auto& user : m_users) {
-        if (user->state() == SyncUser::State::LoggedIn) {
-            if (m_metadata_manager)
-                m_metadata_manager->set_current_user_identity(user->identity());
-            m_current_user = user;
-            return;
-        }
+    if (active_user != user_pos) {
+        m_current_user = *active_user;
+        if (m_metadata_manager)
+            m_metadata_manager->set_current_user_identity((*active_user)->identity());
     }
-
-    if (m_metadata_manager)
-        m_metadata_manager->set_current_user_identity("");
-    m_current_user = nullptr;
+    else {
+        m_current_user = nullptr;
+        if (m_metadata_manager)
+            m_metadata_manager->set_current_user_identity("");
+    }
 }
 
 void SyncManager::set_current_user(const std::string& user_id)
