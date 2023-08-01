@@ -16,7 +16,13 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
+#include <collection_fixtures.hpp>
+#include <util/event_loop.hpp>
+#include <util/test_utils.hpp>
+#include <util/test_file.hpp>
+#include <util/sync/baas_admin_api.hpp>
+#include <util/sync/sync_test_utils.hpp>
+
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/sync/app.hpp>
@@ -30,24 +36,21 @@
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
+
 #include <realm/sync/network/default_socket.hpp>
-
-#include "collection_fixtures.hpp"
-#include "sync_test_utils.hpp"
-#include "util/baas_admin_api.hpp"
-#include "util/event_loop.hpp"
-#include "util/test_utils.hpp"
-#include "util/test_file.hpp"
-
-#include <external/json/json.hpp>
-#include <external/mpark/variant.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/server/access_token.hpp>
+
 #include <realm/util/base64.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/overload.hpp>
 #include <realm/util/platform_info.hpp>
 #include <realm/util/uri.hpp>
-#include <realm/sync/network/websocket.hpp>
+
+#include <catch2/catch_all.hpp>
+
+#include <external/json/json.hpp>
+#include <external/mpark/variant.hpp>
 
 #include <chrono>
 #include <condition_variable>
@@ -64,6 +67,7 @@ using util::any_cast;
 using util::Optional;
 
 using namespace std::string_view_literals;
+using namespace std::literals::string_literals;
 
 namespace {
 std::shared_ptr<SyncUser> log_in(std::shared_ptr<App> app, AppCredentials credentials = AppCredentials::anonymous())
@@ -153,7 +157,7 @@ static std::string create_jwt(const std::string& appId)
 
 // MARK: - Login with Credentials Tests
 
-TEST_CASE("app: login_with_credentials integration", "[sync][app][baas]") {
+TEST_CASE("app: login_with_credentials integration", "[sync][app][user][baas]") {
     SECTION("login") {
         TestAppSession session;
         auto app = session.app();
@@ -190,7 +194,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app][baas]") {
 
 // MARK: - UsernamePasswordProviderClient Tests
 
-TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][baas]") {
+TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][user][baas]") {
     const std::string base_url = get_base_url();
     AutoVerifiedEmailCredentials creds;
     auto email = creds.email;
@@ -368,7 +372,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][baas]"
 
 // MARK: - UserAPIKeyProviderClient Tests
 
-TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app][baas]") {
+TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app][api key][baas]") {
     TestAppSession session;
     auto app = session.app();
     auto client = app->provider_client<App::UserAPIKeyProviderClient>();
@@ -630,7 +634,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app][baas]") {
 
 // MARK: - Auth Providers Function Tests
 
-TEST_CASE("app: auth providers function integration", "[sync][app][baas]") {
+TEST_CASE("app: auth providers function integration", "[sync][app][user][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -644,7 +648,7 @@ TEST_CASE("app: auth providers function integration", "[sync][app][baas]") {
 
 // MARK: - Link User Tests
 
-TEST_CASE("app: link_user integration", "[sync][app][baas]") {
+TEST_CASE("app: link_user integration", "[sync][app][user][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -677,7 +681,7 @@ TEST_CASE("app: link_user integration", "[sync][app][baas]") {
 
 // MARK: - Delete User Tests
 
-TEST_CASE("app: delete anonymous user integration", "[sync][app][baas]") {
+TEST_CASE("app: delete anonymous user integration", "[sync][app][user][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -719,7 +723,7 @@ TEST_CASE("app: delete anonymous user integration", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: delete user with credentials integration", "[sync][app][baas]") {
+TEST_CASE("app: delete user with credentials integration", "[sync][app][user][baas]") {
     TestAppSession session;
     auto app = session.app();
     app->remove_user(app->current_user(), [](auto) {});
@@ -760,7 +764,7 @@ TEST_CASE("app: delete user with credentials integration", "[sync][app][baas]") 
 
 // MARK: - Call Function Tests
 
-TEST_CASE("app: call function", "[sync][app][baas]") {
+TEST_CASE("app: call function", "[sync][app][function][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -776,7 +780,7 @@ TEST_CASE("app: call function", "[sync][app][baas]") {
 
 // MARK: - Remote Mongo Client Tests
 
-TEST_CASE("app: remote mongo client", "[sync][app][baas]") {
+TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -1444,7 +1448,7 @@ TEST_CASE("app: remote mongo client", "[sync][app][baas]") {
 
 // MARK: - Push Notifications Tests
 
-TEST_CASE("app: push notifications", "[sync][app][baas]") {
+TEST_CASE("app: push notifications", "[sync][app][notifications][baas]") {
     TestAppSession session;
     auto app = session.app();
     std::shared_ptr<SyncUser> sync_user = app->current_user();
@@ -1558,7 +1562,7 @@ TEST_CASE("app: token refresh", "[sync][app][token][baas]") {
 
 // MARK: - Sync Tests
 
-TEST_CASE("app: mixed lists with object links", "[sync][app][baas]") {
+TEST_CASE("app: mixed lists with object links", "[sync][pbs][app][links][baas]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
@@ -1596,7 +1600,7 @@ TEST_CASE("app: mixed lists with object links", "[sync][app][baas]") {
         realm->begin_transaction();
         auto target_obj = Object::create(
             c, realm, "Target", std::any(AnyDict{{valid_pk_name, target_id}, {"value", static_cast<int64_t>(1234)}}));
-        mixed_list_values.push_back(Mixed(target_obj.obj().get_link()));
+        mixed_list_values.push_back(Mixed(target_obj.get_obj().get_link()));
 
         Object::create(c, realm, "TopLevel",
                        std::any(AnyDict{
@@ -1634,7 +1638,7 @@ TEST_CASE("app: mixed lists with object links", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: roundtrip values", "[sync][app][baas]") {
+TEST_CASE("app: roundtrip values", "[sync][pbs][app][baas]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
@@ -1683,7 +1687,7 @@ TEST_CASE("app: roundtrip values", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: upgrade from local to synced realm", "[sync][app][baas]") {
+TEST_CASE("app: upgrade from local to synced realm", "[sync][pbs][app][upgrade][baas]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
@@ -1785,7 +1789,7 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app][baas]") {
     // r1->read_group().to_json(std::cout);
 }
 
-TEST_CASE("app: set new embedded object", "[sync][app][baas]") {
+TEST_CASE("app: set new embedded object", "[sync][pbs][app][baas]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
@@ -1923,7 +1927,7 @@ TEST_CASE("app: set new embedded object", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: make distributable client file", "[sync][app][baas]") {
+TEST_CASE("app: make distributable client file", "[sync][pbs][app][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -1997,7 +2001,7 @@ TEST_CASE("app: make distributable client file", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: sync integration", "[sync][app][baas]") {
+TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     auto logger = std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
     const auto schema = default_app_config("").schema;
@@ -2470,7 +2474,7 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
         auto partition = random_string(100);
         auto user1 = test_session.app()->current_user();
         SyncTestFile r_config(user1, partition, schema);
-        // Overrride the default
+        // Override the default
         r_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
             if (error.get_system_error() == sync::make_error_code(realm::sync::ProtocolError::bad_authentication)) {
                 util::format(std::cerr, "Websocket redirect test: User logged out\n");
@@ -3221,7 +3225,7 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: custom user data integration tests", "[sync][app][baas]") {
+TEST_CASE("app: custom user data integration tests", "[sync][app][user][function][baas]") {
     TestAppSession session;
     auto app = session.app();
     auto user = app->current_user();
@@ -3246,7 +3250,7 @@ TEST_CASE("app: custom user data integration tests", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: jwt login and metadata tests", "[sync][app][baas]") {
+TEST_CASE("app: jwt login and metadata tests", "[sync][app][user][metadata][function][baas]") {
     TestAppSession session;
     auto app = session.app();
     auto jwt = create_jwt(session.app()->config().app_id);
@@ -3277,7 +3281,7 @@ TEST_CASE("app: jwt login and metadata tests", "[sync][app][baas]") {
 }
 
 namespace cf = realm::collection_fixtures;
-TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][baas][collections]", cf::ListOfObjects,
+TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][pbs][app][collections][baas]", cf::ListOfObjects,
                    cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks, cf::DictionaryOfObjects,
                    cf::DictionaryOfMixedLinks)
 {
@@ -3322,7 +3326,8 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][baas][c
             CreatePolicy::ForceCreate);
 
         for (auto link : links) {
-            test_type.add_link(object.obj(), link);
+            auto& obj = object.get_obj();
+            test_type.add_link(obj, link);
         }
         r->commit_transaction();
     };
@@ -3334,7 +3339,7 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][baas][c
             std::any(realm::AnyDict{{valid_pk_name, std::any(val)}, {"realm_id", std::string(partition)}}),
             CreatePolicy::ForceCreate);
         r->commit_transaction();
-        return ObjLink{obj.obj().get_table()->get_key(), obj.obj().get_key()};
+        return ObjLink{obj.get_obj().get_table()->get_key(), obj.get_obj().get_key()};
     };
 
     auto require_links_to_match_ids = [&](std::vector<Obj> links, std::vector<int64_t> expected) {
@@ -3400,7 +3405,8 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][baas][c
             auto linked_objects = test_type.get_links(r1_source_objs.get(0));
             require_links_to_match_ids(linked_objects, remaining_dest_object_ids);
             r1->begin_transaction();
-            test_type.remove_link(r1_source_objs.get(0),
+            auto obj = r1_source_objs.get(0);
+            test_type.remove_link(obj,
                                   ObjLink{linked_objects[0].get_table()->get_key(), linked_objects[0].get_key()});
             r1->commit_transaction();
             --expected_coll_size;
@@ -3428,8 +3434,8 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][baas][c
     }
 }
 
-TEMPLATE_TEST_CASE("app: partition types", "[sync][app][baas][partition]", cf::Int, cf::String, cf::OID, cf::UUID,
-                   cf::BoxedOptional<cf::Int>, cf::UnboxedOptional<cf::String>, cf::BoxedOptional<cf::OID>,
+TEMPLATE_TEST_CASE("app: partition types", "[sync][pbs][app][partition][baas]", cf::Int, cf::String, cf::OID,
+                   cf::UUID, cf::BoxedOptional<cf::Int>, cf::UnboxedOptional<cf::String>, cf::BoxedOptional<cf::OID>,
                    cf::BoxedOptional<cf::UUID>)
 {
     std::string base_url = get_base_url();
@@ -3515,9 +3521,70 @@ TEMPLATE_TEST_CASE("app: partition types", "[sync][app][baas][partition]", cf::I
     }
 }
 
+TEST_CASE("app: full-text compatible with sync", "[sync][app][baas]") {
+    std::string base_url = get_base_url();
+    const std::string valid_pk_name = "_id";
+    REQUIRE(!base_url.empty());
+
+    Schema schema{
+        {"TopLevel",
+         {
+             {valid_pk_name, PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"full_text", Property::IsFulltextIndexed{true}},
+         }},
+    };
+
+    auto server_app_config = minimal_app_config(base_url, "full_text", schema);
+    auto app_session = create_app(server_app_config);
+    const auto partition = random_string(100);
+    TestAppSession test_session(app_session, nullptr);
+    SyncTestFile config(test_session.app(), partition, schema);
+    SharedRealm realm;
+    SECTION("sync open") {
+        INFO("realm opened without async open");
+        realm = Realm::get_shared_realm(config);
+    }
+    SECTION("async open") {
+        INFO("realm opened with async open");
+        auto async_open_task = Realm::get_synchronized_realm(config);
+
+        auto [realm_promise, realm_future] = util::make_promise_future<ThreadSafeReference>();
+        async_open_task->start(
+            [promise = std::move(realm_promise)](ThreadSafeReference ref, std::exception_ptr ouch) mutable {
+                if (ouch) {
+                    try {
+                        std::rethrow_exception(ouch);
+                    }
+                    catch (...) {
+                        promise.set_error(exception_to_status());
+                    }
+                }
+                else {
+                    promise.emplace_value(std::move(ref));
+                }
+            });
+
+        realm = Realm::get_shared_realm(std::move(realm_future.get()));
+    }
+
+    CppContext c(realm);
+    auto obj_id_1 = ObjectId::gen();
+    auto obj_id_2 = ObjectId::gen();
+    realm->begin_transaction();
+    Object::create(c, realm, "TopLevel", std::any(AnyDict{{"_id", obj_id_1}, {"full_text", "Hello, world!"s}}));
+    Object::create(c, realm, "TopLevel", std::any(AnyDict{{"_id", obj_id_2}, {"full_text", "Hello, everyone!"s}}));
+    realm->commit_transaction();
+
+    auto table = realm->read_group().get_table("class_TopLevel");
+    REQUIRE(table->search_index_type(table->get_column_key("full_text")) == IndexType::Fulltext);
+    Results world_results(realm, Query(table).fulltext(table->get_column_key("full_text"), "world"));
+    REQUIRE(world_results.size() == 1);
+    REQUIRE(world_results.get<Obj>(0).get_primary_key() == Mixed{obj_id_1});
+}
+
 #endif // REALM_ENABLE_AUTH_TESTS
 
-TEST_CASE("app: custom error handling", "[sync][app][baas][custom_errors]") {
+TEST_CASE("app: custom error handling", "[sync][app][custom errors]") {
     class CustomErrorTransport : public GenericNetworkTransport {
     public:
         CustomErrorTransport(int code, const std::string& message)
@@ -3811,7 +3878,7 @@ const std::string UnitTestTransport::user_id = "Ailuropoda melanoleuca";
 const std::string UnitTestTransport::identity_0_id = "Ursus arctos isabellinus";
 const std::string UnitTestTransport::identity_1_id = "Ursus arctos horribilis";
 
-TEST_CASE("subscribable unit tests", "[sync][app][local]") {
+TEST_CASE("subscribable unit tests", "[sync][app]") {
     struct Foo : public Subscribable<Foo> {
         void event()
         {
@@ -3880,7 +3947,7 @@ TEST_CASE("subscribable unit tests", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][local]") {
+TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
     auto config = get_config();
 
     SECTION("login_anonymous good") {
@@ -3968,7 +4035,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app][local]") {
+TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app][user][api key]") {
     TestSyncManager sync_manager(get_config(), {});
     auto app = sync_manager.app();
     auto client = app->provider_client<App::UserAPIKeyProviderClient>();
@@ -4015,7 +4082,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app][local]") {
 }
 
 
-TEST_CASE("app: user_semantics", "[app][local]") {
+TEST_CASE("app: user_semantics", "[sync][app][user]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4160,7 +4227,7 @@ private:
     Response* m_response;
 };
 
-TEST_CASE("app: response error handling", "[sync][app][local]") {
+TEST_CASE("app: response error handling", "[sync][app]") {
     std::string response_body = nlohmann::json({{"access_token", good_access_token},
                                                 {"refresh_token", good_access_token},
                                                 {"user_id", "Brown Bear"},
@@ -4243,7 +4310,7 @@ TEST_CASE("app: response error handling", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: switch user", "[sync][app][local]") {
+TEST_CASE("app: switch user", "[sync][app][user]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4299,7 +4366,7 @@ TEST_CASE("app: switch user", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: remove anonymous user", "[sync][app][local]") {
+TEST_CASE("app: remove anonymous user", "[sync][app][user]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4341,7 +4408,7 @@ TEST_CASE("app: remove anonymous user", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: remove user with credentials", "[sync][app][local]") {
+TEST_CASE("app: remove user with credentials", "[sync][app][user]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4374,7 +4441,7 @@ TEST_CASE("app: remove user with credentials", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: link_user", "[sync][app][local]") {
+TEST_CASE("app: link_user", "[sync][app][user]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4413,7 +4480,7 @@ TEST_CASE("app: link_user", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: auth providers", "[sync][app][local]") {
+TEST_CASE("app: auth providers", "[sync][app][user]") {
     SECTION("auth providers facebook") {
         auto credentials = AppCredentials::facebook("a_token");
         CHECK(credentials.provider() == AuthProvider::FACEBOOK);
@@ -4493,7 +4560,7 @@ TEST_CASE("app: auth providers", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: refresh access token unit tests", "[sync][app][local]") {
+TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
     auto setup_user = [](std::shared_ptr<App> app) {
         if (app->sync_manager()->get_current_user()) {
             return;
@@ -4714,7 +4781,7 @@ private:
 
 } // namespace
 
-TEST_CASE("app: app destroyed during token refresh", "[sync][app][local]") {
+TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, profile_1, profile_2, refresh_1, refresh_2, refresh_3 };
     struct TestStateBundle {
@@ -4864,7 +4931,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][local]") {
     mock_transport_worker.mark_complete();
 }
 
-TEST_CASE("app: metadata is persisted between sessions", "[sync][app][local]") {
+TEST_CASE("app: metadata is persisted between sessions", "[sync][app][metadata]") {
     static const auto test_hostname = "proto://host:1234";
     static const auto test_ws_hostname = "wsproto://host:1234";
 
@@ -4918,7 +4985,7 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: make_streaming_request", "[sync][app][local]") {
+TEST_CASE("app: make_streaming_request", "[sync][app][streaming]") {
     UnitTestTransport::access_token = good_access_token;
 
     constexpr uint64_t timeout_ms = 60000;
@@ -4992,7 +5059,7 @@ TEST_CASE("app: make_streaming_request", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: sync_user_profile unit tests", "[sync][app][local]") {
+TEST_CASE("app: sync_user_profile unit tests", "[sync][app][user]") {
     SECTION("with empty map") {
         auto profile = SyncUserProfile(bson::BsonDocument());
         CHECK(profile.name() == util::none);
@@ -5030,7 +5097,7 @@ TEST_CASE("app: sync_user_profile unit tests", "[sync][app][local]") {
 }
 
 #if 0
-TEST_CASE("app: app cannot get deallocated during log in", "[sync][app][local]") {
+TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, app_deallocated, profile };
     struct TestStateBundle {
@@ -5122,7 +5189,7 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app][local]")
 }
 #endif
 
-TEST_CASE("app: user logs out while profile is fetched", "[sync][app][local]") {
+TEST_CASE("app: user logs out while profile is fetched", "[sync][app][user]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, profile };
     struct TestStateBundle {
@@ -5219,7 +5286,7 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app][local]") {
     mock_transport_worker.mark_complete();
 }
 
-TEST_CASE("app: shared instances", "[sync][app][local]") {
+TEST_CASE("app: shared instances", "[sync][app]") {
     App::Config base_config;
     set_app_config_defaults(base_config, instance_of<UnitTestTransport>);
 

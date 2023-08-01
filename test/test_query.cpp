@@ -3697,7 +3697,7 @@ TEST(Query_Simple)
 
     ObjKey k0 = ttt.create_object().set_all(1, "a").get_key();
     ObjKey k1 = ttt.create_object().set_all(2, "a").get_key();
-    ObjKey k2 = ttt.create_object().set_all(3, "X").get_key();
+    ObjKey k2 = ttt.create_object(ObjKey(0xc001ede1b0)).set_all(3, "X").get_key();
 
     Query q0 = ttt.where();
 
@@ -3716,7 +3716,20 @@ TEST(Query_Simple)
     TableView tv2 = q2.find_all();
     CHECK_EQUAL(1, tv2.size());
     CHECK_EQUAL(k2, tv2.get_key(0));
+
+    ttt.add_search_index(col_str);
+
+    q2 = ttt.where().equal(col_str, "X");
+    tv2 = q2.find_all();
+    CHECK_EQUAL(1, tv2.size());
+    CHECK_EQUAL(k2, tv2.get_key(0));
+
+    q2 = ttt.where().equal(col_str, "X").equal(col_int, 3);
+    tv2 = q2.find_all();
+    CHECK_EQUAL(1, tv2.size());
+    CHECK_EQUAL(k2, tv2.get_key(0));
 }
+
 
 TEST(Query_Sort1)
 {

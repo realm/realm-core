@@ -331,7 +331,7 @@ RLM_API realm_results_t* realm_get_backlinks(realm_object_t* object, realm_class
         object->verify_attached();
         auto realm = object->realm();
         auto source_table = realm->read_group().get_table(TableKey{source_table_key});
-        auto backlink_view = object->obj().get_backlink_view(source_table, ColKey{property_key});
+        auto backlink_view = object->get_obj().get_backlink_view(source_table, ColKey{property_key});
         return new realm_results_t{Results{realm, backlink_view}};
     });
 }
@@ -453,7 +453,7 @@ RLM_API bool realm_results_find_object(realm_results_t* results, realm_object_t*
 
     return wrap_err([&]() {
         if (out_index) {
-            *out_index = results->index_of(value->obj());
+            *out_index = results->index_of(value->get_obj());
             if (out_found && *out_index != realm::not_found)
                 *out_found = true;
         }

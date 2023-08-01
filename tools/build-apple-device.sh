@@ -21,6 +21,7 @@ function usage {
     echo "  iphoneos iphonesimulator"
     echo "  tvos tvsimulator"
     echo "  watchos watchsimulator"
+    echo "  xros xrsimulator"
     echo "  maccatalyst"
     echo ""
     echo "Arguments:"

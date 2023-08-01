@@ -2,6 +2,7 @@
 #ifndef REALM_UTIL_TIME_HPP
 #define REALM_UTIL_TIME_HPP
 
+#include <chrono>
 #include <cstring>
 #include <ctime>
 #include <iterator>
@@ -10,8 +11,7 @@
 #include <sstream>
 
 
-namespace realm {
-namespace util {
+namespace realm::util {
 
 /// Thread safe version of std::localtime(). Uses localtime_r() on POSIX.
 std::tm localtime(std::time_t);
@@ -67,7 +67,49 @@ inline std::string format_utc_time(std::time_t time, const char* format)
     return out.str();                // Throws
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
+// This is a C++17 version of https://en.cppreference.com/w/cpp/chrono/duration/operator_ltlt to make
+// logging and comparing durations easier - especially in tests.
+//
+// Currently it only supports the ratios for C++17 duration helper types.
+namespace std::chrono {
+
+template <typename CharT, typename Traits, typename Rep, typename Period>
+std::ostream& operator<<(std::basic_ostream<CharT, Traits>& os, const std::chrono::duration<Rep, Period>& duration)
+{
+    std::basic_ostringstream<CharT, Traits> s;
+    s.flags(os.flags());
+    s.imbue(os.getloc());
+    s.precision(os.precision());
+    s << duration.count();
+    if constexpr (std::is_same_v<Period, std::nano>) {
+        s << "ns";
+    }
+    else if constexpr (std::is_same_v<Period, std::micro>) {
+        s << "us";
+    }
+    else if constexpr (std::is_same_v<Period, std::milli>) {
+        s << "ms";
+    }
+    else if constexpr (std::is_same_v<Period, std::ratio<1>>) {
+        s << "s";
+    }
+    else if constexpr (std::is_same_v<Period, std::ratio<60>>) {
+        s << "min";
+    }
+    else if constexpr (std::is_same_v<Period, std::ratio<3600>>) {
+        s << "h";
+    }
+    else if constexpr (Period::den == 1) {
+        s << "[" << Period::num << "]s";
+    }
+    else {
+        s << "[" << Period::num << "/" << Period::den << "]s";
+    }
+
+    return os << s.str();
+}
+
+} // namespace std::chrono
 #endif // REALM_UTIL_TIME_HPP

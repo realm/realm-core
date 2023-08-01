@@ -454,11 +454,14 @@ void ClientHistory::integrate_server_changesets(
             update_sync_progress(progress, downloadable_bytes, transact); // Throws
         }
         // Always update progress for download messages from steady state.
-        else if (batch_state == DownloadBatchState::SteadyState) {
+        else if (batch_state == DownloadBatchState::SteadyState && !changesets_to_integrate.empty()) {
             auto partial_progress = progress;
             partial_progress.download.server_version = last_changeset.remote_version;
             partial_progress.download.last_integrated_client_version = last_changeset.last_integrated_local_version;
             update_sync_progress(partial_progress, downloadable_bytes, transact); // Throws
+        }
+        else if (batch_state == DownloadBatchState::SteadyState && changesets_to_integrate.empty()) {
+            update_sync_progress(progress, downloadable_bytes, transact); // Throws
         }
         if (run_in_write_tr) {
             run_in_write_tr(transact, changesets_for_cb);

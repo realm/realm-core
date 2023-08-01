@@ -52,6 +52,7 @@ protected:
     StringData get_string(InternString) const;
     StringData get_string(StringBufferRange) const;
     BinaryData get_binary(StringBufferRange) const;
+    TableRef get_table(const Instruction::TableInstruction&, const std::string_view& instr = "(unspecified)");
 #define REALM_DECLARE_INSTRUCTION_HANDLER(X) virtual void operator()(const Instruction::X&);
     REALM_FOR_EACH_INSTRUCTION_TYPE(REALM_DECLARE_INSTRUCTION_HANDLER)
 #undef REALM_DECLARE_INSTRUCTION_HANDLER
@@ -134,7 +135,6 @@ private:
     std::unique_ptr<LstBase> m_last_list;
 
     StringData get_table_name(const Instruction::TableInstruction&, const std::string_view& instr = "(unspecified)");
-    TableRef get_table(const Instruction::TableInstruction&, const std::string_view& instr = "(unspecified)");
 
     // Note: This may return a non-invalid ObjKey if the key is dangling.
     ObjKey get_object_key(Table& table, const Instruction::PrimaryKey&,

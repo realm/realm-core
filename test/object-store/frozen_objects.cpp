@@ -46,7 +46,7 @@
 using namespace realm;
 using util::any_cast;
 
-TEST_CASE("Construct frozen Realm") {
+TEST_CASE("Construct frozen Realm", "[frozen]") {
     TestFile config;
     config.schema_version = 1;
     config.schema = Schema{
@@ -62,7 +62,7 @@ TEST_CASE("Construct frozen Realm") {
     }
 }
 
-TEST_CASE("Freeze Realm", "[freeze_realm]") {
+TEST_CASE("Freeze Realm", "[frozen]") {
     TestFile config;
     config.schema_version = 1;
     config.schema = Schema{
@@ -112,7 +112,7 @@ TEST_CASE("Freeze Realm", "[freeze_realm]") {
     }
 }
 
-TEST_CASE("Freeze Results", "[freeze_results]") {
+TEST_CASE("Freeze Results", "[frozen]") {
     TestFile config;
     config.schema_version = 1;
     config.schema = Schema{{"object",
@@ -400,7 +400,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     }
 }
 
-TEST_CASE("Freeze List", "[freeze_list]") {
+TEST_CASE("Freeze List", "[frozen]") {
 
     TestFile config;
     config.schema_version = 1;
@@ -476,7 +476,7 @@ TEST_CASE("Freeze List", "[freeze_list]") {
     }
 }
 
-TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
+TEST_CASE("Reclaim Frozen", "[frozen]") {
 
 #ifdef REALM_DEBUG
     constexpr int num_pending_transactions = 10;
@@ -544,8 +544,8 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
         auto table2 = realm2->read_group().get_table(table_key);
         auto& o = entry.o;
         o = Object(realm2, table2->get_object(key));
-        entry.value = o.obj().get<Int>(col);
-        entry.link = o.obj().get<ObjKey>(link_col);
+        entry.value = o.get_obj().get<Int>(col);
+        entry.link = o.get_obj().get<ObjKey>(link_col);
         auto linked = table2->get_object(entry.link);
         entry.linked_value = linked.get<Int>(col);
         // add a dummy notification callback to later exercise the notification machinery
@@ -568,8 +568,8 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
         for (int k = 0; k < num_checks_pr_trans; ++k) {
             auto& entry = refs[(unsigned)random_int() % num_pending_transactions];
             if (entry.realm) {
-                CHECK(entry.value == entry.o.obj().get<Int>(col));
-                auto link = entry.o.obj().get<ObjKey>(link_col);
+                CHECK(entry.value == entry.o.get_obj().get<Int>(col));
+                auto link = entry.o.get_obj().get<ObjKey>(link_col);
                 CHECK(link == entry.link);
                 auto table = entry.realm->read_group().get_table(table_key);
                 auto linked_value = table->get_object(link).get<Int>(col);
@@ -589,7 +589,7 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
     realm->commit_transaction();
 }
 
-TEST_CASE("Freeze Object", "[freeze_object]") {
+TEST_CASE("Freeze Object", "[frozen]") {
 
     TestFile config;
     config.schema_version = 1;
@@ -654,7 +654,7 @@ TEST_CASE("Freeze Object", "[freeze_object]") {
     }
 }
 
-TEST_CASE("Freeze dictionary", "[freeze_dictionary]") {
+TEST_CASE("Freeze dictionary", "[frozen]") {
 
     TestFile config;
     config.schema_version = 1;

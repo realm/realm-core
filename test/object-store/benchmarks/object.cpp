@@ -18,21 +18,21 @@
 
 #define CATCH_CONFIG_ENABLE_BENCHMARKING
 
-#include "util/index_helpers.hpp"
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
+#include <util/index_helpers.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
 
-#include <realm/object-store/impl/object_accessor_impl.hpp>
-#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/db.hpp>
+#include <realm/query_expression.hpp>
+
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/util/scheduler.hpp>
-
-#include <realm/db.hpp>
-#include <realm/query_expression.hpp>
 
 #include <memory>
 #include <vector>
@@ -73,7 +73,7 @@ struct TestContext : CppContext {
     }
 };
 
-TEST_CASE("Benchmark index change calculations", "[benchmark]") {
+TEST_CASE("Benchmark index change calculations", "[benchmark][index]") {
     _impl::CollectionChangeBuilder c;
 
     auto all_modified = [](ObjKey) {
@@ -147,7 +147,7 @@ TEST_CASE("Benchmark index change calculations", "[benchmark]") {
     }
 }
 
-TEST_CASE("Benchmark object", "[benchmark]") {
+TEST_CASE("Benchmark object", "[benchmark][object]") {
     using namespace std::string_literals;
     using AnyVec = std::vector<std::any>;
     using AnyDict = std::map<std::string, std::any>;
@@ -290,6 +290,71 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             REQUIRE(result.get(0).get<Int>(col_int) == update_int);
             update_int++;
         };
+    }
+
+    SECTION("Update and Read multiple objects") {
+        auto table = r->read_group().get_table("class_all types");
+        ObjectSchema all_types = *r->schema().find("all types");
+        r->begin_transaction();
+        std::vector<Object> objs;
+        objs.reserve(1000);
+
+        std::random_device dev;
+        std::mt19937 rng(dev());
+        std::uniform_int_distribution<std::mt19937::result_type> dist(500, 5000);
+        int64_t benchmark_pk = dist(rng);
+        for (size_t i = 0; i < 1000; ++i) {
+            auto obj = Object::create(d, r, all_types,
+                                      std::any(AnyDict{
+                                          {"pk", benchmark_pk + i},
+                                          {"bool", true},
+                                          {"int", INT64_C(5)},
+                                          {"float", 2.2f},
+                                          {"double", 3.3},
+                                          {"string", "hello"s},
+                                          {"data", "olleh"s},
+                                          {"date", Timestamp(10, 20)},
+                                          {"object", AnyDict{{"value", INT64_C(10)}}},
+
+                                          {"bool array", AnyVec{true, false}},
+                                          {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
+                                          {"float array", AnyVec{1.1f, 2.2f}},
+                                          {"double array", AnyVec{3.3, 4.4}},
+                                          {"string array", AnyVec{"a"s, "b"s, "c"s}},
+                                          {"data array", AnyVec{"d"s, "e"s, "f"s}},
+                                          {"date array", AnyVec{}},
+                                          {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
+                                      }),
+                                      CreatePolicy::ForceCreate);
+            objs.push_back(obj);
+        }
+        r->commit_transaction();
+        advance_and_notify(*r);
+        ColKey col_int = table->get_column_key("int");
+        BENCHMARK_ADVANCED("update object get_obj()")(Catch::Benchmark::Chronometer meter)
+        {
+            r->begin_transaction();
+            meter.measure([&objs, &col_int] {
+                for (Object& obj : objs) {
+                    obj.get_obj().set(col_int, 10);
+                    REQUIRE(obj.get_obj().get<Int>(col_int) == 10);
+                }
+            });
+            r->commit_transaction();
+        };
+
+        // TODO remove this once Object::obj() is deleted.
+        //  BENCHMARK_ADVANCED("update object obj()")(Catch::Benchmark::Chronometer meter)
+        //  {
+        //      r->begin_transaction();
+        //      meter.measure([&objs, &col_int] {
+        //          for (Object& obj : objs) {
+        //              obj.obj().set(col_int, 10);
+        //              REQUIRE(obj.obj().get<Int>(col_int) == 10);
+        //          }
+        //      });
+        //      r->commit_transaction();
+        //  };
     }
 
     SECTION("change notifications reporting") {
@@ -709,7 +774,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
     }
 }
 
-TEST_CASE("Benchmark object notification delivery", "[benchmark]") {
+TEST_CASE("Benchmark object notification delivery", "[benchmark][notifications]") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;

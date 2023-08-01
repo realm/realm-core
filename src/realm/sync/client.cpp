@@ -676,7 +676,9 @@ ClientImpl::Connection& ClientImpl::get_connection(ServerEndpoint endpoint,
                                                    std::function<SyncConfig::SSLVerifyCallback> ssl_verify_callback,
                                                    Optional<ProxyConfig> proxy_config, bool& was_created)
 {
-    ServerSlot& server_slot = m_server_slots[endpoint]; // Throws
+    auto&& [server_slot_it, inserted] =
+        m_server_slots.try_emplace(endpoint, ReconnectInfo(m_reconnect_mode, m_reconnect_backoff_info, get_random()));
+    ServerSlot& server_slot = server_slot_it->second; // Throws
 
     // TODO: enable multiplexing with proxies
     if (server_slot.connection && !m_one_connection_per_session && !proxy_config) {
@@ -1472,7 +1474,7 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess)) {
             // Already finalized
-            handler(util::error::operation_aborted); // Throws
+            handler({ErrorCodes::OperationAborted, "Session finalized before callback could run"}); // Throws
             return;
         }
         if (upload_completion) {
@@ -1730,20 +1732,19 @@ void SessionWrapper::finalize()
     while (!m_upload_completion_handlers.empty()) {
         auto handler = std::move(m_upload_completion_handlers.back());
         m_upload_completion_handlers.pop_back();
-        std::error_code ec = error::operation_aborted;
-        handler(ec); // Throws
+        handler(
+            {ErrorCodes::OperationAborted, "Sync session is being finalized before upload was complete"}); // Throws
     }
     while (!m_download_completion_handlers.empty()) {
         auto handler = std::move(m_download_completion_handlers.back());
         m_download_completion_handlers.pop_back();
-        std::error_code ec = error::operation_aborted;
-        handler(ec); // Throws
+        handler(
+            {ErrorCodes::OperationAborted, "Sync session is being finalized before download was complete"}); // Throws
     }
     while (!m_sync_completion_handlers.empty()) {
         auto handler = std::move(m_sync_completion_handlers.back());
         m_sync_completion_handlers.pop_back();
-        std::error_code ec = error::operation_aborted;
-        handler(ec); // Throws
+        handler({ErrorCodes::OperationAborted, "Sync session is being finalized before sync was complete"}); // Throws
     }
 }
 
@@ -1781,8 +1782,7 @@ void SessionWrapper::on_upload_completion()
     while (!m_upload_completion_handlers.empty()) {
         auto handler = std::move(m_upload_completion_handlers.back());
         m_upload_completion_handlers.pop_back();
-        std::error_code ec; // Success
-        handler(ec);        // Throws
+        handler(Status::OK()); // Throws
     }
     while (!m_sync_completion_handlers.empty()) {
         auto handler = std::move(m_sync_completion_handlers.back());
@@ -1802,8 +1802,7 @@ void SessionWrapper::on_download_completion()
     while (!m_download_completion_handlers.empty()) {
         auto handler = std::move(m_download_completion_handlers.back());
         m_download_completion_handlers.pop_back();
-        std::error_code ec; // Success
-        handler(ec);        // Throws
+        handler(Status::OK()); // Throws
     }
     while (!m_sync_completion_handlers.empty()) {
         auto handler = std::move(m_sync_completion_handlers.back());
@@ -1919,13 +1918,13 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
     m_sess->logger.info("Tracking pending client reset of type \"%1\" from %2", pending_reset->type,
                         pending_reset->time);
     util::bind_ptr<SessionWrapper> self(this);
-    async_wait_for(true, true, [self = std::move(self), pending_reset = *pending_reset](std::error_code ec) {
-        if (ec == util::error::operation_aborted) {
+    async_wait_for(true, true, [self = std::move(self), pending_reset = *pending_reset](Status status) {
+        if (status == ErrorCodes::OperationAborted) {
             return;
         }
         auto& logger = self->m_sess->logger;
-        if (ec) {
-            logger.error("Error while tracking client reset acknowledgement: %1", ec.message());
+        if (!status.is_ok()) {
+            logger.error("Error while tracking client reset acknowledgement: %1", status);
             return;
         }
 

@@ -16,24 +16,27 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_SYNC_TEST_UTILS_HPP
-#define REALM_SYNC_TEST_UTILS_HPP
+#pragma once
+
+#include <util/event_loop.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
 
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+#include <realm/object-store/thread_safe_reference.hpp>
 
 #include <realm/util/functional.hpp>
 #include <realm/util/function_ref.hpp>
 
-#include "util/event_loop.hpp"
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
-
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_templated.hpp>
+
+#include <chrono>
+#include <vector>
 
 // disable the tests that rely on having baas available on the network
 // but allow opt-in by building with REALM_ENABLE_AUTH_TESTS=1
@@ -155,6 +158,9 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app);
 
 void wait_for_advance(Realm& realm);
 
+void async_open_realm(const Realm::Config& config,
+                      util::UniqueFunction<void(ThreadSafeReference&& ref, std::exception_ptr e)> finish);
+
 #endif // REALM_ENABLE_AUTH_TESTS
 
 #endif // REALM_ENABLE_SYNC
@@ -232,5 +238,3 @@ std::unique_ptr<TestClientReset> make_fake_local_client_reset(const Realm::Confi
 } // namespace reset_utils
 
 } // namespace realm
-
-#endif // REALM_SYNC_TEST_UTILS_HPP
