@@ -16,21 +16,26 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync_test_utils.hpp"
+#include <util/sync/sync_test_utils.hpp>
 
-#include "util/baas_admin_api.hpp"
+#include <util/sync/baas_admin_api.hpp>
 
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
+
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
+
 #include <realm/util/base64.hpp>
 #include <realm/util/hex_dump.hpp>
 #include <realm/util/sha_crypto.hpp>
+
+#include <chrono>
 
 namespace realm {
 
@@ -233,6 +238,24 @@ void wait_for_advance(Realm& realm)
         return done;
     });
     realm.m_binding_context = nullptr;
+}
+
+void async_open_realm(const Realm::Config& config,
+                      util::UniqueFunction<void(ThreadSafeReference&& ref, std::exception_ptr e)> finish)
+{
+    std::mutex mutex;
+    bool did_finish = false;
+    auto task = Realm::get_synchronized_realm(config);
+    task->start([&, callback = std::move(finish)](ThreadSafeReference&& ref, std::exception_ptr e) {
+        callback(std::move(ref), e);
+        std::lock_guard lock(mutex);
+        did_finish = true;
+    });
+    util::EventLoop::main().run_until([&] {
+        std::lock_guard lock(mutex);
+        return did_finish;
+    });
+    task->cancel(); // don't run the above notifier again on this session
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS

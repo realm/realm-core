@@ -273,8 +273,8 @@ struct realm_object : realm::c_api::WrapC, realm::Object {
     bool equals(const WrapC& other) const noexcept final
     {
         if (auto ptr = dynamic_cast<const realm_object_t*>(&other)) {
-            auto a = obj();
-            auto b = ptr->obj();
+            auto a = get_obj();
+            auto b = ptr->get_obj();
             return a.get_table() == b.get_table() && a.get_key() == b.get_key();
         }
         return false;

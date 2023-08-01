@@ -42,7 +42,7 @@
 using namespace realm;
 using util::any_cast;
 
-TEST_CASE("list") {
+TEST_CASE("list", "[list]") {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -1276,11 +1276,11 @@ TEST_CASE("list") {
         Object obj;
         REQUIRE_NOTHROW(obj = util::any_cast<Object&&>(list.get(ctx, 1)));
         REQUIRE(obj.is_valid());
-        REQUIRE(obj.obj().get_key() == target_keys[1]);
+        REQUIRE(obj.get_obj().get_key() == target_keys[1]);
     }
 }
 
-TEST_CASE("embedded List") {
+TEST_CASE("embedded List", "[list]") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
@@ -1713,12 +1713,12 @@ TEST_CASE("embedded List") {
         Object obj;
         REQUIRE_NOTHROW(obj = util::any_cast<Object&&>(list.get(ctx, 1)));
         REQUIRE(obj.is_valid());
-        REQUIRE(obj.obj().get<int64_t>(col_value) == 1);
+        REQUIRE(obj.get_obj().get<int64_t>(col_value) == 1);
     }
 }
 
 
-TEST_CASE("list of embedded objects") {
+TEST_CASE("list of embedded objects", "[list]") {
     Schema schema{
         {"parent",
          {
@@ -1838,7 +1838,7 @@ TEST_CASE("list of embedded objects") {
 
 #if REALM_ENABLE_SYNC
 
-TEST_CASE("list with unresolved links") {
+TEST_CASE("list with unresolved links", "[list]") {
     TestSyncManager init_sync_manager({}, {false});
     auto& server = init_sync_manager.sync_server();
 

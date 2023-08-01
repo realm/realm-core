@@ -466,7 +466,7 @@ struct UnboxedOptional : BaseT {
 };
 } // namespace realm::sectioned_results_fixtures
 
-TEST_CASE("sectioned results", "[sectioned_results]") {
+TEST_CASE("sectioned results", "[sectioned results]") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
@@ -625,7 +625,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         // Should throw on `type_TypedLink` being a section key.
         sr = sorted.sectioned_results([&](Mixed value, SharedRealm realm) {
             auto obj = Object(realm, value.get_link());
-            return Mixed(obj.obj().get<ObjLink>(col_typed_link));
+            return Mixed(obj.get_obj().get<ObjLink>(col_typed_link));
         });
         REQUIRE_EXCEPTION(sr.size(), InvalidArgument,
                           "Links are not supported as section keys."); // Trigger calculation
@@ -1514,7 +1514,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
     }
 }
 
-TEST_CASE("sectioned results link notification bug", "[sectioned_results]") {
+TEST_CASE("sectioned results link notification bug", "[sectioned results]") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
@@ -1585,7 +1585,7 @@ TEST_CASE("sectioned results link notification bug", "[sectioned_results]") {
 
 namespace cf = realm::sectioned_results_fixtures;
 
-TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", cf::MixedVal, cf::Int, cf::Bool,
+TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned results]", cf::MixedVal, cf::Int, cf::Bool,
                    cf::Float, cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
                    cf::BoxedOptional<cf::Int>, cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>,
                    cf::BoxedOptional<cf::Double>, cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>,

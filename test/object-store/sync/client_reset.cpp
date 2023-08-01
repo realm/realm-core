@@ -16,20 +16,13 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
-
-#include "collection_fixtures.hpp"
-#include "sync/sync_test_utils.hpp"
-#include "util/baas_admin_api.hpp"
-#include "util/event_loop.hpp"
-#include "util/index_helpers.hpp"
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
-
-#include <realm/sync/noinst/client_reset.hpp>
-#include <realm/sync/noinst/client_reset_operation.hpp>
-#include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/network/websocket.hpp>
+#include <collection_fixtures.hpp>
+#include <util/event_loop.hpp>
+#include <util/index_helpers.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
+#include <util/sync/baas_admin_api.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/util/scheduler.hpp>
@@ -40,8 +33,16 @@
 #include <realm/object-store/sync/app_credentials.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+
+#include <realm/sync/noinst/client_reset.hpp>
+#include <realm/sync/noinst/client_reset_operation.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/network/websocket.hpp>
+
 #include <realm/util/flat_map.hpp>
 #include <realm/util/overload.hpp>
+
+#include <catch2/catch_all.hpp>
 
 #include <external/mpark/variant.hpp>
 
@@ -109,7 +110,7 @@ TableRef get_table(Realm& realm, StringData object_type)
 namespace cf = realm::collection_fixtures;
 using reset_utils::create_object;
 
-TEST_CASE("sync: large reset with recovery is restartable", "[client reset][baas]") {
+TEST_CASE("sync: large reset with recovery is restartable", "[sync][pbs][client reset][baas]") {
     const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
@@ -204,7 +205,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset][baas
     REQUIRE(expected_obj_ids == found_object_ids);
 }
 
-TEST_CASE("sync: pending client resets are cleared when downloads are complete", "[client reset][baas]") {
+TEST_CASE("sync: pending client resets are cleared when downloads are complete", "[sync][pbs][client reset][baas]") {
     const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
@@ -261,7 +262,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
     wait_for_download(*realm, std::chrono::minutes(10));
 }
 
-TEST_CASE("sync: client reset", "[client reset][baas]") {
+TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
     if (!util::EventLoop::has_implementation())
         return;
 
@@ -317,6 +318,9 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
     local_config.path = local_config.path + ".local";
     remote_config.path = remote_config.path + ".remote";
 
+// TODO: remote-baas: This test fails consistently with Windows remote baas server - to be fixed in RCORE-1674
+// This may be due to the realm file at `orig_path` not being deleted on Windows since it is still in use.
+#ifndef _WIN32
     SECTION("a client reset in manual mode can be handled") {
         std::string orig_path, recovery_path;
         local_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
@@ -361,6 +365,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
         wait_for_download(*post_reset_realm); // this should now succeed without any sync errors
         REQUIRE(util::File::exists(orig_path));
     }
+#endif
 
     local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
         CAPTURE(err.reason());
@@ -371,12 +376,12 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
     local_config.cache = false;
     local_config.automatic_change_notifications = false;
     const std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
-    size_t before_callback_invoctions = 0;
+    size_t before_callback_invocations = 0;
     size_t after_callback_invocations = 0;
     std::mutex mtx;
     local_config.sync_config->notify_before_client_reset = [&](SharedRealm before) {
         std::lock_guard<std::mutex> lock(mtx);
-        ++before_callback_invoctions;
+        ++before_callback_invocations;
         REQUIRE(before);
         REQUIRE(before->is_frozen());
         REQUIRE(before->read_group().get_table("class_object"));
@@ -437,11 +442,11 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 ->on_post_reset([&](SharedRealm realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
 
-                    CHECK(before_callback_invoctions == 1);
+                    CHECK(before_callback_invocations == 1);
                     CHECK(after_callback_invocations == 1);
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 4);
-                    CHECK(object.obj().get<Int>("value") == 4);
+                    CHECK(object.get_obj().get<Int>("value") == 4);
                     REQUIRE_INDICES(results_changes.modifications);
                     REQUIRE_INDICES(results_changes.insertions);
                     REQUIRE_INDICES(results_changes.deletions);
@@ -490,11 +495,11 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 })
                 ->on_post_reset([&](SharedRealm realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
-                    CHECK(before_callback_invoctions == 1);
+                    CHECK(before_callback_invocations == 1);
                     CHECK(after_callback_invocations == 1);
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 4);
-                    CHECK(object.obj().get<Int>("value") == 4);
+                    CHECK(object.get_obj().get<Int>("value") == 4);
                     REQUIRE_INDICES(results_changes.modifications);
                     REQUIRE_INDICES(results_changes.insertions);
                     REQUIRE_INDICES(results_changes.deletions, 1); // the deletion "wins"
@@ -527,12 +532,12 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 })
                 ->on_post_reset([&](SharedRealm realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
-                    CHECK(before_callback_invoctions == 1);
+                    CHECK(before_callback_invocations == 1);
                     CHECK(after_callback_invocations == 1);
                     CHECK(results.size() == 2);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 4);
                     CHECK(results.get<Obj>(1).get<Int>("value") == new_value);
-                    CHECK(object.obj().get<Int>("value") == 4);
+                    CHECK(object.get_obj().get<Int>("value") == 4);
                     REQUIRE_INDICES(results_changes.modifications);
                     REQUIRE_INDICES(results_changes.insertions);
                     REQUIRE_INDICES(results_changes.deletions);
@@ -688,7 +693,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
             wait_for_upload(*remote);
             wait_for_download(*remote);
             verify_changes(remote);
-            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 1);
         }
 
@@ -735,7 +740,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 ->run();
             REQUIRE(err);
             REQUIRE(err.value()->is_client_reset_requested());
-            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 0);
         }
     } // end recovery section
@@ -755,11 +760,11 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 ->on_post_reset([&](SharedRealm realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
 
-                    CHECK(before_callback_invoctions == 1);
+                    CHECK(before_callback_invocations == 1);
                     CHECK(after_callback_invocations == 1);
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 6);
-                    CHECK(object.obj().get<Int>("value") == 6);
+                    CHECK(object.get_obj().get<Int>("value") == 6);
                     REQUIRE_INDICES(results_changes.modifications, 0);
                     REQUIRE_INDICES(results_changes.insertions);
                     REQUIRE_INDICES(results_changes.deletions);
@@ -786,7 +791,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                         REQUIRE(table->size() == 1);
                         REQUIRE(table->begin()->get<Int>("value") == 6);
                         REQUIRE_NOTHROW(advance_and_notify(*object.get_realm()));
-                        CHECK(object.obj().get<Int>("value") == 6);
+                        CHECK(object.get_obj().get<Int>("value") == 6);
                         object_changes = {};
                         results_changes = {};
                     })
@@ -796,7 +801,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                         // 6 -> 4
                         CHECK(results.size() == 1);
                         CHECK(results.get<Obj>(0).get<Int>("value") == 4);
-                        CHECK(object.obj().get<Int>("value") == 4);
+                        CHECK(object.get_obj().get<Int>("value") == 4);
                         REQUIRE_INDICES(results_changes.modifications, 0);
                         REQUIRE_INDICES(results_changes.insertions);
                         REQUIRE_INDICES(results_changes.deletions);
@@ -808,12 +813,12 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                     })
                     ->on_post_reset([&](SharedRealm) {
                         REQUIRE_NOTHROW(advance_and_notify(*object.get_realm()));
-                        CHECK(before_callback_invoctions == 2);
+                        CHECK(before_callback_invocations == 2);
                         CHECK(after_callback_invocations == 2);
                         // 4 -> 6
                         CHECK(results.size() == 1);
                         CHECK(results.get<Obj>(0).get<Int>("value") == 6);
-                        CHECK(object.obj().get<Int>("value") == 6);
+                        CHECK(object.get_obj().get<Int>("value") == 6);
                         REQUIRE_INDICES(results_changes.modifications, 0);
                         REQUIRE_INDICES(results_changes.insertions);
                         REQUIRE_INDICES(results_changes.deletions);
@@ -829,7 +834,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
             local_config.sync_config->notify_before_client_reset = nullptr;
             local_config.sync_config->notify_after_client_reset = nullptr;
             make_reset(local_config, remote_config)->run();
-            REQUIRE(before_callback_invoctions == 0);
+            REQUIRE(before_callback_invocations == 0);
             REQUIRE(after_callback_invocations == 0);
         }
 
@@ -845,7 +850,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 ->run();
             auto local_coordinator = realm::_impl::RealmCoordinator::get_existing_coordinator(local_config.path);
             REQUIRE(!local_coordinator);
-            REQUIRE(before_callback_invoctions == 0);
+            REQUIRE(before_callback_invocations == 0);
             REQUIRE(after_callback_invocations == 0);
             timed_sleeping_wait_for(
                 [&]() -> bool {
@@ -854,13 +859,13 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 },
                 std::chrono::seconds(60));
             // this test also relies on the test config above to verify the Realm instances in the callbacks
-            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 1);
         }
 
         SECTION("notifiers work if the session instance changes") {
             // run this test with ASAN to check for use after free
-            size_t before_callback_invoctions_2 = 0;
+            size_t before_callback_invocations_2 = 0;
             size_t after_callback_invocations_2 = 0;
             std::shared_ptr<SyncSession> session;
             std::unique_ptr<SyncConfig> config_copy;
@@ -873,7 +878,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                     std::lock_guard<std::mutex> lock(mtx);
                     REQUIRE(before_realm);
                     REQUIRE(before_realm->schema_version() != ObjectStore::NotVersioned);
-                    ++before_callback_invoctions_2;
+                    ++before_callback_invocations_2;
                 };
                 config_copy->notify_after_client_reset = [&](SharedRealm, ThreadSafeReference, bool) {
                     std::lock_guard<std::mutex> lock(mtx);
@@ -882,7 +887,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
 
                 temp_config.sync_config->notify_before_client_reset = [&](SharedRealm before_realm) {
                     std::lock_guard<std::mutex> lock(mtx);
-                    ++before_callback_invoctions;
+                    ++before_callback_invocations;
                     REQUIRE(session);
                     REQUIRE(config_copy);
                     REQUIRE(before_realm);
@@ -905,13 +910,13 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
             timed_sleeping_wait_for(
                 [&]() -> bool {
                     std::lock_guard<std::mutex> lock(mtx);
-                    return before_callback_invoctions > 0;
+                    return before_callback_invocations > 0;
                 },
                 std::chrono::seconds(120));
             millisleep(500); // just make some space for the after callback to be attempted
-            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 0);
-            REQUIRE(before_callback_invoctions_2 == 0);
+            REQUIRE(before_callback_invocations_2 == 0);
             REQUIRE(after_callback_invocations_2 == 0);
         }
 
@@ -927,7 +932,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                     ->run();
             }
             catch (const SessionInterruption&) {
-                REQUIRE(before_callback_invoctions == 0);
+                REQUIRE(before_callback_invocations == 0);
                 REQUIRE(after_callback_invocations == 0);
                 test_reset.reset();
                 auto realm = Realm::get_shared_realm(local_config);
@@ -951,7 +956,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
             }
             {
                 std::lock_guard<std::mutex> lock(mtx);
-                REQUIRE(before_callback_invoctions == 1);
+                REQUIRE(before_callback_invocations == 1);
                 REQUIRE(after_callback_invocations == 1);
             }
         }
@@ -985,7 +990,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
 
             {
                 std::lock_guard<std::mutex> lock(mtx);
-                REQUIRE(before_callback_invoctions == 1);
+                REQUIRE(before_callback_invocations == 1);
                 REQUIRE(after_callback_invocations == 1);
             }
         }
@@ -1003,7 +1008,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
 
             make_reset(local_config, remote_config)->run();
             REQUIRE(!err);
-            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 1);
         }
 
@@ -1103,7 +1108,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == new_value);
                     CHECK(object.is_valid());
-                    CHECK(object.obj().get<Int>("value") == new_value);
+                    CHECK(object.get_obj().get<Int>("value") == new_value);
                     REQUIRE_INDICES(results_changes.modifications, 0);
                     REQUIRE_INDICES(results_changes.insertions);
                     REQUIRE_INDICES(results_changes.deletions);
@@ -1136,7 +1141,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 6);
                     CHECK(object.is_valid());
-                    CHECK(object.obj().get<Int>("value") == 6);
+                    CHECK(object.get_obj().get<Int>("value") == 6);
                     REQUIRE_INDICES(results_changes.modifications, 0);
                     REQUIRE_INDICES(results_changes.insertions);
                     REQUIRE_INDICES(results_changes.deletions, 1);
@@ -1201,7 +1206,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 ->run();
             REQUIRE(err);
             REQUIRE(err.value()->is_client_reset_requested());
-            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 0);
         }
 
@@ -1237,7 +1242,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
 
             REQUIRE(err);
             REQUIRE(err.value()->is_client_reset_requested());
-            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 0);
         }
 
@@ -1594,7 +1599,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 auto flag = has_reset_cycle_flag(realm);
                 REQUIRE(!flag);
                 std::lock_guard<std::mutex> lock(mtx);
-                ++before_callback_invoctions;
+                ++before_callback_invocations;
             };
             local_config.sync_config->notify_after_client_reset = [&](SharedRealm, ThreadSafeReference realm_ref,
                                                                       bool did_recover) {
@@ -1613,7 +1618,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 })
                 ->run();
             REQUIRE(!err);
-            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(before_callback_invocations == 1);
             REQUIRE(after_callback_invocations == 1);
         }
         SECTION("In DiscardLocal mode: a previous failed discard reset is detected and generates an error") {
@@ -1774,14 +1779,14 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                     CHECK(results.size() == 1); // insert was discarded
                     CHECK(results.get<Obj>(0).get<Int>("value") == 6);
                     CHECK(object.is_valid());
-                    CHECK(object.obj().get<Int>("value") == 6);
+                    CHECK(object.get_obj().get<Int>("value") == 6);
                 })
                 ->run();
         }
     } // end: The server can prohibit recovery
 }
 
-TEST_CASE("sync: Client reset during async open", "[client reset][baas]") {
+TEST_CASE("sync: Client reset during async open", "[sync][pbs][client reset][baas]") {
     const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
@@ -1876,7 +1881,7 @@ TEST_CASE("sync: Client reset during async open", "[client reset][baas]") {
 #endif // REALM_ENABLE_AUTH_TESTS
 
 namespace cf = realm::collection_fixtures;
-TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
+TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
                    cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
                    cf::BoxedOptional<cf::Int>, cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>,
                    cf::BoxedOptional<cf::Double>, cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>,
@@ -2004,7 +2009,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                     CHECK(results.get<Obj>(0).get<Int>("_id") == pk_val);
                     CHECK(object.is_valid());
                     check_value(results.get<Obj>(0), local_state);
-                    check_value(object.obj(), local_state);
+                    check_value(object.get_obj(), local_state);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
@@ -2013,7 +2018,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                     CHECK(object.is_valid());
                     T expected_state = (test_mode == ClientResyncMode::DiscardLocal) ? remote_state : local_state;
                     check_value(results.get<Obj>(0), expected_state);
-                    check_value(object.obj(), expected_state);
+                    check_value(object.get_obj(), expected_state);
                     if (local_state == expected_state) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
@@ -2082,7 +2087,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                     CHECK(results.get<Obj>(0).get<Int>("_id") == pk_val);
                     CHECK(object.is_valid());
                     check_list(results.get<Obj>(0), local_state);
-                    check_list(object.obj(), local_state);
+                    check_list(object.get_obj(), local_state);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
@@ -2094,7 +2099,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                         expected_state = local_state;
                     }
                     check_list(results.get<Obj>(0), expected_state);
-                    check_list(object.obj(), expected_state);
+                    check_list(object.get_obj(), expected_state);
                     if (local_state == expected_state) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
@@ -2206,7 +2211,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                     CHECK(results.get<Obj>(0).get<Int>("_id") == pk_val);
                     CHECK(object.is_valid());
                     check_dictionary(results.get<Obj>(0), local_state);
-                    check_dictionary(object.obj(), local_state);
+                    check_dictionary(object.get_obj(), local_state);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
@@ -2219,11 +2224,11 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                             expected_state[it.first] = it.second;
                         }
                         if (local_state.find(dict_key) == local_state.end()) {
-                            expected_state.erase(dict_key); // explict erasure of initial state occured
+                            expected_state.erase(dict_key); // explict erasure of initial state occurred
                         }
                     }
                     check_dictionary(results.get<Obj>(0), expected_state);
-                    check_dictionary(object.obj(), expected_state);
+                    check_dictionary(object.get_obj(), expected_state);
                     if (local_state == expected_state) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
@@ -2317,7 +2322,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                     CHECK(results.get<Obj>(0).get<Int>("_id") == pk_val);
                     CHECK(object.is_valid());
                     check_set(results.get<Obj>(0), local_state);
-                    check_set(object.obj(), local_state);
+                    check_set(object.get_obj(), local_state);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
@@ -2331,11 +2336,11 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                             expected.insert(e);
                         }
                         if (do_erase_initial) {
-                            expected.erase(Mixed{values[0]}); // explicit erase of initial element occured
+                            expected.erase(Mixed{values[0]}); // explicit erase of initial element occurred
                         }
                     }
                     check_set(results.get<Obj>(0), expected);
-                    check_set(object.obj(), expected);
+                    check_set(object.get_obj(), expected);
                     if (local_state == expected) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
@@ -2516,7 +2521,7 @@ private:
 
 } // namespace test_instructions
 
-TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][links][collections]",
+TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client reset][links][collections]",
                    cf::ListOfObjects, cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,
                    cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks)
 {
@@ -2570,7 +2575,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
             CreatePolicy::ForceCreate);
 
         for (auto link : links) {
-            test_type.add_link(object.obj(), link);
+            test_type.add_link(object.get_obj(), link);
         }
     };
 
@@ -2583,7 +2588,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
             c, r, "dest",
             std::any(realm::AnyDict{{valid_pk_name, std::move(v)}, {"realm_id", std::string(partition)}}),
             CreatePolicy::ForceCreate);
-        return ObjLink{obj.obj().get_table()->get_key(), obj.obj().get_key()};
+        return ObjLink{obj.get_obj().get_table()->get_key(), obj.get_obj().get_key()};
     };
 
     auto require_links_to_match_ids = [&](std::vector<Obj>& links, std::vector<util::Optional<int64_t>>& expected,
@@ -2944,7 +2949,7 @@ void combine_array_values(std::vector<T>& from, const std::vector<T>& to)
     }
 }
 
-TEST_CASE("client reset with embedded object", "[client reset][local][embedded objects]") {
+TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedded objects]") {
     if (!util::EventLoop::has_implementation())
         return;
 

@@ -26,6 +26,7 @@
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
 #include <realm/db_options.hpp>
 #include <realm/sync/client.hpp>
@@ -140,15 +141,14 @@ void SyncSession::become_dying(util::CheckedUniqueLock lock)
     }
 
     size_t current_death_count = ++m_death_count;
-    m_session->async_wait_for_upload_completion(
-        [weak_session = weak_from_this(), current_death_count](std::error_code) {
-            if (auto session = weak_session.lock()) {
-                util::CheckedUniqueLock lock(session->m_state_mutex);
-                if (session->m_state == State::Dying && session->m_death_count == current_death_count) {
-                    session->become_inactive(std::move(lock));
-                }
+    m_session->async_wait_for_upload_completion([weak_session = weak_from_this(), current_death_count](Status) {
+        if (auto session = weak_session.lock()) {
+            util::CheckedUniqueLock lock(session->m_state_mutex);
+            if (session->m_state == State::Dying && session->m_death_count == current_death_count) {
+                session->become_inactive(std::move(lock));
             }
-        });
+        }
+    });
     m_state_mutex.unlock(lock);
 }
 
@@ -581,7 +581,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
         const bool try_again = false;
         sync::SessionErrorInfo synthetic(
             make_error_code(sync::Client::Error::auto_client_reset_failure),
-            util::format("A fatal error occured during client reset: '%1'", status.reason()), try_again);
+            util::format("A fatal error occurred during client reset: '%1'", status.reason()), try_again);
         handle_error(synthetic);
         return;
     }
@@ -864,35 +864,52 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
     m_progress_notifier.update(downloaded, downloadable, uploaded, uploadable, download_version, snapshot_version);
 }
 
-static sync::Session::Config::ClientReset make_client_reset_config(RealmConfig session_config, DBRef&& fresh_copy,
-                                                                   bool recovery_is_allowed)
+static sync::Session::Config::ClientReset make_client_reset_config(const RealmConfig& base_config,
+                                                                   const std::shared_ptr<SyncConfig>& sync_config,
+                                                                   DBRef&& fresh_copy, bool recovery_is_allowed)
 {
-    REALM_ASSERT(session_config.sync_config->client_resync_mode != ClientResyncMode::Manual);
+    REALM_ASSERT(sync_config->client_resync_mode != ClientResyncMode::Manual);
 
     sync::Session::Config::ClientReset config;
-    config.mode = session_config.sync_config->client_resync_mode;
+    config.mode = sync_config->client_resync_mode;
     config.fresh_copy = std::move(fresh_copy);
     config.recovery_is_allowed = recovery_is_allowed;
 
-    session_config.sync_config = std::make_shared<SyncConfig>(*session_config.sync_config); // deep copy
-    session_config.scheduler = nullptr;
-    if (session_config.sync_config->notify_after_client_reset) {
-        config.notify_after_client_reset = [config = session_config](VersionID previous_version, bool did_recover) {
-            auto local_coordinator = RealmCoordinator::get_coordinator(config);
-            REALM_ASSERT(local_coordinator);
-            ThreadSafeReference active_after = local_coordinator->get_unbound_realm();
-            SharedRealm frozen_before = local_coordinator->get_realm(config, previous_version);
+    // The conditions here are asymmetric because if we have *either* a before
+    // or after callback we need to make sure to initialize the local schema
+    // before the client reset happens.
+    if (!sync_config->notify_before_client_reset && !sync_config->notify_after_client_reset)
+        return config;
+
+    RealmConfig realm_config = base_config;
+    realm_config.sync_config = std::make_shared<SyncConfig>(*sync_config); // deep copy
+    realm_config.scheduler = util::Scheduler::make_dummy();
+
+    if (sync_config->notify_after_client_reset) {
+        config.notify_after_client_reset = [realm_config](VersionID previous_version, bool did_recover) {
+            auto coordinator = _impl::RealmCoordinator::get_coordinator(realm_config);
+            ThreadSafeReference active_after = coordinator->get_unbound_realm();
+            SharedRealm frozen_before = coordinator->get_realm(realm_config, previous_version);
             REALM_ASSERT(frozen_before);
             REALM_ASSERT(frozen_before->is_frozen());
-            config.sync_config->notify_after_client_reset(std::move(frozen_before), std::move(active_after),
-                                                          did_recover);
+            realm_config.sync_config->notify_after_client_reset(std::move(frozen_before), std::move(active_after),
+                                                                did_recover);
         };
     }
-    if (session_config.sync_config->notify_before_client_reset) {
-        config.notify_before_client_reset = [config = session_config](VersionID version) {
-            config.sync_config->notify_before_client_reset(Realm::get_frozen_realm(config, version));
-        };
-    }
+    config.notify_before_client_reset = [config = std::move(realm_config)]() -> VersionID {
+        // Opening the Realm live here may make a write if the schema is different
+        // than what exists on disk. It is necessary to pass a fully usable Realm
+        // to the user here. Note that the schema changes made here will be considered
+        // an "offline write" to be recovered if this is recovery mode.
+        auto before = Realm::get_shared_realm(config);
+        before->read_group();
+        if (auto& notify_before = config.sync_config->notify_before_client_reset) {
+            notify_before(config.sync_config->freeze_before_reset_realm ? before->freeze() : before);
+        }
+        // Note that if the SDK requested a live Realm this may be a different
+        // version than what we had before calling the callback.
+        return before->read_transaction_version();
+    };
 
     return config;
 }
@@ -950,10 +967,8 @@ void SyncSession::create_sync_session()
                                         m_server_requests_action == sync::ProtocolErrorInfo::Action::MigrateToFLX ||
                                         m_server_requests_action == sync::ProtocolErrorInfo::Action::RevertToPBS;
         // Use the original sync config, not the updated one from the migration store
-        RealmConfig client_reset_config = m_config;
-        client_reset_config.sync_config = m_original_sync_config;
-        session_config.client_reset_config =
-            make_client_reset_config(client_reset_config, std::move(m_client_reset_fresh_copy), allowed_to_recover);
+        session_config.client_reset_config = make_client_reset_config(
+            m_config, m_original_sync_config, std::move(m_client_reset_fresh_copy), allowed_to_recover);
         m_server_requests_action = sync::ProtocolErrorInfo::Action::NoAction;
     }
 
@@ -1239,7 +1254,7 @@ void SyncSession::add_completion_callback(util::UniqueFunction<void(Status)> cal
     auto waiter = is_download ? &sync::Session::async_wait_for_download_completion
                               : &sync::Session::async_wait_for_upload_completion;
 
-    (m_session.get()->*waiter)([weak_self = weak_from_this(), id = m_completion_request_counter](std::error_code ec) {
+    (m_session.get()->*waiter)([weak_self = weak_from_this(), id = m_completion_request_counter](Status status) {
         auto self = weak_self.lock();
         if (!self)
             return;
@@ -1247,7 +1262,7 @@ void SyncSession::add_completion_callback(util::UniqueFunction<void(Status)> cal
         auto callback_node = self->m_completion_callbacks.extract(id);
         lock.unlock();
         if (callback_node) {
-            callback_node.mapped().second(Status(ec, ""));
+            callback_node.mapped().second(std::move(status));
         }
     });
 }
