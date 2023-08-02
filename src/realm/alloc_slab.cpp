@@ -804,6 +804,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
     File::CreateMode create = cfg.read_only || cfg.no_create ? File::create_Never : File::create_Auto;
     set_read_only(cfg.read_only);
     try {
+        rand_pause();
         m_file.open(path.c_str(), access, create, 0); // Throws
     }
     catch (const FileAccessError& ex) {

@@ -859,8 +859,9 @@ inline void rand_pause()
     auto ctrl = std::rand();
     if (ctrl & 1) {
         // short pause, stay on CPU
+        ctrl = (ctrl >> 1) & 0xFFF;
         while (ctrl--) {
-            prevent_optimizations++;
+            prevent_optimizations = (1 + prevent_optimizations) & 0xF;
         }
     }
     else {

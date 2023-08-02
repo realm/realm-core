@@ -977,7 +977,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
             // This will in particular set m_init_complete to 0.
             m_file.resize(0);
             m_file.prealloc(sizeof(SharedInfo));
-
+            rand_pause();
             // We can crash anytime during this process. A crash prior to
             // the first resize could allow another thread which could not
             // get the exclusive lock because we hold it, and hence were
@@ -993,7 +993,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
             // as being 1 before the entire SharedInfo header has been written.
             info->init_complete = 1;
         }
-
+        rand_pause();
 // We hold the shared lock from here until we close the file!
 #if REALM_PLATFORM_APPLE
         // macOS has a bug which can cause a hang waiting to obtain a lock, even
@@ -1109,8 +1109,11 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                 path, format("Architecture mismatch: Condition variable size is %1 but should be %2.",
                              info->size_of_condvar, sizeof(info->room_to_write)));
         }
+        rand_pause();
         m_writemutex.set_shared_part(info->shared_writemutex, lockfile_prefix, "write");
+        rand_pause();
         m_controlmutex.set_shared_part(info->shared_controlmutex, lockfile_prefix, "control");
+        rand_pause();
         m_versionlist_mutex.set_shared_part(info->shared_versionlist_mutex, lockfile_prefix, "versions");
 
         // even though fields match wrt alignment and size, there may still be incompatibilities
@@ -1131,6 +1134,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
         // - Waiting for and signalling database changes
         {
             std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
+            rand_pause();
             auto version_manager = std::make_unique<FileVersionManager>(m_file, m_versionlist_mutex);
 
             // proceed to initialize versioning and other metadata information related to
@@ -1156,6 +1160,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
             ref_type top_ref;
             m_marker_observer = std::make_unique<EncryptionMarkerObserver>(*version_manager);
             try {
+                rand_pause();
                 top_ref = alloc.attach_file(path, cfg, m_marker_observer.get()); // Throws
             }
             catch (const SlabAlloc::Retry&) {
@@ -1231,6 +1236,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                 throw UnsupportedFileFormatVersion(current_file_format_version);
             }
 
+            rand_pause();
             if (begin_new_session) {
                 // Determine version (snapshot number) and check history
                 // compatibility
@@ -1305,8 +1311,10 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                     throw FileFormatUpgradeRequired(m_db_path);
                 }
 
+                rand_pause();
                 alloc.convert_from_streaming_form(top_ref);
                 try {
+                    rand_pause();
                     bool file_changed_size = alloc.align_filesize_for_mmap(top_ref, cfg);
                     if (file_changed_size) {
                         // we need to re-establish proper mappings after file size change.
@@ -1342,6 +1350,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                     top.init_from_ref(top_ref);
                     file_size = Group::get_logical_file_size(top);
                 }
+                rand_pause();
                 version_manager->init_versioning(top_ref, file_size, version);
             }
             else { // Not the session initiator
@@ -1394,11 +1403,14 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                 // We need to setup the allocators version information, as it is needed
                 // to correctly age and later reclaim memory mappings.
                 version_type version = info->latest_version_number;
+                rand_pause();
                 alloc.init_mapping_management(version);
             }
 
+            rand_pause();
             m_new_commit_available.set_shared_part(info->new_commit_available, lockfile_prefix, "new_commit",
                                                    options.temp_dir);
+            rand_pause();
             m_pick_next_writer.set_shared_part(info->pick_next_writer, lockfile_prefix, "pick_writer",
                                                options.temp_dir);
 
