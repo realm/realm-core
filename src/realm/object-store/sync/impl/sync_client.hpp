@@ -132,16 +132,20 @@ struct SyncClient {
         m_client.wait_for_session_terminations_or_client_stopped();
     }
 
-    void notify_session_terminated(util::UniqueFunction<void()> callback)
+    util::Future<void> notify_session_terminated()
     {
-        m_client.post([callback = std::move(callback)](Status status) {
-            if (status == ErrorCodes::OperationAborted)
+        auto pf = util::make_promise_future<void>();
+        m_client.post([promise = std::move(pf.promise)](Status status) mutable {
+            // Includes operation_aborted
+            if (!status.is_ok()) {
+                promise.set_error(status);
                 return;
-            else if (!status.is_ok())
-                throw Exception(status);
+            }
 
-            callback();
+            promise.emplace_value();
         });
+
+        return std::move(pf.future);
     }
 
     ~SyncClient() {}

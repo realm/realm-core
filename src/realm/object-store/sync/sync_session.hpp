@@ -26,6 +26,7 @@
 #include <realm/sync/subscriptions.hpp>
 
 #include <realm/util/checked_mutex.hpp>
+#include <realm/util/future.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/version_id.hpp>
 
@@ -122,7 +123,6 @@ public:
     using TransactionCallback = void(VersionID old_version, VersionID new_version);
     using ProgressNotifierCallback = _impl::SyncProgressNotifier::ProgressNotifierCallback;
     using ProgressDirection = _impl::SyncProgressNotifier::NotifierType;
-    using CloseCallback = util::UniqueFunction<void()>;
 
     ~SyncSession();
     State state() const REQUIRES(!m_state_mutex);
@@ -218,7 +218,7 @@ public:
 
     // Get notified asynchronously when the synchronization session (sync::Session) is shut down and
     // the Realm file is no longer open on behalf of it.
-    void shutdown(CloseCallback&&) REQUIRES(!m_state_mutex, !m_connection_state_mutex);
+    util::Future<void> shutdown() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
 
     // DO NOT CALL OUTSIDE OF TESTING CODE.
     void detach_from_sync_manager() REQUIRES(!m_state_mutex, !m_connection_state_mutex);

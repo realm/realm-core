@@ -1217,7 +1217,7 @@ void SyncSession::shutdown_and_wait()
     m_client.wait_for_session_terminations();
 }
 
-void SyncSession::shutdown(CloseCallback&& callback)
+util::Future<void> SyncSession::shutdown()
 {
     {
         util::CheckedUniqueLock lock(m_state_mutex);
@@ -1225,7 +1225,7 @@ void SyncSession::shutdown(CloseCallback&& callback)
             become_inactive(std::move(lock));
         }
     }
-    m_client.notify_session_terminated(std::move(callback));
+    return m_client.notify_session_terminated();
 }
 
 void SyncSession::update_access_token(const std::string& signed_token)
