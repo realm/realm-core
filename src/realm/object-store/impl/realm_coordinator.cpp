@@ -183,7 +183,7 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         if (config.sync_config) {
             auto old_user = m_config.sync_config->user;
             auto new_user = config.sync_config->user;
-            if (old_user && new_user && *old_user != *new_user) {
+            if (old_user != new_user) {
                 throw LogicError(
                     ErrorCodes::MismatchedConfig,
                     util::format("Realm at path '%1' already opened with different sync user.", config.path));

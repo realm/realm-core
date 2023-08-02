@@ -17,6 +17,7 @@
 ### Breaking changes
 * SyncUser::provider_type() and realm_user_get_auth_provider() have been removed. Users don't have provider types; identities do.
 * SyncUser no longer has a `local_identity()`. `identity()` has been guaranteed to be unique per App ever since v10.
+* SyncUser no longer overrides operator==. Pointer equality should be used to compare sync users.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.

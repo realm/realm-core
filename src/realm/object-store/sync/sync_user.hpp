@@ -284,17 +284,6 @@ public:
         m_seconds_to_adjust_time_for_testing.store(seconds);
     }
 
-    /// Check the SyncUsers passed as argument have the same remote identity id.
-    friend bool operator==(const SyncUser& lhs, const SyncUser& rhs)
-    {
-        return lhs.identity() == rhs.identity();
-    }
-
-    friend bool operator!=(const SyncUser& lhs, const SyncUser& rhs)
-    {
-        return !(lhs == rhs);
-    }
-
 protected:
     friend class SyncManager;
     void detach_from_sync_manager() REQUIRES(!m_mutex);
