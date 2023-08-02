@@ -133,7 +133,9 @@ SlabAlloc::Slab::~Slab()
 void SlabAlloc::detach(bool keep_file_open) noexcept
 {
     delete[] m_ref_translation_ptr;
+    rand_pause();
     m_ref_translation_ptr.store(nullptr);
+    rand_pause();
     m_translation_table_size = 0;
     set_read_only(true);
     purge_old_mappings(static_cast<uint64_t>(-1), 0);
@@ -148,7 +150,9 @@ void SlabAlloc::detach(bool keep_file_open) noexcept
         case attach_SharedFile:
         case attach_UnsharedFile:
             m_data = 0;
+            rand_pause();
             m_mappings.clear();
+            rand_pause();
             m_youngest_live_version = 0;
             if (!keep_file_open)
                 m_file.close();
@@ -163,7 +167,9 @@ void SlabAlloc::detach(bool keep_file_open) noexcept
     // Release all allocated memory - this forces us to create new
     // slabs after re-attaching thereby ensuring that the slabs are
     // placed correctly (logically) after the end of the file.
+    rand_pause();
     m_slabs.clear();
+    rand_pause();
     clear_freelists();
 #if REALM_ENABLE_ENCRYPTION
     m_realm_file_info = nullptr;

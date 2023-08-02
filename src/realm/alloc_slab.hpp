@@ -853,6 +853,24 @@ void SlabAlloc::for_all_free_entries(Func f) const
     }
 }
 
+volatile static int prevent_optimizations;
+inline void rand_pause()
+{
+    auto ctrl = std::rand();
+    if (ctrl & 1) {
+        // short pause, stay on CPU
+        while (ctrl--) {
+            prevent_optimizations++;
+        }
+    }
+    else {
+        // longer pause and (possibly) relinguish CPU
+        ctrl = (ctrl >> 1) & 0x3;
+        millisleep(ctrl);
+    }
+}
+
+
 } // namespace realm
 
 #endif // REALM_ALLOC_SLAB_HPP
