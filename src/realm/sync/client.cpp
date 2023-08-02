@@ -1191,8 +1191,10 @@ util::Future<std::string> SessionImpl::send_test_command(std::string body)
 
     get_client().post([this, promise = std::move(pf.promise), body = std::move(body)](Status status) mutable {
         // Includes operation_aborted
-        if (!status.is_ok())
+        if (!status.is_ok()) {
             promise.set_error(status);
+            return;
+        }
 
         auto id = ++m_last_pending_test_command_ident;
         m_pending_test_commands.push_back(PendingTestCommand{id, std::move(body), std::move(promise)});
