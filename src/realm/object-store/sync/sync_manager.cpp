@@ -355,7 +355,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, cons
     else { // LoggedOut => LoggedIn
         auto user = *it;
         REALM_ASSERT(user->state() != SyncUser::State::Removed);
-        user->update_state_and_tokens(SyncUser::State::LoggedIn, std::move(access_token), std::move(refresh_token));
+        user->log_in(access_token, refresh_token);
         return user;
     }
 }
@@ -443,10 +443,8 @@ void SyncManager::set_current_user(const std::string& user_id)
 void SyncManager::remove_user(const std::string& user_id)
 {
     util::CheckedLockGuard lock(m_user_mutex);
-    auto user = get_user_for_identity(user_id);
-    if (!user)
-        return;
-    user->set_state(SyncUser::State::Removed);
+    if (auto user = get_user_for_identity(user_id))
+        user->invalidate();
 }
 
 void SyncManager::delete_user(const std::string& user_id)

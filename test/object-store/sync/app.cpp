@@ -2868,8 +2868,8 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         std::shared_ptr<SyncUser> user = app->current_user();
         REQUIRE(user);
         REQUIRE(!user->access_token_refresh_required());
-        // Make the SyncUser behave as if the client clock is 31 minutes fast, so the token looks expired locallaly
-        // (access tokens have an lifetime of 30 mintutes today).
+        // Make the SyncUser behave as if the client clock is 31 minutes fast, so the token looks expired locally
+        // (access tokens have an lifetime of 30 minutes today).
         user->set_seconds_to_adjust_time_for_testing(31 * 60);
         REQUIRE(user->access_token_refresh_required());
 
@@ -2980,6 +2980,17 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             });
             // the failed refresh logs out the user
             REQUIRE(!user->is_logged_in());
+        }
+
+        SECTION("User is left logged out if logged out while the refresh is in progress") {
+            REQUIRE(user->is_logged_in());
+            transport->request_hook = [&](const Request&) {
+                user->log_out();
+            };
+            SyncTestFile config(app, partition, schema);
+            auto r = Realm::get_shared_realm(config);
+            REQUIRE_FALSE(user->is_logged_in());
+            REQUIRE(user->state() == SyncUser::State::LoggedOut);
         }
 
         SECTION("Requests that receive an error are retried on a backoff") {
@@ -3193,11 +3204,10 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                                      anon_user->identity()));
             });
 
-            REQUIRE_THROWS_MATCHES(
-                Realm::get_shared_realm(config), std::logic_error,
-                Catch::Matchers::Message(
-                    util::format("Cannot start a sync session for user '%1' because this user has been removed.",
-                                 anon_user->identity())));
+            REQUIRE_EXCEPTION(
+                Realm::get_shared_realm(config), ClientUserNotFound,
+                util::format("Cannot start a sync session for user '%1' because this user has been removed.",
+                             anon_user->identity()));
         }
 
         SECTION("Opening a Realm with a removed email user results produces an exception") {
@@ -3216,11 +3226,11 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             REQUIRE_FALSE(email_user->is_logged_in());
             REQUIRE(email_user->state() == SyncUser::State::Removed);
 
-            // should not be able to open a sync'd Realm with an invalid user
-            REQUIRE_THROWS_MATCHES(
-                Realm::get_shared_realm(config), std::logic_error,
-                Catch::Matchers::Message(util::format(
-                    "Cannot start a sync session for user '%1' because this user has been removed.", user_ident)));
+            // should not be able to open a synced Realm with an invalid user
+            REQUIRE_EXCEPTION(
+                Realm::get_shared_realm(config), ClientUserNotFound,
+                util::format("Cannot start a sync session for user '%1' because this user has been removed.",
+                             user_ident));
 
             std::shared_ptr<SyncUser> new_user_instance = log_in(app, creds);
             // the previous instance is still invalid
@@ -4891,7 +4901,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]")
             // Ignore these errors, since there's not really an app out there...
             // Primarily make sure we don't crash unexpectedly
             std::vector<const char*> expected_errors = {"Bad WebSocket", "Connection Failed", "user has been removed",
-                                                        "Connection refused"};
+                                                        "Connection refused", "The user is not logged in"};
             auto expected =
                 std::find_if(expected_errors.begin(), expected_errors.end(), [error](const char* err_msg) {
                     return error.status.reason().find(err_msg) != std::string::npos;

@@ -93,6 +93,7 @@ SyncUser::SyncUser(const std::string& refresh_token, const std::string& id, cons
     , m_device_id(device_id)
     , m_sync_manager(sync_manager)
 {
+    REALM_ASSERT(!access_token.empty() && !refresh_token.empty());
     {
         std::lock_guard lock(s_binding_context_factory_mutex);
         if (s_binding_context_factory) {
@@ -120,6 +121,15 @@ SyncUser::SyncUser(const SyncUserMetadata& data, SyncManager* sync_manager)
     , m_device_id(data.device_id())
     , m_sync_manager(sync_manager)
 {
+    // Check for inconsistent state in the metadata Realm. This shouldn't happen,
+    // but previous versions could sometimes mark a user as logged in with an
+    // empty refresh token.
+    if (m_state == State::LoggedIn && (m_refresh_token.token.empty() || m_access_token.token.empty())) {
+        m_state = State::LoggedOut;
+        m_refresh_token = {};
+        m_access_token = {};
+    }
+
     {
         std::lock_guard lock(s_binding_context_factory_mutex);
         if (s_binding_context_factory) {
@@ -132,8 +142,10 @@ std::shared_ptr<SyncManager> SyncUser::sync_manager() const
 {
     util::CheckedLockGuard lk(m_mutex);
     if (m_state == State::Removed) {
-        throw std::logic_error(util::format(
-            "Cannot start a sync session for user '%1' because this user has been removed.", identity()));
+        throw app::AppError(
+            ErrorCodes::ClientUserNotFound,
+            util::format("Cannot start a sync session for user '%1' because this user has been removed.",
+                         m_identity));
     }
     REALM_ASSERT(m_sync_manager);
     return m_sync_manager->shared_from_this();
@@ -184,33 +196,22 @@ std::shared_ptr<SyncSession> SyncUser::session_for_on_disk_path(const std::strin
     return locked;
 }
 
-void SyncUser::update_state_and_tokens(SyncUser::State state, const std::string& access_token,
-                                       const std::string& refresh_token)
+void SyncUser::log_in(const std::string& access_token, const std::string& refresh_token)
 {
+    REALM_ASSERT(!access_token.empty());
+    REALM_ASSERT(!refresh_token.empty());
     std::vector<std::shared_ptr<SyncSession>> sessions_to_revive;
     {
         util::CheckedLockGuard lock1(m_mutex);
         util::CheckedLockGuard lock2(m_tokens_mutex);
-        m_state = state;
-        m_access_token = access_token.empty() ? RealmJWT{} : RealmJWT(access_token);
-        m_refresh_token = refresh_token.empty() ? RealmJWT{} : RealmJWT(refresh_token);
-        switch (m_state) {
-            case State::Removed:
-                // Call set_state() rather than update_state_and_tokens to remove a user.
-                REALM_UNREACHABLE();
-            case State::LoggedIn:
-                sessions_to_revive = revive_sessions();
-                break;
-            case State::LoggedOut: {
-                REALM_ASSERT(m_access_token == RealmJWT{});
-                REALM_ASSERT(m_refresh_token == RealmJWT{});
-                break;
-            }
-        }
+        m_state = State::LoggedIn;
+        m_access_token = RealmJWT(access_token);
+        m_refresh_token = RealmJWT(refresh_token);
+        sessions_to_revive = revive_sessions();
 
         m_sync_manager->perform_metadata_update([&](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity);
-            metadata->set_state_and_tokens(state, access_token, refresh_token);
+            metadata->set_state_and_tokens(State::LoggedIn, access_token, refresh_token);
         });
     }
     // (Re)activate all pending sessions.
@@ -220,6 +221,23 @@ void SyncUser::update_state_and_tokens(SyncUser::State state, const std::string&
         session->revive_if_needed();
     }
 
+    emit_change_to_subscribers(*this);
+}
+
+void SyncUser::invalidate()
+{
+    {
+        util::CheckedLockGuard lock1(m_mutex);
+        util::CheckedLockGuard lock2(m_tokens_mutex);
+        m_state = State::Removed;
+        m_access_token = {};
+        m_refresh_token = {};
+
+        m_sync_manager->perform_metadata_update([&](const auto& manager) {
+            auto metadata = manager.get_or_make_user_metadata(m_identity);
+            metadata->set_state_and_tokens(State::Removed, "", "");
+        });
+    }
     emit_change_to_subscribers(*this);
 }
 
@@ -239,35 +257,17 @@ std::vector<std::shared_ptr<SyncSession>> SyncUser::revive_sessions()
 
 void SyncUser::update_access_token(std::string&& token)
 {
-    std::vector<std::shared_ptr<SyncSession>> sessions_to_revive;
     {
         util::CheckedLockGuard lock(m_mutex);
-        util::CheckedLockGuard lock2(m_tokens_mutex);
-        switch (m_state) {
-            case State::Removed:
-                return;
-            case State::LoggedIn:
-                m_access_token = RealmJWT(std::move(token));
-                break;
-            case State::LoggedOut: {
-                m_access_token = RealmJWT(std::move(token));
-                m_state = State::LoggedIn;
-                sessions_to_revive = revive_sessions();
-                break;
-            }
-        }
+        if (m_state != State::LoggedIn)
+            return;
 
+        util::CheckedLockGuard lock2(m_tokens_mutex);
+        m_access_token = RealmJWT(std::move(token));
         m_sync_manager->perform_metadata_update([&, raw_access_token = m_access_token.token](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity);
             metadata->set_access_token(raw_access_token);
         });
-    }
-
-    // (Re)activate all pending sessions.
-    // Note that we do this after releasing the lock, since the session may
-    // need to access protected User state in the process of binding itself.
-    for (auto& session : sessions_to_revive) {
-        session->revive_if_needed();
     }
 
     emit_change_to_subscribers(*this);
@@ -333,13 +333,7 @@ void SyncUser::log_out()
 bool SyncUser::is_logged_in() const
 {
     util::CheckedLockGuard lock(m_mutex);
-    util::CheckedLockGuard lock2(m_tokens_mutex);
-    return do_is_logged_in();
-}
-
-bool SyncUser::do_is_logged_in() const
-{
-    return !m_access_token.token.empty() && !m_refresh_token.token.empty() && m_state == State::LoggedIn;
+    return m_state == State::LoggedIn;
 }
 
 bool SyncUser::is_anonymous() const
@@ -351,13 +345,8 @@ bool SyncUser::is_anonymous() const
 
 bool SyncUser::do_is_anonymous() const
 {
-    return do_is_logged_in() && m_user_identities.size() == 1 &&
+    return m_state == State::LoggedIn && m_user_identities.size() == 1 &&
            m_user_identities[0].provider_type == app::IdentityProviderAnonymous;
-}
-
-void SyncUser::invalidate()
-{
-    set_state(SyncUser::State::Removed);
 }
 
 std::string SyncUser::refresh_token() const
@@ -388,18 +377,6 @@ SyncUser::State SyncUser::state() const
 {
     util::CheckedLockGuard lock(m_mutex);
     return m_state;
-}
-
-void SyncUser::set_state(SyncUser::State state)
-{
-    util::CheckedLockGuard lock(m_mutex);
-    m_state = state;
-
-    REALM_ASSERT(m_sync_manager);
-    m_sync_manager->perform_metadata_update([&](const auto& manager) {
-        auto metadata = manager.get_or_make_user_metadata(m_identity);
-        metadata->set_state(state);
-    });
 }
 
 SyncUserProfile SyncUser::user_profile() const
@@ -506,12 +483,11 @@ bool SyncUser::access_token_refresh_required() const
 {
     using namespace std::chrono;
     constexpr size_t buffer_seconds = 5; // arbitrary
-    util::CheckedLockGuard lock(m_mutex);
-    util::CheckedLockGuard lock2(m_tokens_mutex);
+    util::CheckedLockGuard lock(m_tokens_mutex);
     const auto now = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() +
                      m_seconds_to_adjust_time_for_testing.load(std::memory_order_relaxed);
     const auto threshold = now - buffer_seconds;
-    return do_is_logged_in() && m_access_token.expires_at < static_cast<int64_t>(threshold);
+    return !m_access_token.token.empty() && m_access_token.expires_at < static_cast<int64_t>(threshold);
 }
 
 } // namespace realm

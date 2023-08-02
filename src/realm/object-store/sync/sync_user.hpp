@@ -243,15 +243,12 @@ public:
              const std::string& device_id, SyncManager* sync_manager);
     SyncUser(const SyncUserMetadata& data, SyncManager* sync_manager);
 
-    void set_state(SyncUser::State state) REQUIRES(!m_mutex);
+    // Atomically set the user to be logged in and update both tokens.
+    void log_in(const std::string& access_token, const std::string& refresh_token)
+        REQUIRES(!m_mutex, !m_tokens_mutex);
 
-    // Update the user's state and refresh/access tokens atomically in a Realm transaction.
-    // If the user is transitioning between LoggedIn and LoggedOut, then the access_token and
-    // refresh token must be empty, and likewise must not be empty if transitioning between
-    // logged out and logged in.
-    // Note that this is called by the SyncManager, and should not be directly called.
-    void update_state_and_tokens(SyncUser::State state, const std::string& access_token,
-                                 const std::string& refresh_token) REQUIRES(!m_mutex, !m_tokens_mutex);
+    // Atomically set the user to be removed and remove tokens.
+    void invalidate() REQUIRES(!m_mutex, !m_tokens_mutex);
 
     // Update the user's access token. If the user is logged out, it will log itself back in.
     // Note that this is called by the SyncManager, and should not be directly called.
@@ -276,7 +273,7 @@ public:
 
     /// Checks the expiry on the access token against the local time and if it is invalid or expires soon, returns
     /// true.
-    bool access_token_refresh_required() const REQUIRES(!m_mutex, !m_tokens_mutex);
+    bool access_token_refresh_required() const REQUIRES(!m_tokens_mutex);
 
     // Hook for testing access token timeouts
     void set_seconds_to_adjust_time_for_testing(int seconds)
@@ -292,8 +289,7 @@ private:
     static SyncUserContextFactory s_binding_context_factory;
     static std::mutex s_binding_context_factory_mutex;
 
-    bool do_is_logged_in() const REQUIRES(m_tokens_mutex, m_mutex);
-    bool do_is_anonymous() const REQUIRES(m_tokens_mutex, m_mutex);
+    bool do_is_anonymous() const REQUIRES(m_mutex);
 
     std::vector<std::shared_ptr<SyncSession>> revive_sessions() REQUIRES(m_mutex);
 
@@ -304,9 +300,6 @@ private:
     // UUIDs which used to be used to generate local Realm file paths. Now only
     // used to locate existing files.
     std::vector<std::string> m_legacy_identities;
-
-    // Mark the user as invalid, since a fatal user-related error was encountered.
-    void invalidate() REQUIRES(!m_mutex);
 
     mutable util::CheckedMutex m_mutex;
 

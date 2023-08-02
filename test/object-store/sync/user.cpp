@@ -97,19 +97,19 @@ TEST_CASE("sync_user: update state and tokens", "[sync][user]") {
     REQUIRE(user->is_logged_in());
     REQUIRE(user->refresh_token() == refresh_token);
 
-    user->update_state_and_tokens(SyncUser::State::LoggedIn, second_access_token, second_refresh_token);
+    user->log_in(second_access_token, second_refresh_token);
     REQUIRE(user->is_logged_in());
     REQUIRE(user->refresh_token() == second_refresh_token);
 
-    user->update_state_and_tokens(SyncUser::State::LoggedOut, "", "");
+    user->log_out();
     REQUIRE(!user->is_logged_in());
     REQUIRE(user->refresh_token().empty());
 
-    user->update_state_and_tokens(SyncUser::State::LoggedIn, access_token, refresh_token);
+    user->log_in(access_token, refresh_token);
     REQUIRE(user->is_logged_in());
     REQUIRE(user->refresh_token() == refresh_token);
 
-    sync_manager->remove_user(identity);
+    user->invalidate();
 }
 
 TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync][user]") {
