@@ -64,7 +64,7 @@ std::string LinkMap::description(util::serializer::SerialisationState& state) co
     std::string s;
     for (size_t i = 0; i < m_link_column_keys.size(); ++i) {
         if (i < m_tables.size() && m_tables[i]) {
-            s += state.get_column_name(m_tables[i], m_link_column_keys[i]);
+            s += m_link_column_keys[i].get_description(m_tables[i], state);
             if (i != m_link_column_keys.size() - 1) {
                 s += util::serializer::value_separator;
             }
@@ -85,11 +85,36 @@ bool LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction lm) const
     ColKey column_key = m_link_column_keys[column];
     const Obj obj = m_tables[column]->get_object(key);
     if (column_key.is_collection()) {
-        auto coll = obj.get_linkcollection_ptr(column_key);
-        size_t sz = coll->size();
-        for (size_t t = 0; t < sz; t++) {
-            if (!map_links(column + 1, coll->get_key(t), lm))
-                return false;
+        auto& pe = m_link_column_keys[column].get_index();
+        if (pe.is_all()) {
+            auto coll = obj.get_linkcollection_ptr(column_key);
+            size_t sz = coll->size();
+            for (size_t t = 0; t < sz; t++) {
+                if (!map_links(column + 1, coll->get_key(t), lm))
+                    return false;
+            }
+        }
+        else if (pe.is_key()) {
+            REALM_ASSERT(column_key.is_dictionary());
+            auto dict = obj.get_dictionary(column_key);
+            if (auto x = dict.try_get(pe.get_key())) {
+                if (!map_links(column + 1, x->get<ObjKey>(), lm))
+                    return false;
+            }
+        }
+        else if (pe.is_ndx()) {
+            REALM_ASSERT(column_key.is_list());
+            auto list = obj.get_linklist(column_key);
+            if (auto sz = list.size()) {
+                auto ndx = pe.get_ndx();
+                if (ndx == realm::npos) {
+                    ndx = sz - 1;
+                }
+                if (ndx < sz) {
+                    if (!map_links(column + 1, list.get(ndx), lm))
+                        return false;
+                }
+            }
         }
     }
     else if (type == col_type_Link) {
@@ -112,10 +137,11 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction lm) const
 {
     ColumnType type = m_link_types[column];
     ColKey column_key = m_link_column_keys[column];
-    if (type == col_type_Link && !column_key.is_set()) {
+    if (column_key.is_collection()) {
         if (column_key.is_dictionary()) {
             auto& leaf = mpark::get<ArrayInteger>(m_leaf);
             if (leaf.get(row)) {
+                auto& pe = m_link_column_keys[column].get_index();
                 Allocator& alloc = get_base_table()->get_alloc();
                 Array top(alloc);
                 top.set_parent(const_cast<ArrayInteger*>(&leaf), row);
@@ -123,42 +149,64 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction lm) const
                 BPlusTree<Mixed> values(alloc);
                 values.set_parent(&top, 1);
                 values.init_from_parent();
-
+                size_t start = 0;
+                size_t end = values.size();
+                if (pe.is_key()) {
+                    BPlusTree<StringData> keys(alloc);
+                    keys.set_parent(&top, 0);
+                    keys.init_from_parent();
+                    start = keys.find_first(StringData(pe.get_key()));
+                    if (start == realm::not_found) {
+                        return;
+                    }
+                    end = start + 1;
+                }
                 // Iterate through values and insert all link values
-                values.for_all([&](Mixed m) {
+                for (; start < end; start++) {
+                    Mixed m = values.get(start);
                     if (m.is_type(type_TypedLink)) {
                         auto link = m.get_link();
                         REALM_ASSERT(link.get_table_key() == this->m_tables[column + 1]->get_key());
                         if (!map_links(column + 1, link.get_obj_key(), lm))
-                            return false;
+                            break;
                     }
-                    return true;
-                });
+                }
             }
         }
         else {
-            REALM_ASSERT(!column_key.is_collection());
-            map_links(column + 1, mpark::get<ArrayKey>(m_leaf).get(row), lm);
+            ref_type ref;
+            if (auto list = mpark::get_if<ArrayList>(&m_leaf)) {
+                ref = list->get(row);
+            }
+            else {
+                ref = mpark::get<ArrayKey>(m_leaf).get_as_ref(row);
+            }
+
+            if (ref) {
+                BPlusTree<ObjKey> links(get_base_table()->get_alloc());
+                links.init_from_ref(ref);
+                size_t sz = links.size();
+                size_t start = 0;
+                size_t end = sz;
+                auto& pe = m_link_column_keys[column].get_index();
+                if (pe.is_ndx()) {
+                    start = pe.get_ndx();
+                    if (start == realm::npos) {
+                        start = sz - 1;
+                    }
+                    else if (start < sz) {
+                        end = start + 1;
+                    }
+                }
+                for (size_t t = start; t < end; t++) {
+                    if (!map_links(column + 1, links.get(t), lm))
+                        break;
+                }
+            }
         }
     }
-    else if (type == col_type_LinkList || (type == col_type_Link && column_key.is_set())) {
-        ref_type ref;
-        if (auto list = mpark::get_if<ArrayList>(&m_leaf)) {
-            ref = list->get(row);
-        }
-        else {
-            ref = mpark::get<ArrayKey>(m_leaf).get_as_ref(row);
-        }
-
-        if (ref) {
-            BPlusTree<ObjKey> links(get_base_table()->get_alloc());
-            links.init_from_ref(ref);
-            size_t sz = links.size();
-            for (size_t t = 0; t < sz; t++) {
-                if (!map_links(column + 1, links.get(t), lm))
-                    break;
-            }
-        }
+    else if (type == col_type_Link) {
+        map_links(column + 1, mpark::get<ArrayKey>(m_leaf).get(row), lm);
     }
     else if (type == col_type_BackLink) {
         auto& back_links = mpark::get<ArrayBacklink>(m_leaf);
@@ -170,7 +218,7 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction lm) const
         }
     }
     else {
-        REALM_ASSERT(false);
+        REALM_TERMINATE("Invalid column type in LinkMap::map_links()");
     }
 }
 

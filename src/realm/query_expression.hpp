@@ -718,6 +718,11 @@ public:
         return false;
     }
 
+    virtual bool has_indexes_in_link_map() const
+    {
+        return false;
+    }
+
     virtual std::vector<ObjKey> find_all(Mixed) const
     {
         return {};
@@ -1521,6 +1526,14 @@ public:
     {
         return m_link_column_keys.size() > 0;
     }
+    bool has_indexes() const
+    {
+        for (auto& k : m_link_column_keys) {
+            if (k.has_index())
+                return true;
+        }
+        return false;
+    }
 
     ColKey get_first_column_key() const
     {
@@ -1752,6 +1765,11 @@ public:
     {
         auto target_table = m_link_map.get_target_table();
         return target_table->search_index_type(m_column_key) == IndexType::General;
+    }
+
+    bool has_indexes_in_link_map() const final
+    {
+        return m_link_map.has_indexes();
     }
 
     std::vector<ObjKey> find_all(Mixed value) const final
@@ -4391,7 +4409,7 @@ public:
                     column = m_left.get();
                 }
 
-                if (column->has_search_index() &&
+                if (column->has_search_index() && !column->has_indexes_in_link_map() &&
                     column->get_comparison_type().value_or(ExpressionComparisonType::Any) ==
                         ExpressionComparisonType::Any) {
                     if (const_value.is_null()) {

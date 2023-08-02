@@ -39,6 +39,16 @@ std::string ExtendedColumnKey::get_description(const Table* table) const
     return description;
 }
 
+std::string ExtendedColumnKey::get_description(ConstTableRef table, util::serializer::SerialisationState& state) const
+{
+    std::string description = state.get_column_name(table, m_colkey);
+    // m_index has the type col_key if it is not set
+    if (has_index()) {
+        description += util::format("[%1]", util::serializer::print_value(m_index));
+    }
+    return description;
+}
+
 bool ExtendedColumnKey::is_collection() const
 {
     return m_colkey.is_collection() && !has_index();
@@ -222,7 +232,7 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ExtendedColumnKey>> const
         std::vector<const Table*> tables = {&root_table};
         tables.resize(sz);
         for (size_t j = 0; j + 1 < sz; ++j) {
-            ColKey col = columns[j].get_col_key();
+            ColKey col = columns[j];
             if (!tables[j]->valid_column(col)) {
                 throw InvalidArgument(ErrorCodes::InvalidSortDescriptor, "Invalid property");
             }

@@ -1032,6 +1032,24 @@ public:
         return false;
     }
 
+    bool index(PathElement index)
+    {
+        if (!m_link_cols.empty() && !m_link_cols.back().has_index()) {
+            if (index.is_all())
+                return true;
+            ColKey last_col = m_link_cols.back();
+            if (index.is_ndx() && last_col.is_list()) {
+                m_link_cols.back().set_index(index);
+                return true;
+            }
+            if (index.is_key() && last_col.is_dictionary()) {
+                m_link_cols.back().set_index(index);
+                return true;
+            }
+        }
+        return false;
+    }
+
     LinkChain& backlink(const Table& origin, ColKey origin_col_key)
     {
         auto backlink_col_key = origin.get_opposite_column(origin_col_key);
