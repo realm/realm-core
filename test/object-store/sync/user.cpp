@@ -174,7 +174,7 @@ TEST_CASE("sync_user: user persistence", "[sync][user]") {
         const std::string access_token = ENCODE_FAKE_JWT("a-token-1");
         const std::vector<SyncUserIdentity> identities{{"12345", "test_case_provider"}};
         auto user = sync_manager->get_user(identity, refresh_token, access_token, dummy_device_id);
-        user->update_identities(identities);
+        user->update_user_profile(identities, {});
         // Now try to pull the user out of the shadow manager directly.
         auto metadata = manager.get_or_make_user_metadata(identity, false);
         REQUIRE((bool)metadata);
@@ -191,7 +191,7 @@ TEST_CASE("sync_user: user persistence", "[sync][user]") {
         const std::string access_token = ENCODE_FAKE_JWT("a-token-1");
         const std::vector<SyncUserIdentity> identities{{"12345", "test_case_provider"}};
         auto user = sync_manager->get_user(identity, refresh_token, access_token, dummy_device_id);
-        user->update_identities(identities);
+        user->update_user_profile(identities, {});
         user->log_out();
         // Now try to pull the user out of the shadow manager directly.
         auto metadata = manager.get_or_make_user_metadata(identity, false);
@@ -242,7 +242,7 @@ TEST_CASE("sync_user: user persistence", "[sync][user]") {
         const std::string access_token = ENCODE_FAKE_JWT("a-token-3");
         // Create the user and validate it.
         auto user = sync_manager->get_user(identity, refresh_token, access_token, dummy_device_id);
-        user->update_identities({{"id", app::IdentityProviderAnonymous}});
+        user->update_user_profile({{"id", app::IdentityProviderAnonymous}}, {});
         auto marked_users = manager.all_users_marked_for_removal();
         REQUIRE(marked_users.size() == 0);
         // Log out the user.

@@ -595,9 +595,8 @@ void App::get_profile(const std::shared_ptr<SyncUser>& sync_user,
                         SyncUserIdentity(get<std::string>(doc, "id"), get<std::string>(doc, "provider_type")));
                 }
 
-                sync_user->update_identities(identities);
-                sync_user->update_user_profile(SyncUserProfile(get<BsonDocument>(profile_json, "data")));
-                sync_user->set_state(SyncUser::State::LoggedIn);
+                sync_user->update_user_profile(std::move(identities),
+                                               SyncUserProfile(get<BsonDocument>(profile_json, "data")));
                 self->m_sync_manager->set_current_user(sync_user->identity());
                 self->emit_change_to_subscribers(*self);
             }

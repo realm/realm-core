@@ -12,6 +12,7 @@
   - Deleting the server-side user via one of the SyncUsers left the other SyncUsers in an invalid state.
   - A SyncUser which was originally created via anonymous login and then linked to an identity would still be treated as an anonymous users and removed entirely on logout.
   (since v10.0.0)
+* Reading existing logged-in users on app startup from the sync metadata Realm performed three no-op writes per user on the metadata Realm.
 
 ### Breaking changes
 * SyncUser::provider_type() and realm_user_get_auth_provider() have been removed. Users don't have provider types; identities do.

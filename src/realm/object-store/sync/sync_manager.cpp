@@ -46,16 +46,7 @@ SyncManager::SyncManager() = default;
 void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sync_route,
                             const SyncClientConfig& config)
 {
-    struct UserCreationData {
-        std::string identity;
-        std::string refresh_token;
-        std::string access_token;
-        std::vector<SyncUserIdentity> identities;
-        SyncUser::State state;
-        std::string device_id;
-    };
-
-    std::vector<UserCreationData> users_to_add;
+    std::vector<std::shared_ptr<SyncUser>> users_to_add;
     {
         // Locking the mutex here ensures that it is released before locking m_user_mutex
         util::CheckedLockGuard lock(m_mutex);
@@ -113,11 +104,8 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
                 auto user_data = users.get(i);
                 auto refresh_token = user_data.refresh_token();
                 auto access_token = user_data.access_token();
-                auto device_id = user_data.device_id();
                 if (!refresh_token.empty() && !access_token.empty()) {
-                    users_to_add.push_back(UserCreationData{user_data.identity(), std::move(refresh_token),
-                                                            std::move(access_token), user_data.identities(),
-                                                            user_data.state(), device_id});
+                    users_to_add.push_back(std::make_shared<SyncUser>(user_data, this));
                 }
             }
 
@@ -144,13 +132,7 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
     }
     {
         util::CheckedLockGuard lock(m_user_mutex);
-        for (auto& user_data : users_to_add) {
-            auto& identity = user_data.identity;
-            auto user = std::make_shared<SyncUser>(user_data.refresh_token, identity, user_data.access_token,
-                                                   user_data.state, user_data.device_id, this);
-            user->update_identities(user_data.identities);
-            m_users.emplace_back(std::move(user));
-        }
+        m_users.insert(m_users.end(), users_to_add.begin(), users_to_add.end());
     }
 }
 
@@ -351,8 +333,8 @@ bool SyncManager::perform_metadata_update(util::FunctionRef<void(SyncMetadataMan
     return true;
 }
 
-std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, std::string refresh_token,
-                                                std::string access_token, std::string device_id)
+std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, const std::string& refresh_token,
+                                                const std::string& access_token, const std::string& device_id)
 {
     util::CheckedLockGuard lock(m_user_mutex);
     auto it = std::find_if(m_users.begin(), m_users.end(), [&](const auto& user) {
@@ -360,8 +342,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, std:
     });
     if (it == m_users.end()) {
         // No existing user.
-        auto new_user = std::make_shared<SyncUser>(std::move(refresh_token), user_id, std::move(access_token),
-                                                   SyncUser::State::LoggedIn, device_id, this);
+        auto new_user = std::make_shared<SyncUser>(refresh_token, user_id, access_token, device_id, this);
         m_users.emplace(m_users.begin(), new_user);
         {
             util::CheckedLockGuard lock(m_file_system_mutex);

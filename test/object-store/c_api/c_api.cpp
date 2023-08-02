@@ -5006,8 +5006,7 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
         realm_sync_config_t* sync_config = realm_sync_config_new(&user, "realm");
         realm_sync_config_set_initial_subscription_handler(sync_config, task_init_subscription, false, nullptr,
                                                            nullptr);
-        sync_config->user->update_refresh_token(std::string(invalid_token));
-        sync_config->user->update_access_token(std::move(invalid_token));
+        sync_config->user->update_state_and_tokens(SyncUser::State::LoggedIn, invalid_token, invalid_token);
 
         realm_config_set_path(config, test_config.path.c_str());
         realm_config_set_schema_version(config, 1);
