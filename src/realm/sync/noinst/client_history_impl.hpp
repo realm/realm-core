@@ -76,7 +76,7 @@ public:
     {
     }
 
-    ProtocolError error_for_server = ProtocolError::other_session_error;
+    ProtocolError error_for_server;
 };
 
 class ClientHistory final : public _impl::History, public TransformHistory {

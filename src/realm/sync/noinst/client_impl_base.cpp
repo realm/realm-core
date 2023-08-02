@@ -1116,7 +1116,7 @@ void Connection::close_due_to_client_side_error(std::error_code ec, std::optiona
 
 void Connection::close_due_to_client_side_error(Status status, IsFatal is_fatal, ConnectionTerminationReason reason)
 {
-    logger.info("Connection closed due to error"); // Throws
+    logger.info("Connection closed due to error: %1", status); // Throws
     const bool try_again = !is_fatal;
 
     involuntary_disconnect(SessionErrorInfo{std::move(status), try_again}, reason); // Throw
@@ -1124,7 +1124,7 @@ void Connection::close_due_to_client_side_error(Status status, IsFatal is_fatal,
 
 void Connection::close_due_to_transient_error(Status status, ConnectionTerminationReason reason)
 {
-    logger.info("Connection closed due to error"); // Throws
+    logger.info("Connection closed due to transient error: %1", status); // Throws
     SessionErrorInfo error_info{std::move(status), true};
     error_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
 
@@ -2434,10 +2434,11 @@ Status Session::receive_mark_message(request_ident_type request_ident)
     bool good_request_ident =
         (request_ident <= m_last_download_mark_sent && request_ident > m_last_download_mark_received);
     if (REALM_UNLIKELY(!good_request_ident)) {
-        return {ErrorCodes::SyncProtocolInvariantFailed,
-                util::format(
-                    "Received MARK message with invalid request identifer (last mark sent: %1 last mark received: %2",
-                    m_last_download_mark_sent, m_last_download_mark_received)};
+        return {
+            ErrorCodes::SyncProtocolInvariantFailed,
+            util::format(
+                "Received MARK message with invalid request identifer (last mark sent: %1 last mark received: %2)",
+                m_last_download_mark_sent, m_last_download_mark_received)};
     }
 
     m_server_version_at_last_download_mark = m_progress.download.server_version;
