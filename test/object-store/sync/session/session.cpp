@@ -351,12 +351,8 @@ TEST_CASE("SyncSession: shutdown() API", "[sync][session]") {
         return sessions_are_active(*session);
     });
     REQUIRE(sessions_are_active(*session));
-    auto done_pf = util::make_promise_future<void>();
-    SyncSession::CloseCallback cb = [promise = std::move(done_pf.promise)]() mutable {
-        promise.emplace_value();
-    };
-    session->shutdown(std::move(cb));
-    done_pf.future.get();
+    auto future = session->shutdown();
+    future.get();
 }
 
 TEST_CASE("SyncSession: update_configuration()", "[sync][session]") {
