@@ -593,7 +593,7 @@ public:
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
-            handler(error_info->status, error_info->is_fatal(), error_info->message);
+            handler(error_info->status, error_info->is_fatal, error_info->message);
         };
         m_connection_state_change_listeners[client_index] = std::move(handler_wrapped);
     }
@@ -713,7 +713,7 @@ public:
                 REALM_ASSERT(error);
                 unit_test::TestContext& test_context = m_test_context;
                 test_context.logger->error("Client disconnect: %1: %2 (is_fatal=%3)",
-                                           error->status.get_std_error_code(), error->message, error->is_fatal());
+                                           error->status.get_std_error_code(), error->message, error->is_fatal);
                 bool client_error_occurred = true;
                 CHECK_NOT(client_error_occurred);
                 stop();
@@ -1078,7 +1078,7 @@ inline void RealmFixture::setup_error_handler(util::UniqueFunction<ErrorHandler>
         if (state != ConnectionState::disconnected)
             return;
         REALM_ASSERT(error_info);
-        handler(error_info->status, error_info->is_fatal(), error_info->message);
+        handler(error_info->status, error_info->is_fatal, error_info->message);
     };
     m_session.set_connection_state_change_listener(std::move(listener));
 }

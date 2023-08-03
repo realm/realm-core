@@ -483,7 +483,7 @@ public:
     void websocket_connected_handler(const std::string& protocol);
     bool websocket_binary_message_received(util::Span<const char> data);
     void websocket_error_handler();
-    bool websocket_closed_handler(bool, Status);
+    bool websocket_closed_handler(bool, websocket::WebSocketError, std::string_view msg);
 
     connection_ident_type get_ident() const noexcept;
     const ServerEndpoint& get_server_endpoint() const noexcept;
@@ -511,9 +511,6 @@ private:
         bool destroyed = false;
     };
     struct WebSocketObserverShim;
-
-    class IsFatalTag {};
-    using IsFatal = util::TaggedBool<class IsFatalTag>;
 
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
 

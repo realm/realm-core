@@ -7,6 +7,7 @@
 #include <realm/error_codes.h>
 #include <realm/mixed.hpp>
 #include <realm/replication.hpp>
+#include <realm/util/tagged_bool.hpp>
 
 
 // NOTE: The protocol specification is in `/doc/protocol.md`
@@ -247,6 +248,9 @@ struct ResumptionDelayInfo {
     int delay_jitter_divisor = 4;
 };
 
+class IsFatalTag {};
+using IsFatal = util::TaggedBool<class IsFatalTag>;
+
 struct ProtocolErrorInfo {
     enum class Action {
         NoAction,
@@ -258,14 +262,16 @@ struct ProtocolErrorInfo {
         ClientReset,
         ClientResetNoRecovery,
         MigrateToFLX,
-        RevertToPBS
+        RevertToPBS,
+        RefreshUser,
+        RefreshLocation,
     };
 
     ProtocolErrorInfo() = default;
-    ProtocolErrorInfo(int error_code, const std::string& msg, bool do_try_again)
+    ProtocolErrorInfo(int error_code, const std::string& msg, IsFatal is_fatal)
         : raw_error_code(error_code)
         , message(msg)
-        , try_again(do_try_again)
+        , is_fatal(is_fatal)
         , client_reset_recovery_is_disabled(false)
         , should_client_reset(util::none)
         , server_requests_action(Action::NoAction)
@@ -273,7 +279,7 @@ struct ProtocolErrorInfo {
     }
     int raw_error_code = 0;
     std::string message;
-    bool try_again = false;
+    IsFatal is_fatal = true;
     bool client_reset_recovery_is_disabled = false;
     std::optional<bool> should_client_reset;
     std::optional<std::string> log_url;
@@ -283,11 +289,6 @@ struct ProtocolErrorInfo {
     std::optional<ResumptionDelayInfo> resumption_delay_interval;
     Action server_requests_action;
     std::optional<std::string> migration_query_string;
-
-    bool is_fatal() const
-    {
-        return !try_again;
-    }
 };
 
 
@@ -447,6 +448,10 @@ inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action actio
             return o << "MigrateToFLX";
         case ProtocolErrorInfo::Action::RevertToPBS:
             return o << "RevertToPBS";
+        case ProtocolErrorInfo::Action::RefreshUser:
+            return o << "RefreshUser";
+        case ProtocolErrorInfo::Action::RefreshLocation:
+            return o << "RefreshLocation";
     }
     return o << "Invalid error action: " << int64_t(action);
 }

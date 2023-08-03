@@ -4106,8 +4106,8 @@ RLM_API realm_sync_socket_t* realm_sync_socket_new(
     realm_sync_socket_websocket_async_write_func_t websocket_write_func,
     realm_sync_socket_websocket_free_func_t websocket_free_func);
 
-RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback_t* realm_callback,
-                                                 realm_web_socket_errno_e status, const char* reason);
+RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback_t* realm_callback, realm_errno_e status,
+                                                 const char* reason);
 
 RLM_API void realm_sync_socket_websocket_connected(realm_websocket_observer_t* realm_websocket_observer,
                                                    const char* protocol);

@@ -715,16 +715,6 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(ec_check.category() == std::system_category());
         CHECK(ec_check.value() == int(error_code.value()));
 
-        error_code.assign(ErrorCodes::WebSocketResolveFailedError,
-                          realm::sync::websocket::websocket_error_category());
-        error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
-        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_WEBSOCKET);
-        CHECK(error.value == realm_errno::RLM_ERR_WEBSOCKET_RESOLVE_FAILED_ERROR);
-
-        c_api::sync_error_to_error_code(error, &ec_check);
-        CHECK(ec_check.category() == realm::sync::websocket::websocket_error_category());
-        CHECK(ec_check.value() == int(error_code.value()));
-
         error_code = make_error_code(util::error::misc_errors::unknown);
         error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
         CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_UNKNOWN);
@@ -6183,9 +6173,9 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
             return m_observer->websocket_binary_message_received(data);
         }
 
-        bool websocket_closed_handler(bool was_clean, Status status) override
+        bool websocket_closed_handler(bool was_clean, WebSocketError error, std::string_view msg) override
         {
-            return m_observer->websocket_closed_handler(was_clean, std::move(status));
+            return m_observer->websocket_closed_handler(was_clean, error, msg);
         }
 
     private:
@@ -6253,7 +6243,7 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
         auto test_data = static_cast<TestData*>(userdata);
         REQUIRE(test_data);
         auto cb = [callback_copy = callback](Status s) {
-            realm_sync_socket_callback_complete(callback_copy, static_cast<realm_web_socket_errno_e>(s.code()),
+            realm_sync_socket_callback_complete(callback_copy, static_cast<realm_errno_e>(s.code()),
                                                 s.reason().c_str());
         };
         test_data->socket_provider->post(std::move(cb));
