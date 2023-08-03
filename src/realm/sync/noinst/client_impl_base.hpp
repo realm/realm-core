@@ -951,7 +951,7 @@ private:
     ///
     /// The synchronization progress passed to
     /// ClientReplication::integrate_server_changesets() must be obtained
-    /// by calling get_sync_progress(), and that call must occur after the last
+    /// by calling get_status(), and that call must occur after the last
     /// invocation of initiate_integrate_changesets() whose changesets are
     /// included in what is passed to
     /// ClientReplication::integrate_server_changesets().

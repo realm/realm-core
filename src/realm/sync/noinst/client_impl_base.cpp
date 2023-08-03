@@ -2360,6 +2360,8 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
         // version must be increasing, but can stay the same during bootstraps.
         bool good_server_version = m_is_flx_sync_session ? (changeset.remote_version >= server_version)
                                                          : (changeset.remote_version > server_version);
+        // Each server version cannot be greater than the one in the header of the download message.
+        good_server_version = good_server_version && (changeset.remote_version <= progress.download.server_version);
         if (!good_server_version) {
             return {ErrorCodes::SyncProtocolInvariantFailed,
                     util::format("Bad server version in changeset header (DOWNLOAD) (%1, %2, %3)",
