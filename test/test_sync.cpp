@@ -603,7 +603,7 @@ TEST(Sync_TokenWithNullExpirationAllowed)
         TEST_DIR(dir);
         TEST_CLIENT_DB(db);
         ClientServerFixture fixture(dir, test_context);
-        auto error_handler = [&](std::error_code, bool, const std::string&) {
+        auto error_handler = [&](Status, bool, const std::string&) {
             did_fail = true;
             fixture.stop();
         };
@@ -785,13 +785,10 @@ struct ExpectChangesetError {
         if (!error_info)
             return;
         REALM_ASSERT(error_info);
-        std::error_code ec = error_info->status.get_std_error_code();
-        CHECK_EQUAL(ec, sync::Client::Error::bad_changeset);
-        CHECK(ec.category() == client_error_category());
+        CHECK_EQUAL(error_info->status, ErrorCodes::BadChangeset);
         CHECK(!error_info->is_fatal());
         CHECK_EQUAL(error_info->message,
-                    "Bad changeset (DOWNLOAD): Failed to transform received changeset: Schema mismatch: " +
-                        expected_error);
+                    "Failed to transform received changeset: Schema mismatch: " + expected_error);
         fixture.stop();
     }
 };
@@ -1479,7 +1476,8 @@ TEST(Sync_ReadFailureSimulation)
         {
             ClientServerFixture fixture(server_dir, test_context);
             fixture.set_client_side_error_rate(1, 1); // 100% chance of failure
-            auto error_handler = [&](std::error_code ec, bool is_fatal, const std::string&) {
+            auto error_handler = [&](Status status, bool is_fatal, const std::string&) {
+                auto ec = status.get_std_error_code();
                 CHECK_EQUAL(_impl::SimulatedFailure::sync_client__read_head, ec);
                 CHECK_NOT(is_fatal);
                 client_side_read_did_fail = true;
@@ -1509,7 +1507,8 @@ TEST(Sync_FailingReadsOnClientSide)
         TEST_DIR(dir);
         ClientServerFixture fixture{dir, test_context};
         fixture.set_client_side_error_rate(5, 100); // 5% chance of failure
-        auto error_handler = [&](std::error_code ec, bool, const std::string&) {
+        auto error_handler = [&](Status status, bool, const std::string&) {
+            auto ec = status.get_std_error_code();
             if (CHECK_EQUAL(_impl::SimulatedFailure::sync_client__read_head, ec))
                 fixture.cancel_reconnect_delay();
         };
@@ -1569,7 +1568,7 @@ TEST(Sync_FailingReadsOnServerSide)
         TEST_DIR(dir);
         ClientServerFixture fixture{dir, test_context};
         fixture.set_server_side_error_rate(5, 100); // 5% chance of failure
-        auto error_handler = [&](std::error_code, bool is_fatal, const std::string&) {
+        auto error_handler = [&](Status, bool is_fatal, const std::string&) {
             CHECK_NOT(is_fatal);
             fixture.cancel_reconnect_delay();
         };
@@ -1648,8 +1647,8 @@ TEST(Sync_ErrorAfterServerRestore_BadClientFileIdent)
     bool did_fail = false;
     {
         ClientServerFixture fixture(server_dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool is_fatal, const std::string&) {
-            CHECK_EQUAL(ProtocolError::bad_server_version, ec);
+        auto error_handler = [&](Status status, bool is_fatal, const std::string&) {
+            CHECK_EQUAL(ProtocolError::bad_server_version, status.get_std_error_code());
             CHECK(is_fatal);
             did_fail = true;
             fixture.stop();
@@ -1858,8 +1857,8 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersion)
     bool did_fail = false;
     {
         ClientServerFixture fixture(server_dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool is_fatal, const std::string&) {
-            CHECK_EQUAL(ProtocolError::bad_server_version, ec);
+        auto error_handler = [&](Status status, bool is_fatal, const std::string&) {
+            CHECK_EQUAL(ProtocolError::bad_server_version, status.get_std_error_code());
             CHECK(is_fatal);
             did_fail = true;
             fixture.stop();
@@ -1936,8 +1935,8 @@ TEST(Sync_ErrorAfterServerRestore_BadClientVersion)
     bool did_fail = false;
     {
         ClientServerFixture fixture(server_dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool is_fatal, const std::string&) {
-            CHECK_EQUAL(ProtocolError::bad_client_version, ec);
+        auto error_handler = [&](Status status, bool is_fatal, const std::string&) {
+            CHECK_EQUAL(ProtocolError::bad_client_version, status.get_std_error_code());
             CHECK(is_fatal);
             did_fail = true;
             fixture.stop();
@@ -2003,8 +2002,8 @@ TEST(Sync_ErrorAfterServerRestore_BadClientFileIdentSalt)
     bool did_fail = false;
     {
         ClientServerFixture fixture(server_dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool is_fatal, const std::string&) {
-            CHECK_EQUAL(ProtocolError::diverging_histories, ec);
+        auto error_handler = [&](Status status, bool is_fatal, const std::string&) {
+            CHECK_EQUAL(ProtocolError::diverging_histories, status.get_std_error_code());
             CHECK(is_fatal);
             did_fail = true;
             fixture.stop();
@@ -2087,8 +2086,8 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersionSalt)
     bool did_fail = false;
     {
         ClientServerFixture fixture(server_dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool is_fatal, const std::string&) {
-            CHECK_EQUAL(ProtocolError::diverging_histories, ec);
+        auto error_handler = [&](Status status, bool is_fatal, const std::string&) {
+            CHECK_EQUAL(ProtocolError::diverging_histories, status.get_std_error_code());
             CHECK(is_fatal);
             did_fail = true;
             fixture.stop();
@@ -2272,8 +2271,8 @@ TEST_IF(Sync_ReadOnlyClient, false)
     TEST_DIR(server_dir);
     MultiClientServerFixture fixture(2, 1, server_dir, test_context);
     bool did_get_permission_denied = false;
-    fixture.set_client_side_error_handler(1, [&](std::error_code ec, bool, const std::string&) {
-        CHECK_EQUAL(ProtocolError::permission_denied, ec);
+    fixture.set_client_side_error_handler(1, [&](Status status, bool, const std::string&) {
+        CHECK_EQUAL(ProtocolError::permission_denied, status.get_std_error_code());
         did_get_permission_denied = true;
         fixture.get_client(1).shutdown();
     });
@@ -2666,7 +2665,7 @@ TEST(Sync_Permissions)
     TEST_DIR(server_dir);
 
     ClientServerFixture fixture{server_dir, test_context};
-    fixture.set_client_side_error_handler([&](std::error_code, bool, const std::string& message) {
+    fixture.set_client_side_error_handler([&](Status, bool, const std::string& message) {
         CHECK_EQUAL("", message);
         did_see_error_for_valid = true;
     });
@@ -2736,8 +2735,8 @@ TEST(Sync_SSL_Certificate_2)
     session_config.verify_servers_ssl_certificate = true;
     session_config.ssl_trust_certificate_path = ca_dir + "dns-chain.crt.pem";
 
-    auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        CHECK_EQUAL(ec, Client::Error::ssl_server_cert_rejected);
+    auto error_handler = [&](Status status, bool, const std::string&) {
+        CHECK_EQUAL(status, ErrorCodes::TlsHandshakeFailed);
         did_fail = true;
         fixture.stop();
     };
@@ -2887,8 +2886,8 @@ TEST(Sync_SSL_Certificate_Verify_Callback_2)
 
     ClientServerFixture fixture{server_dir, test_context, config};
 
-    auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        CHECK_EQUAL(ec, Client::Error::ssl_server_cert_rejected);
+    auto error_handler = [&](Status status, bool, const std::string&) {
+        CHECK_EQUAL(status, ErrorCodes::TlsHandshakeFailed);
         did_fail = true;
         fixture.stop();
     };
@@ -4493,8 +4492,8 @@ TEST(Sync_PingTimesOut)
         config.client_pong_timeout = 0; // time out immediately
         ClientServerFixture fixture(dir, test_context, std::move(config));
 
-        auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-            CHECK_EQUAL(Client::Error::pong_timeout, ec);
+        auto error_handler = [&](Status status, bool, const std::string&) {
+            CHECK_EQUAL(status, ErrorCodes::ConnectionClosed);
             did_fail = true;
             fixture.stop();
         };
@@ -4521,8 +4520,8 @@ TEST(Sync_ReconnectAfterPingTimeout)
     ClientServerFixture fixture(dir, test_context, std::move(config));
 
     BowlOfStonesSemaphore bowl;
-    auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        if (CHECK_EQUAL(Client::Error::pong_timeout, ec))
+    auto error_handler = [&](Status status, bool, const std::string&) {
+        if (CHECK_EQUAL(status, ErrorCodes::ConnectionClosed))
             bowl.add_stone();
     };
     fixture.set_client_side_error_handler(std::move(error_handler));
@@ -4545,8 +4544,8 @@ TEST(Sync_UrgentPingIsSent)
 
         ClientServerFixture fixture(dir, test_context, std::move(config));
 
-        auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-            CHECK_EQUAL(Client::Error::pong_timeout, ec);
+        auto error_handler = [&](Status status, bool, const std::string&) {
+            CHECK_EQUAL(status, ErrorCodes::ConnectionClosed);
             did_fail = true;
             fixture.stop();
         };
@@ -4574,7 +4573,8 @@ TEST(Sync_ServerDiscardDeadConnections)
     ClientServerFixture fixture(dir, test_context, std::move(config));
 
     BowlOfStonesSemaphore bowl;
-    auto error_handler = [&](std::error_code ec, bool, const std::string&) {
+    auto error_handler = [&](Status status, bool, const std::string&) {
+        auto ec = status.get_std_error_code();
         bool valid_error = (ec == sync::websocket::WebSocketError::websocket_read_error);
         CHECK(valid_error);
         bowl.add_stone();
@@ -5174,7 +5174,7 @@ TEST_IF(Sync_SSL_Certificates, false)
                     "State change: disconnected, error_code = %1, is_fatal = %2, detailed_message = %3",
                     error_info->status.get_std_error_code(), error_info->is_fatal(), error_info->message);
                 // We expect to get through the SSL handshake but will hit an error due to the wrong token.
-                CHECK_NOT_EQUAL(error_info->status.get_std_error_code(), Client::Error::ssl_server_cert_rejected);
+                CHECK_NOT_EQUAL(error_info->status, ErrorCodes::TlsHandshakeFailed);
                 client.shutdown();
             }
         };

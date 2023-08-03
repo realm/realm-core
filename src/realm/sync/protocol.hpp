@@ -367,6 +367,8 @@ constexpr bool is_session_level_error(ProtocolError);
 /// ProtocolError.
 const char* get_protocol_error_message(int error_code) noexcept;
 
+Status protocol_error_to_status(ProtocolError error_code, std::string_view msg);
+
 const std::error_category& protocol_error_category() noexcept;
 
 std::error_code make_error_code(ProtocolError) noexcept;

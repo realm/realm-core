@@ -634,8 +634,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
                 auto sync_error = wait_for_future(std::move(err_future)).get();
                 REQUIRE(before_reset_count == 1);
                 REQUIRE(after_reset_count == 0);
-                REQUIRE(sync_error.get_system_error() ==
-                        sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+                REQUIRE(sync_error.status == ErrorCodes::AutoClientResetFailed);
                 REQUIRE(sync_error.is_client_reset_requested());
                 local_realm->refresh();
                 auto table = local_realm->read_group().get_table("class_TopLevel");
@@ -681,8 +680,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
             auto sync_error = wait_for_future(std::move(err_future)).get();
             REQUIRE(before_reset_count == 1);
             REQUIRE(after_reset_count == 0);
-            REQUIRE(sync_error.get_system_error() ==
-                    sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+            REQUIRE(sync_error.status == ErrorCodes::AutoClientResetFailed);
             REQUIRE(sync_error.is_client_reset_requested());
             local_realm->refresh();
             auto table = local_realm->read_group().get_table("class_TopLevel");
@@ -709,8 +707,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
             auto sync_error = wait_for_future(std::move(error_future2)).get();
             REQUIRE(before_reset_count == 2);
             REQUIRE(after_reset_count == 0);
-            REQUIRE(sync_error.get_system_error() ==
-                    sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+            REQUIRE(sync_error.status == ErrorCodes::AutoClientResetFailed);
             REQUIRE(sync_error.is_client_reset_requested());
         }
 
@@ -850,8 +847,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
             ->on_post_reset([&, err_future = std::move(error_future)](SharedRealm) mutable {
                 auto sync_error = wait_for_future(std::move(err_future)).get();
                 INFO(sync_error.status);
-                CHECK(sync_error.get_system_error() ==
-                      sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+                CHECK(sync_error.status == ErrorCodes::AutoClientResetFailed);
             })
             ->run();
     }
@@ -884,7 +880,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
 
         // Client reset fails due to sync client not being able to create the fresh realm.
         auto sync_error = wait_for_future(std::move(error_future)).get();
-        CHECK(sync_error.get_system_error() == sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+        CHECK(sync_error.status == ErrorCodes::AutoClientResetFailed);
 
         // Open the realm again. This should not crash.
         {
@@ -894,8 +890,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
 
             auto realm_post_reset = Realm::get_shared_realm(config_copy);
             auto sync_error = wait_for_future(std::move(err_future)).get();
-            CHECK(sync_error.get_system_error() ==
-                  sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+            CHECK(sync_error.status == ErrorCodes::AutoClientResetFailed);
         }
     }
 
@@ -2340,6 +2335,7 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][protocol][
         return static_cast<bool>(sync_error);
     });
 
+
     CHECK(sync_error->get_system_error() == make_error_code(sync::ProtocolError::switch_to_pbs));
     CHECK(sync_error->server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
 }
@@ -2494,7 +2490,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
         auto realm = Realm::get_shared_realm(interrupted_realm_config);
         const auto& error = error_pf.future.get();
         REQUIRE(error.is_fatal);
-        REQUIRE(error.get_system_error() == make_error_code(sync::ClientError::bad_changeset));
+        REQUIRE(error.status == ErrorCodes::BadChangeset);
     }
 
     SECTION("interrupted before final bootstrap message") {
@@ -2819,7 +2815,7 @@ TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
                 ++error_count;
                 if (error_count == 1) {
                     // Bad changeset detected by the client.
-                    CHECK(err.get_system_error() == sync::make_error_code(sync::ClientError::bad_changeset));
+                    CHECK(err.status == ErrorCodes::BadChangeset);
                 }
                 else if (error_count == 2) {
                     // Server asking for a client reset.
@@ -2961,7 +2957,7 @@ TEST_CASE("flx: send client error", "[sync][flx][baas]") {
         ++error_count;
         if (error_count == 1) {
             // Bad changeset detected by the client.
-            CHECK(err.get_system_error() == sync::make_error_code(sync::ClientError::bad_changeset));
+            CHECK(err.status == ErrorCodes::BadChangeset);
         }
         else if (error_count == 2) {
             // Server asking for a client reset.

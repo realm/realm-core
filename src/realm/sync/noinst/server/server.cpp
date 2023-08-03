@@ -1275,7 +1275,7 @@ public:
 
     void initiate_pong_output_buffer();
 
-    void handle_protocol_error(ServerProtocol::Error error);
+    void handle_protocol_error(ServerProtocol::Error error, std::string msg);
 
     void receive_bind_message(session_ident_type, std::string path, std::string signed_user_token,
                               bool need_client_file_ident, bool is_subserver);
@@ -4247,8 +4247,9 @@ void SyncConnection::enlist_to_send(Session* sess) noexcept
 }
 
 
-void SyncConnection::handle_protocol_error(ServerProtocol::Error error)
+void SyncConnection::handle_protocol_error(ServerProtocol::Error error, std::string msg)
 {
+    logger.error("%1", msg);
     switch (error) {
         case ServerProtocol::Error::unknown_message:
             protocol_error(ProtocolError::unknown_message); // Throws
