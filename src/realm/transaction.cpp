@@ -249,6 +249,7 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
             db->release_read_lock(*m_oldest_version_not_persisted);
             m_oldest_version_not_persisted.reset();
         }
+        rand_pause();
         m_read_lock = new_read_lock;
         // We can be sure that m_read_lock != m_oldest_version_not_persisted
         // because m_oldest_version_not_persisted is either equal to former m_read_lock
@@ -272,7 +273,7 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
                 m_async_stage = AsyncState::HasCommits;
             }
         }
-
+        rand_pause();
         // Remap file if it has grown, and update refs in underlying node structure.
         remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false); // Throws
         return VersionID{version, new_read_lock.m_reader_idx};

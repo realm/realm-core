@@ -2498,7 +2498,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
 #if REALM_METRICS
     transaction.update_num_objects();
 #endif                                                                                   // REALM_METRICS
-
+    rand_pause();
     GroupWriter out(transaction, Durability(info->durability), m_marker_observer.get()); // Throws
     out.set_versions(new_version, top_refs, any_new_unreachables);
     auto t1 = std::chrono::steady_clock::now();
@@ -2513,6 +2513,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         transaction.cow_outliers(out.get_evacuation_progress(), limit, work_limit);
     }
 
+    rand_pause();
     ref_type new_top_ref;
     // Recursively write all changed arrays to end of file
     {
@@ -2520,6 +2521,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
         new_top_ref = out.write_group();                         // Throws
     }
+    rand_pause();
     {
         // protect access to shared variables and m_reader_mapping from here
         CheckedLockGuard lock_guard(m_mutex);

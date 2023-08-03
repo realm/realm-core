@@ -381,8 +381,8 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
         Replication* repl = db->get_replication();
         if (!repl)
             throw IllegalOperation("No transaction log when promoting to write");
-
-        VersionID version = VersionID(); // Latest
+        rand_pause();
+        VersionID version = VersionID();                                                   // Latest
         m_history = repl->_get_history_write();
         bool history_updated = internal_advance_read(observer, version, *m_history, true); // Throws
 
@@ -448,7 +448,7 @@ inline void Transaction::rollback_and_continue_as_read()
     size_t file_size = m_read_lock.m_file_size;
 
     // since we had the write lock, we already have the latest encrypted pages in memory
-    m_alloc.update_reader_view(file_size); // Throws
+    m_alloc.update_reader_view(file_size);     // Throws
     update_allocator_wrappers(false);
     advance_transact(top_ref, nullptr, false); // Throws
 
@@ -472,6 +472,7 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
         db->release_read_lock(new_read_lock);
         // _impl::History::update_early_from_top_ref() was not called
         // update allocator wrappers merely to update write protection
+        rand_pause();
         update_allocator_wrappers(writable);
         return false;
     }
@@ -485,11 +486,12 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
     // Synchronize readers view of the file
     SlabAlloc& alloc = m_alloc;
     alloc.update_reader_view(new_file_size);
+    rand_pause();
     update_allocator_wrappers(writable);
     using gf = _impl::GroupFriend;
     ref_type hist_ref = gf::get_history_ref(alloc, new_top_ref);
     hist.update_from_ref_and_version(hist_ref, new_version);
-
+    rand_pause();
     if (observer) {
         // This has to happen in the context of the originally bound snapshot
         // and while the read transaction is still in a fully functional state.

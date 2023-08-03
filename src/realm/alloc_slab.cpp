@@ -1148,6 +1148,7 @@ void SlabAlloc::reset_free_space_tracking()
         --m_translation_table_size;
         m_slabs.pop_back();
     }
+    rand_pause();
     rebuild_freelists_from_slab();
     m_free_space_state = free_space_Clean;
     m_commit_size = 0;
@@ -1255,7 +1256,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
                     --old_num_mappings;
                 }
             }
-
+            rand_pause();
             // Create new mappings covering from the end of the last complete
             // section to the end of the new file size.
             const auto new_slab_base = align_size_to_section_boundary(file_size);
@@ -1295,8 +1296,10 @@ void SlabAlloc::update_reader_view(size_t file_size)
             // that there was already something mapped after the last section
             REALM_ASSERT(!cur_entry.xover_mapping.is_attached());
             // save the old mapping/keep it open
+            rand_pause();
             m_old_mappings.push_back({m_youngest_live_version, std::move(cur_entry.primary_mapping)});
             m_mappings.pop_back();
+            rand_pause();
             m_mapping_version++;
         }
 
@@ -1389,6 +1392,7 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
     if (requires_new_translation) {
         // we need a new translation table, but must preserve old, as translations using it
         // may be in progress concurrently
+        rand_pause();
         if (m_translation_table_size)
             m_old_translations.emplace_back(m_youngest_live_version, m_translation_table_size - free_space_size,
                                             m_ref_translation_ptr.load());
@@ -1414,6 +1418,7 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
         // mapping is freed, any new array allocated at the same position will NOT need a cross
         // over mapping, but just use the primary mapping.
     }
+    rand_pause();
     for (size_t k = 0; k < free_space_size; ++k) {
         char* base = m_slabs[k].addr;
         REALM_ASSERT(base);
@@ -1423,6 +1428,7 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
     // This will either be null or the same as new_translation_table, which is about to become owned by
     // m_ref_translation_ptr.
     (void)new_translation_table_owner.release();
+    rand_pause();
 
     m_ref_translation_ptr = new_translation_table;
 }
