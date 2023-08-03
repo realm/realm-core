@@ -16,12 +16,20 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "util/test_file.hpp"
+#include <util/test_file.hpp>
 
-#include "baas_admin_api.hpp"
-#include "test_utils.hpp"
-#include "../util/crypt_key.hpp"
+#include <util/test_utils.hpp>
+#include <util/sync/baas_admin_api.hpp>
+
+#include <../util/crypt_key.hpp>
+
+#include <realm/db.hpp>
+#include <realm/disable_sync_to_disk.hpp>
+#include <realm/history.hpp>
+#include <realm/string_data.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/util/base64.hpp>
+#include <realm/util/file.hpp>
 
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/sync_manager.hpp>
@@ -29,13 +37,6 @@
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/schema.hpp>
 #endif
-
-#include <realm/db.hpp>
-#include <realm/disable_sync_to_disk.hpp>
-#include <realm/history.hpp>
-#include <realm/string_data.hpp>
-#include <realm/util/base64.hpp>
-#include <realm/util/file.hpp>
 
 #include <cstdlib>
 #include <iostream>

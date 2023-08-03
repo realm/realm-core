@@ -169,6 +169,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case APIKeyNotFound:
         case AWSError:
         case AccountNameInUse:
+        case AppServerError:
         case AppUnknownError:
         case ArgumentsNotAllowed:
         case AuthError:
@@ -248,6 +249,7 @@ static const MapElem string_to_error_code[] = {
     {"AWSError", ErrorCodes::AWSError},
     {"AccountNameInUse", ErrorCodes::AccountNameInUse},
     {"AddressSpaceExhausted", ErrorCodes::AddressSpaceExhausted},
+    {"AppServerError", ErrorCodes::AppServerError},
     {"AppUnknownError", ErrorCodes::AppUnknownError},
     {"ArgumentsNotAllowed", ErrorCodes::ArgumentsNotAllowed},
     {"AuthError", ErrorCodes::AuthError},
@@ -475,6 +477,15 @@ std::vector<std::string_view> ErrorCodes::get_all_names()
     std::vector<std::string_view> ret;
     for (auto it : string_to_error_code) {
         ret.emplace_back(it.name);
+    }
+    return ret;
+}
+
+std::vector<std::pair<std::string_view, ErrorCodes::Error>> ErrorCodes::get_error_list()
+{
+    std::vector<std::pair<std::string_view, ErrorCodes::Error>> ret;
+    for (auto it : string_to_error_code) {
+        ret.emplace_back(std::make_pair(it.name, it.code));
     }
     return ret;
 }

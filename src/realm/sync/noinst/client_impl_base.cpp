@@ -1127,6 +1127,7 @@ void Connection::close_due_to_client_side_error(Status status, IsFatal is_fatal,
     involuntary_disconnect(SessionErrorInfo{std::move(status), is_fatal}, reason); // Throw
 }
 
+
 void Connection::close_due_to_transient_error(Status status, ConnectionTerminationReason reason)
 {
     logger.info("Connection closed due to transient error: %1", status); // Throws
@@ -1135,6 +1136,7 @@ void Connection::close_due_to_transient_error(Status status, ConnectionTerminati
 
     involuntary_disconnect(std::move(error_info), reason); // Throw
 }
+
 
 // Close connection due to error discovered on the server-side, and then
 // reported to the client by way of a connection-level ERROR message.
@@ -1216,9 +1218,9 @@ void Connection::receive_pong(milliseconds_type timestamp)
 
     if (REALM_UNLIKELY(timestamp != m_last_ping_sent_at)) {
         close_due_to_protocol_error(
-            {ErrorCodes::SyncProtocolInvariantFailed, util::format("Received PONG message with an invalid timestamp "
-                                                                   "(expected %1, received %2",
-                                                                   m_last_ping_sent_at, timestamp)}); // Throws
+            {ErrorCodes::SyncProtocolInvariantFailed,
+             util::format("Received PONG message with an invalid timestamp (expected %1, received %2",
+                          m_last_ping_sent_at, timestamp)}); // Throws
         return;
     }
 
@@ -1258,10 +1260,10 @@ Session* Connection::find_and_validate_session(session_ident_type session_ident,
     // Check the history to see if the message received was for a previous session
     if (auto it = m_session_history.find(session_ident); it == m_session_history.end()) {
         logger.error("Bad session identifier in %1 message, session_ident = %2", message, session_ident);
-        close_due_to_protocol_error({ErrorCodes::SyncProtocolInvariantFailed,
-                                     util::format("Received message %1 for session iden %2 when that "
-                                                  "session never existed",
-                                                  message, session_ident)});
+        close_due_to_protocol_error(
+            {ErrorCodes::SyncProtocolInvariantFailed,
+             util::format("Received message %1 for session iden %2 when that session never existed", message,
+                          session_ident)});
     }
     else {
         logger.error("Received %1 message for closed session, session_ident = %2", message,
@@ -1301,10 +1303,10 @@ void Connection::receive_error_message(const ProtocolErrorInfo& info, session_id
             close_due_to_server_side_error(error_code, info); // Throws
             return;
         }
-        close_due_to_protocol_error({ErrorCodes::SyncProtocolInvariantFailed,
-                                     util::format("Received ERROR message with a non-connection-level "
-                                                  "error code %1 without a session ident",
-                                                  info.raw_error_code)});
+        close_due_to_protocol_error(
+            {ErrorCodes::SyncProtocolInvariantFailed,
+             util::format("Received ERROR message with a non-connection-level error code %1 without a session ident",
+                          info.raw_error_code)});
     }
     else {
         close_due_to_protocol_error(
@@ -2375,8 +2377,7 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
     // Ignore download messages when the client detects an error. This is to
     // prevent transforming the same bad changeset over and over again.
     if (m_client_error) {
-        logger.debug("Ignoring download message because the client detected an "
-                     "integration error");
+        logger.debug("Ignoring download message because the client detected an integration error");
         return Status::OK();
     }
 
@@ -2392,15 +2393,15 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
     version_type server_version = m_progress.download.server_version;
     version_type last_integrated_client_version = m_progress.download.last_integrated_client_version;
     for (const Transformer::RemoteChangeset& changeset : received_changesets) {
-        // Check that per-changeset server version is strictly increasing, except
-        // in FLX sync where the server version must be increasing, but can stay
-        // the same during bootstraps.
+        // Check that per-changeset server version is strictly increasing, except in FLX sync where the server
+        // version must be increasing, but can stay the same during bootstraps.
         bool good_server_version = m_is_flx_sync_session ? (changeset.remote_version >= server_version)
                                                          : (changeset.remote_version > server_version);
+        // Each server version cannot be greater than the one in the header of the download message.
+        good_server_version = good_server_version && (changeset.remote_version <= progress.download.server_version);
         if (!good_server_version) {
             return {ErrorCodes::SyncProtocolInvariantFailed,
-                    util::format("Bad server version in changeset header "
-                                 "(DOWNLOAD) (%1, %2, %3)",
+                    util::format("Bad server version in changeset header (DOWNLOAD) (%1, %2, %3)",
                                  changeset.remote_version, server_version, progress.download.server_version)};
         }
         server_version = changeset.remote_version;
@@ -2411,8 +2412,7 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
              changeset.last_integrated_local_version <= progress.download.last_integrated_client_version);
         if (!good_client_version) {
             return {ErrorCodes::SyncProtocolInvariantFailed,
-                    util::format("Bad last integrated client version in changeset "
-                                 "header (DOWNLOAD) "
+                    util::format("Bad last integrated client version in changeset header (DOWNLOAD) "
                                  "(%1, %2, %3)",
                                  changeset.last_integrated_local_version, last_integrated_client_version,
                                  progress.download.last_integrated_client_version)};
@@ -2474,11 +2474,11 @@ Status Session::receive_mark_message(request_ident_type request_ident)
     bool good_request_ident =
         (request_ident <= m_last_download_mark_sent && request_ident > m_last_download_mark_received);
     if (REALM_UNLIKELY(!good_request_ident)) {
-        return {ErrorCodes::SyncProtocolInvariantFailed,
-                util::format("Received MARK message with invalid request "
-                             "identifer (last mark sent: %1 last mark "
-                             "received: %2)",
-                             m_last_download_mark_sent, m_last_download_mark_received)};
+        return {
+            ErrorCodes::SyncProtocolInvariantFailed,
+            util::format(
+                "Received MARK message with invalid request identifer (last mark sent: %1 last mark received: %2)",
+                m_last_download_mark_sent, m_last_download_mark_received)};
     }
 
     m_server_version_at_last_download_mark = m_progress.download.server_version;
@@ -2552,9 +2552,9 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
     }
     ProtocolError error_code = ProtocolError(info.raw_error_code);
     if (REALM_UNLIKELY(!is_session_level_error(error_code))) {
-        return {ErrorCodes::SyncProtocolInvariantFailed, util::format("Received ERROR message for session with "
-                                                                      "non-session-level error code %1",
-                                                                      info.raw_error_code)};
+        return {ErrorCodes::SyncProtocolInvariantFailed,
+                util::format("Received ERROR message for session with non-session-level error code %1",
+                             info.raw_error_code)};
     }
 
     // Can't process debug hook actions once the Session is undergoing
@@ -2647,11 +2647,9 @@ void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)
                                   error_info.resumption_delay_interval);
     auto try_again_interval = m_try_again_delay_info.delay_interval();
     if (ProtocolError(error_info.raw_error_code) == ProtocolError::session_closed) {
-        // FIXME With compensating writes the server sends this error after
-        // completing a bootstrap. Doing the normal backoff behavior would result
-        // in waiting up to 5 minutes in between each query change which is not
-        // acceptable latency. So for this error code alone, we hard-code a 1
-        // second retry interval.
+        // FIXME With compensating writes the server sends this error after completing a bootstrap. Doing the
+        // normal backoff behavior would result in waiting up to 5 minutes in between each query change which is
+        // not acceptable latency. So for this error code alone, we hard-code a 1 second retry interval.
         try_again_interval = std::chrono::milliseconds{1000};
     }
     logger.debug("Will attempt to resume session after %1 milliseconds", try_again_interval.count());
@@ -2680,47 +2678,39 @@ Status ClientImpl::Session::check_received_sync_progress(const SyncProgress& pro
     const SyncProgress& b = progress;
     std::string message;
     if (b.latest_server_version.version < a.latest_server_version.version) {
-        message = util::format("Latest server version in download messages must "
-                               "be weakly increasing throughout a "
+        message = util::format("Latest server version in download messages must be weakly increasing throughout a "
                                "session (current: %1, received: %2)",
                                a.latest_server_version.version, b.latest_server_version.version);
     }
     if (b.upload.client_version < a.upload.client_version) {
-        message = util::format("Last integrated client version in download "
-                               "messages must be weakly increasing "
+        message = util::format("Last integrated client version in download messages must be weakly increasing "
                                "throughout a session (current: %1, received: %2)",
                                a.upload.client_version, b.upload.client_version);
     }
     if (b.upload.client_version > m_last_version_available) {
-        message = util::format("Last integrated client version on server cannot "
-                               "be greater than the latest client "
+        message = util::format("Last integrated client version on server cannot be greater than the latest client "
                                "version in existence (current: %1, received: %2)",
                                m_last_version_available, b.upload.client_version);
     }
     if (b.download.server_version < a.download.server_version) {
-        message = util::format("Download cursor must be weakly increasing throughout a "
-                               "session (current: %1, received: %2)",
-                               a.download.server_version, b.download.server_version);
+        message =
+            util::format("Download cursor must be weakly increasing throughout a session (current: %1, received: %2)",
+                         a.download.server_version, b.download.server_version);
     }
     if (b.download.server_version > b.latest_server_version.version) {
-        message = util::format("Download cursor cannot be greater than the latest "
-                               "server version in existence "
-                               "(cursor: %1, latest: %2)",
-                               b.download.server_version, b.latest_server_version.version);
+        message = util::format(
+            "Download cursor cannot be greater than the latest server version in existence (cursor: %1, latest: %2)",
+            b.download.server_version, b.latest_server_version.version);
     }
     if (b.download.last_integrated_client_version < a.download.last_integrated_client_version) {
-        message = util::format("Last integrated client version on the server at "
-                               "the position in the server's history "
-                               "of the download "
-                               "cursor must be weakly increasing throughout a "
-                               "session (current: %1, received: %2)",
-                               a.download.last_integrated_client_version, b.download.last_integrated_client_version);
+        message = util::format(
+            "Last integrated client version on the server at the position in the server's history of the download "
+            "cursor must be weakly increasing throughout a session (current: %1, received: %2)",
+            a.download.last_integrated_client_version, b.download.last_integrated_client_version);
     }
     if (b.download.last_integrated_client_version > b.upload.client_version) {
-        message = util::format("Last integrated client version on the server in "
-                               "the position at the server's history "
-                               "of the download cursor cannot be greater than the "
-                               "latest client version integrated "
+        message = util::format("Last integrated client version on the server in the position at the server's history "
+                               "of the download cursor cannot be greater than the latest client version integrated "
                                "on the server (download: %1, upload: %2)",
                                b.download.last_integrated_client_version, b.upload.client_version);
     }
