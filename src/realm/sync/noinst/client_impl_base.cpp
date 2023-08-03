@@ -1523,8 +1523,7 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
                                        "received empty download message that was not the last in batch",
                                        ProtocolError::bad_progress);
         }
-        history.set_sync_progress(progress, &downloadable_bytes,
-                                  version_info); // Throws
+        history.set_sync_progress(progress, &downloadable_bytes, version_info); // Throws
         return;
     }
 
@@ -1542,13 +1541,11 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
     }
     else {
         logger.debug("%2 remote changesets integrated, producing client version %1",
-                     version_info.sync_version.version,
-                     received_changesets.size()); // Throws
+                     version_info.sync_version.version, received_changesets.size()); // Throws
     }
 
     for (const auto& pending_error : pending_compensating_write_errors) {
-        logger.info("Reporting compensating write for client version %1 in server "
-                    "version %2: %3",
+        logger.info("Reporting compensating write for client version %1 in server version %2: %3",
                     pending_error.compensating_write_rejected_client_version,
                     pending_error.compensating_write_server_version, pending_error.message);
         try {
@@ -1605,8 +1602,7 @@ void Session::on_changesets_integrated(version_type client_version, const SyncPr
     do_recognize_sync_version(client_version); // Allows upload process to resume
     check_for_download_completion();           // Throws
 
-    // If the client migrated from PBS to FLX, create subscriptions when new tables
-    // are received from server.
+    // If the client migrated from PBS to FLX, create subscriptions when new tables are received from server.
     if (auto migration_store = get_migration_store(); migration_store && m_is_flx_sync_session) {
         auto& flx_subscription_store = *get_flx_subscription_store();
         get_migration_store()->create_subscriptions(flx_subscription_store);
@@ -1623,8 +1619,7 @@ void Session::on_changesets_integrated(version_type client_version, const SyncPr
 
 Session::~Session()
 {
-    //    REALM_ASSERT_EX(m_state == Unactivated || m_state == Deactivated,
-    //    m_state);
+    //    REALM_ASSERT_EX(m_state == Unactivated || m_state == Deactivated, m_state);
 }
 
 
@@ -1645,15 +1640,13 @@ void Session::activate()
 
     bool has_pending_client_reset = false;
     if (REALM_LIKELY(!get_client().is_dry_run())) {
-        // The reason we need a mutable reference from get_client_reset_config() is
-        // because we don't want the session to keep a strong reference to the
-        // client_reset_config->fresh_copy DB. If it did, then the fresh DB would
-        // stay alive for the duration of this sync session and we want to clean it
-        // up once the reset is finished. Additionally, the fresh copy will be set
-        // to a new copy on every reset so there is no reason to keep a reference
-        // to it. The modification to the client reset config happens via
-        // std::move(client_reset_config->fresh_copy). If the client reset config
-        // were a `const &` then this std::move would create another strong
+        // The reason we need a mutable reference from get_client_reset_config() is because we
+        // don't want the session to keep a strong reference to the client_reset_config->fresh_copy
+        // DB. If it did, then the fresh DB would stay alive for the duration of this sync session
+        // and we want to clean it up once the reset is finished. Additionally, the fresh copy will
+        // be set to a new copy on every reset so there is no reason to keep a reference to it.
+        // The modification to the client reset config happens via std::move(client_reset_config->fresh_copy).
+        // If the client reset config were a `const &` then this std::move would create another strong
         // reference which we don't want to happen.
         util::Optional<ClientReset>& client_reset_config = get_client_reset_config();
 
@@ -1685,12 +1678,9 @@ void Session::activate()
     m_download_progress = m_progress.download;
     REALM_ASSERT_3(m_last_version_available, >=, m_progress.upload.client_version);
 
-    logger.debug("last_version_available  = %1",
-                 m_last_version_available); // Throws
-    logger.debug("progress_server_version = %1",
-                 m_progress.download.server_version); // Throws
-    logger.debug("progress_client_version = %1",
-                 m_progress.download.last_integrated_client_version); // Throws
+    logger.debug("last_version_available  = %1", m_last_version_available);                           // Throws
+    logger.debug("progress_server_version = %1", m_progress.download.server_version);                 // Throws
+    logger.debug("progress_client_version = %1", m_progress.download.last_integrated_client_version); // Throws
 
     reset_protocol_state();
     m_state = Active;
@@ -1808,8 +1798,7 @@ void Session::send_message()
     if (m_error_to_send)
         return send_json_error_message(); // Throws
 
-    // Stop sending upload, mark and query messages when the client detects an
-    // error.
+    // Stop sending upload, mark and query messages when the client detects an error.
     if (m_client_error) {
         return;
     }
@@ -1832,8 +1821,7 @@ void Session::send_message()
             return true;
         }
 
-        // Do not allow upload if the last query sent is the sentinel one used by
-        // the migration store.
+        // Do not allow upload if the last query sent is the sentinel one used by the migration store.
         return m_last_sent_flx_query_version != *sentinel_query_version;
     };
 
@@ -1896,23 +1884,19 @@ void Session::send_bind_message()
             if (!bind_json_data.empty()) {
                 json_data_dump = bind_json_data.dump();
             }
-            logger.debug("Sending: BIND(session_ident=%1, "
-                         "need_client_file_ident=%2, is_subserver=%3, "
-                         "json_data=\"%4\")",
-                         session_ident, need_client_file_ident, is_subserver, json_data_dump);
+            logger.debug(
+                "Sending: BIND(session_ident=%1, need_client_file_ident=%2, is_subserver=%3, json_data=\"%4\")",
+                session_ident, need_client_file_ident, is_subserver, json_data_dump);
         }
         protocol.make_flx_bind_message(protocol_version, out, session_ident, bind_json_data, empty_access_token,
-                                       need_client_file_ident,
-                                       is_subserver); // Throws
+                                       need_client_file_ident, is_subserver); // Throws
     }
     else {
         std::string server_path = get_virt_path();
-        logger.debug("Sending: BIND(session_ident=%1, need_client_file_ident=%2, "
-                     "is_subserver=%3, server_path=%4)",
+        logger.debug("Sending: BIND(session_ident=%1, need_client_file_ident=%2, is_subserver=%3, server_path=%4)",
                      session_ident, need_client_file_ident, is_subserver, server_path);
         protocol.make_pbs_bind_message(protocol_version, out, session_ident, server_path, empty_access_token,
-                                       need_client_file_ident,
-                                       is_subserver); // Throws
+                                       need_client_file_ident, is_subserver); // Throws
     }
     m_conn.initiate_write_message(out, this); // Throws
 
@@ -1940,30 +1924,26 @@ void Session::send_ident_message()
     if (m_is_flx_sync_session) {
         const auto active_query_set = get_flx_subscription_store()->get_active();
         const auto active_query_body = active_query_set.to_ext_json();
-        logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
-                     "scan_server_version=%3, scan_client_version=%4, "
-                     "latest_server_version=%5, "
-                     "latest_server_version_salt=%6, query_version=%7, query_size=%8, "
-                     "query=\"%9\")",
-                     m_client_file_ident.ident, m_client_file_ident.salt, m_progress.download.server_version,
-                     m_progress.download.last_integrated_client_version, m_progress.latest_server_version.version,
-                     m_progress.latest_server_version.salt, active_query_set.version(), active_query_body.size(),
-                     active_query_body); // Throws
+        logger.debug(
+            "Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, scan_server_version=%3, "
+            "scan_client_version=%4, "
+            "latest_server_version=%5, latest_server_version_salt=%6, query_version=%7, query_size=%8, query=\"%9\")",
+            m_client_file_ident.ident, m_client_file_ident.salt, m_progress.download.server_version,
+            m_progress.download.last_integrated_client_version, m_progress.latest_server_version.version,
+            m_progress.latest_server_version.salt, active_query_set.version(), active_query_body.size(),
+            active_query_body); // Throws
         protocol.make_flx_ident_message(out, session_ident, m_client_file_ident, m_progress,
-                                        active_query_set.version(),
-                                        active_query_body); // Throws
+                                        active_query_set.version(), active_query_body); // Throws
         m_last_sent_flx_query_version = active_query_set.version();
     }
     else {
-        logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
-                     "scan_server_version=%3, scan_client_version=%4, "
-                     "latest_server_version=%5, "
-                     "latest_server_version_salt=%6)",
+        logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, scan_server_version=%3, "
+                     "scan_client_version=%4, "
+                     "latest_server_version=%5, latest_server_version_salt=%6)",
                      m_client_file_ident.ident, m_client_file_ident.salt, m_progress.download.server_version,
                      m_progress.download.last_integrated_client_version, m_progress.latest_server_version.version,
-                     m_progress.latest_server_version.salt); // Throws
-        protocol.make_pbs_ident_message(out, session_ident, m_client_file_ident,
-                                        m_progress); // Throws
+                     m_progress.latest_server_version.salt);                                  // Throws
+        protocol.make_pbs_ident_message(out, session_ident, m_client_file_ident, m_progress); // Throws
     }
     m_conn.initiate_write_message(out, this); // Throws
 
@@ -1988,8 +1968,7 @@ void Session::send_query_change_message()
     auto sub_store = get_flx_subscription_store();
     auto latest_sub_set = sub_store->get_by_version(m_pending_flx_sub_set->query_version);
     auto latest_queries = latest_sub_set.to_ext_json();
-    logger.debug("Sending: QUERY(query_version=%1, query_size=%2, query=\"%3\", "
-                 "snapshot_version=%4)",
+    logger.debug("Sending: QUERY(query_version=%1, query_size=%2, query=\"%3\", snapshot_version=%4)",
                  latest_sub_set.version(), latest_queries.size(), latest_queries, latest_sub_set.snapshot_version());
 
     OutputBuffer& out = m_conn.get_output_buffer();
@@ -2020,8 +1999,7 @@ void Session::send_upload_message()
                 m_last_sent_flx_query_version, m_upload_progress.client_version);
         }
         if (m_pending_flx_sub_set && m_pending_flx_sub_set->snapshot_version < m_upload_target_version) {
-            logger.trace("Limiting UPLOAD message up to version %1 to send QUERY "
-                         "version %2",
+            logger.trace("Limiting UPLOAD message up to version %1 to send QUERY version %2",
                          m_pending_flx_sub_set->snapshot_version, m_pending_flx_sub_set->query_version);
             target_upload_version = m_pending_flx_sub_set->snapshot_version;
         }
@@ -2057,8 +2035,7 @@ void Session::send_upload_message()
         logger.debug("Fetching changeset for upload (client_version=%1, server_version=%2, "
                      "changeset_size=%3, origin_timestamp=%4, origin_file_ident=%5)",
                      uc.progress.client_version, uc.progress.last_integrated_server_version, uc.changeset.size(),
-                     uc.origin_timestamp,
-                     uc.origin_file_ident); // Throws
+                     uc.origin_timestamp, uc.origin_file_ident); // Throws
         if (logger.would_log(util::Logger::Level::trace)) {
             BinaryData changeset_data = uc.changeset.get_first_chunk();
             if (changeset_data.size() < 1024) {
@@ -2264,11 +2241,11 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
             return false;
         }
 
-        // ClientResetOperation::finalize() will return true only if the operation
-        // actually did a client reset. It may choose not to do a reset if the
-        // local Realm does not exist at this point (in that case there is nothing
-        // to reset). But in any case, we must clean up m_client_reset_operation at
-        // this point as sync should be able to continue from this point forward.
+        // ClientResetOperation::finalize() will return true only if the operation actually did
+        // a client reset. It may choose not to do a reset if the local Realm does not exist
+        // at this point (in that case there is nothing to reset). But in any case, we must
+        // clean up m_client_reset_operation at this point as sync should be able to continue from
+        // this point forward.
         auto client_reset_operation = std::move(m_client_reset_operation);
         util::UniqueFunction<void(int64_t)> on_flx_subscription_complete = [this](int64_t version) {
             this->on_flx_sync_version_complete(version);
@@ -2281,8 +2258,7 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
         realm::VersionID client_reset_new_version = client_reset_operation->get_client_reset_new_version();
 
         // The fresh Realm has been used to reset the state
-        logger.debug("Client reset is completed, path=%1",
-                     get_realm_path()); // Throws
+        logger.debug("Client reset is completed, path=%1", get_realm_path()); // Throws
 
         SaltedFileIdent client_file_ident;
         bool has_pending_client_reset = false;
@@ -2295,16 +2271,14 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
         REALM_ASSERT_EX(m_progress.upload.client_version == 0, m_progress.upload.client_version);
         REALM_ASSERT_EX(m_progress.upload.last_integrated_server_version == 0,
                         m_progress.upload.last_integrated_server_version);
-        logger.trace("last_version_available  = %1",
-                     m_last_version_available); // Throws
+        logger.trace("last_version_available  = %1", m_last_version_available); // Throws
 
         m_upload_target_version = m_last_version_available;
         m_upload_progress = m_progress.upload;
         m_download_progress = m_progress.download;
-        // In recovery mode, there may be new changesets to upload and nothing left
-        // to download. In FLX DiscardLocal mode, there may be new commits due to
-        // subscription handling. For both, we want to allow uploads again without
-        // needing external changes to download first.
+        // In recovery mode, there may be new changesets to upload and nothing left to download.
+        // In FLX DiscardLocal mode, there may be new commits due to subscription handling.
+        // For both, we want to allow uploads again without needing external changes to download first.
         m_allow_upload = true;
         REALM_ASSERT_EX(m_last_version_selected_for_upload == 0, m_last_version_selected_for_upload);
 
@@ -2314,8 +2288,7 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
             handle_pending_client_reset_acknowledgement();
         }
 
-        // If a migration or rollback is in progress, mark it complete when client
-        // reset is completed.
+        // If a migration or rollback is in progress, mark it complete when client reset is completed.
         if (auto migration_store = get_migration_store()) {
             migration_store->complete_migration_or_rollback();
         }
@@ -2362,20 +2335,17 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
         batch_state = DownloadBatchState::SteadyState;
     }
 
-    logger.debug("Received: DOWNLOAD(download_server_version=%1, "
-                 "download_client_version=%2, "
+    logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
                  "latest_server_version=%3, latest_server_version_salt=%4, "
-                 "upload_client_version=%5, upload_server_version=%6, "
-                 "downloadable_bytes=%7, "
+                 "upload_client_version=%5, upload_server_version=%6, downloadable_bytes=%7, "
                  "last_in_batch=%8, query_version=%9, num_changesets=%10, ...)",
                  progress.download.server_version, progress.download.last_integrated_client_version,
                  progress.latest_server_version.version, progress.latest_server_version.salt,
                  progress.upload.client_version, progress.upload.last_integrated_server_version, downloadable_bytes,
-                 batch_state != DownloadBatchState::MoreToCome, query_version,
-                 received_changesets.size()); // Throws
+                 batch_state != DownloadBatchState::MoreToCome, query_version, received_changesets.size()); // Throws
 
-    // Ignore download messages when the client detects an error. This is to
-    // prevent transforming the same bad changeset over and over again.
+    // Ignore download messages when the client detects an error. This is to prevent transforming the same bad_syntax
+    // changeset over and over again.
     if (m_client_error) {
         logger.debug("Ignoring download message because the client detected an integration error");
         return Status::OK();
@@ -2441,8 +2411,7 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
         return Status::OK();
     }
 
-    initiate_integrate_changesets(downloadable_bytes, batch_state, progress,
-                                  received_changesets); // Throws
+    initiate_integrate_changesets(downloadable_bytes, batch_state, progress, received_changesets); // Throws
 
     hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
                                   batch_state, received_changesets.size());
@@ -2451,8 +2420,8 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
     }
     REALM_ASSERT_EX(hook_action == SyncClientHookAction::NoAction, hook_action);
 
-    // When we receive a DOWNLOAD message successfully, we can clear the backoff
-    // timer value used to reconnect after a retryable session error.
+    // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
+    // after a retryable session error.
     clear_resumption_delay_state();
     return Status::OK();
 }
@@ -2513,7 +2482,7 @@ Status Session::receive_unbound_message()
         // The deactivation process completes when the unbinding process
         // completes.
         complete_deactivation(); // Throws
-                                 // Life cycle state is now Deactivated
+        // Life cycle state is now Deactivated
     }
 
     return Status::OK(); // Success
@@ -2537,8 +2506,7 @@ Status Session::receive_query_error_message(int error_code, std::string_view mes
 Status Session::receive_error_message(const ProtocolErrorInfo& info)
 {
     logger.info("Received: ERROR \"%1\" (error_code=%2, is_fatal=%3, error_action=%4)", info.message,
-                info.raw_error_code, info.is_fatal,
-                info.server_requests_action); // Throws
+                info.raw_error_code, info.is_fatal, info.server_requests_action); // Throws
 
     bool legal_at_this_time = (m_bind_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
@@ -2557,8 +2525,8 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
                              info.raw_error_code)};
     }
 
-    // Can't process debug hook actions once the Session is undergoing
-    // deactivation, since the SessionWrapper may not be available
+    // Can't process debug hook actions once the Session is undergoing deactivation, since
+    // the SessionWrapper may not be available
     if (m_state == Active) {
         auto debug_action = call_debug_hook(SyncClientHookEvent::ErrorMessageReceived, info);
         if (debug_action == SyncClientHookAction::EarlyReturn) {
@@ -2566,12 +2534,11 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
         }
     }
 
-    // For compensating write errors, we need to defer raising them to the SDK
-    // until after the server version containing the compensating write has
-    // appeared in a download message.
+    // For compensating write errors, we need to defer raising them to the SDK until after the server version
+    // containing the compensating write has appeared in a download message.
     if (error_code == ProtocolError::compensating_write) {
-        // If the client is not active, the compensating writes will not be
-        // processed now, but will be sent again the next time the client connects
+        // If the client is not active, the compensating writes will not be processed now, but will be
+        // sent again the next time the client connects
         if (m_state == Active) {
             m_pending_compensating_write_errors.push_back(info);
         }
@@ -2593,16 +2560,15 @@ void Session::suspend(const SessionErrorInfo& info)
 
     // Detect completion of the unbinding process
     if (m_unbind_message_send_complete && m_error_message_received) {
-        // The fact that the UNBIND message has been sent, but we are not being
-        // suspended because we received an ERROR message implies that the
-        // deactivation process must have been initiated, so this session must be
-        // in the Deactivating state.
+        // The fact that the UNBIND message has been sent, but we are not being suspended because
+        // we received an ERROR message implies that the deactivation process must
+        // have been initiated, so this session must be in the Deactivating state.
         REALM_ASSERT_EX(m_state == Deactivating, m_state);
 
         // The deactivation process completes when the unbinding process
         // completes.
         complete_deactivation(); // Throws
-                                 // Life cycle state is now Deactivated
+        // Life cycle state is now Deactivated
     }
 
     // Notify the application of the suspension of the session if the session is
