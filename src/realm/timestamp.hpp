@@ -21,6 +21,7 @@
 
 #include <cstdint>
 #include <ostream>
+#include <iomanip>
 #include <chrono>
 #include <ctime>
 #include <realm/util/assert.hpp>
@@ -213,6 +214,9 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const
         char buffer[30];
         if (strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &buf)) {
             out << buffer;
+            if (auto nano = d.get_nanoseconds()) {
+                out << '.' << std::setfill('0') << std::setw(9) << nano;
+            }
         }
     }
 
