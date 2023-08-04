@@ -1,3 +1,13 @@
+# Evergreen CI config script for the Realm Core codebase
+# Run types:
+# * Pull Requests:
+#   * add the "for_pull_requests" tag to the task to run for pull requests
+# * Nightly Builds:
+#   * Add the 'patch_only: true' configuration setting to the task to run for nightly test runs
+#   * Add the '"for_nightly_tests"'' tag to the task for the "nightly_tests" alias to work
+# * Commit Builds:
+#   * All other tasks will be included in the set run when a PR is merged to master
+
 # Some tests take up to 4 hours to run, so give a very generous timeout project-wide, but generally try to complete tasks within 30 minutes.
 exec_timeout_secs: 14400
 
@@ -656,6 +666,7 @@ tasks:
 - name: valgrind
   exec_timeout_secs: 14400
   tags: [ "for_nightly_tests" ]
+  patch_only: true
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -775,6 +786,7 @@ tasks:
 
 - name: long-running-core-tests
   tags: [ "for_nightly_tests" ]
+  patch_only: true
   commands:
   - func: "run tests"
     # The long-running tests can take a really long time on Windows, so we give the test up to 4
@@ -1005,6 +1017,7 @@ tasks:
 
 - name: fuzzer
   tags: [ "for_nightly_tests" ]
+  patch_only: true
   commands:
   - command: shell.exec
     params:
