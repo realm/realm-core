@@ -587,8 +587,13 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
                                    ConnectionTerminationReason::http_response_says_nonfatal_error);
             break;
         }
-        case WebSocketError::websocket_moved_permanently:
-            [[fallthrough]];
+        case WebSocketError::websocket_moved_permanently: {
+            SessionErrorInfo error_info({ErrorCodes::ConnectionClosed, msg}, IsFatal{false});
+            error_info.server_requests_action = ProtocolErrorInfo::Action::RefreshLocation;
+            involuntary_disconnect(std::move(error_info),
+                                   ConnectionTerminationReason::http_response_says_nonfatal_error);
+            break;
+        }
         case WebSocketError::websocket_abnormal_closure: {
             SessionErrorInfo error_info({ErrorCodes::ConnectionClosed, msg}, IsFatal{false});
             error_info.server_requests_action = ProtocolErrorInfo::Action::RefreshUser;
