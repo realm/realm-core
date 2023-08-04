@@ -1131,7 +1131,7 @@ void Connection::close_due_to_client_side_error(Status status, IsFatal is_fatal,
 void Connection::close_due_to_transient_error(Status status, ConnectionTerminationReason reason)
 {
     logger.info("Connection closed due to transient error: %1", status); // Throws
-    SessionErrorInfo error_info{std::move(status), true};
+    SessionErrorInfo error_info{std::move(status), IsFatal{false}};
     error_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
 
     involuntary_disconnect(std::move(error_info), reason); // Throw
