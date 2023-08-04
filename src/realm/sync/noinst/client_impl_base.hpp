@@ -927,6 +927,9 @@ private:
     // transfer from the server.
     util::Optional<ClientReset>& get_client_reset_config() noexcept;
 
+    /// Returns the schema version the synchronization session connects with to the server.
+    uint64_t get_schema_version() noexcept;
+
     /// \brief Initiate the integration of downloaded changesets.
     ///
     /// This function must provide for the passed changesets (if any) to
