@@ -504,6 +504,8 @@ private:
             {"ClientResetNoRecovery", action::ClientResetNoRecovery},
             {"MigrateToFLX", action::MigrateToFLX},
             {"RevertToPBS", action::RevertToPBS},
+            {"RefreshUser", action::RefreshUser},
+            {"RefreshLocation", action::RefreshLocation},
         };
 
         if (auto action_it = mapping.find(action_string); action_it != mapping.end()) {

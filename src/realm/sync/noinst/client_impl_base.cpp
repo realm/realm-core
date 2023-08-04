@@ -1295,8 +1295,7 @@ void Connection::receive_error_message(const ProtocolErrorInfo& info, session_id
         return;
     }
 
-    logger.info("Received: ERROR \"%1\" (error_code=%2, is_fatal=%3, "
-                "session_ident=%4, error_action=%5)",
+    logger.info("Received: ERROR \"%1\" (error_code=%2, is_fatal=%3, session_ident=%4, error_action=%5)",
                 info.message, info.raw_error_code, info.is_fatal, session_ident,
                 info.server_requests_action); // Throws
 
@@ -1682,9 +1681,10 @@ void Session::activate()
     m_download_progress = m_progress.download;
     REALM_ASSERT_3(m_last_version_available, >=, m_progress.upload.client_version);
 
-    logger.debug("last_version_available  = %1", m_last_version_available);                           // Throws
-    logger.debug("progress_server_version = %1", m_progress.download.server_version);                 // Throws
-    logger.debug("progress_client_version = %1", m_progress.download.last_integrated_client_version); // Throws
+    logger.debug("last_version_available  = %1", m_last_version_available);           // Throws
+    logger.debug("progress_server_version = %1", m_progress.download.server_version); // Throws
+    logger.debug("progress_client_version = %1",
+                 m_progress.download.last_integrated_client_version); // Throws
 
     reset_protocol_state();
     m_state = Active;
@@ -1928,22 +1928,21 @@ void Session::send_ident_message()
     if (m_is_flx_sync_session) {
         const auto active_query_set = get_flx_subscription_store()->get_active();
         const auto active_query_body = active_query_set.to_ext_json();
-        logger.debug(
-            "Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, scan_server_version=%3, "
-            "scan_client_version=%4, "
-            "latest_server_version=%5, latest_server_version_salt=%6, query_version=%7, query_size=%8, query=\"%9\")",
-            m_client_file_ident.ident, m_client_file_ident.salt, m_progress.download.server_version,
-            m_progress.download.last_integrated_client_version, m_progress.latest_server_version.version,
-            m_progress.latest_server_version.salt, active_query_set.version(), active_query_body.size(),
-            active_query_body); // Throws
+        logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
+                     "scan_server_version=%3, scan_client_version=%4, latest_server_version=%5, "
+                     "latest_server_version_salt=%6, query_version=%7, query_size=%8, query=\"%9\")",
+                     m_client_file_ident.ident, m_client_file_ident.salt, m_progress.download.server_version,
+                     m_progress.download.last_integrated_client_version, m_progress.latest_server_version.version,
+                     m_progress.latest_server_version.salt, active_query_set.version(), active_query_body.size(),
+                     active_query_body); // T
         protocol.make_flx_ident_message(out, session_ident, m_client_file_ident, m_progress,
                                         active_query_set.version(), active_query_body); // Throws
         m_last_sent_flx_query_version = active_query_set.version();
     }
     else {
-        logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, scan_server_version=%3, "
-                     "scan_client_version=%4, "
-                     "latest_server_version=%5, latest_server_version_salt=%6)",
+        logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
+                     "scan_server_version=%3, scan_client_version=%4, latest_server_version=%5, "
+                     "latest_server_version_salt=%6)",
                      m_client_file_ident.ident, m_client_file_ident.salt, m_progress.download.server_version,
                      m_progress.download.last_integrated_client_version, m_progress.latest_server_version.version,
                      m_progress.latest_server_version.salt);                                  // Throws
@@ -2348,7 +2347,7 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
                  progress.upload.client_version, progress.upload.last_integrated_server_version, downloadable_bytes,
                  batch_state != DownloadBatchState::MoreToCome, query_version, received_changesets.size()); // Throws
 
-    // Ignore download messages when the client detects an error. This is to prevent transforming the same bad_syntax
+    // Ignore download messages when the client detects an error. This is to prevent transforming the same bad
     // changeset over and over again.
     if (m_client_error) {
         logger.debug("Ignoring download message because the client detected an integration error");
