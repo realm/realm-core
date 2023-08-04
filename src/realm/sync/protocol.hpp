@@ -279,7 +279,7 @@ struct ProtocolErrorInfo {
     }
     int raw_error_code = 0;
     std::string message;
-    IsFatal is_fatal = true;
+    IsFatal is_fatal = IsFatal{true};
     bool client_reset_recovery_is_disabled = false;
     std::optional<bool> should_client_reset;
     std::optional<std::string> log_url;

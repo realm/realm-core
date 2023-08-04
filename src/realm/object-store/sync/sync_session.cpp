@@ -579,11 +579,10 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
         }
         lock.unlock();
 
-        const bool try_again = false;
         sync::SessionErrorInfo synthetic(
             Status{ErrorCodes::AutoClientResetFailed,
                    util::format("A fatal error occurred during client reset: '%1'", status.reason())},
-            try_again);
+            sync::IsFatal{true});
         handle_error(synthetic);
         return;
     }

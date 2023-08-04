@@ -1309,8 +1309,7 @@ void ClientImpl::Connection::for_each_active_session(H handler)
 inline void ClientImpl::Connection::voluntary_disconnect()
 {
     m_reconnect_info.update(ConnectionTerminationReason::closed_voluntarily, std::nullopt);
-    constexpr bool try_again = true;
-    SessionErrorInfo error_info{Status{ErrorCodes::ConnectionClosed, "Connection closed"}, try_again};
+    SessionErrorInfo error_info{Status{ErrorCodes::ConnectionClosed, "Connection closed"}, IsFatal{false}};
     error_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
 
     disconnect(std::move(error_info)); // Throws

@@ -252,7 +252,7 @@ public:
             else if (message_type == "error") {
                 auto error_code = msg.read_next<int>();
                 auto message_size = msg.read_next<size_t>();
-                auto try_again = msg.read_next<bool>();
+                auto is_fatal = sync::IsFatal{!msg.read_next<bool>()};
                 auto session_ident = msg.read_next<session_ident_type>('\n');
 
                 bool unknown_error = !sync::get_protocol_error_message(error_code);
@@ -262,7 +262,7 @@ public:
 
                 auto message = msg.read_sized_data<StringData>(message_size);
 
-                connection.receive_error_message(sync::ProtocolErrorInfo{error_code, message, !try_again},
+                connection.receive_error_message(sync::ProtocolErrorInfo{error_code, message, is_fatal},
                                                  session_ident); // Throws
             }
             else if (message_type == "json_error") { // introduced in protocol 4
@@ -275,7 +275,7 @@ public:
                     auto json = nlohmann::json::parse(json_raw);
                     logger.trace("Error message encoded as json: %1", json_raw);
                     info.client_reset_recovery_is_disabled = json["isRecoveryModeDisabled"];
-                    info.is_fatal = !json["tryAgain"];
+                    info.is_fatal = sync::IsFatal{!json["tryAgain"]};
                     info.message = json["message"];
                     info.log_url = std::make_optional<std::string>(json["logURL"]);
                     info.should_client_reset = std::make_optional<bool>(json["shouldClientReset"]);

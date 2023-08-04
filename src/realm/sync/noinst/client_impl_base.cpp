@@ -505,8 +505,7 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
         logger.debug("Received websocket close message after connection was force closed");
         return false;
     }
-    logger.info("Closing the websocket with error code=%1, message=%2, was_clean='%2'", static_cast<int>(error_code),
-                msg, was_clean);
+    logger.info("Closing the websocket with error code=%1, message='%2', was_clean=%3", error_code, msg, was_clean);
 
     switch (error_code) {
         case WebSocketError::websocket_ok:
@@ -1695,7 +1694,7 @@ void Session::activate()
         logger.error("Error integrating bootstrap changesets: %1", error.what());
         m_suspended = true;
         m_conn.one_less_active_unsuspended_session(); // Throws
-        on_suspended(SessionErrorInfo{Status{error.code(), error.what()}, false});
+        on_suspended(SessionErrorInfo{Status{error.code(), error.what()}, IsFatal{true}});
     }
 
     if (has_pending_client_reset) {
@@ -2304,7 +2303,7 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
     catch (const std::exception& e) {
         auto err_msg = util::format("A fatal error occurred during client reset: '%1'", e.what());
         logger.error(err_msg.c_str());
-        SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, err_msg}, false);
+        SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, err_msg}, IsFatal{true});
         suspend(err_info);
         return Status::OK();
     }

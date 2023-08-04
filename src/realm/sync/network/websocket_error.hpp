@@ -21,6 +21,8 @@
 
 #include "realm/error_codes.h"
 
+#include <ostream>
+
 namespace realm::sync::websocket {
 
 enum class WebSocketError {
@@ -53,5 +55,7 @@ enum class WebSocketError {
     websocket_retry_error = RLM_ERR_WEBSOCKET_RETRY_ERROR,
     websocket_fatal_error = RLM_ERR_WEBSOCKET_FATAL_ERROR,
 };
+
+std::ostream& operator<<(std::ostream& os, WebSocketError code);
 
 } // namespace realm::sync::websocket
