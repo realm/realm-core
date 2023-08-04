@@ -40,6 +40,25 @@
 
 namespace realm::util {
 
+volatile static int prevent_optimizations;
+inline void rand_pause()
+{
+    auto ctrl = std::rand();
+    if (ctrl & 1) {
+        // short pause, stay on CPU
+        ctrl = (ctrl >> 1) & 0xFFF;
+        while (ctrl--) {
+            prevent_optimizations = (1 + prevent_optimizations) & 0xF;
+        }
+    }
+    else {
+        // longer pause and (possibly) relinguish CPU
+        ctrl = (ctrl >> 1) & 0x3;
+        millisleep(ctrl);
+    }
+}
+
+
 // fwd decl to support friend decl below
 class InterprocessCondVar;
 
@@ -83,8 +102,7 @@ public:
     InterprocessMutex& operator=(const InterprocessMutex&) = delete;
 
 #if REALM_ROBUST_MUTEX_EMULATION || defined(_WIN32)
-    struct SharedPart {
-    };
+    struct SharedPart {};
 #else
     using SharedPart = RobustMutex;
 #endif
@@ -217,6 +235,7 @@ inline void InterprocessMutex::free_lock_info()
 
     m_lock_info.reset();
     if ((*s_info_map)[m_fileuid].expired()) {
+        rand_pause();
         s_info_map->erase(m_fileuid);
     }
     m_filename.clear();
@@ -264,7 +283,7 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, const st
     // exFAT does not allocate a unique id for the file until it's non-empty
     m_lock_info->m_file.resize(1);
     m_fileuid = m_lock_info->m_file.get_unique_id();
-
+    rand_pause();
     (*s_info_map)[m_fileuid] = m_lock_info;
 #elif defined(_WIN32)
     if (m_handle) {
@@ -302,6 +321,7 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, File&& l
     if (result == s_info_map->end()) {
         m_lock_info = std::make_shared<LockInfo>();
         m_lock_info->m_file = std::move(lock_file);
+        rand_pause();
         (*s_info_map)[m_fileuid] = m_lock_info;
     }
     else {
