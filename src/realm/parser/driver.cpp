@@ -873,12 +873,12 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
                     subexpr = std::make_unique<ColumnDictionaryKeys>(*dict);
                 }
                 else {
-                    dict->key(indexes);
+                    dict->path(indexes);
                 }
             }
             else if (first_index.is_all()) {
                 ok = true;
-                dict->key(indexes);
+                dict->path(indexes);
             }
         }
         else if (auto coll = dynamic_cast<Columns<Lst<Mixed>>*>(subexpr.get())) {

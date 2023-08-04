@@ -796,7 +796,7 @@ Query create(L left, const Subexpr2<R>& right)
         // TODO: recognize size operator expressions
         // auto size_operator = dynamic_cast<const SizeOperator<Size<StringData>, Subexpr>*>(&right);
 
-        if (column && !column->links_exist()) {
+        if (column && !column->links_exist() && !column->has_path()) {
             ConstTableRef t = column->get_base_table();
             Query q(t);
 
@@ -2012,7 +2012,7 @@ public:
     {
         return ObjPropertyExpr::description(state) + util::to_string(m_path);
     }
-    void path(const Path& path)
+    Columns<Mixed>& path(const Path& path)
     {
         for (auto& elem : path) {
             if (elem.is_all()) {
@@ -2020,6 +2020,7 @@ public:
             }
             m_path.emplace_back(elem);
         }
+        return *this;
     }
     bool has_path() const noexcept override
     {
@@ -3159,6 +3160,13 @@ public:
         }
         return false;
     }
+    Columns<Lst<Mixed>>& path(const Path& path)
+    {
+        if (!indexes(path)) {
+            throw InvalidArgument("Illegal path");
+        }
+        return *this;
+    }
     std::string description(util::serializer::SerialisationState& state) const override
     {
         return ColumnListBase::description(state) + util::to_string(m_path);
@@ -3221,7 +3229,7 @@ public:
     }
 
     // Change the node to handle a specific key value only
-    Columns<Dictionary>& key(const Path& path)
+    Columns<Dictionary>& path(const Path& path)
     {
         auto sz = path.size();
         const PathElement* first = &path[0];

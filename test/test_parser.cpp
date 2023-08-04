@@ -5162,6 +5162,9 @@ TEST(Parser_NestedDictionaryList)
     list2->add(3);
     list2->add(4);
 
+    auto q = persons->column<Dictionary>(col).path({"tickets", 0}) == 0;
+    CHECK_EQUAL(q.count(), 1);
+
     verify_query(test_context, persons, "properties.tickets[0] == 0", 1);
     verify_query(test_context, persons, "properties.tickets[last] == 4", 2);
 }
@@ -5188,6 +5191,9 @@ TEST(Parser_NestedListDictionary)
     dict2->insert("two", 2);
     dict2->insert("bar", 5);
     dict2->insert("four", 4);
+
+    auto q = persons->column<Lst<Mixed>>(col).path({0, "one"}) == 1;
+    CHECK_EQUAL(q.count(), 1);
 
     verify_query(test_context, persons, "properties[0].one == 1", 1);
     verify_query(test_context, persons, "properties[*].one == 1", 1);
@@ -5275,6 +5281,9 @@ TEST(Parser_NestedMixedDictionaryList)
         snake->insert("legs", 0);
         snake->insert("age", 20);
     }
+
+    auto q = persons->column<Mixed>(col).path({"instruments", 0, "strings"}) == 6;
+    CHECK_EQUAL(q.count(), 1);
 
     verify_query(test_context, persons, "properties.instruments[0].strings == 6", 1);
     verify_query(test_context, persons, "properties.instruments[*].strings == 6", 2);
