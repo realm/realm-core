@@ -582,7 +582,7 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
                 {ErrorCodes::AuthError,
                  util::format("Websocket was closed because of an authentication issue: %1", msg)},
                 IsFatal{false});
-            error_info.server_requests_action = ProtocolErrorInfo::Action::RefreshLocation;
+            error_info.server_requests_action = ProtocolErrorInfo::Action::RefreshUser;
             involuntary_disconnect(std::move(error_info),
                                    ConnectionTerminationReason::http_response_says_nonfatal_error);
             break;
