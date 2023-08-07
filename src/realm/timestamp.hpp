@@ -21,7 +21,6 @@
 
 #include <cstdint>
 #include <ostream>
-#include <iomanip>
 #include <chrono>
 #include <ctime>
 #include <realm/util/assert.hpp>
@@ -183,6 +182,9 @@ public:
         return size_t(m_seconds) ^ size_t(m_nanoseconds);
     }
 
+    // Buffer must be at least 32 bytes long
+    const char* to_string(char* buffer) const;
+
     template <class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Timestamp&);
     static constexpr int32_t nanoseconds_per_second = 1000000000;
@@ -197,29 +199,8 @@ private:
 template <class C, class T>
 inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const Timestamp& d)
 {
-    if (d.is_null()) {
-        out << "null";
-        return out;
-    }
-    auto seconds = time_t(d.get_seconds());
-    struct tm buf;
-#ifdef _MSC_VER
-    bool success = gmtime_s(&buf, &seconds) == 0;
-#else
-    bool success = gmtime_r(&seconds, &buf) != nullptr;
-#endif
-    if (success) {
-        // We need a buffer for formatting dates.
-        // Max size is 20 bytes (incl terminating zero) "YYYY-MM-DD HH:MM:SS"\0
-        char buffer[30];
-        if (strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &buf)) {
-            out << buffer;
-            if (auto nano = d.get_nanoseconds()) {
-                out << '.' << std::setfill('0') << std::setw(9) << nano;
-            }
-        }
-    }
-
+    char buffer[32];
+    out << d.to_string(buffer);
     return out;
 }
 // LCOV_EXCL_STOP
