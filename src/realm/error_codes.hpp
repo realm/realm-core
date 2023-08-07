@@ -244,6 +244,7 @@ public:
         MaintenanceInProgress = RLM_ERR_MAINTENANCE_IN_PROGRESS,
         UserpassTokenInvalid = RLM_ERR_USERPASS_TOKEN_INVALID,
         InvalidServerResponse = RLM_ERR_INVALID_SERVER_RESPONSE,
+        AppServerError = RLM_ERR_APP_SERVER_ERROR,
 
         CallbackFailed = RLM_ERR_CALLBACK,
         UnknownError = RLM_ERR_UNKNOWN,
@@ -254,6 +255,7 @@ public:
     static Error from_string(std::string_view str);
     static std::vector<Error> get_all_codes();
     static std::vector<std::string_view> get_all_names();
+    static std::vector<std::pair<std::string_view, ErrorCodes::Error>> get_error_list();
 };
 
 std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code);

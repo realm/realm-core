@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync_test_utils.hpp"
+#include <util/sync/sync_test_utils.hpp>
 
-#include "util/baas_admin_api.hpp"
+#include <util/sync/baas_admin_api.hpp>
 
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_store.hpp>
@@ -27,11 +27,15 @@
 #include <realm/object-store/sync/mongo_client.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
+
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
+
 #include <realm/util/base64.hpp>
 #include <realm/util/hex_dump.hpp>
 #include <realm/util/sha_crypto.hpp>
+
+#include <chrono>
 
 namespace realm {
 
@@ -41,7 +45,7 @@ std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error)
         os << "(none)";
     }
     else {
-        os << "AppError(error_code=" << error->code()
+        os << "AppError(error_code=" << error->code() << ", server_error=" << error->server_error
            << ", http_status_code=" << error->additional_status_code.value_or(0) << ", message=\"" << error->reason()
            << "\", link_to_server_logs=\"" << error->link_to_server_logs << "\")";
     }

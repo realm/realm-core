@@ -67,10 +67,6 @@ struct ClientReset {
     util::UniqueFunction<void(VersionID before_version, bool did_recover)> notify_after_client_reset;
 };
 
-} // namespace realm::sync
-
-namespace realm::sync {
-
 static constexpr milliseconds_type default_connect_timeout = 120000;        // 2 minutes
 static constexpr milliseconds_type default_connection_linger_time = 30000;  // 30 seconds
 static constexpr milliseconds_type default_ping_keepalive_period = 60000;   // 1 minute
@@ -256,17 +252,19 @@ struct SessionErrorInfo : public ProtocolErrorInfo {
     {
     }
 
-    SessionErrorInfo(Status status, bool try_again, ProtocolError protocol_error = ProtocolError::other_session_error)
-        : ProtocolErrorInfo(static_cast<int>(protocol_error), status.reason(), try_again)
+    SessionErrorInfo(Status status, IsFatal is_fatal,
+                     ProtocolError protocol_error = ProtocolError::other_session_error)
+        : ProtocolErrorInfo(static_cast<int>(protocol_error), status.reason(), is_fatal)
+        , status(std::move(status))
+    {
+    }
+    SessionErrorInfo(const ProtocolErrorInfo& info, Status status)
+        : ProtocolErrorInfo(info)
         , status(std::move(status))
     {
     }
 
     Status status;
-
-    // If this error was created as a result of a network error, this will contain the closure code
-    // from the websocket close message.
-    websocket::WebSocketError websocket_error = websocket::WebSocketError::websocket_ok;
 };
 
 enum class ConnectionState { disconnected, connecting, connected };

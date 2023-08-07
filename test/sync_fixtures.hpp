@@ -588,15 +588,14 @@ public:
     // make_session().
     void set_client_side_error_handler(int client_index, std::function<ErrorHandler> handler)
     {
-        auto handler_2 = [handler = std::move(handler)](ConnectionState state,
-                                                        std::optional<SessionErrorInfo> error_info) {
+        auto handler_wrapped = [handler = std::move(handler)](ConnectionState state,
+                                                              std::optional<SessionErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
-            bool is_fatal = error_info->is_fatal();
-            handler(error_info->status, is_fatal);
+            handler(error_info->status, error_info->is_fatal);
         };
-        m_connection_state_change_listeners[client_index] = std::move(handler_2);
+        m_connection_state_change_listeners[client_index] = std::move(handler_wrapped);
     }
 
     void set_client_side_error_rate(int client_index, int n, int m)
@@ -713,7 +712,7 @@ public:
                     return;
                 REALM_ASSERT(error);
                 unit_test::TestContext& test_context = m_test_context;
-                test_context.logger->error("Client disconnect: %1 (is_fatal=%3)", error->status, error->is_fatal());
+                test_context.logger->error("Client disconnect: %1 (is_fatal=%3)", error->status, error->is_fatal);
                 bool client_error_occurred = true;
                 CHECK_NOT(client_error_occurred);
                 stop();
@@ -1078,8 +1077,7 @@ inline void RealmFixture::setup_error_handler(util::UniqueFunction<ErrorHandler>
         if (state != ConnectionState::disconnected)
             return;
         REALM_ASSERT(error_info);
-        bool is_fatal = error_info->is_fatal();
-        handler(error_info->status, is_fatal);
+        handler(error_info->status, error_info->is_fatal);
     };
     m_session.set_connection_state_change_listener(std::move(listener));
 }

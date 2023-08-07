@@ -786,7 +786,7 @@ void AuditRealmPool::wait_for_upload(std::shared_ptr<SyncSession> session)
             if (!status.is_ok()) {
                 m_logger->error("Events: Upload on '%1' failed with error '%2'.", path, status);
                 if (m_error_handler) {
-                    m_error_handler(SyncError(status, false));
+                    m_error_handler(SyncError(std::move(status), false));
                 }
             }
             else {
@@ -873,7 +873,7 @@ void AuditRealmPool::open_new_realm()
     sync_config->error_handler = [error_handler = m_error_handler, weak_self = weak_from_this()](auto,
                                                                                                  SyncError error) {
         if (auto self = weak_self.lock()) {
-            self->m_logger->error("Events: Received sync error: %1", error.to_status());
+            self->m_logger->error("Events: Received sync error: %1", error.status);
         }
         if (error_handler) {
             error_handler(error);

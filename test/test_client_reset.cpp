@@ -153,7 +153,8 @@ TEST(ClientReset_NoLocalChanges)
                     return;
                 REALM_ASSERT(error_info);
                 CHECK_EQUAL(error_info->status, ErrorCodes::SyncClientResetRequired);
-                CHECK_EQUAL(error_info->to_protocol_error(), ProtocolError::bad_server_version);
+                CHECK_EQUAL(static_cast<ProtocolError>(error_info->raw_error_code),
+                            ProtocolError::bad_server_version);
                 bowl.add_stone();
             };
 
@@ -602,7 +603,8 @@ TEST(ClientReset_ThreeClients)
                     return;
                 REALM_ASSERT(error_info);
                 CHECK_EQUAL(error_info->status, ErrorCodes::SyncClientResetRequired);
-                CHECK_EQUAL(error_info->to_protocol_error(), ProtocolError::bad_server_version);
+                CHECK_EQUAL(static_cast<ProtocolError>(error_info->raw_error_code),
+                            ProtocolError::bad_server_version);
                 bowl.add_stone();
             };
 

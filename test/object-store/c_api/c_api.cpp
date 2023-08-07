@@ -1,19 +1,40 @@
-#include <catch2/catch_all.hpp>
+////////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2019 Realm Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+////////////////////////////////////////////////////////////////////////////
+
+#include <util/event_loop.hpp>
+#include <util/test_file.hpp>
+#include <util/sync/flx_sync_harness.hpp>
 
 #include <realm.h>
+
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/c_api/conversion.hpp>
 #include <realm/object-store/c_api/realm.hpp>
 #include <realm/object-store/c_api/types.hpp>
+#include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
-#include <realm/sync/binding_callback_thread_observer.hpp>
-#include <realm/util/base64.hpp>
 
-#include "sync/flx_sync_harness.hpp"
-#include "util/test_file.hpp"
-#include "util/event_loop.hpp"
-#include "realm/util/logger.hpp"
-#include "realm/object-store/impl/object_accessor_impl.hpp"
+#include <realm/sync/binding_callback_thread_observer.hpp>
+
+#include <realm/util/base64.hpp>
+#include <realm/util/logger.hpp>
+
+#include <catch2/catch_all.hpp>
 
 #include <cstring>
 #include <numeric>
@@ -22,16 +43,20 @@
 
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/sync_user.hpp>
+
 #include <external/json/json.hpp>
 #endif
 
 #if REALM_ENABLE_AUTH_TESTS
+#include <util/sync/baas_admin_api.hpp>
+#include <util/sync/sync_test_utils.hpp>
+
 #include <realm/object-store/sync/app_utils.hpp>
+
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/network/websocket.hpp>
+
 #include <realm/util/misc_errors.hpp>
-#include "sync/sync_test_utils.hpp"
-#include "util/baas_admin_api.hpp"
 #endif
 
 using namespace realm;
@@ -6123,10 +6148,9 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
             return m_observer->websocket_binary_message_received(data);
         }
 
-        bool websocket_closed_handler(bool was_clean, websocket::WebSocketError code,
-                                      std::string_view message) override
+        bool websocket_closed_handler(bool was_clean, WebSocketError error, std::string_view msg) override
         {
-            return m_observer->websocket_closed_handler(was_clean, code, message);
+            return m_observer->websocket_closed_handler(was_clean, error, msg);
         }
 
     private:

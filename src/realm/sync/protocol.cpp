@@ -1,31 +1,7 @@
 #include <realm/sync/protocol.hpp>
 
 
-namespace {
-
-class ErrorCategoryImpl : public std::error_category {
-public:
-    const char* name() const noexcept override final
-    {
-        return "realm::sync::ProtocolError";
-    }
-    std::string message(int error_code) const override final
-    {
-        const char* msg = realm::sync::get_protocol_error_message(error_code);
-        if (!msg)
-            msg = "Unknown error";
-        std::string msg_2{msg}; // Throws (copy)
-        return msg_2;
-    }
-};
-
-ErrorCategoryImpl g_error_category;
-
-} // unnamed namespace
-
-
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 const char* get_protocol_error_message(int error_code) noexcept
 {
@@ -151,6 +127,13 @@ const char* get_protocol_error_message(int error_code) noexcept
     return nullptr;
 }
 
+std::ostream& operator<<(std::ostream& os, ProtocolError error)
+{
+    if (auto str = get_protocol_error_message(static_cast<int>(error))) {
+        return os << str;
+    }
+    return os << "Unknown protocol error " << static_cast<int>(error);
+}
 
 Status protocol_error_to_status(int raw_error_code, std::string_view msg)
 {
@@ -262,15 +245,4 @@ Status protocol_error_to_status(int raw_error_code, std::string_view msg)
     return {err_code, msg};
 }
 
-const std::error_category& protocol_error_category() noexcept
-{
-    return g_error_category;
-}
-
-std::error_code make_error_code(ProtocolError error_code) noexcept
-{
-    return std::error_code(int(error_code), g_error_category);
-}
-
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync

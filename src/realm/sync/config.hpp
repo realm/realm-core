@@ -45,10 +45,16 @@ using port_type = std::uint_fast16_t;
 enum class ProtocolError;
 } // namespace sync
 
-struct SyncError : public Exception {
+struct SyncError {
     enum class ClientResetModeAllowed { DoNotClientReset, RecoveryPermitted, RecoveryNotPermitted };
 
+    Status status;
+
     bool is_fatal;
+
+    // The following two string_view's are views into the reason string of the status member. Users of
+    // SyncError should take care not to modify the status if they are going to access these views into
+    // the reason string.
     // Just the minimal error message, without any log URL.
     std::string_view simple_message;
     // The URL to the associated server log if any. If not supplied by the server, this will be `empty()`.
@@ -68,7 +74,7 @@ struct SyncError : public Exception {
     // that caused a compensating write and why the write was illegal.
     std::vector<sync::CompensatingWriteErrorInfo> compensating_writes_info;
 
-    SyncError(Status status, bool is_fatal, std::optional<std::string_view> serverLog = std::nullopt,
+    SyncError(Status status, bool is_fatal, std::optional<std::string_view> server_log = std::nullopt,
               std::vector<sync::CompensatingWriteErrorInfo> compensating_writes = {});
 
     static constexpr const char c_original_file_path_key[] = "ORIGINAL_FILE_PATH";
@@ -157,8 +163,7 @@ struct SyncClientHookData {
 };
 
 struct SyncConfig {
-    struct FLXSyncEnabled {
-    };
+    struct FLXSyncEnabled {};
 
     struct ProxyConfig {
         using port_type = sync::port_type;

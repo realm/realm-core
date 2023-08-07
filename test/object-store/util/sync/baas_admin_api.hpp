@@ -18,18 +18,21 @@
 
 #pragma once
 
-#include "realm/object-store/property.hpp"
-#include "realm/object-store/object_schema.hpp"
-#include "realm/object-store/schema.hpp"
-#include "realm/object-store/sync/app_credentials.hpp"
-#include "realm/object-store/sync/generic_network_transport.hpp"
+#ifdef REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_AUTH_TESTS
 
-#include "sync/sync_test_utils.hpp"
+#include <util/sync/sync_test_utils.hpp>
 
-#include "external/json/json.hpp"
-#include "external/mpark/variant.hpp"
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/schema.hpp>
 
-#if REALM_ENABLE_AUTH_TESTS
+#include <realm/object-store/sync/app_credentials.hpp>
+#include <realm/object-store/sync/generic_network_transport.hpp>
+
+#include <external/json/json.hpp>
+#include <external/mpark/variant.hpp>
+
 namespace realm {
 app::Response do_http_request(const app::Request& request);
 
@@ -288,3 +291,4 @@ inline app::App::Config get_config(Factory factory, const AppSession& app_sessio
 } // namespace realm
 
 #endif // REALM_ENABLE_AUTH_TESTS
+#endif // REALM_ENABLE_SYNC

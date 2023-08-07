@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
-
-#include "sync/session/session_util.hpp"
+#include <util/event_loop.hpp>
+#include <util/test_utils.hpp>
+#include <util/sync/session_util.hpp>
 
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/object_schema.hpp>
@@ -26,11 +26,10 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
 
-#include "util/event_loop.hpp"
-#include "util/test_utils.hpp"
-
 #include <realm/util/time.hpp>
 #include <realm/util/scope_exit.hpp>
+
+#include <catch2/catch_all.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -535,8 +534,8 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync][session]", RegularUser)
         }
 
         SECTION("transitions to Inactive if a fatal error occurs") {
-            Status err_status(ErrorCodes::SyncProtocolInvariantFailed, "Not a real error message");
-            sync::SessionErrorInfo err{err_status, false};
+            sync::SessionErrorInfo err{Status{ErrorCodes::SyncProtocolInvariantFailed, "Not a real error message"},
+                                       sync::IsFatal{true}};
             err.server_requests_action = realm::sync::ProtocolErrorInfo::Action::ProtocolViolation;
             SyncSession::OnlyForTesting::handle_error(*session, std::move(err));
             CHECK(sessions_are_inactive(*session));
@@ -546,8 +545,8 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync][session]", RegularUser)
 
         SECTION("ignores non-fatal errors and does not transition to Inactive") {
             // Fire a simulated *non-fatal* error.
-            Status err_status(ErrorCodes::RuntimeError, "Not a real error message");
-            sync::SessionErrorInfo err{err_status, true};
+            sync::SessionErrorInfo err{Status{ErrorCodes::ConnectionClosed, "Not a real error message"},
+                                       sync::IsFatal{false}};
             err.server_requests_action = realm::sync::ProtocolErrorInfo::Action::Transient;
             SyncSession::OnlyForTesting::handle_error(*session, std::move(err));
             REQUIRE(session->state() == SyncSession::State::Dying);

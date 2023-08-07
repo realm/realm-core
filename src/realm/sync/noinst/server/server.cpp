@@ -1274,7 +1274,7 @@ public:
 
     void initiate_pong_output_buffer();
 
-    void close_due_to_protocol_error(Status status);
+    void handle_protocol_error(Status status);
 
     void receive_bind_message(session_ident_type, std::string path, std::string signed_user_token,
                               bool need_client_file_ident, bool is_subserver);
@@ -4245,9 +4245,21 @@ void SyncConnection::enlist_to_send(Session* sess) noexcept
     m_send_trigger->trigger();
 }
 
-void SyncConnection::close_due_to_protocol_error(Status)
+
+void SyncConnection::handle_protocol_error(Status status)
 {
-    protocol_error(ProtocolError::bad_syntax);
+    logger.error("%1", status);
+    switch (status.code()) {
+        case ErrorCodes::SyncProtocolInvariantFailed:
+            protocol_error(ProtocolError::bad_syntax); // Throws
+            break;
+        case ErrorCodes::LimitExceeded:
+            protocol_error(ProtocolError::limits_exceeded); // Throws
+            break;
+        default:
+            protocol_error(ProtocolError::other_error);
+            break;
+    }
 }
 
 void SyncConnection::receive_bind_message(session_ident_type session_ident, std::string path,

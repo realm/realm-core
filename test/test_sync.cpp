@@ -146,9 +146,8 @@ TEST(Sync_BadVirtualPath)
         if (state != ConnectionState::disconnected)
             return;
         REALM_ASSERT(error_info);
-        bool is_fatal = error_info->is_fatal();
         CHECK_EQUAL(error_info->status, ErrorCodes::BadSyncPartitionValue);
-        CHECK(is_fatal);
+        CHECK(error_info->is_fatal);
         ++nerrors;
         if (nerrors == 3)
             fixture.stop();
@@ -783,7 +782,7 @@ struct ExpectChangesetError {
             return;
         REALM_ASSERT(error_info);
         CHECK_EQUAL(error_info->status, ErrorCodes::BadChangeset);
-        CHECK(!error_info->is_fatal());
+        CHECK(!error_info->is_fatal);
         CHECK_EQUAL(error_info->status.reason(),
                     "Failed to transform received changeset: Schema mismatch: " + expected_error);
         fixture.stop();
@@ -5169,7 +5168,7 @@ TEST_IF(Sync_SSL_Certificates, false)
             if (state == ConnectionState::disconnected) {
                 CHECK(error_info);
                 client_logger->debug("State change: disconnected, error_code = %1, is_fatal = %2", error_info->status,
-                                     error_info->is_fatal());
+                                     error_info->is_fatal);
                 // We expect to get through the SSL handshake but will hit an error due to the wrong token.
                 CHECK_NOT_EQUAL(error_info->status, ErrorCodes::TlsHandshakeFailed);
                 client.shutdown();
@@ -5246,7 +5245,7 @@ TEST(Sync_BadChangeset)
                 return;
             REALM_ASSERT(error_info);
             CHECK_EQUAL(error_info->status, ErrorCodes::BadChangeset);
-            CHECK(error_info->is_fatal());
+            CHECK(error_info->is_fatal);
             did_fail = true;
             fixture.stop();
         };
@@ -6645,7 +6644,7 @@ TEST(Sync_NonIncreasingServerVersions)
         return ++timestamp;
     });
 
-    auto latest_local_verson = [&] {
+    auto latest_local_version = [&] {
         auto tr = db->start_write();
         tr->add_table_with_primary_key("class_foo", type_String, "_id")->add_column(type_Int, "int_col");
         return tr->commit();
@@ -6655,7 +6654,7 @@ TEST(Sync_NonIncreasingServerVersions)
     auto prep_changeset = [&](auto pk_name, auto int_col_val) {
         Changeset changeset;
         changeset.version = 10;
-        changeset.last_integrated_remote_version = latest_local_verson - 1;
+        changeset.last_integrated_remote_version = latest_local_version - 1;
         changeset.origin_timestamp = ++timestamp;
         changeset.origin_file_ident = 1;
         instr::PrimaryKey pk{changeset.intern_string(pk_name)};
@@ -6695,7 +6694,7 @@ TEST(Sync_NonIncreasingServerVersions)
 
     SyncProgress progress = {};
     progress.download.server_version = server_changesets.back().version;
-    progress.download.last_integrated_client_version = latest_local_verson - 1;
+    progress.download.last_integrated_client_version = latest_local_version - 1;
     progress.latest_server_version.version = server_changesets.back().version;
     progress.latest_server_version.salt = 0x7876543217654321;
 
@@ -6796,7 +6795,7 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
         return ++timestamp;
     });
 
-    auto latest_local_verson = [&] {
+    auto latest_local_version = [&] {
         auto tr = db->start_write();
         // Create schema: single table with array of ints as property.
         tr->add_table_with_primary_key("class_table", type_Int, "_id")->add_column_list(type_Int, "ints");
@@ -6829,7 +6828,7 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
     instr.prior_size = 8;
     changeset.push_back(instr);
     changeset.version = 1;
-    changeset.last_integrated_remote_version = latest_local_verson - 1;
+    changeset.last_integrated_remote_version = latest_local_version - 1;
     changeset.origin_timestamp = timestamp;
     changeset.origin_file_ident = 2;
 
@@ -6842,7 +6841,7 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
 
     SyncProgress progress = {};
     progress.download.server_version = changeset.version;
-    progress.download.last_integrated_client_version = latest_local_verson - 1;
+    progress.download.last_integrated_client_version = latest_local_version - 1;
     progress.latest_server_version.version = changeset.version;
     progress.latest_server_version.salt = 0x7876543217654321;
 
@@ -6854,7 +6853,7 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
                                         DownloadBatchState::SteadyState, logger, transact);
 
     bool is_compressed = false;
-    auto data = history.get_reciprocal_transform(latest_local_verson, is_compressed);
+    auto data = history.get_reciprocal_transform(latest_local_version, is_compressed);
     Changeset reciprocal_changeset;
     ChunkedBinaryInputStream in{data};
     if (is_compressed) {
@@ -6952,6 +6951,67 @@ TEST(Sync_TransformAgainstEmptyReciprocalChangeset)
     group_1.verify();
     group_2.verify();
     CHECK(compare_groups(rt_1, rt_2));
+}
+
+TEST(Sync_ServerVersionsSkippedFromDownloadCursor)
+{
+    TEST_CLIENT_DB(db);
+
+    auto& history = get_history(db);
+    history.set_client_file_ident(SaltedFileIdent{2, 0x1234567812345678}, false);
+    timestamp_type timestamp{1};
+    history.set_local_origin_timestamp_source([&] {
+        return ++timestamp;
+    });
+
+    auto latest_local_version = [&] {
+        auto tr = db->start_write();
+        tr->add_table_with_primary_key("class_foo", type_String, "_id")->add_column(type_Int, "int_col");
+        return tr->commit();
+    }();
+
+    Changeset server_changeset;
+    server_changeset.version = 10;
+    server_changeset.last_integrated_remote_version = latest_local_version - 1;
+    server_changeset.origin_timestamp = ++timestamp;
+    server_changeset.origin_file_ident = 1;
+
+    std::vector<ChangesetEncoder::Buffer> encoded;
+    std::vector<Transformer::RemoteChangeset> server_changesets_encoded;
+    encoded.emplace_back();
+    encode_changeset(server_changeset, encoded.back());
+    server_changesets_encoded.emplace_back(server_changeset.version, server_changeset.last_integrated_remote_version,
+                                           BinaryData(encoded.back().data(), encoded.back().size()),
+                                           server_changeset.origin_timestamp, server_changeset.origin_file_ident);
+
+    SyncProgress progress = {};
+    // The server skips 10 server versions.
+    progress.download.server_version = server_changeset.version + 10;
+    progress.download.last_integrated_client_version = latest_local_version - 1;
+    progress.latest_server_version.version = server_changeset.version + 15;
+    progress.latest_server_version.salt = 0x7876543217654321;
+
+    uint_fast64_t downloadable_bytes = 0;
+    VersionInfo version_info;
+    util::StderrLogger logger;
+    auto transact = db->start_read();
+    history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
+                                        DownloadBatchState::SteadyState, logger, transact);
+
+    version_type current_version;
+    SaltedFileIdent file_ident;
+    SyncProgress expected_progress;
+    history.get_status(current_version, file_ident, expected_progress);
+
+    // Check progress is reported correctly.
+    CHECK_EQUAL(progress.latest_server_version.salt, expected_progress.latest_server_version.salt);
+    CHECK_EQUAL(progress.latest_server_version.version, expected_progress.latest_server_version.version);
+    CHECK_EQUAL(progress.download.last_integrated_client_version,
+                expected_progress.download.last_integrated_client_version);
+    CHECK_EQUAL(progress.download.server_version, expected_progress.download.server_version);
+    CHECK_EQUAL(progress.upload.client_version, expected_progress.upload.client_version);
+    CHECK_EQUAL(progress.upload.last_integrated_server_version,
+                expected_progress.upload.last_integrated_server_version);
 }
 
 } // unnamed namespace

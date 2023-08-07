@@ -256,7 +256,7 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         auto c_error = realm_sync_error_t();
 
         std::string error_code_message;
-        auto status = error.to_status();
+        const auto& status = error.status;
         c_error.status.message = status.reason().c_str();
         c_error.status.error = static_cast<realm_errno_e>(status.code());
         c_error.status.categories = ErrorCodes::error_categories(status.code()).value();

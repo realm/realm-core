@@ -26,8 +26,9 @@
 
 namespace realm {
 namespace {
+
 constexpr static std::string_view s_middle_part(" Logs: ");
-std::string format_sync_error_message(Status status, std::optional<std::string_view> log_url)
+std::string format_sync_error_message(const Status& status, std::optional<std::string_view> log_url)
 {
     if (!log_url) {
         return status.reason();
@@ -42,18 +43,17 @@ static_assert(std::is_same_v<sync::port_type, sync::network::Endpoint::port_type
 
 using ProtocolError = realm::sync::ProtocolError;
 
-SyncError::SyncError(Status status, bool is_fatal, std::optional<std::string_view> server_log,
+SyncError::SyncError(Status orig_status, bool is_fatal, std::optional<std::string_view> server_log,
                      std::vector<sync::CompensatingWriteErrorInfo> compensating_writes)
-    : Exception(status.code(), format_sync_error_message(status, server_log))
+    : status(orig_status.code(), format_sync_error_message(orig_status, server_log))
     , is_fatal(is_fatal)
-    , simple_message(std::string_view(reason()).substr(0, status.reason().size()))
+    , simple_message(std::string_view(status.reason()).substr(0, orig_status.reason().size()))
     , compensating_writes_info(std::move(compensating_writes))
 {
     if (server_log) {
-        logURL = std::string_view(reason()).substr(simple_message.size() + s_middle_part.size());
+        logURL = std::string_view(status.reason()).substr(simple_message.size() + s_middle_part.size());
     }
 }
-
 
 /// The error indicates a client reset situation.
 bool SyncError::is_client_reset_requested() const
@@ -62,7 +62,7 @@ bool SyncError::is_client_reset_requested() const
         server_requests_action == sync::ProtocolErrorInfo::Action::ClientResetNoRecovery) {
         return true;
     }
-    if (code() == ErrorCodes::AutoClientResetFailed) {
+    if (status == ErrorCodes::AutoClientResetFailed) {
         return true;
     }
     return false;

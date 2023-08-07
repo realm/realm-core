@@ -200,6 +200,7 @@ typedef enum realm_errno {
     RLM_ERR_MAINTENANCE_IN_PROGRESS = 4352,
     RLM_ERR_USERPASS_TOKEN_INVALID = 4353,
     RLM_ERR_INVALID_SERVER_RESPONSE = 4354,
+    RLM_ERR_APP_SERVER_ERROR = 4355,
 
     RLM_ERR_CALLBACK = 1000000, /**< A user-provided callback failed. */
     RLM_ERR_UNKNOWN = 2000000   /* Should not be used in code */

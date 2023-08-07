@@ -179,6 +179,15 @@ void encryption_read_barrier(const File::Map<T>& map, size_t index, size_t num_e
 }
 
 template <typename T>
+void encryption_read_barrier_for_write(const File::Map<T>& map, size_t index, size_t num_elements = 1)
+{
+    if (auto mapping = map.get_encrypted_mapping(); REALM_UNLIKELY(mapping)) {
+        do_encryption_read_barrier(map.get_addr() + index, sizeof(T) * num_elements, nullptr, mapping,
+                                   map.is_writeable());
+    }
+}
+
+template <typename T>
 void encryption_write_barrier(const File::Map<T>& map, size_t index, size_t num_elements = 1)
 {
     if (auto mapping = map.get_encrypted_mapping(); REALM_UNLIKELY(mapping)) {

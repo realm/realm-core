@@ -723,7 +723,7 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
     try {
         bool simulate_integration_error = (m_wrapper.m_simulate_integration_error && !changesets.empty());
         if (simulate_integration_error) {
-            throw IntegrationException(Status{ErrorCodes::BadChangeset, "simulated failure"});
+            throw IntegrationException(ErrorCodes::BadChangeset, "simulated failure", ProtocolError::bad_changeset);
         }
         version_type client_version;
         if (REALM_LIKELY(!get_client().is_dry_run())) {
@@ -814,8 +814,9 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     }
     catch (const LogicError& ex) {
         if (ex.code() == ErrorCodes::LimitExceeded) {
-            IntegrationException ex(Status{ErrorCodes::LimitExceeded,
-                                           "bootstrap changeset too large to store in pending bootstrap store"});
+            IntegrationException ex(ErrorCodes::LimitExceeded,
+                                    "bootstrap changeset too large to store in pending bootstrap store",
+                                    ProtocolError::bad_changeset_size);
             on_integration_failure(ex);
             return true;
         }
@@ -895,7 +896,7 @@ void SessionImpl::process_pending_flx_bootstrap()
         bool simulate_integration_error =
             (m_wrapper.m_simulate_integration_error && !pending_batch.changesets.empty());
         if (simulate_integration_error) {
-            throw IntegrationException(Status{ErrorCodes::BadChangeset, "simulated failure"});
+            throw IntegrationException(ErrorCodes::BadChangeset, "simulated failure", ProtocolError::bad_changeset);
         }
 
         history.integrate_server_changesets(
@@ -998,7 +999,7 @@ SyncClientHookAction SessionImpl::call_debug_hook(const SyncClientHookData& data
     auto action = m_wrapper.m_debug_hook(data);
     switch (action) {
         case realm::SyncClientHookAction::SuspendWithRetryableError: {
-            SessionErrorInfo err_info(Status{ErrorCodes::RuntimeError, "hook requested error"}, true);
+            SessionErrorInfo err_info(Status{ErrorCodes::RuntimeError, "hook requested error"}, IsFatal{false});
             err_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
 
             auto err_processing_err = receive_error_message(err_info);
