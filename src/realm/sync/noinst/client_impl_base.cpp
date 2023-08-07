@@ -206,10 +206,8 @@ ClientImpl::ClientImpl(ClientConfig config)
     REALM_ASSERT_EX(m_socket_provider, "Must provide socket provider in sync Client config");
 
     if (m_one_connection_per_session) {
-        // FIXME: Re-enable this warning when the load balancer is able to handle
-        // multiplexing.
-        //        logger.warn("Testing/debugging feature 'one connection per session' enabled - "
-        //            "never do this in production");
+        logger.warn("Testing/debugging feature 'one connection per session' enabled - "
+                    "never do this in production");
     }
 
     if (config.disable_upload_activation_delay) {
@@ -1873,6 +1871,7 @@ void Session::send_bind_message()
             bind_json_data["migratedPartition"] = *migrated_partition;
         }
         bind_json_data["sessionReason"] = static_cast<uint64_t>(get_session_reason());
+        bind_json_data["schema_version"] = get_schema_version();
         if (logger.would_log(util::Logger::Level::debug)) {
             std::string json_data_dump;
             if (!bind_json_data.empty()) {

@@ -167,6 +167,8 @@ private:
 
     SessionReason m_session_reason;
 
+    const uint64_t m_schema_version;
+
     std::shared_ptr<SubscriptionStore> m_flx_subscription_store;
     int64_t m_flx_active_version = 0;
     int64_t m_flx_last_seen_version = 0;
@@ -714,6 +716,13 @@ SessionReason SessionImpl::get_session_reason() noexcept
     return m_wrapper.m_session_reason;
 }
 
+uint64_t SessionImpl::get_schema_version() noexcept
+{
+    // Can only be called if the session is active or being activated
+    REALM_ASSERT_EX(m_state == State::Active || m_state == State::Unactivated, m_state);
+    return m_wrapper.m_schema_version;
+}
+
 void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes, DownloadBatchState batch_state,
                                                 const SyncProgress& progress, const ReceivedChangesets& changesets)
 {
@@ -1140,6 +1149,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_proxy_config{config.proxy_config} // Throws
     , m_debug_hook(std::move(config.on_sync_client_event_hook))
     , m_session_reason(config.session_reason)
+    , m_schema_version(config.schema_version)
     , m_flx_subscription_store(std::move(flx_sub_store))
     , m_migration_store(std::move(migration_store))
 {
@@ -2014,7 +2024,7 @@ void Client::voluntary_disconnect_all_connections()
 
 bool Client::wait_for_session_terminations_or_client_stopped()
 {
-    return m_impl.get()->wait_for_session_terminations_or_client_stopped();
+    return m_impl->wait_for_session_terminations_or_client_stopped();
 }
 
 

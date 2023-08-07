@@ -908,6 +908,9 @@ private:
     // - Client reset state means the session is going to be used to download a fresh realm.
     SessionReason get_session_reason() noexcept;
 
+    /// Returns the schema version the synchronization session connects with to the server.
+    uint64_t get_schema_version() noexcept;
+
     /// \brief Initiate the integration of downloaded changesets.
     ///
     /// This function must provide for the passed changesets (if any) to

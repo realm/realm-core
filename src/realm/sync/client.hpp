@@ -353,6 +353,11 @@ public:
         ///
         /// Note: Currently only used in FLX sync.
         SessionReason session_reason = SessionReason::Sync;
+
+        /// Schema version
+        ///
+        /// Note: Currently set only for FLX sync.
+        uint64_t schema_version = -1; // = ObjectStore::NotVersioned
     };
 
     /// \brief Start a new session for the specified client-side Realm.
