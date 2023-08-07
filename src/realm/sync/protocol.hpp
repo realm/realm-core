@@ -263,6 +263,8 @@ struct ProtocolErrorInfo {
         ClientResetNoRecovery,
         MigrateToFLX,
         RevertToPBS,
+        // The RefreshUser/RefreshLocation actions are currently generated internally when the
+        // sync websocket is closed with specific error codes.
         RefreshUser,
         RefreshLocation,
     };

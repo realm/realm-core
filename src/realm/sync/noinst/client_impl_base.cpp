@@ -1934,7 +1934,7 @@ void Session::send_ident_message()
                      m_client_file_ident.ident, m_client_file_ident.salt, m_progress.download.server_version,
                      m_progress.download.last_integrated_client_version, m_progress.latest_server_version.version,
                      m_progress.latest_server_version.salt, active_query_set.version(), active_query_body.size(),
-                     active_query_body); // T
+                     active_query_body); // Throws
         protocol.make_flx_ident_message(out, session_ident, m_client_file_ident, m_progress,
                                         active_query_set.version(), active_query_body); // Throws
         m_last_sent_flx_query_version = active_query_set.version();
