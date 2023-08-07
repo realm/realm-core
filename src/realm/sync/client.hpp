@@ -352,6 +352,8 @@ public:
         std::function<SyncClientHookAction(const SyncClientHookData&)> on_sync_client_event_hook;
 
         /// Schema version
+        ///
+        /// Note: Currently set only for FLX sync.
         uint64_t schema_version = -1; // = ObjectStore::NotVersioned
     };
 
