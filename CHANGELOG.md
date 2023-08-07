@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Add schema version to flexible sync client BIND message. ([#6840](https://github.com/realm/realm-core/issues/6840))
 
 ----------------------------------------------
 
