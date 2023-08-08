@@ -545,6 +545,23 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
 }
 
 
+// This relies on the same assumptions and guarantees as wait_for_session_terminations_or_client_stopped().
+util::Future<void> ClientImpl::notify_session_terminated()
+{
+    auto pf = util::make_promise_future<void>();
+    post([promise = std::move(pf.promise)](Status status) mutable {
+        // Includes operation_aborted
+        if (!status.is_ok()) {
+            promise.set_error(status);
+            return;
+        }
+
+        promise.emplace_value();
+    });
+
+    return std::move(pf.future);
+}
+
 void ClientImpl::drain_connections_on_loop()
 {
     post([this](Status status) mutable {
@@ -2127,9 +2144,9 @@ bool Client::wait_for_session_terminations_or_client_stopped()
     return m_impl.get()->wait_for_session_terminations_or_client_stopped();
 }
 
-void Client::post(realm::sync::SyncSocketProvider::FunctionHandler&& handler)
+util::Future<void> Client::notify_session_terminated()
 {
-    m_impl.get()->post(std::move(handler));
+    return m_impl->notify_session_terminated();
 }
 
 bool Client::decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,

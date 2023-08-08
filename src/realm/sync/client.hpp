@@ -96,7 +96,8 @@ public:
     /// by any thread, and by multiple threads concurrently.
     bool wait_for_session_terminations_or_client_stopped();
 
-    void post(SyncSocketProvider::FunctionHandler&& handler);
+    /// Async version of wait_for_session_terminations_or_client_stopped().
+    util::Future<void> notify_session_terminated();
 
     /// Returns false if the specified URL is invalid.
     bool decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,

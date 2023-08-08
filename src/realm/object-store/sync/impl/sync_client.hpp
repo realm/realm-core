@@ -132,20 +132,10 @@ struct SyncClient {
         m_client.wait_for_session_terminations_or_client_stopped();
     }
 
+    // Async version of wait_for_session_terminations().
     util::Future<void> notify_session_terminated()
     {
-        auto pf = util::make_promise_future<void>();
-        m_client.post([promise = std::move(pf.promise)](Status status) mutable {
-            // Includes operation_aborted
-            if (!status.is_ok()) {
-                promise.set_error(status);
-                return;
-            }
-
-            promise.emplace_value();
-        });
-
-        return std::move(pf.future);
+        return m_client.notify_session_terminated();
     }
 
     ~SyncClient() {}

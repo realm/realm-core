@@ -1220,6 +1220,11 @@ void SyncSession::shutdown_and_wait()
 util::Future<void> SyncSession::shutdown()
 {
     {
+        // Transition immediately to `inactive` state. Calling this function must guarantee that any
+        // sync::Session object in SyncSession::m_session that existed prior to the time of invocation
+        // must have been destroyed upon return. This allows the caller to follow up with a call to
+        // sync::Client::notify_session_terminated() in order to be notified when the Realm file is closed. This works
+        // so long as this SyncSession object remains in the `inactive` state after the invocation of shutdown().
         util::CheckedUniqueLock lock(m_state_mutex);
         if (m_state != State::Inactive && m_state != State::Paused) {
             become_inactive(std::move(lock));
