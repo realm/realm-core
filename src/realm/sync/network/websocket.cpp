@@ -1208,7 +1208,7 @@ std::ostream& operator<<(std::ostream& os, WebSocketError code)
     }();
 
     if (str == nullptr) {
-        os << "WebSocket: Unkhown Error (" << static_cast<std::underlying_type_t<WebSocketError>>(code) << ")";
+        os << "WebSocket: Unknown Error (" << static_cast<std::underlying_type_t<WebSocketError>>(code) << ")";
     }
     else {
         os << str;
