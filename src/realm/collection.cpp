@@ -86,4 +86,26 @@ void check_for_last_unresolved(BPlusTree<ObjKey>* tree)
     }
 }
 
+size_t get_collection_size_from_ref(ref_type ref, Allocator& alloc)
+{
+    size_t ret = 0;
+    if (ref) {
+        Array arr(alloc);
+        arr.init_from_ref(ref);
+        if (arr.is_inner_bptree_node()) {
+            // This is a BPlusTree
+            ret = size_t(arr.back()) >> 1;
+        }
+        else if (arr.has_refs()) {
+            // This is a dictionary
+            auto key_ref = arr.get_as_ref(0);
+            ret = get_collection_size_from_ref(key_ref, alloc);
+        }
+        else {
+            ret = arr.size();
+        }
+    }
+    return ret;
+}
+
 } // namespace realm::_impl
