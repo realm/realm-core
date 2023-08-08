@@ -412,8 +412,8 @@ TEST_CASE("sync: error handling", "[sync][session]") {
             final_error = std::move(error);
         };
 
-        auto code = static_cast<int>(GENERATE(ProtocolError::bad_client_file_ident, ProtocolError::bad_server_version,
-                                              ProtocolError::diverging_histories));
+        auto code = GENERATE(ProtocolError::bad_client_file_ident, ProtocolError::bad_server_version,
+                             ProtocolError::diverging_histories);
 
         sync::SessionErrorInfo initial_error{sync::protocol_error_to_status(code, "Something bad happened"), true};
         initial_error.server_requests_action = ProtocolErrorInfo::Action::ClientReset;

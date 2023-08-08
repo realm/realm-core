@@ -252,14 +252,14 @@ struct SessionErrorInfo : public ProtocolErrorInfo {
     {
     }
 
-    SessionErrorInfo(Status status, IsFatal is_fatal,
-                     ProtocolError protocol_error = ProtocolError::other_session_error)
-        : ProtocolErrorInfo(static_cast<int>(protocol_error), status.reason(), is_fatal)
+    SessionErrorInfo(const ProtocolErrorInfo& info, Status status)
+        : ProtocolErrorInfo(info)
         , status(std::move(status))
     {
     }
-    SessionErrorInfo(const ProtocolErrorInfo& info, Status status)
-        : ProtocolErrorInfo(info)
+
+    SessionErrorInfo(Status status, IsFatal is_fatal)
+        : ProtocolErrorInfo(0, {}, is_fatal)
         , status(std::move(status))
     {
     }

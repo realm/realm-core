@@ -544,7 +544,6 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
         case WebSocketError::websocket_no_status_received:
             [[fallthrough]];
         case WebSocketError::websocket_invalid_extension: {
-
             close_due_to_client_side_error({ErrorCodes::SyncProtocolInvariantFailed, msg}, IsFatal{false},
                                            ConnectionTerminationReason::websocket_protocol_violation); // Throws
             break;
@@ -609,7 +608,6 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
         case WebSocketError::websocket_internal_server_error:
             [[fallthrough]];
         case WebSocketError::websocket_retry_error: {
-
             involuntary_disconnect(SessionErrorInfo({ErrorCodes::ConnectionClosed, msg}, IsFatal{false}),
                                    ConnectionTerminationReason::http_response_says_nonfatal_error);
             break;
@@ -1136,10 +1134,9 @@ void Connection::close_due_to_server_side_error(ProtocolError error_code, const 
     logger.info("Connection closed due to error reported by server: %1 (%2)", info.message,
                 int(error_code)); // Throws
 
-
     const auto reason = info.is_fatal ? ConnectionTerminationReason::server_said_do_not_reconnect
                                       : ConnectionTerminationReason::server_said_try_again_later;
-    involuntary_disconnect(SessionErrorInfo{info, protocol_error_to_status(info.raw_error_code, info.message)},
+    involuntary_disconnect(SessionErrorInfo{info, protocol_error_to_status(error_code, info.message)},
                            reason); // Throws
 }
 
@@ -2315,8 +2312,7 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
                  progress.download.server_version, progress.download.last_integrated_client_version,
                  progress.latest_server_version.version, progress.latest_server_version.salt,
                  progress.upload.client_version, progress.upload.last_integrated_server_version, downloadable_bytes,
-                 batch_state != DownloadBatchState::MoreToCome, query_version,
-                 received_changesets.size()); // Throws
+                 batch_state != DownloadBatchState::MoreToCome, query_version, received_changesets.size()); // Throws
 
     // Ignore download messages when the client detects an error. This is to prevent transforming the same
     // bad changeset over and over again.
