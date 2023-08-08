@@ -1683,25 +1683,25 @@ auto ParserDriver::cmp(const std::vector<ExpressionNode*>& values) -> std::pair<
     return {std::move(left), std::move(right)};
 }
 
-auto ParserDriver::column(LinkChain& link_chain, std::string identifier) -> SubexprPtr
+auto ParserDriver::column(LinkChain& link_chain, const std::string& identifier) -> SubexprPtr
 {
-    identifier = m_mapping.translate(link_chain, identifier);
+    auto translated_identifier = m_mapping.translate(link_chain, identifier);
 
-    if (identifier.find("@links.") == 0) {
+    if (translated_identifier.find("@links.") == 0) {
         backlink(link_chain, identifier);
         return link_chain.create_subexpr<Link>(ColKey());
     }
-    if (auto col = link_chain.column(identifier)) {
+    if (auto col = link_chain.column(translated_identifier)) {
         return col;
     }
     throw InvalidQueryError(
         util::format("'%1' has no property '%2'", link_chain.get_current_table()->get_class_name(), identifier));
 }
 
-auto ParserDriver::dictionary_column(LinkChain& link_chain, std::string identifier) -> SubexprPtr
+auto ParserDriver::dictionary_column(LinkChain& link_chain, const std::string& identifier) -> SubexprPtr
 {
-    identifier = m_mapping.translate(link_chain, identifier);
-    auto col_key = link_chain.get_current_table()->get_column_key(identifier);
+    auto translated_identifier = m_mapping.translate(link_chain, identifier);
+    auto col_key = link_chain.get_current_table()->get_column_key(translated_identifier);
     if (col_key.is_dictionary()) {
         return link_chain.create_subexpr<Dictionary>(col_key);
     }
