@@ -351,8 +351,15 @@ TEST_CASE("SyncSession: shutdown() API", "[sync][session]") {
         return sessions_are_active(*session);
     });
     REQUIRE(sessions_are_active(*session));
+    auto dbref = SyncSession::OnlyForTesting::get_db(*session);
+    auto before = dbref.use_count();
     auto future = session->shutdown();
     future.get();
+    auto after = dbref.use_count();
+    // Check SessionImpl released the sync agent as result of SessionWrapper::finalize() being called.
+    REQUIRE_NOTHROW(dbref->claim_sync_agent());
+    // Check DBRef is released in SessionWrapper::finalize().
+    REQUIRE(after == before - 1);
 }
 
 TEST_CASE("SyncSession: update_configuration()", "[sync][session]") {
