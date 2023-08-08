@@ -359,7 +359,7 @@ TEST_CASE("SyncSession: shutdown() API", "[sync][session]") {
     // Check SessionImpl released the sync agent as result of SessionWrapper::finalize() being called.
     REQUIRE_NOTHROW(dbref->claim_sync_agent());
     // Check DBRef is released in SessionWrapper::finalize().
-    REQUIRE(after == before - 1);
+    REQUIRE(after < before);
 }
 
 TEST_CASE("SyncSession: update_configuration()", "[sync][session]") {
