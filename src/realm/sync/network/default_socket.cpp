@@ -526,6 +526,24 @@ void DefaultSocketProvider::start()
     state_wait_for(lock, State::Running);
 }
 
+void DefaultSocketProvider::OnlyForTesting::run_event_loop_on_current_thread(DefaultSocketProvider* provider)
+{
+    {
+        std::unique_lock<std::mutex> lk(provider->m_mutex);
+        REALM_ASSERT(provider->m_state == State::Stopped);
+        provider->do_state_update(lk, State::Starting);
+    }
+
+    provider->event_loop();
+}
+
+void DefaultSocketProvider::OnlyForTesting::prep_event_loop_for_restart(DefaultSocketProvider* provider)
+{
+    std::unique_lock<std::mutex> lk(provider->m_mutex);
+    REALM_ASSERT(provider->m_state == State::Stopped);
+    provider->m_service.reset();
+}
+
 void DefaultSocketProvider::event_loop()
 {
     m_logger_ptr->trace("Default event loop: thread running");
@@ -541,7 +559,8 @@ void DefaultSocketProvider::event_loop()
             m_logger_ptr->error("Default event loop: thread exited unexpectedly");
         }
         m_state = State::Stopped;
-        std::notify_all_at_thread_exit(m_state_cv, std::move(lock));
+        lock.unlock();
+        m_state_cv.notify_all();
     });
 
     if (m_observer_ptr)
