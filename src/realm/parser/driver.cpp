@@ -855,16 +855,23 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
     }
     try {
         m_link_chain = path->visit(drv, comp_type);
-        std::unique_ptr<Subexpr> subexpr{drv->column(m_link_chain, identifier)};
-        if (!path->path_elems.back().index.is_null()) {
-            if (auto s = dynamic_cast<Columns<Dictionary>*>(subexpr.get())) {
+        std::unique_ptr<Subexpr> subexpr;
+        if (is_keys || !path->path_elems.back().index.is_null()) {
+            // It must be a dictionary
+            subexpr = drv->dictionary_column(m_link_chain, identifier);
+            auto s = dynamic_cast<Columns<Dictionary>*>(subexpr.get());
+            if (!s) {
+                throw InvalidQueryError("Not a dictionary");
+            }
+            if (is_keys) {
+                subexpr = std::make_unique<ColumnDictionaryKeys>(*s);
+            }
+            else {
                 subexpr = s->key(path->path_elems.back().index).clone();
             }
         }
-        if (is_keys) {
-            if (auto s = dynamic_cast<Columns<Dictionary>*>(subexpr.get())) {
-                subexpr = std::make_unique<ColumnDictionaryKeys>(*s);
-            }
+        else {
+            subexpr = drv->column(m_link_chain, identifier);
         }
 
         if (post_op) {
@@ -1689,6 +1696,16 @@ auto ParserDriver::column(LinkChain& link_chain, std::string identifier) -> Sube
     }
     throw InvalidQueryError(
         util::format("'%1' has no property '%2'", link_chain.get_current_table()->get_class_name(), identifier));
+}
+
+auto ParserDriver::dictionary_column(LinkChain& link_chain, std::string identifier) -> SubexprPtr
+{
+    identifier = m_mapping.translate(link_chain, identifier);
+    auto col_key = link_chain.get_current_table()->get_column_key(identifier);
+    if (col_key.is_dictionary()) {
+        return link_chain.create_subexpr<Dictionary>(col_key);
+    }
+    return {};
 }
 
 void ParserDriver::backlink(LinkChain& link_chain, const std::string& identifier)
