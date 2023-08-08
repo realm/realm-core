@@ -1688,7 +1688,7 @@ auto ParserDriver::column(LinkChain& link_chain, const std::string& identifier) 
     auto translated_identifier = m_mapping.translate(link_chain, identifier);
 
     if (translated_identifier.find("@links.") == 0) {
-        backlink(link_chain, identifier);
+        backlink(link_chain, translated_identifier);
         return link_chain.create_subexpr<Link>(ColKey());
     }
     if (auto col = link_chain.column(translated_identifier)) {
