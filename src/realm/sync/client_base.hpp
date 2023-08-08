@@ -251,8 +251,8 @@ struct SessionErrorInfo : public ProtocolErrorInfo {
     {
     }
 
-    SessionErrorInfo(Status status, bool try_again)
-        : ProtocolErrorInfo(status.get_std_error_code().value(), status.reason(), try_again)
+    SessionErrorInfo(Status status, IsFatal is_fatal)
+        : ProtocolErrorInfo(status.get_std_error_code().value(), status.reason(), is_fatal)
         , status(std::move(status))
     {
     }

@@ -499,30 +499,30 @@ void Connection::websocket_error_handler()
     m_websocket_error_received = true;
 }
 
-bool Connection::websocket_closed_handler(bool was_clean, Status status)
+bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_code, std::string_view msg)
 {
     if (m_force_closed) {
         logger.debug("Received websocket close message after connection was force closed");
         return false;
     }
-    logger.info("Closing the websocket with status='%1', was_clean='%2'", status, was_clean);
-    auto error_code = status.get_std_error_code();
+    logger.info("Closing the websocket with error code=%1, message='%2', was_clean=%3", error_code, msg, was_clean);
 
-    switch (static_cast<WebSocketError>(error_code.value())) {
+    switch (error_code) {
         case WebSocketError::websocket_ok:
             break;
         case WebSocketError::websocket_resolve_failed:
             [[fallthrough]];
         case WebSocketError::websocket_connection_failed: {
-            constexpr bool try_again = true;
-            involuntary_disconnect(SessionErrorInfo{std::move(status), try_again},
-                                   ConnectionTerminationReason::connect_operation_failed); // Throws
+            SessionErrorInfo error_info(
+                {ErrorCodes::SyncConnectFailed, util::format("Failed to connect to sync: %1", msg)}, IsFatal{false});
+            involuntary_disconnect(std::move(error_info), ConnectionTerminationReason::connect_operation_failed);
             break;
         }
         case WebSocketError::websocket_read_error:
             [[fallthrough]];
         case WebSocketError::websocket_write_error: {
-            read_or_write_error(error_code, status.reason()); // Throws
+            close_due_to_transient_error({ErrorCodes::ConnectionClosed, msg},
+                                         ConnectionTerminationReason::read_or_write_error);
             break;
         }
         case WebSocketError::websocket_going_away:
@@ -540,61 +540,72 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         case WebSocketError::websocket_no_status_received:
             [[fallthrough]];
         case WebSocketError::websocket_invalid_extension: {
-            constexpr bool try_again = true;
-            SessionErrorInfo error_info{std::move(status), try_again};
-            involuntary_disconnect(std::move(error_info),
-                                   ConnectionTerminationReason::websocket_protocol_violation); // Throws
+            close_due_to_client_side_error({ErrorCodes::SyncProtocolInvariantFailed, msg}, IsFatal{false},
+                                           ConnectionTerminationReason::websocket_protocol_violation); // Throws
             break;
         }
         case WebSocketError::websocket_message_too_big: {
-            constexpr bool try_again = true;
-            auto message =
-                util::format("Sync websocket closed because the server received a message that was too large: %1",
-                             status.reason());
-            SessionErrorInfo error_info(Status(ErrorCodes::LimitExceeded, std::move(message)), try_again);
+            auto message = util::format(
+                "Sync websocket closed because the server received a message that was too large: %1", msg);
+            SessionErrorInfo error_info(Status(ErrorCodes::LimitExceeded, std::move(message)), IsFatal{false});
             error_info.server_requests_action = ProtocolErrorInfo::Action::ClientReset;
             involuntary_disconnect(std::move(error_info),
                                    ConnectionTerminationReason::websocket_protocol_violation); // Throws
             break;
         }
         case WebSocketError::websocket_tls_handshake_failed: {
-            close_due_to_client_side_error(Status(ErrorCodes::TlsHandshakeFailed, status.reason()), IsFatal{false},
+            close_due_to_client_side_error(Status(ErrorCodes::TlsHandshakeFailed, msg), IsFatal{false},
                                            ConnectionTerminationReason::ssl_certificate_rejected); // Throws
             break;
         }
-        case WebSocketError::websocket_client_too_old: {
-            close_due_to_client_side_error(std::move(status), IsFatal{true},
-                                           ConnectionTerminationReason::http_response_says_fatal_error); // Throws
-            break;
-        }
-        case WebSocketError::websocket_client_too_new: {
-            close_due_to_client_side_error(std::move(status), IsFatal{true},
-                                           ConnectionTerminationReason::http_response_says_fatal_error); // Throws
-            break;
-        }
+        case WebSocketError::websocket_client_too_old:
+            [[fallthrough]];
+        case WebSocketError::websocket_client_too_new:
+            [[fallthrough]];
         case WebSocketError::websocket_protocol_mismatch: {
-            close_due_to_client_side_error(std::move(status), IsFatal{true},
+            close_due_to_client_side_error({ErrorCodes::SyncProtocolNegotiationFailed, msg}, IsFatal{true},
                                            ConnectionTerminationReason::http_response_says_fatal_error); // Throws
             break;
         }
-        case WebSocketError::websocket_fatal_error:
-            [[fallthrough]];
+        case WebSocketError::websocket_fatal_error: {
+            involuntary_disconnect(SessionErrorInfo({ErrorCodes::ConnectionClosed, msg}, IsFatal{true}),
+                                   ConnectionTerminationReason::http_response_says_fatal_error);
+            break;
+        }
         case WebSocketError::websocket_forbidden: {
-            close_due_to_client_side_error(std::move(status), IsFatal{true},
-                                           ConnectionTerminationReason::http_response_says_fatal_error); // Throws
+            involuntary_disconnect(SessionErrorInfo({ErrorCodes::AuthError, msg}, IsFatal{true}),
+                                   ConnectionTerminationReason::http_response_says_fatal_error);
             break;
         }
-        case WebSocketError::websocket_unauthorized:
-            [[fallthrough]];
-        case WebSocketError::websocket_moved_permanently:
-            [[fallthrough]];
+        case WebSocketError::websocket_unauthorized: {
+            SessionErrorInfo error_info(
+                {ErrorCodes::AuthError,
+                 util::format("Websocket was closed because of an authentication issue: %1", msg)},
+                IsFatal{false});
+            error_info.server_requests_action = ProtocolErrorInfo::Action::RefreshUser;
+            involuntary_disconnect(std::move(error_info),
+                                   ConnectionTerminationReason::http_response_says_nonfatal_error);
+            break;
+        }
+        case WebSocketError::websocket_moved_permanently: {
+            SessionErrorInfo error_info({ErrorCodes::ConnectionClosed, msg}, IsFatal{false});
+            error_info.server_requests_action = ProtocolErrorInfo::Action::RefreshLocation;
+            involuntary_disconnect(std::move(error_info),
+                                   ConnectionTerminationReason::http_response_says_nonfatal_error);
+            break;
+        }
+        case WebSocketError::websocket_abnormal_closure: {
+            SessionErrorInfo error_info({ErrorCodes::ConnectionClosed, msg}, IsFatal{false});
+            error_info.server_requests_action = ProtocolErrorInfo::Action::RefreshUser;
+            involuntary_disconnect(std::move(error_info),
+                                   ConnectionTerminationReason::http_response_says_nonfatal_error);
+            break;
+        }
         case WebSocketError::websocket_internal_server_error:
             [[fallthrough]];
-        case WebSocketError::websocket_abnormal_closure:
-            [[fallthrough]];
         case WebSocketError::websocket_retry_error: {
-            close_due_to_client_side_error(error_code, status.reason(), IsFatal{false},
-                                           ConnectionTerminationReason::http_response_says_nonfatal_error); // Throws
+            involuntary_disconnect(SessionErrorInfo({ErrorCodes::ConnectionClosed, msg}, IsFatal{false}),
+                                   ConnectionTerminationReason::http_response_says_nonfatal_error);
             break;
         }
     }
@@ -695,13 +706,13 @@ struct Connection::WebSocketObserverShim : public sync::WebSocketObserver {
         return conn->websocket_binary_message_received(data);
     }
 
-    bool websocket_closed_handler(bool was_clean, Status status) override
+    bool websocket_closed_handler(bool was_clean, WebSocketError error_code, std::string_view msg) override
     {
         if (sentinel->destroyed) {
             return true;
         }
 
-        return conn->websocket_closed_handler(was_clean, std::move(status));
+        return conn->websocket_closed_handler(was_clean, error_code, msg);
     }
 };
 
@@ -782,8 +793,7 @@ void Connection::handle_connect_wait(Status status)
 
     REALM_ASSERT_EX(m_state == ConnectionState::connecting, m_state);
     logger.info("Connect timeout"); // Throws
-    constexpr bool try_again = true;
-    involuntary_disconnect(SessionErrorInfo{Status{ErrorCodes::SyncConnectFailed, status.reason()}, try_again},
+    involuntary_disconnect(SessionErrorInfo{Status{ErrorCodes::SyncConnectFailed, status.reason()}, IsFatal{false}},
                            ConnectionTerminationReason::sync_connect_timeout); // Throws
 }
 
@@ -1117,19 +1127,20 @@ void Connection::close_due_to_client_side_error(std::error_code ec, std::optiona
 void Connection::close_due_to_client_side_error(Status status, IsFatal is_fatal, ConnectionTerminationReason reason)
 {
     logger.info("Connection closed due to error: %1", status); // Throws
-    const bool try_again = !is_fatal;
 
-    involuntary_disconnect(SessionErrorInfo{std::move(status), try_again}, reason); // Throw
+    involuntary_disconnect(SessionErrorInfo{std::move(status), is_fatal}, reason); // Throw
 }
+
 
 void Connection::close_due_to_transient_error(Status status, ConnectionTerminationReason reason)
 {
     logger.info("Connection closed due to transient error: %1", status); // Throws
-    SessionErrorInfo error_info{std::move(status), true};
+    SessionErrorInfo error_info{std::move(status), IsFatal{false}};
     error_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
 
     involuntary_disconnect(std::move(error_info), reason); // Throw
 }
+
 
 // Close connection due to error discovered on the server-side, and then
 // reported to the client by way of a connection-level ERROR message.
@@ -1138,8 +1149,8 @@ void Connection::close_due_to_server_side_error(ProtocolError error_code, const 
     logger.info("Connection closed due to error reported by server: %1 (%2)", info.message,
                 int(error_code)); // Throws
 
-    const auto reason = info.try_again ? ConnectionTerminationReason::server_said_try_again_later
-                                       : ConnectionTerminationReason::server_said_do_not_reconnect;
+    const auto reason = info.is_fatal ? ConnectionTerminationReason::server_said_do_not_reconnect
+                                      : ConnectionTerminationReason::server_said_try_again_later;
     involuntary_disconnect(SessionErrorInfo{info, protocol_error_to_status(error_code, info.message)},
                            reason); // Throws
 }
@@ -1284,8 +1295,8 @@ void Connection::receive_error_message(const ProtocolErrorInfo& info, session_id
         return;
     }
 
-    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, session_ident=%4, error_action=%5)",
-                info.message, info.raw_error_code, info.try_again, session_ident,
+    logger.info("Received: ERROR \"%1\" (error_code=%2, is_fatal=%3, session_ident=%4, error_action=%5)",
+                info.message, info.raw_error_code, info.is_fatal, session_ident,
                 info.server_requests_action); // Throws
 
     bool known_error_code = bool(get_protocol_error_message(info.raw_error_code));
@@ -1563,9 +1574,8 @@ void Session::on_integration_failure(const IntegrationException& error)
     m_client_error = util::make_optional<IntegrationException>(error);
     m_error_to_send = true;
 
-    constexpr bool try_again = true;
     // Surface the error to the user otherwise is lost.
-    on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{error.to_status(), try_again});
+    on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{error.to_status(), IsFatal{false}});
 
     // Since the deactivation process has not been initiated, the UNBIND
     // message cannot have been sent unless an ERROR message was received.
@@ -1689,7 +1699,7 @@ void Session::activate()
         logger.error("Error integrating bootstrap changesets: %1", error.what());
         m_suspended = true;
         m_conn.one_less_active_unsuspended_session(); // Throws
-        on_suspended(SessionErrorInfo{Status{error.code(), error.what()}, false});
+        on_suspended(SessionErrorInfo{Status{error.code(), error.what()}, IsFatal{true}});
     }
 
     if (has_pending_client_reset) {
@@ -2297,12 +2307,13 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
     catch (const std::exception& e) {
         auto err_msg = util::format("A fatal error occurred during client reset: '%1'", e.what());
         logger.error(err_msg.c_str());
-        SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, err_msg}, false);
+        SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, err_msg}, IsFatal{true});
         suspend(err_info);
         return Status::OK();
     }
     if (!did_client_reset) {
-        repl.get_history().set_client_file_ident(client_file_ident, m_fix_up_object_ids); // Throws
+        repl.get_history().set_client_file_ident(client_file_ident,
+                                                 m_fix_up_object_ids); // Throws
         m_progress.download.last_integrated_client_version = 0;
         m_progress.upload.client_version = 0;
         m_last_version_selected_for_upload = 0;
@@ -2334,8 +2345,7 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
                  progress.download.server_version, progress.download.last_integrated_client_version,
                  progress.latest_server_version.version, progress.latest_server_version.salt,
                  progress.upload.client_version, progress.upload.last_integrated_server_version, downloadable_bytes,
-                 batch_state != DownloadBatchState::MoreToCome, query_version,
-                 received_changesets.size()); // Throws
+                 batch_state != DownloadBatchState::MoreToCome, query_version, received_changesets.size()); // Throws
 
     // Ignore download messages when the client detects an error. This is to prevent transforming the same bad
     // changeset over and over again.
@@ -2498,8 +2508,8 @@ Status Session::receive_query_error_message(int error_code, std::string_view mes
 // deactivated upon return.
 Status Session::receive_error_message(const ProtocolErrorInfo& info)
 {
-    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, error_action=%4)", info.message,
-                info.raw_error_code, info.try_again, info.server_requests_action); // Throws
+    logger.info("Received: ERROR \"%1\" (error_code=%2, is_fatal=%3, error_action=%4)", info.message,
+                info.raw_error_code, info.is_fatal, info.server_requests_action); // Throws
 
     bool legal_at_this_time = (m_bind_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
@@ -2571,7 +2581,7 @@ void Session::suspend(const SessionErrorInfo& info)
         on_suspended(info);                           // Throws
     }
 
-    if (info.try_again) {
+    if (!info.is_fatal) {
         begin_resumption_delay(info);
     }
 

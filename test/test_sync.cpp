@@ -147,9 +147,8 @@ TEST(Sync_BadVirtualPath)
             return;
         REALM_ASSERT(error_info);
         std::error_code ec = error_info->status.get_std_error_code();
-        bool is_fatal = error_info->is_fatal();
         CHECK_EQUAL(sync::ProtocolError::illegal_realm_path, ec);
-        CHECK(is_fatal);
+        CHECK(error_info->is_fatal);
         ++nerrors;
         if (nerrors == 3)
             fixture.stop();
@@ -786,7 +785,7 @@ struct ExpectChangesetError {
             return;
         REALM_ASSERT(error_info);
         CHECK_EQUAL(error_info->status, ErrorCodes::BadChangeset);
-        CHECK(!error_info->is_fatal());
+        CHECK(!error_info->is_fatal);
         CHECK_EQUAL(error_info->message,
                     "Failed to transform received changeset: Schema mismatch: " + expected_error);
         fixture.stop();
@@ -4574,9 +4573,7 @@ TEST(Sync_ServerDiscardDeadConnections)
 
     BowlOfStonesSemaphore bowl;
     auto error_handler = [&](Status status, bool, const std::string&) {
-        auto ec = status.get_std_error_code();
-        bool valid_error = (ec == sync::websocket::WebSocketError::websocket_read_error);
-        CHECK(valid_error);
+        CHECK_EQUAL(status, ErrorCodes::ConnectionClosed);
         bowl.add_stone();
     };
     fixture.set_client_side_error_handler(std::move(error_handler));
@@ -5172,7 +5169,7 @@ TEST_IF(Sync_SSL_Certificates, false)
                 CHECK(error_info);
                 client_logger->debug(
                     "State change: disconnected, error_code = %1, is_fatal = %2, detailed_message = %3",
-                    error_info->status.get_std_error_code(), error_info->is_fatal(), error_info->message);
+                    error_info->status.get_std_error_code(), error_info->is_fatal, error_info->message);
                 // We expect to get through the SSL handshake but will hit an error due to the wrong token.
                 CHECK_NOT_EQUAL(error_info->status, ErrorCodes::TlsHandshakeFailed);
                 client.shutdown();
@@ -5249,7 +5246,7 @@ TEST(Sync_BadChangeset)
                 return;
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->status.get_std_error_code();
-            bool is_fatal = error_info->is_fatal();
+            bool is_fatal = error_info->is_fatal;
             CHECK_EQUAL(sync::ProtocolError::bad_changeset, ec);
             CHECK(is_fatal);
             did_fail = true;

@@ -144,9 +144,6 @@ realm_sync_error_code_t to_capi(const Status& status, std::string& message)
     else if (category == std::system_category() || category == realm::util::error::basic_system_error_category()) {
         ret.category = RLM_SYNC_ERROR_CATEGORY_SYSTEM;
     }
-    else if (category == realm::sync::websocket::websocket_error_category()) {
-        ret.category = RLM_SYNC_ERROR_CATEGORY_WEBSOCKET;
-    }
     else {
         ret.category = RLM_SYNC_ERROR_CATEGORY_UNKNOWN;
     }
@@ -177,9 +174,6 @@ void sync_error_to_error_code(const realm_sync_error_code_t& sync_error_code, st
         }
         else if (category == RLM_SYNC_ERROR_CATEGORY_SYSTEM) {
             error_code_out->assign(sync_error_code.value, std::system_category());
-        }
-        else if (category == RLM_SYNC_ERROR_CATEGORY_WEBSOCKET) {
-            error_code_out->assign(sync_error_code.value, realm::sync::websocket::websocket_error_category());
         }
         else if (category == RLM_SYNC_ERROR_CATEGORY_UNKNOWN) {
             error_code_out->assign(sync_error_code.value, realm::util::error::basic_system_error_category());
@@ -902,7 +896,7 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
     std::error_code err;
     sync_error_to_error_code(sync_error, &err);
     SyncSession::OnlyForTesting::handle_error(*session->get(),
-                                              sync::SessionErrorInfo{Status{err, error_message}, !is_fatal});
+                                              sync::SessionErrorInfo{Status{err, error_message}, IsFatal{is_fatal}});
 }
 
 } // namespace realm::c_api

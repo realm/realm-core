@@ -1000,7 +1000,7 @@ SyncClientHookAction SessionImpl::call_debug_hook(const SyncClientHookData& data
     auto action = m_wrapper.m_debug_hook(data);
     switch (action) {
         case realm::SyncClientHookAction::SuspendWithRetryableError: {
-            SessionErrorInfo err_info(Status{ErrorCodes::RuntimeError, "hook requested error"}, true);
+            SessionErrorInfo err_info(Status{ErrorCodes::RuntimeError, "hook requested error"}, IsFatal{false});
             err_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
 
             auto err_processing_err = receive_error_message(err_info);

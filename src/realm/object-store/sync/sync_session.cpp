@@ -579,11 +579,10 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
         }
         lock.unlock();
 
-        const bool try_again = false;
         sync::SessionErrorInfo synthetic(
             Status{ErrorCodes::AutoClientResetFailed,
                    util::format("A fatal error occurred during client reset: '%1'", status.reason())},
-            try_again);
+            sync::IsFatal{true});
         handle_error(synthetic);
         return;
     }
@@ -633,7 +632,7 @@ void SyncSession::OnlyForTesting::handle_error(SyncSession& session, sync::Sessi
 void SyncSession::handle_error(sync::SessionErrorInfo error)
 {
     enum class NextStateAfterError { none, inactive, error };
-    auto next_state = error.is_fatal() ? NextStateAfterError::error : NextStateAfterError::none;
+    auto next_state = error.is_fatal ? NextStateAfterError::error : NextStateAfterError::none;
     auto error_code = error.status.get_std_error_code();
     util::Optional<ShouldBackup> delete_file;
     bool log_out_user = false;
@@ -708,38 +707,19 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                 save_sync_config_after_migration_or_rollback();
                 download_fresh_realm(error.server_requests_action);
                 return;
+            case sync::ProtocolErrorInfo::Action::RefreshUser:
+                if (auto u = user()) {
+                    u->refresh_custom_data(false, handle_refresh(shared_from_this(), false));
+                    return;
+                }
+                break;
+            case sync::ProtocolErrorInfo::Action::RefreshLocation:
+                if (auto u = user()) {
+                    u->refresh_custom_data(true, handle_refresh(shared_from_this(), true));
+                    return;
+                }
+                break;
         }
-    }
-    else if (error_code.category() == sync::websocket::websocket_error_category()) {
-        using WebSocketError = sync::websocket::WebSocketError;
-        auto websocket_error = static_cast<WebSocketError>(error_code.value());
-
-        // The server replies with '401: unauthorized' if the access token is invalid, expired, revoked, or the user
-        // is disabled. In this scenario we attempt an automatic token refresh and if that succeeds continue as
-        // normal. If the refresh request also fails with 401 then we need to stop retrying and pass along the error;
-        // see handle_refresh().
-        bool redirect_occurred = websocket_error == WebSocketError::websocket_moved_permanently;
-        if (redirect_occurred || websocket_error == WebSocketError::websocket_unauthorized ||
-            websocket_error == WebSocketError::websocket_abnormal_closure) {
-            if (auto u = user()) {
-                // If a redirection occurred, the location metadata will be updated before refreshing the access
-                // token.
-                u->refresh_custom_data(redirect_occurred, handle_refresh(shared_from_this(), redirect_occurred));
-                return;
-            }
-        }
-
-        // If the websocket was closed cleanly or if the socket disappeared, don't notify the user as an error
-        // since the sync client will retry.
-        if (websocket_error == WebSocketError::websocket_read_error ||
-            websocket_error == WebSocketError::websocket_write_error) {
-            return;
-        }
-
-        // Surface a simplified websocket error to the user.
-        auto simplified_error = sync::websocket::get_simplified_websocket_error(websocket_error);
-        std::error_code new_error_code(simplified_error, sync::websocket::websocket_error_category());
-        error = sync::SessionErrorInfo(Status{new_error_code, error.message}, error.try_again);
     }
     else {
         // Unrecognized error code.
@@ -747,7 +727,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     }
 
     util::CheckedUniqueLock lock(m_state_mutex);
-    SyncError sync_error{error.status, error.is_fatal(), error.log_url, std::move(error.compensating_writes)};
+    SyncError sync_error{error.status, error.is_fatal, error.log_url, std::move(error.compensating_writes)};
     // `action` is used over `shouldClientReset` and `isRecoveryModeDisabled`.
     sync_error.server_requests_action = error.server_requests_action;
     sync_error.is_unrecognized_by_client = unrecognized_by_client;
@@ -755,7 +735,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     if (delete_file)
         update_error_and_mark_file_for_deletion(sync_error, *delete_file);
 
-    if (m_state == State::Dying && error.is_fatal()) {
+    if (m_state == State::Dying && error.is_fatal) {
         become_inactive(std::move(lock), error.status);
         return;
     }
