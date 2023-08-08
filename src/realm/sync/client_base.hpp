@@ -248,7 +248,7 @@ struct ClientConfig {
 struct SessionErrorInfo : public ProtocolErrorInfo {
     SessionErrorInfo(const ProtocolErrorInfo& info)
         : ProtocolErrorInfo(info)
-        , status(protocol_error_to_status(raw_error_code, message))
+        , status(protocol_error_to_status(static_cast<ProtocolError>(info.raw_error_code), message))
     {
     }
 

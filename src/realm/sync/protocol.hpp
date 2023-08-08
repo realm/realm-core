@@ -364,7 +364,7 @@ enum class ProtocolError {
     // clang-format on
 };
 
-Status protocol_error_to_status(int raw_error_code, std::string_view msg);
+Status protocol_error_to_status(ProtocolError raw_error_code, std::string_view msg);
 
 constexpr bool is_session_level_error(ProtocolError);
 

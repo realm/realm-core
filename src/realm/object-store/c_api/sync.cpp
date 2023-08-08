@@ -836,18 +836,9 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
                                                          bool is_fatal)
 {
     REALM_ASSERT(session);
-<<<<<<< HEAD
     SyncSession::OnlyForTesting::handle_error(
         *session->get(),
         sync::SessionErrorInfo{Status{static_cast<ErrorCodes::Error>(error_code), error_str}, !is_fatal});
-=======
-    realm_sync_error_code_t sync_error{static_cast<realm_sync_error_category_e>(error_category), error_code,
-                                       error_message};
-    std::error_code err;
-    sync_error_to_error_code(sync_error, &err);
-    SyncSession::OnlyForTesting::handle_error(*session->get(),
-                                              sync::SessionErrorInfo{Status{err, error_message}, IsFatal{is_fatal}});
->>>>>>> feature/sync_error_unification
 }
 
 } // namespace realm::c_api

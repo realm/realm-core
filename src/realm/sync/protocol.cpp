@@ -135,10 +135,10 @@ std::ostream& operator<<(std::ostream& os, ProtocolError error)
     return os << "Unknown protocol error " << static_cast<int>(error);
 }
 
-Status protocol_error_to_status(int raw_error_code, std::string_view msg)
+Status protocol_error_to_status(ProtocolError error_code, std::string_view msg)
 {
     auto err_code = [&] {
-        switch (ProtocolError(raw_error_code)) {
+        switch (error_code) {
             case ProtocolError::connection_closed:
                 return ErrorCodes::ConnectionClosed;
             case ProtocolError::other_error:

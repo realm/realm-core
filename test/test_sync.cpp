@@ -4489,7 +4489,7 @@ TEST(Sync_PingTimesOut)
 
         auto error_handler = [&](Status status, bool) {
             CHECK_EQUAL(status, ErrorCodes::ConnectionClosed);
-            CHECK_EQUAL(status.reason(), "Timed out waiting for PONG message");
+            CHECK_EQUAL(status.reason(), "Timed out waiting for PONG response from server");
             did_fail = true;
             fixture.stop();
         };
@@ -4518,7 +4518,7 @@ TEST(Sync_ReconnectAfterPingTimeout)
     BowlOfStonesSemaphore bowl;
     auto error_handler = [&](Status status, bool) {
         if (CHECK_EQUAL(status, ErrorCodes::ConnectionClosed)) {
-            CHECK_EQUAL(status.reason(), "Timed out waiting for PONG message");
+            CHECK_EQUAL(status.reason(), "Timed out waiting for PONG response from server");
             bowl.add_stone();
         }
     };
@@ -4544,7 +4544,7 @@ TEST(Sync_UrgentPingIsSent)
 
         auto error_handler = [&](Status status, bool) {
             CHECK_EQUAL(status, ErrorCodes::ConnectionClosed);
-            CHECK_EQUAL(status.reason(), "Timed out waiting for PONG message");
+            CHECK_EQUAL(status.reason(), "Timed out waiting for PONG response from server");
             did_fail = true;
             fixture.stop();
         };

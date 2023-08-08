@@ -1520,7 +1520,8 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
             on_connection_state_changed(
                 m_conn.get_state(),
                 SessionErrorInfo{pending_error,
-                                 protocol_error_to_status(pending_error.raw_error_code, pending_error.message)});
+                                 protocol_error_to_status(static_cast<ProtocolError>(pending_error.raw_error_code),
+                                                          pending_error.message)});
         }
         catch (...) {
             logger.error("Exception thrown while reporting compensating write: %1", exception_to_status());
@@ -2519,7 +2520,8 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
     }
 
     m_error_message_received = true;
-    suspend(SessionErrorInfo{info, protocol_error_to_status(info.raw_error_code, info.message)});
+    suspend(SessionErrorInfo{
+        info, protocol_error_to_status(static_cast<ProtocolError>(info.raw_error_code), info.message)});
     return Status::OK();
 }
 
