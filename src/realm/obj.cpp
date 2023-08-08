@@ -922,7 +922,7 @@ void out_mixed_json(std::ostream& out, const Mixed& val)
         }
         case type_Timestamp:
             out << "\"";
-            out << util::serializer::print_value<Timestamp>(val.get_timestamp());
+            out << val.get<Timestamp>();
             out << "\"";
             break;
         case type_Decimal:
