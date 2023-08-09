@@ -270,6 +270,8 @@ void InstructionApplier::visit_payload(const Instruction::Payload& payload, F&& 
     switch (payload.type) {
         case Type::ObjectValue:
             return visitor(Instruction::Payload::ObjectValue{});
+        case Type::Set:
+            return visitor(Instruction::Payload::Set{});
         case Type::List:
             return visitor(Instruction::Payload::List{});
         case Type::Dictionary:
@@ -341,7 +343,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
 
             auto visitor = [&](const mpark::variant<ObjLink, Mixed, Instruction::Payload::ObjectValue,
                                                     Instruction::Payload::Dictionary, Instruction::Payload::List,
-                                                    Instruction::Payload::Erased>& arg) {
+                                                    Instruction::Payload::Set, Instruction::Payload::Erased>& arg) {
                 if (const auto link_ptr = mpark::get_if<ObjLink>(&arg)) {
                     if (data_type == type_Mixed || data_type == type_TypedLink) {
                         obj.set_any(col, *link_ptr, m_instr.is_default);
@@ -392,6 +394,9 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                 }
                 else if (mpark::get_if<Instruction::Payload::List>(&arg)) {
                     obj.set_collection(col, CollectionType::List);
+                }
+                else if (mpark::get_if<Instruction::Payload::Set>(&arg)) {
+                    obj.set_collection(col, CollectionType::Set);
                 }
             };
 
@@ -468,6 +473,9 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                 [&](const Instruction::Payload::List&) {
                     list.set_collection(size_t(index), CollectionType::List);
                 },
+                [&](const Instruction::Payload::Set&) {
+                    list.set_collection(size_t(index), CollectionType::Set);
+                },
                 [&](const Instruction::Payload::Erased&) {
                     m_applier->bad_transaction_log("Update: Dictionary erase of list element");
                 },
@@ -505,6 +513,9 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                 },
                 [&](const Instruction::Payload::List&) {
                     dict.insert_collection(key.get_string(), CollectionType::List);
+                },
+                [&](const Instruction::Payload::Set&) {
+                    dict.insert_collection(key.get_string(), CollectionType::Set);
                 },
             };
 
@@ -795,6 +806,11 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
                     auto& mixed_list = static_cast<Lst<Mixed>&>(list);
                     mixed_list.insert_collection(size_t(index), CollectionType::List);
                 },
+                [&](const Instruction::Payload::Set&) {
+                    REALM_ASSERT(dynamic_cast<Lst<Mixed>*>(&list));
+                    auto& mixed_list = static_cast<Lst<Mixed>&>(list);
+                    mixed_list.insert_collection(size_t(index), CollectionType::Set);
+                },
                 [&](const Instruction::Payload::Erased&) {
                     m_applier->bad_transaction_log("Dictionary erase payload for ArrayInsert");
                 },
@@ -909,6 +925,11 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
                     list.clear();
                     return;
                 }
+                else if (val.is_type(type_Set)) {
+                    Set<Mixed> set(obj, col_key);
+                    set.clear();
+                    return;
+                }
             }
 
             PathResolver::on_property(obj, col_key);
@@ -1020,6 +1041,13 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
             , m_instr(instr)
         {
         }
+        void on_property(Obj& obj, ColKey col) override
+        {
+            // This better be a mixed column
+            REALM_ASSERT(col.get_type() == col_type_Mixed);
+            auto set = obj.get_set<Mixed>(col);
+            on_set(set);
+        }
         void on_set(SetBase& set) override
         {
             auto col = set.get_col_key();
@@ -1082,6 +1110,9 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
                 [&](const Instruction::Payload::List&) {
                     m_applier->bad_transaction_log("SetInsert: Sets of lists are not supported.");
                 },
+                [&](const Instruction::Payload::Set&) {
+                    m_applier->bad_transaction_log("SetInsert: Sets of sets are not supported.");
+                },
                 [&](const Instruction::Payload::Erased&) {
                     m_applier->bad_transaction_log("SetInsert: Dictionary erase payload in SetInsert");
                 },
@@ -1103,6 +1134,13 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
             : PathResolver(applier, instr, "SetErase")
             , m_instr(instr)
         {
+        }
+        void on_property(Obj& obj, ColKey col) override
+        {
+            // This better be a mixed column
+            REALM_ASSERT(col.get_type() == col_type_Mixed);
+            auto set = obj.get_set<Mixed>(col);
+            on_set(set);
         }
         void on_set(SetBase& set) override
         {
@@ -1162,6 +1200,9 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
                 },
                 [&](const Instruction::Payload::List&) {
                     m_applier->bad_transaction_log("SetErase: Sets of lists are not supported.");
+                },
+                [&](const Instruction::Payload::Set&) {
+                    m_applier->bad_transaction_log("SetErase: Sets of sets are not supported.");
                 },
                 [&](const Instruction::Payload::Dictionary&) {
                     m_applier->bad_transaction_log("SetErase: Sets of dictionaries are not supported.");

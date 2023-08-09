@@ -90,6 +90,10 @@ Instruction::Payload SyncReplication::as_payload(Mixed value)
         throw IllegalOperation("Cannot sync nested list");
         return Instruction::Payload(Instruction::Payload::List());
     }
+    else if (type == type_Set) {
+        throw IllegalOperation("Cannot sync nested set");
+        return Instruction::Payload(Instruction::Payload::Set());
+    }
     return Instruction::Payload{};
 }
 
