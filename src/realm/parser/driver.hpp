@@ -632,7 +632,8 @@ public:
     template <class T>
     Query simple_query(int op, ColKey col_key, T val);
     std::pair<SubexprPtr, SubexprPtr> cmp(const std::vector<ExpressionNode*>& values);
-    SubexprPtr column(LinkChain&, std::string);
+    SubexprPtr column(LinkChain&, const std::string&);
+    SubexprPtr dictionary_column(LinkChain&, const std::string&);
     void backlink(LinkChain&, const std::string&);
     std::string translate(const LinkChain&, const std::string&);
 
