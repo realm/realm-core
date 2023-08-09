@@ -844,6 +844,9 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
     }
     m_link_chain = path->visit(drv, comp_type);
     if (!path->at_end()) {
+        if (!path->current_path_elem->is_key()) {
+            throw InvalidQueryError(util::format("[%1] not expected", *path->current_path_elem));
+        }
         identifier = path->current_path_elem->get_key();
     }
     std::unique_ptr<Subexpr> subexpr{drv->column(m_link_chain, path)};
@@ -1537,13 +1540,17 @@ LinkChain PathNode::visit(ParserDriver* drv, util::Optional<ExpressionComparison
                 continue; // this element has been removed, this happens in subqueries
             }
 
-            if (!link_chain.link(path_elem)) {
+            // Check if it is a link
+            if (link_chain.link(path_elem)) {
+                continue;
+            }
+            // The next identifier being a property on the linked to object takes precedence
+            if (link_chain.get_current_table()->get_column_key(path_elem)) {
                 break;
             }
         }
-        else {
-            throw InvalidQueryError("Index not supported here");
-        }
+        if (!link_chain.index(*current_path_elem))
+            break;
     }
     return link_chain;
 }

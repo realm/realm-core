@@ -709,6 +709,13 @@ public:
         // FIXME: Should this add to the end of the unresolved list?
         insert(size(), value);
     }
+    void add(const Obj& obj)
+    {
+        if (get_target_table()->get_key() != obj.get_table_key()) {
+            throw InvalidArgument("LnkLst::add: Wrong object type");
+        }
+        add(obj.get_key());
+    }
 
     // Overriding members of CollectionBase:
     using CollectionBase::get_owner_key;

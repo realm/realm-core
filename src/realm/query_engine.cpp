@@ -503,8 +503,8 @@ void StringNodeFulltext::_search_index_init()
     if (m_link_map->links_exist()) {
         std::set<ObjKey> tmp;
         for (auto k : m_index_matches) {
-            auto ndxs = m_link_map->get_origin_ndxs(k);
-            tmp.insert(ndxs.begin(), ndxs.end());
+            auto keys = m_link_map->get_origin_objkeys(k);
+            tmp.insert(keys.begin(), keys.end());
         }
         m_index_matches.assign(tmp.begin(), tmp.end());
     }

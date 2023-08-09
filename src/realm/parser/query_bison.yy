@@ -123,6 +123,7 @@ using namespace realm::query_parser;
 %token <std::string> DESCENDING "descending"
 %token <std::string> INDEX_FIRST "FIRST"
 %token <std::string> INDEX_LAST  "LAST"
+%token <std::string> INDEX_SIZE  "SIZE"
 %token <std::string> SIZE "@size"
 %token <std::string> TYPE "@type"
 %token <std::string> KEY_VAL "key or value"
@@ -336,6 +337,7 @@ comp_type
 post_op
     : %empty                    { $$ = nullptr; }
     | '.' SIZE                  { $$ = drv.m_parse_nodes.create<PostOpNode>($2, PostOpNode::SIZE);}
+    | '[' INDEX_SIZE ']'        { $$ = drv.m_parse_nodes.create<PostOpNode>($2, PostOpNode::SIZE);}
     | '.' TYPE                  { $$ = drv.m_parse_nodes.create<PostOpNode>($2, PostOpNode::TYPE);}
 
 aggr_op
@@ -390,6 +392,7 @@ id
     | BINARY                    { $$ = $1; }
     | INDEX_FIRST               { $$ = $1; }
     | INDEX_LAST                { $$ = $1; }
+    | INDEX_SIZE                { $$ = $1; }
 %%
 
 void
