@@ -1544,7 +1544,7 @@ LinkChain PathNode::visit(ParserDriver* drv, util::Optional<ExpressionComparison
             if (link_chain.link(path_elem)) {
                 continue;
             }
-            // The next identifier being a property on the linked to object takes precedense
+            // The next identifier being a property on the linked to object takes precedence
             if (link_chain.get_current_table()->get_column_key(path_elem)) {
                 break;
             }
