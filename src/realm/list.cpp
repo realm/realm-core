@@ -335,6 +335,22 @@ Mixed Lst<Mixed>::set(size_t ndx, Mixed value)
     // get will check for ndx out of bounds
     Mixed old = do_get(ndx, "set()");
     if (Replication* repl = Base::get_replication()) {
+        if (!(old.is_same_type(value) && old == value)) {
+            // if old is holding a collection, notify also the collection held
+            // that has been cleared.
+            if (old.is_type(type_List)) {
+                auto l = get_list(ndx);
+                repl->list_clear(*l);
+            }
+            else if (old.is_type(type_Set)) {
+                auto s = get_set(ndx);
+                repl->set_clear(*s);
+            }
+            else if (old.is_type(type_Dictionary)) {
+                auto d = get_dictionary(ndx);
+                repl->dictionary_clear(*d);
+            }
+        }
         repl->list_set(*this, ndx, value);
     }
     if (!(old.is_same_type(value) && old == value)) {
@@ -373,6 +389,20 @@ Mixed Lst<Mixed>::remove(size_t ndx)
     // get will check for ndx out of bounds
     Mixed old = do_get(ndx, "remove()");
     if (Replication* repl = Base::get_replication()) {
+        // if old is holding a collection, notify also the collection held
+        // that has been cleared.
+        if (old.is_type(type_List)) {
+            auto l = get_list(ndx);
+            repl->list_clear(*l);
+        }
+        else if (old.is_type(type_Set)) {
+            auto s = get_set(ndx);
+            repl->set_clear(*s);
+        }
+        else if (old.is_type(type_Dictionary)) {
+            auto d = get_dictionary(ndx);
+            repl->dictionary_clear(*d);
+        }
         repl->list_erase(*this, ndx);
     }
 

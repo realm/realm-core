@@ -1318,6 +1318,33 @@ TEST_CASE("nested List") {
         advance_and_notify(*r);
     };
 
+    SECTION("delete nested collection. Notify parent and collection just deleted") {
+        List top_lst(r, top_list);
+        List lst0(r, l0);
+        CollectionChangeSet change_current;
+        CollectionChangeSet change_parent;
+        auto require_change_current = [&] {
+            auto token = lst0.add_notification_callback([&](CollectionChangeSet c) {
+                change_current = c;
+            });
+            return token;
+        };
+        auto require_change_parent = [&] {
+            auto token = top_lst.add_notification_callback([&](CollectionChangeSet c) {
+                change_parent = c;
+            });
+            return token;
+        };
+        auto tkn_current = require_change_current();
+        auto tkn_parent = require_change_parent();
+        // notification for nested collection
+        write([&]() {
+            top_list.remove(1);
+        });
+        REQUIRE(change_current.collection_was_cleared);
+        REQUIRE_INDICES(change_parent.deletions, 1);
+    }
+
     SECTION("add_notification_block()") {
         CollectionChangeSet change;
         List lst0(r, l0);
@@ -1382,6 +1409,18 @@ TEST_CASE("nested List") {
             });
             REQUIRE_INDICES(change.insertions, 0);
             REQUIRE(!change.collection_was_cleared);
+        }
+
+        SECTION("remove item from collection") {
+            auto token = require_change();
+            write([&] {
+                lst0.add(Mixed(8));
+            });
+            REQUIRE_INDICES(change.insertions, 0);
+            write([&] {
+                lst0.remove(0);
+            });
+            REQUIRE_INDICES(change.deletions, 0);
         }
     }
 }
