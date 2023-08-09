@@ -317,6 +317,7 @@ static const MapElem string_to_error_code[] = {
     {"MongoDBError", ErrorCodes::MongoDBError},
     {"MultipleSyncAgents", ErrorCodes::MultipleSyncAgents},
     {"NoMatchingRule", ErrorCodes::NoMatchingRule},
+    {"NoMatchingRuleFound", ErrorCodes::NoMatchingRule},
     {"NoSubscriptionForWrite", ErrorCodes::NoSubscriptionForWrite},
     {"NoSuchTable", ErrorCodes::NoSuchTable},
     {"NotCallable", ErrorCodes::NotCallable},
