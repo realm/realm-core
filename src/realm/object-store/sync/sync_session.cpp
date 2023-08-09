@@ -638,16 +638,19 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     bool log_out_user = false;
     bool unrecognized_by_client = false;
 
+    // Can be called from within SyncSession with an AuthError to handle app-level authentication problems,
+    // so even if there's an error action, we need to set a fall-back to logging out the user and making
+    // the session inactive.
+    if (error.status == ErrorCodes::AuthError) {
+        next_state = NextStateAfterError::inactive;
+        log_out_user = true;
+    }
+
     if (error.status == ErrorCodes::AutoClientResetFailed) {
         // At this point, automatic recovery has been attempted but it failed.
         // Fallback to a manual reset and let the user try to handle it.
         next_state = NextStateAfterError::inactive;
         delete_file = ShouldBackup::yes;
-    }
-    // Can be called from within SyncSession with an AuthError to handle app-level authentication problems.
-    else if (error.status == ErrorCodes::AuthError) {
-        next_state = NextStateAfterError::inactive;
-        log_out_user = true;
     }
     else if (error.server_requests_action != sync::ProtocolErrorInfo::Action::NoAction) {
         switch (error.server_requests_action) {
