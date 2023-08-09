@@ -83,11 +83,11 @@ Instruction::Payload SyncReplication::as_payload(Mixed value)
         }
     }
     if (type == type_Dictionary) {
-        // throw IllegalOperation("Cannot sync nested dictionary");
+        throw IllegalOperation("Cannot sync nested dictionary");
         return Instruction::Payload(Instruction::Payload::Dictionary());
     }
     else if (type == type_List) {
-        // throw IllegalOperation("Cannot sync nested list");
+        throw IllegalOperation("Cannot sync nested list");
         return Instruction::Payload(Instruction::Payload::List());
     }
     return Instruction::Payload{};
