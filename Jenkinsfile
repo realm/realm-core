@@ -196,8 +196,8 @@ jobWrapper {
                 buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
                 buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
                 buildEmscripten         : doBuildEmscripten('Debug'),
-                threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
-                addressSanitizer        : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'address']),
+                threadSanitizer         : doCheckSanity(buildOptions + [buildType: 'RelWithDebInfo', enableSync: true, sanitizeMode: 'thread']),
+                addressSanitizer        : doCheckSanity(buildOptions + [buildType: 'RelWithDebInfo', enableSync: true, sanitizeMode: 'address']),
             ]
             if (releaseTesting) {
                 extendedChecks = [

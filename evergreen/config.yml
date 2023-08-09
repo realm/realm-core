@@ -1186,6 +1186,7 @@ buildvariants:
     cxx_compiler: "./clang_binaries/bin/clang++"
     run_with_encryption: On
     enable_tsan: On
+    cmake_build_type: RelWithDebInfo
   tasks:
   - name: core_tests_group
     distros:
@@ -1204,6 +1205,7 @@ buildvariants:
     llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
     run_with_encryption: On
     enable_asan: On
+    cmake_build_type: RelWithDebInfo
   tasks:
   - name: core_tests_group
     distros:
@@ -1242,6 +1244,7 @@ buildvariants:
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
     enable_asan: On
+    cmake_build_type: RelWithDebInfo
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
     llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
@@ -1260,6 +1263,7 @@ buildvariants:
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
     enable_tsan: On
+    cmake_build_type: RelWithDebInfo
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
   tasks:
@@ -1274,6 +1278,7 @@ buildvariants:
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
     enable_ubsan: On
+    cmake_build_type: RelWithDebInfo
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
   tasks:
