@@ -216,10 +216,6 @@ public:
     // longer be open on behalf of it.
     void shutdown_and_wait() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
 
-    // Get notified asynchronously when the synchronization session (sync::Session) is shut down and
-    // the Realm file is no longer open on behalf of it.
-    util::Future<void> shutdown() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
-
     // DO NOT CALL OUTSIDE OF TESTING CODE.
     void detach_from_sync_manager() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
 
@@ -271,10 +267,13 @@ public:
     // Return an existing external reference to this session, if one exists. Otherwise, returns `nullptr`.
     std::shared_ptr<SyncSession> existing_external_reference() REQUIRES(!m_external_reference_mutex);
 
+    struct OnlyForTesting;
+
     // Expose some internal functionality to other parts of the ObjectStore
     // without making it public to everyone
     class Internal {
         friend class _impl::RealmCoordinator;
+        friend struct OnlyForTesting;
 
         static void set_sync_transact_callback(SyncSession& session, std::function<TransactionCallback>&& callback)
         {
@@ -290,6 +289,8 @@ public:
         {
             return session.m_db;
         }
+
+        static util::Future<void> pause_async(SyncSession& session);
     };
 
     // Expose some internal functionality to testing code.
@@ -323,6 +324,8 @@ public:
         {
             return session.get_subscription_store_base();
         }
+
+        static util::Future<void> pause_async(SyncSession& session);
     };
 
 private:

@@ -338,7 +338,7 @@ TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync][session]") {
     }
 }
 
-TEST_CASE("SyncSession: shutdown() API", "[sync][session]") {
+TEST_CASE("SyncSession: internal pause_async API", "[sync][session]") {
     TestSyncManager init_sync_manager;
     auto app = init_sync_manager.app();
     auto user = app->sync_manager()->get_user("close-api-tests-user", ENCODE_FAKE_JWT("fake_refresh_token"),
@@ -353,7 +353,7 @@ TEST_CASE("SyncSession: shutdown() API", "[sync][session]") {
     REQUIRE(sessions_are_active(*session));
     auto dbref = SyncSession::OnlyForTesting::get_db(*session);
     auto before = dbref.use_count();
-    auto future = session->shutdown();
+    auto future = SyncSession::OnlyForTesting::pause_async(*session);
     future.get();
     auto after = dbref.use_count();
     // Check SessionImpl released the sync agent as result of SessionWrapper::finalize() being called.
