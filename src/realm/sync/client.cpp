@@ -27,6 +27,7 @@ namespace sync {
 namespace {
 using namespace realm::util;
 
+
 // clang-format off
 using SessionImpl                     = ClientImpl::Session;
 using SyncTransactReporter            = ClientHistory::SyncTransactReporter;

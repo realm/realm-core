@@ -519,18 +519,6 @@ public:
 
     using OutputBuffer = util::ResettableExpandableBufferOutputStream;
 
-    // FIXME: No need to explicitly assign numbers to these
-    enum class Error {
-        // clang-format off
-        unknown_message             = 101, // Unknown type of input message
-        bad_syntax                  = 102, // Bad syntax in input message head
-        limits_exceeded             = 103, // Limits exceeded in input message
-        bad_decompression           = 104, // Error in decompression (UPLOAD)
-        bad_changeset_header_syntax = 105, // Bad syntax in changeset header (UPLOAD)
-        bad_changeset_size          = 106, // Changeset size doesn't fit in message (UPLOAD)
-        // clang-format on
-    };
-
     // Messages sent by the server to the client
 
     void make_ident_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,

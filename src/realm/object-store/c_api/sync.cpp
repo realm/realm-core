@@ -257,10 +257,7 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         auto c_error = realm_sync_error_t();
 
         std::string error_code_message;
-        const auto& status = error.status;
-        c_error.status.message = status.reason().c_str();
-        c_error.status.error = static_cast<realm_errno_e>(status.code());
-        c_error.status.categories = ErrorCodes::error_categories(status.code()).value();
+        c_error.status = to_capi(error.status);
         c_error.is_fatal = error.is_fatal;
         c_error.is_unrecognized_by_client = error.is_unrecognized_by_client;
         c_error.is_client_reset_requested = error.is_client_reset_requested();
@@ -801,7 +798,6 @@ RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_
     util::UniqueFunction<void(Status)> cb =
         [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](Status s) {
             if (!s.is_ok()) {
-                std::string error_code_message;
                 realm_error_t error = to_capi(s);
                 done(userdata.get(), &error);
             }
@@ -820,7 +816,6 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
     util::UniqueFunction<void(Status)> cb =
         [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](Status s) {
             if (!s.is_ok()) {
-                std::string error_code_message;
                 realm_error_t error = to_capi(s);
                 done(userdata.get(), &error);
             }

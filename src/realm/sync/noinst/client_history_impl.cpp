@@ -803,6 +803,7 @@ void ClientHistory::update_sync_progress(const SyncProgress& progress, const std
 {
     Array& root = m_arrays->root;
 
+    // Progress must never decrease
     if (auto current = version_type(root.get_as_ref_or_tagged(s_progress_latest_server_version_iip).get_as_int());
         progress.latest_server_version.version < current) {
         throw IntegrationException(ErrorCodes::SyncProtocolInvariantFailed,

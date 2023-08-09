@@ -561,10 +561,7 @@ private:
     void initiate_disconnect_wait();
     void handle_disconnect_wait(Status status);
     void close_due_to_protocol_error(Status status);
-
     void close_due_to_client_side_error(Status, IsFatal is_fatal, ConnectionTerminationReason reason);
-    void read_or_write_error(std::error_code ec, std::string_view msg);
-
     void close_due_to_transient_error(Status status, ConnectionTerminationReason reason);
     void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
     void involuntary_disconnect(const SessionErrorInfo& info, ConnectionTerminationReason reason);

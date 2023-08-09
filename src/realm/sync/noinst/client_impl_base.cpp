@@ -1291,7 +1291,6 @@ void Connection::receive_error_message(const ProtocolErrorInfo& info, session_id
             close_due_to_server_side_error(error_code, info); // Throws
             return;
         }
-
         close_due_to_protocol_error(
             {ErrorCodes::SyncProtocolInvariantFailed,
              util::format("Received ERROR message with a non-connection-level error code %1 without a session ident",
@@ -1570,8 +1569,7 @@ void Session::on_changesets_integrated(version_type client_version, const SyncPr
     do_recognize_sync_version(client_version); // Allows upload process to resume
     check_for_download_completion();           // Throws
 
-    // If the client migrated from PBS to FLX, create subscriptions when new tables are received from
-    // server.
+    // If the client migrated from PBS to FLX, create subscriptions when new tables are received from server.
     if (auto migration_store = get_migration_store(); migration_store && m_is_flx_sync_session) {
         auto& flx_subscription_store = *get_flx_subscription_store();
         get_migration_store()->create_subscriptions(flx_subscription_store);
@@ -1614,9 +1612,9 @@ void Session::activate()
         // DB. If it did, then the fresh DB would stay alive for the duration of this sync session
         // and we want to clean it up once the reset is finished. Additionally, the fresh copy will
         // be set to a new copy on every reset so there is no reason to keep a reference to it.
-        // The modification to the client reset config happens via
-        // std::move(client_reset_config->fresh_copy). If the client reset config were a `const &` then
-        // this std::move would create another strong reference which we don't want to happen.
+        // The modification to the client reset config happens via std::move(client_reset_config->fresh_copy).
+        // If the client reset config were a `const &` then this std::move would create another strong
+        // reference which we don't want to happen.
         util::Optional<ClientReset>& client_reset_config = get_client_reset_config();
 
         bool file_exists = util::File::exists(get_realm_path());
@@ -1854,21 +1852,19 @@ void Session::send_bind_message()
             if (!bind_json_data.empty()) {
                 json_data_dump = bind_json_data.dump();
             }
-            logger.debug("Sending: BIND(session_ident=%1, need_client_file_ident=%2, is_subserver=%3, "
-                         "json_data=\"%4\")",
-                         session_ident, need_client_file_ident, is_subserver, json_data_dump);
+            logger.debug(
+                "Sending: BIND(session_ident=%1, need_client_file_ident=%2, is_subserver=%3, json_data=\"%4\")",
+                session_ident, need_client_file_ident, is_subserver, json_data_dump);
         }
         protocol.make_flx_bind_message(protocol_version, out, session_ident, bind_json_data, empty_access_token,
-                                       need_client_file_ident,
-                                       is_subserver); // Throws
+                                       need_client_file_ident, is_subserver); // Throws
     }
     else {
         std::string server_path = get_virt_path();
         logger.debug("Sending: BIND(session_ident=%1, need_client_file_ident=%2, is_subserver=%3, server_path=%4)",
                      session_ident, need_client_file_ident, is_subserver, server_path);
         protocol.make_pbs_bind_message(protocol_version, out, session_ident, server_path, empty_access_token,
-                                       need_client_file_ident,
-                                       is_subserver); // Throws
+                                       need_client_file_ident, is_subserver); // Throws
     }
     m_conn.initiate_write_message(out, this); // Throws
 
@@ -2315,8 +2311,8 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
                  progress.upload.client_version, progress.upload.last_integrated_server_version, downloadable_bytes,
                  batch_state != DownloadBatchState::MoreToCome, query_version, received_changesets.size()); // Throws
 
-    // Ignore download messages when the client detects an error. This is to prevent transforming the same
-    // bad changeset over and over again.
+    // Ignore download messages when the client detects an error. This is to prevent transforming the same bad
+    // changeset over and over again.
     if (m_client_error) {
         logger.debug("Ignoring download message because the client detected an integration error");
         return Status::OK();
@@ -2334,8 +2330,8 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
     version_type server_version = m_progress.download.server_version;
     version_type last_integrated_client_version = m_progress.download.last_integrated_client_version;
     for (const Transformer::RemoteChangeset& changeset : received_changesets) {
-        // Check that per-changeset server version is strictly increasing, except in FLX sync where the
-        // server version must be increasing, but can stay the same during bootstraps.
+        // Check that per-changeset server version is strictly increasing, except in FLX sync where the server
+        // version must be increasing, but can stay the same during bootstraps.
         bool good_server_version = m_is_flx_sync_session ? (changeset.remote_version >= server_version)
                                                          : (changeset.remote_version > server_version);
         // Each server version cannot be greater than the one in the header of the download message.
@@ -2382,8 +2378,7 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
         return Status::OK();
     }
 
-    initiate_integrate_changesets(downloadable_bytes, batch_state, progress,
-                                  received_changesets); // Throws
+    initiate_integrate_changesets(downloadable_bytes, batch_state, progress, received_changesets); // Throws
 
     hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
                                   batch_state, received_changesets.size());
@@ -2392,8 +2387,8 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
     }
     REALM_ASSERT_EX(hook_action == SyncClientHookAction::NoAction, hook_action);
 
-    // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to
-    // reconnect after a retryable session error.
+    // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
+    // after a retryable session error.
     clear_resumption_delay_state();
     return Status::OK();
 }
@@ -2485,8 +2480,11 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
         return {ErrorCodes::SyncProtocolInvariantFailed, "Received ERROR message when it was not legal"};
     }
 
-    bool known_error_code = bool(get_protocol_error_message(info.raw_error_code));
-    if (REALM_UNLIKELY(!known_error_code) && info.server_requests_action != ProtocolErrorInfo::Action::NoAction) {
+    auto status = protocol_error_to_status(static_cast<ProtocolError>(info.raw_error_code), info.message);
+    // If the server has requested an action but sent an invalid error code we can still process the error and pass an
+    // UnknownError status to the user. This lets us add error codes on the server side without strictly having to
+    // bump the protocol version to avoid crashing older clients.
+    if (status == ErrorCodes::UnknownError && info.server_requests_action != ProtocolErrorInfo::Action::NoAction) {
         return {
             ErrorCodes::SyncProtocolInvariantFailed,
             util::format("Received ERROR message with unknown error code %1 and no action.", info.raw_error_code)};
@@ -2508,9 +2506,9 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
         }
     }
 
-    // For compensating write errors, we need to defer raising them to the SDK until after the server
-    // version containing the compensating write has appeared in a download message.
-    if (ProtocolError(info.raw_error_code) == ProtocolError::compensating_write) {
+    // For compensating write errors, we need to defer raising them to the SDK until after the server version
+    // containing the compensating write has appeared in a download message.
+    if (status == ErrorCodes::SyncCompensatingWrite) {
         // If the client is not active, the compensating writes will not be processed now, but will be
         // sent again the next time the client connects
         if (m_state == Active) {
@@ -2520,8 +2518,7 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
     }
 
     m_error_message_received = true;
-    suspend(SessionErrorInfo{
-        info, protocol_error_to_status(static_cast<ProtocolError>(info.raw_error_code), info.message)});
+    suspend(SessionErrorInfo{info, std::move(status)});
     return Status::OK();
 }
 

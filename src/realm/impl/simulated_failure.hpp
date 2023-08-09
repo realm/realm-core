@@ -24,7 +24,6 @@
 
 #include <realm/exceptions.hpp>
 #include <realm/util/features.h>
-#include <realm/exceptions.hpp>
 
 #ifdef REALM_DEBUG
 #define REALM_ENABLE_SIMULATED_FAILURE
