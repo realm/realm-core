@@ -92,6 +92,8 @@ std::ostream& Changeset::print_value(std::ostream& os, const Instruction::Payloa
             break;
         case Type::Erased:
             break;
+        case Type::Set:
+            break;
         case Type::List:
             break;
         case Type::Dictionary:
