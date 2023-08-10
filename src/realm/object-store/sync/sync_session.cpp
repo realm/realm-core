@@ -628,9 +628,32 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
     revive_if_needed();
 }
 
+util::Future<void> SyncSession::Internal::pause_async(SyncSession& session)
+{
+    {
+        util::CheckedUniqueLock lock(session.m_state_mutex);
+        // Nothing to wait for if the session is already paused or inactive.
+        if (session.m_state == SyncSession::State::Paused || session.m_state == SyncSession::State::Inactive) {
+            return util::Future<void>::make_ready();
+        }
+    }
+    // Transition immediately to `paused` state. Calling this function must guarantee that any
+    // sync::Session object in SyncSession::m_session that existed prior to the time of invocation
+    // must have been destroyed upon return. This allows the caller to follow up with a call to
+    // sync::Client::notify_session_terminated() in order to be notified when the Realm file is closed. This works
+    // so long as this SyncSession object remains in the `paused` state after the invocation of shutdown().
+    session.pause();
+    return session.m_client.notify_session_terminated();
+}
+
 void SyncSession::OnlyForTesting::handle_error(SyncSession& session, sync::SessionErrorInfo&& error)
 {
     session.handle_error(std::move(error));
+}
+
+util::Future<void> SyncSession::OnlyForTesting::pause_async(SyncSession& session)
+{
+    return SyncSession::Internal::pause_async(session);
 }
 
 // This method should only be called from within the error handler callback registered upon the underlying
@@ -1106,7 +1129,7 @@ void SyncSession::close(util::CheckedUniqueLock lock)
             break;
         case State::Paused:
         case State::Inactive: {
-            // We need to register from the sync manager if it still exists so that we don't end up
+            // We need to unregister from the sync manager if it still exists so that we don't end up
             // holding the DBRef open after the session is closed. Otherwise we can end up preventing
             // the user from deleting the realm when it's in the paused/inactive state.
             if (m_sync_manager) {
@@ -1125,7 +1148,7 @@ void SyncSession::close(util::CheckedUniqueLock lock)
 void SyncSession::shutdown_and_wait()
 {
     {
-        // Transition immediately to `inactive` state. Calling this function must gurantee that any
+        // Transition immediately to `inactive` state. Calling this function must guarantee that any
         // sync::Session object in SyncSession::m_session that existed prior to the time of invocation
         // must have been destroyed upon return. This allows the caller to follow up with a call to
         // sync::Client::wait_for_session_terminations_or_client_stopped() in order to wait for the

@@ -26,6 +26,7 @@
 #include <realm/sync/subscriptions.hpp>
 
 #include <realm/util/checked_mutex.hpp>
+#include <realm/util/future.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/version_id.hpp>
 
@@ -120,7 +121,6 @@ public:
         Connected,
     };
 
-    using StateChangeCallback = void(State old_state, State new_state);
     using ConnectionStateChangeCallback = void(ConnectionState old_state, ConnectionState new_state);
     using TransactionCallback = void(VersionID old_version, VersionID new_version);
     using ProgressNotifierCallback = _impl::SyncProgressNotifier::ProgressNotifierCallback;
@@ -273,10 +273,13 @@ public:
     // Return an existing external reference to this session, if one exists. Otherwise, returns `nullptr`.
     std::shared_ptr<SyncSession> existing_external_reference() REQUIRES(!m_external_reference_mutex);
 
+    struct OnlyForTesting;
+
     // Expose some internal functionality to other parts of the ObjectStore
     // without making it public to everyone
     class Internal {
         friend class _impl::RealmCoordinator;
+        friend struct OnlyForTesting;
 
         static void nonsync_transact_notify(SyncSession& session, VersionID::version_type version)
         {
@@ -287,6 +290,8 @@ public:
         {
             return session.m_db;
         }
+
+        static util::Future<void> pause_async(SyncSession& session);
     };
 
     // Expose some internal functionality to testing code.
@@ -320,6 +325,8 @@ public:
         {
             return session.get_subscription_store_base();
         }
+
+        static util::Future<void> pause_async(SyncSession& session);
     };
 
 private:
