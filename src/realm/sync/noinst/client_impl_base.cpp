@@ -2484,9 +2484,8 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
 
     auto status = protocol_error_to_status(static_cast<ProtocolError>(info.raw_error_code), info.message);
     if (status == ErrorCodes::UnknownError) {
-        return {
-            ErrorCodes::SyncProtocolInvariantFailed,
-            util::format("Received ERROR message with unknown error code %1 and no action.", info.raw_error_code)};
+        return {ErrorCodes::SyncProtocolInvariantFailed,
+                util::format("Received ERROR message with unknown error code %1", info.raw_error_code)};
     }
     else if (auto error_code = ProtocolError(info.raw_error_code);
              REALM_UNLIKELY(!is_session_level_error(error_code))) {
