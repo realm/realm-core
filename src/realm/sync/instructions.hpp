@@ -176,6 +176,8 @@ struct Payload {
     struct List {};
     /// Create an empty dictionary in-place (does not clear an existing dictionary).
     struct Dictionary {};
+    /// Create an empty set in-place (does not clear an existing dictionary).
+    struct Set {};
     /// Sentinel value for an erased dictionary element.
     struct Erased {};
 
@@ -195,6 +197,9 @@ struct Payload {
     /// Note: For Mixed columns (including typed links), no separate value is required, because the
     /// instruction set encodes the type of each value in the instruction.
     enum class Type : int8_t {
+        // Special value indicating that a set should be created at the position.
+        Set = -6,
+
         // Special value indicating that a list should be created at the position.
         List = -5,
 
@@ -316,6 +321,10 @@ struct Payload {
         : type(Type::List)
     {
     }
+    Payload(const Set&) noexcept
+        : type(Type::Set)
+    {
+    }
 
     explicit Payload(Timestamp value) noexcept
         : type(value.is_null() ? Type::Null : Type::Timestamp)
@@ -367,6 +376,7 @@ struct Payload {
                 case Type::Null:
                 case Type::Erased:
                 case Type::List:
+                case Type::Set:
                 case Type::Dictionary:
                 case Type::ObjectValue:
                     return true;
@@ -780,6 +790,8 @@ inline const char* get_type_name(Instruction::Payload::Type type)
     switch (type) {
         case Type::Erased:
             return "Erased";
+        case Type::Set:
+            return "Set";
         case Type::List:
             return "List";
         case Type::Dictionary:
@@ -901,6 +913,8 @@ inline DataType get_data_type(Instruction::Payload::Type type) noexcept
         case Type::Dictionary:
             [[fallthrough]];
         case Type::List:
+            [[fallthrough]];
+        case Type::Set:
             [[fallthrough]];
         case Type::ObjectValue:
             [[fallthrough]];

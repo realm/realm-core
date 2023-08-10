@@ -2084,6 +2084,9 @@ CollectionPtr Obj::get_collection_ptr(const Path& path) const
         if (ref.is_type(type_List)) {
             collection = collection->get_list(path_elem);
         }
+        else if (ref.is_type(type_Set)) {
+            collection = collection->get_set(path_elem);
+        }
         else if (ref.is_type(type_Dictionary)) {
             collection = collection->get_dictionary(path_elem);
         }

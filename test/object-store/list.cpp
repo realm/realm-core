@@ -1304,8 +1304,13 @@ TEST_CASE("nested List") {
     top_list.insert_collection(1, CollectionType::List);
     top_list.insert(2, "Godbye");
     top_list.insert_collection(3, CollectionType::List);
+    top_list.insert_collection(4, CollectionType::Set);
+    top_list.insert_collection(5, CollectionType::Dictionary);
+
     auto l0 = obj.get_list_ptr<Mixed>(Path{"any", 1});
     auto l1 = obj.get_list_ptr<Mixed>(Path{"any", 3});
+    auto s0 = obj.get_set_ptr<Mixed>(Path{"any", 4});
+    auto d0 = obj.get_dictionary_ptr(Path{"any", 5});
 
     r->commit_transaction();
 
@@ -1321,10 +1326,13 @@ TEST_CASE("nested List") {
     SECTION("delete nested collection. Notify parent and collection just deleted") {
         List top_lst(r, top_list);
         List lst0(r, l0);
+        object_store::Set set0(r, s0);
+        object_store::Dictionary dict0(r, d0);
+
         CollectionChangeSet change_current;
         CollectionChangeSet change_parent;
-        auto require_change_current = [&] {
-            auto token = lst0.add_notification_callback([&](CollectionChangeSet c) {
+        auto require_change_current = [&](object_store::Collection& collection) {
+            auto token = collection.add_notification_callback([&](CollectionChangeSet c) {
                 change_current = c;
             });
             return token;
@@ -1335,14 +1343,28 @@ TEST_CASE("nested List") {
             });
             return token;
         };
-        auto tkn_current = require_change_current();
+        auto tkn_current_list = require_change_current(lst0);
+        auto tkn_current_dict = require_change_current(dict0);
         auto tkn_parent = require_change_parent();
-        // notification for nested collection
+
+        // notification for nested list
         write([&]() {
             top_list.remove(1);
         });
         REQUIRE(change_current.collection_was_cleared);
         REQUIRE_INDICES(change_parent.deletions, 1);
+        // notification for nested set
+        write([&]() {
+            top_list.remove(3);
+        });
+        REQUIRE(change_current.collection_was_cleared);
+        REQUIRE_INDICES(change_parent.deletions, 3);
+        // notification for nested dictionary
+        write([&]() {
+            top_list.remove(3);
+        });
+        REQUIRE(change_current.collection_was_cleared);
+        REQUIRE_INDICES(change_parent.deletions, 3);
     }
 
     SECTION("add_notification_block()") {
