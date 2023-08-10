@@ -638,14 +638,6 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     bool log_out_user = false;
     bool unrecognized_by_client = false;
 
-    // Can be called from within SyncSession with an AuthError to handle app-level authentication problems,
-    // so even if there's an error action, we need to set a fall-back to logging out the user and making
-    // the session inactive.
-    if (error.status == ErrorCodes::AuthError) {
-        next_state = NextStateAfterError::inactive;
-        log_out_user = true;
-    }
-
     if (error.status == ErrorCodes::AutoClientResetFailed) {
         // At this point, automatic recovery has been attempted but it failed.
         // Fallback to a manual reset and let the user try to handle it.
@@ -722,6 +714,10 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                     u->refresh_custom_data(true, handle_refresh(shared_from_this(), true));
                     return;
                 }
+                break;
+            case sync::ProtocolErrorInfo::Action::LogOutUser:
+                next_state = NextStateAfterError::inactive;
+                log_out_user = true;
                 break;
         }
     }

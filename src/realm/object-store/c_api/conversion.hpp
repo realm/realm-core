@@ -485,7 +485,7 @@ static inline realm_version_id_t to_capi(const VersionID& v)
     return version_id;
 }
 
-static inline realm_error_t to_capi(const Status s)
+static inline realm_error_t to_capi(const Status& s)
 {
     realm_error_t err;
     err.error = static_cast<realm_errno_e>(s.code());

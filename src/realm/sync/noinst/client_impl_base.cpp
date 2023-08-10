@@ -577,7 +577,9 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
             break;
         }
         case WebSocketError::websocket_forbidden: {
-            involuntary_disconnect(SessionErrorInfo({ErrorCodes::AuthError, msg}, IsFatal{true}),
+            SessionErrorInfo error_info({ErrorCodes::AuthError, msg}, IsFatal{true});
+            error_info.server_requests_action = ProtocolErrorInfo::Action::LogOutUser;
+            involuntary_disconnect(std::move(error_info),
                                    ConnectionTerminationReason::http_response_says_fatal_error);
             break;
         }
@@ -2481,10 +2483,7 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
     }
 
     auto status = protocol_error_to_status(static_cast<ProtocolError>(info.raw_error_code), info.message);
-    // If the server has requested an action but sent an invalid error code we can still process the error and pass an
-    // UnknownError status to the user. This lets us add error codes on the server side without strictly having to
-    // bump the protocol version to avoid crashing older clients.
-    if (status == ErrorCodes::UnknownError && info.server_requests_action != ProtocolErrorInfo::Action::NoAction) {
+    if (status == ErrorCodes::UnknownError) {
         return {
             ErrorCodes::SyncProtocolInvariantFailed,
             util::format("Received ERROR message with unknown error code %1 and no action.", info.raw_error_code)};

@@ -263,10 +263,11 @@ struct ProtocolErrorInfo {
         ClientResetNoRecovery,
         MigrateToFLX,
         RevertToPBS,
-        // The RefreshUser/RefreshLocation actions are currently generated internally when the
+        // The RefreshUser/RefreshLocation/LogOutUser actions are currently generated internally when the
         // sync websocket is closed with specific error codes.
         RefreshUser,
         RefreshLocation,
+        LogOutUser,
     };
 
     ProtocolErrorInfo() = default;
@@ -437,6 +438,8 @@ inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action actio
             return o << "RefreshUser";
         case ProtocolErrorInfo::Action::RefreshLocation:
             return o << "RefreshLocation";
+        case ProtocolErrorInfo::Action::LogOutUser:
+            return o << "LogOutUser";
     }
     return o << "Invalid error action: " << int64_t(action);
 }
