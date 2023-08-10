@@ -13,7 +13,6 @@
 #include <realm/util/functional.hpp>
 #include <realm/util/future.hpp>
 #include <realm/sync/client_base.hpp>
-#include <realm/sync/socket_provider.hpp>
 
 namespace realm::sync {
 
