@@ -1722,7 +1722,14 @@ auto ParserDriver::cmp(const std::vector<ExpressionNode*>& values) -> std::pair<
 auto ParserDriver::column(LinkChain& link_chain, PathNode* path) -> SubexprPtr
 {
     if (path->at_end()) {
-        return link_chain.create_subexpr<Link>(link_chain.m_link_cols.back());
+        // This is a link property. However Columns<Link> does not handle @keys and indexes
+        auto extended_col_key = link_chain.m_link_cols.back();
+        if (!extended_col_key.has_index()) {
+            return link_chain.create_subexpr<Link>(ColKey(extended_col_key));
+        }
+        link_chain.pop_back();
+        --path->current_path_elem;
+        --path->current_path_elem;
     }
     auto identifier = m_mapping.translate(link_chain, path->next_identifier());
     if (auto col = link_chain.column(identifier)) {
@@ -1853,15 +1860,15 @@ std::unique_ptr<Subexpr> LinkChain::column(const std::string& col)
     }
 
     auto col_type{col_key.get_type()};
+    if (col_key.is_dictionary()) {
+        return create_subexpr<Dictionary>(col_key);
+    }
     if (Table::is_link_type(col_type)) {
         add(col_key);
         return create_subexpr<Link>(col_key);
     }
 
-    if (col_key.is_dictionary()) {
-        return create_subexpr<Dictionary>(col_key);
-    }
-    else if (col_key.is_set()) {
+    if (col_key.is_set()) {
         switch (col_type) {
             case col_type_Int:
                 return create_subexpr<Set<Int>>(col_key);

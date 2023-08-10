@@ -1058,6 +1058,10 @@ private:
     T* m_list;
 };
 
+namespace _impl {
+size_t get_collection_size_from_ref(ref_type, Allocator& alloc);
+}
+
 } // namespace realm
 
 #endif // REALM_COLLECTION_HPP

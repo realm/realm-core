@@ -584,7 +584,7 @@ void Mixed::to_json(std::ostream& out, JSONOutputMode output_mode) const noexcep
                 }
                 case type_Timestamp:
                     out << "\"";
-                    out << util::serializer::print_value<Timestamp>(date_val);
+                    out << date_val;
                     out << "\"";
                     break;
                 case type_Decimal:

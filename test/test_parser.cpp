@@ -6277,4 +6277,29 @@ TEST(Parser_RecursiveLogial)
     CHECK_EQUAL(q_count, 1);
 }
 
+TEST(Parser_issue6831)
+{
+    Group g;
+    auto plant = g.add_table_with_primary_key("Plant", type_ObjectId, "id");
+    plant->add_column(type_String, "Family");
+    auto inventory = g.add_table_with_primary_key("Inventory", type_String, "id");
+    inventory->add_column_dictionary(*plant, "Plants");
+
+    auto potato = plant->create_object_with_primary_key(ObjectId::gen());
+    potato.set("Family", "Solanaceae");
+    auto petunia = plant->create_object_with_primary_key(ObjectId::gen());
+    petunia.set("Family", "Solanaceae");
+    auto rose = plant->create_object_with_primary_key(ObjectId::gen());
+    rose.set("Family", "Rosaceae");
+    auto obj = inventory->create_object_with_primary_key("Inv");
+    auto dict = obj.get_dictionary("Plants");
+    dict.insert("Potato", potato);
+    dict.insert("Petunia", petunia);
+    dict.insert("Rose", rose);
+    auto q = inventory->query("Plants.@keys == 'Petunia'");
+    CHECK_EQUAL(q.count(), 1);
+    q = inventory->query("Plants.Rose.Family == 'Rosaceae'");
+    CHECK_EQUAL(q.count(), 1);
+}
+
 #endif // TEST_PARSER
