@@ -285,14 +285,17 @@ void ArrayMixed::set_key(size_t ndx, int64_t key)
 {
     Array keys(Array::get_alloc());
     ensure_array_accessor(keys, payload_idx_key);
-    return keys.set(ndx, key);
+    while (keys.size() <= ndx) {
+        keys.add(0);
+    }
+    keys.set(ndx, key);
 }
 
 int64_t ArrayMixed::get_key(size_t ndx) const
 {
     Array keys(Array::get_alloc());
     ensure_array_accessor(keys, payload_idx_key);
-    return keys.get(ndx);
+    return (ndx < keys.size()) ? keys.get(ndx) : 0;
 }
 
 void ArrayMixed::verify() const

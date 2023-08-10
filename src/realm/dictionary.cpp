@@ -946,6 +946,20 @@ void Dictionary::do_erase(size_t ndx, Mixed key)
 
     if (Replication* repl = get_replication()) {
         repl->dictionary_erase(*this, ndx, key);
+
+        auto old = m_values->get(ndx);
+        if (old.is_type(type_List)) {
+            auto l = get_list(key.get_string());
+            repl->list_clear(*l);
+        }
+        else if (old.is_type(type_Set)) {
+            auto s = get_set(key.get_string());
+            repl->set_clear(*s);
+        }
+        else if (old.is_type(type_Dictionary)) {
+            auto d = get_dictionary(key.get_string());
+            repl->dictionary_clear(*d);
+        }
     }
 
     m_keys->erase(ndx);

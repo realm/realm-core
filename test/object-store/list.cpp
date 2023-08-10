@@ -1329,11 +1329,11 @@ TEST_CASE("nested List") {
         object_store::Set set0(r, s0);
         object_store::Dictionary dict0(r, d0);
 
-        CollectionChangeSet change_current;
+        CollectionChangeSet change_current_list, change_current_set, change_current_dict;
         CollectionChangeSet change_parent;
-        auto require_change_current = [&](object_store::Collection& collection) {
+        auto require_change_current = [](object_store::Collection& collection, CollectionChangeSet& change) {
             auto token = collection.add_notification_callback([&](CollectionChangeSet c) {
-                change_current = c;
+                change = c;
             });
             return token;
         };
@@ -1343,27 +1343,28 @@ TEST_CASE("nested List") {
             });
             return token;
         };
-        auto tkn_current_list = require_change_current(lst0);
-        auto tkn_current_dict = require_change_current(dict0);
+        auto tkn_current_list = require_change_current(lst0, change_current_list);
+        auto tkn_current_set = require_change_current(set0, change_current_set);
+        auto tkn_current_dict = require_change_current(dict0, change_current_dict);
         auto tkn_parent = require_change_parent();
 
         // notification for nested list
         write([&]() {
             top_list.remove(1);
         });
-        REQUIRE(change_current.collection_was_cleared);
+        REQUIRE(change_current_list.collection_was_cleared);
         REQUIRE_INDICES(change_parent.deletions, 1);
         // notification for nested set
         write([&]() {
             top_list.remove(3);
         });
-        REQUIRE(change_current.collection_was_cleared);
+        REQUIRE(change_current_set.collection_was_cleared);
         REQUIRE_INDICES(change_parent.deletions, 3);
         // notification for nested dictionary
         write([&]() {
             top_list.remove(3);
         });
-        REQUIRE(change_current.collection_was_cleared);
+        REQUIRE(change_current_dict.collection_was_cleared);
         REQUIRE_INDICES(change_parent.deletions, 3);
     }
 

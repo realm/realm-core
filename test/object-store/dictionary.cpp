@@ -96,7 +96,7 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
     REQUIRE(calls_dict == 2);
 
     auto list = dict_mixed.get_list("test");
-    auto token_list = list.add_notification_callback([&](CollectionChangeSet c) {
+    auto tkn = list.add_notification_callback([&](CollectionChangeSet c) {
         change_list = c;
         ++calls_list;
     });
@@ -123,21 +123,62 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
     REQUIRE(calls_list == 3);
 
     // for keys in dictionary insertion in front of the previous key should not matter.
-    CollectionChangeSet change_list_after_insert;
+    CollectionChangeSet change_list_after_op;
     r->begin_transaction();
     dict_mixed.insert_collection("A", CollectionType::List);
     r->commit_transaction();
 
     auto new_list = dict_mixed.get_list("A");
-    auto token_new_list = new_list.add_notification_callback([&](CollectionChangeSet c) {
-        change_list_after_insert = c;
+    tkn = new_list.add_notification_callback([&](CollectionChangeSet c) {
+        change_list_after_op = c;
     });
     r->begin_transaction();
     new_list.add(Mixed{42});
     r->commit_transaction();
     advance_and_notify(*r);
 
-    REQUIRE_INDICES(change_list_after_insert.insertions, 0);
+    REQUIRE_INDICES(change_list_after_op.insertions, 0);
+
+    // remove the collection
+    r->begin_transaction();
+    dict_mixed.erase("A");
+    r->commit_transaction();
+    advance_and_notify(*r);
+    REQUIRE(change_list_after_op.collection_was_cleared);
+
+    r->begin_transaction();
+    dict_mixed.insert_collection("Set", CollectionType::Set);
+    dict_mixed.insert_collection("Dictionary", CollectionType::Dictionary);
+    r->commit_transaction();
+
+    r->begin_transaction();
+    auto n_set = dict_mixed.get_set("Set");
+    n_set.insert(Mixed{10});
+    auto n_dict = dict_mixed.get_dictionary("Dictionary");
+    n_dict.insert("K", 11);
+    r->commit_transaction();
+
+    // remove set
+    CollectionChangeSet change_set_after_op;
+    tkn = n_set.add_notification_callback([&](CollectionChangeSet c) {
+        change_set_after_op = c;
+    });
+    r->begin_transaction();
+    dict_mixed.erase("Set");
+    r->commit_transaction();
+    advance_and_notify(*r);
+    REQUIRE(change_set_after_op.collection_was_cleared);
+
+    // remove dictionary
+    CollectionChangeSet change_dictionary_after_op;
+    tkn = n_dict.add_notification_callback([&](CollectionChangeSet c) {
+        change_dictionary_after_op = c;
+    });
+    r->begin_transaction();
+    dict_mixed.erase("Dictionary");
+    r->commit_transaction();
+    advance_and_notify(*r);
+    REQUIRE(change_dictionary_after_op.collection_was_cleared);
 }
 
 TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,

@@ -2134,6 +2134,11 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
                 size_t ndx = list_of_mixed->find_key(mpark::get<int64_t>(index));
                 return {list_of_mixed->get(ndx), PathElement(ndx)};
             }
+            else if (collection->get_collection_type() == CollectionType::Set) {
+                auto set_of_mixed = dynamic_cast<Set<Mixed>*>(collection.get());
+                size_t ndx = set_of_mixed->find_any(mpark::get<int64_t>(index));
+                return {set_of_mixed->get(ndx), PathElement(ndx)};
+            }
             else {
                 std::string key = mpark::get<std::string>(index);
                 auto ref = dynamic_cast<Dictionary*>(collection.get())->get(key);
@@ -2143,6 +2148,9 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
         auto [ref, path_elem] = get_ref();
         if (ref.is_type(type_List)) {
             collection = collection->get_list(path_elem);
+        }
+        else if (ref.is_type(type_Set)) {
+            collection = collection->get_set(path_elem);
         }
         else if (ref.is_type(type_Dictionary)) {
             collection = collection->get_dictionary(path_elem);
