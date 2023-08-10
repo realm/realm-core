@@ -172,18 +172,38 @@ ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::
 
 #if REALM_ENABLE_AUTH_TESTS
 
+static std::string unquote_string(std::string_view possibly_quoted_string)
+{
+    if (possibly_quoted_string.size() > 0) {
+        auto check_char = possibly_quoted_string.front();
+        if (check_char == '"' || check_char == '\'') {
+            possibly_quoted_string.remove_prefix(1);
+        }
+    }
+    if (possibly_quoted_string.size() > 0) {
+        auto check_char = possibly_quoted_string.back();
+        if (check_char == '"' || check_char == '\'') {
+            possibly_quoted_string.remove_suffix(1);
+        }
+    }
+    return std::string{possibly_quoted_string};
+}
+
 #ifdef REALM_MONGODB_ENDPOINT
 std::string get_base_url()
 {
     // allows configuration with or without quotes
-    std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
-    if (base_url.size() > 0 && base_url[0] == '"') {
-        base_url.erase(0, 1);
-    }
-    if (base_url.size() > 0 && base_url[base_url.size() - 1] == '"') {
-        base_url.erase(base_url.size() - 1);
-    }
-    return base_url;
+    return unquote_string(REALM_QUOTE(REALM_MONGODB_ENDPOINT));
+}
+
+std::string get_admin_url()
+{
+#ifdef REALM_ADMIN_ENDPOINT
+    // allows configuration with or without quotes
+    return unquote_string(REALM_QUOTE(REALM_ADMIN_ENDPOINT));
+#else
+    return get_base_url();
+#endif
 }
 #endif // REALM_MONGODB_ENDPOINT
 

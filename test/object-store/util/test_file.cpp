@@ -317,7 +317,7 @@ void set_app_config_defaults(app::App::Config& app_config,
 #if REALM_ENABLE_AUTH_TESTS
 
 TestAppSession::TestAppSession()
-    : TestAppSession(get_runtime_app_session(get_base_url()), nullptr, DeleteApp{false})
+    : TestAppSession(get_runtime_app_session(), nullptr, DeleteApp{false})
 {
 }
 

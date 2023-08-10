@@ -970,7 +970,8 @@ TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
     auto app = session.app();
 
     auto remote_client = app->current_user()->mongo_client("BackingDB");
-    auto db = remote_client.db(get_runtime_app_session("").config.mongo_dbname);
+    auto app_session = get_runtime_app_session();
+    auto db = remote_client.db(app_session.config.mongo_dbname);
     auto dog_collection = db["Dog"];
     auto cat_collection = db["Cat"];
     auto person_collection = db["Person"];
@@ -1722,7 +1723,8 @@ TEST_CASE("app: token refresh", "[sync][app][token][baas]") {
     sync_user->update_access_token(ENCODE_FAKE_JWT("fake_access_token"));
 
     auto remote_client = app->current_user()->mongo_client("BackingDB");
-    auto db = remote_client.db(get_runtime_app_session("").config.mongo_dbname);
+    auto app_session = get_runtime_app_session();
+    auto db = remote_client.db(app_session.config.mongo_dbname);
     auto dog_collection = db["Dog"];
     bson::BsonDocument dog_document{{"name", "fido"}, {"breed", "king charles"}};
 
@@ -1748,9 +1750,7 @@ TEST_CASE("app: token refresh", "[sync][app][token][baas]") {
 // MARK: - Sync Tests
 
 TEST_CASE("app: mixed lists with object links", "[sync][pbs][app][links][baas]") {
-    std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
-    REQUIRE(!base_url.empty());
 
     Schema schema{
         {"TopLevel",
@@ -1765,7 +1765,7 @@ TEST_CASE("app: mixed lists with object links", "[sync][pbs][app][links][baas]")
          }},
     };
 
-    auto server_app_config = minimal_app_config(base_url, "set_new_embedded_object", schema);
+    auto server_app_config = minimal_app_config("set_new_embedded_object", schema);
     auto app_session = create_app(server_app_config);
     auto partition = random_string(100);
 
@@ -1824,9 +1824,7 @@ TEST_CASE("app: mixed lists with object links", "[sync][pbs][app][links][baas]")
 }
 
 TEST_CASE("app: roundtrip values", "[sync][pbs][app][baas]") {
-    std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
-    REQUIRE(!base_url.empty());
 
     Schema schema{
         {"TopLevel",
@@ -1836,7 +1834,7 @@ TEST_CASE("app: roundtrip values", "[sync][pbs][app][baas]") {
          }},
     };
 
-    auto server_app_config = minimal_app_config(base_url, "roundtrip_values", schema);
+    auto server_app_config = minimal_app_config("roundtrip_values", schema);
     auto app_session = create_app(server_app_config);
     auto partition = random_string(100);
 
@@ -1873,9 +1871,7 @@ TEST_CASE("app: roundtrip values", "[sync][pbs][app][baas]") {
 }
 
 TEST_CASE("app: upgrade from local to synced realm", "[sync][pbs][app][upgrade][baas]") {
-    std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
-    REQUIRE(!base_url.empty());
 
     Schema schema{
         {"origin",
@@ -1918,7 +1914,7 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][pbs][app][upgrade][
     }
 
     /* Create a synced realm and upload some data */
-    auto server_app_config = minimal_app_config(base_url, "upgrade_from_local", schema);
+    auto server_app_config = minimal_app_config("upgrade_from_local", schema);
     TestAppSession test_session(create_app(server_app_config));
     auto partition = random_string(100);
     auto user1 = test_session.app()->current_user();
@@ -1975,9 +1971,7 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][pbs][app][upgrade][
 }
 
 TEST_CASE("app: set new embedded object", "[sync][pbs][app][baas]") {
-    std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
-    REQUIRE(!base_url.empty());
 
     Schema schema{
         {"TopLevel",
@@ -2005,7 +1999,7 @@ TEST_CASE("app: set new embedded object", "[sync][pbs][app][baas]") {
          }},
     };
 
-    auto server_app_config = minimal_app_config(base_url, "set_new_embedded_object", schema);
+    auto server_app_config = minimal_app_config("set_new_embedded_object", schema);
     TestAppSession test_session(create_app(server_app_config));
     auto partition = random_string(100);
 
@@ -2116,7 +2110,7 @@ TEST_CASE("app: make distributable client file", "[sync][pbs][app][baas]") {
     TestAppSession session;
     auto app = session.app();
 
-    auto schema = default_app_config("").schema;
+    auto schema = get_default_schema();
     SyncTestFile original_config(app, bson::Bson("foo"), schema);
     create_user_and_log_in(app);
     SyncTestFile target_config(app, bson::Bson("foo"), schema);
@@ -2189,7 +2183,7 @@ TEST_CASE("app: make distributable client file", "[sync][pbs][app][baas]") {
 TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     auto logger = std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
-    const auto schema = default_app_config("").schema;
+    const auto schema = get_default_schema();
 
     auto get_dogs = [](SharedRealm r) -> Results {
         wait_for_upload(*r, std::chrono::seconds(10));
@@ -2652,8 +2646,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             logger->trace("redirect_url: %1", redirect_url);
         };
 
-        auto base_url = get_base_url();
-        auto server_app_config = minimal_app_config(base_url, "websocket_redirect", schema);
+        auto server_app_config = minimal_app_config("websocket_redirect", schema);
         TestAppSession test_session(create_app(server_app_config), redir_transport, DeleteApp{true},
                                     realm::ReconnectMode::normal, redir_provider);
         auto partition = random_string(100);
@@ -3470,9 +3463,7 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][pbs][app][co
                    cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks, cf::DictionaryOfObjects,
                    cf::DictionaryOfMixedLinks)
 {
-    std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
-    REQUIRE(!base_url.empty());
     const auto partition = random_string(100);
     TestType test_type("collection", "dest");
     Schema schema = {{"source",
@@ -3484,7 +3475,7 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][pbs][app][co
                           {valid_pk_name, PropertyType::Int | PropertyType::Nullable, true},
                           {"realm_id", PropertyType::String | PropertyType::Nullable},
                       }}};
-    auto server_app_config = minimal_app_config(base_url, "collections_of_links", schema);
+    auto server_app_config = minimal_app_config("collections_of_links", schema);
     TestAppSession test_session(create_app(server_app_config));
 
     auto wait_for_num_objects_to_equal = [](realm::SharedRealm r, const std::string& table_name, size_t count) {
@@ -3623,18 +3614,16 @@ TEMPLATE_TEST_CASE("app: partition types", "[sync][pbs][app][partition][baas]", 
                    cf::UUID, cf::BoxedOptional<cf::Int>, cf::UnboxedOptional<cf::String>, cf::BoxedOptional<cf::OID>,
                    cf::BoxedOptional<cf::UUID>)
 {
-    std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     const std::string partition_key_col_name = "partition_key_prop";
     const std::string table_name = "class_partition_test_type";
-    REQUIRE(!base_url.empty());
     auto partition_property = Property(partition_key_col_name, TestType::property_type);
     Schema schema = {{Group::table_name_to_class_name(table_name),
                       {
                           {valid_pk_name, PropertyType::Int, true},
                           partition_property,
                       }}};
-    auto server_app_config = minimal_app_config(base_url, "partition_types_app_name", schema);
+    auto server_app_config = minimal_app_config("partition_types_app_name", schema);
     server_app_config.partition_key = partition_property;
     TestAppSession test_session(create_app(server_app_config));
     auto app = test_session.app();
@@ -3707,9 +3696,7 @@ TEMPLATE_TEST_CASE("app: partition types", "[sync][pbs][app][partition][baas]", 
 }
 
 TEST_CASE("app: full-text compatible with sync", "[sync][app][baas]") {
-    std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
-    REQUIRE(!base_url.empty());
 
     Schema schema{
         {"TopLevel",
@@ -3719,7 +3706,7 @@ TEST_CASE("app: full-text compatible with sync", "[sync][app][baas]") {
          }},
     };
 
-    auto server_app_config = minimal_app_config(base_url, "full_text", schema);
+    auto server_app_config = minimal_app_config("full_text", schema);
     auto app_session = create_app(server_app_config);
     const auto partition = random_string(100);
     TestAppSession test_session(app_session, nullptr);

@@ -2,31 +2,12 @@
 # The script to be run on the ubuntu host that will run baas for the evergreen windows tests
 #
 # Usage:
-# ./evergreen/setup_baas_host_local.sh [-w PATH] [-u USER] [-b BRANCH] [-v] [-h] [-t] [-l PORT] [-c PORT] HOST_VARS SSH_KEY
+# ./evergreen/setup_baas_host_local.sh [-w PATH] [-u USER] [-b BRANCH] [-v] [-h] [-t] [-d PORT] [-l PORT] [-c PORT] HOST_VARS SSH_KEY
 #
 
 set -o errexit
 set -o errtrace
 set -o pipefail
-
-function usage()
-{
-    echo "Usage: setup_baas_host_local.sh [-w PATH] [-u USER] [-b BRANCH] [-v] [-h] [-t] [-l PORT] [-c PORT] HOST_VARS SSH_KEY"
-    echo -e "\tHOST_VARS\tPath to baas host vars script file"
-    echo -e "\tSSH_KEY\t\tPath to baas host private key file"
-    echo "Options:"
-    echo -e "\t-w PATH\t\tPath to local baas server working directory (default ./baas-work-dir)"
-    echo -e "\t-u USER\t\tUsername to connect to baas host (default ubuntu)"
-    echo -e "\t-b BRANCH\tOptional branch or git spec of baas to checkout/build"
-    echo -e "\t-v\t\tEnable verbose script debugging"
-    echo -e "\t-h\t\tShow this usage summary and exit"
-    echo "Baas Proxy Options:"
-    echo -e "\t-t\t\tEnable baas proxy support (proxy between baas on :9090 and remote port)"
-    echo -e "\t-l PORT\t\tBaas proxy listen port on remote host (default 9092)"
-    echo -e "\t-c PORT\t\tLocal configuration port for proxy HTTP API (default 8474)"
-    # Default to 0 if exit code not provided
-    exit "${1:0}"
-}
 
 EVERGREEN_PATH=./evergreen
 BAAS_WORK_PATH=./baas-work-dir
@@ -35,15 +16,37 @@ BAAS_USER=ubuntu
 BAAS_BRANCH=
 VERBOSE=
 BAAS_PROXY=
+DIRECT_PORT=9098
 LISTEN_PORT=9092
 CONFIG_PORT=8474
 
-while getopts "w:u:b:tl:c:vh" opt; do
+function usage()
+{
+    echo "Usage: setup_baas_host_local.sh [-w PATH] [-u USER] [-b BRANCH] [-v] [-h] [-t] [-d PORT] [-l PORT] [-c PORT] HOST_VARS SSH_KEY"
+    echo -e "\tHOST_VARS\tPath to baas host vars script file"
+    echo -e "\tSSH_KEY\t\tPath to baas host private key file"
+    echo "Options:"
+    echo -e "\t-w PATH\t\tPath to local baas server working directory (default ${BAAS_WORK_PATH})"
+    echo -e "\t-u USER\t\tUsername to connect to baas host (default ${BAAS_USER})"
+    echo -e "\t-b BRANCH\tOptional branch or git spec of baas to checkout/build"
+    echo -e "\t-v\t\tEnable verbose script debugging"
+    echo -e "\t-h\t\tShow this usage summary and exit"
+    echo "Baas Proxy Options:"
+    echo -e "\t-t\t\tEnable baas proxy support (proxy between baas on :9090 and remote port)"
+    echo -e "\t-d PORT\t\tPort for direct connection to baas - skips proxy (default ${DIRECT_PORT})"
+    echo -e "\t-l PORT\t\tBaas proxy listen port on remote host (default ${LISTEN_PORT})"
+    echo -e "\t-c PORT\t\tLocal configuration port for proxy HTTP API (default ${CONFIG_PORT})"
+    # Default to 0 if exit code not provided
+    exit "${1:0}"
+}
+
+while getopts "w:u:b:ta:d:l:c:vh" opt; do
     case "${opt}" in
         w) BAAS_WORK_PATH="${OPTARG}";;
         u) BAAS_USER="${OPTARG}";;
         b) BAAS_BRANCH="${OPTARG}";;
         t) BAAS_PROXY="yes";;
+        d) DIRECT_PORT="${OPTARG}";;
         l) LISTEN_PORT="${OPTARG}";;
         c) CONFIG_PORT="${OPTARG}";;
         v) VERBOSE="yes";;
@@ -199,8 +202,11 @@ if [[ -n "${BAAS_PROXY}" ]]; then
     echo "Transferring baas proxy setup script to ${SSH_USER}:${FILE_DEST_DIR}"
     scp "${SSH_OPTIONS[@]}" "${EVERGREEN_PATH}/setup_baas_proxy.sh" "${SSH_USER}:${FILE_DEST_DIR}/"
 
-    # Add extra tunnel for baas proxy HTTP API config interface
+    # Add extra tunnel for baas proxy HTTP API config interface and direct connection to baas
     BAAS_TUNNELS=("-L" "${CONFIG_PORT}:127.0.0.1:8474")
+    if [[ -n "${DIRECT_PORT}" ]]; then
+        BAAS_TUNNELS+=("-L" "${DIRECT_PORT}:127.0.0.1:9090")
+    fi
     # Enable baas proxy and use LISTEN_PORT as the proxy listen port
     EXTRA_OPTIONS+=("-t" "${LISTEN_PORT}")
 else
@@ -220,6 +226,9 @@ if [[ -n "${BAAS_BRANCH}" ]]; then
 fi
 if [[ -n "${BAAS_PROXY}" ]]; then
     echo "- Baas proxy enabled - local HTTP API config port on :${CONFIG_PORT}"
+    if [[ -n "${DIRECT_PORT}" ]]; then
+        echo "- Baas direct connection on port :${DIRECT_PORT}"
+    fi
 fi
 
 # shellcheck disable=SC2029

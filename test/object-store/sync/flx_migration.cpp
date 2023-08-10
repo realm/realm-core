@@ -117,7 +117,6 @@ TEST_CASE("Test server migration and rollback", "[sync][flx][flx migration][baas
     std::shared_ptr<util::Logger> logger_ptr =
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
-    const std::string base_url = get_base_url();
     const std::string partition1 = "migration-test";
     const std::string partition2 = "another-value";
     const Schema mig_schema{
@@ -125,7 +124,7 @@ TEST_CASE("Test server migration and rollback", "[sync][flx][flx migration][baas
                                 {"string_field", PropertyType::String | PropertyType::Nullable},
                                 {"realm_id", PropertyType::String | PropertyType::Nullable}}),
     };
-    auto server_app_config = minimal_app_config(base_url, "server_migrate_rollback", mig_schema);
+    auto server_app_config = minimal_app_config("server_migrate_rollback", mig_schema);
     TestAppSession session(create_app(server_app_config));
     SyncTestFile config1(session.app(), partition1, server_app_config.schema);
     SyncTestFile config2(session.app(), partition2, server_app_config.schema);
@@ -267,14 +266,13 @@ TEST_CASE("Test client migration and rollback", "[sync][flx][flx migration][baas
     std::shared_ptr<util::Logger> logger_ptr =
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
-    const std::string base_url = get_base_url();
     const std::string partition = "migration-test";
     const Schema mig_schema{
         ObjectSchema("Object", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                 {"string_field", PropertyType::String | PropertyType::Nullable},
                                 {"realm_id", PropertyType::String | PropertyType::Nullable}}),
     };
-    auto server_app_config = minimal_app_config(base_url, "server_migrate_rollback", mig_schema);
+    auto server_app_config = minimal_app_config("server_migrate_rollback", mig_schema);
     TestAppSession session(create_app(server_app_config));
     SyncTestFile config(session.app(), partition, server_app_config.schema);
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
@@ -324,13 +322,12 @@ TEST_CASE("Test client migration and rollback with recovery", "[sync][flx][flx m
     std::shared_ptr<util::Logger> logger_ptr =
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
-    const std::string base_url = get_base_url();
     const std::string partition = "migration-test";
     const Schema mig_schema{
         ObjectSchema("Object", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                 {"string_field", PropertyType::String | PropertyType::Nullable}}),
     };
-    auto server_app_config = minimal_app_config(base_url, "server_migrate_rollback", mig_schema);
+    auto server_app_config = minimal_app_config("server_migrate_rollback", mig_schema);
     TestAppSession session(create_app(server_app_config));
     SyncTestFile config(session.app(), partition, server_app_config.schema);
     config.sync_config->client_resync_mode = ClientResyncMode::Recover;
@@ -476,14 +473,13 @@ TEST_CASE("An interrupted migration or rollback can recover on the next session"
     std::shared_ptr<util::Logger> logger_ptr =
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
-    const std::string base_url = get_base_url();
     const std::string partition = "migration-test";
     const Schema mig_schema{
         ObjectSchema("Object", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                 {"string_field", PropertyType::String | PropertyType::Nullable},
                                 {"realm_id", PropertyType::String | PropertyType::Nullable}}),
     };
-    auto server_app_config = minimal_app_config(base_url, "server_migrate_rollback", mig_schema);
+    auto server_app_config = minimal_app_config("server_migrate_rollback", mig_schema);
     TestAppSession session(create_app(server_app_config));
     SyncTestFile config(session.app(), partition, server_app_config.schema);
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
@@ -588,14 +584,13 @@ TEST_CASE("Update to native FLX after migration", "[sync][flx][flx migration][ba
     std::shared_ptr<util::Logger> logger_ptr =
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
-    const std::string base_url = get_base_url();
     const std::string partition = "migration-test";
     const Schema mig_schema{
         ObjectSchema("Object", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                 {"string_field", PropertyType::String | PropertyType::Nullable},
                                 {"realm_id", PropertyType::String | PropertyType::Nullable}}),
     };
-    auto server_app_config = minimal_app_config(base_url, "server_migrate_rollback", mig_schema);
+    auto server_app_config = minimal_app_config("server_migrate_rollback", mig_schema);
     TestAppSession session(create_app(server_app_config));
     SyncTestFile config(session.app(), partition, server_app_config.schema);
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
@@ -708,14 +703,13 @@ TEST_CASE("New table is synced after migration", "[sync][flx][flx migration][baa
     std::shared_ptr<util::Logger> logger_ptr =
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
-    const std::string base_url = get_base_url();
     const std::string partition = "migration-test";
     const Schema mig_schema{
         ObjectSchema("Object", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                 {"string_field", PropertyType::String | PropertyType::Nullable},
                                 {"realm_id", PropertyType::String | PropertyType::Nullable}}),
     };
-    auto server_app_config = minimal_app_config(base_url, "server_migrate_rollback", mig_schema);
+    auto server_app_config = minimal_app_config("server_migrate_rollback", mig_schema);
     TestAppSession session(create_app(server_app_config));
     SyncTestFile config(session.app(), partition, server_app_config.schema);
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
@@ -817,7 +811,6 @@ TEST_CASE("Async open + client reset", "[sync][flx][flx migration][baas]") {
     std::shared_ptr<util::Logger> logger_ptr =
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
-    const std::string base_url = get_base_url();
     const std::string partition = "async-open-migration-test";
     ObjectSchema shared_object("Object", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                           {"string_field", PropertyType::String | PropertyType::Nullable},
@@ -825,7 +818,7 @@ TEST_CASE("Async open + client reset", "[sync][flx][flx migration][baas]") {
     const Schema mig_schema{shared_object};
     size_t num_before_reset_notifications = 0;
     size_t num_after_reset_notifications = 0;
-    auto server_app_config = minimal_app_config(base_url, "async_open_during_migration", mig_schema);
+    auto server_app_config = minimal_app_config("async_open_during_migration", mig_schema);
     std::optional<SyncTestFile> config; // destruct this after the sessions are torn down
     TestAppSession session(create_app(server_app_config));
     config.emplace(session.app(), partition, server_app_config.schema);

@@ -52,7 +52,7 @@ public:
     static AppSession make_app_from_server_schema(const std::string& test_name,
                                                   const FLXSyncTestHarness::ServerSchema& server_schema)
     {
-        auto server_app_config = minimal_app_config(get_base_url(), test_name, server_schema.schema);
+        auto server_app_config = minimal_app_config(test_name, server_schema.schema);
         server_app_config.dev_mode_enabled = server_schema.dev_mode_enabled;
         AppCreateConfig::FLXSyncConfig flx_config;
         flx_config.queryable_fields = server_schema.queryable_fields;

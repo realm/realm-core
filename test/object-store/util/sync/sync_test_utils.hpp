@@ -146,6 +146,8 @@ TestSyncManager::Config get_config(Transport&& transport)
 
 #ifdef REALM_MONGODB_ENDPOINT
 std::string get_base_url();
+std::string get_admin_url();
+
 #endif
 
 struct AutoVerifiedEmailCredentials : app::AppCredentials {

@@ -30,6 +30,8 @@
 #include <realm/object-store/sync/app_credentials.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 
+#include <realm/util/logger.hpp>
+
 #include <external/json/json.hpp>
 #include <external/mpark/variant.hpp>
 
@@ -65,10 +67,11 @@ private:
     std::string m_access_token;
 };
 
+struct AppCreateConfig;
+
 class AdminAPISession {
 public:
-    static AdminAPISession login(const std::string& base_url, const std::string& username,
-                                 const std::string& password);
+    static AdminAPISession login(const AppCreateConfig& config);
 
     enum class APIFamily { Admin, Private };
     AdminAPIEndpoint apps(APIFamily family = APIFamily::Admin) const;
@@ -133,14 +136,14 @@ public:
 
     MigrationStatus get_migration_status(const std::string& app_id) const;
 
-    const std::string& base_url() const noexcept
+    const std::string& admin_url() const noexcept
     {
         return m_base_url;
     }
 
 private:
-    AdminAPISession(std::string base_url, std::string access_token, std::string group_id)
-        : m_base_url(std::move(base_url))
+    AdminAPISession(std::string admin_url, std::string access_token, std::string group_id)
+        : m_base_url(std::move(admin_url))
         , m_access_token(std::move(access_token))
         , m_group_id(std::move(group_id))
     {
@@ -213,7 +216,8 @@ struct AppCreateConfig {
     };
 
     std::string app_name;
-    std::string base_url;
+    std::string app_url;
+    std::string admin_url;
     std::string admin_username;
     std::string admin_password;
 
@@ -234,10 +238,13 @@ struct AppCreateConfig {
     bool enable_custom_token_auth = false;
 
     std::vector<ServiceRole> service_roles;
+
+    std::shared_ptr<util::Logger> logger;
 };
 
-AppCreateConfig default_app_config(const std::string& base_url);
-AppCreateConfig minimal_app_config(const std::string& base_url, const std::string& name, const Schema& schema);
+realm::Schema get_default_schema();
+AppCreateConfig default_app_config();
+AppCreateConfig minimal_app_config(const std::string& name, const Schema& schema);
 
 struct AppSession {
     std::string client_app_id;
@@ -271,16 +278,18 @@ private:
     std::mutex m_mutex;
 };
 
-// This will create a new test app in the baas server at base_url
-// to be used in tests.
-AppSession get_runtime_app_session(std::string base_url);
+// This will create a new test app in the baas server - base_url and admin_url
+// are automatically set
+AppSession get_runtime_app_session();
+
+std::string get_mongodb_server();
 
 template <typename Factory>
 inline app::App::Config get_config(Factory factory, const AppSession& app_session)
 {
     return {app_session.client_app_id,
             factory,
-            app_session.admin_api.base_url(),
+            app_session.config.app_url,
             util::none,
             util::Optional<std::string>("A Local App Version"),
             util::none,
