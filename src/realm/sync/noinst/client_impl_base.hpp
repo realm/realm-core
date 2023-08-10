@@ -234,6 +234,8 @@ public:
 
     void cancel_reconnect_delay();
     bool wait_for_session_terminations_or_client_stopped();
+    // Async version of wait_for_session_terminations_or_client_stopped().
+    util::Future<void> notify_session_terminated();
     void voluntary_disconnect_all_connections();
 
 private:

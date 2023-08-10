@@ -338,6 +338,30 @@ TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync][session]") {
     }
 }
 
+TEST_CASE("SyncSession: internal pause_async API", "[sync][session]") {
+    TestSyncManager init_sync_manager;
+    auto app = init_sync_manager.app();
+    auto user = app->sync_manager()->get_user("close-api-tests-user", ENCODE_FAKE_JWT("fake_refresh_token"),
+                                              ENCODE_FAKE_JWT("fake_access_token"), "https://realm.example.org",
+                                              dummy_device_id);
+
+    auto session = sync_session(
+        user, "/test-close-for-active", [](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded);
+    EventLoop::main().run_until([&] {
+        return sessions_are_active(*session);
+    });
+    REQUIRE(sessions_are_active(*session));
+    auto dbref = SyncSession::OnlyForTesting::get_db(*session);
+    auto before = dbref.use_count();
+    auto future = SyncSession::OnlyForTesting::pause_async(*session);
+    future.get();
+    auto after = dbref.use_count();
+    // Check SessionImpl released the sync agent as result of SessionWrapper::finalize() being called.
+    REQUIRE_NOTHROW(dbref->claim_sync_agent());
+    // Check DBRef is released in SessionWrapper::finalize().
+    REQUIRE(after < before);
+}
+
 TEST_CASE("SyncSession: update_configuration()", "[sync][session]") {
     TestSyncManager init_sync_manager({}, {false});
     auto app = init_sync_manager.app();
