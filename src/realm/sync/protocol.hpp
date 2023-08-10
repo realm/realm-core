@@ -374,8 +374,6 @@ constexpr bool is_session_level_error(ProtocolError);
 const char* get_protocol_error_message(int error_code) noexcept;
 std::ostream& operator<<(std::ostream&, ProtocolError protocol_error);
 
-Status protocol_error_to_status(ProtocolError error_code, std::string_view msg);
-
 // Implementation
 
 inline bool is_consistent(DownloadCursor dc) noexcept
