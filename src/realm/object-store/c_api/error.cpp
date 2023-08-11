@@ -159,7 +159,6 @@ bool ErrorStorage::get_as_realm_error_t(realm_error_t* out) const noexcept
     if (out) {
         *out = *m_err;
     }
-
     return true;
 }
 
