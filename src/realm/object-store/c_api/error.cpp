@@ -165,6 +165,7 @@ bool ErrorStorage::clear() noexcept
 
 void ErrorStorage::set_usercode_error(void* usercode_error)
 {
+    printf("setting usercode_error ptr %p", usercode_error);
     m_usercode_error = usercode_error;
 }
 
