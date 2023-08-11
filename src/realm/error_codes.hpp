@@ -186,7 +186,7 @@ public:
         MongoDBError = RLM_ERR_MONGODB_ERROR,
         ArgumentsNotAllowed = RLM_ERR_ARGUMENTS_NOT_ALLOWED,
         FunctionExecutionError = RLM_ERR_FUNCTION_EXECUTION_ERROR,
-        NoMatchingRule = RLM_ERR_NO_MATCHING_RULE,
+        NoMatchingRuleFound = RLM_ERR_NO_MATCHING_RULE_FOUND,
         InternalServerError = RLM_ERR_INTERNAL_SERVER_ERROR,
         AuthProviderNotFound = RLM_ERR_AUTH_PROVIDER_NOT_FOUND,
         AuthProviderAlreadyExists = RLM_ERR_AUTH_PROVIDER_ALREADY_EXISTS,
