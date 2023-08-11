@@ -1781,7 +1781,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
     SECTION("invalid metadata properties") {
         config.audit_config->metadata = {{"invalid key", "value"}};
         auto error = expect_error(config, generate_event);
-        REQUIRE_THAT(error.what(), StartsWith("Invalid schema change"));
+        REQUIRE_THAT(error.status.reason(), StartsWith("Invalid schema change"));
         REQUIRE(error.is_fatal);
     }
 
@@ -1814,7 +1814,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
         config.audit_config = std::make_shared<AuditConfig>();
 
         auto error = expect_error(config, generate_event);
-        REQUIRE_THAT(error.what(), StartsWith("Invalid schema change"));
+        REQUIRE_THAT(error.status.reason(), StartsWith("Invalid schema change"));
         REQUIRE(error.is_fatal);
     }
 
@@ -1889,7 +1889,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
         SECTION("auditing with a flexible sync user reports a sync error") {
             config.audit_config->audit_user = harness.app()->current_user();
             auto error = expect_error(config, generate_event);
-            REQUIRE_THAT(error.what(),
+            REQUIRE_THAT(error.status.reason(),
                          Catch::Matchers::ContainsSubstring(
                              "Client connected using partition-based sync when app is using flexible sync"));
             REQUIRE(error.is_fatal);

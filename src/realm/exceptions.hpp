@@ -367,20 +367,11 @@ struct SystemError : RuntimeError {
 
     ~SystemError() noexcept override;
 
-    std::error_code get_system_error() const
-    {
-        return to_status().get_std_error_code();
-    }
-
-    const std::error_category& get_category() const
-    {
-        return get_system_error().category();
-    }
-
 private:
     static Status make_status(std::error_code err, std::string_view msg, bool msg_is_prefix)
     {
-        return Status(err, msg_is_prefix ? util::format("%1: %2 (%3)", msg, err.message(), err.value()) : msg);
+        return Status(ErrorCodes::SystemError,
+                      msg_is_prefix ? util::format("%1: %2 (%3)", msg, err.message(), err.value()) : msg);
     }
 };
 
