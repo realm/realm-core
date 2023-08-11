@@ -1107,8 +1107,10 @@ void Connection::handle_disconnect_wait(Status status)
 
 void Connection::close_due_to_protocol_error(Status status)
 {
-    close_due_to_client_side_error(std::move(status), IsFatal{true},
-                                   ConnectionTerminationReason::sync_protocol_violation); // Throws
+    SessionErrorInfo error_info(std::move(status), IsFatal{true});
+    error_info.server_requests_action = ProtocolErrorInfo::Action::ProtocolViolation;
+    involuntary_disconnect(std::move(error_info),
+                           ConnectionTerminationReason::sync_protocol_violation); // Throws
 }
 
 
@@ -2483,18 +2485,13 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
         return {ErrorCodes::SyncProtocolInvariantFailed, "Received ERROR message when it was not legal"};
     }
 
-    auto status = protocol_error_to_status(static_cast<ProtocolError>(info.raw_error_code), info.message);
-    if (status == ErrorCodes::UnknownError) {
-        return {ErrorCodes::SyncProtocolInvariantFailed,
-                util::format("Received ERROR message with unknown error code %1", info.raw_error_code)};
-    }
-    else if (auto error_code = ProtocolError(info.raw_error_code);
-             REALM_UNLIKELY(!is_session_level_error(error_code))) {
+    auto protocol_error = static_cast<ProtocolError>(info.raw_error_code);
+    auto status = protocol_error_to_status(protocol_error, info.message);
+    if (status != ErrorCodes::UnknownError && REALM_UNLIKELY(!is_session_level_error(protocol_error))) {
         return {ErrorCodes::SyncProtocolInvariantFailed,
                 util::format("Received ERROR message for session with non-session-level error code %1",
                              info.raw_error_code)};
     }
-
 
     // Can't process debug hook actions once the Session is undergoing deactivation, since
     // the SessionWrapper may not be available
