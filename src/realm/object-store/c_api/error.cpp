@@ -18,7 +18,6 @@ ErrorStorage::ErrorStorage(std::exception_ptr ptr) noexcept
     , m_usercode_error(nullptr)
     
 {
-    printf("ErrorStorage::ErrorStorage(std::exception_ptr ptr) noexcept\n");
     assign(std::move(ptr));
 }
 
@@ -27,7 +26,6 @@ ErrorStorage::ErrorStorage(const ErrorStorage& other)
     , m_message_buf(other.m_message_buf)
     , m_usercode_error(other.m_usercode_error)
 {
-    printf("ErrorStorage::ErrorStorage(const ErrorStorage& other)\n");
     if (m_err) {
         m_err->message = m_message_buf.c_str();
     }
@@ -35,7 +33,6 @@ ErrorStorage::ErrorStorage(const ErrorStorage& other)
 
 ErrorStorage& ErrorStorage::operator=(const ErrorStorage& other)
 {
-    printf("ErrorStorage& ErrorStorage::operator=(const ErrorStorage& other)\n");
     m_err = other.m_err;
     m_message_buf = other.m_message_buf;
     m_usercode_error = other.m_usercode_error;
@@ -50,7 +47,6 @@ ErrorStorage::ErrorStorage(ErrorStorage&& other)
     , m_message_buf(std::move(other.m_message_buf))
     , m_usercode_error(std::move(other.m_usercode_error))
 {
-    printf("ErrorStorage::ErrorStorage(ErrorStorage&& other)\n");
     if (m_err) {
         m_err->message = m_message_buf.c_str();
     }
@@ -59,7 +55,6 @@ ErrorStorage::ErrorStorage(ErrorStorage&& other)
 
 ErrorStorage& ErrorStorage::operator=(ErrorStorage&& other)
 {
-    printf("ErrorStorage& ErrorStorage::operator=(ErrorStorage&& other)\n");
     m_err = std::move(other.m_err);
     m_message_buf = std::move(other.m_message_buf);
     m_usercode_error = std::move(other.m_usercode_error);
@@ -83,7 +78,6 @@ bool ErrorStorage::operator==(const ErrorStorage& other) const noexcept
 
 void ErrorStorage::assign(std::exception_ptr eptr) noexcept
 {
-    printf("void ErrorStorage::assign(std::exception_ptr eptr) noexcept\n");
     if (!eptr) {
         clear();
         return;
@@ -113,10 +107,8 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
 
     // Core exceptions:
     catch (const Exception& ex) {
-        printf("ErrorStorage error message: %s\n", ex.what());
         populate_error(ex, ex.code());
         if (ex.code() == ErrorCodes::CallbackFailed) {
-            printf("ex.code is ErrorCodes::CallbackFailed\n");
             m_err->usercode_error = static_cast<const CallbackFailed&>(ex).usercode_error;
         }
         if (ErrorCodes::error_categories(ex.code()).test(ErrorCategory::file_access)) {
@@ -128,32 +120,25 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
 
     // Generic exceptions:
     catch (const std::invalid_argument& ex) {
-        printf("ErrorStorage invalid argument error message: %s\n", ex.what());
         populate_error(ex, ErrorCodes::InvalidArgument);
     }
     catch (const std::out_of_range& ex) {
-        printf("ErrorStorage out_of_range error message: %s\n", ex.what());
         populate_error(ex, ErrorCodes::OutOfBounds);
     }
     catch (const std::logic_error& ex) {
-        printf("ErrorStorage std::logic_error message: %s\n", ex.what());
         populate_error(ex, ErrorCodes::LogicError);
     }
     catch (const std::runtime_error& ex) {
-        printf("ErrorStorage std::runtime_error message: %s\n", ex.what());
         populate_error(ex, ErrorCodes::RuntimeError);
     }
     catch (const std::bad_alloc& ex) {
-        printf("ErrorStorage std::exception message: %s\n", ex.what());
         populate_error(ex, ErrorCodes::OutOfMemory);
     }
     catch (const std::exception& ex) {
-        printf("ErrorStorage std::exceptio message: %s\n", ex.what());
         populate_error(ex, ErrorCodes::UnknownError);
     }
     // FIXME: Handle more exception types.
     catch (...) {
-        printf("ErrorStorage RLM_ERR_UNKNOWN message\n");
         m_err->error = RLM_ERR_UNKNOWN;
         m_message_buf = "Unknown error";
         m_err->message = m_message_buf.c_str();
@@ -167,20 +152,14 @@ bool ErrorStorage::has_error() const noexcept
 
 bool ErrorStorage::get_as_realm_error_t(realm_error_t* out) const noexcept
 {
-    printf("bool ErrorStorage::get_as_realm_error_t(realm_error_t* out) const noexcept\n");
     if (!m_err) {
-        printf("no m_err. returning false\n");
         return false;
     }
 
     if (out) {
-        printf("m_err found. returning true\n");    
         *out = *m_err;
-        if ((*m_err).usercode_error != nullptr) {
-            printf("m_err.usercode_error != nullptr\n");
-        }
     }
-    printf("m_err found. returning true\n");
+
     return true;
 }
 
@@ -193,7 +172,6 @@ bool ErrorStorage::clear() noexcept
 
 void ErrorStorage::set_usercode_error(void* usercode_error)
 {
-    printf("setting usercode_error ptr %p\n", usercode_error);
     m_usercode_error = usercode_error;
 }
 
@@ -206,7 +184,6 @@ void* ErrorStorage::get_and_clear_usercode_error()
 
 ErrorStorage* ErrorStorage::get_thread_local()
 {
-    printf("ErrorStorage* ErrorStorage::get_thread_local()\n");
 #if !defined(RLM_NO_THREAD_LOCAL)
     static thread_local ErrorStorage g_error_storage;
     return &g_error_storage;
@@ -271,6 +248,5 @@ RLM_EXPORT bool realm_wrap_exceptions(void (*func)()) noexcept
 
 RLM_API void realm_register_user_code_callback_error(void* usercode_error) noexcept
 {
-    printf("RLM_API void realm_register_user_code_callback_error(void* usercode_error) noexcept\n");
     realm::c_api::ErrorStorage::get_thread_local()->set_usercode_error(usercode_error);
 }
