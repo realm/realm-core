@@ -113,8 +113,10 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
 
     // Core exceptions:
     catch (const Exception& ex) {
+        printf("ErrorStorage error message: %s\n", ex.what());
         populate_error(ex, ex.code());
         if (ex.code() == ErrorCodes::CallbackFailed) {
+            printf("ex.code is ErrorCodes::CallbackFailed\n");
             m_err->usercode_error = static_cast<const CallbackFailed&>(ex).usercode_error;
         }
         if (ErrorCodes::error_categories(ex.code()).test(ErrorCategory::file_access)) {
@@ -126,25 +128,32 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
 
     // Generic exceptions:
     catch (const std::invalid_argument& ex) {
+        printf("ErrorStorage invalid argument error message: %s\n", ex.what());
         populate_error(ex, ErrorCodes::InvalidArgument);
     }
     catch (const std::out_of_range& ex) {
+        printf("ErrorStorage out_of_range error message: %s\n", ex.what());
         populate_error(ex, ErrorCodes::OutOfBounds);
     }
     catch (const std::logic_error& ex) {
+        printf("ErrorStorage std::logic_error message: %s\n", ex.what());
         populate_error(ex, ErrorCodes::LogicError);
     }
     catch (const std::runtime_error& ex) {
+        printf("ErrorStorage std::runtime_error message: %s\n", ex.what());
         populate_error(ex, ErrorCodes::RuntimeError);
     }
     catch (const std::bad_alloc& ex) {
+        printf("ErrorStorage std::exception message: %s\n", ex.what());
         populate_error(ex, ErrorCodes::OutOfMemory);
     }
     catch (const std::exception& ex) {
+        printf("ErrorStorage std::exceptio message: %s\n", ex.what());
         populate_error(ex, ErrorCodes::UnknownError);
     }
     // FIXME: Handle more exception types.
     catch (...) {
+        printf("ErrorStorage RLM_ERR_UNKNOWN message\n");
         m_err->error = RLM_ERR_UNKNOWN;
         m_message_buf = "Unknown error";
         m_err->message = m_message_buf.c_str();
