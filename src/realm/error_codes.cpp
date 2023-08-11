@@ -181,7 +181,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case MissingAuthReq:
         case MissingParameter:
         case MongoDBError:
-        case NoMatchingRule:
+        case NoMatchingRuleFound:
         case NotCallable:
         case ReadSizeLimitExceeded:
         case RestrictedHost:
@@ -316,8 +316,7 @@ static const MapElem string_to_error_code[] = {
     {"ModifyPrimaryKey", ErrorCodes::ModifyPrimaryKey},
     {"MongoDBError", ErrorCodes::MongoDBError},
     {"MultipleSyncAgents", ErrorCodes::MultipleSyncAgents},
-    {"NoMatchingRule", ErrorCodes::NoMatchingRule},
-    {"NoMatchingRuleFound", ErrorCodes::NoMatchingRule},
+    {"NoMatchingRuleFound", ErrorCodes::NoMatchingRuleFound},
     {"NoSubscriptionForWrite", ErrorCodes::NoSubscriptionForWrite},
     {"NoSuchTable", ErrorCodes::NoSuchTable},
     {"NotCallable", ErrorCodes::NotCallable},
