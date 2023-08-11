@@ -67,6 +67,7 @@ typedef bool (*realm_on_object_store_error_callback_t)(realm_userdata_t userdata
 
 /* Accessor types */
 typedef struct realm_object realm_object_t;
+
 typedef struct realm_list realm_list_t;
 typedef struct realm_set realm_set_t;
 typedef struct realm_dictionary realm_dictionary_t;
@@ -279,6 +280,11 @@ typedef enum realm_collection_type {
     RLM_COLLECTION_TYPE_SET = 2,
     RLM_COLLECTION_TYPE_DICTIONARY = 4,
 } realm_collection_type_e;
+
+typedef struct realm_collection {
+    void* collection;
+    realm_collection_type_e collection_type;
+} realm_collection_t;
 
 typedef struct realm_property_info {
     const char* name;
@@ -1784,6 +1790,11 @@ RLM_API bool realm_list_set(realm_list_t*, size_t index, realm_value_t value);
  */
 RLM_API bool realm_list_insert(realm_list_t*, size_t index, realm_value_t value);
 
+
+//unique API for nested collections
+RLM_API realm_collection_t* realm_collection_insert_collection(
+    realm_collection_t*, realm_value_t, realm_collection_type_e);
+
 /**
  * Insert a collection inside a list (only available for mixed properities)
  *
@@ -2309,9 +2320,10 @@ RLM_API bool realm_dictionary_insert(realm_dictionary_t*, realm_value_t key, rea
 RLM_API realm_object_t* realm_dictionary_insert_embedded(realm_dictionary_t*, realm_value_t key);
 
 /**
- * Insert a nested collection
+ * Insert collection inside a dictionary 
+ * @return true/false
  */
-RLM_API bool realm_dictionary_insert_collection(realm_dictionary_t*, realm_value_t key, realm_collection_type_e);
+RLM_API bool realm_dictionary_insert_collection(realm_dictionary_t*, realm_value_t, realm_collection_type_e);
 
 /**
  * Fetch a list from a dictionary.

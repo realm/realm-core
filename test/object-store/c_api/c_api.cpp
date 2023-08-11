@@ -5113,6 +5113,45 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         REQUIRE(size == 5);
     }
 
+    SECTION("list new API") {
+        REQUIRE(realm_set_collection(obj1.get(), foo_any_col_key, RLM_COLLECTION_TYPE_LIST));
+        realm_value_t value;
+        realm_get_value(obj1.get(), foo_any_col_key, &value);
+        REQUIRE(value.type == RLM_TYPE_LIST);
+        auto list = cptr_checked(realm_get_list(obj1.get(), foo_any_col_key));
+        realm_list_insert(list.get(), 0, rlm_str_val("Hello"));
+        realm_list_insert(list.get(), 1, rlm_str_val("World"));
+        // list -> dict
+        realm_collection_t input_collection;
+        input_collection.collection = list.get();
+        input_collection.collection_type = RLM_COLLECTION_TYPE_LIST;
+        auto coll =
+            realm_collection_insert_collection(&input_collection, rlm_int_val(1), RLM_COLLECTION_TYPE_DICTIONARY);
+        CHECK(coll);
+        CHECK(coll->collection);
+        CHECK(coll->collection_type == RLM_COLLECTION_TYPE_DICTIONARY);
+        auto dict = cptr_checked((realm_dictionary_t*)coll->collection);
+        // realm_list_insert_collection(list.get(), 1, RLM_COLLECTION_TYPE_DICTIONARY);
+        // auto dict = cptr_checked(realm_list_get_dictionary(list.get(), 1));
+        checked(realm_dictionary_insert(dict.get(), rlm_str_val("Hello"), rlm_str_val("world"), nullptr, nullptr));
+        // list -> list
+        // realm_list_insert_collection(list.get(), 2, RLM_COLLECTION_TYPE_LIST);
+        // auto list2 = cptr_checked(realm_list_get_list(list.get(), 2));
+        // realm_list_insert(list2.get(), 0, rlm_str_val("Nested-Hello"));
+        // realm_list_insert(list2.get(), 1, rlm_str_val("Nested-World"));
+        // list -> set
+        // realm_list_insert_collection(list.get(), 3, RLM_COLLECTION_TYPE_SET);
+        // auto set = cptr_checked(realm_list_get_set(list.get(), 3));
+        // bool inserted;
+        // size_t index;
+        // realm_set_insert(set.get(), rlm_str_val("Set-Hello"), &index, &inserted);
+        // CHECK(index == 0);
+        // CHECK(inserted);
+        // size_t size;
+        // checked(realm_list_size(list.get(), &size));
+        // REQUIRE(size == 5);
+    }
+
     SECTION("set list for collection in mixed, verify that previous reference is invalid") {
         REQUIRE(realm_set_collection(obj1.get(), foo_any_col_key, RLM_COLLECTION_TYPE_LIST));
         realm_value_t value;

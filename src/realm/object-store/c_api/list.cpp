@@ -83,6 +83,71 @@ RLM_API bool realm_list_insert(realm_list_t* list, size_t index, realm_value_t v
     });
 }
 
+// Test: unique API for nested collections
+RLM_API realm_collection_t* realm_collection_insert_collection(realm_collection_t* collection, realm_value_t path,
+                                                               realm_collection_type_e type)
+{
+    REALM_ASSERT(collection);
+    return wrap_err([&]() {
+        realm_collection_t* out_collection = nullptr;
+        auto collection_type = from_capi(collection->collection_type);
+        if (collection_type) {
+            if (*collection_type == CollectionType::List) {
+                realm_list_t* list = (realm_list_t*)(collection->collection);
+                if (path.type != RLM_TYPE_INT) {
+                    throw InvalidArgument{"Only integer ndx are supported in lists"};
+                }
+                auto index = static_cast<int>(path.integer);
+                const auto collection_type = from_capi(type);
+                list->insert_collection(index, *collection_type);
+
+                out_collection = new realm_collection_t;
+                if (collection_type == CollectionType::List) {
+                    out_collection->collection = new realm_list_t{list->get_list(index)};
+                    out_collection->collection_type = RLM_COLLECTION_TYPE_LIST;
+                }
+                else if (collection_type == CollectionType::Set) {
+                    out_collection->collection = new realm_set_t{list->get_set(index)};
+                    out_collection->collection_type = RLM_COLLECTION_TYPE_SET;
+                }
+                else if (collection_type == CollectionType::Dictionary) {
+                    out_collection->collection = new realm_dictionary_t{list->get_dictionary(index)};
+                    out_collection->collection_type = RLM_COLLECTION_TYPE_DICTIONARY;
+                }
+                return out_collection;
+            }
+            else if (*collection_type == CollectionType::Set) {
+                throw InvalidArgument{"Sets cannot contain any nested collection"};
+            }
+            else if (*collection_type == CollectionType::Dictionary) {
+                realm_dictionary_t* dictionary = (realm_dictionary_t*)(collection->collection);
+                if (path.type != RLM_TYPE_STRING) {
+                    throw InvalidArgument{"Only string keys are supported in dictionaries"};
+                }
+                StringData k{path.string.data, path.string.size};
+                const auto collection_type = from_capi(type);
+                dictionary->insert_collection(k, *collection_type);
+
+                out_collection = new realm_collection_t;
+                if (collection_type == CollectionType::List) {
+                    out_collection->collection = new realm_list_t{dictionary->get_list(k)};
+                    out_collection->collection_type = RLM_COLLECTION_TYPE_LIST;
+                }
+                else if (collection_type == CollectionType::Set) {
+                    out_collection->collection = new realm_set_t{dictionary->get_set(k)};
+                    out_collection->collection_type = RLM_COLLECTION_TYPE_SET;
+                }
+                else if (collection_type == CollectionType::Dictionary) {
+                    out_collection->collection = new realm_dictionary_t{dictionary->get_dictionary(k)};
+                    out_collection->collection_type = RLM_COLLECTION_TYPE_DICTIONARY;
+                }
+                return out_collection;
+            }
+        }
+        return out_collection;
+    });
+}
+
 RLM_API bool realm_list_insert_collection(realm_list_t* list, size_t index, realm_collection_type_e type)
 {
     return wrap_err([&]() {
