@@ -147,8 +147,6 @@ public:
     using RemoteChangeset = sync::Transformer::RemoteChangeset;
     using ReceivedChangesets = std::vector<RemoteChangeset>;
 
-    enum class ErrorMessageType { Legacy, JSON };
-
     /// Messages sent by the client.
 
     void make_pbs_bind_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
@@ -244,7 +242,7 @@ public:
                 auto message = msg.read_sized_data<StringData>(message_size);
 
                 connection.receive_error_message(sync::ProtocolErrorInfo{error_code, message, is_fatal},
-                                                 session_ident, ErrorMessageType::Legacy); // Throws
+                                                 session_ident); // Throws
             }
             else if (message_type == "json_error") { // introduced in protocol 4
                 sync::ProtocolErrorInfo info{};
@@ -315,7 +313,7 @@ public:
                     return report_error("Failed to parse 'json_error' with error_code %1: '%2'", info.raw_error_code,
                                         e.what());
                 }
-                connection.receive_error_message(info, session_ident, ErrorMessageType::JSON); // Throws
+                connection.receive_error_message(info, session_ident); // Throws
             }
             else if (message_type == "query_error") {
                 auto error_code = msg.read_next<int>();
@@ -490,7 +488,7 @@ private:
         if (auto action_it = mapping.find(action_string); action_it != mapping.end()) {
             return action_it->second;
         }
-        return action::NoAction;
+        return action::ApplicationBug;
     }
 
     static constexpr std::size_t s_max_body_size = std::numeric_limits<std::size_t>::max();

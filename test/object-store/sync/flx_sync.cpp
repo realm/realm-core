@@ -293,9 +293,9 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
         auto r = Realm::get_shared_realm(config);
         wait_for_download(*r);
         nlohmann::json error_body = {
-            {"tryAgain", false},          {"message", "fake error"},
-            {"shouldClientReset", false}, {"isRecoveryModeDisabled", false},
-            {"action", "ApplicationBug"},
+            {"tryAgain", false},         {"message", "fake error"},
+            {"shouldClientReset", true}, {"isRecoveryModeDisabled", false},
+            {"action", "ClientReset"},
         };
         nlohmann::json test_command = {{"command", "ECHO_ERROR"},
                                        {"args", nlohmann::json{{"errorCode", 299}, {"errorBody", error_body}}}};
@@ -305,11 +305,14 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
         REQUIRE(test_cmd_res == "{}");
         auto error = wait_for_future(std::move(error_future)).get();
         REQUIRE(error.status == ErrorCodes::UnknownError);
-        REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
+        REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ClientReset);
         REQUIRE(error.is_fatal);
+        REQUIRE_THAT(error.status.reason(),
+                     Catch::Matchers::ContainsSubstring("Unknown sync protocol error code 299"));
+        REQUIRE_THAT(error.status.reason(), Catch::Matchers::ContainsSubstring("fake error"));
     }
 
-    SECTION("unknown errors without actions are protocol violations") {
+    SECTION("unknown errors without actions are application bugs") {
         auto r = Realm::get_shared_realm(config);
         wait_for_download(*r);
         nlohmann::json error_body = {
@@ -325,10 +328,38 @@ TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
                 .get();
         REQUIRE(test_cmd_res == "{}");
         auto error = wait_for_future(std::move(error_future)).get();
-        REQUIRE(error.status == ErrorCodes::SyncProtocolInvariantFailed);
-        REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ProtocolViolation);
+        REQUIRE(error.status == ErrorCodes::UnknownError);
+        REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
         REQUIRE(error.is_fatal);
+        REQUIRE_THAT(error.status.reason(),
+                     Catch::Matchers::ContainsSubstring("Unknown sync protocol error code 299"));
+        REQUIRE_THAT(error.status.reason(), Catch::Matchers::ContainsSubstring("fake error"));
     }
+
+    SECTION("handles unknown actions gracefully") {
+        auto r = Realm::get_shared_realm(config);
+        wait_for_download(*r);
+        nlohmann::json error_body = {
+            {"tryAgain", false},
+            {"message", "fake error"},
+            {"shouldClientReset", true},
+            {"isRecoveryModeDisabled", false},
+            {"action", "FakeActionThatWillNeverExist"},
+        };
+        nlohmann::json test_command = {{"command", "ECHO_ERROR"},
+                                       {"args", nlohmann::json{{"errorCode", 201}, {"errorBody", error_body}}}};
+        auto test_cmd_res =
+            wait_for_future(SyncSession::OnlyForTesting::send_test_command(*r->sync_session(), test_command.dump()))
+                .get();
+        REQUIRE(test_cmd_res == "{}");
+        auto error = wait_for_future(std::move(error_future)).get();
+        REQUIRE(error.status == ErrorCodes::RuntimeError);
+        REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
+        REQUIRE(error.is_fatal);
+        REQUIRE_THAT(error.status.reason(), !Catch::Matchers::ContainsSubstring("Unknown sync protocol error code"));
+        REQUIRE_THAT(error.status.reason(), Catch::Matchers::ContainsSubstring("fake error"));
+    }
+
 
     SECTION("unknown connection-level errors are still errors") {
         auto r = Realm::get_shared_realm(config);
