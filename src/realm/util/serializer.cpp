@@ -388,7 +388,7 @@ std::string SerialisationState::get_column_name(ConstTableRef table, ColKey col_
             }
             col_name = col_name.substr(0, pos) + "\\" + col_name.substr(pos);
             pos += 2;
-            pos = col_name.find_first_of(" \b\n\r", pos);
+            pos = col_name.find_first_of(" \t\r\n", pos);
         }
         return col_name;
     }
