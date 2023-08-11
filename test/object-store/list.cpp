@@ -1383,6 +1383,17 @@ TEST_CASE("nested List") {
             REQUIRE_INDICES(change.insertions, 0);
             REQUIRE(!change.collection_was_cleared);
         }
+        SECTION("remove item from collection") {
+            auto token = require_change();
+            write([&] {
+                lst0.add(Mixed(8));
+            });
+            REQUIRE_INDICES(change.insertions, 0);
+            write([&] {
+                lst0.remove(0);
+            });
+            REQUIRE_INDICES(change.deletions, 0);
+        }
     }
 }
 
