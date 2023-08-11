@@ -607,6 +607,13 @@ protected:
         return m_parent->get_collection_ref(m_index, Interface::s_collection_type);
     }
 
+    bool check_collection_ref() const noexcept
+    {
+        UpdateStatus status = m_parent ? m_parent->update_if_needed_with_status() : UpdateStatus::Detached;
+        return (status != UpdateStatus::Detached) &&
+               m_parent->check_collection_ref(m_index, Interface::s_collection_type);
+    }
+
     void set_collection_ref(ref_type ref)
     {
         m_parent->set_collection_ref(m_index, ref, Interface::s_collection_type);

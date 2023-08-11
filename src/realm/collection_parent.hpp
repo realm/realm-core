@@ -127,6 +127,11 @@ protected:
     virtual const Obj& get_object() const noexcept = 0;
     /// Get the top ref from pareht
     virtual ref_type get_collection_ref(Index, CollectionType) const = 0;
+    /// Check if we can possibly get a ref
+    virtual bool check_collection_ref(Index, CollectionType) const noexcept
+    {
+        return true;
+    }
     /// Set the top ref in parent
     virtual void set_collection_ref(Index, ref_type ref, CollectionType) = 0;
 

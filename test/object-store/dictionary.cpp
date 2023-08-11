@@ -78,66 +78,103 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
     object_store::Dictionary dict_mixed(r, any_obj, col_any);
     r->commit_transaction();
 
-    CollectionChangeSet change_dictionary, change_list;
-    size_t calls_dict = 0, calls_list = 0;
+    CollectionChangeSet change_dictionary;
     auto token_dict = dict_mixed.add_notification_callback([&](CollectionChangeSet c) {
         change_dictionary = c;
-        ++calls_dict;
     });
 
-    r->begin_transaction();
-    dict_mixed.insert_collection("test", CollectionType::List);
-    r->commit_transaction();
+    auto write = [&](auto&& f) {
+        r->begin_transaction();
+        f();
+        r->commit_transaction();
+        advance_and_notify(*r);
+    };
 
-    REQUIRE(calls_dict == 1);
-    advance_and_notify(*r);
+    write([&] {
+        dict_mixed.insert_collection("test", CollectionType::List);
+    });
 
     REQUIRE(change_dictionary.insertions.count() == 1);
-    REQUIRE(calls_dict == 2);
 
     auto list = dict_mixed.get_list("test");
-    auto token_list = list.add_notification_callback([&](CollectionChangeSet c) {
-        change_list = c;
-        ++calls_list;
-    });
-    advance_and_notify(*r);
 
-    r->begin_transaction();
-    list.add(Mixed{5});
-    list.add(Mixed{6});
-    r->commit_transaction();
+    SECTION("notification on nested list") {
+        CollectionChangeSet change;
 
-    REQUIRE(calls_list == 1);
-    advance_and_notify(*r);
+        auto require_change = [&] {
+            auto token = list.add_notification_callback([&](CollectionChangeSet c) {
+                change = c;
+            });
+            advance_and_notify(*r);
+            return token;
+        };
 
-    REQUIRE(change_list.insertions.count() == 2);
-    REQUIRE(calls_list == 2);
+        SECTION("adding values") {
+            auto token = require_change();
+            write([&] {
+                list.add(Mixed{5});
+                list.add(Mixed{6});
+            });
+            REQUIRE_INDICES(change.insertions, 0, 1);
+        }
 
-    r->begin_transaction();
-    list.add(Mixed{5});
-    list.add(Mixed{6});
-    r->commit_transaction();
-    advance_and_notify(*r);
+        SECTION("adding list before") {
+            // for keys in dictionary insertion in front of the previous key should not matter.
+            CollectionChangeSet change_list_after_insert;
+            write([&] {
+                dict_mixed.insert_collection("A", CollectionType::List);
+            });
 
-    REQUIRE(change_list.insertions.count() == 2);
-    REQUIRE(calls_list == 3);
+            auto new_list = dict_mixed.get_list("A");
+            auto token_new_list = new_list.add_notification_callback([&](CollectionChangeSet c) {
+                change_list_after_insert = c;
+            });
+            write([&] {
+                new_list.add(Mixed{42});
+            });
 
-    // for keys in dictionary insertion in front of the previous key should not matter.
-    CollectionChangeSet change_list_after_insert;
-    r->begin_transaction();
-    dict_mixed.insert_collection("A", CollectionType::List);
-    r->commit_transaction();
-
-    auto new_list = dict_mixed.get_list("A");
-    auto token_new_list = new_list.add_notification_callback([&](CollectionChangeSet c) {
-        change_list_after_insert = c;
-    });
-    r->begin_transaction();
-    new_list.add(Mixed{42});
-    r->commit_transaction();
-    advance_and_notify(*r);
-
-    REQUIRE_INDICES(change_list_after_insert.insertions, 0);
+            REQUIRE_INDICES(change_list_after_insert.insertions, 0);
+        }
+        SECTION("erase from containing dictionary") {
+            auto token = require_change();
+            write([&] {
+                list.add(Mixed{5});
+                list.add(Mixed{6});
+            });
+            REQUIRE_INDICES(change.insertions, 0, 1);
+            write([&] {
+                dict_mixed.insert("test", 42);
+            });
+            REQUIRE_INDICES(change.deletions, 0, 1);
+            REQUIRE(change.collection_root_was_deleted);
+        }
+        SECTION("erase containing dictionary") {
+            auto token = require_change();
+            write([&] {
+                list.add(Mixed{5});
+                list.add(Mixed{6});
+            });
+            REQUIRE_INDICES(change.insertions, 0, 1);
+            write([&] {
+                any_obj.set(col_any, Mixed(42));
+            });
+            REQUIRE_INDICES(change.deletions, 0, 1);
+            REQUIRE(change.collection_root_was_deleted);
+        }
+        SECTION("erase containing object") {
+            auto token = require_change();
+            write([&] {
+                list.add(Mixed{5});
+                list.add(Mixed{6});
+            });
+            REQUIRE_INDICES(change.insertions, 0, 1);
+            write([&] {
+                any_obj.remove();
+            });
+            REQUIRE_INDICES(change.deletions, 0, 1);
+            REQUIRE(change.collection_root_was_deleted);
+        }
+    }
 }
 
 TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,

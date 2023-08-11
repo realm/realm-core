@@ -71,10 +71,18 @@ void ArrayMixed::set(size_t ndx, Mixed value)
     // ref stored in the parent. If the new type is a different
     // type then it means that we are overwriting a collection
     // with some other value and hence the collection must be
-    // destroyed.
+    // destroyed as well as the possible key.
     bool destroy_collection = old_type != value.get_type();
     erase_linked_payload(ndx, destroy_collection);
     m_composite.set(ndx, store(value));
+    if (destroy_collection && Array::size() > payload_idx_key) {
+        if (auto ref = Array::get_as_ref(payload_idx_key)) {
+            Array keys(Array::get_alloc());
+            keys.set_parent(const_cast<ArrayMixed*>(this), payload_idx_key);
+            keys.init_from_ref(ref);
+            keys.set(ndx, 0);
+        }
+    }
 }
 
 void ArrayMixed::insert(size_t ndx, Mixed value)
@@ -285,14 +293,17 @@ void ArrayMixed::set_key(size_t ndx, int64_t key)
 {
     Array keys(Array::get_alloc());
     ensure_array_accessor(keys, payload_idx_key);
-    return keys.set(ndx, key);
+    while (keys.size() <= ndx) {
+        keys.add(0);
+    }
+    keys.set(ndx, key);
 }
 
 int64_t ArrayMixed::get_key(size_t ndx) const
 {
     Array keys(Array::get_alloc());
     ensure_array_accessor(keys, payload_idx_key);
-    return keys.get(ndx);
+    return (ndx < keys.size()) ? keys.get(ndx) : 0;
 }
 
 void ArrayMixed::verify() const

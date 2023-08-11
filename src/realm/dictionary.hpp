@@ -113,6 +113,11 @@ public:
     DictionaryPtr get_dictionary(const PathElement& path_elem) const override;
     SetMixedPtr get_set(const PathElement&) const override;
     ListMixedPtr get_list(const PathElement& path_elem) const override;
+    bool is_attached() const override
+    {
+        // Basically we will have to test that we can get ref from parent
+        return Base::check_collection_ref();
+    }
 
     // throws std::out_of_range if key is not found
     Mixed get(Mixed key) const;
@@ -210,6 +215,7 @@ public:
         return get_obj();
     }
     ref_type get_collection_ref(Index, CollectionType) const override;
+    bool check_collection_ref(Index, CollectionType) const noexcept override;
     void set_collection_ref(Index, ref_type ref, CollectionType) override;
 
     void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
