@@ -82,7 +82,7 @@ function check_port_in_use()
 
 # Check the baas proxy listen and Toxiproxy config port availability first
 check_port_in_use "${LISTEN_PORT}" "baas proxy"
-checK_port_in_use "${CONFIG_PORT}" "Toxiproxy config"
+check_port_in_use "${CONFIG_PORT}" "Toxiproxy config"
 
 [[ -d "${WORK_PATH}" ]] || mkdir -p "${WORK_PATH}"
 pushd "${WORK_PATH}" > /dev/null
