@@ -37,15 +37,6 @@ std::string format_sync_error_message(const Status& status, std::optional<std::s
     return util::format("%1%2%3", status.reason(), s_middle_part, *log_url);
 }
 
-// TODO Remove this once we've fully ported SyncError to not use std::error_code for anything
-Status fixup_sync_error_status(const Status& status, std::optional<std::string_view> log_url)
-{
-    if (status.get_std_error_code()) {
-        return Status(status.get_std_error_code(), format_sync_error_message(status, log_url));
-    }
-    return Status(status.code(), format_sync_error_message(status, log_url));
-}
-
 } // namespace
 // sync defines its own copy of port_type to avoid depending on network.hpp, but they should be the same.
 static_assert(std::is_same_v<sync::port_type, sync::network::Endpoint::port_type>);
@@ -54,7 +45,7 @@ using ProtocolError = realm::sync::ProtocolError;
 
 SyncError::SyncError(Status orig_status, bool is_fatal, std::optional<std::string_view> server_log,
                      std::vector<sync::CompensatingWriteErrorInfo> compensating_writes)
-    : status(fixup_sync_error_status(orig_status, server_log))
+    : status(orig_status.code(), format_sync_error_message(orig_status, server_log))
     , is_fatal(is_fatal)
     , simple_message(std::string_view(status.reason()).substr(0, orig_status.reason().size()))
     , compensating_writes_info(std::move(compensating_writes))

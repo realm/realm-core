@@ -246,10 +246,6 @@ public:
         InvalidServerResponse = RLM_ERR_INVALID_SERVER_RESPONSE,
         AppServerError = RLM_ERR_APP_SERVER_ERROR,
 
-        WebSocketResolveFailedError = RLM_ERR_WEBSOCKET_RESOLVE_FAILED_ERROR,
-        WebSocketConnectionClosedClientError = RLM_ERR_WEBSOCKET_CONNECTION_CLOSED_CLIENT_ERROR,
-        WebSocketConnectionClosedServerError = RLM_ERR_WEBSOCKET_CONNECTION_CLOSED_SERVER_ERROR,
-
         CallbackFailed = RLM_ERR_CALLBACK,
         UnknownError = RLM_ERR_UNKNOWN,
     };

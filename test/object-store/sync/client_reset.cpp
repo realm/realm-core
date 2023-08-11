@@ -80,8 +80,8 @@ struct StringMaker<ThreadSafeSyncError> {
         if (!value) {
             return "No SyncError";
         }
-        return realm::util::format("SyncError(%1), is_fatal: %2, with message: '%3'", value->get_system_error(),
-                                   value->is_fatal, value->status);
+        return realm::util::format("SyncError(%1), is_fatal: %2, with message: '%3'", value->status.code_string(),
+                                   value->is_fatal, value->status.reason());
     }
 };
 } // namespace Catch
@@ -133,7 +133,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[sync][pbs][client 
     SyncTestFile realm_config(app->current_user(), partition.value, schema);
     realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        if (err.get_system_error() == util::make_error_code(util::MiscExtErrors::end_of_input)) {
+        if (err.status == ErrorCodes::ConnectionClosed) {
             return;
         }
 
@@ -142,7 +142,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[sync][pbs][client 
             return;
         }
 
-        FAIL(util::format("got error from server: %1: %2", err.get_system_error().value(), err.status));
+        FAIL(util::format("got error from server: %1", err.status));
     };
 
     auto realm = Realm::get_shared_realm(realm_config);
@@ -233,7 +233,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
             return;
         }
 
-        FAIL(util::format("got error from server: %1: %2", err.get_system_error().value(), err.status));
+        FAIL(util::format("got error from server: %1", err.status));
     };
 
     auto realm = Realm::get_shared_realm(realm_config);
@@ -2409,8 +2409,7 @@ struct Remove {
     util::Optional<int64_t> pk;
 };
 
-struct Clear {
-};
+struct Clear {};
 
 struct RemoveObject {
     RemoveObject(std::string_view name, util::Optional<int64_t> key)

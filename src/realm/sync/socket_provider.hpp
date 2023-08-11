@@ -32,6 +32,9 @@
 #include <realm/util/span.hpp>
 
 namespace realm::sync {
+namespace websocket {
+enum class WebSocketError;
+}
 
 struct WebSocketEndpoint;
 struct WebSocketInterface;

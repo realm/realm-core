@@ -147,21 +147,6 @@ public:
     using RemoteChangeset = sync::Transformer::RemoteChangeset;
     using ReceivedChangesets = std::vector<RemoteChangeset>;
 
-    // FIXME: No need to explicitly assign numbers to these
-    enum class Error {
-        // clang-format off
-        unknown_message             = 101, // Unknown type of input message
-        bad_syntax                  = 102, // Bad syntax in input message head
-        limits_exceeded             = 103, // Limits exceeded in input message
-        bad_changeset_header_syntax = 108, // Bad syntax in changeset header (DOWNLOAD)
-        bad_changeset_size          = 109, // Bad changeset size in changeset header (DOWNLOAD)
-        bad_server_version          = 111, // Bad server version in changeset header (DOWNLOAD)
-        bad_error_code              = 114, ///< Bad error code (ERROR)
-        bad_decompression           = 115, // Error in decompression (DOWNLOAD)
-        // clang-format on
-    };
-
-
     /// Messages sent by the client.
 
     void make_pbs_bind_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
@@ -223,9 +208,9 @@ public:
     void parse_message_received(Connection& connection, std::string_view msg_data)
     {
         util::Logger& logger = connection.logger;
-        auto report_error = [&](Error err, const auto fmt, auto&&... args) {
+        auto report_error = [&](const auto fmt, auto&&... args) {
             auto msg = util::format(fmt, std::forward<decltype(args)>(args)...);
-            connection.handle_protocol_error(err, std::move(msg));
+            connection.handle_protocol_error(Status{ErrorCodes::SyncProtocolInvariantFailed, std::move(msg)});
         };
 
         HeaderLineParser msg(msg_data);
@@ -234,7 +219,7 @@ public:
             message_type = msg.read_next<std::string_view>();
         }
         catch (const ProtocolCodecException& e) {
-            return report_error(Error::bad_syntax, "Could not find message type in message: %1", e.what());
+            return report_error("Could not find message type in message: %1", e.what());
         }
 
         try {
@@ -254,12 +239,6 @@ public:
                 auto message_size = msg.read_next<size_t>();
                 auto is_fatal = sync::IsFatal{!msg.read_next<bool>()};
                 auto session_ident = msg.read_next<session_ident_type>('\n');
-
-                bool unknown_error = !sync::get_protocol_error_message(error_code);
-                if (unknown_error) {
-                    return report_error(Error::bad_error_code, "Bad error code");
-                }
-
                 auto message = msg.read_sized_data<StringData>(message_size);
 
                 connection.receive_error_message(sync::ProtocolErrorInfo{error_code, message, is_fatal},
@@ -296,7 +275,6 @@ public:
                         if (query_string == json.end() || !query_string->is_string() ||
                             query_string->get<std::string_view>().empty()) {
                             return report_error(
-                                Error::bad_syntax,
                                 "Missing/invalid partition query string in migrate to flexible sync error response");
                         }
 
@@ -306,14 +284,12 @@ public:
                     if (auto rejected_updates = json.find("rejectedUpdates"); rejected_updates != json.end()) {
                         if (!rejected_updates->is_array()) {
                             return report_error(
-                                Error::bad_syntax,
                                 "Compensating writes error list is not stored in an array as expected");
                         }
 
                         for (const auto& rejected_update : *rejected_updates) {
                             if (!rejected_update.is_object()) {
                                 return report_error(
-                                    Error::bad_syntax,
                                     "Compensating write error information is not stored in an object as expected");
                             }
 
@@ -334,8 +310,8 @@ public:
                 catch (const nlohmann::json::exception& e) {
                     // If any of the above json fields are not present, this is a fatal error
                     // however, additional optional fields may be added in the future.
-                    return report_error(Error::bad_syntax, "Failed to parse 'json_error' with error_code %1: '%2'",
-                                        info.raw_error_code, e.what());
+                    return report_error("Failed to parse 'json_error' with error_code %1: '%2'", info.raw_error_code,
+                                        e.what());
                 }
                 connection.receive_error_message(info, session_ident); // Throws
             }
@@ -372,14 +348,14 @@ public:
                 connection.receive_test_command_response(session_ident, request_ident, body);
             }
             else {
-                return report_error(Error::unknown_message, "Unknown input message type '%1'", msg_data);
+                return report_error("Unknown input message type '%1'", msg_data);
             }
         }
         catch (const ProtocolCodecException& e) {
-            return report_error(Error::bad_syntax, "Bad syntax in %1 message: %2", message_type, e.what());
+            return report_error("Bad syntax in %1 message: %2", message_type, e.what());
         }
         if (!msg.at_end()) {
-            return report_error(Error::bad_syntax, "wire protocol message had leftover data after being parsed");
+            return report_error("wire protocol message had leftover data after being parsed");
         }
     }
 
@@ -388,9 +364,9 @@ private:
     void parse_download_message(Connection& connection, HeaderLineParser& msg)
     {
         util::Logger& logger = connection.logger;
-        auto report_error = [&](Error err, const auto fmt, auto&&... args) {
+        auto report_error = [&](ErrorCodes::Error code, const auto fmt, auto&&... args) {
             auto msg = util::format(fmt, std::forward<decltype(args)>(args)...);
-            connection.handle_protocol_error(err, std::move(msg));
+            connection.handle_protocol_error(Status{code, std::move(msg)});
         };
 
         auto msg_with_header = msg.remaining();
@@ -413,7 +389,7 @@ private:
 
         if (uncompressed_body_size > s_max_body_size) {
             auto header = msg_with_header.substr(0, msg_with_header.size() - msg.remaining().size());
-            return report_error(Error::limits_exceeded, "Limits exceeded in input message '%1'", header);
+            return report_error(ErrorCodes::LimitExceeded, "Limits exceeded in input message '%1'", header);
         }
 
         std::unique_ptr<char[]> uncompressed_body_buffer;
@@ -425,7 +401,7 @@ private:
                                               {uncompressed_body_buffer.get(), uncompressed_body_size});
 
             if (ec) {
-                return report_error(Error::bad_decompression, "compression::inflate: %1", ec.message());
+                return report_error(ErrorCodes::RuntimeError, "compression::inflate: %1", ec.message());
             }
 
             msg = HeaderLineParser(std::string_view(uncompressed_body_buffer.get(), uncompressed_body_size));
@@ -448,11 +424,11 @@ private:
             auto changeset_size = msg.read_next<size_t>();
 
             if (changeset_size > msg.bytes_remaining()) {
-                return report_error(Error::bad_changeset_size, "Bad changeset size %1 > %2", changeset_size,
-                                    msg.bytes_remaining());
+                return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad changeset size %1 > %2",
+                                    changeset_size, msg.bytes_remaining());
             }
             if (cur_changeset.remote_version == 0) {
-                return report_error(Error::bad_server_version,
+                return report_error(ErrorCodes::SyncProtocolInvariantFailed,
                                     "Server version in downloaded changeset cannot be zero");
             }
             auto changeset_data = msg.read_sized_data<BinaryData>(changeset_size);
@@ -506,6 +482,7 @@ private:
             {"RevertToPBS", action::RevertToPBS},
             {"RefreshUser", action::RefreshUser},
             {"RefreshLocation", action::RefreshLocation},
+            {"LogOutUser", action::LogOutUser},
         };
 
         if (auto action_it = mapping.find(action_string); action_it != mapping.end()) {
@@ -542,18 +519,6 @@ public:
     // clang-format on
 
     using OutputBuffer = util::ResettableExpandableBufferOutputStream;
-
-    // FIXME: No need to explicitly assign numbers to these
-    enum class Error {
-        // clang-format off
-        unknown_message             = 101, // Unknown type of input message
-        bad_syntax                  = 102, // Bad syntax in input message head
-        limits_exceeded             = 103, // Limits exceeded in input message
-        bad_decompression           = 104, // Error in decompression (UPLOAD)
-        bad_changeset_header_syntax = 105, // Bad syntax in changeset header (UPLOAD)
-        bad_changeset_size          = 106, // Changeset size doesn't fit in message (UPLOAD)
-        // clang-format on
-    };
 
     // Messages sent by the server to the client
 
@@ -603,8 +568,8 @@ public:
             connection.receive_ping(timestamp, rtt);
         }
         catch (const ProtocolCodecException& e) {
-            connection.handle_protocol_error(Error::bad_syntax,
-                                             util::format("Bad syntax in PING message: %1", e.what()));
+            connection.handle_protocol_error(Status{ErrorCodes::SyncProtocolInvariantFailed,
+                                                    util::format("Bad syntax in PING message: %1", e.what())});
         }
     }
 
@@ -625,9 +590,9 @@ public:
     {
         auto& logger = connection.logger;
 
-        auto report_error = [&](Error err, const auto fmt, auto&&... args) {
+        auto report_error = [&](ErrorCodes::Error err, const auto fmt, auto&&... args) {
             auto msg = util::format(fmt, std::forward<decltype(args)>(args)...);
-            connection.handle_protocol_error(err, std::move(msg));
+            connection.handle_protocol_error(Status{err, std::move(msg)});
         };
 
         HeaderLineParser msg(msg_data);
@@ -636,7 +601,8 @@ public:
             message_type = msg.read_next<std::string_view>();
         }
         catch (const ProtocolCodecException& e) {
-            return report_error(Error::bad_syntax, "Could not find message type in message: %1", e.what());
+            return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Could not find message type in message: %1",
+                                e.what());
         }
 
         try {
@@ -653,7 +619,8 @@ public:
                 std::size_t body_size = (is_body_compressed ? compressed_body_size : uncompressed_body_size);
                 if (body_size > s_max_body_size) {
                     auto header = msg_with_header.substr(0, msg_with_header.size() - msg.bytes_remaining());
-                    return report_error(Error::limits_exceeded,
+
+                    return report_error(ErrorCodes::LimitExceeded,
                                         "Body size of upload message is too large. Raw header: %1", header);
                 }
 
@@ -668,7 +635,7 @@ public:
                         compressed_body, {uncompressed_body_buffer.get(), uncompressed_body_size});
 
                     if (ec) {
-                        return report_error(Error::bad_decompression, "compression::inflate: %1", ec.message());
+                        return report_error(ErrorCodes::RuntimeError, "compression::inflate: %1", ec.message());
                     }
 
                     msg = HeaderLineParser(std::string_view(uncompressed_body_buffer.get(), uncompressed_body_size));
@@ -696,12 +663,12 @@ public:
                         changeset_size = msg.read_next<size_t>();
                     }
                     catch (const ProtocolCodecException& e) {
-                        return report_error(Error::bad_changeset_header_syntax, "Bad changeset header syntax: %1",
-                                            e.what());
+                        return report_error(ErrorCodes::SyncProtocolInvariantFailed,
+                                            "Bad changeset header syntax: %1", e.what());
                     }
 
                     if (changeset_size > msg.bytes_remaining()) {
-                        return report_error(Error::bad_changeset_size, "Bad changeset size");
+                        return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Bad changeset size");
                     }
 
                     upload_changeset.changeset = msg.read_sized_data<BinaryData>(changeset_size);
@@ -743,13 +710,14 @@ public:
                 auto is_subserver = msg.read_next<bool>('\n');
 
                 if (path_size == 0) {
-                    return report_error(Error::bad_syntax, "Path size in BIND message is zero");
+                    return report_error(ErrorCodes::SyncProtocolInvariantFailed, "Path size in BIND message is zero");
                 }
                 if (path_size > s_max_path_size) {
-                    return report_error(Error::limits_exceeded, "Path size in BIND message is too large");
+                    return report_error(ErrorCodes::SyncProtocolInvariantFailed,
+                                        "Path size in BIND message is too large");
                 }
                 if (signed_user_token_size > s_max_signed_user_token_size) {
-                    return report_error(Error::limits_exceeded,
+                    return report_error(ErrorCodes::SyncProtocolInvariantFailed,
                                         "Signed user token size in BIND message is too large");
                 }
 
@@ -786,11 +754,12 @@ public:
                 connection.receive_error_message(session_ident, error_code, json_raw);
             }
             else {
-                return report_error(Error::unknown_message, "unknown message type %1", message_type);
+                return report_error(ErrorCodes::SyncProtocolInvariantFailed, "unknown message type %1", message_type);
             }
         }
         catch (const ProtocolCodecException& e) {
-            return report_error(Error::bad_syntax, "bad syntax in %1 message: %2", message_type, e.what());
+            return report_error(ErrorCodes::SyncProtocolInvariantFailed, "bad syntax in %1 message: %2", message_type,
+                                e.what());
         }
     }
 

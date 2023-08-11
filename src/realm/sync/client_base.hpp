@@ -4,6 +4,7 @@
 #include <realm/db.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/sync/network/websocket_error.hpp>
 #include <realm/util/functional.hpp>
 
 namespace realm::sync {
@@ -245,6 +246,12 @@ struct ClientConfig {
 ///
 /// \sa set_connection_state_change_listener().
 struct SessionErrorInfo : public ProtocolErrorInfo {
+    SessionErrorInfo(const ProtocolErrorInfo& info)
+        : ProtocolErrorInfo(info)
+        , status(protocol_error_to_status(static_cast<ProtocolError>(info.raw_error_code), message))
+    {
+    }
+
     SessionErrorInfo(const ProtocolErrorInfo& info, Status status)
         : ProtocolErrorInfo(info)
         , status(std::move(status))
@@ -252,7 +259,7 @@ struct SessionErrorInfo : public ProtocolErrorInfo {
     }
 
     SessionErrorInfo(Status status, IsFatal is_fatal)
-        : ProtocolErrorInfo(status.get_std_error_code().value(), status.reason(), is_fatal)
+        : ProtocolErrorInfo(0, {}, is_fatal)
         , status(std::move(status))
     {
     }

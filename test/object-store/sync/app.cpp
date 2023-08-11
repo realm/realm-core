@@ -2661,7 +2661,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         SyncTestFile r_config(user1, partition, schema);
         // Override the default
         r_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-            if (error.get_system_error() == sync::make_error_code(realm::sync::ProtocolError::bad_authentication)) {
+            if (error.status == ErrorCodes::AuthError) {
                 util::format(std::cerr, "Websocket redirect test: User logged out\n");
                 std::unique_lock lk(logout_mutex);
                 logged_out = true;
@@ -2958,9 +2958,9 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             std::atomic<bool> sync_error_handler_called{false};
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 sync_error_handler_called.store(true);
-                REQUIRE(error.get_system_error() ==
-                        sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                REQUIRE(error.status.reason() == "Unable to refresh the user access token.");
+                REQUIRE(error.status.code() == ErrorCodes::AuthError);
+                REQUIRE_THAT(std::string{error.status.reason()},
+                             Catch::Matchers::StartsWith("Unable to refresh the user access token"));
             };
             auto r = Realm::get_shared_realm(config);
             timed_wait_for([&] {
@@ -3054,21 +3054,19 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             user->update_access_token(encode_fake_jwt("fake_access_token"));
             REQUIRE(!app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
 
-            std::atomic<bool> sync_error_handler_called{false};
-            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                std::lock_guard<std::mutex> lock(mtx);
-                sync_error_handler_called.store(true);
-                REQUIRE(error.get_system_error() ==
-                        sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                REQUIRE(error.status.reason() == "Unable to refresh the user access token.");
-            };
+            auto [sync_error_promise, sync_error] = util::make_promise_future<SyncError>();
+            config.sync_config->error_handler =
+                [promise = util::CopyablePromiseHolder(std::move(sync_error_promise))](std::shared_ptr<SyncSession>,
+                                                                                       SyncError error) mutable {
+                    promise.get_promise().emplace_value(std::move(error));
+                };
 
             auto transport = static_cast<SynchronousTestTransport*>(session.transport());
             transport->block(); // don't let the token refresh happen until we're ready for it
             auto r = Realm::get_shared_realm(config);
             auto session = user->session_for_on_disk_path(config.path);
             REQUIRE(user->is_logged_in());
-            REQUIRE(!sync_error_handler_called.load());
+            REQUIRE(!sync_error.is_ready());
             {
                 std::atomic<bool> called{false};
                 session->wait_for_upload_completion([&](Status stat) {
@@ -3083,9 +3081,11 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 std::lock_guard<std::mutex> lock(mtx);
                 REQUIRE(called);
             }
-            timed_wait_for([&] {
-                return sync_error_handler_called.load();
-            });
+
+            auto sync_error_res = wait_for_future(std::move(sync_error)).get();
+            REQUIRE(sync_error_res.status == ErrorCodes::AuthError);
+            REQUIRE_THAT(std::string{sync_error_res.status.reason()},
+                         Catch::Matchers::StartsWith("Unable to refresh the user access token"));
 
             // the failed refresh logs out the user
             std::lock_guard<std::mutex> lock(mtx);
@@ -3248,9 +3248,9 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                            CreatePolicy::ForceCreate);
             r->commit_transaction();
         }
-        r->sync_session()->wait_for_upload_completion([&](Status ec) {
+        r->sync_session()->wait_for_upload_completion([&](Status status) {
             std::lock_guard lk(mutex);
-            REQUIRE(!ec.get_std_error_code());
+            REQUIRE(status.is_ok());
             done = true;
         });
         r->sync_session()->resume();

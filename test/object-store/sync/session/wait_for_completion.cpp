@@ -99,15 +99,15 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync][pbs][sessio
         std::shared_ptr<SyncSession> session = sync_session(user, "/async-wait-download-4", [&](auto, auto) {
             ++error_count;
         });
+        Status err_status(ErrorCodes::SyncProtocolInvariantFailed, "Not a real error message");
         // Register the download-completion notification
         session->wait_for_download_completion([&](Status status) {
-            REQUIRE(status == ErrorCodes::SyncProtocolInvariantFailed);
+            REQUIRE(status == err_status);
             handler_called = true;
         });
         REQUIRE(handler_called == false);
         // Now trigger an error
-        sync::SessionErrorInfo err{Status{ErrorCodes::SyncProtocolInvariantFailed, "Not a real error message"},
-                                   sync::IsFatal{false}};
+        sync::SessionErrorInfo err{err_status, sync::IsFatal{false}};
         err.server_requests_action = sync::ProtocolErrorInfo::Action::ProtocolViolation;
         SyncSession::OnlyForTesting::handle_error(*session, std::move(err));
         EventLoop::main().run_until([&] {

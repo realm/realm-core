@@ -13,6 +13,7 @@
 #include <realm/sync/impl/clock.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/sync/network/http.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/sync/noinst/compact_changesets.hpp>
@@ -465,14 +466,15 @@ void Connection::websocket_connected_handler(const std::string& protocol)
                 }
             }
         }
-        logger.error("Bad protocol info from server: '%1'", protocol); // Throws
+        close_due_to_client_side_error({ErrorCodes::SyncProtocolNegotiationFailed,
+                                        util::format("Bad protocol info from server: '%1'", protocol)},
+                                       IsFatal{true}, ConnectionTerminationReason::bad_headers_in_http_response);
     }
     else {
-        logger.error("Missing protocol info from server"); // Throws
+        close_due_to_client_side_error(
+            {ErrorCodes::SyncProtocolNegotiationFailed, "Missing protocol info from server"}, IsFatal{true},
+            ConnectionTerminationReason::bad_headers_in_http_response);
     }
-    close_due_to_client_side_error(
-        {ErrorCodes::SyncProtocolNegotiationFailed, "Failed to negotiate websocket protocol"}, IsFatal{true},
-        ConnectionTerminationReason::bad_headers_in_http_response); // Throws
 }
 
 
@@ -482,10 +484,12 @@ bool Connection::websocket_binary_message_received(util::Span<const char> data)
         logger.debug("Received binary message after connection was force closed");
         return false;
     }
-    std::error_code ec;
+
     using sf = SimulatedFailure;
-    if (sf::trigger(sf::sync_client__read_head, ec)) {
-        read_or_write_error(ec, "simulated read error");
+    if (sf::check_trigger(sf::sync_client__read_head)) {
+        close_due_to_client_side_error(
+            {ErrorCodes::RuntimeError, "Simulated failure during sync client websocket read"}, IsFatal{false},
+            ConnectionTerminationReason::read_or_write_error);
         return bool(m_websocket);
     }
 
@@ -573,7 +577,9 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
             break;
         }
         case WebSocketError::websocket_forbidden: {
-            involuntary_disconnect(SessionErrorInfo({ErrorCodes::AuthError, msg}, IsFatal{true}),
+            SessionErrorInfo error_info({ErrorCodes::AuthError, msg}, IsFatal{true});
+            error_info.server_requests_action = ProtocolErrorInfo::Action::LogOutUser;
+            involuntary_disconnect(std::move(error_info),
                                    ConnectionTerminationReason::http_response_says_fatal_error);
             break;
         }
@@ -1098,31 +1104,12 @@ void Connection::handle_disconnect_wait(Status status)
 }
 
 
-void Connection::read_or_write_error(std::error_code ec, std::string_view msg)
-{
-    close_due_to_client_side_error(ec, msg, IsFatal{false},
-                                   ConnectionTerminationReason::read_or_write_error); // Throws
-}
-
-
 void Connection::close_due_to_protocol_error(Status status)
 {
     close_due_to_client_side_error(std::move(status), IsFatal{true},
                                    ConnectionTerminationReason::sync_protocol_violation); // Throws
 }
 
-
-// Close connection due to error discovered on the client-side.
-void Connection::close_due_to_client_side_error(std::error_code ec, std::optional<std::string_view> msg,
-                                                IsFatal is_fatal, ConnectionTerminationReason reason)
-{
-    std::string message = ec.message();
-    if (msg) {
-        message += ": ";
-        message += *msg;
-    }
-    close_due_to_client_side_error(Status{ec, std::move(message)}, is_fatal, reason);
-}
 
 void Connection::close_due_to_client_side_error(Status status, IsFatal is_fatal, ConnectionTerminationReason reason)
 {
@@ -1223,7 +1210,7 @@ void Connection::receive_pong(milliseconds_type timestamp)
     if (REALM_UNLIKELY(timestamp != m_last_ping_sent_at)) {
         close_due_to_protocol_error(
             {ErrorCodes::SyncProtocolInvariantFailed,
-             util::format("Received PONG message with an invalid timestamp (expected %1, received %2",
+             util::format("Received PONG message with an invalid timestamp (expected %1, received %2)",
                           m_last_ping_sent_at, timestamp)}); // Throws
         return;
     }
@@ -1415,30 +1402,9 @@ void Connection::receive_test_command_response(session_ident_type session_ident,
 }
 
 
-void Connection::handle_protocol_error(ClientProtocol::Error error, std::string msg)
+void Connection::handle_protocol_error(Status status)
 {
-    switch (error) {
-        case ClientProtocol::Error::unknown_message:
-            [[fallthrough]];
-        case ClientProtocol::Error::bad_syntax:
-            [[fallthrough]];
-        case ClientProtocol::Error::bad_changeset_header_syntax:
-            [[fallthrough]];
-        case ClientProtocol::Error::bad_changeset_size:
-            [[fallthrough]];
-        case ClientProtocol::Error::bad_server_version:
-            close_due_to_protocol_error({ErrorCodes::SyncProtocolInvariantFailed, std::move(msg)}); // Throws
-            break;
-        case ClientProtocol::Error::limits_exceeded:
-            close_due_to_protocol_error({ErrorCodes::LimitExceeded, std::move(msg)}); // Throws
-            break;
-        case ClientProtocol::Error::bad_decompression:
-            close_due_to_protocol_error({ErrorCodes::RuntimeError, std::move(msg)}); // Throws
-            break;
-        case ClientProtocol::Error::bad_error_code:
-            close_due_to_protocol_error({ErrorCodes::UnknownError, std::move(msg)}); // Throws
-            break;
-    }
+    close_due_to_protocol_error(std::move(status));
 }
 
 
@@ -1569,7 +1535,7 @@ void Session::on_integration_failure(const IntegrationException& error)
 {
     REALM_ASSERT_EX(m_state == Active, m_state);
     REALM_ASSERT(!m_client_error && !m_error_to_send);
-    logger.error("Failed to integrate downloaded changesets: %1", error.what());
+    logger.error("Failed to integrate downloaded changesets: %1", error.to_status());
 
     m_client_error = util::make_optional<IntegrationException>(error);
     m_error_to_send = true;
@@ -2516,17 +2482,18 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
         return {ErrorCodes::SyncProtocolInvariantFailed, "Received ERROR message when it was not legal"};
     }
 
-    bool known_error_code = bool(get_protocol_error_message(info.raw_error_code));
-    if (REALM_UNLIKELY(!known_error_code)) {
+    auto status = protocol_error_to_status(static_cast<ProtocolError>(info.raw_error_code), info.message);
+    if (status == ErrorCodes::UnknownError) {
         return {ErrorCodes::SyncProtocolInvariantFailed,
                 util::format("Received ERROR message with unknown error code %1", info.raw_error_code)};
     }
-    ProtocolError error_code = ProtocolError(info.raw_error_code);
-    if (REALM_UNLIKELY(!is_session_level_error(error_code))) {
+    else if (auto error_code = ProtocolError(info.raw_error_code);
+             REALM_UNLIKELY(!is_session_level_error(error_code))) {
         return {ErrorCodes::SyncProtocolInvariantFailed,
                 util::format("Received ERROR message for session with non-session-level error code %1",
                              info.raw_error_code)};
     }
+
 
     // Can't process debug hook actions once the Session is undergoing deactivation, since
     // the SessionWrapper may not be available
@@ -2539,7 +2506,7 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
 
     // For compensating write errors, we need to defer raising them to the SDK until after the server version
     // containing the compensating write has appeared in a download message.
-    if (error_code == ProtocolError::compensating_write) {
+    if (status == ErrorCodes::SyncCompensatingWrite) {
         // If the client is not active, the compensating writes will not be processed now, but will be
         // sent again the next time the client connects
         if (m_state == Active) {
@@ -2549,7 +2516,7 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
     }
 
     m_error_message_received = true;
-    suspend(SessionErrorInfo{info, protocol_error_to_status(error_code, info.message)});
+    suspend(SessionErrorInfo{info, std::move(status)});
     return Status::OK();
 }
 
@@ -2599,7 +2566,7 @@ Status Session::receive_test_command_response(request_ident_type ident, std::str
                            });
     if (it == m_pending_test_commands.end()) {
         return {ErrorCodes::SyncProtocolInvariantFailed,
-                util::format("Received TEST_COMMAND for request ident %1 which does not exist", ident)};
+                util::format("Received test command response for a non-existent ident %1", ident)};
     }
 
     it->promise.emplace_value(std::string{body});

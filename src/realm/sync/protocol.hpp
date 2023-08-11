@@ -263,10 +263,11 @@ struct ProtocolErrorInfo {
         ClientResetNoRecovery,
         MigrateToFLX,
         RevertToPBS,
-        // The RefreshUser/RefreshLocation actions are currently generated internally when the
+        // The RefreshUser/RefreshLocation/LogOutUser actions are currently generated internally when the
         // sync websocket is closed with specific error codes.
         RefreshUser,
         RefreshLocation,
+        LogOutUser,
     };
 
     ProtocolErrorInfo() = default;
@@ -364,33 +365,14 @@ enum class ProtocolError {
     // clang-format on
 };
 
+Status protocol_error_to_status(ProtocolError raw_error_code, std::string_view msg);
+
 constexpr bool is_session_level_error(ProtocolError);
 
 /// Returns null if the specified protocol error code is not defined by
 /// ProtocolError.
 const char* get_protocol_error_message(int error_code) noexcept;
-
-Status protocol_error_to_status(ProtocolError error_code, std::string_view msg);
-
-const std::error_category& protocol_error_category() noexcept;
-
-std::error_code make_error_code(ProtocolError) noexcept;
-
-} // namespace sync
-} // namespace realm
-
-namespace std {
-
-template <>
-struct is_error_code_enum<realm::sync::ProtocolError> {
-    static const bool value = true;
-};
-
-} // namespace std
-
-namespace realm {
-namespace sync {
-
+std::ostream& operator<<(std::ostream&, ProtocolError protocol_error);
 
 // Implementation
 
@@ -454,6 +436,8 @@ inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action actio
             return o << "RefreshUser";
         case ProtocolErrorInfo::Action::RefreshLocation:
             return o << "RefreshLocation";
+        case ProtocolErrorInfo::Action::LogOutUser:
+            return o << "LogOutUser";
     }
     return o << "Invalid error action: " << int64_t(action);
 }

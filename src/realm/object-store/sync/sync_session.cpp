@@ -32,7 +32,7 @@
 #include <realm/sync/client.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/network/http.hpp>
-#include <realm/sync/network/websocket.hpp>
+#include <realm/sync/network/websocket_error.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/noinst/migration_store.hpp>
@@ -237,21 +237,19 @@ void SyncSession::become_waiting_for_access_token()
     m_state = State::WaitingForAccessToken;
 }
 
-void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status error_code,
-                                  std::string_view context_message)
+void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status status)
 {
     // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
     {
         util::CheckedUniqueLock lock(m_state_mutex);
-        cancel_pending_waits(std::move(lock), error_code);
+        cancel_pending_waits(std::move(lock), status);
     }
     if (user) {
         user->log_out();
     }
 
     if (auto error_handler = config(&SyncConfig::error_handler)) {
-        auto user_facing_error =
-            SyncError(Status{realm::sync::ProtocolError::bad_authentication, context_message}, true);
+        auto user_facing_error = SyncError({ErrorCodes::AuthError, status.reason()}, true);
         error_handler(shared_from_this(), std::move(user_facing_error));
     }
 }
@@ -301,21 +299,24 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool re
                 // there was a problem locally before even sending the request to the server
                 // eg. ClientErrorCode::user_not_found, ClientErrorCode::user_not_logged_in,
                 // ClientErrorCode::too_many_redirects
-                session->handle_bad_auth(session_user, error->to_status(), error->reason());
+                session->handle_bad_auth(session_user, error->to_status());
             }
             else if (check_for_auth_failure(*error)) {
                 // A 401 response on a refresh request means that the token cannot be refreshed and we should not
                 // retry. This can be because an admin has revoked this user's sessions, the user has been disabled,
                 // or the refresh token has expired according to the server's clock.
-                session->handle_bad_auth(session_user, error->to_status(),
-                                         "Unable to refresh the user access token.");
+                session->handle_bad_auth(
+                    session_user,
+                    {error->code(), util::format("Unable to refresh the user access token: %1", error->reason())});
             }
             else if (check_for_redirect_response(*error)) {
                 // A 301 or 308 response is an unhandled permanent redirect response (which should not happen) - if
                 // this is received, fail the request with an appropriate error message.
                 // Temporary redirect responses (302, 307) are not supported
-                session->handle_bad_auth(session_user, error->to_status(),
-                                         "Unhandled redirect response when trying to reach the server.");
+                session->handle_bad_auth(
+                    session_user,
+                    {error->code(), util::format("Unhandled redirect response when trying to reach the server: %1",
+                                                 error->reason())});
             }
             else {
                 // A refresh request has failed. This is an unexpected non-fatal error and we would
@@ -633,7 +634,6 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
 {
     enum class NextStateAfterError { none, inactive, error };
     auto next_state = error.is_fatal ? NextStateAfterError::error : NextStateAfterError::none;
-    auto error_code = error.status.get_std_error_code();
     util::Optional<ShouldBackup> delete_file;
     bool log_out_user = false;
     bool unrecognized_by_client = false;
@@ -643,10 +643,6 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
         // Fallback to a manual reset and let the user try to handle it.
         next_state = NextStateAfterError::inactive;
         delete_file = ShouldBackup::yes;
-    }
-    else if (error_code == realm::sync::ProtocolError::bad_authentication) {
-        next_state = NextStateAfterError::inactive;
-        log_out_user = true;
     }
     else if (error.server_requests_action != sync::ProtocolErrorInfo::Action::NoAction) {
         switch (error.server_requests_action) {
@@ -718,6 +714,10 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                     u->refresh_custom_data(true, handle_refresh(shared_from_this(), true));
                     return;
                 }
+                break;
+            case sync::ProtocolErrorInfo::Action::LogOutUser:
+                next_state = NextStateAfterError::inactive;
+                log_out_user = true;
                 break;
         }
     }

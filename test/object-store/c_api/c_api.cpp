@@ -700,56 +700,6 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         });
     }
 
-    SECTION("realm_sync_error_code") {
-        using namespace realm::sync;
-        std::string message;
-
-        Status fake_status(ErrorCodes::SyncProtocolInvariantFailed, "fake sync error");
-        realm_sync_error_code_t error = c_api::to_capi(fake_status, message);
-        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_CLIENT);
-        CHECK(error.value == int(ErrorCodes::SyncProtocolInvariantFailed));
-        CHECK(fake_status.reason() == error.message);
-        CHECK(message == error.message);
-
-        std::error_code ec_check;
-        c_api::sync_error_to_error_code(error, &ec_check);
-        CHECK(ec_check.category() == std::generic_category());
-        CHECK(ec_check.value() == int(fake_status.code()));
-
-        std::error_code error_code = make_error_code(sync::ProtocolError::connection_closed);
-        error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
-        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_CONNECTION);
-
-        c_api::sync_error_to_error_code(error, &ec_check);
-        CHECK(ec_check.category() == realm::sync::protocol_error_category());
-        CHECK(ec_check.value() == int(error_code.value()));
-
-        error_code = make_error_code(sync::ProtocolError::session_closed);
-        error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
-        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_SESSION);
-
-        c_api::sync_error_to_error_code(error, &ec_check);
-        CHECK(ec_check.category() == realm::sync::protocol_error_category());
-        CHECK(ec_check.value() == int(error_code.value()));
-
-        error_code = make_error_code(realm::util::error::basic_system_errors::invalid_argument);
-        error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
-        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_SYSTEM);
-
-        c_api::sync_error_to_error_code(error, &ec_check);
-        CHECK(ec_check.category() == std::system_category());
-        CHECK(ec_check.value() == int(error_code.value()));
-
-        error_code = make_error_code(util::error::misc_errors::unknown);
-        error = c_api::to_capi(SystemError(error_code, "").to_status(), message);
-        CHECK(error.category == realm_sync_error_category_e::RLM_SYNC_ERROR_CATEGORY_UNKNOWN);
-
-        c_api::sync_error_to_error_code(error, &ec_check);
-        CHECK(ec_check.category() == realm::util::error::basic_system_error_category());
-        CHECK(ec_check.value() == int(error_code.value()));
-    }
-
-
 #endif // REALM_ENABLE_AUTH_TESTS
 }
 
@@ -5084,7 +5034,6 @@ struct Userdata {
     realm_error_t error;
     realm_thread_safe_reference_t* realm_ref = nullptr;
     std::string error_message;
-    std::string error_catagory;
 };
 
 #if REALM_ENABLE_SYNC
@@ -5110,8 +5059,10 @@ static void sync_error_handler(void* p, realm_sync_session_t*, const realm_sync_
 {
     auto userdata_p = static_cast<Userdata*>(p);
     userdata_p->has_error = true;
-    userdata_p->error_message = error.error_code.message;
-    userdata_p->error_catagory = error.error_code.category_name;
+    userdata_p->error_message = error.status.message;
+    userdata_p->error.error = error.status.error;
+    userdata_p->error.categories = error.status.categories;
+    userdata_p->error.message = userdata_p->error_message.c_str();
 }
 
 TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
@@ -5191,8 +5142,9 @@ TEST_CASE("C API - async_open", "[sync][pbs][c_api]") {
         });
         REQUIRE(userdata.called);
         REQUIRE(!userdata.realm_ref);
-        REQUIRE(userdata.error_message == "Bad user authentication (BIND)");
-        REQUIRE(userdata.error_catagory == "realm::sync::ProtocolError");
+        REQUIRE(userdata.error.error == RLM_ERR_AUTH_ERROR);
+        REQUIRE(userdata.error_message ==
+                "Unable to refresh the user access token: http error code considered fatal. Client Error: 403");
         realm_release(task);
         realm_release(config);
         realm_release(sync_config);
@@ -5735,9 +5687,7 @@ TEST_CASE("app: flx-sync compensating writes C API support", "[sync][flx][c_api]
         sync_config,
         [](realm_userdata_t user_data, realm_sync_session_t*, const realm_sync_error_t error) {
             auto state = reinterpret_cast<TestState*>(user_data);
-            REQUIRE(error.error_code.category == RLM_SYNC_ERROR_CATEGORY_SESSION);
-            REQUIRE(error.error_code.value == RLM_SYNC_ERR_SESSION_COMPENSATING_WRITE);
-
+            REQUIRE(error.status.error == RLM_ERR_SYNC_COMPENSATING_WRITE);
             REQUIRE(error.compensating_writes_length > 0);
 
             std::lock_guard<std::mutex> lk(state->mutex);
