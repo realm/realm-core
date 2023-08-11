@@ -16,6 +16,7 @@ ErrorStorage::ErrorStorage(std::exception_ptr ptr) noexcept
     : m_err(none)
     , m_message_buf()
 {
+    printf("ErrorStorage::ErrorStorage(std::exception_ptr ptr) noexcept");
     assign(std::move(ptr));
 }
 
@@ -23,6 +24,7 @@ ErrorStorage::ErrorStorage(const ErrorStorage& other)
     : m_err(other.m_err)
     , m_message_buf(other.m_message_buf)
 {
+    printf("ErrorStorage::ErrorStorage(const ErrorStorage& other)");
     if (m_err) {
         m_err->message = m_message_buf.c_str();
     }
@@ -30,6 +32,7 @@ ErrorStorage::ErrorStorage(const ErrorStorage& other)
 
 ErrorStorage& ErrorStorage::operator=(const ErrorStorage& other)
 {
+    printf("ErrorStorage& ErrorStorage::operator=(const ErrorStorage& other)");
     m_err = other.m_err;
     m_message_buf = other.m_message_buf;
     if (m_err) {
@@ -42,6 +45,7 @@ ErrorStorage::ErrorStorage(ErrorStorage&& other)
     : m_err(std::move(other.m_err))
     , m_message_buf(std::move(other.m_message_buf))
 {
+    printf("ErrorStorage::ErrorStorage(ErrorStorage&& other)");
     if (m_err) {
         m_err->message = m_message_buf.c_str();
     }
@@ -50,6 +54,7 @@ ErrorStorage::ErrorStorage(ErrorStorage&& other)
 
 ErrorStorage& ErrorStorage::operator=(ErrorStorage&& other)
 {
+    printf("ErrorStorage& ErrorStorage::operator=(ErrorStorage&& other)");
     m_err = std::move(other.m_err);
     m_message_buf = std::move(other.m_message_buf);
     if (m_err) {
@@ -72,6 +77,7 @@ bool ErrorStorage::operator==(const ErrorStorage& other) const noexcept
 
 void ErrorStorage::assign(std::exception_ptr eptr) noexcept
 {
+    printf("void ErrorStorage::assign(std::exception_ptr eptr) noexcept");
     if (!eptr) {
         clear();
         return;
@@ -146,6 +152,7 @@ bool ErrorStorage::has_error() const noexcept
 
 bool ErrorStorage::get_as_realm_error_t(realm_error_t* out) const noexcept
 {
+    printf("bool ErrorStorage::get_as_realm_error_t(realm_error_t* out) const noexcept");
     if (!m_err) {
         return false;
     }
@@ -178,6 +185,7 @@ void* ErrorStorage::get_and_clear_usercode_error()
 
 ErrorStorage* ErrorStorage::get_thread_local()
 {
+    printf("ErrorStorage* ErrorStorage::get_thread_local()");
 #if !defined(RLM_NO_THREAD_LOCAL)
     static thread_local ErrorStorage g_error_storage;
     return &g_error_storage;
@@ -242,5 +250,6 @@ RLM_EXPORT bool realm_wrap_exceptions(void (*func)()) noexcept
 
 RLM_API void realm_register_user_code_callback_error(void* usercode_error) noexcept
 {
+    printf("RLM_API void realm_register_user_code_callback_error(void* usercode_error) noexcept");
     realm::c_api::ErrorStorage::get_thread_local()->set_usercode_error(usercode_error);
 }
