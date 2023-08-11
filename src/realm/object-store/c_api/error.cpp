@@ -160,12 +160,18 @@ bool ErrorStorage::get_as_realm_error_t(realm_error_t* out) const noexcept
 {
     printf("bool ErrorStorage::get_as_realm_error_t(realm_error_t* out) const noexcept\n");
     if (!m_err) {
+        printf("no m_err. returning false\n");
         return false;
     }
 
     if (out) {
+        printf("m_err found. returning true\n");    
         *out = *m_err;
+        if ((*m_err).usercode_error != nullptr) {
+            printf("m_err.usercode_error != nullptr\n");
+        }
     }
+    printf("m_err found. returning true\n");
     return true;
 }
 
