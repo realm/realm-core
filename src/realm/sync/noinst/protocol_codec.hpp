@@ -488,7 +488,7 @@ private:
         if (auto action_it = mapping.find(action_string); action_it != mapping.end()) {
             return action_it->second;
         }
-        return action::ApplicationBug;
+        return action::NoAction;
     }
 
     static constexpr std::size_t s_max_body_size = std::numeric_limits<std::size_t>::max();

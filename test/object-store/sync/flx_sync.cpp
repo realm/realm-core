@@ -259,6 +259,7 @@ TEST_CASE("flx: test commands work", "[sync][flx][test command][baas]") {
     });
 }
 
+
 static auto make_error_handler()
 {
     auto [error_promise, error_future] = util::make_promise_future<SyncError>();
@@ -278,6 +279,105 @@ static auto make_client_reset_handler()
     };
     return std::make_pair(std::move(reset_future), std::move(fn));
 }
+
+
+TEST_CASE("app: error handling integration test", "[sync][flx][baas]") {
+    static std::optional<FLXSyncTestHarness> harness{"error_handling"};
+    create_user_and_log_in(harness->app());
+    SyncTestFile config(harness->app()->current_user(), harness->schema(), SyncConfig::FLXSyncEnabled{});
+    auto&& [error_future, error_handler] = make_error_handler();
+    config.sync_config->error_handler = std::move(error_handler);
+    config.sync_config->client_resync_mode = ClientResyncMode::Manual;
+
+    SECTION("handles unknown errors gracefully") {
+        auto r = Realm::get_shared_realm(config);
+        wait_for_download(*r);
+        nlohmann::json error_body = {
+            {"tryAgain", false},          {"message", "fake error"},
+            {"shouldClientReset", false}, {"isRecoveryModeDisabled", false},
+            {"action", "ApplicationBug"},
+        };
+        nlohmann::json test_command = {{"command", "ECHO_ERROR"},
+                                       {"args", nlohmann::json{{"errorCode", 299}, {"errorBody", error_body}}}};
+        auto test_cmd_res =
+            wait_for_future(SyncSession::OnlyForTesting::send_test_command(*r->sync_session(), test_command.dump()))
+                .get();
+        REQUIRE(test_cmd_res == "{}");
+        auto error = wait_for_future(std::move(error_future)).get();
+        REQUIRE(error.status == ErrorCodes::UnknownError);
+        REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
+        REQUIRE(error.is_fatal);
+    }
+
+    SECTION("unknown errors without actions are protocol violations") {
+        auto r = Realm::get_shared_realm(config);
+        wait_for_download(*r);
+        nlohmann::json error_body = {
+            {"tryAgain", false},
+            {"message", "fake error"},
+            {"shouldClientReset", false},
+            {"isRecoveryModeDisabled", false},
+        };
+        nlohmann::json test_command = {{"command", "ECHO_ERROR"},
+                                       {"args", nlohmann::json{{"errorCode", 299}, {"errorBody", error_body}}}};
+        auto test_cmd_res =
+            wait_for_future(SyncSession::OnlyForTesting::send_test_command(*r->sync_session(), test_command.dump()))
+                .get();
+        REQUIRE(test_cmd_res == "{}");
+        auto error = wait_for_future(std::move(error_future)).get();
+        REQUIRE(error.status == ErrorCodes::SyncProtocolInvariantFailed);
+        REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ProtocolViolation);
+        REQUIRE(error.is_fatal);
+    }
+
+    SECTION("unknown connection-level errors are still errors") {
+        auto r = Realm::get_shared_realm(config);
+        wait_for_download(*r);
+        nlohmann::json error_body = {{"tryAgain", false},
+                                     {"message", "fake error"},
+                                     {"shouldClientReset", false},
+                                     {"isRecoveryModeDisabled", false},
+                                     {"action", "ApplicationBug"}};
+        nlohmann::json test_command = {{"command", "ECHO_ERROR"},
+                                       {"args", nlohmann::json{{"errorCode", 199}, {"errorBody", error_body}}}};
+        auto test_cmd_res =
+            wait_for_future(SyncSession::OnlyForTesting::send_test_command(*r->sync_session(), test_command.dump()))
+                .get();
+        REQUIRE(test_cmd_res == "{}");
+        auto error = wait_for_future(std::move(error_future)).get();
+        REQUIRE(error.status == ErrorCodes::SyncProtocolInvariantFailed);
+        REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ProtocolViolation);
+        REQUIRE(error.is_fatal);
+    }
+
+    SECTION("client reset errors") {
+        auto r = Realm::get_shared_realm(config);
+        wait_for_download(*r);
+        nlohmann::json error_body = {{"tryAgain", false},
+                                     {"message", "fake error"},
+                                     {"shouldClientReset", true},
+                                     {"isRecoveryModeDisabled", false},
+                                     {"action", "ClientReset"}};
+        auto code = GENERATE(sync::ProtocolError::bad_client_file_ident, sync::ProtocolError::bad_server_version,
+                             sync::ProtocolError::diverging_histories);
+        nlohmann::json test_command = {{"command", "ECHO_ERROR"},
+                                       {"args", nlohmann::json{{"errorCode", code}, {"errorBody", error_body}}}};
+        auto test_cmd_res =
+            wait_for_future(SyncSession::OnlyForTesting::send_test_command(*r->sync_session(), test_command.dump()))
+                .get();
+        REQUIRE(test_cmd_res == "{}");
+        auto error = wait_for_future(std::move(error_future)).get();
+        REQUIRE(error.status == ErrorCodes::SyncClientResetRequired);
+        REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ClientReset);
+        REQUIRE(error.is_client_reset_requested());
+        REQUIRE(error.is_fatal);
+    }
+
+    SECTION("teardown") {
+        harness.reset();
+    }
+}
+
 
 TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
     std::vector<ObjectSchema> schema{
