@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* Removed some old and unused files that were out of date. ([]())
+* Removed some unused files/directories and dogless dependency. ([PR #6884](https://github.com/realm/realm-core/pull/6884))
 
 ----------------------------------------------
 
