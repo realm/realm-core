@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Removed some old and unused files that were out of date. ([]())
 
 ----------------------------------------------
 
