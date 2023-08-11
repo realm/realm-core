@@ -24,6 +24,7 @@
 
 ### Internals
 * Removed some unused files/directories and dogless dependency. ([PR #6884](https://github.com/realm/realm-core/pull/6884))
+* Add baas-network-tests nightly task for (future) testing sync client operation with non-ideal network conditions. ([PR #6852](https://github.com/realm/realm-core/pull/6852))
 
 ----------------------------------------------
 
@@ -48,7 +49,6 @@
 
 ### Internals
 * Timestamp objects can now only be created from a system clock timepoint. ([#6112](https://github.com/realm/realm-core/issues/6112))
-* Add baas-network-tests nightly task for testing sync client operation with non-ideal network conditions. ([PR #6852](https://github.com/realm/realm-core/pull/6852))
 
 ----------------------------------------------
 
