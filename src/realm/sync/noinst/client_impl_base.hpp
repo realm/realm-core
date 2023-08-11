@@ -569,7 +569,8 @@ private:
     void change_state_to_disconnected() noexcept;
     // These are only called from ClientProtocol class.
     void receive_pong(milliseconds_type timestamp);
-    void receive_error_message(const ProtocolErrorInfo& info, session_ident_type);
+    void receive_error_message(const ProtocolErrorInfo& info, session_ident_type,
+                               ClientProtocol::ErrorMessageType msg_type);
     void receive_query_error_message(int error_code, std::string_view message, int64_t query_version,
                                      session_ident_type);
     void receive_ident_message(session_ident_type, SaltedFileIdent);
@@ -1211,7 +1212,7 @@ private:
                                     const ReceivedChangesets&);
     Status receive_mark_message(request_ident_type);
     Status receive_unbound_message();
-    Status receive_error_message(const ProtocolErrorInfo& info);
+    Status receive_error_message(const ProtocolErrorInfo& info, ClientProtocol::ErrorMessageType msg_type);
     Status receive_query_error_message(int error_code, std::string_view message, int64_t query_version);
     Status receive_test_command_response(request_ident_type, std::string_view body);
 

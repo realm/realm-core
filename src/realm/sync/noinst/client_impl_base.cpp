@@ -1265,7 +1265,8 @@ Session* Connection::find_and_validate_session(session_ident_type session_ident,
     return nullptr;
 }
 
-void Connection::receive_error_message(const ProtocolErrorInfo& info, session_ident_type session_ident)
+void Connection::receive_error_message(const ProtocolErrorInfo& info, session_ident_type session_ident,
+                                       ClientProtocol::ErrorMessageType msg_type)
 {
     Session* sess = nullptr;
     if (session_ident != 0) {
@@ -1273,7 +1274,7 @@ void Connection::receive_error_message(const ProtocolErrorInfo& info, session_id
         if (REALM_UNLIKELY(!sess)) {
             return;
         }
-        if (auto status = sess->receive_error_message(info); !status.is_ok()) {
+        if (auto status = sess->receive_error_message(info, msg_type); !status.is_ok()) {
             close_due_to_protocol_error(std::move(status)); // Throws
             return;
         }
@@ -2474,7 +2475,7 @@ Status Session::receive_query_error_message(int error_code, std::string_view mes
 
 // The caller (Connection) must discard the session if the session has become
 // deactivated upon return.
-Status Session::receive_error_message(const ProtocolErrorInfo& info)
+Status Session::receive_error_message(const ProtocolErrorInfo& info, ClientProtocol::ErrorMessageType msg_type)
 {
     logger.info("Received: ERROR \"%1\" (error_code=%2, is_fatal=%3, error_action=%4)", info.message,
                 info.raw_error_code, info.is_fatal, info.server_requests_action); // Throws
@@ -2484,7 +2485,10 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
         return {ErrorCodes::SyncProtocolInvariantFailed, "Received ERROR message when it was not legal"};
     }
 
-    if (info.server_requests_action == ProtocolErrorInfo::Action::NoAction) {
+    // The legacy ERROR message doesn't include an action, so we don't need to do this validation there. But for
+    // baas we need to verify that we've received an action.
+    if (msg_type == ClientProtocol::ErrorMessageType::JSON &&
+        info.server_requests_action == ProtocolErrorInfo::Action::NoAction) {
         return {ErrorCodes::SyncProtocolInvariantFailed, "Received ERROR message without an action defined"};
     }
 

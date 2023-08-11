@@ -1003,7 +1003,7 @@ SyncClientHookAction SessionImpl::call_debug_hook(const SyncClientHookData& data
             SessionErrorInfo err_info(Status{ErrorCodes::RuntimeError, "hook requested error"}, IsFatal{false});
             err_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
 
-            auto err_processing_err = receive_error_message(err_info);
+            auto err_processing_err = receive_error_message(err_info, ClientProtocol::ErrorMessageType::JSON);
             REALM_ASSERT_EX(err_processing_err.is_ok(), err_processing_err);
             return SyncClientHookAction::EarlyReturn;
         }
