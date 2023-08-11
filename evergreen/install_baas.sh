@@ -166,9 +166,9 @@ if [[ -z "${AWS_ACCESS_KEY_ID}" || -z "${AWS_SECRET_ACCESS_KEY}" ]]; then
     exit 1
 fi
 
-function check_port()
+function check_port_in_use()
 {
-    # Usage: check_port PORT PORT_NAME
+    # Usage: check_port_in_use PORT PORT_NAME
     port_num="${1}"
     port_check=$(lsof -P "-i:${port_num}" | grep "LISTEN" || true)
     if [[ -n "${port_check}" ]]; then
@@ -180,10 +180,10 @@ function check_port()
 
 # Check the mongodb and baas_server port availability first
 MONGODB_PORT=26000
-check_port "${MONGODB_PORT}" "mongodb"
+check_port_in_use "${MONGODB_PORT}" "mongodb"
 
 BAAS_PORT=9090
-check_port "${BAAS_PORT}" "baas server"
+check_port_in_use "${BAAS_PORT}" "baas server"
 
 # Wait to enable verbosity logging, if enabled
 if [[ -n "${VERBOSE}" ]]; then
@@ -436,7 +436,6 @@ mkdir -p "${MONGODB_PATH}"
     --logpath "${MONGOD_LOG}" \
     --dbpath "${MONGODB_PATH}/" \
     --pidfilepath "${MONGOD_PID_FILE}" &
-
 
 # Wait for mongod to start (up to 40 secs) while attempting to initialize the replica set
 echo "Initializing replica set"

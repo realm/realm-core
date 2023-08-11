@@ -225,7 +225,7 @@ fi
 
 sudo chmod 600 "${HOME}/.ssh"/*
 
-# Should an alternate data directory location be used? If so, dont init the data device
+# Should an alternate data directory location be used? If so, don't init the data device
 if [[ -z "${OPT_DATA_DIR}" ]]; then
     DATA_DIR=/data
     init_data_device

@@ -24,6 +24,7 @@ TOXIPROXY_VERSION="v2.5.0"
 LISTEN_PORT=9092
 BAAS_PORT=9090
 SKIP_BAAS_WAIT=
+CONFIG_PORT=8474
 
 function usage()
 {
@@ -67,9 +68,9 @@ if [[ -z "${LISTEN_PORT}" ]]; then
     usage 1
 fi
 
-function check_port()
+function check_port_in_use()
 {
-    # Usage: check_port PORT PORT_NAME
+    # Usage: check_port_in_use PORT PORT_NAME
     port_num="${1}"
     port_check=$(lsof -P "-i:${port_num}" | grep "LISTEN" || true)
     if [[ -n "${port_check}" ]]; then
@@ -79,8 +80,9 @@ function check_port()
     fi
 }
 
-# Check the mongodb and baas_server port availability first
-check_port "${LISTEN_PORT}" "baas proxy"
+# Check the baas proxy listen and Toxiproxy config port availability first
+check_port_in_use "${LISTEN_PORT}" "baas proxy"
+checK_port_in_use "${CONFIG_PORT}" "Toxiproxy config"
 
 [[ -d "${WORK_PATH}" ]] || mkdir -p "${WORK_PATH}"
 pushd "${WORK_PATH}" > /dev/null

@@ -32,7 +32,7 @@ function usage()
     echo -e "\t-v\t\tEnable verbose script debugging"
     echo -e "\t-h\t\tShow this usage summary and exit"
     echo "Baas Proxy Options:"
-    echo -e "\t-t\t\tEnable baas proxy support (proxy between baas on :9090 and remote port)"
+    echo -e "\t-t\t\tEnable baas proxy support (proxy between baas on :9090 and listen port)"
     echo -e "\t-d PORT\t\tPort for direct connection to baas - skips proxy (default ${DIRECT_PORT})"
     echo -e "\t-l PORT\t\tBaas proxy listen port on remote host (default ${LISTEN_PORT})"
     echo -e "\t-c PORT\t\tLocal configuration port for proxy HTTP API (default ${CONFIG_PORT})"
@@ -96,6 +96,22 @@ function check_port()
     return 1
 }
 
+function check_port_in_use()
+{
+    # Usage: check_port_in_use PORT PORT_NAME
+    port_num="${1}"
+    port_check=$(lsof -P "-i:${port_num}" | grep "LISTEN" || true)
+    if [[ -n "${port_check}" ]]; then
+        echo "Error: ${2} port (${port_num}) is already in use"
+        echo -e "${port_check}"
+        exit 1
+    fi
+}
+
+# Check the local baas port availability
+check_port_in_use "${CONFIG_PORT}" "Baas proxy config"
+
+# Check the port values and local ports in use for baas proxy
 if [[ -n "${BAAS_PROXY}" ]]; then
     if ! check_port "${CONFIG_PORT}"; then
         echo "Error: Baas proxy local HTTP API config port was invalid: '${CONFIG_PORT}'"
@@ -103,6 +119,15 @@ if [[ -n "${BAAS_PROXY}" ]]; then
     elif ! check_port "${LISTEN_PORT}"; then
         echo "Error: Baas proxy listen port was invalid: '${LISTEN_PORT}'"
         usage 1
+    fi
+    check_port_in_use "${CONFIG_PORT}" "Baas proxy config"
+
+    if [[ -n "${DIRECT_PORT}" ]]; then
+        if ! check_port "${DIRECT_PORT}"; then
+            echo "Error: Baas direct connect port was invalid: '${DIRECT_PORT}'"
+            usage 1
+        fi
+        check_port_in_use "${DIRECT_PORT}" "Baas direct connect"
     fi
 fi
 
