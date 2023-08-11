@@ -1139,7 +1139,6 @@ task_groups:
   timeout:
   - func: "run hang analyzer"
   tasks:
-  - compile
   - baas-network-tests
 
 # Runs object-store-tests against baas running on remote host
@@ -1389,7 +1388,7 @@ buildvariants:
     test_logging_level: trace
   tasks:
   - name: network_tests
-    patchable: true
+    activate: true
 
 - name: rhel70
   display_name: "RHEL 7 x86_64"
