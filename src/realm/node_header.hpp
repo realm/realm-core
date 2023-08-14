@@ -52,10 +52,26 @@ public:
         wtype_Bits = 0,     // width indicates how many bits every element occupies
         wtype_Multiply = 1, // width indicates how many bytes every element occupies
         wtype_Ignore = 2,   // each element is 1 byte
-        // the following use the width field (bits 0-2) of byte 4 to specify layouts
-        wtype_Wide = 3,     // smaller arrays with wider elements
-        wtype_LocalDir = 4, // two combined arrays, second one indexes first one
-        wtype_Sparse = 5,   // sparse array controlled by a bitvector
+        // the following encodings use the width field (bits 0-2) of byte 4 to specify layouts
+        // the header stores enough data to a) compute the total size of a block,
+        // and b) determine which part of a block may hold refs, which may need to be
+        // scanned/updated for example during write to disk.
+        // the element width is given by bits 0-4 of byte 5. Detailed encoding described later.
+        wtype_Wide = 3,     // smaller arrays with wider/better packed elements:
+                            // number of elements given by bytes 6 (hi) and 7 (lo)
+        wtype_LocalDir = 4, // two combined arrays, second one indexes first one:
+                            // the header specifies the element size of the first
+                            // array. The element size of the second array is derived
+                            // from the number of entries in the first one.
+                            // number of entries in the directory (first array) given
+                            // by byte 7. number of elements given by byte 6 (lo) and
+                            // bits 5-7 of byte 5 (hi)
+        wtype_Sparse = 5,   // sparse array controlled by a bitvector:
+                            // size of the bitvector and other metadata given by byte 7
+                            // only some sizes (for example 8-bytes) may be valid,
+                            // depending on context.
+                            // number of elements given by byte 6 (lo) and bits (5-7) of
+                            // byte 5 (hi).
         // possibly more....
     };
     static const int wtype_extend = 3; // value held in wtype field for wtypes after wtype_Wide
@@ -113,9 +129,11 @@ public:
     }
 
     // For wtype lower than wtype_extend, the element width is given by
-    // bits 0-2 in byte 4 of the header. For new wtypes these bits are already used to
-    // extend the wtype and the element width is instead placed in bits 0-4 of
-    // byte 3. These 5 bits encode the following element widths (all widths in bits)
+    // bits 0-2 in byte 4 of the header and only powers of two is supported.
+    // For new wtypes these bits are already used to extend the wtype and the
+    // element width is instead placed in bits 0-4 of byte 3.
+    // These 5 bits encode the following element widths (all widths in bits)
+    //
     // Encoding:    Sizes: (in bits)
     // 0         -> 0
     // 1-4       -> 1,2,3,4
@@ -126,7 +144,8 @@ public:
     // 21-24     -> 80,96,112,128
     // 25-28     -> 160,192,224,256
     // 29-31     reserved
-    // Some layouts may not support all sizes. Or may support them without packing them.
+    // Some layouts may not support all sizes. But for element sizes which are not
+    // powers of two, dense/unaligned packing is assumed.
     static int width_encoding_to_num_bits(int encoding)
     {
         int factor = 1;
@@ -296,6 +315,6 @@ public:
         return num_bytes;
     }
 };
-}
+} // namespace realm
 
 #endif /* REALM_NODE_HEADER_HPP */
