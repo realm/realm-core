@@ -69,6 +69,11 @@ inline timestamp_type generate_changeset_timestamp() noexcept
     // `offset_in_millis` is the number of milliseconds between
     // 1970-01-01T00:00:00Z and 2015-01-01T00:00:00Z not counting leap seconds.
     std::uint_fast64_t offset_in_millis = 1420070400000ULL;
+    // TODO: change error type.
+    if (millis_since_epoch < offset_in_millis) {
+        throw RuntimeError(ErrorCodes::SyncProtocolInvariantFailed,
+                           "Local clock set to date before 2015-01-01T00:00:00Z");
+    }
     return timestamp_type(millis_since_epoch - offset_in_millis);
 }
 
