@@ -101,11 +101,11 @@ public:
     {
         return m_obj;
     }
-    const Obj& get_obj() const
+    const Obj& get_obj() const noexcept
     {
         return m_obj;
     }
-    Obj& get_obj()
+    Obj& get_obj() noexcept
     {
         return m_obj;
     }
