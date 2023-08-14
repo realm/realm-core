@@ -176,7 +176,7 @@ public:
 
     /// Returns true if the accessor is in the attached state. By default, this
     /// checks if the owning object is still valid.
-    virtual bool is_attached() const
+    virtual bool is_attached() const noexcept
     {
         return get_obj().is_valid();
     }
@@ -470,6 +470,16 @@ public:
         return m_obj_mem;
     }
 
+    bool is_attached() const noexcept final
+    {
+        UpdateStatus status = m_parent ? m_parent->update_if_needed_with_status() : UpdateStatus::Detached;
+        if (status == UpdateStatus::Updated) {
+            // Make sure to update next time around
+            m_content_version = 0;
+        }
+        return (status != UpdateStatus::Detached) &&
+               m_parent->check_collection_ref(m_index, Interface::s_collection_type);
+    }
 
     /// Returns true if the accessor has changed since the last time
     /// `has_changed()` was called.
@@ -605,13 +615,6 @@ protected:
     ref_type get_collection_ref() const
     {
         return m_parent->get_collection_ref(m_index, Interface::s_collection_type);
-    }
-
-    bool check_collection_ref() const noexcept
-    {
-        UpdateStatus status = m_parent ? m_parent->update_if_needed_with_status() : UpdateStatus::Detached;
-        return (status != UpdateStatus::Detached) &&
-               m_parent->check_collection_ref(m_index, Interface::s_collection_type);
     }
 
     void set_collection_ref(ref_type ref)

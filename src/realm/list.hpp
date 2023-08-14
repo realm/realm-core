@@ -350,11 +350,7 @@ public:
     DictionaryPtr get_dictionary(const PathElement& path_elem) const override;
     SetMixedPtr get_set(const PathElement& path_elem) const override;
     ListMixedPtr get_list(const PathElement& path_elem) const override;
-    bool is_attached() const override
-    {
-        // Basically we will have to test that we can get ref from parent
-        return Base::check_collection_ref();
-    }
+
     int64_t get_key(size_t ndx)
     {
         return m_tree->get_key(ndx);
@@ -737,6 +733,10 @@ public:
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
     const Obj& get_obj() const noexcept final;
+    bool is_attached() const noexcept final
+    {
+        return m_list.is_attached();
+    }
     bool has_changed() const noexcept final;
     ColKey get_col_key() const noexcept final;
     CollectionType get_collection_type() const noexcept override

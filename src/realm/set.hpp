@@ -346,7 +346,7 @@ public:
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
     const Obj& get_obj() const noexcept final;
-    bool is_attached() const final;
+    bool is_attached() const noexcept final;
     bool has_changed() const noexcept final;
     ColKey get_col_key() const noexcept final;
     CollectionType get_collection_type() const noexcept override
@@ -1283,7 +1283,7 @@ inline const Obj& LnkSet::get_obj() const noexcept
     return m_set.get_obj();
 }
 
-inline bool LnkSet::is_attached() const
+inline bool LnkSet::is_attached() const noexcept
 {
     return m_set.is_attached();
 }
