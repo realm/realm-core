@@ -2484,12 +2484,24 @@ ref_type Obj::get_collection_ref(Index index, CollectionType type) const
     }
     if (col_key.get_type() == col_type_Mixed) {
         auto val = _get<Mixed>(col_key.get_index());
-        if (val.is_null() || !val.is_type(DataType(int(type)))) {
+        if (!val.is_type(DataType(int(type)))) {
             throw IllegalOperation("Not proper collection type");
         }
         return val.get_ref();
     }
     return 0;
+}
+
+bool Obj::check_collection_ref(Index index, CollectionType type) const noexcept
+{
+    ColKey col_key = mpark::get<ColKey>(index);
+    if (col_key.is_collection()) {
+        return true;
+    }
+    if (col_key.get_type() == col_type_Mixed) {
+        return _get<Mixed>(col_key.get_index()).is_type(DataType(int(type)));
+    }
+    return false;
 }
 
 void Obj::set_collection_ref(Index index, ref_type ref, CollectionType type)

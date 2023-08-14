@@ -1304,6 +1304,7 @@ TEST_CASE("nested List") {
     top_list.insert_collection(1, CollectionType::List);
     top_list.insert(2, "Godbye");
     top_list.insert_collection(3, CollectionType::List);
+    top_list.insert_collection(4, CollectionType::List);
     auto l0 = obj.get_list_ptr<Mixed>(Path{"any", 1});
     auto l1 = obj.get_list_ptr<Mixed>(Path{"any", 3});
 
@@ -1393,6 +1394,30 @@ TEST_CASE("nested List") {
                 lst0.remove(0);
             });
             REQUIRE_INDICES(change.deletions, 0);
+        }
+        SECTION("erase from containing list") {
+            auto token = require_change();
+            write([&] {
+                lst0.add(Mixed(8));
+            });
+            REQUIRE_INDICES(change.insertions, 0);
+            write([&] {
+                top_list.set(1, 42);
+            });
+            REQUIRE_INDICES(change.deletions, 0);
+            REQUIRE(change.collection_root_was_deleted);
+        }
+        SECTION("remove containing object") {
+            auto token = require_change();
+            write([&] {
+                lst0.add(Mixed(8));
+            });
+            REQUIRE_INDICES(change.insertions, 0);
+            write([&] {
+                obj.remove();
+            });
+            REQUIRE_INDICES(change.deletions, 0);
+            REQUIRE(change.collection_root_was_deleted);
         }
     }
 }

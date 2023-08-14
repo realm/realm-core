@@ -1151,13 +1151,22 @@ ref_type Dictionary::get_collection_ref(Index index, CollectionType type) const
     auto ndx = do_find_key(StringData(mpark::get<std::string>(index)));
     if (ndx != realm::not_found) {
         auto val = m_values->get(ndx);
-        if (val.is_null() || !val.is_type(DataType(int(type)))) {
+        if (!val.is_type(DataType(int(type)))) {
             throw IllegalOperation("Not proper collection type");
         }
         return val.get_ref();
     }
 
     return 0;
+}
+
+bool Dictionary::check_collection_ref(Index index, CollectionType type) const noexcept
+{
+    auto ndx = do_find_key(StringData(mpark::get<std::string>(index)));
+    if (ndx != realm::not_found) {
+        return m_values->get(ndx).is_type(DataType(int(type)));
+    }
+    return false;
 }
 
 void Dictionary::set_collection_ref(Index index, ref_type ref, CollectionType type)

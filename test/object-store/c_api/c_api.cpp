@@ -5128,7 +5128,7 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         realm_list_set_collection(list.get(), 0, RLM_COLLECTION_TYPE_DICTIONARY);
         // accessor has become invalid
         REQUIRE(!realm_list_insert(n_list.get(), 1, rlm_str_val("Test2")));
-        CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
+        CHECK_ERR(RLM_ERR_INVALIDATED_OBJECT);
         // try to get a dictionary should work
         auto n_dict = cptr_checked(realm_list_get_dictionary(list.get(), 0));
         bool inserted = false;
@@ -5141,7 +5141,7 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         realm_list_set_collection(list.get(), 0, RLM_COLLECTION_TYPE_SET);
         // accessor invalid
         REQUIRE(!realm_dictionary_insert(n_dict.get(), key, val, &ndx, &inserted));
-        CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
+        CHECK_ERR(RLM_ERR_INVALIDATED_OBJECT);
         auto n_set = cptr_checked(realm_list_get_set(list.get(), 0));
         REQUIRE(realm_set_insert(n_set.get(), val, &ndx, &inserted));
         REQUIRE(ndx == 0);
@@ -5149,7 +5149,7 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         realm_list_set_collection(list.get(), 0, RLM_COLLECTION_TYPE_LIST);
         // accessor invalid
         REQUIRE(!realm_set_insert(n_set.get(), val, &ndx, &inserted));
-        CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
+        CHECK_ERR(RLM_ERR_INVALIDATED_OBJECT);
         // get a list should work
         n_list = cptr_checked(realm_list_get_list(list.get(), 0));
         REQUIRE(realm_list_insert(n_list.get(), 0, rlm_str_val("Test1")));
