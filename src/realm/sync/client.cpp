@@ -1541,7 +1541,13 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
     // Cannot be actualized if it's already been finalized or force closed
     REALM_ASSERT(!m_finalized);
     REALM_ASSERT(!m_force_closed);
-    m_db->claim_sync_agent();
+    try {
+        m_db->claim_sync_agent();
+    }
+    catch (const MultipleSyncAgents&) {
+        finalize_before_actualization();
+        throw;
+    }
     auto sync_mode = endpoint.server_mode;
 
     bool was_created = false;
@@ -1560,15 +1566,16 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         sess->logger.info("Binding '%1' to '%2'", m_db->get_path(), m_virt_path); // Throws
         m_sess = sess.get();
         conn.activate_session(std::move(sess)); // Throws
-
-        m_actualized = true;
     }
     catch (...) {
         if (was_created)
             m_client.remove_connection(conn);
+
+        finalize_before_actualization();
         throw;
     }
 
+    m_actualized = true;
     if (was_created)
         conn.activate(); // Throws
 

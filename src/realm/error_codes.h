@@ -222,6 +222,7 @@ typedef enum realm_sync_errno_connection {
     RLM_SYNC_ERR_CONNECTION_BAD_CHANGESET_SIZE = 112,
     RLM_SYNC_ERR_CONNECTION_SWITCH_TO_FLX_SYNC = 113,
     RLM_SYNC_ERR_CONNECTION_SWITCH_TO_PBS = 114,
+    // Error code 199 is reserved as an "unknown connection error" in tests
 } realm_sync_errno_connection_e;
 
 typedef enum realm_sync_errno_session {
@@ -259,6 +260,7 @@ typedef enum realm_sync_errno_session {
     RLM_SYNC_ERR_SESSION_MIGRATE_TO_FLX = 232,
     RLM_SYNC_ERR_SESSION_BAD_PROGRESS = 233,
     RLM_SYNC_ERR_SESSION_REVERT_TO_PBS = 234,
+    // Error code 299 is reserved as an "unknown session error" in tests
 } realm_sync_errno_session_e;
 
 typedef enum realm_web_socket_errno {
