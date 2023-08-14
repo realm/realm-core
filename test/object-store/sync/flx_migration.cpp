@@ -704,12 +704,14 @@ TEST_CASE("New table is synced after migration", "[sync][flx][flx migration][baa
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
     const std::string partition = "migration-test";
-    const Schema mig_schema{
-        ObjectSchema("Object", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                                {"string_field", PropertyType::String | PropertyType::Nullable},
-                                {"realm_id", PropertyType::String | PropertyType::Nullable}}),
-    };
-    auto server_app_config = minimal_app_config("server_migrate_rollback", mig_schema);
+    const auto obj1_schema = ObjectSchema("Object", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                                     {"string_field", PropertyType::String | PropertyType::Nullable},
+                                                     {"realm_id", PropertyType::String | PropertyType::Nullable}});
+    const auto obj2_schema = ObjectSchema("Object2", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                                      {"realm_id", PropertyType::String | PropertyType::Nullable}});
+    const Schema mig_schema{obj1_schema};
+    const Schema two_obj_schema{obj1_schema, obj2_schema};
+    auto server_app_config = minimal_app_config("server_migrate_rollback", two_obj_schema);
     TestAppSession session(create_app(server_app_config));
     SyncTestFile config(session.app(), partition, server_app_config.schema);
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
@@ -743,14 +745,7 @@ TEST_CASE("New table is synced after migration", "[sync][flx][flx migration][baa
 
     // Open a new realm with an additional table.
     {
-        const Schema schema{
-            ObjectSchema("Object", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                                    {"string_field", PropertyType::String | PropertyType::Nullable},
-                                    {"realm_id", PropertyType::String | PropertyType::Nullable}}),
-            ObjectSchema("Object2", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                                     {"realm_id", PropertyType::String | PropertyType::Nullable}}),
-        };
-        SyncTestFile flx_config(session.app()->current_user(), schema, SyncConfig::FLXSyncEnabled{});
+        SyncTestFile flx_config(session.app()->current_user(), two_obj_schema, SyncConfig::FLXSyncEnabled{});
 
         auto flx_realm = Realm::get_shared_realm(flx_config);
 

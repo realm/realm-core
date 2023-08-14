@@ -598,6 +598,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 }
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->setup([&](SharedRealm before) {
                     before->update_schema(
                         {
@@ -697,6 +698,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 err = error;
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([&](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1174,6 +1176,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 err = error;
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([&](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1206,6 +1209,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 err = error;
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1237,7 +1241,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         }
 
         SECTION("compatible schema changes in both remote and local transactions") {
-            test_reset
+            test_reset->set_development_mode(true)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1289,6 +1293,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 err = error;
             };
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -1331,6 +1336,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
             };
 
             make_reset(local_config, remote_config)
+                ->set_development_mode(true)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {

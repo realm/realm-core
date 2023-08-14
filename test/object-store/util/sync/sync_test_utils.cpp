@@ -521,6 +521,13 @@ struct BaasClientReset : public TestClientReset {
     {
     }
 
+    TestClientReset* set_development_mode(bool enable) override
+    {
+        const AppSession& app_session = m_test_app_session.app_session();
+        app_session.admin_api.set_development_mode_to(app_session.server_app_id, enable);
+        return this;
+    }
+
     void run() override
     {
         m_did_run = true;
@@ -644,6 +651,13 @@ struct BaasFLXClientReset : public TestClientReset {
         REALM_ASSERT(m_local_config.sync_config->flx_sync_requested);
         REALM_ASSERT(m_remote_config.sync_config->flx_sync_requested);
         REALM_ASSERT(m_local_config.schema->find(c_object_schema_name) != m_local_config.schema->end());
+    }
+
+    TestClientReset* set_development_mode(bool enable) override
+    {
+        const AppSession& app_session = m_test_app_session.app_session();
+        app_session.admin_api.set_development_mode_to(app_session.server_app_id, enable);
+        return this;
     }
 
     void run() override
@@ -819,6 +833,10 @@ TestClientReset* TestClientReset::on_post_local_changes(Callback&& post_local)
 TestClientReset* TestClientReset::on_post_reset(Callback&& post_reset)
 {
     m_on_post_reset = std::move(post_reset);
+    return this;
+}
+TestClientReset* TestClientReset::set_development_mode(bool)
+{
     return this;
 }
 

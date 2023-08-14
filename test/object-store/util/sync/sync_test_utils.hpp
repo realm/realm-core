@@ -194,6 +194,7 @@ struct TestClientReset {
     ObjectId get_pk_of_object_driving_reset() const;
     void disable_wait_for_reset_completion();
 
+    virtual TestClientReset* set_development_mode(bool enable = true);
     virtual void run() = 0;
 
 protected:

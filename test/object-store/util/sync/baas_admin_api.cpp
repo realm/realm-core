@@ -869,7 +869,7 @@ AppCreateConfig default_app_config()
         db_name,
         get_default_schema(),
         std::move(partition_key),
-        true,                               // dev_mode_enabled
+        false,                              // Dev mode disabled
         util::none,                         // Default to no FLX sync config
         std::move(funcs),                   // Add default functions
         std::move(user_pass_config),        // enable basic user/pass auth
@@ -906,7 +906,7 @@ AppCreateConfig minimal_app_config(const std::string& name, const Schema& schema
         util::format("test_data_%1_%2", name, id.to_string()),
         schema,
         std::move(partition_key),
-        true,                               // dev_mode_enabled
+        false,                              // Dev mode disabled
         util::none,                         // no FLX sync config
         {},                                 // no functions
         std::move(user_pass_config),        // enable basic user/pass auth
