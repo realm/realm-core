@@ -16,22 +16,25 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <sync/flx_sync_harness.hpp>
-#include <sync/sync_test_utils.hpp>
-#include <util/baas_admin_api.hpp>
 #include <util/crypt_key.hpp>
+#include <util/sync/baas_admin_api.hpp>
+#include <util/sync/flx_sync_harness.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/util/scheduler.hpp>
+
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
+
 #include <realm/util/future.hpp>
 
 #include <catch2/catch_all.hpp>
+
 #include <chrono>
 
 #if REALM_ENABLE_SYNC
@@ -231,12 +234,12 @@ TEST_CASE("Test server migration and rollback", "[sync][flx][flx migration][baas
         flx_config.sync_config->error_handler =
             [&logger_ptr, error_promise = std::move(promise)](std::shared_ptr<SyncSession>, SyncError err) mutable {
                 // This situation should return the switch_to_pbs error
-                logger_ptr->error("Server rolled back - connect as FLX received error: %1", err.reason());
+                logger_ptr->error("Server rolled back - connect as FLX received error: %1", err.status);
                 error_promise.get_promise().emplace_value(std::move(err));
             };
         auto flx_realm = Realm::get_shared_realm(flx_config);
         auto err = wait_for_future(std::move(err_future), std::chrono::seconds(30)).get();
-        REQUIRE(err.get_system_error() == make_error_code(sync::ProtocolError::switch_to_pbs));
+        REQUIRE(err.status == ErrorCodes::WrongSyncType);
         REQUIRE(err.server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
     }
 
@@ -691,12 +694,12 @@ TEST_CASE("Update to native FLX after migration", "[sync][flx][flx migration][ba
         flx_config.sync_config->error_handler =
             [&logger_ptr, error_promise = std::move(promise)](std::shared_ptr<SyncSession>, SyncError err) mutable {
                 // This situation should return the switch_to_pbs error
-                logger_ptr->error("Server rolled back - connect as FLX received error: %1", err.reason());
+                logger_ptr->error("Server rolled back - connect as FLX received error: %1", err.status);
                 error_promise.get_promise().emplace_value(std::move(err));
             };
         auto flx_realm = Realm::get_shared_realm(flx_config);
         auto err = wait_for_future(std::move(err_future), std::chrono::seconds(30)).get();
-        REQUIRE(err.get_system_error() == make_error_code(sync::ProtocolError::switch_to_pbs));
+        REQUIRE(err.status == ErrorCodes::WrongSyncType);
         REQUIRE(err.server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
     }
 }

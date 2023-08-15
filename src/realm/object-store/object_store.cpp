@@ -45,6 +45,9 @@ const char* const c_versionColumnName = "version";
 
 const char c_object_table_prefix[] = "class_";
 
+const char* const c_development_mode_msg =
+    "If your app is running in development mode, you can delete the realm and restart the app to update your schema.";
+
 void create_metadata_tables(Group& group)
 {
     // The 'metadata' table is simply ignored by Sync
@@ -677,8 +680,9 @@ void ObjectStore::apply_additive_changes(Group& group, std::vector<SchemaChange>
         }
         void operator()(AddIndex op)
         {
-            if (update_indexes)
-                table(op.object).add_search_index(op.property->column_key);
+            if (update_indexes) {
+                add_search_index(table(op.object), *op.property, op.type);
+            }
         }
         void operator()(RemoveIndex op)
         {
@@ -1054,6 +1058,12 @@ static void append_errors(std::string& message, std::vector<ObjectSchemaValidati
     }
 }
 
+static void append_line(std::string& message, std::string_view line)
+{
+    message += "\n";
+    message += line;
+}
+
 SchemaValidationException::SchemaValidationException(std::vector<ObjectSchemaValidationException> const& errors)
     : LogicError(ErrorCodes::SchemaValidationFailed, [&] {
         std::string message = "Schema validation failed due to the following errors:";
@@ -1087,6 +1097,7 @@ InvalidAdditiveSchemaChangeException::InvalidAdditiveSchemaChangeException(
     : LogicError(ErrorCodes::InvalidSchemaChange, [&] {
         std::string message = "The following changes cannot be made in additive-only schema mode:";
         append_errors(message, errors);
+        append_line(message, c_development_mode_msg);
         return message;
     }())
 {
@@ -1097,6 +1108,7 @@ InvalidExternalSchemaChangeException::InvalidExternalSchemaChangeException(
     : LogicError(ErrorCodes::InvalidSchemaChange, [&] {
         std::string message = "Unsupported schema changes were made by another client or process:";
         append_errors(message, errors);
+        append_line(message, c_development_mode_msg);
         return message;
     }())
 {

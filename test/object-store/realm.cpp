@@ -16,16 +16,17 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
-#include <catch2/matchers/catch_matchers_string.hpp>
+#include <util/event_loop.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
+#include <../util/semaphore.hpp>
 
-#include "util/event_loop.hpp"
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
-#include "../util/semaphore.hpp"
+#include <realm/db.hpp>
+#include <realm/history.hpp>
+
+#include <realm/impl/simulated_failure.hpp>
 
 #include <realm/object-store/binding_context.hpp>
-#include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/keypath_helpers.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
@@ -33,23 +34,26 @@
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
-#include <realm/object-store/util/scheduler.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/util/event_loop_dispatcher.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
-#if REALM_ENABLE_SYNC
-#include <realm/object-store/sync/async_open_task.hpp>
-#include <realm/object-store/sync/impl/sync_metadata.hpp>
-#include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/subscriptions.hpp>
-#include "sync/flx_sync_harness.hpp"
-#endif
-
-#include <realm/db.hpp>
-#include <realm/history.hpp>
-#include <realm/impl/simulated_failure.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/fifo_helper.hpp>
 #include <realm/util/scope_exit.hpp>
+
+#if REALM_ENABLE_SYNC
+#include <util/sync/flx_sync_harness.hpp>
+
+#include <realm/object-store/sync/async_open_task.hpp>
+#include <realm/object-store/sync/impl/sync_metadata.hpp>
+
+#include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/subscriptions.hpp>
+#endif
+
+#include <catch2/catch_all.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include <external/json/json.hpp>
 
@@ -1189,8 +1193,9 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         task->start([&](auto ref, auto error) {
             std::lock_guard<std::mutex> lock(mutex);
             REQUIRE(error);
-            REQUIRE_EXCEPTION(std::rethrow_exception(error), HTTPError,
-                              "http error code considered fatal. Client Error: 403");
+            REQUIRE_EXCEPTION(
+                std::rethrow_exception(error), HTTPError,
+                "Unable to refresh the user access token: http error code considered fatal. Client Error: 403");
             REQUIRE(!ref);
             called = true;
         });

@@ -16,12 +16,20 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "util/test_file.hpp"
+#include <util/test_file.hpp>
 
-#include "baas_admin_api.hpp"
-#include "test_utils.hpp"
-#include "../util/crypt_key.hpp"
+#include <util/test_utils.hpp>
+#include <util/sync/baas_admin_api.hpp>
+
+#include <../util/crypt_key.hpp>
+
+#include <realm/db.hpp>
+#include <realm/disable_sync_to_disk.hpp>
+#include <realm/history.hpp>
+#include <realm/string_data.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/util/base64.hpp>
+#include <realm/util/file.hpp>
 
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/sync_manager.hpp>
@@ -29,13 +37,6 @@
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/schema.hpp>
 #endif
-
-#include <realm/db.hpp>
-#include <realm/disable_sync_to_disk.hpp>
-#include <realm/history.hpp>
-#include <realm/string_data.hpp>
-#include <realm/util/base64.hpp>
-#include <realm/util/file.hpp>
 
 #include <cstdlib>
 #include <iostream>
@@ -146,7 +147,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<SyncUser> user, bson::Bson partition,
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
         util::format(std::cerr, "An unexpected sync error was caught by the default SyncTestFile handler: '%1'\n",
-                     error.what());
+                     error.status);
         abort();
     };
     schema_version = 1;
@@ -175,7 +176,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema 
     sync_config->error_handler = [](std::shared_ptr<SyncSession> session, SyncError error) {
         util::format(std::cerr,
                      "An unexpected sync error was caught by the default SyncTestFile handler: '%1' for '%2'",
-                     error.what(), session->path());
+                     error.status, session->path());
         abort();
     };
     schema_version = 1;
