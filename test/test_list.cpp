@@ -883,20 +883,29 @@ TEST(List_Nested_InMixed)
       ]
     }
     */
+    std::string message;
     CHECK_EQUAL(list2->get(1), Mixed("Hello"));
     tr->promote_to_write();
     list2->remove(1);
     CHECK_EQUAL(dict2->get("Hello"), Mixed("World"));
     obj.set(col_any, Mixed());
     CHECK_EQUAL(dict->size(), 0);
-    CHECK_THROW_ANY(dict->insert("Five", 5)); // This dictionary ceased to be
+    CHECK_THROW_ANY_GET_MESSAGE(dict->insert("Five", 5), message); // This dictionary ceased to be
+    CHECK_EQUAL(message, "This is an ex-dictionary");
+    CHECK_THROW_ANY_GET_MESSAGE(dict->get("Five"), message);
+    CHECK_EQUAL(message, "This is an ex-dictionary");
 
     obj.set_collection(col_any, CollectionType::List);
     auto list3 = obj.get_list_ptr<Mixed>(col_any);
     list3->add(5);
     obj.set(col_any, Mixed());
     CHECK_EQUAL(list3->size(), 0);
-    CHECK_THROW_ANY(list3->add(42));
+    CHECK_THROW_ANY_GET_MESSAGE(list3->add(42), message);
+    CHECK_EQUAL(message, "This is an ex-list");
+    CHECK_THROW_ANY_GET_MESSAGE(list3->insert(5, 42), message);
+    CHECK_EQUAL(message, "This is an ex-list");
+    CHECK_THROW_ANY_GET_MESSAGE(list3->get(5), message);
+    CHECK_EQUAL(message, "This is an ex-list");
     tr->verify();
     obj.set_json(col_any,
                  "[{\"Seven\":7, \"Six\":6}, \"Hello\", {\"Points\": [1.25, 4.5, 6.75], \"Hello\": \"World\"}]");

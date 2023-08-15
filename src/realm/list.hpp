@@ -480,9 +480,8 @@ public:
     void ensure_created()
     {
         if (Base::should_update() || !(m_tree && m_tree->is_attached())) {
-            if (!init_from_parent(true)) {
-                throw IllegalOperation("This is an ex-list");
-            }
+            init_from_parent(true);
+            ensure_attached();
             Base::update_content_version();
         }
     }
@@ -623,9 +622,16 @@ private:
             return Mixed{};
         return value;
     }
+    void ensure_attached() const
+    {
+        if (!m_tree->is_attached()) {
+            throw IllegalOperation("This is an ex-list");
+        }
+    }
     Mixed do_get(size_t ndx, const char* msg) const
     {
         const auto current_size = size();
+        ensure_attached();
         CollectionBase::validate_index(msg, ndx, current_size);
 
         return unresolved_to_null(m_tree->get(ndx));
