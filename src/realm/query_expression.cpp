@@ -510,10 +510,11 @@ void LinkCount::evaluate(size_t index, ValueBase& destination)
         auto sz = links.size();
 
         if (sz == 0) {
-            destination.init(true, 0);
+            destination = Value<int64_t>(0);
         }
         else {
-            destination.init(true, sz);
+            constexpr bool from_list = true;
+            destination.init(from_list, sz);
             Allocator& alloc = m_link_map.get_target_table()->get_alloc();
             for (size_t i = 0; i < sz; i++) {
                 const Obj obj = m_link_map.get_target_table()->get_object(links[i]);

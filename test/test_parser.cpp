@@ -3286,6 +3286,8 @@ TEST(Parser_BacklinkCount)
     verify_query(test_context, items, "@links.@count == 13", 1);
     verify_query(test_context, items, "@links.@count == 13 && item_id == 5", 1);
 
+    verify_query(test_context, items, "self.@links.Items.self.@size == 0", 1);
+
     // @size is still a synonym to @count
     verify_query(test_context, items, "@links.@size == 0", 1);
     verify_query(test_context, items, "@links.@size == 0 && item_id == 20", 1);

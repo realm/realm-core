@@ -5,6 +5,7 @@
 
 ### Fixed
 * Made binding a `sync::Session` exception safe so if a `MultipleSyncAgents` exception is thrown you can safely tear down the sync client. ([PR #6868](https://github.com/realm/realm-core/pull/6868), since v13.4.1)
+* Fixed an incorrect query result when searching for zero elements across more than one link. ([#6878](https://github.com/realm/realm-core/issues/6878), since v13.17.2)
 
 ### Breaking changes
 * The `WebSocketObserver` interface in the sync `SocketProvider` API now takes a `WebSocketError` enum/`std::string_view` for the `websocket_closed_handler()` instead of a `Status`. Implementers of platform networking should make sure all their error handling is expressed in terms of the WebSocketError enum. ([PR #6859](https://github.com/realm/realm-core/pull/6859))

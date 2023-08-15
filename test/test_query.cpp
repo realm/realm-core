@@ -5651,13 +5651,15 @@ TEST(Query_NestedLinkCount)
     o3.get_linklist("children").add(o2.get_key());
 
     auto q = table->query("children.list.@size == 0");
-    CHECK_EQUAL(q.count(), 2);
+    CHECK_EQUAL(q.count(), 3); // all lists are empty
 
     q = table->query("@links.TestClass.children.dictionary.@size == 0");
-    CHECK_EQUAL(q.count(), 1); // Only o2
+    CHECK_EQUAL(q.count(), 2); // o2, o3
+    q = table->query("@links.TestClass.children.dictionary.@size > 0");
+    CHECK_EQUAL(q.count(), 1); // o1
 
     q = table->query("@links.TestClass.children.list.@size == 0");
-    CHECK_EQUAL(q.count(), 2);
+    CHECK_EQUAL(q.count(), 3); // all lists are empty
 
     o3.get_dictionary("dictionary").insert("key", o1);
     auto list = o3.get_linklist("list");
