@@ -14,6 +14,7 @@
 * `ProtocolError` is no longer a `std::error_code` enum and is no longer directly exposed by the sync error API ([PR #6869](https://github.com/realm/realm-core/pull/6869))
 * The ClientError enum/`std::error_code` in the sync client has been removed in favor of a simplified error set using Status/ErrorCodes ([PR #6846](https://github.com/realm/realm-core/pull/6846)).
 * SyncError now contains a Status to hold the error information from the sync client instead of a `std::error_code`/`std::string` ([PR #6824](https://github.com/realm/realm-core/pull/6824)).
+* C API: return whether or not an error is present from realm_get_async_error() ([#6897](https://github.com/realm/realm-core/issues/6897))
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.

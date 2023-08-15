@@ -485,6 +485,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
         realm_error_t err;
         CHECK(realm_get_async_error(async_err, &err));
+        CHECK_FALSE(realm_get_async_error(nullptr, &err));
 
         CHECK(err.error == RLM_ERR_RUNTIME);
         CHECK(std::string{err.message} == "Synthetic error");
