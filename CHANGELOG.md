@@ -5,8 +5,7 @@
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Serialization of large offsets from epoch fixed. ((PR [#6893](https://github.com/realm/realm-core/pull/6893))
 
 ### Breaking changes
 * None.
