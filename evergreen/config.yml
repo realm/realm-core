@@ -1,3 +1,13 @@
+# Evergreen CI config script for the Realm Core codebase
+# Run types:
+# * Pull Requests:
+#   * add the "for_pull_requests" tag to the task to run for pull requests
+# * Nightly Builds:
+#   * Add the '"for_nightly_tests"'' tag to the task for the "nightly_tests" alias to work
+#   * Add the 'activate: false' setting to the task under the build variant for each task to run during the nightly test runs
+# * Commit Builds:
+#   * All other tasks will be included in the set run when a PR is merged to master
+
 # Some tests take up to 4 hours to run, so give a very generous timeout project-wide, but generally try to complete tasks within 30 minutes.
 exec_timeout_secs: 14400
 
@@ -654,7 +664,8 @@ tasks:
       script: ../tools/run-tests-on-exfat.sh
 
 - name: valgrind
-  exec_timeout_secs: 18000
+  exec_timeout_secs: 14400
+  tags: [ "for_nightly_tests" ]
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -773,6 +784,7 @@ tasks:
       display_name: bloaty-results
 
 - name: long-running-core-tests
+  tags: [ "for_nightly_tests" ]
   commands:
   - func: "run tests"
     # The long-running tests can take a really long time on Windows, so we give the test up to 4
@@ -1002,6 +1014,7 @@ tasks:
         exit 1
 
 - name: fuzzer
+  tags: [ "for_nightly_tests" ]
   commands:
   - command: shell.exec
     params:
@@ -1022,19 +1035,6 @@ task_groups:
   - func: "run hang analyzer"
   tasks:
   - core-tests
-
-- name: core_sync_tests_group
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  teardown_task:
-  - func: "upload test results"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - compile
-  - .test_suite
 
 # Runs object-store-tests against baas running on remote host
 - name: compile_test_and_package
@@ -1158,7 +1158,7 @@ buildvariants:
   - name: lint
     distros:
     - ubuntu2204-small
-  - name: core_sync_tests_group
+  - name: compile_test
 
 - name: ubuntu2004-no-session-multiplexing
   display_name: "Ubuntu 20.04 x86_64 (Sync Multiplexing Disabled)"
@@ -1230,6 +1230,7 @@ buildvariants:
     distros:
     - ubuntu2004-large
   - name: long-running-tests
+    activate: false
   - name: bloaty
 
 - name: ubuntu2004-asan
@@ -1296,8 +1297,7 @@ buildvariants:
     enable_fuzzer: On
   tasks:
   - name: fuzzer-tests
-    cron: "@daily"
-    patchable: true
+    activate: false
 
 - name: rhel70
   display_name: "RHEL 7 x86_64"
@@ -1315,7 +1315,7 @@ buildvariants:
   - name: compile_test_and_package
 
 - name: ubuntu-valgrind
-  display_name: "Ubuntu 2204 Valgrind"
+  display_name: "Ubuntu 22.04 x86_64 (Valgrind)"
   run_on: ubuntu2204-large
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
@@ -1325,6 +1325,7 @@ buildvariants:
     cmake_build_type: RelWithDebInfo
   tasks:
   - name: valgrind
+    activate: false
 
 - name: ubuntu2004-arm64
   display_name: "Ubuntu 20.04 ARM64"
