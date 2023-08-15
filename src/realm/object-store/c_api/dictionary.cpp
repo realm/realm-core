@@ -98,8 +98,7 @@ RLM_API realm_object_t* realm_dictionary_insert_embedded(realm_dictionary_t* dic
     });
 }
 
-RLM_API bool realm_dictionary_insert_collection(realm_dictionary_t* dict, realm_value_t key,
-                                                realm_collection_type_e type)
+RLM_API realm_list_t* realm_dictionary_insert_list(realm_dictionary_t* dictionary, realm_value_t key)
 {
     return wrap_err([&]() {
         if (key.type != RLM_TYPE_STRING) {
@@ -107,8 +106,34 @@ RLM_API bool realm_dictionary_insert_collection(realm_dictionary_t* dict, realm_
         }
 
         StringData k{key.string.data, key.string.size};
-        dict->insert_collection(k, *from_capi(type));
-        return true;
+        dictionary->insert_collection(k, CollectionType::List);
+        return new realm_list_t{dictionary->get_list(k)};
+    });
+}
+
+RLM_API realm_set_t* realm_dictionary_insert_set(realm_dictionary_t* dictionary, realm_value_t key)
+{
+    return wrap_err([&]() {
+        if (key.type != RLM_TYPE_STRING) {
+            throw InvalidArgument{"Only string keys are supported in dictionaries"};
+        }
+
+        StringData k{key.string.data, key.string.size};
+        dictionary->insert_collection(k, CollectionType::Set);
+        return new realm_set_t{dictionary->get_set(k)};
+    });
+}
+
+RLM_API realm_dictionary_t* realm_dictionary_insert_dictionary(realm_dictionary_t* dictionary, realm_value_t key)
+{
+    return wrap_err([&]() {
+        if (key.type != RLM_TYPE_STRING) {
+            throw InvalidArgument{"Only string keys are supported in dictionaries"};
+        }
+
+        StringData k{key.string.data, key.string.size};
+        dictionary->insert_collection(k, CollectionType::Dictionary);
+        return new realm_dictionary_t{dictionary->get_dictionary(k)};
     });
 }
 
