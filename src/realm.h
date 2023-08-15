@@ -443,9 +443,10 @@ RLM_API bool realm_get_last_error(realm_error_t* err);
  *
  * @param err A pointer to a `realm_error_t` struct that will be populated with
  *            information about the error. May not be NULL.
+ * @return A bool indicating whether or not an error is available to be returned
  * @see realm_get_last_error()
  */
-RLM_API void realm_get_async_error(const realm_async_error_t* err, realm_error_t* out_err);
+RLM_API bool realm_get_async_error(const realm_async_error_t* err, realm_error_t* out_err);
 
 /**
  * Convert the last error to `realm_async_error_t`, which can safely be passed

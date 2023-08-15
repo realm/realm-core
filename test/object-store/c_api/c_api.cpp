@@ -484,7 +484,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(async_err);
 
         realm_error_t err;
-        realm_get_async_error(async_err, &err);
+        CHECK(realm_get_async_error(async_err, &err));
 
         CHECK(err.error == RLM_ERR_RUNTIME);
         CHECK(std::string{err.message} == "Synthetic error");
@@ -493,7 +493,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             auto cloned = clone_cptr(async_err);
             CHECK(realm_equals(async_err, cloned.get()));
             realm_error_t err2;
-            realm_get_async_error(cloned.get(), &err2);
+            CHECK(realm_get_async_error(cloned.get(), &err2));
             CHECK(err2.error == RLM_ERR_RUNTIME);
             CHECK(std::string{err2.message} == "Synthetic error");
         }
@@ -5044,9 +5044,7 @@ static void task_completion_func(void* p, realm_thread_safe_reference_t* realm,
     auto userdata_p = static_cast<Userdata*>(p);
 
     userdata_p->realm_ref = realm;
-    userdata_p->has_error = async_error != nullptr;
-    if (userdata_p->has_error)
-        realm_get_async_error(async_error, &userdata_p->error);
+    userdata_p->has_error = realm_get_async_error(async_error, &userdata_p->error);
     userdata_p->called = true;
 }
 
