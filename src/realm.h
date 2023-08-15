@@ -67,6 +67,7 @@ typedef bool (*realm_on_object_store_error_callback_t)(realm_userdata_t userdata
 
 /* Accessor types */
 typedef struct realm_object realm_object_t;
+
 typedef struct realm_list realm_list_t;
 typedef struct realm_set realm_set_t;
 typedef struct realm_dictionary realm_dictionary_t;
@@ -1785,13 +1786,15 @@ RLM_API bool realm_list_set(realm_list_t*, size_t index, realm_value_t value);
 RLM_API bool realm_list_insert(realm_list_t*, size_t index, realm_value_t value);
 
 /**
- * Insert a collection inside a list (only available for mixed properities)
+ * Insert a collection inside a list (only available for mixed types)
  *
- * @param list valid ptr to a list where a nested collection needs to be added
+ * @param list valid ptr to a list of mixed
  * @param index position in the list where to add the collection
- * @return RLM_API
+ * @return pointer to a valid collection that has been just inserted at the index passed as argument
  */
-RLM_API bool realm_list_insert_collection(realm_list_t* list, size_t index, realm_collection_type_e);
+RLM_API realm_list_t* realm_list_insert_list(realm_list_t* list, size_t index);
+RLM_API realm_set_t* realm_list_insert_set(realm_list_t* list, size_t index);
+RLM_API realm_dictionary_t* realm_list_insert_dictionary(realm_list_t* list, size_t index);
 
 /**
  * Set a collection inside a list (only available for mixed properities).
@@ -2309,9 +2312,16 @@ RLM_API bool realm_dictionary_insert(realm_dictionary_t*, realm_value_t key, rea
 RLM_API realm_object_t* realm_dictionary_insert_embedded(realm_dictionary_t*, realm_value_t key);
 
 /**
- * Insert a nested collection
+ * Insert a collection inside a dictionary (only available for mixed types)
+ *
+ * @param dictionary valid ptr to a dictionary of mixed
+ * @param key the mixed representing a key for a dictionary (only string)
+ * @return pointer to a valid collection that has been just inserted at the key passed as argument
  */
-RLM_API bool realm_dictionary_insert_collection(realm_dictionary_t*, realm_value_t key, realm_collection_type_e);
+RLM_API realm_list_t* realm_dictionary_insert_list(realm_dictionary_t* dictionary, realm_value_t key);
+RLM_API realm_set_t* realm_dictionary_insert_set(realm_dictionary_t*, realm_value_t);
+RLM_API realm_dictionary_t* realm_dictionary_insert_dictionary(realm_dictionary_t*, realm_value_t);
+
 
 /**
  * Fetch a list from a dictionary.
