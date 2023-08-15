@@ -3562,7 +3562,8 @@ TEST_CASE("C API", "[c_api]") {
                     size_t num_deletions, num_insertions, num_modifications;
                     bool collection_cleared = false;
                     realm_collection_changes_get_num_changes(state.changes.get(), &num_deletions, &num_insertions,
-                                                             &num_modifications, &num_moves, &collection_cleared);
+                                                             &num_modifications, &num_moves, &collection_cleared,
+                                                             nullptr);
                     CHECK(num_deletions == 1);
                     CHECK(num_insertions == 2);
                     CHECK(num_modifications == 1);
@@ -3609,7 +3610,8 @@ TEST_CASE("C API", "[c_api]") {
                     });
 
                     realm_collection_changes_get_num_changes(state.changes.get(), &num_deletions, &num_insertions,
-                                                             &num_modifications, &num_moves, &collection_cleared);
+                                                             &num_modifications, &num_moves, &collection_cleared,
+                                                             nullptr);
                     CHECK(collection_cleared == true);
                 }
             }
@@ -4037,7 +4039,8 @@ TEST_CASE("C API", "[c_api]") {
                     size_t num_deletions, num_insertions, num_modifications;
                     bool collection_cleared = false;
                     realm_collection_changes_get_num_changes(state.changes.get(), &num_deletions, &num_insertions,
-                                                             &num_modifications, &num_moves, &collection_cleared);
+                                                             &num_modifications, &num_moves, &collection_cleared,
+                                                             nullptr);
                     CHECK(collection_cleared == true);
                 }
             }
@@ -4542,7 +4545,7 @@ TEST_CASE("C API", "[c_api]") {
 
                     size_t num_deletions, num_insertions, num_modifications;
                     realm_dictionary_get_changes(state.dictionary_changes.get(), &num_deletions, &num_insertions,
-                                                 &num_modifications);
+                                                 &num_modifications, nullptr);
                     CHECK(num_deletions == 1);
                     CHECK(num_insertions == 2);
                     CHECK(num_modifications == 0);
@@ -5052,7 +5055,22 @@ TEST_CASE("C API: nested collections", "[c_api]") {
     realm_value_t pk = rlm_int_val(42);
     obj1 = cptr_checked(realm_object_create_with_primary_key(realm, class_foo.key, pk));
 
+    auto write = [&](auto&& f) {
+        checked(realm_begin_write(realm));
+        f();
+        checked(realm_commit(realm));
+        checked(realm_refresh(realm, nullptr));
+    };
+
     SECTION("dictionary") {
+        struct UserData {
+            size_t deletions;
+            size_t insertions;
+            size_t modifications;
+            bool was_deleted;
+            realm_dictionary_t* dict;
+        } user_data;
+
         REQUIRE(realm_set_collection(obj1.get(), foo_any_col_key, RLM_COLLECTION_TYPE_DICTIONARY));
         realm_value_t value;
         realm_get_value(obj1.get(), foo_any_col_key, &value);
@@ -5066,8 +5084,41 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         realm_list_insert(list.get(), 0, rlm_int_val(42));
         // dict -> dict
         auto dict2 = cptr_checked(realm_dictionary_insert_dictionary(dict.get(), rlm_str_val("Hi")));
+        user_data.dict = dict2.get();
         checked(realm_dictionary_insert(dict2.get(), rlm_str_val("Nested-Hello"), rlm_str_val("Nested-World"),
                                         nullptr, nullptr));
+        checked(realm_commit(realm));
+
+        auto on_dictionary_change = [](void* data, const realm_dictionary_changes_t* changes) {
+            auto* user_data = static_cast<UserData*>(data);
+            realm_dictionary_get_changes(changes, &user_data->deletions, &user_data->insertions,
+                                         &user_data->modifications, &user_data->was_deleted);
+            if (user_data->was_deleted) {
+                CHECK(!realm_dictionary_is_valid(user_data->dict));
+            }
+        };
+        auto require_change = [&]() {
+            auto token = cptr_checked(realm_dictionary_add_notification_callback(dict2.get(), &user_data, nullptr,
+                                                                                 nullptr, on_dictionary_change));
+            checked(realm_refresh(realm, nullptr));
+            return token;
+        };
+
+        auto token = require_change();
+
+        write([&] {
+            checked(realm_dictionary_insert(dict2.get(), rlm_str_val("Nested-Godbye"),
+                                            rlm_str_val("Nested-CruelWorld"), nullptr, nullptr));
+        });
+        CHECK(user_data.insertions == 1);
+
+        write([&] {
+            realm_dictionary_insert(dict.get(), rlm_str_val("Hi"), rlm_str_val("Foo"), nullptr, nullptr);
+        });
+        CHECK(user_data.deletions == 2);
+        CHECK(user_data.was_deleted);
+
+        checked(realm_begin_write(realm));
         // dict -> set
         auto set = cptr_checked(realm_dictionary_insert_set(dict.get(), rlm_str_val("Leaf-Set")));
         bool inserted;
@@ -5081,6 +5132,14 @@ TEST_CASE("C API: nested collections", "[c_api]") {
     }
 
     SECTION("list") {
+        struct UserData {
+            size_t deletions;
+            size_t insertions;
+            size_t modifications;
+            bool was_deleted;
+            realm_list_t* list;
+        } user_data;
+
         REQUIRE(realm_set_collection(obj1.get(), foo_any_col_key, RLM_COLLECTION_TYPE_LIST));
         realm_value_t value;
         realm_get_value(obj1.get(), foo_any_col_key, &value);
@@ -5093,9 +5152,42 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         checked(realm_dictionary_insert(dict.get(), rlm_str_val("Hello"), rlm_str_val("world"), nullptr, nullptr));
         // list -> list
         auto list2 = cptr_checked(realm_list_insert_list(list.get(), 2));
-        realm_list_insert(list2.get(), 0, rlm_str_val("Nested-Hello"));
-        realm_list_insert(list2.get(), 1, rlm_str_val("Nested-World"));
+        user_data.list = list2.get();
+
+        checked(realm_commit(realm));
+
+        auto on_list_change = [](void* data, const realm_collection_changes_t* changes) {
+            auto* user_data = static_cast<UserData*>(data);
+            realm_collection_changes_get_num_changes(changes, &user_data->deletions, &user_data->insertions,
+                                                     &user_data->modifications, nullptr, nullptr,
+                                                     &user_data->was_deleted);
+            if (user_data->was_deleted) {
+                CHECK(!realm_list_is_valid(user_data->list));
+            }
+        };
+        auto require_change = [&]() {
+            auto token = cptr_checked(
+                realm_list_add_notification_callback(list2.get(), &user_data, nullptr, nullptr, on_list_change));
+            checked(realm_refresh(realm, nullptr));
+            return token;
+        };
+
+        auto token = require_change();
+
+        write([&] {
+            realm_list_insert(list2.get(), 0, rlm_str_val("Nested-Hello"));
+            realm_list_insert(list2.get(), 1, rlm_str_val("Nested-World"));
+        });
+        CHECK(user_data.insertions == 2);
+
+        write([&] {
+            realm_list_set(list.get(), 2, rlm_str_val("Foo"));
+        });
+        CHECK(user_data.deletions == 2);
+        CHECK(user_data.was_deleted);
+
         // list -> set
+        checked(realm_begin_write(realm));
         auto set = cptr_checked(realm_list_insert_set(list.get(), 3));
         bool inserted;
         size_t index;

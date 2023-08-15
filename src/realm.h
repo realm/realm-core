@@ -1942,7 +1942,8 @@ RLM_API size_t realm_object_changes_get_modified_properties(const realm_object_c
  */
 RLM_API void realm_collection_changes_get_num_changes(const realm_collection_changes_t*, size_t* out_num_deletions,
                                                       size_t* out_num_insertions, size_t* out_num_modifications,
-                                                      size_t* out_num_moves, bool* out_collection_was_cleared);
+                                                      size_t* out_num_moves, bool* out_collection_was_cleared,
+                                                      bool* out_collection_was_deleted);
 
 /**
  * Get the number of various types of changes in a collection notification,
@@ -2025,7 +2026,8 @@ RLM_API void realm_collection_changes_get_ranges(
  * @param out_modification_size number of modifications
  */
 RLM_API void realm_dictionary_get_changes(const realm_dictionary_changes_t* changes, size_t* out_deletions_size,
-                                          size_t* out_insertion_size, size_t* out_modification_size);
+                                          size_t* out_insertion_size, size_t* out_modification_size,
+                                          bool* out_was_deleted);
 
 /**
  * Returns the list of keys changed for the dictionary passed as argument.
