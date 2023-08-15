@@ -5919,4 +5919,21 @@ TEST(Parser_RecursiveLogial)
     CHECK_EQUAL(q_count, 1);
 }
 
+TEST(Parser_issue6831)
+{
+    Group g;
+    auto plant = g.add_table_with_primary_key("Plant", type_ObjectId, "id");
+    plant->add_column(type_String, "Name");
+    auto inventory = g.add_table_with_primary_key("Inventory", type_String, "id");
+    inventory->add_column_dictionary(*plant, "Plants");
+
+    auto petunia = plant->create_object_with_primary_key(ObjectId::gen());
+    petunia.set("Name", "Petunia");
+    auto obj = inventory->create_object_with_primary_key("Inv");
+    auto dict = obj.get_dictionary("Plants");
+    dict.insert("Petunia", petunia);
+    auto q = inventory->query("Plants.@keys == 'Petunia'");
+    CHECK_EQUAL(q.count(), 1);
+}
+
 #endif // TEST_PARSER

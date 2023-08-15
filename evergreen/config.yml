@@ -1,3 +1,13 @@
+# Evergreen CI config script for the Realm Core codebase
+# Run types:
+# * Pull Requests:
+#   * add the "for_pull_requests" tag to the task to run for pull requests
+# * Nightly Builds:
+#   * Add the '"for_nightly_tests"'' tag to the task for the "nightly_tests" alias to work
+#   * Add the 'activate: false' setting to the task under the build variant for each task to run during the nightly test runs
+# * Commit Builds:
+#   * All other tasks will be included in the set run when a PR is merged to master
+
 # Some tests take up to 4 hours to run, so give a very generous timeout project-wide, but generally try to complete tasks within 30 minutes.
 exec_timeout_secs: 14400
 
@@ -854,7 +864,7 @@ tasks:
   commands:
   - func: "launch remote baas"
     vars:
-      baas_branch: 1a0d1c021460d2215b21bc4f7c7f668714ce81c7
+      baas_branch: 3f31617aacfe5d31b9057fc298b735b60acd6424
   - func: "compile"
     vars:
       target_to_build: ObjectStoreTests
@@ -1220,6 +1230,7 @@ buildvariants:
     distros:
     - ubuntu2004-large
   - name: long-running-tests
+    activate: false
   - name: bloaty
 
 - name: ubuntu2004-asan
@@ -1286,7 +1297,7 @@ buildvariants:
     enable_fuzzer: On
   tasks:
   - name: fuzzer-tests
-    patchable: true
+    activate: false
 
 - name: rhel70
   display_name: "RHEL 7 x86_64"
@@ -1314,6 +1325,7 @@ buildvariants:
     cmake_build_type: RelWithDebInfo
   tasks:
   - name: valgrind
+    activate: false
 
 - name: ubuntu2004-arm64
   display_name: "Ubuntu 20.04 ARM64"

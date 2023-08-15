@@ -80,8 +80,8 @@ struct StringMaker<ThreadSafeSyncError> {
         if (!value) {
             return "No SyncError";
         }
-        return realm::util::format("SyncError(%1), is_fatal: %2, with message: '%3'", value->get_system_error(),
-                                   value->is_fatal, value->reason());
+        return realm::util::format("SyncError(%1), is_fatal: %2, with message: '%3'", value->status.code_string(),
+                                   value->is_fatal, value->status.reason());
     }
 };
 } // namespace Catch
@@ -133,7 +133,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[sync][pbs][client 
     SyncTestFile realm_config(app->current_user(), partition.value, schema);
     realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        if (err.get_system_error() == util::make_error_code(util::MiscExtErrors::end_of_input)) {
+        if (err.status == ErrorCodes::ConnectionClosed) {
             return;
         }
 
@@ -142,7 +142,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[sync][pbs][client 
             return;
         }
 
-        FAIL(util::format("got error from server: %1: %2", err.get_system_error().value(), err.what()));
+        FAIL(util::format("got error from server: %1", err.status));
     };
 
     auto realm = Realm::get_shared_realm(realm_config);
@@ -228,16 +228,12 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
     SyncTestFile realm_config(app->current_user(), partition.value, schema);
     realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        if (err.get_system_error() == sync::websocket::WebSocketError::websocket_read_error) {
-            return;
-        }
-
         if (err.server_requests_action == sync::ProtocolErrorInfo::Action::Warning ||
             err.server_requests_action == sync::ProtocolErrorInfo::Action::Transient) {
             return;
         }
 
-        FAIL(util::format("got error from server: %1: %2", err.get_system_error().value(), err.what()));
+        FAIL(util::format("got error from server: %1", err.status));
     };
 
     auto realm = Realm::get_shared_realm(realm_config);
@@ -357,7 +353,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
         REQUIRE(!util::File::exists(orig_path));
         REQUIRE(util::File::exists(recovery_path));
         local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-            CAPTURE(err.reason());
+            CAPTURE(err.status);
             CAPTURE(local_config.path);
             FAIL("Error handler should not have been called");
         };
@@ -368,7 +364,7 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
 #endif
 
     local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        CAPTURE(err.reason());
+        CAPTURE(err.status);
         CAPTURE(local_config.path);
         FAIL("Error handler should not have been called");
     };
@@ -901,8 +897,8 @@ TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
                 session = test_app_session.app()->sync_manager()->get_existing_session(temp_config.path);
                 REQUIRE(session);
             }
-            sync::SessionErrorInfo synthetic(sync::make_error_code(sync::ProtocolError::bad_client_file),
-                                             "A fake client reset error", false);
+            sync::SessionErrorInfo synthetic(Status{ErrorCodes::SyncClientResetRequired, "A fake client reset error"},
+                                             sync::IsFatal{true});
             synthetic.server_requests_action = sync::ProtocolErrorInfo::Action::ClientReset;
             SyncSession::OnlyForTesting::handle_error(*session, std::move(synthetic));
 
@@ -2413,8 +2409,7 @@ struct Remove {
     util::Optional<int64_t> pk;
 };
 
-struct Clear {
-};
+struct Clear {};
 
 struct RemoveObject {
     RemoveObject(std::string_view name, util::Optional<int64_t> key)
