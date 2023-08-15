@@ -6172,7 +6172,7 @@ TEST(Query_FullTextPrefix)
     table->add_fulltext_index(col);
 
     table->create_object().set(col, "Abby Abba Ada Adalee Baylee Bellamy Blaire Adalyn");
-    table->create_object().set(col, "Abigail Barbara Beatrice Bella Blair Blake");
+    table->create_object().set(col, "Abigail Abba Barbara Beatrice Bella Blair Blake");
     table->create_object().set(col, "Adaline Bellamy Blakely");
 
     // table->get_search_index(col)->do_dump_node_structure(std::cout, 0);
@@ -6185,5 +6185,7 @@ TEST(Query_FullTextPrefix)
     CHECK_EQUAL(q.count(), 2);
     q = table->query("text TEXT 'Bellam*'");
     CHECK_EQUAL(q.count(), 2);
+    q = table->query("text TEXT 'Bel* Abba -Ada'");
+    CHECK_EQUAL(q.count(), 1);
 }
 #endif // TEST_QUERY
