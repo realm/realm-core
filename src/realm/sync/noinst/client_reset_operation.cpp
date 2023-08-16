@@ -52,6 +52,17 @@ std::string ClientResetOperation::get_fresh_path_for(const std::string& path)
     return path + fresh_suffix;
 }
 
+bool ClientResetOperation::is_fresh_path(const std::string& path)
+{
+    const std::string fresh_suffix = ".fresh";
+    const size_t suffix_len = fresh_suffix.size();
+    REALM_ASSERT(path.length());
+    if (path.size() < suffix_len) {
+        return false;
+    }
+    return path.substr(path.size() - suffix_len, suffix_len) == fresh_suffix;
+}
+
 bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident, sync::SubscriptionStore* sub_store,
                                     util::UniqueFunction<void(int64_t)> on_flx_version_complete)
 {

@@ -348,6 +348,11 @@ public:
         bool simulate_integration_error = false;
 
         std::function<SyncClientHookAction(const SyncClientHookData&)> on_sync_client_event_hook;
+
+        /// The reason this synchronization session is used for.
+        ///
+        /// Note: Currently only used in FLX sync.
+        SessionReason session_reason = SessionReason::Sync;
     };
 
     /// \brief Start a new session for the specified client-side Realm.

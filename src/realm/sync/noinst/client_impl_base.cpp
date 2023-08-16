@@ -1852,6 +1852,7 @@ void Session::send_bind_message()
         if (auto migrated_partition = get_migration_store()->get_migrated_partition()) {
             bind_json_data["migratedPartition"] = *migrated_partition;
         }
+        bind_json_data["sessionReason"] = static_cast<uint64_t>(get_session_reason());
         if (logger.would_log(util::Logger::Level::debug)) {
             std::string json_data_dump;
             if (!bind_json_data.empty()) {
