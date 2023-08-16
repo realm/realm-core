@@ -6099,7 +6099,7 @@ TEST(Query_FullTextMulti)
     CHECK_THROW_ANY(do_fulltext_find(""));
 
     // search with multiple terms
-    CHECK_EQUAL(do_fulltext_find("one three"), Keys({7, 8}));
+    CHECK_EQUAL(do_fulltext_find("ONE THREE"), Keys({7, 8}));
     CHECK_EQUAL(do_fulltext_find("three one"), Keys({7, 8}));
     CHECK_EQUAL(do_fulltext_find("1990s"), Keys({2, 4}));
     CHECK_EQUAL(do_fulltext_find("1990s c++"), Keys({4}));
@@ -6121,6 +6121,10 @@ TEST(Query_FullTextMulti)
 
     // search for combination that is not present
     CHECK_EQUAL(do_fulltext_find("object data"), Keys());
+
+    // Prefix
+    CHECK_EQUAL(do_fulltext_find("manage*"), Keys({0, 1, 4}));
+    CHECK_EQUAL(do_fulltext_find("manage* virtu*"), Keys({4}));
 
     // exclude words
     CHECK_EQUAL(do_fulltext_find("-three one"), Keys({9}));
@@ -6160,4 +6164,28 @@ TEST(Query_FullTextMulti)
     CHECK(table->get_search_index(col)->is_empty());
 }
 
+TEST(Query_FullTextPrefix)
+{
+    Group g;
+    auto table = g.add_table("table");
+    auto col = table->add_column(type_String, "text");
+    table->add_fulltext_index(col);
+
+    table->create_object().set(col, "Abby Abba Ada Adalee Baylee Bellamy Blaire Adalyn");
+    table->create_object().set(col, "Abigail Abba Barbara Beatrice Bella Blair Blake");
+    table->create_object().set(col, "Adaline Bellamy Blakely");
+
+    // table->get_search_index(col)->do_dump_node_structure(std::cout, 0);
+
+    auto q = table->query("text TEXT 'ab*'");
+    CHECK_EQUAL(q.count(), 2);
+    q = table->query("text TEXT 'Bel*'");
+    CHECK_EQUAL(q.count(), 3);
+    q = table->query("text TEXT 'Blak*'");
+    CHECK_EQUAL(q.count(), 2);
+    q = table->query("text TEXT 'Bellam*'");
+    CHECK_EQUAL(q.count(), 2);
+    q = table->query("text TEXT 'Bel* Abba -Ada'");
+    CHECK_EQUAL(q.count(), 1);
+}
 #endif // TEST_QUERY
