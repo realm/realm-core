@@ -374,7 +374,6 @@ private:
         CHECK(nlohmann::json::parse(request.body)["options"] ==
               nlohmann::json({{"device",
                                {{"appId", "app_id_123"},
-                                {"appVersion", "some_app_version"},
                                 {"platform", util::get_library_platform()},
                                 {"platformVersion", "some_platform_version"},
                                 {"sdk", "some_sdk_name"},
@@ -657,12 +656,6 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
         realm_app_config_set_base_url(app_config.get(), "https://path/to/app");
         CHECK(app_config->base_url == "https://path/to/app");
-
-        realm_app_config_set_local_app_name(app_config.get(), "some_app_name");
-        CHECK(app_config->local_app_name == "some_app_name");
-
-        realm_app_config_set_local_app_version(app_config.get(), "some_app_version");
-        CHECK(app_config->local_app_version == "some_app_version");
 
         realm_app_config_set_default_request_timeout(app_config.get(), request_timeout);
         CHECK(app_config->default_request_timeout_ms == request_timeout);

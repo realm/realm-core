@@ -291,8 +291,6 @@ inline app::App::Config get_config(Factory factory, const AppSession& app_sessio
             factory,
             app_session.config.app_url,
             util::none,
-            util::Optional<std::string>("A Local App Version"),
-            util::none,
             {"Object Store Platform Version Blah", "An sdk version", "An sdk name", "A device name",
              "A device version", "A framework name", "A framework version", "A bundle id"}};
 }
