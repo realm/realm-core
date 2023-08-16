@@ -1,6 +1,8 @@
 # NEXT RELEASE
 
 ### Enhancements
+* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* Full text search supports searching for prefix only. Eg. "description TEXT 'alex*'" ([#6860](https://github.com/realm/realm-core/issues/6860))
 * Unknown protocol errors received from the baas server will no longer cause the application to crash if a valid error action is also received. Unknown error actions will be treated as an ApplicationBug error action and will cause sync to fail with an error via the sync error handler. [PR #6885](https://github.com/realm/realm-core/pull/6885))
 
 ### Fixed
@@ -14,6 +16,7 @@
 * `ProtocolError` is no longer a `std::error_code` enum and is no longer directly exposed by the sync error API ([PR #6869](https://github.com/realm/realm-core/pull/6869))
 * The ClientError enum/`std::error_code` in the sync client has been removed in favor of a simplified error set using Status/ErrorCodes ([PR #6846](https://github.com/realm/realm-core/pull/6846)).
 * SyncError now contains a Status to hold the error information from the sync client instead of a `std::error_code`/`std::string` ([PR #6824](https://github.com/realm/realm-core/pull/6824)).
+* Remove App::Config::local_app_[name|version] parameters. They were not used by the server and were not needed internally also.
 * C API: return whether or not an error is present from realm_get_async_error() ([#6897](https://github.com/realm/realm-core/issues/6897))
 
 ### Compatibility
@@ -149,7 +152,7 @@
 * None.
 
 ### Fixed
-* A GeoBox is now just a shortcut for the equivilent GeoPolygon. This provides consistent query results and error checking. ([#6703](https://github.com/realm/realm-core/issues/6703), since v13.11.0) 
+* A GeoBox is now just a shortcut for the equivilent GeoPolygon. This provides consistent query results and error checking. ([#6703](https://github.com/realm/realm-core/issues/6703), since v13.11.0)
 * Fixed several corner cases (eg. around the poles) where invalid points matched a geoWithin query.
 * Disallow full text search index for primary key columns. ([#6657](https://github.com/realm/realm-core/issues/6657), since v13.2.0)
 * Searching for objects in Results would not always find the requested item. This is particularly the case when the C API is used. ([#6695](https://github.com/realm/realm-core/issues/6695), since v10.0.0)
