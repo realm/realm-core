@@ -1642,7 +1642,9 @@ RLM_API realm_object_t* realm_set_embedded(realm_object_t*, realm_property_key_t
  * Create a collection in a given Mixed property.
  *
  */
-RLM_API bool realm_set_collection(realm_object_t*, realm_property_key_t, realm_collection_type_e);
+RLM_API bool realm_set_list(realm_object_t*, realm_property_key_t);
+RLM_API bool realm_set_set(realm_object_t*, realm_property_key_t);
+RLM_API bool realm_set_dictionary(realm_object_t*, realm_property_key_t);
 
 /** Return the object linked by the given property
  *
@@ -1797,15 +1799,17 @@ RLM_API realm_set_t* realm_list_insert_set(realm_list_t* list, size_t index);
 RLM_API realm_dictionary_t* realm_list_insert_dictionary(realm_list_t* list, size_t index);
 
 /**
- * Set a collection inside a list (only available for mixed properities).
+ * Set a collection inside a list (only available for mixed types).
  * If the list already contains a collection of the requested type, the
  * operation is idempotent.
  *
  * @param list valid ptr to a list where a nested collection needs to be set
  * @param index position in the list where to set the collection
- * @return RLM_API
+ * @return a valid ptr representing the collection just set
  */
-RLM_API bool realm_list_set_collection(realm_list_t* list, size_t index, realm_collection_type_e);
+RLM_API realm_list_t* realm_list_set_list(realm_list_t* list, size_t index);
+RLM_API realm_set_t* realm_list_set_set(realm_list_t* list, size_t index);
+RLM_API realm_dictionary_t* realm_list_set_dictionary(realm_list_t* list, size_t index);
 
 /**
  * Returns a nested list if such collection exists, NULL otherwise.

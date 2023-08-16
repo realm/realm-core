@@ -5071,7 +5071,7 @@ TEST_CASE("C API: nested collections", "[c_api]") {
             realm_dictionary_t* dict;
         } user_data;
 
-        REQUIRE(realm_set_collection(obj1.get(), foo_any_col_key, RLM_COLLECTION_TYPE_DICTIONARY));
+        REQUIRE(realm_set_dictionary(obj1.get(), foo_any_col_key));
         realm_value_t value;
         realm_get_value(obj1.get(), foo_any_col_key, &value);
         REQUIRE(value.type == RLM_TYPE_DICTIONARY);
@@ -5140,7 +5140,7 @@ TEST_CASE("C API: nested collections", "[c_api]") {
             realm_list_t* list;
         } user_data;
 
-        REQUIRE(realm_set_collection(obj1.get(), foo_any_col_key, RLM_COLLECTION_TYPE_LIST));
+        REQUIRE(realm_set_list(obj1.get(), foo_any_col_key));
         realm_value_t value;
         realm_get_value(obj1.get(), foo_any_col_key, &value);
         REQUIRE(value.type == RLM_TYPE_LIST);
@@ -5200,7 +5200,7 @@ TEST_CASE("C API: nested collections", "[c_api]") {
     }
 
     SECTION("set list for collection in mixed, verify that previous reference is invalid") {
-        REQUIRE(realm_set_collection(obj1.get(), foo_any_col_key, RLM_COLLECTION_TYPE_LIST));
+        REQUIRE(realm_set_list(obj1.get(), foo_any_col_key));
         realm_value_t value;
         realm_get_value(obj1.get(), foo_any_col_key, &value);
         REQUIRE(value.type == RLM_TYPE_LIST);
@@ -5210,12 +5210,12 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         checked(realm_list_size(list.get(), &size));
         REQUIRE(size == 1);
         realm_list_insert(n_list.get(), 0, rlm_str_val("Test1"));
-        realm_list_set_collection(list.get(), 0, RLM_COLLECTION_TYPE_DICTIONARY);
+        auto n_dict = cptr_checked(realm_list_set_dictionary(list.get(), 0));
         // accessor has become invalid
         REQUIRE(!realm_list_insert(n_list.get(), 1, rlm_str_val("Test2")));
         CHECK_ERR(RLM_ERR_INVALIDATED_OBJECT);
         // try to get a dictionary should work
-        auto n_dict = cptr_checked(realm_list_get_dictionary(list.get(), 0));
+        n_dict = cptr_checked(realm_list_get_dictionary(list.get(), 0));
         bool inserted = false;
         size_t ndx;
         realm_value_t key = rlm_str_val("key");
@@ -5223,15 +5223,15 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         REQUIRE(realm_dictionary_insert(n_dict.get(), key, val, &ndx, &inserted));
         REQUIRE(ndx == 0);
         REQUIRE(inserted);
-        realm_list_set_collection(list.get(), 0, RLM_COLLECTION_TYPE_SET);
+        auto n_set = cptr_checked(realm_list_set_set(list.get(), 0));
         // accessor invalid
         REQUIRE(!realm_dictionary_insert(n_dict.get(), key, val, &ndx, &inserted));
         CHECK_ERR(RLM_ERR_INVALIDATED_OBJECT);
-        auto n_set = cptr_checked(realm_list_get_set(list.get(), 0));
+        n_set = cptr_checked(realm_list_get_set(list.get(), 0));
         REQUIRE(realm_set_insert(n_set.get(), val, &ndx, &inserted));
         REQUIRE(ndx == 0);
         REQUIRE(inserted);
-        realm_list_set_collection(list.get(), 0, RLM_COLLECTION_TYPE_LIST);
+        n_list = cptr_checked(realm_list_set_list(list.get(), 0));
         // accessor invalid
         REQUIRE(!realm_set_insert(n_set.get(), val, &ndx, &inserted));
         CHECK_ERR(RLM_ERR_INVALIDATED_OBJECT);
@@ -5239,7 +5239,7 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         n_list = cptr_checked(realm_list_get_list(list.get(), 0));
         REQUIRE(realm_list_insert(n_list.get(), 0, rlm_str_val("Test1")));
         // reset the collection type to the same type (nop)
-        realm_list_set_collection(list.get(), 0, RLM_COLLECTION_TYPE_LIST);
+        n_list = cptr_checked(realm_list_set_list(list.get(), 0));
         // accessor is still valid
         REQUIRE(realm_list_insert(n_list.get(), 0, rlm_str_val("Test2")));
         checked(realm_list_size(n_list.get(), &size));
@@ -5247,7 +5247,7 @@ TEST_CASE("C API: nested collections", "[c_api]") {
     }
 
     SECTION("set") {
-        REQUIRE(realm_set_collection(obj1.get(), foo_any_col_key, RLM_COLLECTION_TYPE_SET));
+        REQUIRE(realm_set_set(obj1.get(), foo_any_col_key));
         realm_value_t value;
         realm_get_value(obj1.get(), foo_any_col_key, &value);
         REQUIRE(value.type == RLM_TYPE_SET);

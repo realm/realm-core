@@ -337,11 +337,29 @@ RLM_API realm_object_t* realm_set_embedded(realm_object_t* obj, realm_property_k
     });
 }
 
-RLM_API bool realm_set_collection(realm_object_t* obj, realm_property_key_t col, realm_collection_type_e type)
+RLM_API bool realm_set_list(realm_object_t* obj, realm_property_key_t col)
 {
     return wrap_err([&]() {
         obj->verify_attached();
-        obj->get_obj().set_collection(ColKey(col), *from_capi(type));
+        obj->get_obj().set_collection(ColKey(col), CollectionType::List);
+        return true;
+    });
+}
+
+RLM_API bool realm_set_set(realm_object_t* obj, realm_property_key_t col)
+{
+    return wrap_err([&]() {
+        obj->verify_attached();
+        obj->get_obj().set_collection(ColKey(col), CollectionType::Set);
+        return true;
+    });
+}
+
+RLM_API bool realm_set_dictionary(realm_object_t* obj, realm_property_key_t col)
+{
+    return wrap_err([&]() {
+        obj->verify_attached();
+        obj->get_obj().set_collection(ColKey(col), CollectionType::Dictionary);
         return true;
     });
 }
