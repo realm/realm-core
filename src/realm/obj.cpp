@@ -1698,11 +1698,10 @@ INSTANTIATE_OBJ_SET(BinaryData);
 INSTANTIATE_OBJ_SET(ObjectId);
 INSTANTIATE_OBJ_SET(UUID);
 
-void Obj::set_int(ColKey col_key, int64_t value)
+void Obj::set_int(ColKey::Idx col_ndx, int64_t value)
 {
     update_if_needed();
 
-    ColKey::Idx col_ndx = col_key.get_index();
     Allocator& alloc = get_alloc();
     alloc.bump_content_version();
     Array fallback(alloc);
@@ -1716,11 +1715,10 @@ void Obj::set_int(ColKey col_key, int64_t value)
     sync(fields);
 }
 
-void Obj::set_ref(ColKey col_key, ref_type value, CollectionType type)
+void Obj::set_ref(ColKey::Idx col_ndx, ref_type value, CollectionType type)
 {
     update_if_needed();
 
-    ColKey::Idx col_ndx = col_key.get_index();
     Allocator& alloc = get_alloc();
     alloc.bump_content_version();
     Array fallback(alloc);

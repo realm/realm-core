@@ -404,8 +404,8 @@ private:
         return _get_linked_object(get_column_key(link_col_name), link);
     }
 
-    void set_int(ColKey col_key, int64_t value);
-    void set_ref(ColKey col_key, ref_type value, CollectionType type);
+    void set_int(ColKey::Idx col_ndx, int64_t value);
+    void set_ref(ColKey::Idx col_ndx, ref_type value, CollectionType type);
     void add_backlink(ColKey backlink_col, ObjKey origin_key);
     bool remove_one_backlink(ColKey backlink_col, ObjKey origin_key);
     void nullify_link(ColKey origin_col, ObjLink target_key) &&;

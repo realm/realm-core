@@ -1161,15 +1161,14 @@ void Dictionary::to_json(std::ostream& out, size_t link_depth, JSONOutputMode ou
 ref_type Dictionary::get_collection_ref(Index index, CollectionType type) const
 {
     auto ndx = do_find_key(StringData(mpark::get<std::string>(index)));
-    if (ndx != realm::not_found) {
-        auto val = m_values->get(ndx);
-        if (!val.is_type(DataType(int(type)))) {
-            throw IllegalOperation("Not proper collection type");
-        }
-        return val.get_ref();
+    if (ndx == realm::not_found) {
+        throw IllegalOperation("This collection has run down the curtain");
     }
-
-    return 0;
+    auto val = m_values->get(ndx);
+    if (!val.is_type(DataType(int(type)))) {
+        throw IllegalOperation("Not proper collection type");
+    }
+    return val.get_ref();
 }
 
 bool Dictionary::check_collection_ref(Index index, CollectionType type) const noexcept

@@ -6154,9 +6154,7 @@ TEST(Sync_Dictionary)
     }
 }
 
-constexpr bool SYNC_SUPPORTS_NESTED_COLLECTIONS = false;
-
-TEST_IF(Sync_CollectionInMixed, SYNC_SUPPORTS_NESTED_COLLECTIONS)
+TEST_IF(Sync_CollectionInMixed, sync::SYNC_SUPPORTS_NESTED_COLLECTIONS)
 {
     TEST_CLIENT_DB(db_1);
     TEST_CLIENT_DB(db_2);
