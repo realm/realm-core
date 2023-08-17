@@ -305,7 +305,7 @@ bool Lst<Mixed>::init_from_parent(bool allow_create) const
             REALM_ASSERT(m_tree->is_attached());
         }
     }
-    catch (...) {
+    catch (const StaleAccessor&) {
         m_tree->detach();
         return false;
     }
@@ -694,14 +694,15 @@ void Lst<Mixed>::to_json(std::ostream& out, size_t link_depth, JSONOutputMode ou
 ref_type Lst<Mixed>::get_collection_ref(Index index, CollectionType type) const
 {
     auto ndx = m_tree->find_key(mpark::get<int64_t>(index));
-    if (ndx == realm::not_found) {
-        throw IllegalOperation("This collection is no more");
+    if (ndx != realm::not_found) {
+        auto val = get(ndx);
+        if (val.is_type(DataType(int(type)))) {
+            return val.get_ref();
+        }
     }
-    auto val = get(ndx);
-    if (!val.is_type(DataType(int(type)))) {
-        throw IllegalOperation("Not proper collection type");
-    }
-    return val.get_ref();
+    // This exception should never escape to the application
+    throw StaleAccessor("This collection is no more");
+    return 0;
 }
 
 bool Lst<Mixed>::check_collection_ref(Index index, CollectionType type) const noexcept

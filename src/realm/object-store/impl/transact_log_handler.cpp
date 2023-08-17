@@ -86,8 +86,8 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
     for (auto& tbl : tables_needed)
         tables[tbl] = {};
     for (auto& list : m_lists)
-        collections.push_back(
-            {list.observer->table_key, list.observer->obj_key, StablePath{{list.col_key}}, &list.builder});
+        collections.push_back({list.observer->table_key, list.observer->obj_key,
+                               StablePath{{ColIndex(list.col_key, 0)}}, &list.builder});
 }
 
 void KVOAdapter::before(Transaction& sg)

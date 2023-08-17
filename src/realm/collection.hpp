@@ -511,7 +511,7 @@ public:
     {
         m_obj_mem = obj;
         m_parent = &m_obj_mem;
-        m_index = ck;
+        m_index = obj.build_index(ck);
         if (obj) {
             m_alloc = &obj.get_alloc();
         }
@@ -573,7 +573,7 @@ protected:
 
     CollectionBaseImpl(const Obj& obj, ColKey col_key) noexcept
         : m_obj_mem(obj)
-        , m_index(col_key)
+        , m_index(obj.build_index(col_key))
         , m_col_key(col_key)
         , m_nullable(col_key.is_nullable())
         , m_parent(&m_obj_mem)

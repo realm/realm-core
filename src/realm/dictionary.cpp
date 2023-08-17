@@ -885,7 +885,7 @@ bool Dictionary::init_from_parent(bool allow_create) const
 
         return true;
     }
-    catch (...) {
+    catch (const StaleAccessor&) {
         m_dictionary_top.reset();
         return false;
     }
@@ -1161,14 +1161,15 @@ void Dictionary::to_json(std::ostream& out, size_t link_depth, JSONOutputMode ou
 ref_type Dictionary::get_collection_ref(Index index, CollectionType type) const
 {
     auto ndx = do_find_key(StringData(mpark::get<std::string>(index)));
-    if (ndx == realm::not_found) {
-        throw IllegalOperation("This collection has run down the curtain");
+    if (ndx != realm::not_found) {
+        auto val = m_values->get(ndx);
+        if (val.is_type(DataType(int(type)))) {
+            return val.get_ref();
+        }
     }
-    auto val = m_values->get(ndx);
-    if (!val.is_type(DataType(int(type)))) {
-        throw IllegalOperation("Not proper collection type");
-    }
-    return val.get_ref();
+    // This exception should never escape to the application
+    throw StaleAccessor("This collection has run down the curtain");
+    return 0;
 }
 
 bool Dictionary::check_collection_ref(Index index, CollectionType type) const noexcept

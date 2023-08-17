@@ -906,10 +906,14 @@ TEST(List_Nested_InMixed)
     CHECK_EQUAL(message, "This is an ex-list");
     CHECK_THROW_ANY_GET_MESSAGE(list3->get(5), message);
     CHECK_EQUAL(message, "This is an ex-list");
+    // Try creating a new list. list3 should still be stale
+    obj.set_collection(col_any, CollectionType::List);
+    CHECK_THROW_ANY_GET_MESSAGE(list3->add(42), message);
+    CHECK_EQUAL(message, "This is an ex-list");
     tr->verify();
     obj.set_json(col_any,
                  "[{\"Seven\":7, \"Six\":6}, \"Hello\", {\"Points\": [1.25, 4.5, 6.75], \"Hello\": \"World\"}]");
-    CHECK_EQUAL(list3->size(), 3);
+    CHECK_EQUAL(obj.get_list_ptr<Mixed>(col_any)->size(), 3);
     // tr->to_json(std::cout);
 }
 

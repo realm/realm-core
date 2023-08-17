@@ -90,6 +90,8 @@ public:
     ref_type get_collection_ref(Index, CollectionType) const final;
     bool check_collection_ref(Index, CollectionType) const noexcept final;
     void set_collection_ref(Index, ref_type, CollectionType) final;
+    ColIndex build_index(ColKey) const;
+    bool check_index(ColIndex) const;
 
     // Operator overloads
     bool operator==(const Obj& other) const;

@@ -205,7 +205,7 @@ void CollectionList::add_index(Path& path, Index index) const noexcept
 
 ref_type CollectionList::get_child_ref(size_t) const noexcept
 {
-    return m_parent->get_collection_ref(m_col_key, m_coll_type);
+    return m_parent->get_collection_ref(m_index, m_coll_type);
 }
 
 void CollectionList::update_child_ref(size_t, ref_type ref)
