@@ -244,7 +244,7 @@ public:
                 connection.receive_error_message(sync::ProtocolErrorInfo{error_code, message, is_fatal},
                                                  session_ident); // Throws
             }
-            else if (message_type == "log_message") { // introduced in protocol 8
+            else if (message_type == "log_message") { // introduced in protocol version 10
                 auto session_ident = msg.read_next<session_ident_type>();
                 auto message_length = msg.read_next<size_t>('\n');
                 auto message_body_str = msg.read_sized_data<std::string_view>(message_length);
@@ -253,7 +253,8 @@ public:
                     message_body = nlohmann::json::parse(message_body_str);
                 }
                 catch (const nlohmann::json::exception& e) {
-                    return report_error("Malformed json in log_message message: \"%1\": %2", message_body_str, e.what());
+                    return report_error("Malformed json in log_message message: \"%1\": %2", message_body_str,
+                                        e.what());
                 }
 
                 static constexpr std::array<std::pair<std::string_view, util::Logger::Level>, 7> name_to_level = {

@@ -812,10 +812,7 @@ void Connection::handle_connection_established()
 
     m_state = ConnectionState::connected;
 
-    // TODO(RCORE-1380) get this information in-band rather than from the websocket.
-    if (auto coid = m_websocket->get_appservices_request_id(); !coid.empty()) {
-        logger.info("Connected to app services with request id: \"%1\"", coid);
-    }
+    // Server connection id will be provided via a LOG_MESSAGE protocol message
 
     milliseconds_type now = monotonic_clock_now();
     m_pong_wait_started_at = now; // Initially, no time was spent waiting for a PONG message
@@ -1410,14 +1407,14 @@ void Connection::receive_server_log_message(session_ident_type session_ident, ut
 {
     if (session_ident != 0) {
         if (auto sess = get_session(session_ident)) {
-            sess->logger.log(level, "Log message from server: \"%1\"", message);
+            sess->logger.log(level, "Server log message: %1", message);
             return;
         }
 
-        logger.log(level, "Log message from server for unknown session %1: \"%2\"", session_ident, message);
+        logger.log(level, "Server log message for unknown session %1: %2", session_ident, message);
     }
 
-    logger.log(level, "Log message from server: \"%1\"", message);
+    logger.log(level, "Server log message: %1", message);
 }
 
 
