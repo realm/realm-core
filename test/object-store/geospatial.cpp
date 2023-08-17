@@ -16,11 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
+#include <util/event_loop.hpp>
+#include <util/index_helpers.hpp>
+#include <util/test_file.hpp>
 
-#include "util/event_loop.hpp"
-#include "util/index_helpers.hpp"
-#include "util/test_file.hpp"
+#include <realm/geospatial.hpp>
+#include <realm/group.hpp>
 
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/collection_notifications.hpp>
@@ -28,18 +29,17 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/object.hpp>
-#include <realm/object-store/util/scheduler.hpp>
-
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
-#include <realm/geospatial.hpp>
-#include <realm/group.hpp>
 #include <realm/util/any.hpp>
 
 #if REALM_ENABLE_AUTH_TESTS
-#include "sync/flx_sync_harness.hpp"
+#include <util/sync/flx_sync_harness.hpp>
 #endif // REALM_ENABLE_AUTH_TESTS
+
+#include <catch2/catch_all.hpp>
 
 #include <cstdint>
 
@@ -95,7 +95,7 @@ struct TestContext : CppContext {
     }
 };
 
-TEST_CASE("geospatial") {
+TEST_CASE("geospatial", "[geospatial]") {
     using namespace std::string_literals;
 
     Schema schema{
@@ -134,13 +134,13 @@ TEST_CASE("geospatial") {
         });
 
         {
-            TableRef table = obj.obj().get_table();
+            TableRef table = obj.get_obj().get_table();
             REQUIRE(!Geospatial::is_geospatial(table, table->get_column_key("_id")));
             REQUIRE(Geospatial::is_geospatial(table, table->get_column_key("location")));
         }
 
-        REQUIRE(obj.obj().get<int64_t>("_id") == 1);
-        auto linked_obj = util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "location")).obj();
+        REQUIRE(obj.get_obj().get<int64_t>("_id") == 1);
+        auto linked_obj = util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "location")).get_obj();
         REQUIRE(linked_obj.is_valid());
         REQUIRE(linked_obj.get<String>("type") == "Point");
         auto list = util::any_cast<List>(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "location"))
@@ -151,7 +151,7 @@ TEST_CASE("geospatial") {
         REQUIRE(list.get<double>(2) == 3.3);
 
         {
-            Geospatial geo = obj.obj().get<Geospatial>("location");
+            Geospatial geo = obj.get_obj().get<Geospatial>("location");
             REQUIRE(geo.get_type_string() == "Point");
             REQUIRE(geo.get_type() == Geospatial::Type::Point);
             auto&& point = geo.get<GeoPoint>();
@@ -167,7 +167,7 @@ TEST_CASE("geospatial") {
             obj.set_property_value(ctx, "location", std::any{geo});
             realm->commit_transaction();
             Geospatial fetched = Geospatial::from_link(
-                util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "location")).obj());
+                util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "location")).get_obj());
             REQUIRE(geo == fetched);
         }
     }

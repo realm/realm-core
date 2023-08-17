@@ -102,7 +102,7 @@ struct TestContext : CppContext {
 };
 
 
-TEST_CASE("notifications: async delivery") {
+TEST_CASE("notifications: async delivery", "[notifications]") {
     _impl::RealmCoordinator::assert_no_open_realms();
     TestFile config;
     config.in_memory = true;
@@ -896,7 +896,7 @@ TEST_CASE("notifications: async delivery") {
     }
 }
 
-TEST_CASE("notifications: skip") {
+TEST_CASE("notifications: skip", "[notifications]") {
     _impl::RealmCoordinator::assert_no_open_realms();
     InMemoryTestFile config;
     config.cache = false;
@@ -1262,7 +1262,7 @@ TEST_CASE("notifications: skip") {
     }
 }
 
-TEST_CASE("notifications: TableView delivery") {
+TEST_CASE("notifications: TableView delivery", "[notifications]") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
@@ -1422,7 +1422,7 @@ TEST_CASE("notifications: TableView delivery") {
 
 
 #if REALM_ENABLE_SYNC
-TEST_CASE("notifications: sync") {
+TEST_CASE("notifications: sync", "[sync][pbs][notifications]") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     TestSyncManager init_sync_manager({}, {false});
@@ -1471,7 +1471,7 @@ TEST_CASE("notifications: sync") {
 }
 #endif
 
-TEST_CASE("notifications: results") {
+TEST_CASE("notifications: results", "[notifications][results]") {
     _impl::RealmCoordinator::assert_no_open_realms();
     InMemoryTestFile config;
     config.cache = false;
@@ -3191,7 +3191,7 @@ TEST_CASE("notifications: results") {
     }
 }
 
-TEST_CASE("results: notifications after move") {
+TEST_CASE("results: notifications after move", "[notifications][results]") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
 
@@ -3242,7 +3242,7 @@ TEST_CASE("results: notifications after move") {
     }
 }
 
-TEST_CASE("results: notifier with no callbacks") {
+TEST_CASE("results: notifier with no callbacks", "[notifications][results]") {
     _impl::RealmCoordinator::assert_no_open_realms();
     InMemoryTestFile config;
     config.cache = false;
@@ -3319,7 +3319,7 @@ TEST_CASE("results: notifier with no callbacks") {
     }
 }
 
-TEST_CASE("results: snapshots") {
+TEST_CASE("results: snapshots", "[results]") {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -3640,7 +3640,7 @@ TEST_CASE("results: snapshots") {
     }
 }
 
-TEST_CASE("results: distinct") {
+TEST_CASE("results: distinct", "[results]") {
     const int N = 10;
     InMemoryTestFile config;
     config.cache = false;
@@ -3852,7 +3852,7 @@ TEST_CASE("results: distinct") {
     }
 }
 
-TEST_CASE("results: sort") {
+TEST_CASE("results: sort", "[results]") {
     InMemoryTestFile config;
     config.cache = false;
     config.schema = Schema{
@@ -4035,7 +4035,7 @@ struct ResultsFromInvalidTable {
     }
 };
 
-TEMPLATE_TEST_CASE("results: get<Obj>()", "", ResultsFromTable, ResultsFromQuery, ResultsFromTableView,
+TEMPLATE_TEST_CASE("results: get<Obj>()", "[results]", ResultsFromTable, ResultsFromQuery, ResultsFromTableView,
                    ResultsFromLinkView, ResultsFromLinkSet)
 {
     InMemoryTestFile config;
@@ -4088,7 +4088,7 @@ TEMPLATE_TEST_CASE("results: get<Obj>()", "", ResultsFromTable, ResultsFromQuery
     }
 }
 
-TEMPLATE_TEST_CASE("results: get<Obj>() intermixed with writes", "", ResultsFromTable, ResultsFromQuery,
+TEMPLATE_TEST_CASE("results: get<Obj>() intermixed with writes", "[results]", ResultsFromTable, ResultsFromQuery,
                    ResultsFromTableView)
 {
     InMemoryTestFile config;
@@ -4143,8 +4143,8 @@ TEMPLATE_TEST_CASE("results: get<Obj>() intermixed with writes", "", ResultsFrom
     }
 }
 
-TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsFromQuery, ResultsFromTableView,
-                   ResultsFromLinkView, ResultsFromLinkSet)
+TEMPLATE_TEST_CASE("results: accessor interface", "[results]", ResultsFromTable, ResultsFromQuery,
+                   ResultsFromTableView, ResultsFromLinkView, ResultsFromLinkSet)
 {
     TestFile config;
     config.automatic_change_notifications = false;
@@ -4230,7 +4230,7 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
     }
 }
 
-TEST_CASE("results: list of primitives indexes") {
+TEST_CASE("results: list of primitives indexes", "[results]") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
 
@@ -4265,7 +4265,7 @@ TEST_CASE("results: list of primitives indexes") {
     }
 }
 
-TEST_CASE("results: dictionary keys") {
+TEST_CASE("results: dictionary keys", "[results][dictionary]") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
 
@@ -4301,7 +4301,7 @@ TEST_CASE("results: dictionary keys") {
     }
 }
 
-TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable, ResultsFromQuery,
+TEMPLATE_TEST_CASE("results: aggregate", "[results][query][aggregate]", ResultsFromTable, ResultsFromQuery,
                    ResultsFromTableView, ResultsFromLinkView, ResultsFromLinkSet)
 {
     InMemoryTestFile config;
@@ -4502,7 +4502,7 @@ TEMPLATE_TEST_CASE("results: backed by nothing", "[results]", ResultsFromInvalid
     }
 }
 
-TEST_CASE("results: set property value on all objects", "[batch_updates]") {
+TEST_CASE("results: set property value on all objects", "[results][batch updates]") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     config.schema = Schema{{"AllTypes",
@@ -4708,7 +4708,7 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
     }
 }
 
-TEST_CASE("results: nullable list of primitives") {
+TEST_CASE("results: nullable list of primitives", "[results]") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     config.schema =
@@ -4759,7 +4759,7 @@ TEST_CASE("results: nullable list of primitives") {
     }
 }
 
-TEST_CASE("results: limit", "[limit]") {
+TEST_CASE("results: limit", "[results][limit]") {
     InMemoryTestFile config;
     // config.cache = false;
     config.automatic_change_notifications = false;
@@ -4885,7 +4885,7 @@ TEST_CASE("results: limit", "[limit]") {
     }
 }
 
-TEST_CASE("results: public name declared") {
+TEST_CASE("results: public name declared", "[results]") {
     InMemoryTestFile config;
     // config.cache = false;
     config.automatic_change_notifications = false;
@@ -4931,7 +4931,7 @@ TEST_CASE("results: public name declared") {
     }
 }
 
-TEST_CASE("notifications: objects with PK recreated") {
+TEST_CASE("notifications: objects with PK recreated", "[results]") {
     _impl::RealmCoordinator::assert_no_open_realms();
     InMemoryTestFile config;
     config.cache = false;
@@ -4974,9 +4974,9 @@ TEST_CASE("notifications: objects with PK recreated") {
     };
 
     r->begin_transaction();
-    auto k1 = create("no_pk", AnyDict{{"id", INT64_C(123)}, {"value", INT64_C(100)}}).obj().get_key();
-    auto k2 = create("int_pk", AnyDict{{"id", INT64_C(456)}, {"value", INT64_C(100)}}).obj().get_key();
-    auto k3 = create("string_pk", AnyDict{{"id", std::string("hello")}, {"value", INT64_C(100)}}).obj().get_key();
+    auto k1 = create("no_pk", AnyDict{{"id", INT64_C(123)}, {"value", INT64_C(100)}}).get_obj().get_key();
+    auto k2 = create("int_pk", AnyDict{{"id", INT64_C(456)}, {"value", INT64_C(100)}}).get_obj().get_key();
+    auto k3 = create("string_pk", AnyDict{{"id", std::string("hello")}, {"value", INT64_C(100)}}).get_obj().get_key();
     r->commit_transaction();
 
     Results results1(r, table1->where());

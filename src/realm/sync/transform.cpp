@@ -955,6 +955,8 @@ struct MergeUtils {
                 return true;
             case Type::Erased:
                 return true;
+            case Type::Set:
+                return true;
             case Type::List:
                 return true;
             case Type::Dictionary:

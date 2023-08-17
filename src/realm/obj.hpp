@@ -88,6 +88,7 @@ public:
         return *this;
     }
     ref_type get_collection_ref(Index, CollectionType) const final;
+    bool check_collection_ref(Index, CollectionType) const noexcept final;
     void set_collection_ref(Index, ref_type, CollectionType) final;
 
     // Operator overloads
@@ -334,6 +335,7 @@ private:
     template <class>
     friend class Lst;
     friend class LnkLst;
+    friend class LinkCount;
     friend class Dictionary;
     friend class LinkMap;
     template <class>

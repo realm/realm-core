@@ -31,13 +31,15 @@
 
 namespace realm::app {
 
-struct AppError : public RuntimeError {
-    util::Optional<int> additional_status_code;
+struct AppError : public Exception {
+    std::optional<int> additional_status_code;
 
     std::string link_to_server_logs;
+    std::string server_error;
 
-    AppError(ErrorCodes::Error error_code, std::string message, std::string link = "",
-             util::Optional<int> additional_error_code = util::none);
+    AppError(ErrorCodes::Error ec, std::string message, std::string link = "",
+             std::optional<int> additional_error_code = std::nullopt,
+             std::optional<std::string> server_err = std::nullopt);
 
     bool is_json_error() const
     {

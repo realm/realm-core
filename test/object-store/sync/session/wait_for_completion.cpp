@@ -16,17 +16,19 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
-#include "sync/session/session_util.hpp"
-#include "util/event_loop.hpp"
-#include "util/test_utils.hpp"
+#include <util/event_loop.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
+#include <util/sync/session_util.hpp>
 
 #include <realm/util/scope_exit.hpp>
+
+#include <catch2/catch_all.hpp>
 
 using namespace realm;
 using namespace realm::util;
 
-TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
+TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync][pbs][session][completion]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -117,7 +119,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
     }
 }
 
-TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
+TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync][pbs][session][completion]") {
     if (!EventLoop::has_implementation())
         return;
 

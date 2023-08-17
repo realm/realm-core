@@ -1024,10 +1024,38 @@ public:
         return *this;
     }
 
+    void pop_back()
+    {
+        m_link_cols.pop_back();
+        // Recalculate m_current_table
+        m_current_table = m_base_table;
+        for (auto col : m_link_cols) {
+            m_current_table = m_current_table->get_opposite_table(col);
+        }
+    }
+
     bool link(std::string col_name)
     {
         if (auto ck = m_current_table->get_column_key(col_name)) {
             return add(ck);
+        }
+        return false;
+    }
+
+    bool index(PathElement index)
+    {
+        if (!m_link_cols.empty() && !m_link_cols.back().has_index()) {
+            if (index.is_all())
+                return true;
+            ColKey last_col = m_link_cols.back();
+            if (index.is_ndx() && last_col.is_list()) {
+                m_link_cols.back().set_index(index);
+                return true;
+            }
+            if (index.is_key() && last_col.is_dictionary()) {
+                m_link_cols.back().set_index(index);
+                return true;
+            }
         }
         return false;
     }
@@ -1075,7 +1103,7 @@ public:
         auto backlink_col_key = origin.get_opposite_column(origin_col_key);
         m_link_cols.push_back(backlink_col_key);
 
-        return Columns<T>(backlink_col_key, m_base_table, std::move(m_link_cols));
+        return Columns<T>(backlink_col_key, m_base_table, m_link_cols);
     }
     template <class T>
     SubQuery<T> column(ColKey col_key, Query subquery)
@@ -1101,7 +1129,7 @@ private:
     friend class Table;
     friend class query_parser::ParserDriver;
 
-    std::vector<ColKey> m_link_cols;
+    std::vector<ExtendedColumnKey> m_link_cols;
     ConstTableRef m_current_table;
     ConstTableRef m_base_table;
     util::Optional<ExpressionComparisonType> m_comparison_type;

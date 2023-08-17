@@ -120,14 +120,18 @@ namespace {
 struct CheckObjectPath {
     const ObjectSchema& object;              // the schema to check
     std::string path;                        // a printable path for error messaging
-    std::unordered_set<std::string> visited; // the list of object types encountered along this path so far
 };
 
 // a non-recursive search that returns a property path to the first embedded object cycle detected
-std::string do_check(Schema const& schema, const ObjectSchema& start)
+std::string do_check(Schema const& schema, const ObjectSchema& obj)
 {
     std::queue<CheckObjectPath> to_visit;
-    to_visit.push(CheckObjectPath{start, start.name, {start.name}});
+    to_visit.push(CheckObjectPath{obj, obj.name});
+
+    // Keep track of already visited object types within this starting point. Say we have two links
+    // A -> B -> C -> D -> E, and A -> F -> C -> D -> E, we don't need to check C twice to see if it
+    // includes a cycle of A.
+    std::unordered_set<std::string> seen_embedded_object_types;
 
     while (to_visit.size() > 0) {
         auto current = to_visit.front();
@@ -140,13 +144,17 @@ std::string do_check(Schema const& schema, const ObjectSchema& start)
                     // so if we encounter this type of link, no need to check further along this path
                     continue;
                 }
+
+                if (seen_embedded_object_types.find(prop.object_type) != seen_embedded_object_types.end()) {
+                    continue;
+                }
+
                 auto next_path = current.path + "." + prop.name;
-                if (current.visited.find(prop.object_type) != current.visited.end()) {
+                if (prop.object_type == obj.name) {
                     return next_path;
                 }
-                auto visited_copy = current.visited;
-                visited_copy.insert(current.object.name);
-                to_visit.push(CheckObjectPath{*it, next_path, std::move(visited_copy)});
+                to_visit.push(CheckObjectPath{*it, next_path});
+                seen_embedded_object_types.insert(prop.object_type);
             }
         }
         to_visit.pop();

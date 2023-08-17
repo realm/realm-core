@@ -2084,6 +2084,9 @@ CollectionPtr Obj::get_collection_ptr(const Path& path) const
         if (ref.is_type(type_List)) {
             collection = collection->get_list(path_elem);
         }
+        else if (ref.is_type(type_Set)) {
+            collection = collection->get_set(path_elem);
+        }
         else if (ref.is_type(type_Dictionary)) {
             collection = collection->get_dictionary(path_elem);
         }
@@ -2134,6 +2137,11 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
                 }
                 return {list_of_mixed->get(ndx), PathElement(ndx)};
             }
+            else if (collection->get_collection_type() == CollectionType::Set) {
+                auto set_of_mixed = dynamic_cast<Set<Mixed>*>(collection.get());
+                size_t ndx = set_of_mixed->find_any(mpark::get<int64_t>(index));
+                return {set_of_mixed->get(ndx), PathElement(ndx)};
+            }
             else {
                 std::string key = mpark::get<std::string>(index);
                 auto ref = dynamic_cast<Dictionary*>(collection.get())->get(key);
@@ -2144,6 +2152,9 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
         auto [ref, path_elem] = get_ref();
         if (ref.is_type(type_List)) {
             collection = collection->get_list(path_elem);
+        }
+        else if (ref.is_type(type_Set)) {
+            collection = collection->get_set(path_elem);
         }
         else if (ref.is_type(type_Dictionary)) {
             collection = collection->get_dictionary(path_elem);
@@ -2477,12 +2488,24 @@ ref_type Obj::get_collection_ref(Index index, CollectionType type) const
     }
     if (col_key.get_type() == col_type_Mixed) {
         auto val = _get<Mixed>(col_key.get_index());
-        if (val.is_null() || !val.is_type(DataType(int(type)))) {
+        if (!val.is_type(DataType(int(type)))) {
             throw IllegalOperation("Not proper collection type");
         }
         return val.get_ref();
     }
     return 0;
+}
+
+bool Obj::check_collection_ref(Index index, CollectionType type) const noexcept
+{
+    ColKey col_key = mpark::get<ColKey>(index);
+    if (col_key.is_collection()) {
+        return true;
+    }
+    if (col_key.get_type() == col_type_Mixed) {
+        return _get<Mixed>(col_key.get_index()).is_type(DataType(int(type)));
+    }
+    return false;
 }
 
 void Obj::set_collection_ref(Index index, ref_type ref, CollectionType type)

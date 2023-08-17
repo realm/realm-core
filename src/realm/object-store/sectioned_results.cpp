@@ -290,7 +290,7 @@ void create_buffered_key(Mixed& key, std::list<std::string>& buffer, StringType 
         key = StringType("", 0);
     }
     else {
-        key = buffer.emplace_back(value.data(), value.size());
+        key = StringType(buffer.emplace_back(value.data(), value.size()).data(), value.size());
     }
 }
 

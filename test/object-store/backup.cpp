@@ -45,7 +45,7 @@
 
 using namespace realm;
 
-TEST_CASE("Automated backup") {
+TEST_CASE("Automated backup", "[backup]") {
     TestFile config;
     std::string copy_from_file_name = test_util::get_test_resource_path() + "test_backup-olden-and-golden.realm";
     config.path = test_util::get_test_path_prefix() + "test_backup.realm";

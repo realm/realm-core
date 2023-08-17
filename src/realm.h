@@ -67,6 +67,7 @@ typedef bool (*realm_on_object_store_error_callback_t)(realm_userdata_t userdata
 
 /* Accessor types */
 typedef struct realm_object realm_object_t;
+
 typedef struct realm_list realm_list_t;
 typedef struct realm_set realm_set_t;
 typedef struct realm_dictionary realm_dictionary_t;
@@ -1641,7 +1642,9 @@ RLM_API realm_object_t* realm_set_embedded(realm_object_t*, realm_property_key_t
  * Create a collection in a given Mixed property.
  *
  */
-RLM_API bool realm_set_collection(realm_object_t*, realm_property_key_t, realm_collection_type_e);
+RLM_API bool realm_set_list(realm_object_t*, realm_property_key_t);
+RLM_API bool realm_set_set(realm_object_t*, realm_property_key_t);
+RLM_API bool realm_set_dictionary(realm_object_t*, realm_property_key_t);
 
 /** Return the object linked by the given property
  *
@@ -1785,24 +1788,28 @@ RLM_API bool realm_list_set(realm_list_t*, size_t index, realm_value_t value);
 RLM_API bool realm_list_insert(realm_list_t*, size_t index, realm_value_t value);
 
 /**
- * Insert a collection inside a list (only available for mixed properities)
+ * Insert a collection inside a list (only available for mixed types)
  *
- * @param list valid ptr to a list where a nested collection needs to be added
+ * @param list valid ptr to a list of mixed
  * @param index position in the list where to add the collection
- * @return RLM_API
+ * @return pointer to a valid collection that has been just inserted at the index passed as argument
  */
-RLM_API bool realm_list_insert_collection(realm_list_t* list, size_t index, realm_collection_type_e);
+RLM_API realm_list_t* realm_list_insert_list(realm_list_t* list, size_t index);
+RLM_API realm_set_t* realm_list_insert_set(realm_list_t* list, size_t index);
+RLM_API realm_dictionary_t* realm_list_insert_dictionary(realm_list_t* list, size_t index);
 
 /**
- * Set a collection inside a list (only available for mixed properities).
+ * Set a collection inside a list (only available for mixed types).
  * If the list already contains a collection of the requested type, the
  * operation is idempotent.
  *
  * @param list valid ptr to a list where a nested collection needs to be set
  * @param index position in the list where to set the collection
- * @return RLM_API
+ * @return a valid ptr representing the collection just set
  */
-RLM_API bool realm_list_set_collection(realm_list_t* list, size_t index, realm_collection_type_e);
+RLM_API realm_list_t* realm_list_set_list(realm_list_t* list, size_t index);
+RLM_API realm_set_t* realm_list_set_set(realm_list_t* list, size_t index);
+RLM_API realm_dictionary_t* realm_list_set_dictionary(realm_list_t* list, size_t index);
 
 /**
  * Returns a nested list if such collection exists, NULL otherwise.
@@ -1936,10 +1943,12 @@ RLM_API size_t realm_object_changes_get_modified_properties(const realm_object_c
  * @param out_num_modifications The number of modifications. May be NULL.
  * @param out_num_moves The number of moved elements. May be NULL.
  * @param out_collection_was_cleared a flag to signal if the collection has been cleared. May be NULL
+ * @param out_collection_was_deleted a flag to signal if the collection has been deleted. May be NULL
  */
 RLM_API void realm_collection_changes_get_num_changes(const realm_collection_changes_t*, size_t* out_num_deletions,
                                                       size_t* out_num_insertions, size_t* out_num_modifications,
-                                                      size_t* out_num_moves, bool* out_collection_was_cleared);
+                                                      size_t* out_num_moves, bool* out_collection_was_cleared,
+                                                      bool* out_collection_was_deleted);
 
 /**
  * Get the number of various types of changes in a collection notification,
@@ -2020,9 +2029,11 @@ RLM_API void realm_collection_changes_get_ranges(
  * @param out_deletions_size number of deletions
  * @param out_insertion_size number of insertions
  * @param out_modification_size number of modifications
+ * @param out_was_deleted a flag to signal if the dictionary has been deleted.
  */
 RLM_API void realm_dictionary_get_changes(const realm_dictionary_changes_t* changes, size_t* out_deletions_size,
-                                          size_t* out_insertion_size, size_t* out_modification_size);
+                                          size_t* out_insertion_size, size_t* out_modification_size,
+                                          bool* out_was_deleted);
 
 /**
  * Returns the list of keys changed for the dictionary passed as argument.
@@ -2309,9 +2320,16 @@ RLM_API bool realm_dictionary_insert(realm_dictionary_t*, realm_value_t key, rea
 RLM_API realm_object_t* realm_dictionary_insert_embedded(realm_dictionary_t*, realm_value_t key);
 
 /**
- * Insert a nested collection
+ * Insert a collection inside a dictionary (only available for mixed types)
+ *
+ * @param dictionary valid ptr to a dictionary of mixed
+ * @param key the mixed representing a key for a dictionary (only string)
+ * @return pointer to a valid collection that has been just inserted at the key passed as argument
  */
-RLM_API bool realm_dictionary_insert_collection(realm_dictionary_t*, realm_value_t key, realm_collection_type_e);
+RLM_API realm_list_t* realm_dictionary_insert_list(realm_dictionary_t* dictionary, realm_value_t key);
+RLM_API realm_set_t* realm_dictionary_insert_set(realm_dictionary_t*, realm_value_t);
+RLM_API realm_dictionary_t* realm_dictionary_insert_dictionary(realm_dictionary_t*, realm_value_t);
+
 
 /**
  * Fetch a list from a dictionary.

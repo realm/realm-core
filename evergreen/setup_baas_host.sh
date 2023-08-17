@@ -34,7 +34,7 @@ VERBOSE=
 while getopts "b:vh" opt; do
     case "${opt}" in
         b) BAAS_BRANCH="${OPTARG}";;
-        v) VERBOSE="-v";;
+        v) VERBOSE="yes";;
         h) usage 0;;
         *) usage 1;;
     esac
@@ -136,12 +136,15 @@ if [[ -f "${HOME}/install_baas.sh" ]]; then
     cp "${HOME}/install_baas.sh" evergreen/
 fi
 
-OPT_BAAS_BRANCH=
+INSTALL_BAAS_OPTS=()
 if [[ -n "${BAAS_BRANCH}" ]]; then
-    OPT_BAAS_BRANCH=(-b "${BAAS_BRANCH}")
+    INSTALL_BAAS_OPTS=("-b" "${BAAS_BRANCH}")
+fi
+if [[ -n "${VERBOSE}" ]]; then
+    INSTALL_BAAS_OPTS+=("-v")
 fi
 
-./evergreen/install_baas.sh "${VERBOSE}" -w "${BAAS_WORK_DIR}" "${OPT_BAAS_BRANCH[@]}" 2>&1
+./evergreen/install_baas.sh -w "${BAAS_WORK_DIR}" "${INSTALL_BAAS_OPTS[@]}" 2>&1
 
 popd > /dev/null  # realm-core
 popd > /dev/null  # /data/baas-remote

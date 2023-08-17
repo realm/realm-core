@@ -141,15 +141,14 @@ void SyncSession::become_dying(util::CheckedUniqueLock lock)
     }
 
     size_t current_death_count = ++m_death_count;
-    m_session->async_wait_for_upload_completion(
-        [weak_session = weak_from_this(), current_death_count](std::error_code) {
-            if (auto session = weak_session.lock()) {
-                util::CheckedUniqueLock lock(session->m_state_mutex);
-                if (session->m_state == State::Dying && session->m_death_count == current_death_count) {
-                    session->become_inactive(std::move(lock));
-                }
+    m_session->async_wait_for_upload_completion([weak_session = weak_from_this(), current_death_count](Status) {
+        if (auto session = weak_session.lock()) {
+            util::CheckedUniqueLock lock(session->m_state_mutex);
+            if (session->m_state == State::Dying && session->m_death_count == current_death_count) {
+                session->become_inactive(std::move(lock));
             }
-        });
+        }
+    });
     m_state_mutex.unlock(lock);
 }
 
@@ -1255,7 +1254,7 @@ void SyncSession::add_completion_callback(util::UniqueFunction<void(Status)> cal
     auto waiter = is_download ? &sync::Session::async_wait_for_download_completion
                               : &sync::Session::async_wait_for_upload_completion;
 
-    (m_session.get()->*waiter)([weak_self = weak_from_this(), id = m_completion_request_counter](std::error_code ec) {
+    (m_session.get()->*waiter)([weak_self = weak_from_this(), id = m_completion_request_counter](Status status) {
         auto self = weak_self.lock();
         if (!self)
             return;
@@ -1263,7 +1262,7 @@ void SyncSession::add_completion_callback(util::UniqueFunction<void(Status)> cal
         auto callback_node = self->m_completion_callbacks.extract(id);
         lock.unlock();
         if (callback_node) {
-            callback_node.mapped().second(Status(ec, ""));
+            callback_node.mapped().second(std::move(status));
         }
     });
 }
