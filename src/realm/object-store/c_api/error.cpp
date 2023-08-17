@@ -224,9 +224,12 @@ RLM_API realm_async_error_t* realm_get_last_error_as_async_error(void)
     return new realm_async_error_t{*ErrorStorage::get_thread_local()};
 }
 
-RLM_API void realm_get_async_error(const realm_async_error_t* async_err, realm_error_t* out_err)
+RLM_API bool realm_get_async_error(const realm_async_error_t* async_err, realm_error_t* out_err)
 {
-    async_err->error_storage.get_as_realm_error_t(out_err);
+    if (!async_err)
+        return false;
+
+    return async_err->error_storage.get_as_realm_error_t(out_err);
 }
 
 } // namespace realm::c_api

@@ -2420,11 +2420,6 @@ void TransformerImpl::Transformer::merge_nested(OuterSide& outer_side, InnerSide
 }
 
 
-TransformerImpl::TransformerImpl()
-    : m_changeset_parser() // Throws
-{
-}
-
 void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changeset* their_changesets,
                                        size_t their_size, Changeset** our_changesets, size_t our_size,
                                        util::Logger& logger)
@@ -2433,7 +2428,7 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
     REALM_ASSERT(our_size != 0);
     bool trace = false;
 #if REALM_DEBUG && !REALM_UWP
-    // FIXME: Not thread-safe (use config parameter instead and confine enviromnent reading to test/test_all.cpp)
+    // FIXME: Not thread-safe (use config parameter instead and confine environment reading to test/test_all.cpp)
     const char* trace_p = ::getenv("UNITTEST_TRACE_TRANSFORM");
     trace = (trace_p && StringData{trace_p} != "no");
     static std::mutex trace_mutex;

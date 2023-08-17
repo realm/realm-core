@@ -97,11 +97,18 @@ public:
     {
         return *m_object_schema;
     }
-    Obj obj() const
+    [[deprecated]] Obj obj() const
     {
         return m_obj;
     }
-
+    const Obj& get_obj() const
+    {
+        return m_obj;
+    }
+    Obj& get_obj()
+    {
+        return m_obj;
+    }
     bool is_valid() const
     {
         return m_obj.is_valid();

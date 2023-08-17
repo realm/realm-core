@@ -27,6 +27,9 @@
 #include <realm/keys.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/data_type.hpp>
+#if REALM_ENABLE_GEOSPATIAL
+#include <realm/geospatial.hpp>
+#endif
 #include <realm/string_data.hpp>
 #include <realm/timestamp.hpp>
 #include <realm/decimal128.hpp>
@@ -146,6 +149,9 @@ public:
     Mixed(UUID) noexcept;
     Mixed(util::Optional<UUID>) noexcept;
     Mixed(const Obj&) noexcept;
+#if REALM_ENABLE_GEOSPATIAL
+    Mixed(Geospatial*) noexcept;
+#endif
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
@@ -161,8 +167,6 @@ public:
         : Mixed(StringData(s))
     {
     }
-
-    ~Mixed() noexcept {}
 
     DataType get_type() const noexcept
     {
@@ -265,6 +269,9 @@ protected:
         Decimal128 decimal_val;
         ObjLink link_val;
         UUID uuid_val;
+#if REALM_ENABLE_GEOSPATIAL
+        Geospatial* geospatial_val;
+#endif
     };
 
 private:
@@ -292,6 +299,7 @@ private:
         return _is_numeric(head) && _is_numeric(tail...);
     }
 };
+static_assert(std::is_trivially_destructible_v<Mixed>);
 
 class OwnedMixed : public Mixed {
 public:
@@ -510,6 +518,14 @@ inline Mixed::Mixed(Decimal128 v)
         m_type = 0;
     }
 }
+
+#if REALM_ENABLE_GEOSPATIAL
+inline Mixed::Mixed(Geospatial* store) noexcept
+{
+    m_type = int(type_Geospatial) + 1;
+    geospatial_val = store;
+}
+#endif
 
 inline Mixed::Mixed(ObjectId v) noexcept
 {
@@ -761,6 +777,19 @@ inline ObjLink Mixed::get<ObjLink>() const noexcept
     REALM_ASSERT(get_type() == type_TypedLink);
     return link_val;
 }
+
+#if REALM_ENABLE_GEOSPATIAL
+template <>
+inline Geospatial Mixed::get<Geospatial>() const noexcept
+{
+    auto type = get_type();
+    REALM_ASSERT_EX(type == type_Geospatial, type);
+    if (type == type_Geospatial) {
+        return *geospatial_val;
+    }
+    REALM_UNREACHABLE();
+}
+#endif
 
 template <>
 inline Mixed Mixed::get<Mixed>() const noexcept

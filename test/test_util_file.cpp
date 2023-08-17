@@ -304,4 +304,17 @@ TEST(Utils_File_Lock)
     CHECK_NOT(f2.try_rw_lock_exclusive());
 }
 
+TEST(Utils_File_SystemErrorMessage)
+{
+    std::error_code err = std::make_error_code(std::errc::too_many_files_open);
+    std::string_view message = "my message";
+#ifdef _WIN32
+    const char* expected = "my message: too many files open (%1)";
+#else
+    const char* expected = "my message: Too many open files (%1)";
+#endif
+    CHECK_THROW_CONTAINING_MESSAGE(throw SystemError(err, message), message);
+    CHECK_THROW_CONTAINING_MESSAGE(throw SystemError(err.value(), message), util::format(expected, err.value()));
+}
+
 #endif

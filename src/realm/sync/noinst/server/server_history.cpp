@@ -535,7 +535,7 @@ auto ServerHistory::allocate_file_ident(file_ident_type proxy_file_ident, Client
     std::size_t file_index = m_num_client_files;
     salt_type salt = register_client_file_by_index(file_index, proxy_file_ident, client_type); // Throws
 
-    if (file_index > std::uint_fast64_t(get_max_file_ident()))
+    if (uint64_t(file_index) > get_max_file_ident())
         throw util::overflow_error{"File identifier"};
 
     file_ident_type ident = file_ident_type(file_index);

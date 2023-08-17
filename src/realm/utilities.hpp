@@ -250,6 +250,7 @@ enum FindRes {
 enum IndexMethod {
     index_FindFirst,
     index_FindAll_nocopy,
+    index_FindAll_prefix,
     index_Count,
 };
 
@@ -360,31 +361,6 @@ constexpr inline size_t round_down(size_t p, size_t align)
     return r & (~(align - 1));
 }
 
-
-template <class T>
-struct Wrap {
-    Wrap(const T& v)
-        : m_value(v)
-    {
-    }
-    operator T() const
-    {
-        return m_value;
-    }
-
-private:
-    T m_value;
-};
-
-// PlacementDelete is intended for use with std::unique_ptr when it holds an object allocated with
-// placement new. It simply calls the object's destructor without freeing the memory.
-struct PlacementDelete {
-    template <class T>
-    void operator()(T* v) const
-    {
-        v->~T();
-    }
-};
 
 #ifdef _WIN32
 typedef HANDLE FileDesc;

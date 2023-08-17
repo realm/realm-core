@@ -54,6 +54,7 @@
 #define TEST_COLUMN_STRING
 #define TEST_FILE
 #define TEST_FILE_LOCKS
+#define TEST_GEO
 #define TEST_GROUP
 #define TEST_UPGRADE
 #define TEST_INDEX_STRING

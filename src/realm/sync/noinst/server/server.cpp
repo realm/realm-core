@@ -2,6 +2,7 @@
 
 #include <realm/binary_data.hpp>
 #include <realm/impl/simulated_failure.hpp>
+#include <realm/object_id.hpp>
 #include <realm/string_data.hpp>
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/trigger.hpp>
@@ -104,6 +105,11 @@ namespace {
 
 enum class SchedStatus { done = 0, pending, in_progress };
 
+// Only used by the Sync Server to support older pbs sync clients (prior to protocol v8)
+constexpr std::string_view get_old_pbs_websocket_protocol_prefix() noexcept
+{
+    return "com.mongodb.realm-sync/";
+}
 
 std::string short_token_fmt(const std::string& str, size_t cutoff = 30)
 {
@@ -1142,11 +1148,10 @@ public:
 
     bool websocket_binary_message_received(const char* data, size_t size) final override
     {
-        std::error_code ec;
         using sf = _impl::SimulatedFailure;
-        if (sf::trigger(sf::sync_server__read_head, ec)) {
+        if (sf::check_trigger(sf::sync_server__read_head)) {
             // Suicide
-            read_error(ec);
+            read_error(sf::sync_server__read_head);
             return false;
         }
         // After a connection level error has occurred, all incoming messages
@@ -1269,7 +1274,7 @@ public:
 
     void initiate_pong_output_buffer();
 
-    void handle_protocol_error(ServerProtocol::Error error);
+    void handle_protocol_error(Status status);
 
     void receive_bind_message(session_ident_type, std::string path, std::string signed_user_token,
                               bool need_client_file_ident, bool is_subserver);
@@ -1578,6 +1583,7 @@ public:
 private:
     ServerImpl& m_server;
     const int_fast64_t m_id;
+    const ObjectId m_appservices_request_id = ObjectId::gen();
     std::unique_ptr<network::Socket> m_socket;
     std::unique_ptr<network::ssl::Stream> m_ssl_stream;
     std::unique_ptr<network::ReadAheadBuffer> m_read_ahead_buffer;
@@ -1683,11 +1689,14 @@ private:
             HttpListHeaderValueParser parser{value};
             std::string_view elem;
             while (parser.next(elem)) {
-                auto prefix = get_pbs_websocket_protocol_prefix();
                 // FIXME: Use std::string_view::begins_with() in C++20.
-                bool begins_with = (elem.size() >= prefix.size() &&
-                                    std::equal(elem.data(), elem.data() + prefix.size(), prefix.data()));
-                if (begins_with) {
+                const StringData protocol{elem};
+                std::string_view prefix;
+                if (protocol.begins_with(get_pbs_websocket_protocol_prefix()))
+                    prefix = get_pbs_websocket_protocol_prefix();
+                else if (protocol.begins_with(get_old_pbs_websocket_protocol_prefix()))
+                    prefix = get_old_pbs_websocket_protocol_prefix();
+                if (!prefix.empty()) {
                     auto parse_version = [&](std::string_view str) {
                         in.set_buffer(str.data(), str.data() + str.size());
                         int version = 0;
@@ -1745,8 +1754,9 @@ private:
                 if (client_max >= server_min && client_min <= server_max) {
                     // Overlap
                     int version = std::min(client_max, server_max);
-                    if (version > best_match)
+                    if (version > best_match) {
                         best_match = version;
+                    }
                 }
                 if (client_min < overall_client_min)
                     overall_client_min = client_min;
@@ -1780,6 +1790,7 @@ private:
                         nonfirst = true;
                     }
                 };
+                using Range = ProtocolVersionRange;
                 formatter.reset();
                 format_ranges(protocol_version_ranges); // Throws
                 logger.error("Protocol version negotiation failed: %1 "
@@ -1788,8 +1799,7 @@ private:
                 formatter.reset();
                 formatter << "Protocol version negotiation failed: "
                              ""
-                          << elaboration << ".\n\n"; // Throws
-                using Range = ProtocolVersionRange;
+                          << elaboration << ".\n\n";                                   // Throws
                 formatter << "Server supports: ";                                      // Throws
                 format_ranges(std::initializer_list<Range>{{server_min, server_max}}); // Throws
                 formatter << "\n";                                                     // Throws
@@ -1811,9 +1821,11 @@ private:
 
         std::string sec_websocket_protocol_2;
         {
+            std::string_view prefix = negotiated_protocol_version < 8 ? get_old_pbs_websocket_protocol_prefix()
+                                                                      : get_pbs_websocket_protocol_prefix();
             std::ostringstream out;
             out.imbue(std::locale::classic());
-            out << get_pbs_websocket_protocol_prefix() << negotiated_protocol_version; // Throws
+            out << prefix << negotiated_protocol_version; // Throws
             sec_websocket_protocol_2 = std::move(out).str();
         }
 
@@ -1920,6 +1932,8 @@ private:
     void add_common_http_response_headers(HTTPResponse& response)
     {
         response.headers["Server"] = "RealmSync/" REALM_VERSION_STRING; // Throws
+        // This isn't a real X-Appservices-Request-Id, but it should be enough to test with
+        response.headers["X-Appservices-Request-Id"] = m_appservices_request_id.to_string();
     }
 
     void read_error(std::error_code ec)
@@ -4232,30 +4246,21 @@ void SyncConnection::enlist_to_send(Session* sess) noexcept
 }
 
 
-void SyncConnection::handle_protocol_error(ServerProtocol::Error error)
+void SyncConnection::handle_protocol_error(Status status)
 {
-    switch (error) {
-        case ServerProtocol::Error::unknown_message:
-            protocol_error(ProtocolError::unknown_message); // Throws
-            break;
-        case ServerProtocol::Error::bad_syntax:
+    logger.error("%1", status);
+    switch (status.code()) {
+        case ErrorCodes::SyncProtocolInvariantFailed:
             protocol_error(ProtocolError::bad_syntax); // Throws
             break;
-        case ServerProtocol::Error::limits_exceeded:
+        case ErrorCodes::LimitExceeded:
             protocol_error(ProtocolError::limits_exceeded); // Throws
             break;
-        case ServerProtocol::Error::bad_decompression:
-            protocol_error(ProtocolError::bad_decompression); // Throws
-            break;
-        case ServerProtocol::Error::bad_changeset_header_syntax:
-            protocol_error(ProtocolError::bad_changeset_header_syntax); // Throws
-            break;
-        case ServerProtocol::Error::bad_changeset_size:
-            protocol_error(ProtocolError::bad_changeset_size); // Throws
+        default:
+            protocol_error(ProtocolError::other_error);
             break;
     }
 }
-
 
 void SyncConnection::receive_bind_message(session_ident_type session_ident, std::string path,
                                           std::string signed_user_token, bool need_client_file_ident,

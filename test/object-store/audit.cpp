@@ -16,13 +16,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
+#include <util/event_loop.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
+#include <util/sync/baas_admin_api.hpp>
+#include <util/sync/flx_sync_harness.hpp>
 
-#include "sync/flx_sync_harness.hpp"
-#include "util/event_loop.hpp"
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
-#include "util/baas_admin_api.hpp"
+#include <realm/set.hpp>
+#include <realm/list.hpp>
+#include <realm/dictionary.hpp>
 
 #include <realm/object-store/audit.hpp>
 #include <realm/object-store/audit_serializer.hpp>
@@ -32,7 +34,6 @@
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/shared_realm.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
-
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
@@ -40,9 +41,7 @@
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 
-#include <realm/set.hpp>
-#include <realm/list.hpp>
-#include <realm/dictionary.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <external/json/json.hpp>
 
@@ -282,7 +281,7 @@ struct TestClock {
 
 } // namespace
 
-TEST_CASE("audit object serialization") {
+TEST_CASE("audit object serialization", "[sync][pbs][audit]") {
     TestSyncManager test_session;
     SyncTestFile config(test_session.app(), "parent");
     config.cache = false;
@@ -1079,7 +1078,7 @@ TEST_CASE("audit object serialization") {
     }
 }
 
-TEST_CASE("audit management") {
+TEST_CASE("audit management", "[sync][pbs][audit]") {
     TestClock clock;
 
     TestSyncManager test_session;
@@ -1496,7 +1495,7 @@ TEST_CASE("audit management") {
 #endif
 }
 
-TEST_CASE("audit realm sharding") {
+TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
     // Don't start the server immediately so that we're forced to accumulate
     // a lot of local unuploaded data.
     TestSyncManager test_session{{}, {.start_immediately = false}};
@@ -1667,7 +1666,7 @@ static void generate_event(std::shared_ptr<Realm> realm, int call = 0)
     audit->end_scope(scope, assert_no_error);
 }
 
-TEST_CASE("audit integration tests") {
+TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
     // None of these tests need a deterministic clock, but the server rounding
     // timestamps to milliseconds can result in events not having monotonically
     // increasing timestamps with an actual clock.
@@ -1782,7 +1781,7 @@ TEST_CASE("audit integration tests") {
     SECTION("invalid metadata properties") {
         config.audit_config->metadata = {{"invalid key", "value"}};
         auto error = expect_error(config, generate_event);
-        REQUIRE_THAT(error.what(), StartsWith("Invalid schema change"));
+        REQUIRE_THAT(error.status.reason(), StartsWith("Invalid schema change"));
         REQUIRE(error.is_fatal);
     }
 
@@ -1815,7 +1814,7 @@ TEST_CASE("audit integration tests") {
         config.audit_config = std::make_shared<AuditConfig>();
 
         auto error = expect_error(config, generate_event);
-        REQUIRE_THAT(error.what(), StartsWith("Invalid schema change"));
+        REQUIRE_THAT(error.status.reason(), StartsWith("Invalid schema change"));
         REQUIRE(error.is_fatal);
     }
 
@@ -1890,7 +1889,7 @@ TEST_CASE("audit integration tests") {
         SECTION("auditing with a flexible sync user reports a sync error") {
             config.audit_config->audit_user = harness.app()->current_user();
             auto error = expect_error(config, generate_event);
-            REQUIRE_THAT(error.what(),
+            REQUIRE_THAT(error.status.reason(),
                          Catch::Matchers::ContainsSubstring(
                              "Client connected using partition-based sync when app is using flexible sync"));
             REQUIRE(error.is_fatal);

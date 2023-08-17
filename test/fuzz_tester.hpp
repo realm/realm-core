@@ -960,7 +960,7 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
                 }
                 if (m_trace && identical_initial_schema_creating_transaction) {
                     std::cerr << "// Special handling of identical initial "
-                                 "schema-creating transaction occured\n";
+                                 "schema-creating transaction occurred\n";
                 }
                 continue;
             }

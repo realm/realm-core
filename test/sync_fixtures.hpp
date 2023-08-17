@@ -2,19 +2,19 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include <sstream>
 
+#include <realm/impl/simulated_failure.hpp>
+#include <realm/string_data.hpp>
+#include <realm/sync/client.hpp>
 #include <realm/sync/network/default_socket.hpp>
 #include <realm/sync/network/http.hpp>
 #include <realm/sync/network/network.hpp>
-#include <realm/string_data.hpp>
-#include <realm/impl/simulated_failure.hpp>
-#include <realm/sync/noinst/protocol_codec.hpp>
-#include <realm/sync/noinst/server/server_dir.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/version.hpp>
-#include <realm/sync/client.hpp>
+#include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/server/server.hpp>
+#include <realm/sync/noinst/server/server_dir.hpp>
+#include <realm/transaction.hpp>
+#include <realm/version.hpp>
 
 #include "test.hpp"
 
@@ -440,7 +440,11 @@ public:
 
         size_t max_download_size = 0x1000000; // 16 MB as in Server::Config
 
+#if REALM_DISABLE_SYNC_MULTIPLEXING
+        bool one_connection_per_session = true;
+#else
         bool one_connection_per_session = false;
+#endif
 
         bool disable_upload_activation_delay = false;
 
@@ -577,24 +581,21 @@ public:
         }
     }
 
-    using ErrorHandler = void(std::error_code ec, bool is_fatal, const std::string& detailed_message);
+    using ErrorHandler = void(Status status, bool is_fatal);
 
     // Set an error handler to be used for all sessions of the specified client
     // (\a handler will be copied for each session). Must be called before
     // make_session().
     void set_client_side_error_handler(int client_index, std::function<ErrorHandler> handler)
     {
-        auto handler_2 = [handler = std::move(handler)](ConnectionState state,
-                                                        std::optional<SessionErrorInfo> error_info) {
+        auto handler_wrapped = [handler = std::move(handler)](ConnectionState state,
+                                                              std::optional<SessionErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
-            std::error_code ec = error_info->error_code;
-            bool is_fatal = error_info->is_fatal();
-            const std::string& detailed_message = error_info->message;
-            handler(ec, is_fatal, detailed_message);
+            handler(error_info->status, error_info->is_fatal);
         };
-        m_connection_state_change_listeners[client_index] = std::move(handler_2);
+        m_connection_state_change_listeners[client_index] = std::move(handler_wrapped);
     }
 
     void set_client_side_error_rate(int client_index, int n, int m)
@@ -701,7 +702,7 @@ public:
         config.server_port = m_server_ports[server_index];
         config.server_address = "localhost";
 
-        Session session{*m_clients[client_index], std::move(db), nullptr, std::move(config)};
+        Session session{*m_clients[client_index], std::move(db), nullptr, nullptr, std::move(config)};
         if (m_connection_state_change_listeners[client_index]) {
             session.set_connection_state_change_listener(m_connection_state_change_listeners[client_index]);
         }
@@ -711,8 +712,7 @@ public:
                     return;
                 REALM_ASSERT(error);
                 unit_test::TestContext& test_context = m_test_context;
-                test_context.logger->error("Client disconnect: %1: %2 (is_fatal=%3)", error->error_code,
-                                           error->message, error->is_fatal());
+                test_context.logger->error("Client disconnect: %1 (is_fatal=%3)", error->status, error->is_fatal);
                 bool client_error_occurred = true;
                 CHECK_NOT(client_error_occurred);
                 stop();
@@ -1077,10 +1077,7 @@ inline void RealmFixture::setup_error_handler(util::UniqueFunction<ErrorHandler>
         if (state != ConnectionState::disconnected)
             return;
         REALM_ASSERT(error_info);
-        std::error_code ec = error_info->error_code;
-        bool is_fatal = error_info->is_fatal();
-        const std::string& detailed_message = error_info->message;
-        handler(ec, is_fatal, detailed_message);
+        handler(error_info->status, error_info->is_fatal);
     };
     m_session.set_connection_state_change_listener(std::move(listener));
 }

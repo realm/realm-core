@@ -148,7 +148,7 @@ std::error_code decompress(Span<const char> compressed_buf, Span<char> decompres
 /// thrown by \a compressed, but all other errors (including the target buffer
 /// being too small) are reported by returning an error code of category
 /// compression::error_code.
-std::error_code decompress(NoCopyInputStream& compressed, Span<char> decompressed_buf);
+std::error_code decompress(InputStream& compressed, Span<char> decompressed_buf);
 
 /// allocate_and_compress() compresses the data in \a uncompressed_buf using
 /// zlib, storing the result in \a compressed_buf. \a compressed_buf is resized
@@ -163,7 +163,7 @@ std::error_code allocate_and_compress(CompressMemoryArena& compress_memory_arena
 /// \a decompressed is resized to the required size, and on non-error return
 /// has size equal to the compressed size. All errors other than std::bad_alloc
 /// are returned as an error code of categrory compression::error_code.
-std::error_code decompress_nonportable(NoCopyInputStream& compressed, AppendBuffer<char>& decompressed);
+std::error_code decompress_nonportable(InputStream& compressed, AppendBuffer<char>& decompressed);
 
 /// decompress_nonportable_input_stream() returns an input stream which wraps
 /// the \a source input stream and decompresses data produced by
@@ -173,7 +173,7 @@ std::error_code decompress_nonportable(NoCopyInputStream& compressed, AppendBuff
 /// code of category compression::error_code. If this returns a non-nullptr
 /// input stream, \a total_size is set to the decompressed size of the data
 /// which will be produced by fully consuming the returned input stream.
-std::unique_ptr<NoCopyInputStream> decompress_nonportable_input_stream(NoCopyInputStream& source, size_t& total_size);
+std::unique_ptr<InputStream> decompress_nonportable_input_stream(InputStream& source, size_t& total_size);
 
 /// allocate_and_compress_nonportable() compresses the data stored in \a
 /// uncompressed_buf, writing it to \a compressed_buf.
@@ -206,7 +206,7 @@ util::AppendBuffer<char> allocate_and_compress_nonportable(Span<const char> unco
 
 /// Get the decompressed size of the data produced by
 /// allocate_and_compress_nonportable() which is stored in \a source.
-size_t get_uncompressed_size_from_header(NoCopyInputStream& source);
+size_t get_uncompressed_size_from_header(InputStream& source);
 
 } // namespace realm::util::compression
 

@@ -321,7 +321,18 @@ ThreadSafeReference RealmCoordinator::get_unbound_realm()
 void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>& realm,
                                     util::Optional<VersionID> version, util::CheckedUniqueLock& realm_lock)
 {
-    open_db();
+    const auto db_opened_first_time = open_db();
+#ifdef REALM_ENABLE_SYNC
+    SyncConfig::SubscriptionInitializerCallback subscription_function = nullptr;
+    bool rerun_on_open = false;
+    if (config.sync_config && config.sync_config->flx_sync_requested &&
+        config.sync_config->subscription_initializer) {
+        subscription_function = std::move(config.sync_config->subscription_initializer);
+        rerun_on_open = config.sync_config->rerun_init_subscription_on_open;
+    }
+#else
+    static_cast<void>(db_opened_first_time);
+#endif
 
     auto schema = std::move(config.schema);
     auto migration_function = std::move(config.migration_function);
@@ -360,6 +371,19 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
         realm->update_schema(std::move(*schema), config.schema_version, std::move(migration_function),
                              std::move(initialization_function));
     }
+
+#ifdef REALM_ENABLE_SYNC
+    // run subscription initializer if the SDK has instructed core to do so. The subscription callback will be run if:
+    // 1. this is the first time we are creating the realm file
+    // 2. the database was already created, but this is the first time we are opening the db and the flag
+    // rerun_on_open was set
+    if (subscription_function) {
+        const auto current_subscription = realm->get_latest_subscription_set();
+        if ((current_subscription.version() == 0) || (rerun_on_open && db_opened_first_time)) {
+            subscription_function(realm);
+        }
+    }
+#endif
 }
 
 void RealmCoordinator::bind_to_context(Realm& realm)
@@ -383,16 +407,16 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
 
     util::CheckedLockGuard lock(m_realm_mutex);
     set_config(config);
-    open_db();
-    return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session);
+    const auto db_open_first_time = open_db();
+    return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session, db_open_first_time);
 }
 
 #endif
 
-void RealmCoordinator::open_db()
+bool RealmCoordinator::open_db()
 {
     if (m_db)
-        return;
+        return false;
 
 #if REALM_ENABLE_SYNC
     if (m_config.sync_config) {
@@ -403,7 +427,7 @@ void RealmCoordinator::open_db()
         if (m_sync_session) {
             m_db = SyncSession::Internal::get_db(*m_sync_session);
             init_external_helpers();
-            return;
+            return false;
         }
     }
 #endif
@@ -414,7 +438,7 @@ void RealmCoordinator::open_db()
     try {
         if (m_config.immutable() && m_config.realm_data) {
             m_db = DB::create(m_config.realm_data, false);
-            return;
+            return true;
         }
         std::unique_ptr<Replication> history;
         if (server_synchronization_mode) {
@@ -430,7 +454,9 @@ void RealmCoordinator::open_db()
         }
 
         DBOptions options;
+#ifndef __EMSCRIPTEN__
         options.enable_async_writes = true;
+#endif
         options.durability = m_config.in_memory ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full;
         options.is_immutable = m_config.immutable();
         options.logger = util::Logger::get_default_logger();
@@ -442,12 +468,19 @@ void RealmCoordinator::open_db()
         options.allow_file_format_upgrade = !m_config.disable_format_upgrade && !schema_mode_reset_file;
         if (history) {
             options.backup_at_file_format_change = m_config.backup_at_file_format_change;
+#ifdef __EMSCRIPTEN__
+            // Force the DB to be created in memory-only mode, ignoring the filesystem path supplied in the config.
+            // This is so we can run an SDK on top without having to solve the browser persistence problem yet,
+            // or teach RealmConfig and SDKs about pure in-memory realms.
+            m_db = DB::create_in_memory(std::move(history), m_config.path, options);
+#else
             if (m_config.path.size()) {
                 m_db = DB::create(std::move(history), m_config.path, options);
             }
             else {
                 m_db = DB::create(std::move(history), options);
             }
+#endif
         }
         else {
             m_db = DB::create(m_config.path, true, options);
@@ -480,6 +513,7 @@ void RealmCoordinator::open_db()
     }
 
     init_external_helpers();
+    return true;
 }
 
 void RealmCoordinator::init_external_helpers()
@@ -635,24 +669,26 @@ void RealmCoordinator::unregister_realm(Realm* realm)
     }
 }
 
-// Thread-safety analsys doesn't reasonably handle calling functions on different
+// Thread-safety analysis doesn't reasonably handle calling functions on different
 // instances of this type
 void RealmCoordinator::clear_cache() NO_THREAD_SAFETY_ANALYSIS
 {
-    std::vector<std::shared_ptr<Realm>> realms_to_close;
     std::vector<std::shared_ptr<RealmCoordinator>> coordinators;
     {
         std::lock_guard<std::mutex> lock(s_coordinator_mutex);
-
         for (auto& weak_coordinator : s_coordinators_per_path) {
-            auto coordinator = weak_coordinator.second.lock();
-            if (!coordinator) {
-                continue;
+            if (auto coordinator = weak_coordinator.second.lock()) {
+                coordinators.push_back(coordinator);
             }
-            coordinators.push_back(coordinator);
+        }
+        s_coordinators_per_path.clear();
+    }
 
-            coordinator->m_notifier = nullptr;
+    for (auto& coordinator : coordinators) {
+        coordinator->m_notifier = nullptr;
 
+        std::vector<std::shared_ptr<Realm>> realms_to_close;
+        {
             // Gather a list of all of the realms which will be removed
             util::CheckedLockGuard lock(coordinator->m_realm_mutex);
             for (auto& weak_realm_notifier : coordinator->m_weak_realm_notifiers) {
@@ -662,14 +698,11 @@ void RealmCoordinator::clear_cache() NO_THREAD_SAFETY_ANALYSIS
             }
         }
 
-        s_coordinators_per_path.clear();
+        // Close all of the previously cached Realms. This can't be done while
+        // locks are held as it may try to re-lock them.
+        for (auto& realm : realms_to_close)
+            realm->close();
     }
-    coordinators.clear();
-
-    // Close all of the previously cached Realms. This can't be done while
-    // s_coordinator_mutex is held as it may try to re-lock it.
-    for (auto& realm : realms_to_close)
-        realm->close();
 }
 
 void RealmCoordinator::clear_all_caches()
@@ -790,6 +823,7 @@ void RealmCoordinator::register_notifier(std::shared_ptr<CollectionNotifier> not
     auto& self = Realm::Internal::get_coordinator(*notifier->get_realm());
     {
         util::CheckedLockGuard lock(self.m_notifier_mutex);
+        notifier->set_initial_transaction(self.m_new_notifiers);
         self.m_new_notifiers.push_back(std::move(notifier));
     }
 }
@@ -844,106 +878,6 @@ void RealmCoordinator::on_change()
     }
 }
 
-namespace {
-bool compare_notifier_versions(const std::shared_ptr<_impl::CollectionNotifier>& a,
-                               const std::shared_ptr<_impl::CollectionNotifier>& b)
-{
-    return a->version() < b->version();
-}
-
-class IncrementalChangeInfo {
-public:
-    IncrementalChangeInfo(Transaction& tr, std::vector<std::shared_ptr<_impl::CollectionNotifier>>& notifiers)
-        : m_tr(tr)
-    {
-        if (notifiers.empty())
-            return;
-
-        // Sort the notifiers by their source version so that we can pull them
-        // all forward to the latest version in a single pass over the transaction log
-        std::sort(notifiers.begin(), notifiers.end(), compare_notifier_versions);
-
-        // Preallocate the required amount of space in the vector so that we can
-        // safely give out pointers to within the vector
-        size_t count = 1;
-        for (auto it = notifiers.begin(), next = it + 1; next != notifiers.end(); ++it, ++next) {
-            if (compare_notifier_versions(*it, *next))
-                ++count;
-        }
-        m_info.reserve(count);
-        m_info.resize(1);
-        m_current = &m_info[0];
-    }
-
-    TransactionChangeInfo& current() const
-    {
-        return *m_current;
-    }
-
-    bool advance_incremental(VersionID version)
-    {
-        if (version != m_tr.get_version_of_current_transaction()) {
-            transaction::advance(m_tr, *m_current, version);
-            m_info.push_back({std::move(m_current->lists)});
-            auto next = &m_info.back();
-            for (auto& table : m_current->tables)
-                next->tables[table.first];
-            m_current = next;
-            return true;
-        }
-        return false;
-    }
-
-    void advance_to_final(VersionID version)
-    {
-        if (!m_current) {
-            transaction::advance(m_tr, nullptr, version);
-            return;
-        }
-
-        transaction::advance(m_tr, *m_current, version);
-
-        // We now need to combine the transaction change info objects so that all of
-        // the notifiers see the complete set of changes from their first version to
-        // the most recent one
-        for (size_t i = m_info.size() - 1; i > 0; --i) {
-            auto& cur = m_info[i];
-            if (cur.tables.empty())
-                continue;
-            auto& prev = m_info[i - 1];
-            if (prev.tables.empty()) {
-                prev.tables = cur.tables;
-                continue;
-            }
-            for (auto& ct : cur.tables) {
-                auto& pt = prev.tables[ct.first];
-                if (pt.empty())
-                    pt = ct.second;
-                else
-                    pt.merge(ObjectChangeSet{ct.second});
-            }
-        }
-
-        // Copy the list change info if there are multiple LinkViews for the same LinkList
-        auto id = [](auto const& list) {
-            return std::tie(list.table_key, list.col_key, list.obj_key);
-        };
-        for (size_t i = 1; i < m_current->lists.size(); ++i) {
-            for (size_t j = i; j > 0; --j) {
-                if (id(m_current->lists[i]) == id(m_current->lists[j - 1])) {
-                    m_current->lists[j - 1].changes->merge(CollectionChangeBuilder{*m_current->lists[i].changes});
-                }
-            }
-        }
-    }
-
-private:
-    std::vector<TransactionChangeInfo> m_info;
-    TransactionChangeInfo* m_current = nullptr;
-    Transaction& m_tr;
-};
-} // anonymous namespace
-
 void RealmCoordinator::run_async_notifiers()
 {
     util::CheckedUniqueLock lock(m_notifier_mutex);
@@ -992,47 +926,29 @@ void RealmCoordinator::run_async_notifiers()
     }
     else {
         REALM_ASSERT(!skip_version);
+        if (m_new_notifiers.empty()) {
+            // We were spuriously woken up and there isn't actually anything to do
+            return;
+        }
     }
 
     auto new_notifiers = std::move(m_new_notifiers);
     m_new_notifiers.clear();
     m_notifiers.insert(m_notifiers.end(), new_notifiers.begin(), new_notifiers.end());
+    lock.unlock();
 
     // Advance all of the new notifiers to the most recent version, if any
-    TransactionRef new_notifier_transaction;
-    util::Optional<IncrementalChangeInfo> new_notifier_change_info;
+    std::vector<TransactionChangeInfo> new_notifier_change_info;
     if (!new_notifiers.empty()) {
-        lock.unlock();
-
-        // Starting from the oldest notifier, incrementally advance the notifiers
-        // to the latest version, attaching each new notifier as we reach its
-        // source version. Suppose three new notifiers have been created:
-        //  - Notifier A has a source version of 2
-        //  - Notifier B has a source version of 7
-        //  - Notifier C has a source version of 5
-        // Notifier A wants the changes from versions 2-latest, B wants 7-latest,
-        // and C wants 5-latest. We achieve this by starting at version 2 and
-        // attaching A, then advancing to version 5 (letting A gather changes
-        // from 2-5). We then attach C and advance to 7, then attach B and advance
-        // to the latest.
-        std::sort(new_notifiers.begin(), new_notifiers.end(), compare_notifier_versions);
-        new_notifier_transaction = m_db->start_read(new_notifiers.front()->version());
-        new_notifier_change_info.emplace(*new_notifier_transaction, new_notifiers);
+        new_notifier_change_info.reserve(new_notifiers.size());
         for (auto& notifier : new_notifiers) {
-            new_notifier_change_info->advance_incremental(notifier->version());
-            notifier->attach_to(new_notifier_transaction);
-            notifier->add_required_change_info(new_notifier_change_info->current());
+            if (notifier->version() == version)
+                continue;
+            new_notifier_change_info.emplace_back();
+            notifier->add_required_change_info(new_notifier_change_info.back());
+            transaction::parse(*newest_transaction, new_notifier_change_info.back(), notifier->version().version,
+                               version.version);
         }
-        new_notifier_change_info->advance_to_final(version);
-    }
-    else {
-        if (version == m_notifier_transaction->get_version_of_current_transaction()) {
-            // We were spuriously woken up and there isn't actually anything to do
-            REALM_ASSERT(!skip_version);
-            return;
-        }
-
-        lock.unlock();
     }
 
     // If the skip version is set and we have more than one version to process,
@@ -1045,10 +961,10 @@ void RealmCoordinator::run_async_notifiers()
     if (skip_version && skip_version->get_version_of_current_transaction() != version) {
         REALM_ASSERT(!notifiers.empty());
         REALM_ASSERT(version >= skip_version->get_version_of_current_transaction());
-        IncrementalChangeInfo change_info(*m_notifier_transaction, notifiers);
+        TransactionChangeInfo info;
         for (auto& notifier : notifiers)
-            notifier->add_required_change_info(change_info.current());
-        change_info.advance_to_final(skip_version->get_version_of_current_transaction());
+            notifier->add_required_change_info(info);
+        transaction::advance(*m_notifier_transaction, info, skip_version->get_version_of_current_transaction());
         for (auto& notifier : notifiers)
             notifier->run();
 
@@ -1059,16 +975,34 @@ void RealmCoordinator::run_async_notifiers()
 
     // Advance the non-new notifiers to the same version as we advanced the new
     // ones to (or the latest if there were no new ones)
-    IncrementalChangeInfo change_info(*m_notifier_transaction, notifiers);
+    TransactionChangeInfo change_info;
     for (auto& notifier : notifiers) {
-        notifier->add_required_change_info(change_info.current());
+        notifier->add_required_change_info(change_info);
     }
-    change_info.advance_to_final(version);
+    transaction::advance(*m_notifier_transaction, change_info, version);
+
+    {
+        // If there's multiple notifiers for a single collection, we only populate
+        // the data for the first one during parsing and need to copy it to the
+        // others. This is a reverse scan where each collection looks for the
+        // first collection with the same id. It is O(N^2), but typically the
+        // number of collections observed will be very small.
+        auto id = [](auto const& c) {
+            return std::tie(c.table_key, c.col_key, c.obj_key);
+        };
+        auto& collections = change_info.collections;
+        for (size_t i = collections.size(); i > 0; --i) {
+            for (size_t j = 0; j < i - 1; ++j) {
+                if (id(collections[i - 1]) == id(collections[j])) {
+                    collections[i - 1].changes->merge(CollectionChangeBuilder{*collections[j].changes});
+                    break;
+                }
+            }
+        }
+    }
 
     // Now that they're at the same version, switch the new notifiers over to
     // the main Transaction used for background work rather than the temporary one
-    REALM_ASSERT(new_notifiers.empty() || m_notifier_transaction->get_version_of_current_transaction() ==
-                                              new_notifier_transaction->get_version_of_current_transaction());
     for (auto& notifier : new_notifiers) {
         notifier->attach_to(m_notifier_transaction);
         notifier->run();

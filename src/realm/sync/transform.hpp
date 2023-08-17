@@ -200,7 +200,7 @@ public:
     using TransformHistory = sync::TransformHistory;
     using version_type = sync::version_type;
 
-    TransformerImpl();
+    TransformerImpl() = default;
 
     size_t transform_remote_changesets(TransformHistory&, file_ident_type, version_type, util::Span<Changeset>,
                                        util::UniqueFunction<bool(const Changeset*)>, util::Logger&) override;
@@ -218,8 +218,6 @@ protected:
 
 private:
     std::map<version_type, Changeset> m_reciprocal_transform_cache;
-
-    TransactLogParser m_changeset_parser;
 
     Changeset& get_reciprocal_transform(TransformHistory&, file_ident_type local_file_ident, version_type version,
                                         const HistoryEntry&);

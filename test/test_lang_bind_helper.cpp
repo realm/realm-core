@@ -2017,13 +2017,6 @@ public:
         return true;
     }
 
-    bool select_link_list(ColKey col_key, ObjKey obj_key, size_t)
-    {
-        m_current_linkview_col = col_key;
-        m_current_linkview_row = obj_key;
-        return true;
-    }
-
     bool select_collection(ColKey col_key, ObjKey obj_key)
     {
         m_current_linkview_col = col_key;
@@ -2031,13 +2024,7 @@ public:
         return true;
     }
 
-    // subtables not supported
-    bool select_descriptor(int, const size_t*)
-    {
-        return false;
-    }
-
-    // Default no-op implmentations of all of the mutation instructions
+    // Default no-op implementations of all of the mutation instructions
     bool insert_group_level_table(TableKey)
     {
         return false;
@@ -2054,35 +2041,11 @@ public:
     {
         return false;
     }
-    bool insert_link_column(ColKey, DataType, StringData, size_t, size_t)
-    {
-        return false;
-    }
     bool erase_column(ColKey)
     {
         return false;
     }
-    bool erase_link_column(size_t, size_t, size_t)
-    {
-        return false;
-    }
     bool rename_column(ColKey)
-    {
-        return false;
-    }
-    bool add_search_index(size_t)
-    {
-        return false;
-    }
-    bool remove_search_index(size_t)
-    {
-        return false;
-    }
-    bool add_primary_key(size_t)
-    {
-        return false;
-    }
-    bool remove_primary_key()
     {
         return false;
     }
@@ -2094,131 +2057,31 @@ public:
     {
         return false;
     }
-    bool add_row_with_key(size_t, size_t, size_t, int64_t)
-    {
-        return false;
-    }
     bool remove_object(ObjKey)
     {
         return false;
     }
-    bool swap_rows(size_t, size_t)
+    bool collection_set(size_t)
     {
         return false;
     }
-    bool move_row(size_t, size_t)
+    bool collection_clear(size_t)
     {
         return false;
     }
-    bool list_set(size_t)
+    bool collection_erase(size_t)
     {
         return false;
     }
-    bool list_clear(size_t)
+    bool collection_insert(size_t)
     {
         return false;
     }
-    bool list_erase(size_t)
-    {
-        return false;
-    }
-    bool link_list_nullify(size_t, size_t)
-    {
-        return false;
-    }
-    bool list_insert(size_t)
-    {
-        return false;
-    }
-    bool list_move(size_t, size_t)
-    {
-        return false;
-    }
-    bool dictionary_insert(size_t, Mixed)
-    {
-        return false;
-    }
-    bool dictionary_set(size_t, Mixed)
-    {
-        return false;
-    }
-    bool dictionary_erase(size_t, Mixed)
-    {
-        return false;
-    }
-    bool set_insert(size_t)
-    {
-        return false;
-    }
-    bool set_erase(size_t)
-    {
-        return false;
-    }
-    bool set_clear(size_t)
+    bool collection_move(size_t, size_t)
     {
         return false;
     }
     bool modify_object(ColKey, ObjKey)
-    {
-        return false;
-    }
-    bool add_int(size_t, size_t, int_fast64_t)
-    {
-        return false;
-    }
-    bool set_bool(size_t, size_t, bool, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_float(size_t, size_t, float, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_double(size_t, size_t, double, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_string(size_t, size_t, StringData, _impl::Instruction, size_t)
-    {
-        return false;
-    }
-    bool set_binary(size_t, size_t, BinaryData, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_timestamp(size_t, size_t, Timestamp, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_table(size_t, size_t, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_mixed(size_t, size_t, const Mixed&, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_link(size_t, size_t, size_t, size_t, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_null(size_t, size_t, _impl::Instruction, size_t)
-    {
-        return false;
-    }
-    bool nullify_link(size_t, size_t, size_t)
-    {
-        return false;
-    }
-    bool insert_substring(size_t, size_t, size_t, StringData)
-    {
-        return false;
-    }
-    bool erase_substring(size_t, size_t, size_t, size_t)
-    {
-        return false;
-    }
-    bool optimize_table()
     {
         return false;
     }
@@ -2351,13 +2214,13 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 CHECK(o == o1 || o == o0);
                 return true;
             }
-            bool select_link_list(ColKey col, ObjKey o)
+            bool select_collection(ColKey col, ObjKey o)
             {
                 CHECK(col == link_list_col);
                 CHECK(o == okey);
                 return true;
             }
-            bool list_erase(size_t ndx)
+            bool collection_erase(size_t ndx)
             {
                 CHECK(ndx == 0);
                 return true;
@@ -2399,7 +2262,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            bool list_clear(size_t old_size) const
+            bool collection_clear(size_t old_size) const
             {
                 CHECK_EQUAL(3, old_size);
                 return true;
@@ -3041,109 +2904,6 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_IntIndex)
     target->clear();
 }
 
-
-TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history());
-    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
-    ColKey c0, c1;
-    {
-        WriteTransaction wt(sg);
-        c0 = wt.add_table("table 1")->add_column(type_Int, "int");
-        c1 = wt.add_table("table 2")->add_column(type_Int, "int");
-        wt.commit();
-    }
-
-    auto tr = sg->start_read();
-
-    ObjKey o0, o1;
-    {
-        WriteTransaction wt(sg);
-        wt.get_table("table 1")->get_key();
-        wt.get_table("table 2")->get_key();
-        o0 = wt.get_table("table 1")->create_object().get_key();
-        o1 = wt.get_table("table 2")->create_object().get_key();
-        wt.commit();
-    }
-    ColKey c2, c3;
-    ObjKey okey;
-    {
-        // Add a table with some links
-        WriteTransaction wt(sg);
-        TableRef table = wt.add_table("link origin");
-        c2 = table->add_column(*wt.get_table("table 1"), "link");
-        c3 = table->add_column_list(*wt.get_table("table 2"), "linklist");
-        Obj o = table->create_object();
-        o.set(c2, o.get_key());
-        o.get_linklist(c3).add(o.get_key());
-        okey = o.get_key();
-        wt.commit();
-
-        tr->advance_read();
-    }
-    {
-        // Verify that rolling back deletion restores links correctly
-        auto wt = sg->start_write();
-        wt->get_table("table 1")->remove_object(o0);
-        wt->get_table("table 2")->remove_object(o1);
-
-        struct : NoOpTransactionLogParser {
-            using NoOpTransactionLogParser::NoOpTransactionLogParser;
-
-            bool create_object(ObjKey o)
-            {
-                CHECK(o == o1 || o == o0);
-                return true;
-            }
-            bool select_link_list(ColKey col, ObjKey o)
-            {
-                CHECK(col == link_list_col);
-                CHECK(o == okey);
-                return true;
-            }
-            bool list_insert(size_t ndx)
-            {
-                CHECK(ndx == 0);
-                return true;
-            }
-
-            bool modify_object(ColKey col, ObjKey obj)
-            {
-                CHECK(col == link_col && obj == okey);
-                return true;
-            }
-            ObjKey o0, o1, okey;
-            ColKey link_col, link_list_col;
-        } parser(test_context);
-        parser.o1 = o1;
-        parser.o0 = o0;
-        parser.okey = okey;
-        parser.link_col = c2;
-        parser.link_list_col = c3;
-        wt->rollback_and_continue_as_read(&parser);
-    }
-    // Verify that clear() is rolled back appropriately
-    tr->promote_to_write();
-    tr->get_table("link origin")->begin()->get_linklist(c3).clear();
-
-    {
-        struct foo : NoOpTransactionLogParser {
-            using NoOpTransactionLogParser::NoOpTransactionLogParser;
-
-            size_t list_ndx = 0;
-
-            bool list_insert(size_t ndx)
-            {
-                CHECK_EQUAL(list_ndx, ndx);
-                ++list_ndx;
-                return true;
-            }
-        } parser(test_context);
-        tr->rollback_and_continue_as_read(&parser);
-        CHECK(parser.list_ndx == 1);
-    }
-}
 
 TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
 {
@@ -3986,7 +3746,7 @@ struct HandoverControl {
         while (m_handover != nullptr)
             m_changed.wait(lg);
         // std::cout << " -- put " << h << std::endl;
-        m_handover = move(h);
+        m_handover = std::move(h);
         m_changed.notify_all();
     }
     void get(std::unique_ptr<T>& h)
@@ -3996,7 +3756,7 @@ struct HandoverControl {
         while (m_handover == nullptr)
             m_changed.wait(lg);
         // std::cout << " -- get " << m_handover << std::endl;
-        h = move(m_handover);
+        h = std::move(m_handover);
         m_handover = nullptr;
         m_changed.notify_all();
     }
@@ -4005,7 +3765,7 @@ struct HandoverControl {
         LockGuard lg(m_lock);
         if (m_handover == nullptr)
             return false;
-        h = move(m_handover);
+        h = std::move(m_handover);
         m_handover = nullptr;
         m_changed.notify_all();
         return true;
