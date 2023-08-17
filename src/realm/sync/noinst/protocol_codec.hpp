@@ -512,14 +512,11 @@ private:
         catch (const nlohmann::json::exception& e) {
             return report_error("Malformed json in log_message message: \"%1\": %2", message_body_str, e.what());
         }
-        static constexpr std::array<std::pair<std::string_view, util::Logger::Level>, 7> name_to_level = {
-            std::make_pair("fatal", util::Logger::Level::fatal),
-            std::make_pair("error", util::Logger::Level::error),
-            std::make_pair("warn", util::Logger::Level::warn),
-            std::make_pair("info", util::Logger::Level::info),
-            std::make_pair("detail", util::Logger::Level::detail),
-            std::make_pair("debug", util::Logger::Level::debug),
-            std::make_pair("trace", util::Logger::Level::trace),
+        static const std::unordered_map<std::string_view, util::Logger::Level> name_to_level = {
+            {"fatal", util::Logger::Level::fatal},   {"error", util::Logger::Level::error},
+            {"warn", util::Logger::Level::warn},     {"info", util::Logger::Level::info},
+            {"detail", util::Logger::Level::detail}, {"debug", util::Logger::Level::debug},
+            {"trace", util::Logger::Level::trace},
         };
 
         // connection id (co_id) is optional and level and msg are optional if a co_id is provided
@@ -561,19 +558,13 @@ private:
         }
 
         if (has_level) {
-            util::Logger::Level parsed_level;
-            if (auto it = std::find_if(name_to_level.begin(), name_to_level.end(),
-                                       [&](const decltype(name_to_level)::value_type& cur) {
-                                           return cur.first == log_level;
-                                       });
-                it != name_to_level.end()) {
-                parsed_level = it->second;
+            try {
+                util::Logger::Level parsed_level = name_to_level.at(log_level);
+                connection.receive_server_log_message(session_ident, parsed_level, msg_text);
             }
-            else {
+            catch (const std::out_of_range&) {
                 return report_error("Unknown log level found in log_message: \"%1\"", log_level);
             }
-
-            connection.receive_server_log_message(session_ident, parsed_level, msg_text);
         }
     }
 

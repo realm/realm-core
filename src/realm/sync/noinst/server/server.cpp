@@ -1375,6 +1375,7 @@ private:
         std::optional<std::string> co_id;
     };
 
+    std::mutex m_log_mutex;
     std::queue<LogMessage> m_log_messages;
 
     static std::string make_logger_prefix(int_fast64_t id)
@@ -4485,8 +4486,11 @@ void SyncConnection::send_log_message(util::Logger::Level level, const std::stri
     }
     else {
         LogMessage log_msg{sess_ident, level, std::move(message), std::move(co_id)};
-        m_log_messages.push(log_msg);
-        m_send_trigger->trigger();
+        {
+            std::lock_guard log_guard(m_log_mutex);
+            m_log_messages.push(std::move(log_msg));
+            m_send_trigger->trigger();
+        }
     }
 }
 
@@ -4563,10 +4567,12 @@ void SyncConnection::send_next_message()
         if (m_is_sending)
             return;
     }
-    if (!m_log_messages.empty()) {
-        auto log_msg = m_log_messages.front();
-        m_log_messages.pop();
-        send_log_message(log_msg);
+    {
+        std::lock_guard log_guard(m_log_mutex);
+        if (!m_log_messages.empty()) {
+            send_log_message(m_log_messages.front());
+            m_log_messages.pop();
+        }
     }
     // Otherwise, nothing to do
 }

@@ -817,8 +817,6 @@ void Connection::handle_connection_established()
 
     m_state = ConnectionState::connected;
 
-    // Server connection id will be provided via a LOG_MESSAGE protocol message
-
     milliseconds_type now = monotonic_clock_now();
     m_pong_wait_started_at = now; // Initially, no time was spent waiting for a PONG message
     initiate_ping_delay(now);     // Throws
