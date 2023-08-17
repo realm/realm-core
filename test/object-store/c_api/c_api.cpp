@@ -5270,6 +5270,18 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         CHECK(value.type == RLM_TYPE_STRING);
         CHECK(strncmp(value.string.data, "Hello", value.string.size) == 0);
     }
+    SECTION("json") {
+        REQUIRE(realm_set_json(
+            obj1.get(), foo_any_col_key,
+            "[{\"Seven\":7, \"Six\":6}, \"Hello\", {\"Points\": [1.25, 4.5, 6.75], \"Hello\": \"World\"}]"));
+        realm_value_t value;
+        realm_get_value(obj1.get(), foo_any_col_key, &value);
+        REQUIRE(value.type == RLM_TYPE_LIST);
+        auto list = cptr_checked(realm_get_list(obj1.get(), foo_any_col_key));
+        size_t size;
+        checked(realm_list_size(list.get(), &size));
+        CHECK(size == 3);
+    }
     realm_release(realm);
 }
 

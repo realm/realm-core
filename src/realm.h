@@ -1632,6 +1632,14 @@ RLM_API bool realm_get_values(const realm_object_t*, size_t num_values, const re
 RLM_API bool realm_set_value(realm_object_t*, realm_property_key_t, realm_value_t new_value, bool is_default);
 
 /**
+ * Assign a JSON formatted string to a Mixed property. Underlying structures will be created as needed
+ *
+ * @param json_string The new value for the property.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_set_json(realm_object_t*, realm_property_key_t, const char* json_string);
+
+/**
  * Create an embedded object in a given property.
  *
  * @return A non-NULL pointer if the object was created successfully.
