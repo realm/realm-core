@@ -3797,7 +3797,6 @@ TEST_CASE("flx: open realm + register subscription callack while bootstrapping",
     }
 
     SECTION("Async open") {
-
         SECTION("Initial async open with no rerun on open set") {
             // subscription will be run since this is the first time we are opening the realm file.
             auto open_realm_pf = util::make_promise_future<bool>();
