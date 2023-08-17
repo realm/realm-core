@@ -604,6 +604,9 @@ public:
 
     void make_pong(OutputBuffer&, milliseconds_type timestamp);
 
+    void make_log_message(OutputBuffer& out, util::Logger::Level level, std::string message,
+                          session_ident_type sess_id = 0);
+
     // Messages received by the server.
 
     // parse_ping_received takes a (WebSocket) ping and parses it.

@@ -1302,6 +1302,8 @@ public:
 
     void discard_session(session_ident_type) noexcept;
 
+    void send_log_message(util::Logger::Level level, const std::string&& message, session_ident_type sess_ident = 0);
+
 private:
     ServerImpl& m_server;
     const int_fast64_t m_id;
@@ -1362,6 +1364,14 @@ private:
     ProtocolError m_error_code = {};
     session_ident_type m_error_session_ident = 0;
 
+    struct LogMessage {
+        session_ident_type sess_ident;
+        util::Logger::Level level;
+        std::string message;
+    };
+
+    std::queue<LogMessage> m_log_messages;
+
     static std::string make_logger_prefix(int_fast64_t id)
     {
         std::ostringstream out;
@@ -1380,6 +1390,7 @@ private:
 
     void send_next_message();
     void send_pong(milliseconds_type timestamp);
+    void send_log_message(const LogMessage& log_msg);
 
     void handle_write_output_buffer();
     void handle_pong_output_buffer();
@@ -2401,6 +2412,9 @@ public:
 
         logger.info("Bound to client file (client_file_ident=%1)", client_file_ident); // Throws
 
+        send_log_message(util::Logger::Level::debug, util::format("Session %1 bound to client file ident %2",
+                                                                  m_session_ident, client_file_ident));
+
         m_server_file->identify_session(this, client_file_ident); // Throws
 
         m_client_file_ident = client_file_ident;
@@ -3098,6 +3112,11 @@ private:
 
         m_error_message_sent = true;
         // Protocol state is now WaitForUnbindErr
+    }
+
+    void send_log_message(util::Logger::Level level, const std::string&& message)
+    {
+        m_connection.send_log_message(level, std::move(message), m_session_ident);
     }
 
     // Idempotent
@@ -4199,6 +4218,7 @@ void SyncConnection::initiate()
     m_last_activity_at = steady_clock_now();
     logger.debug("Sync Connection initiated");
     m_websocket.initiate_server_websocket_after_handshake();
+    send_log_message(util::Logger::Level::info, "Client connection established with server");
 }
 
 
@@ -4440,6 +4460,14 @@ void SyncConnection::receive_error_message(session_ident_type session_ident, int
     sess.receive_error_message(session_ident, error_code, error_body); // Throws
 }
 
+void SyncConnection::send_log_message(util::Logger::Level level, const std::string&& message,
+                                      session_ident_type sess_ident)
+{
+    LogMessage log_msg{sess_ident, level, std::move(message)};
+    m_log_messages.push(log_msg);
+    m_send_trigger->trigger();
+}
+
 
 void SyncConnection::bad_session_ident(const char* message_type, session_ident_type session_ident)
 {
@@ -4497,7 +4525,7 @@ void SyncConnection::send_next_message()
         if (!sess) {
             // No sessions were enlisted to send
             if (REALM_LIKELY(!m_is_closing))
-                return; // Nothing more to do right now
+                break; // Check to see if there are any log messages to go out
             // Send a connection level ERROR
             REALM_ASSERT(!is_session_level_error(m_error_code));
             initiate_write_error(m_error_code, m_error_session_ident); // Throws
@@ -4513,6 +4541,12 @@ void SyncConnection::send_next_message()
         if (m_is_sending)
             return;
     }
+    if (!m_log_messages.empty()) {
+        auto log_msg = m_log_messages.front();
+        m_log_messages.pop();
+        send_log_message(log_msg);
+    }
+    // Otherwise, nothing to do
 }
 
 
@@ -4555,6 +4589,14 @@ void SyncConnection::send_pong(milliseconds_type timestamp)
     get_server_protocol().make_pong(out, timestamp); // Throws
 
     initiate_pong_output_buffer(); // Throws
+}
+
+void SyncConnection::send_log_message(const LogMessage& log_msg)
+{
+    OutputBuffer& out = get_output_buffer();
+    get_server_protocol().make_log_message(out, log_msg.level, log_msg.message, log_msg.sess_ident); // Throws
+
+    initiate_write_output_buffer(); // Throws
 }
 
 
