@@ -579,6 +579,7 @@ private:
     void receive_unbound_message(session_ident_type);
     void receive_test_command_response(session_ident_type, request_ident_type, std::string_view body);
     void receive_server_log_message(session_ident_type, util::Logger::Level, std::string_view body);
+    void receive_appservices_coid(std::string_view coid);
     void handle_protocol_error(Status status);
 
     // These are only called from Session class.
@@ -702,6 +703,7 @@ private:
 
     const connection_ident_type m_ident;
     const ServerEndpoint m_server_endpoint;
+    std::string m_appservices_coid;
 
     /// DEPRECATED - These will be removed in a future release
     const std::string m_authorization_header_name;

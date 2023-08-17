@@ -245,56 +245,7 @@ public:
                                                  session_ident); // Throws
             }
             else if (message_type == "log_message") { // introduced in protocol version 10
-                auto session_ident = msg.read_next<session_ident_type>();
-                auto message_length = msg.read_next<size_t>('\n');
-                auto message_body_str = msg.read_sized_data<std::string_view>(message_length);
-                nlohmann::json message_body;
-                try {
-                    message_body = nlohmann::json::parse(message_body_str);
-                }
-                catch (const nlohmann::json::exception& e) {
-                    return report_error("Malformed json in log_message message: \"%1\": %2", message_body_str,
-                                        e.what());
-                }
-
-                static constexpr std::array<std::pair<std::string_view, util::Logger::Level>, 7> name_to_level = {
-                    std::make_pair("fatal", util::Logger::Level::fatal),
-                    std::make_pair("error", util::Logger::Level::error),
-                    std::make_pair("warn", util::Logger::Level::warn),
-                    std::make_pair("info", util::Logger::Level::info),
-                    std::make_pair("detail", util::Logger::Level::detail),
-                    std::make_pair("debug", util::Logger::Level::debug),
-                    std::make_pair("trace", util::Logger::Level::trace),
-                };
-
-                std::string_view log_level;
-                if (auto it = message_body.find("level"); it != message_body.end() && it->is_string()) {
-                    log_level = it->get<std::string_view>();
-                }
-                else {
-                    return report_error("log_message must contain a \"level\" parameter that is a string");
-                }
-                std::string_view msg_text;
-                if (auto it = message_body.find("msg"); it != message_body.end() && it->is_string()) {
-                    msg_text = it->get<std::string_view>();
-                }
-                else {
-                    return report_error("log_message must contain a \"msg\" parameter that is a string");
-                }
-
-                util::Logger::Level parsed_level;
-                if (auto it = std::find_if(name_to_level.begin(), name_to_level.end(),
-                                           [&](const decltype(name_to_level)::value_type& cur) {
-                                               return cur.first == log_level;
-                                           });
-                    it != name_to_level.end()) {
-                    parsed_level = it->second;
-                }
-                else {
-                    return report_error("Unknown log level found in log_message: \"%1\"", log_level);
-                }
-
-                connection.receive_server_log_message(session_ident, parsed_level, msg_text);
+                parse_log_message(connection, msg);
             }
             else if (message_type == "json_error") { // introduced in protocol 4
                 sync::ProtocolErrorInfo info{};
@@ -543,6 +494,89 @@ private:
         return action::ApplicationBug;
     }
 
+    template <typename Connection>
+    void parse_log_message(Connection& connection, HeaderLineParser& msg)
+    {
+        auto report_error = [&](const auto fmt, auto&&... args) {
+            auto msg = util::format(fmt, std::forward<decltype(args)>(args)...);
+            connection.handle_protocol_error(Status{ErrorCodes::SyncProtocolInvariantFailed, std::move(msg)});
+        };
+
+        auto session_ident = msg.read_next<session_ident_type>();
+        auto message_length = msg.read_next<size_t>('\n');
+        auto message_body_str = msg.read_sized_data<std::string_view>(message_length);
+        nlohmann::json message_body;
+        try {
+            message_body = nlohmann::json::parse(message_body_str);
+        }
+        catch (const nlohmann::json::exception& e) {
+            return report_error("Malformed json in log_message message: \"%1\": %2", message_body_str, e.what());
+        }
+        static constexpr std::array<std::pair<std::string_view, util::Logger::Level>, 7> name_to_level = {
+            std::make_pair("fatal", util::Logger::Level::fatal),
+            std::make_pair("error", util::Logger::Level::error),
+            std::make_pair("warn", util::Logger::Level::warn),
+            std::make_pair("info", util::Logger::Level::info),
+            std::make_pair("detail", util::Logger::Level::detail),
+            std::make_pair("debug", util::Logger::Level::debug),
+            std::make_pair("trace", util::Logger::Level::trace),
+        };
+
+        // connection id (co_id) is optional and level and msg are optional if a co_id is provided
+        std::string_view co_id;
+        bool has_co_id = false;
+        if (auto it = message_body.find("co_id"); it != message_body.end() && it->is_string()) {
+            co_id = it->get<std::string_view>();
+            if (!co_id.empty()) {
+                has_co_id = true;
+                connection.receive_appservices_coid(co_id);
+            }
+            else {
+                return report_error("log_message contained an empty \"co_id\" parameter");
+            }
+        }
+
+        std::string_view log_level;
+        bool has_level = false;
+        if (auto it = message_body.find("level"); it != message_body.end() && it->is_string()) {
+            log_level = it->get<std::string_view>();
+            has_level = true;
+            if (log_level.empty()) {
+                return report_error("log_message contained an empty \"level\" parameter");
+            }
+        }
+        else if (!has_co_id) {
+            return report_error("log_message must contain a \"level\" parameter that is a string");
+        }
+        std::string_view msg_text;
+        if (auto it = message_body.find("msg"); it != message_body.end() && it->is_string()) {
+            msg_text = it->get<std::string_view>();
+            // a msg value must always have a level value, whether co_id is provided or not
+            if (!has_level) {
+                return report_error("log_message contained a \"msg\" parameter but no \"level\" parameter");
+            }
+        }
+        else if (!has_co_id) {
+            return report_error("log_message must contain a \"msg\" parameter that is a string");
+        }
+
+        if (has_level) {
+            util::Logger::Level parsed_level;
+            if (auto it = std::find_if(name_to_level.begin(), name_to_level.end(),
+                                       [&](const decltype(name_to_level)::value_type& cur) {
+                                           return cur.first == log_level;
+                                       });
+                it != name_to_level.end()) {
+                parsed_level = it->second;
+            }
+            else {
+                return report_error("Unknown log level found in log_message: \"%1\"", log_level);
+            }
+
+            connection.receive_server_log_message(session_ident, parsed_level, msg_text);
+        }
+    }
+
     static constexpr std::size_t s_max_body_size = std::numeric_limits<std::size_t>::max();
 
     // Permanent buffer to use for building messages.
@@ -605,7 +639,7 @@ public:
     void make_pong(OutputBuffer&, milliseconds_type timestamp);
 
     void make_log_message(OutputBuffer& out, util::Logger::Level level, std::string message,
-                          session_ident_type sess_id = 0);
+                          session_ident_type sess_id = 0, std::optional<std::string> co_id = std::nullopt);
 
     // Messages received by the server.
 

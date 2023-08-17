@@ -461,6 +461,11 @@ void Connection::websocket_connected_handler(const std::string& protocol)
                     (value_2 >= get_oldest_supported_protocol_version() && value_2 <= get_current_protocol_version());
                 if (good_version) {
                     logger.detail("Negotiated protocol version: %1", value_2);
+                    // Grab the connection ID from the websocket if the protocol version is less than 10,
+                    // otherwise, this value will come in a server log message
+                    if (value_2 < 10) {
+                        receive_appservices_coid(m_websocket->get_appservices_request_id());
+                    }
                     m_negotiated_protocol_version = value_2;
                     handle_connection_established(); // Throws
                     return;
@@ -1405,16 +1410,35 @@ void Connection::receive_test_command_response(session_ident_type session_ident,
 void Connection::receive_server_log_message(session_ident_type session_ident, util::Logger::Level level,
                                             std::string_view message)
 {
+    std::string prefix;
+    if (REALM_LIKELY(!m_appservices_coid.empty())) {
+        prefix = util::format("Server[%1]", m_appservices_coid);
+    }
+    else {
+        prefix = "Server";
+    }
+
     if (session_ident != 0) {
         if (auto sess = get_session(session_ident)) {
-            sess->logger.log(level, "Server log message: %1", message);
+            sess->logger.log(level, "%1 log: %2", prefix, message);
             return;
         }
 
-        logger.log(level, "Server log message for unknown session %1: %2", session_ident, message);
+        logger.log(level, "%1 log for unknown session %2: %3", prefix, session_ident, message);
+        return;
     }
 
-    logger.log(level, "Server log message: %1", message);
+    logger.log(level, "%1 log: %2", prefix, message);
+}
+
+
+void Connection::receive_appservices_coid(std::string_view coid)
+{
+    // Only set once per connection
+    if (m_appservices_coid.empty()) {
+        m_appservices_coid = coid;
+        logger.info("Connected to app services with request id: \"%1\"", m_appservices_coid);
+    }
 }
 
 
@@ -1443,11 +1467,7 @@ void Connection::enlist_to_send(Session* sess)
 
 std::string Connection::get_active_appservices_connection_id()
 {
-    if (!m_websocket) {
-        return {};
-    }
-
-    return std::string{m_websocket->get_appservices_request_id()};
+    return m_appservices_coid;
 }
 
 void Session::cancel_resumption_delay()

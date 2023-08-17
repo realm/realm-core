@@ -1082,7 +1082,7 @@ public:
     SyncConnection(ServerImpl& serv, std::int_fast64_t id, std::unique_ptr<network::Socket>&& socket,
                    std::unique_ptr<network::ssl::Stream>&& ssl_stream,
                    std::unique_ptr<network::ReadAheadBuffer>&& read_ahead_buffer, int client_protocol_version,
-                   std::string client_user_agent, std::string remote_endpoint)
+                   std::string client_user_agent, std::string remote_endpoint, std::string appservices_request_id)
         : logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(id), serv.logger_ptr)} // Throws
         , logger{*logger_ptr}
         , m_server{serv}
@@ -1094,6 +1094,7 @@ public:
         , m_client_protocol_version{client_protocol_version}
         , m_client_user_agent{std::move(client_user_agent)}
         , m_remote_endpoint{std::move(remote_endpoint)}
+        , m_appservices_request_id{std::move(appservices_request_id)}
     {
         // Make the output buffer stream throw std::bad_alloc if it fails to
         // expand the buffer
@@ -1302,7 +1303,8 @@ public:
 
     void discard_session(session_ident_type) noexcept;
 
-    void send_log_message(util::Logger::Level level, const std::string&& message, session_ident_type sess_ident = 0);
+    void send_log_message(util::Logger::Level level, const std::string&& message, session_ident_type sess_ident = 0,
+                          std::optional<std::string> co_id = std::nullopt);
 
 private:
     ServerImpl& m_server;
@@ -1323,6 +1325,8 @@ private:
     const std::string m_client_user_agent;
 
     const std::string m_remote_endpoint;
+
+    const std::string m_appservices_request_id;
 
     // A queue of sessions that have enlisted for an opportunity to send a
     // message. Sessions will be served in the order that they enlist. A session
@@ -1368,6 +1372,7 @@ private:
         session_ident_type sess_ident;
         util::Logger::Level level;
         std::string message;
+        std::optional<std::string> co_id;
     };
 
     std::queue<LogMessage> m_log_messages;
@@ -1589,6 +1594,11 @@ public:
                           "HTTP connection closed (response timeout)"); // Throws
             }
         }
+    }
+
+    std::string get_appservices_request_id() const
+    {
+        return m_appservices_request_id.to_string();
     }
 
 private:
@@ -1884,8 +1894,8 @@ private:
 
                 std::unique_ptr<SyncConnection> sync_conn = std::make_unique<SyncConnection>(
                     m_server, m_id, std::move(m_socket), std::move(m_ssl_stream), std::move(m_read_ahead_buffer),
-                    negotiated_protocol_version, std::move(user_agent),
-                    std::move(m_remote_endpoint)); // Throws
+                    negotiated_protocol_version, std::move(user_agent), std::move(m_remote_endpoint),
+                    get_appservices_request_id()); // Throws
                 SyncConnection& sync_conn_ref = *sync_conn;
                 m_server.add_sync_connection(m_id, std::move(sync_conn));
                 m_server.remove_http_connection(m_id);
@@ -1944,7 +1954,7 @@ private:
     {
         response.headers["Server"] = "RealmSync/" REALM_VERSION_STRING; // Throws
         // This isn't a real X-Appservices-Request-Id, but it should be enough to test with
-        response.headers["X-Appservices-Request-Id"] = m_appservices_request_id.to_string();
+        response.headers["X-Appservices-Request-Id"] = get_appservices_request_id();
     }
 
     void read_error(std::error_code ec)
@@ -3116,7 +3126,13 @@ private:
 
     void send_log_message(util::Logger::Level level, const std::string&& message)
     {
-        m_connection.send_log_message(level, std::move(message), m_session_ident);
+        // Clients with protocol version less than 10 do not support log messages
+        if (m_connection.get_client_protocol_version() < 10) {
+            logger.log(level, message.c_str());
+        }
+        else {
+            m_connection.send_log_message(level, std::move(message), m_session_ident);
+        }
     }
 
     // Idempotent
@@ -4218,7 +4234,8 @@ void SyncConnection::initiate()
     m_last_activity_at = steady_clock_now();
     logger.debug("Sync Connection initiated");
     m_websocket.initiate_server_websocket_after_handshake();
-    send_log_message(util::Logger::Level::info, "Client connection established with server");
+    send_log_message(util::Logger::Level::info, "Client connection established with server", 0,
+                     m_appservices_request_id);
 }
 
 
@@ -4461,11 +4478,16 @@ void SyncConnection::receive_error_message(session_ident_type session_ident, int
 }
 
 void SyncConnection::send_log_message(util::Logger::Level level, const std::string&& message,
-                                      session_ident_type sess_ident)
+                                      session_ident_type sess_ident, std::optional<std::string> co_id)
 {
-    LogMessage log_msg{sess_ident, level, std::move(message)};
-    m_log_messages.push(log_msg);
-    m_send_trigger->trigger();
+    if (get_client_protocol_version() < 10) {
+        logger.log(level, message.c_str());
+    }
+    else {
+        LogMessage log_msg{sess_ident, level, std::move(message), std::move(co_id)};
+        m_log_messages.push(log_msg);
+        m_send_trigger->trigger();
+    }
 }
 
 
@@ -4594,7 +4616,8 @@ void SyncConnection::send_pong(milliseconds_type timestamp)
 void SyncConnection::send_log_message(const LogMessage& log_msg)
 {
     OutputBuffer& out = get_output_buffer();
-    get_server_protocol().make_log_message(out, log_msg.level, log_msg.message, log_msg.sess_ident); // Throws
+    get_server_protocol().make_log_message(out, log_msg.level, log_msg.message, log_msg.sess_ident,
+                                           log_msg.co_id); // Throws
 
     initiate_write_output_buffer(); // Throws
 }
