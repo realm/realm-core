@@ -316,10 +316,10 @@ int64_t CollectionParent::generate_key(size_t sz)
             key = int8_t(gen32());
         }
         else if (sz < 0x1000) {
-            key = int32_t(gen32());
+            key = int16_t(gen32());
         }
         else {
-            key = int64_t(gen32());
+            key = int32_t(gen32());
         }
     } while (key == 0);
 

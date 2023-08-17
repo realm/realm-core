@@ -228,6 +228,31 @@ const Spec& Obj::get_spec() const
     return m_table.unchecked_ptr()->m_spec;
 }
 
+ColIndex Obj::build_index(ColKey col_key) const
+{
+    if (col_key.is_collection()) {
+        return {col_key, 0};
+    }
+    REALM_ASSERT(col_key.get_type() == col_type_Mixed);
+    ArrayMixed values(_get_alloc());
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
+    values.init_from_ref(ref);
+    auto key = values.get_key(m_row_ndx);
+    return {col_key, key};
+}
+
+bool Obj::check_index(ColIndex index) const
+{
+    if (index.is_collection()) {
+        return true;
+    }
+    ArrayMixed values(_get_alloc());
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), index.get_index().val + 1));
+    values.init_from_ref(ref);
+    auto key = values.get_key(m_row_ndx);
+    return key == index.get_key();
+}
+
 Replication* Obj::get_replication() const
 {
     return m_table->get_repl();
@@ -1094,12 +1119,12 @@ StablePath Obj::get_stable_path() const noexcept
 
 void Obj::add_index(Path& path, Index index) const
 {
-    auto col_key = mpark::get<ColKey>(index);
+    auto col_index = mpark::get<ColIndex>(index);
     if (path.empty()) {
-        path.emplace_back(col_key);
+        path.emplace_back(get_table()->get_column_key(col_index));
     }
     else {
-        StringData col_name = get_table()->get_column_name(col_key);
+        StringData col_name = get_table()->get_column_name(col_index);
         path.emplace_back(col_name);
     }
 }
@@ -1981,9 +2006,18 @@ void Obj::set_collection(ColKey col_key, CollectionType type)
     REALM_ASSERT(col_key.get_type() == col_type_Mixed);
     update_if_needed();
     Mixed new_val(0, type);
-    auto old_val = get<Mixed>(col_key);
+
+    ArrayMixed values(_get_alloc());
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
+    values.init_from_ref(ref);
+    auto old_val = values.get(m_row_ndx);
+
     if (old_val != new_val) {
         set(col_key, Mixed(0, type));
+        // Update ref after write
+        ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
+        values.init_from_ref(ref);
+        values.set_key(m_row_ndx, generate_key(1));
     }
 }
 
@@ -2006,7 +2040,7 @@ CollectionListPtr Obj::get_collection_list(ColKey col_key) const
 {
     REALM_ASSERT(m_table->get_nesting_levels(col_key) > 0);
     auto coll_type = m_table->get_nested_column_type(col_key, 0);
-    return CollectionList::create(std::make_shared<Obj>(*this), col_key, col_key, coll_type);
+    return CollectionList::create(std::make_shared<Obj>(*this), col_key, build_index(col_key), coll_type);
 }
 
 CollectionPtr Obj::get_collection_ptr(const Path& path) const
@@ -2099,8 +2133,8 @@ CollectionPtr Obj::get_collection_ptr(const Path& path) const
 
 CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
 {
-    // First element in path is column key
-    auto col_key = mpark::get<ColKey>(path[0]);
+    // First element in path is phony column key
+    ColKey col_key = m_table->get_column_key(mpark::get<ColIndex>(path[0]));
     size_t nesting_levels = m_table->get_nesting_levels(col_key);
     CollectionListPtr list;
     size_t level = 0;
@@ -2476,41 +2510,41 @@ ref_type Obj::Internal::get_ref(const Obj& obj, ColKey col_key)
 
 ref_type Obj::get_collection_ref(Index index, CollectionType type) const
 {
-    ColKey col_key = mpark::get<ColKey>(index);
-    if (col_key.is_collection()) {
-        return to_ref(_get<int64_t>(col_key.get_index()));
+    ColIndex col_index = mpark::get<ColIndex>(index);
+    if (col_index.is_collection()) {
+        return to_ref(_get<int64_t>(col_index.get_index()));
     }
-    if (col_key.get_type() == col_type_Mixed) {
-        auto val = _get<Mixed>(col_key.get_index());
-        if (!val.is_type(DataType(int(type)))) {
-            throw IllegalOperation("Not proper collection type");
-        }
-        return val.get_ref();
+    if (!check_index(col_index)) {
+        throw IllegalOperation("This collection has joined the choir invisible");
     }
-    return 0;
+
+    auto val = _get<Mixed>(col_index.get_index());
+    if (!val.is_type(DataType(int(type)))) {
+        throw IllegalOperation("Not proper collection type");
+    }
+    return val.get_ref();
 }
 
 bool Obj::check_collection_ref(Index index, CollectionType type) const noexcept
 {
-    ColKey col_key = mpark::get<ColKey>(index);
-    if (col_key.is_collection()) {
+    ColIndex col_index = mpark::get<ColIndex>(index);
+    if (col_index.is_collection()) {
         return true;
     }
-    if (col_key.get_type() == col_type_Mixed) {
-        return _get<Mixed>(col_key.get_index()).is_type(DataType(int(type)));
+    if (check_index(col_index)) {
+        return _get<Mixed>(col_index.get_index()).is_type(DataType(int(type)));
     }
     return false;
 }
 
 void Obj::set_collection_ref(Index index, ref_type ref, CollectionType type)
 {
-    ColKey col_key = mpark::get<ColKey>(index);
-    if (col_key.is_collection()) {
-        set_int(col_key, from_ref(ref));
+    ColIndex col_index = mpark::get<ColIndex>(index);
+    if (col_index.is_collection()) {
+        set_int(col_index.get_index(), from_ref(ref));
         return;
     }
-    REALM_ASSERT(col_key.get_type() == col_type_Mixed);
-    set_ref(col_key, ref, type);
+    set_ref(col_index.get_index(), ref, type);
 }
 
 } // namespace realm

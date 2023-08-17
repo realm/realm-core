@@ -779,9 +779,11 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             r->commit_transaction();
 
             advance_and_notify(*r);
-            REQUIRE(key_change.insertions.size() == 0);
-            REQUIRE(key_change.deletions[0].get_string() == keys[1]);
-            REQUIRE(key_change.modifications[0].get_string() == keys[0]);
+            CHECK(key_change.insertions.size() == 0);
+            REQUIRE(key_change.deletions.size() == 1);
+            REQUIRE(key_change.modifications.size() == 1);
+            CHECK(key_change.deletions[0].get_string() == keys[1]);
+            CHECK(key_change.modifications[0].get_string() == keys[0]);
 
             r->begin_transaction();
             dict.insert(keys[1], T(values[1]));

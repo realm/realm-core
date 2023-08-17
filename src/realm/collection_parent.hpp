@@ -72,8 +72,51 @@ enum class UpdateStatus {
     NoChange,
 };
 
+class ColIndex {
+public:
+    ColIndex()
+    {
+        value = uint32_t(-1);
+    }
+    explicit ColIndex(int64_t val)
+    {
+        value = uint32_t(val);
+    }
+    ColIndex(ColKey col_key, int64_t key)
+    {
+        value = uint32_t(col_key.get_index().val);
+        int is_collection = int(col_key.is_collection());
+        value += is_collection << 15;
+        value += (uint32_t(key) << 16);
+    }
+    ColKey::Idx get_index() const noexcept
+    {
+        return {unsigned(value & 0x7FFFU)};
+    }
+    int64_t get_key() const noexcept
+    {
+        return int32_t(value) >> 16;
+    }
+    bool is_collection() const noexcept
+    {
+        return (value & 0x8000U) != 0;
+    }
+    uint32_t raw() const noexcept
+    {
+        return value;
+    }
 
-using StableIndex = mpark::variant<ColKey, int64_t, std::string>;
+    bool operator==(const ColIndex& other) const noexcept
+    {
+        // Compare only index
+        return ((value ^ other.value) & 0x7FFFU) == 0;
+    }
+
+private:
+    uint32_t value;
+};
+
+using StableIndex = mpark::variant<ColIndex, int64_t, std::string>;
 using StablePath = std::vector<StableIndex>;
 
 class CollectionParent : public std::enable_shared_from_this<CollectionParent> {
