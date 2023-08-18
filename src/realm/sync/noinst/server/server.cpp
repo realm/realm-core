@@ -1079,6 +1079,9 @@ public:
     const std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
 
+    // Clients with protocol version less than 10 do not support log messages
+    static constexpr int SERVER_LOG_PROTOCOL_VERSION = 10;
+
     SyncConnection(ServerImpl& serv, std::int_fast64_t id, std::unique_ptr<network::Socket>&& socket,
                    std::unique_ptr<network::ssl::Stream>&& ssl_stream,
                    std::unique_ptr<network::ReadAheadBuffer>&& read_ahead_buffer, int client_protocol_version,
@@ -3127,13 +3130,11 @@ private:
 
     void send_log_message(util::Logger::Level level, const std::string&& message)
     {
-        // Clients with protocol version less than 10 do not support log messages
-        if (m_connection.get_client_protocol_version() < 10) {
-            logger.log(level, message.c_str());
+        if (m_connection.get_client_protocol_version() < SyncConnection::SERVER_LOG_PROTOCOL_VERSION) {
+            return logger.log(level, message.c_str());
         }
-        else {
-            m_connection.send_log_message(level, std::move(message), m_session_ident);
-        }
+
+        m_connection.send_log_message(level, std::move(message), m_session_ident);
     }
 
     // Idempotent
@@ -4481,17 +4482,16 @@ void SyncConnection::receive_error_message(session_ident_type session_ident, int
 void SyncConnection::send_log_message(util::Logger::Level level, const std::string&& message,
                                       session_ident_type sess_ident, std::optional<std::string> co_id)
 {
-    if (get_client_protocol_version() < 10) {
-        logger.log(level, message.c_str());
+    if (get_client_protocol_version() < SyncConnection::SERVER_LOG_PROTOCOL_VERSION) {
+        return logger.log(level, message.c_str());
     }
-    else {
-        LogMessage log_msg{sess_ident, level, std::move(message), std::move(co_id)};
-        {
-            std::lock_guard log_guard(m_log_mutex);
-            m_log_messages.push(std::move(log_msg));
-            m_send_trigger->trigger();
-        }
+
+    LogMessage log_msg{sess_ident, level, std::move(message), std::move(co_id)};
+    {
+        std::lock_guard lock(m_log_mutex);
+        m_log_messages.push(std::move(log_msg));
     }
+    m_send_trigger->trigger();
 }
 
 
@@ -4568,7 +4568,7 @@ void SyncConnection::send_next_message()
             return;
     }
     {
-        std::lock_guard log_guard(m_log_mutex);
+        std::lock_guard lock(m_log_mutex);
         if (!m_log_messages.empty()) {
             send_log_message(m_log_messages.front());
             m_log_messages.pop();

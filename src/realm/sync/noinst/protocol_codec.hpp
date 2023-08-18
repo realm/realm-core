@@ -541,14 +541,17 @@ private:
             return;
         }
 
-        try {
-            // If a log level wasn't provided, default to debug
-            util::Logger::Level parsed_level = has_level ? name_to_level.at(log_level) : util::Logger::Level::debug;
-            connection.receive_server_log_message(session_ident, parsed_level, msg_text);
+        // If a log level wasn't provided, default to debug
+        util::Logger::Level parsed_level = util::Logger::Level::debug;
+        if (has_level) {
+            if (auto it = name_to_level.find(log_level); it != name_to_level.end()) {
+                parsed_level = it->second;
+            }
+            else {
+                return report_error("Unknown log level found in log_message: \"%1\"", log_level);
+            }
         }
-        catch (const std::out_of_range&) {
-            return report_error("Unknown log level found in log_message: \"%1\"", log_level);
-        }
+        connection.receive_server_log_message(session_ident, parsed_level, msg_text);
     }
 
     static constexpr std::size_t s_max_body_size = std::numeric_limits<std::size_t>::max();
