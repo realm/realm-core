@@ -145,9 +145,11 @@ public:
     size_t get_column_count() const noexcept;
     DataType get_column_type(ColKey column_key) const;
     StringData get_column_name(ColKey column_key) const;
+    StringData get_column_name(ColIndex) const;
     ColumnAttrMask get_column_attr(ColKey column_key) const noexcept;
     DataType get_dictionary_key_type(ColKey column_key) const noexcept;
     ColKey get_column_key(StringData name) const noexcept;
+    ColKey get_column_key(ColIndex) const noexcept;
     ColKeys get_column_keys() const;
     typedef util::Optional<std::pair<ConstTableRef, ColKey>> BacklinkOrigin;
     BacklinkOrigin find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const noexcept;
@@ -1215,12 +1217,22 @@ inline StringData Table::get_column_name(ColKey column_key) const
     return m_spec.get_column_name(spec_ndx);
 }
 
+inline StringData Table::get_column_name(ColIndex index) const
+{
+    return m_spec.get_column_name(m_leaf_ndx2spec_ndx[index.get_index().val]);
+}
+
 inline ColKey Table::get_column_key(StringData name) const noexcept
 {
     size_t spec_ndx = m_spec.get_column_index(name);
     if (spec_ndx == npos)
         return ColKey();
     return spec_ndx2colkey(spec_ndx);
+}
+
+inline ColKey Table::get_column_key(ColIndex index) const noexcept
+{
+    return m_leaf_ndx2colkey[index.get_index().val];
 }
 
 inline ColumnType Table::get_real_column_type(ColKey col_key) const noexcept
