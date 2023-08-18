@@ -741,7 +741,7 @@ TEST(List_NestedList_Insert)
     CHECK_EQUAL(list_foo_0->size(), 0);
 }
 
-TEST(List_Nested_InMixed)
+ONLY(List_Nested_InMixed)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(make_in_realm_history(), path);

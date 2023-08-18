@@ -27,6 +27,7 @@
 
 #include <random>
 #include <mutex>
+#include <iostream>
 
 namespace realm {
 
@@ -303,7 +304,6 @@ CollectionBasePtr CollectionParent::get_collection_ptr(ColKey col_key) const
     return {};
 }
 
-
 int64_t CollectionParent::generate_key(size_t sz)
 {
     static std::mt19937 gen32;
@@ -323,6 +323,7 @@ int64_t CollectionParent::generate_key(size_t sz)
         }
     } while (key == 0);
 
+    std::cout << key << std::endl;
     return key;
 }
 
