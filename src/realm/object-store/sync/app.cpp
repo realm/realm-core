@@ -613,10 +613,6 @@ void App::attach_auth_options(BsonDocument& body)
 {
     BsonDocument options;
 
-    if (m_config.local_app_version) {
-        options["appVersion"] = *m_config.local_app_version;
-    }
-
     log_debug("App: version info: platform: %1  version: %2 - sdk: %3 - sdk version: %4 - core version: %5",
               m_config.device_info.platform, m_config.device_info.platform_version, m_config.device_info.sdk,
               m_config.device_info.sdk_version, m_config.device_info.core_version);
@@ -642,9 +638,6 @@ void App::log_in_with_credentials(
 {
     if (would_log(util::Logger::Level::debug)) {
         auto app_info = util::format("app_id: %1", m_config.app_id);
-        if (m_config.local_app_version) {
-            app_info += util::format(" - app_version: %1", *m_config.local_app_version);
-        }
         log_debug("App: log_in_with_credentials: %1", app_info);
     }
     // if we try logging in with an anonymous user while there
