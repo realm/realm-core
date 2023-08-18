@@ -5270,6 +5270,7 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         CHECK(value.type == RLM_TYPE_STRING);
         CHECK(strncmp(value.string.data, "Hello", value.string.size) == 0);
     }
+
     SECTION("json") {
         REQUIRE(realm_set_json(
             obj1.get(), foo_any_col_key,
@@ -5281,6 +5282,25 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         size_t size;
         checked(realm_list_size(list.get(), &size));
         CHECK(size == 3);
+    }
+
+    SECTION("freeze list") {
+        REQUIRE(realm_set_dictionary(obj1.get(), foo_any_col_key));
+        auto dict = cptr_checked(realm_get_dictionary(obj1.get(), foo_any_col_key));
+        auto list = cptr_checked(realm_dictionary_insert_list(dict.get(), rlm_str_val("List")));
+        realm_list_insert(list.get(), 0, rlm_str_val("Hello"));
+        realm_list_insert(list.get(), 0, rlm_str_val("42"));
+        checked(realm_commit(realm));
+        size_t size;
+        checked(realm_list_size(list.get(), &size));
+        REQUIRE(size == 2);
+        auto frozen_realm = cptr_checked(realm_freeze(realm));
+
+        realm_list_t* frozen_list;
+        realm_list_resolve_in(list.get(), frozen_realm.get(), &frozen_list);
+        checked(realm_list_size(frozen_list, &size));
+        REQUIRE(size == 2);
+        realm_release(frozen_list);
     }
     realm_release(realm);
 }
