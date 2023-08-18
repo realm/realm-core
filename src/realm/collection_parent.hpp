@@ -72,49 +72,54 @@ enum class UpdateStatus {
     NoChange,
 };
 
+/*
+ * In order to detect stale collection objects (objects referring to entities that have
+ * been deleted from the DB) nested directly in an Obj object, we need a structure that
+ * both holds an index of the relevant column as well as a somewhat unique key. The key
+ * is generated when the collection is assigned to the property and stored alongside the
+ * ref of the collection. The stored key is regenerated/cleared when a new value is
+ * assigned to the property.
+ */
 class ColIndex {
 public:
     ColIndex()
     {
-        value = uint32_t(-1);
-    }
-    explicit ColIndex(int64_t val)
-    {
-        value = uint32_t(val);
+        value.col_index = 0x7fff;
     }
     ColIndex(ColKey col_key, int64_t key)
     {
-        value = uint32_t(col_key.get_index().val);
-        int is_collection = int(col_key.is_collection());
-        value += is_collection << 15;
-        value += (uint32_t(key) << 16);
+        value.col_index = col_key.get_index().val;
+        value.is_collection = col_key.is_collection();
+        value.key = uint16_t(key);
     }
     ColKey::Idx get_index() const noexcept
     {
-        return {unsigned(value & 0x7FFFU)};
+        return {unsigned(value.col_index)};
     }
     int64_t get_key() const noexcept
     {
-        return int32_t(value) >> 16;
+        return int16_t(value.key);
     }
     bool is_collection() const noexcept
     {
-        return (value & 0x8000U) != 0;
-    }
-    uint32_t raw() const noexcept
-    {
-        return value;
+        return value.is_collection;
     }
 
     bool operator==(const ColIndex& other) const noexcept
     {
         // Compare only index
-        return ((value ^ other.value) & 0x7FFFU) == 0;
+        return value.col_index == other.value.col_index;
     }
 
 private:
-    uint32_t value;
+    struct {
+        uint32_t col_index : 15;
+        uint32_t is_collection : 1;
+        uint32_t key : 16;
+    } value;
 };
+
+static_assert(sizeof(ColIndex) == sizeof(uint32_t));
 
 using StableIndex = mpark::variant<ColIndex, int64_t, std::string>;
 using StablePath = std::vector<StableIndex>;

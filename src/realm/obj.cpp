@@ -2514,15 +2514,14 @@ ref_type Obj::get_collection_ref(Index index, CollectionType type) const
     if (col_index.is_collection()) {
         return to_ref(_get<int64_t>(col_index.get_index()));
     }
-    if (!check_index(col_index)) {
-        throw IllegalOperation("This collection has joined the choir invisible");
+    if (check_index(col_index)) {
+        auto val = _get<Mixed>(col_index.get_index());
+        if (val.is_type(DataType(int(type)))) {
+            return val.get_ref();
+        }
     }
-
-    auto val = _get<Mixed>(col_index.get_index());
-    if (!val.is_type(DataType(int(type)))) {
-        throw IllegalOperation("Not proper collection type");
-    }
-    return val.get_ref();
+    // This exception should never escape to the application
+    throw StaleAccessor("This collection has joined the choir invisible");
 }
 
 bool Obj::check_collection_ref(Index index, CollectionType type) const noexcept
