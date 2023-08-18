@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Add baas-network-tests nightly task for (future) testing sync client operation with non-ideal network conditions. ([PR #6852](https://github.com/realm/realm-core/pull/6852))
 
 ----------------------------------------------
 
@@ -49,7 +49,6 @@
 
 ### Internals
 * Removed some unused files/directories and dogless dependency. ([PR #6884](https://github.com/realm/realm-core/pull/6884))
-* Add baas-network-tests nightly task for (future) testing sync client operation with non-ideal network conditions. ([PR #6852](https://github.com/realm/realm-core/pull/6852))
 
 ----------------------------------------------
 
