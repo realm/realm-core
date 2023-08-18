@@ -461,11 +461,10 @@ void Connection::websocket_connected_handler(const std::string& protocol)
                     (value_2 >= get_oldest_supported_protocol_version() && value_2 <= get_current_protocol_version());
                 if (good_version) {
                     logger.detail("Negotiated protocol version: %1", value_2);
-                    // Grab the connection ID from the websocket if the protocol version is less than 10,
-                    // otherwise, this value will come in a server log message
-                    if (value_2 < 10) {
-                        receive_appservices_coid(m_websocket->get_appservices_request_id());
-                    }
+                    // For now, grab the connection ID from the websocket if it supports it. In the future, the server
+                    // will provide the appservices connection ID via a log message.
+                    // TODO: Remove once the server starts sending the connection ID
+                    receive_appservices_request_id(m_websocket->get_appservices_request_id());
                     m_negotiated_protocol_version = value_2;
                     handle_connection_established(); // Throws
                     return;
@@ -1430,10 +1429,10 @@ void Connection::receive_server_log_message(session_ident_type session_ident, ut
 }
 
 
-void Connection::receive_appservices_coid(std::string_view coid)
+void Connection::receive_appservices_request_id(std::string_view coid)
 {
     // Only set once per connection
-    if (m_appservices_coid.empty()) {
+    if (!coid.empty() && m_appservices_coid.empty()) {
         m_appservices_coid = coid;
         logger.info("Connected to app services with request id: \"%1\"", m_appservices_coid);
     }

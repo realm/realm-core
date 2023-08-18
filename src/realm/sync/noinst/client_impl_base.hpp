@@ -579,7 +579,7 @@ private:
     void receive_unbound_message(session_ident_type);
     void receive_test_command_response(session_ident_type, request_ident_type, std::string_view body);
     void receive_server_log_message(session_ident_type, util::Logger::Level, std::string_view body);
-    void receive_appservices_coid(std::string_view coid);
+    void receive_appservices_request_id(std::string_view coid);
     void handle_protocol_error(Status status);
 
     // These are only called from Session class.

@@ -519,52 +519,35 @@ private:
             {"trace", util::Logger::Level::trace},
         };
 
-        // connection id (co_id) is optional and level and msg are optional if a co_id is provided
-        std::string_view co_id;
-        bool has_co_id = false;
+        // See if the log_message contains the appservices_request_id
         if (auto it = message_body.find("co_id"); it != message_body.end() && it->is_string()) {
-            co_id = it->get<std::string_view>();
-            if (!co_id.empty()) {
-                has_co_id = true;
-                connection.receive_appservices_coid(co_id);
-            }
-            else {
-                return report_error("log_message contained an empty \"co_id\" parameter");
-            }
+            connection.receive_appservices_request_id(it->get<std::string_view>());
         }
 
         std::string_view log_level;
         bool has_level = false;
         if (auto it = message_body.find("level"); it != message_body.end() && it->is_string()) {
             log_level = it->get<std::string_view>();
-            has_level = true;
-            if (log_level.empty()) {
-                return report_error("log_message contained an empty \"level\" parameter");
-            }
+            has_level = !log_level.empty();
         }
-        else if (!has_co_id) {
-            return report_error("log_message must contain a \"level\" parameter that is a string");
-        }
+
         std::string_view msg_text;
         if (auto it = message_body.find("msg"); it != message_body.end() && it->is_string()) {
             msg_text = it->get<std::string_view>();
-            // a msg value must always have a level value, whether co_id is provided or not
-            if (!has_level) {
-                return report_error("log_message contained a \"msg\" parameter but no \"level\" parameter");
-            }
-        }
-        else if (!has_co_id) {
-            return report_error("log_message must contain a \"msg\" parameter that is a string");
         }
 
-        if (has_level) {
-            try {
-                util::Logger::Level parsed_level = name_to_level.at(log_level);
-                connection.receive_server_log_message(session_ident, parsed_level, msg_text);
-            }
-            catch (const std::out_of_range&) {
-                return report_error("Unknown log level found in log_message: \"%1\"", log_level);
-            }
+        // If there is no message text, then we're done
+        if (msg_text.empty()) {
+            return;
+        }
+
+        try {
+            // If a log level wasn't provided, default to debug
+            util::Logger::Level parsed_level = has_level ? name_to_level.at(log_level) : util::Logger::Level::debug;
+            connection.receive_server_log_message(session_ident, parsed_level, msg_text);
+        }
+        catch (const std::out_of_range&) {
+            return report_error("Unknown log level found in log_message: \"%1\"", log_level);
         }
     }
 
