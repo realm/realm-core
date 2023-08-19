@@ -47,6 +47,7 @@ public:
                   util::UniqueFunction<void(int64_t)>); // throws
 
     static std::string get_fresh_path_for(const std::string& realm_path);
+    static bool is_fresh_path(const std::string& realm_path);
 
     realm::VersionID get_client_reset_old_version() const noexcept;
     realm::VersionID get_client_reset_new_version() const noexcept;
