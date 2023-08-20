@@ -19,6 +19,7 @@
 #ifndef REALM_ARRAY_DIRECT_HPP
 #define REALM_ARRAY_DIRECT_HPP
 
+#include <cstring>
 #include <realm/utilities.hpp>
 #include <realm/alloc.hpp>
 
@@ -188,6 +189,130 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) noexcept
     REALM_TEMPEX(return get_direct, width, (data, ndx));
 }
 
+// Read a bit field of up to 256 bits. Three functions:
+// read_large_bitfield: handles field of 64 bit or more.
+// read_small_bitfield: handles field of 64 bit or less.
+// read_bitfield: handles both cases
+// - If more than 64 bits, the bitfield must be byte aligned in both start and size.
+// - If not any alignment and size is supported
+// - The start of the 'data' area must be 64 bit aligned in all cases.
+// - 'result' is a 64-bit aligned pointer to where the extracted value should be placed.
+// - For fields of 64-bit or less, the first 64-bit word is filled with the zero-extended
+//   value of the bitfield.
+// - For fields larger than 64-bit (which should always be an integral number of bytes),
+//   the field is copied into the first *bytes* of the result area. The remaining bytes
+//   are untouched. The caller may or may not choose to zero them, depending on contex.
+inline void read_large_bitfield(const char* data_area, size_t field_position, size_t width, uint64_t* result)
+{
+    // entries more than 64 bit (8 bytes)
+    // everything is byte aligned, so just find the right bytes and copy
+    // them out.
+    size_t first_byte_offset = field_position >> 3;
+    memcpy(result, data_area + first_byte_offset, width >> 3);
+}
+
+inline uint64_t read_small_bitfield(const char* data_area, size_t field_position, size_t width)
+{
+    // entries 64 bit or less:
+    // ectract data based on 64-bit word memory access and some bit fiddling
+    size_t offset_begin = field_position;
+    size_t offset_end = offset_begin + width - 1;
+    size_t offset_begin_word = offset_begin >> 6;
+    size_t offset_end_word = offset_end >> 6;
+    uint64_t begin_word = ((const uint64_t*)data_area)[offset_begin_word];
+    begin_word >>= (offset_begin - offset_begin_word);
+    // take into account possible crossing of alignment boundary
+    if (offset_begin_word != offset_end_word) {
+        auto bits_in_end_word = offset_end - (offset_end_word << 6);
+        auto bits_in_begin_word = width - bits_in_end_word;
+        begin_word &= ~((1ULL << bits_in_begin_word) - 1);
+        uint64_t end_word = ((const uint64_t*)data_area)[offset_end_word];
+        end_word <<= bits_in_begin_word;
+        begin_word |= end_word;
+    }
+    // mask out anything above the bits we need:
+    // technically this is undef for width=64 bit, but should in practice
+    // give the correct result.
+    begin_word &= (1ULL << width) - 1;
+    return begin_word;
+}
+
+inline void read_bitfield(const char* data_area, size_t field_position, size_t width, uint64_t* result)
+{
+    if (width <= 64) {
+        result[0] = read_small_bitfield(data_area, field_position, width);
+    }
+    else {
+        read_large_bitfield(data_area, field_position, width, result);
+    }
+}
+
+inline void write_large_bitfield(char* data_area, size_t field_position, size_t width, uint64_t* value)
+{
+    // entries more than 64 bit (8 bytes)
+    // everything is byte aligned, so just find the right bytes and copy
+    // them out.
+    size_t first_byte_offset = field_position >> 3;
+    memcpy(data_area + first_byte_offset, value, width >> 3);
+}
+
+inline void write_small_bitfield(char* data_area, size_t field_position, size_t width, uint64_t value)
+{
+    // entries 64 bit or less:
+    // ectract data based on 64-bit word memory access and some bit fiddling
+    size_t offset_begin = field_position;
+    size_t offset_end = offset_begin + width - 1;
+    size_t offset_begin_word = offset_begin >> 6;
+    size_t offset_end_word = offset_end >> 6;
+    // ensure all zeroes outside the bits we're interested in:
+    value &= ((1ULL << width) - 1);
+    // place low part (or all of) value in proper position within target word
+    auto rot_first_word = offset_begin - (offset_begin_word << 6);
+    auto mask = (size_t(-1) & ((1ULL << width) - 1)) << rot_first_word;
+    uint64_t begin_word = ((const uint64_t*)data_area)[offset_begin_word];
+    begin_word &= ~mask;
+    begin_word |= value << rot_first_word;
+    ((uint64_t*)data_area)[offset_begin_word] = begin_word;
+    // take into account possible crossing of alignment boundary
+    if (offset_begin_word != offset_end_word) {
+        auto bits_in_end_word = offset_end - (offset_end_word << 6);
+        auto bits_in_begin_word = width - bits_in_end_word;
+        value >>= bits_in_begin_word;
+        mask = (size_t(-1)) & ((1ULL << bits_in_end_word) - 1);
+        uint64_t end_word = ((const uint64_t*)data_area)[offset_end_word];
+        end_word &= ~mask;
+        end_word |= value;
+        ((uint64_t*)data_area)[offset_end_word] = end_word;
+    }
+}
+
+inline void write_bitfield(char* data_area, size_t field_position, size_t width, uint64_t* value)
+{
+    if (width <= 64) {
+        write_small_bitfield(data_area, field_position, width, value[0]);
+    }
+    else {
+        write_large_bitfield(data_area, field_position, width, value);
+    }
+}
+
+
+inline int64_t sign_extend_field(size_t width, uint64_t value)
+{
+    uint64_t sign_mask = 1ULL << (width - 1);
+    if (value & sign_mask) { // got a negative value
+        uint64_t negative_extension = -sign_mask;
+        value |= negative_extension;
+        return int64_t(value);
+    }
+    else {
+        // zero out anything above the sign bit
+        // (actually, also zero out the sign bit, but it is already known to be zero)
+        uint64_t below_sign_mask = sign_mask - 1;
+        value &= below_sign_mask;
+        return int64_t(value);
+    }
+}
 
 template <int width>
 inline std::pair<int64_t, int64_t> get_two(const char* data, size_t ndx) noexcept
@@ -350,6 +475,6 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
 
     return low;
 }
-}
+} // namespace realm
 
 #endif /* ARRAY_TPL_HPP_ */
