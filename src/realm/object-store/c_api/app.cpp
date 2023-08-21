@@ -192,17 +192,6 @@ RLM_API void realm_app_config_set_base_url(realm_app_config_t* config, const cha
     config->base_url = std::string(base_url);
 }
 
-RLM_API void realm_app_config_set_local_app_name(realm_app_config_t* config, const char* local_app_name) noexcept
-{
-    config->local_app_name = std::string(local_app_name);
-}
-
-RLM_API void realm_app_config_set_local_app_version(realm_app_config_t* config,
-                                                    const char* local_app_version) noexcept
-{
-    config->local_app_version = std::string(local_app_version);
-}
-
 RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t* config, uint64_t ms) noexcept
 {
     config->default_request_timeout_ms = ms;

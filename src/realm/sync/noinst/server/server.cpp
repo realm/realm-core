@@ -1148,11 +1148,10 @@ public:
 
     bool websocket_binary_message_received(const char* data, size_t size) final override
     {
-        std::error_code ec;
         using sf = _impl::SimulatedFailure;
-        if (sf::trigger(sf::sync_server__read_head, ec)) {
+        if (sf::check_trigger(sf::sync_server__read_head)) {
             // Suicide
-            read_error(ec);
+            read_error(sf::sync_server__read_head);
             return false;
         }
         // After a connection level error has occurred, all incoming messages
@@ -1275,7 +1274,7 @@ public:
 
     void initiate_pong_output_buffer();
 
-    void handle_protocol_error(ServerProtocol::Error error);
+    void handle_protocol_error(Status status);
 
     void receive_bind_message(session_ident_type, std::string path, std::string signed_user_token,
                               bool need_client_file_ident, bool is_subserver);
@@ -4247,30 +4246,21 @@ void SyncConnection::enlist_to_send(Session* sess) noexcept
 }
 
 
-void SyncConnection::handle_protocol_error(ServerProtocol::Error error)
+void SyncConnection::handle_protocol_error(Status status)
 {
-    switch (error) {
-        case ServerProtocol::Error::unknown_message:
-            protocol_error(ProtocolError::unknown_message); // Throws
-            break;
-        case ServerProtocol::Error::bad_syntax:
+    logger.error("%1", status);
+    switch (status.code()) {
+        case ErrorCodes::SyncProtocolInvariantFailed:
             protocol_error(ProtocolError::bad_syntax); // Throws
             break;
-        case ServerProtocol::Error::limits_exceeded:
+        case ErrorCodes::LimitExceeded:
             protocol_error(ProtocolError::limits_exceeded); // Throws
             break;
-        case ServerProtocol::Error::bad_decompression:
-            protocol_error(ProtocolError::bad_decompression); // Throws
-            break;
-        case ServerProtocol::Error::bad_changeset_header_syntax:
-            protocol_error(ProtocolError::bad_changeset_header_syntax); // Throws
-            break;
-        case ServerProtocol::Error::bad_changeset_size:
-            protocol_error(ProtocolError::bad_changeset_size); // Throws
+        default:
+            protocol_error(ProtocolError::other_error);
             break;
     }
 }
-
 
 void SyncConnection::receive_bind_message(session_ident_type session_ident, std::string path,
                                           std::string signed_user_token, bool need_client_file_ident,

@@ -234,12 +234,12 @@ TEST_CASE("Test server migration and rollback", "[sync][flx][flx migration][baas
         flx_config.sync_config->error_handler =
             [&logger_ptr, error_promise = std::move(promise)](std::shared_ptr<SyncSession>, SyncError err) mutable {
                 // This situation should return the switch_to_pbs error
-                logger_ptr->error("Server rolled back - connect as FLX received error: %1", err.reason());
+                logger_ptr->error("Server rolled back - connect as FLX received error: %1", err.status);
                 error_promise.get_promise().emplace_value(std::move(err));
             };
         auto flx_realm = Realm::get_shared_realm(flx_config);
         auto err = wait_for_future(std::move(err_future), std::chrono::seconds(30)).get();
-        REQUIRE(err.get_system_error() == make_error_code(sync::ProtocolError::switch_to_pbs));
+        REQUIRE(err.status == ErrorCodes::WrongSyncType);
         REQUIRE(err.server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
     }
 
@@ -694,12 +694,12 @@ TEST_CASE("Update to native FLX after migration", "[sync][flx][flx migration][ba
         flx_config.sync_config->error_handler =
             [&logger_ptr, error_promise = std::move(promise)](std::shared_ptr<SyncSession>, SyncError err) mutable {
                 // This situation should return the switch_to_pbs error
-                logger_ptr->error("Server rolled back - connect as FLX received error: %1", err.reason());
+                logger_ptr->error("Server rolled back - connect as FLX received error: %1", err.status);
                 error_promise.get_promise().emplace_value(std::move(err));
             };
         auto flx_realm = Realm::get_shared_realm(flx_config);
         auto err = wait_for_future(std::move(err_future), std::chrono::seconds(30)).get();
-        REQUIRE(err.get_system_error() == make_error_code(sync::ProtocolError::switch_to_pbs));
+        REQUIRE(err.status == ErrorCodes::WrongSyncType);
         REQUIRE(err.server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
     }
 }
