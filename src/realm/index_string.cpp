@@ -1883,15 +1883,43 @@ void StringIndex::verify_entries(const ClusterColumn& column) const
 
 namespace {
 
-void out_hex(std::ostream& out, uint64_t val)
+namespace {
+
+bool is_chars(uint32_t val)
+{
+    if (val == 0)
+        return true;
+    if (is_chars(val >> 8)) {
+        char c = val & 0xFF;
+        if (!c || std::isalpha(c)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void out_char(std::ostream& out, uint32_t val)
 {
     if (val) {
-        out_hex(out, val >> 8);
-        if (char c = val & 0xFF) {
+        out_char(out, val >> 8);
+        char c = val & 0xFF;
+        if (c && c != 'X') {
             out << c;
         }
     }
 }
+
+void out_hex(std::ostream& out, uint32_t val)
+{
+    if (is_chars(val)) {
+        out_char(out, val);
+    }
+    else {
+        out << int(val);
+    }
+}
+
+} // namespace
 
 } // namespace
 
