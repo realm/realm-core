@@ -1937,7 +1937,7 @@ void Obj::set_collection(ColKey col_key, CollectionType type)
         // Update ref after write
         ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
         values.init_from_ref(ref);
-        values.set_key(m_row_ndx, generate_key(1));
+        values.set_key(m_row_ndx, generate_key(0x10));
     }
 }
 
