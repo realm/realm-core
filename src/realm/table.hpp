@@ -168,16 +168,14 @@ public:
     static const size_t max_column_name_length = 63;
     static const uint64_t max_num_columns = 0xFFFFUL; // <-- must be power of two -1
 
-    // Add column holding primitive values. The vector of CollectionType specifies if the
-    // property is a collection and if the collection is nested in other collections.
-    // If the vector is empty, the property is a single value. If the vector contains
-    // a single value - eg. CollectionType::Dictionary, the property is a dictionary of
-    // the type specified. If the vector contains {CollectionType::List, CollectionType::Dictionary}
-    // the property is a list of dictionaries.
-    ColKey add_column(DataType type, StringData name, bool nullable = false, std::vector<CollectionType> = {},
+    // Add column holding primitive values. The optional CollectionType specifies if the
+    // property is a collection. If collection type is not specified, the property is a single value.
+    // If the vector contains a value - eg. CollectionType::Dictionary, the property is a dictionary
+    // of the type specified.
+    ColKey add_column(DataType type, StringData name, bool nullable = false, std::optional<CollectionType> = {},
                       DataType key_type = type_String);
     // As above, but the values are links to objects in the target table.
-    ColKey add_column(Table& target, StringData name, std::vector<CollectionType> = {},
+    ColKey add_column(Table& target, StringData name, std::optional<CollectionType> = {},
                       DataType key_type = type_String);
 
     // Map old functions to the more general interface above
@@ -207,20 +205,7 @@ public:
         return add_column(target, name, {CollectionType::Dictionary}, key_type);
     }
 
-    CollectionType get_nested_column_type(ColKey col_key, size_t level) const
-    {
-        auto spec_ndx = colkey2spec_ndx(col_key);
-        REALM_ASSERT_3(spec_ndx, <, get_column_count());
-        return m_spec.get_nested_column_type(spec_ndx, level);
-    }
-
-    size_t get_nesting_levels(ColKey col_key) const
-    {
-        auto spec_ndx = colkey2spec_ndx(col_key);
-        return m_spec.get_nesting_levels(spec_ndx);
-    }
-
-    CollectionType get_collection_type(ColKey col_key, size_t level) const;
+    CollectionType get_collection_type(ColKey col_key) const;
 
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);

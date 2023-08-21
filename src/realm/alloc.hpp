@@ -329,7 +329,6 @@ private:
     friend class Obj;
     template <class>
     friend class CollectionBaseImpl;
-    friend class CollectionList;
     friend class Dictionary;
 };
 

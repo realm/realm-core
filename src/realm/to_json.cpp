@@ -17,7 +17,6 @@
  **************************************************************************/
 
 #include <realm/group.hpp>
-#include <realm/collection_list.hpp>
 #include <realm/dictionary.hpp>
 #include <realm/list.hpp>
 #include <realm/set.hpp>
@@ -321,14 +320,8 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
         };
 
         if (ck.is_collection()) {
-            if (m_table->get_nesting_levels(ck)) {
-                auto collection_list = get_collection_list(ck);
-                collection_list->to_json(out, link_depth, output_mode, print_link);
-            }
-            else {
-                auto collection = get_collection_ptr(ck);
-                collection->to_json(out, link_depth, output_mode, print_link);
-            }
+            auto collection = get_collection_ptr(ck);
+            collection->to_json(out, link_depth, output_mode, print_link);
         }
         else {
             auto val = get_any(ck);
@@ -383,41 +376,6 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
     followed.pop_back();
 }
 
-void CollectionList::to_json(std::ostream& out, size_t link_depth, JSONOutputMode output_mode,
-                             util::FunctionRef<void(const Mixed&)> fn) const
-{
-    bool is_leaf = m_level == get_table()->get_nesting_levels(m_col_key);
-    bool is_dictionary = m_coll_type == CollectionType::Dictionary;
-    auto sz = size();
-    BPlusTree<String>* string_keys = nullptr;
-    if (is_dictionary) {
-        string_keys = static_cast<BPlusTree<String>*>(m_keys.get());
-    }
-
-    bool print_close = false;
-    if (output_mode == output_mode_xjson_plus && is_dictionary) {
-        out << "{ \"$dictionary\": ";
-        print_close = true;
-    }
-    out << (is_dictionary ? "{" : "[");
-    for (size_t i = 0; i < sz; i++) {
-        if (i > 0)
-            out << ",";
-        if (is_dictionary) {
-            out << Mixed(string_keys->get(i)) << ":";
-        }
-        if (is_leaf) {
-            get_collection(i)->to_json(out, link_depth, output_mode, fn);
-        }
-        else {
-            get_collection_list(i)->to_json(out, link_depth, output_mode, fn);
-        }
-    }
-    out << (is_dictionary ? "}" : "]");
-    if (print_close) {
-        out << " }";
-    }
-}
 namespace {
 const char to_be_escaped[] = "\"\n\r\t\f\\\b";
 const char encoding[] = "\"nrtf\\b";
