@@ -925,6 +925,10 @@ private:
     // transfer from the server.
     util::Optional<ClientReset>& get_client_reset_config() noexcept;
 
+    // Get the reason a synchronization session is used for (regular sync or client reset)
+    // - Client reset state means the session is going to be used to download a fresh realm.
+    SessionReason get_session_reason() noexcept;
+
     /// \brief Initiate the integration of downloaded changesets.
     ///
     /// This function must provide for the passed changesets (if any) to
