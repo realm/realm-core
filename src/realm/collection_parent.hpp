@@ -49,7 +49,6 @@ using CollectionPtr = std::shared_ptr<Collection>;
 using LstBasePtr = std::unique_ptr<LstBase>;
 using SetBasePtr = std::unique_ptr<SetBase>;
 using CollectionBasePtr = std::shared_ptr<CollectionBase>;
-using CollectionListPtr = std::shared_ptr<CollectionList>;
 using ListMixedPtr = std::shared_ptr<Lst<Mixed>>;
 using DictionaryPtr = std::shared_ptr<Dictionary>;
 using SetMixedPtr = std::shared_ptr<Set<Mixed>>;

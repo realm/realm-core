@@ -314,9 +314,6 @@ public:
     CollectionPtr get_collection_by_stable_path(const StablePath& path) const;
     LinkCollectionPtr get_linkcollection_ptr(ColKey col_key) const;
 
-    // Get a collection to hold other collections
-    CollectionListPtr get_collection_list(ColKey col_key) const;
-
     void assign_pk_and_backlinks(const Obj& other);
 
     class Internal {

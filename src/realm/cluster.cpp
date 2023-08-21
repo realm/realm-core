@@ -34,7 +34,6 @@
 #include "realm/replication.hpp"
 #include "realm/dictionary.hpp"
 #include "realm/list.hpp"
-#include "realm/collection_list.hpp"
 #include <iostream>
 #include <cmath>
 
@@ -837,17 +836,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
 
             if (ref) {
                 const Table* origin_table = m_tree_top.get_owning_table();
-                auto nesting_levels = origin_table->get_nesting_levels(col_key);
-                if (nesting_levels > 0) {
-                    if (col_type == col_type_Link) {
-                        DummyParent parent(origin_table->m_own_ref, ref);
-                        auto list = CollectionList::create(parent, col_key);
-                        std::vector<ObjKey> keys;
-                        list->get_all_keys(nesting_levels - 1, keys);
-                        do_remove_backlinks(ObjKey(key.value + m_offset), col_key, keys, state);
-                    }
-                }
-                else if (attr.test(col_attr_Dictionary)) {
+                if (attr.test(col_attr_Dictionary)) {
                     if (col_type == col_type_Mixed || col_type == col_type_Link) {
                         Obj obj(origin_table->m_own_ref, get_mem(), key, ndx);
                         Dictionary dict(obj, col_key);
