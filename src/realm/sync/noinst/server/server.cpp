@@ -1079,7 +1079,9 @@ public:
     const std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
 
-    // Clients with protocol version less than 10 do not support log messages
+    // Clients with sync protocol version 8 or greater support pbs->flx migration
+    static constexpr int PBS_FLX_MIGRATION_PROTOCOL_VERSION = 8;
+    // Clients with sync protocol version less than 10 do not support log messages
     static constexpr int SERVER_LOG_PROTOCOL_VERSION = 10;
 
     SyncConnection(ServerImpl& serv, std::int_fast64_t id, std::unique_ptr<network::Socket>&& socket,
@@ -1617,6 +1619,7 @@ private:
     bool m_is_sending = false;
     SteadyTimePoint m_last_activity_at;
     std::string m_remote_endpoint;
+    int m_negotiated_protocol_version = 0;
 
     void initiate_ssl_handshake()
     {
@@ -1765,7 +1768,6 @@ private:
                 return;
             }
         }
-        int negotiated_protocol_version = 0;
         {
             ProtocolVersionRange server_range = m_server.get_protocol_version_range();
             int server_min = server_range.first;
@@ -1838,19 +1840,21 @@ private:
                 handle_400_bad_request({formatter.data(), formatter.size()}); // Throws
                 return;
             }
-            negotiated_protocol_version = best_match;
+            m_negotiated_protocol_version = best_match;
             logger.debug("Received: Sync HTTP request (negotiated_protocol_version=%1)",
-                         negotiated_protocol_version); // Throws
+                         m_negotiated_protocol_version); // Throws
             formatter.reset();
         }
 
         std::string sec_websocket_protocol_2;
         {
-            std::string_view prefix = negotiated_protocol_version < 8 ? get_old_pbs_websocket_protocol_prefix()
-                                                                      : get_pbs_websocket_protocol_prefix();
+            std::string_view prefix =
+                m_negotiated_protocol_version < SyncConnection::PBS_FLX_MIGRATION_PROTOCOL_VERSION
+                    ? get_old_pbs_websocket_protocol_prefix()
+                    : get_pbs_websocket_protocol_prefix();
             std::ostringstream out;
             out.imbue(std::locale::classic());
-            out << prefix << negotiated_protocol_version; // Throws
+            out << prefix << m_negotiated_protocol_version; // Throws
             sec_websocket_protocol_2 = std::move(out).str();
         }
 
@@ -1888,7 +1892,8 @@ private:
                 user_agent = i->second; // Throws (copy)
         }
 
-        auto handler = [negotiated_protocol_version, user_agent = std::move(user_agent), this](std::error_code ec) {
+        auto handler = [protocol_version = m_negotiated_protocol_version, user_agent = std::move(user_agent),
+                        this](std::error_code ec) {
             // If the operation is aborted, the socket object may have been destroyed.
             if (ec != util::error::operation_aborted) {
                 if (ec) {
@@ -1898,7 +1903,7 @@ private:
 
                 std::unique_ptr<SyncConnection> sync_conn = std::make_unique<SyncConnection>(
                     m_server, m_id, std::move(m_socket), std::move(m_ssl_stream), std::move(m_read_ahead_buffer),
-                    negotiated_protocol_version, std::move(user_agent), std::move(m_remote_endpoint),
+                    protocol_version, std::move(user_agent), std::move(m_remote_endpoint),
                     get_appservices_request_id()); // Throws
                 SyncConnection& sync_conn_ref = *sync_conn;
                 m_server.add_sync_connection(m_id, std::move(sync_conn));
@@ -1957,8 +1962,10 @@ private:
     void add_common_http_response_headers(HTTPResponse& response)
     {
         response.headers["Server"] = "RealmSync/" REALM_VERSION_STRING; // Throws
-        // This isn't a real X-Appservices-Request-Id, but it should be enough to test with
-        response.headers["X-Appservices-Request-Id"] = get_appservices_request_id();
+        if (m_negotiated_protocol_version < SyncConnection::SERVER_LOG_PROTOCOL_VERSION) {
+            // This isn't a real X-Appservices-Request-Id, but it should be enough to test with
+            response.headers["X-Appservices-Request-Id"] = get_appservices_request_id();
+        }
     }
 
     void read_error(std::error_code ec)
