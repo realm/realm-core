@@ -458,8 +458,8 @@ SetBasePtr Transaction::import_copy_of(const SetBase& original)
 CollectionBasePtr Transaction::import_copy_of(const CollectionBase& original)
 {
     if (Obj obj = import_copy_of(original.get_obj())) {
-        ColKey ck = original.get_col_key();
-        return obj.get_collection_ptr(ck);
+        auto path = original.get_short_path();
+        return std::static_pointer_cast<CollectionBase>(obj.get_collection_ptr(path));
     }
     return {};
 }

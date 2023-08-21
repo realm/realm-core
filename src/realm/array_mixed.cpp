@@ -61,10 +61,6 @@ void ArrayMixed::add(Mixed value)
 
 void ArrayMixed::set(size_t ndx, Mixed value)
 {
-    if (value.is_null()) {
-        set_null(ndx);
-        return;
-    }
     auto old_type = get_type(ndx);
     // If we replace a collections ref value with one of the
     // same type, then it is just an update of of the
@@ -72,15 +68,23 @@ void ArrayMixed::set(size_t ndx, Mixed value)
     // type then it means that we are overwriting a collection
     // with some other value and hence the collection must be
     // destroyed as well as the possible key.
-    bool destroy_collection = old_type != value.get_type();
-    erase_linked_payload(ndx, destroy_collection);
-    m_composite.set(ndx, store(value));
+    bool destroy_collection = !value.is_type(old_type);
+
+    if (value.is_null()) {
+        set_null(ndx);
+    }
+    else {
+        erase_linked_payload(ndx, destroy_collection);
+        m_composite.set(ndx, store(value));
+    }
+
     if (destroy_collection && Array::size() > payload_idx_key) {
         if (auto ref = Array::get_as_ref(payload_idx_key)) {
             Array keys(Array::get_alloc());
             keys.set_parent(const_cast<ArrayMixed*>(this), payload_idx_key);
             keys.init_from_ref(ref);
-            keys.set(ndx, 0);
+            if (ndx < keys.size())
+                keys.set(ndx, 0);
         }
     }
 }
@@ -89,9 +93,10 @@ void ArrayMixed::insert(size_t ndx, Mixed value)
 {
     if (value.is_null()) {
         m_composite.insert(ndx, 0);
-        return;
     }
-    m_composite.insert(ndx, store(value));
+    else {
+        m_composite.insert(ndx, store(value));
+    }
     if (Array::size() > payload_idx_key) {
         if (auto ref = Array::get_as_ref(payload_idx_key)) {
             Array keys(Array::get_alloc());
@@ -302,8 +307,11 @@ void ArrayMixed::set_key(size_t ndx, int64_t key)
 int64_t ArrayMixed::get_key(size_t ndx) const
 {
     Array keys(Array::get_alloc());
-    ensure_array_accessor(keys, payload_idx_key);
-    return (ndx < keys.size()) ? keys.get(ndx) : 0;
+    if (ref_type ref = get_as_ref(payload_idx_key)) {
+        keys.init_from_ref(ref);
+        return (ndx < keys.size()) ? keys.get(ndx) : 0;
+    }
+    return 0;
 }
 
 void ArrayMixed::verify() const
