@@ -421,6 +421,9 @@ records:
       migration_function: 'Nullable<std::function<(old_realm: SharedRealm, new_realm: SharedRealm, new_schema_handle: IgnoreArgument<Schema&>) -> void>>'
       initialization_function: 'Nullable<std::function<(realm: SharedRealm) -> void>>'
       should_compact_on_launch_function: 'Nullable<std::function<(total_bytes: uint64_t, used_bytes: uint64_t) off_thread -> bool>>'
+      automatically_handle_backlinks_in_migrations:
+        type: bool
+        default: false
 
   UserIdentity:
     cppName: SyncUserIdentity
