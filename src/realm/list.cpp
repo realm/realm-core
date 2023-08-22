@@ -723,11 +723,17 @@ void Lst<Mixed>::set_collection_ref(Index index, ref_type ref, CollectionType ty
     m_tree->set(ndx, Mixed(ref, type));
 }
 
-void Lst<Mixed>::add_index(Path& path, Index index) const
+void Lst<Mixed>::add_index(Path& path, const Index& index) const
 {
     auto ndx = m_tree->find_key(mpark::get<int64_t>(index));
     REALM_ASSERT(ndx != realm::not_found);
     path.emplace_back(ndx);
+}
+
+size_t Lst<Mixed>::find_index(const Index& ndx) const
+{
+    update();
+    return m_tree->find_key(mpark::get<int64_t>(ndx));
 }
 
 bool Lst<Mixed>::nullify(ObjLink link)

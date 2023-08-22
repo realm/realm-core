@@ -120,7 +120,46 @@ private:
 
 static_assert(sizeof(ColIndex) == sizeof(uint32_t));
 
-using StableIndex = mpark::variant<ColIndex, int64_t, std::string>;
+class KeyIndex {
+public:
+    KeyIndex()
+    {
+        value.raw = 0;
+    }
+    KeyIndex(StringData string_key, int64_t key)
+    {
+        size_t sz = string_key.size();
+        const char* str = string_key.data();
+        for (size_t i = 0; i < 4; i++) {
+            value.str[i] = (i < sz) ? str[i] : 0;
+        }
+        value.key = int32_t(key);
+    }
+    const char* get_string() const
+    {
+        return value.str;
+    }
+    int64_t get_key() const
+    {
+        return value.key;
+    }
+
+    bool operator==(const KeyIndex& other) const noexcept
+    {
+        return value.raw == other.value.raw;
+    }
+
+private:
+    union {
+        struct {
+            char str[4];
+            int32_t key;
+        };
+        uint64_t raw;
+    } value;
+};
+
+using StableIndex = mpark::variant<ColIndex, int64_t, KeyIndex>;
 using StablePath = std::vector<StableIndex>;
 
 class CollectionParent : public std::enable_shared_from_this<CollectionParent> {
@@ -141,7 +180,9 @@ public:
     // Return path from owning object
     virtual StablePath get_stable_path() const = 0;
     // Add a translation of Index to PathElement
-    virtual void add_index(Path& path, Index ndx) const = 0;
+    virtual void add_index(Path& path, const Index& ndx) const = 0;
+    // Return position of Index held by child
+    virtual size_t find_index(const Index& ndx) const = 0;
     /// Get table of owning object
     virtual TableRef get_table() const noexcept = 0;
 

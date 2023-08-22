@@ -40,9 +40,13 @@ bool TransactLogEncoder::select_collection(ColKey col_key, ObjKey key, const Sta
             if (const auto int64_ptr = mpark::get_if<int64_t>(&path[n])) {
                 append_simple_instr(*int64_ptr);
             }
-            else if (const auto string_ptr = mpark::get_if<std::string>(&path[n])) {
+            else if (const auto key_index_ptr = mpark::get_if<KeyIndex>(&path[n])) {
                 append_simple_instr(0); // this is based solely on the fact that stable indices cannot be zero.
-                encode_string(StringData((*string_ptr).c_str()));
+                char buffer[5];
+                memcpy(buffer, key_index_ptr->get_string(), 4);
+                buffer[4] = '\0';
+                encode_string(StringData(buffer));
+                append_simple_instr(key_index_ptr->get_key());
             }
         }
     }

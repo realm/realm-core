@@ -1042,7 +1042,7 @@ StablePath Obj::get_stable_path() const noexcept
     return {};
 }
 
-void Obj::add_index(Path& path, Index index) const
+void Obj::add_index(Path& path, const Index& index) const
 {
     auto col_index = mpark::get<ColIndex>(index);
     if (path.empty()) {
@@ -2004,18 +2004,13 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
         auto get_ref = [&]() -> std::pair<Mixed, PathElement> {
             if (collection->get_collection_type() == CollectionType::List) {
                 auto list_of_mixed = dynamic_cast<Lst<Mixed>*>(collection.get());
-                size_t ndx = list_of_mixed->find_key(mpark::get<int64_t>(index));
+                size_t ndx = list_of_mixed->find_index(index);
                 return {list_of_mixed->get(ndx), PathElement(ndx)};
             }
-            else if (collection->get_collection_type() == CollectionType::Set) {
-                auto set_of_mixed = dynamic_cast<Set<Mixed>*>(collection.get());
-                size_t ndx = set_of_mixed->find_any(mpark::get<int64_t>(index));
-                return {set_of_mixed->get(ndx), PathElement(ndx)};
-            }
             else {
-                std::string key = mpark::get<std::string>(index);
-                auto ref = dynamic_cast<Dictionary*>(collection.get())->get(key);
-                return {ref, key};
+                auto dict = dynamic_cast<Dictionary*>(collection.get());
+                size_t ndx = dict->find_index(index);
+                return {dict->get_any(ndx), PathElement(dict->get_key(ndx).get_string())};
             }
         };
         auto [ref, path_elem] = get_ref();

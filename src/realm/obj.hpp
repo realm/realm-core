@@ -76,7 +76,11 @@ public:
     FullPath get_path() const final;
     Path get_short_path() const noexcept final;
     StablePath get_stable_path() const noexcept final;
-    void add_index(Path& path, Index ndx) const final;
+    void add_index(Path& path, const Index& ndx) const final;
+    size_t find_index(const Index&) const final
+    {
+        return realm::npos;
+    }
 
     bool update_if_needed() const final;
     TableRef get_table() const noexcept final

@@ -797,8 +797,9 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             for (size_t l = 0; l < nesting_level; l++) {
                 auto ndx = read_int<int64_t>();
                 if (ndx == 0) {
-                    auto key = read_string(m_string_buffer);
-                    path.emplace_back(key);
+                    auto str = read_string(m_string_buffer);
+                    auto key = read_int<int64_t>();
+                    path.emplace_back(KeyIndex(str, key));
                 }
                 else {
                     path.emplace_back(ndx);
