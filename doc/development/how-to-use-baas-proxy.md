@@ -205,10 +205,10 @@ proxy.
 The following parameters can be provided or are required when adding a toxic:
 
 * `name`: toxic name (string, defaults to `<type>_<stream>`)
-* `type`: toxic type (string). See **[Available Toxics](#available-toxics)**.
-* `stream`: link direction to affect (defaults to `downstream`)
-* `toxicity`: probability of the toxic being applied to a link (defaults to 1.0, 100%)
-* `attributes`: a map of toxic-specific attributes
+* `type`: toxic type (string). See **[Available Toxics](#available-toxics)**
+* `stream`: link direction to affect (string, defaults to `downstream`)
+* `toxicity`: probability of the toxic being applied to a link (numeric, defaults to 1.0, 100%)
+* `attributes`: a map (JSON object) of toxic-specific attributes
 
 ```bash
 curl --data "{\"name\":\"bandwidth_limit\", \"type\":\"bandwidth\", \"stream\": \"downstream\", \"toxicity\": 1.0, \"attributes\": {\"rate\": 20}}" localhost:8474/proxies/baas_proxy/toxics
@@ -258,4 +258,18 @@ $ curl -X DELETE localhost:8474/proxies/baas_proxy/toxics/bandwidth_limit
 
 $ curl localhost:8474/proxies/baas_proxy/toxics
 []%
+```
+
+### Running the tests
+
+Only the object store tests that are performed against the baas server are needed to be run.
+These can be run by running the following command. Depending on the toxics specified for the
+baas proxy, these tests may take a long time.
+
+```bash
+$ cd <build-dir>/test/object-store/realm-object-store-tests.app/Contents/MacOS
+$ ./realm-object-store-tests "[baas]"
+Filters: [baas]
+Randomness seeded to: 1962875058
+. . .
 ```
