@@ -45,7 +45,7 @@ namespace sync {
 //     migrate to FLX server action
 //
 //   10 Update BIND message to send information to the server about the reason a
-//      synchronization session is used for
+//      synchronization session is used for; add support for server log messages
 //
 //  XX Changes:
 //     - TBD
