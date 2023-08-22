@@ -266,7 +266,7 @@ fi
 # Set up the cleanup function that runs at exit and stops baas server and proxy (if run)
 trap 'on_exit' EXIT
 
-BAAS_OPTIONS=
+BAAS_OPTIONS=()
 if [[ -n "${BAAS_BRANCH}" ]]; then
     BAAS_OPTIONS=("-b" "${BAAS_BRANCH}")
 fi

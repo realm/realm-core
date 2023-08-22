@@ -19,6 +19,7 @@ BAAS_PROXY=
 DIRECT_PORT=9098
 LISTEN_PORT=9092
 CONFIG_PORT=8474
+BAAS_PORT=9090
 
 function usage()
 {
@@ -109,7 +110,7 @@ function check_port_in_use()
 }
 
 # Check the local baas port availability
-check_port_in_use "${CONFIG_PORT}" "Baas proxy config"
+check_port_in_use "${BAAS_PORT}" "Local baas server"
 
 # Check the port values and local ports in use for baas proxy
 if [[ -n "${BAAS_PROXY}" ]]; then
@@ -120,14 +121,14 @@ if [[ -n "${BAAS_PROXY}" ]]; then
         echo "Error: Baas proxy listen port was invalid: '${LISTEN_PORT}'"
         usage 1
     fi
-    check_port_in_use "${CONFIG_PORT}" "Baas proxy config"
+    check_port_in_use "${CONFIG_PORT}" "Local baas proxy config"
 
     if [[ -n "${DIRECT_PORT}" ]]; then
         if ! check_port "${DIRECT_PORT}"; then
             echo "Error: Baas direct connect port was invalid: '${DIRECT_PORT}'"
             usage 1
         fi
-        check_port_in_use "${DIRECT_PORT}" "Baas direct connect"
+        check_port_in_use "${DIRECT_PORT}" "Local baas server direct connect"
     fi
 fi
 
