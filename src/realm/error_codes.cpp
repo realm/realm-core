@@ -55,20 +55,21 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case AutoClientResetFailed:
         case ConnectionClosed:
         case SyncProtocolInvariantFailed:
-            return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::sync_client_error);
-
         case SyncClientResetRequired:
         case SyncCompensatingWrite:
         case SyncPermissionDenied:
         case SyncServerPermissionsChanged:
         case SyncUserMismatch:
         case SyncWriteNotAllowed:
-            return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::sync_session_error);
+            return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::sync_error);
 
         case SyncConnectFailed:
         case SyncProtocolNegotiationFailed:
         case TlsHandshakeFailed:
-            return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::websocket_error);
+            return ErrorCategory()
+                .set(ErrorCategory::runtime_error)
+                .set(ErrorCategory::websocket_error)
+                .set(ErrorCategory::sync_error);
 
         case DecryptionFailed:
         case DeleteOnOpenRealm:
@@ -139,16 +140,11 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case BadSyncPartitionValue:
         case InvalidSubscriptionQuery:
         case SyncInvalidSchemaChange:
-            return ErrorCategory()
-                .set(ErrorCategory::invalid_argument)
-                .set(ErrorCategory::logic_error)
-                .set(ErrorCategory::sync_session_error);
-
         case WrongSyncType:
             return ErrorCategory()
                 .set(ErrorCategory::invalid_argument)
                 .set(ErrorCategory::logic_error)
-                .set(ErrorCategory::sync_connection_error);
+                .set(ErrorCategory::sync_error);
 
         case CustomError:
             return ErrorCategory()
