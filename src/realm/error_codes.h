@@ -32,6 +32,9 @@ typedef enum realm_error_category {
     RLM_ERR_CAT_HTTP_ERROR = 0x0400,
     RLM_ERR_CAT_CUSTOM_ERROR = 0x0800,
     RLM_ERR_CAT_WEBSOCKET_ERROR = 0x1000,
+    RLM_ERR_CAT_SYNC_CLIENT = 0x2000,
+    RLM_ERR_CAT_SYNC_CONNECTION = 0x4000,
+    RLM_ERR_CAT_SYNC_SESSION = 0x8000,
 } realm_error_category_e;
 
 typedef enum realm_errno {

@@ -1,8 +1,9 @@
 # NEXT RELEASE
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* 3 new error categories have been added: `ErrorCategory::sync_client_error`, `ErrorCategory::sync_connection_error` and `ErrorCategory::sync_session_error`. These should match the categories that existed before https://github.com/realm/realm-core/pull/6846.
+The new error codes introduced in #6846 have been assigned these categories, so they corrospond to the old behavior, making it easier for SDKs to map errors. Note, some new errors have been assigned the `ErrorCategory::web_socket_error` which was not used before.  
+
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

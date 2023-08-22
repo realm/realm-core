@@ -42,6 +42,9 @@ struct ErrorCategory {
         http_error = RLM_ERR_CAT_HTTP_ERROR,
         custom_error = RLM_ERR_CAT_CUSTOM_ERROR,
         websocket_error = RLM_ERR_CAT_WEBSOCKET_ERROR,
+        sync_client_error = RLM_ERR_CAT_SYNC_CLIENT,
+        sync_connection_error = RLM_ERR_CAT_SYNC_CONNECTION,
+        sync_session_error = RLM_ERR_CAT_SYNC_SESSION
     };
     constexpr ErrorCategory() = default;
     constexpr bool test(Type cat)

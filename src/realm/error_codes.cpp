@@ -50,19 +50,25 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case SubscriptionFailed:
         case UnsupportedFileFormatVersion:
         case OperationAborted:
+            return ErrorCategory().set(ErrorCategory::runtime_error);
+
         case AutoClientResetFailed:
         case ConnectionClosed:
+        case SyncProtocolInvariantFailed:
+            return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::sync_client_error);
+
         case SyncClientResetRequired:
         case SyncCompensatingWrite:
-        case SyncConnectFailed:
         case SyncPermissionDenied:
-        case SyncProtocolInvariantFailed:
-        case SyncProtocolNegotiationFailed:
         case SyncServerPermissionsChanged:
         case SyncUserMismatch:
-        case TlsHandshakeFailed:
         case SyncWriteNotAllowed:
-            return ErrorCategory().set(ErrorCategory::runtime_error);
+            return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::sync_session_error);
+
+        case SyncConnectFailed:
+        case SyncProtocolNegotiationFailed:
+        case TlsHandshakeFailed:
+            return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::websocket_error);
 
         case DecryptionFailed:
         case DeleteOnOpenRealm:
@@ -128,11 +134,21 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case TopLevelObject:
         case TypeMismatch:
         case UnexpectedPrimaryKey:
+            return ErrorCategory().set(ErrorCategory::invalid_argument).set(ErrorCategory::logic_error);
+
         case BadSyncPartitionValue:
         case InvalidSubscriptionQuery:
         case SyncInvalidSchemaChange:
+            return ErrorCategory()
+                .set(ErrorCategory::invalid_argument)
+                .set(ErrorCategory::logic_error)
+                .set(ErrorCategory::sync_session_error);
+
         case WrongSyncType:
-            return ErrorCategory().set(ErrorCategory::invalid_argument).set(ErrorCategory::logic_error);
+            return ErrorCategory()
+                .set(ErrorCategory::invalid_argument)
+                .set(ErrorCategory::logic_error)
+                .set(ErrorCategory::sync_connection_error);
 
         case CustomError:
             return ErrorCategory()
