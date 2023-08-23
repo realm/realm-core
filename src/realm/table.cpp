@@ -676,7 +676,7 @@ ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, T
 }
 
 template <typename Type>
-void do_bulk_insert(Table* table, StringIndex* index, ColKey col_key, Allocator& alloc)
+void do_bulk_insert_index(Table* table, SearchIndex* index, ColKey col_key, Allocator& alloc)
 {
     using LeafType = typename ColumnTypeTraits<Type>::cluster_leaf_type;
     LeafType leaf(alloc);
@@ -693,49 +693,49 @@ void do_bulk_insert(Table* table, StringIndex* index, ColKey col_key, Allocator&
 void Table::populate_search_index(ColKey col_key)
 {
     auto col_ndx = col_key.get_index().val;
-    StringIndex* index = m_index_accessors[col_ndx].get();
+    SearchIndex* index = m_index_accessors[col_ndx].get();
     DataType type = get_column_type(col_key);
 
     if (type == type_Int) {
         if (is_nullable(col_key)) {
-            do_bulk_insert<Optional<int64_t>>(this, index, col_key, get_alloc());
+            do_bulk_insert_index<Optional<int64_t>>(this, index, col_key, get_alloc());
         }
         else {
-            do_bulk_insert<int64_t>(this, index, col_key, get_alloc());
+            do_bulk_insert_index<int64_t>(this, index, col_key, get_alloc());
         }
     }
     else if (type == type_Bool) {
         if (is_nullable(col_key)) {
-            do_bulk_insert<Optional<bool>>(this, index, col_key, get_alloc());
+            do_bulk_insert_index<Optional<bool>>(this, index, col_key, get_alloc());
         }
         else {
-            do_bulk_insert<bool>(this, index, col_key, get_alloc());
+            do_bulk_insert_index<bool>(this, index, col_key, get_alloc());
         }
     }
     else if (type == type_String) {
-        do_bulk_insert<StringData>(this, index, col_key, get_alloc());
+        do_bulk_insert_index<StringData>(this, index, col_key, get_alloc());
     }
     else if (type == type_Timestamp) {
-        do_bulk_insert<Timestamp>(this, index, col_key, get_alloc());
+        do_bulk_insert_index<Timestamp>(this, index, col_key, get_alloc());
     }
     else if (type == type_ObjectId) {
         if (is_nullable(col_key)) {
-            do_bulk_insert<Optional<ObjectId>>(this, index, col_key, get_alloc());
+            do_bulk_insert_index<Optional<ObjectId>>(this, index, col_key, get_alloc());
         }
         else {
-            do_bulk_insert<ObjectId>(this, index, col_key, get_alloc());
+            do_bulk_insert_index<ObjectId>(this, index, col_key, get_alloc());
         }
     }
     else if (type == type_UUID) {
         if (is_nullable(col_key)) {
-            do_bulk_insert<Optional<UUID>>(this, index, col_key, get_alloc());
+            do_bulk_insert_index<Optional<UUID>>(this, index, col_key, get_alloc());
         }
         else {
-            do_bulk_insert<UUID>(this, index, col_key, get_alloc());
+            do_bulk_insert_index<UUID>(this, index, col_key, get_alloc());
         }
     }
     else if (type == type_Mixed) {
-        do_bulk_insert<Mixed>(this, index, col_key, get_alloc());
+        do_bulk_insert_index<Mixed>(this, index, col_key, get_alloc());
     }
     else {
         REALM_ASSERT_RELEASE(false && "Data type does not support search index");
@@ -870,7 +870,7 @@ void Table::do_add_search_index(ColKey col_key, IndexType type)
     // Create the index
     m_index_accessors[column_ndx] =
         std::make_unique<StringIndex>(ClusterColumn(&m_clusters, col_key, type), get_alloc()); // Throws
-    StringIndex* index = m_index_accessors[column_ndx].get();
+    SearchIndex* index = m_index_accessors[column_ndx].get();
     // Insert ref to index
     index->set_parent(&m_index_refs, column_ndx);
 
@@ -1609,7 +1609,13 @@ std::optional<Mixed> Table::max(ColKey col_key, ObjKey* return_ndx) const
 }
 
 
-StringIndex* Table::get_search_index(ColKey col) const noexcept
+SearchIndex* Table::get_search_index(ColKey col) const noexcept
+{
+    check_column(col);
+    return m_index_accessors[col.get_index().val].get();
+}
+
+StringIndex* Table::get_string_index(ColKey col) const noexcept
 {
     check_column(col);
     return dynamic_cast<StringIndex*>(m_index_accessors[col.get_index().val].get());
@@ -1625,7 +1631,7 @@ ObjKey Table::find_first(ColKey col_key, T value) const
     }
     // You cannot call GetIndexData on ObjKey
     if constexpr (!std::is_same_v<T, ObjKey>) {
-        if (StringIndex* index = get_search_index(col_key)) {
+        if (SearchIndex* index = get_search_index(col_key)) {
             return index->find_first(value);
         }
         if (col_key == m_primary_key_col) {

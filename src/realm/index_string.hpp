@@ -144,21 +144,22 @@ public:
     void set(ObjKey key, const Mixed& new_value) final;
     void erase(ObjKey key) final;
     ObjKey find_first(const Mixed& value) const final;
-    void find_all(std::vector<ObjKey>& result, Mixed value, bool case_insensitive = false) const;
-    FindRes find_all_no_copy(Mixed value, InternalFindResult& result) const;
+    void find_all(std::vector<ObjKey>& result, Mixed value, bool case_insensitive = false) const final;
+    FindRes find_all_no_copy(Mixed value, InternalFindResult& result) const final;
     size_t count(const Mixed& value) const final;
-    void insert_bulk(const ArrayUnsigned* keys, uint64_t key_offset, size_t num_values, ArrayPayload& values);
+    void insert_bulk(const ArrayUnsigned* keys, uint64_t key_offset, size_t num_values, ArrayPayload& values) final;
 
     void find_all_fulltext(std::vector<ObjKey>& result, StringData value) const;
 
     void clear() override;
     bool has_duplicate_values() const noexcept override;
 
-    void verify() const;
+    void verify() const final;
 #ifdef REALM_DEBUG
     template <class T>
     void verify_entries(const ClusterColumn& column) const;
     void do_dump_node_structure(std::ostream&, int) const;
+    void print() const final;
 #endif
 
     typedef int32_t key_type;

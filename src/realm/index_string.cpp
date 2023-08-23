@@ -1793,6 +1793,12 @@ bool SortedListComparator::operator()(Mixed needle, int64_t key_value) // used i
 
 // LCOV_EXCL_START ignore debug functions
 
+#ifdef REALM_DEBUG
+void StringIndex::print() const
+{
+    dump_node_structure(*m_array, std::cout, 0);
+}
+#endif // REALM_DEBUG
 
 void StringIndex::verify() const
 {

@@ -5342,7 +5342,7 @@ TEST(Table_FullTextIndex)
         auto t = wt->add_table("foo");
         col = t->add_column(type_String, "str");
         t->add_fulltext_index(col);
-        auto index = t->get_search_index(col);
+        auto index = t->get_string_index(col);
         CHECK(index->is_fulltext_index());
 
         t->create_object().set(col, "This is a test, with  spaces!");
@@ -5354,7 +5354,7 @@ TEST(Table_FullTextIndex)
 
     auto rt = db->start_read();
     auto t = rt->get_table("foo");
-    auto index = t->get_search_index(col);
+    auto index = t->get_string_index(col);
     CHECK(index->is_fulltext_index());
     TableView res = t->find_all_fulltext(col, "spaces with");
     CHECK_EQUAL(2, res.size());

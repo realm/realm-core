@@ -50,6 +50,7 @@ template <class>
 class BacklinkCount;
 class TableView;
 class Group;
+struct SearchIndex;
 class SortDescriptor;
 class TableView;
 template <class>
@@ -439,7 +440,8 @@ public:
     std::optional<Mixed> avg(ColKey col_key, size_t* value_count = nullptr) const;
 
     // Will return pointer to search index accessor. Will return nullptr if no index
-    StringIndex* get_search_index(ColKey col) const noexcept;
+    SearchIndex* get_search_index(ColKey col) const noexcept;
+    StringIndex* get_string_index(ColKey col) const noexcept;
 
     template <class T>
     ObjKey find_first(ColKey col_key, T value) const;
@@ -729,7 +731,7 @@ private:
     Array m_index_refs;                             // 5th slot in m_top
     Array m_opposite_table;                         // 7th slot in m_top
     Array m_opposite_column;                        // 8th slot in m_top
-    std::vector<std::unique_ptr<StringIndex>> m_index_accessors;
+    std::vector<std::unique_ptr<SearchIndex>> m_index_accessors;
     ColKey m_primary_key_col;
     Replication* const* m_repl;
     static Replication* g_dummy_replication;

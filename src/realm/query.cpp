@@ -942,7 +942,7 @@ Query& Query::like(ColKey column_key, StringData value, bool case_sensitive)
 
 Query& Query::fulltext(ColKey column_key, StringData value)
 {
-    auto index = m_table->get_search_index(column_key);
+    auto index = m_table->get_string_index(column_key);
     if (!(index && index->is_fulltext_index())) {
         throw IllegalOperation{"Column has no fulltext index"};
     }
@@ -954,7 +954,7 @@ Query& Query::fulltext(ColKey column_key, StringData value)
 
 Query& Query::fulltext(ColKey column_key, StringData value, const LinkMap& link_map)
 {
-    auto index = link_map.get_target_table()->get_search_index(column_key);
+    auto index = link_map.get_target_table()->get_string_index(column_key);
     if (!(index && index->is_fulltext_index())) {
         throw IllegalOperation{"Column has no fulltext index"};
     }

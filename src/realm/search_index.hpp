@@ -84,11 +84,20 @@ struct SearchIndex {
     virtual void insert(ObjKey value, const Mixed& key) = 0;
     virtual void set(ObjKey value, const Mixed& key) = 0;
     virtual ObjKey find_first(const Mixed&) const = 0;
+    virtual void find_all(std::vector<ObjKey>& result, Mixed value, bool case_insensitive = false) const = 0;
+    virtual FindRes find_all_no_copy(Mixed value, InternalFindResult& result) const = 0;
     virtual size_t count(const Mixed&) const = 0;
     virtual void erase(ObjKey) = 0;
     virtual void clear() = 0;
     virtual bool has_duplicate_values() const noexcept = 0;
     virtual bool is_empty() const = 0;
+    virtual void insert_bulk(const ArrayUnsigned* keys, uint64_t key_offset, size_t num_values,
+                             ArrayPayload& values) = 0;
+    virtual void verify() const = 0;
+
+#ifdef REALM_DEBUG
+    virtual void print() const = 0;
+#endif // REALM_DEBUG
 
     // Accessor concept:
     Allocator& get_alloc() const noexcept;
