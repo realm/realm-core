@@ -41,6 +41,8 @@
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 
+#include <realm/util/logger.hpp>
+
 #include <catch2/catch_all.hpp>
 
 #include <external/json/json.hpp>
@@ -320,8 +322,7 @@ TEST_CASE("audit object serialization", "[sync][pbs][audit]") {
     config.audit_config = std::make_shared<AuditConfig>();
     auto serializer = std::make_shared<CustomSerializer>();
     config.audit_config->serializer = serializer;
-    config.audit_config->logger =
-        std::make_shared<util::ThreadSafeLogger>(std::make_shared<util::StderrLogger>(AUDIT_LOG_LEVEL));
+    config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(util::Logger::get_default_logger());
     auto realm = Realm::get_shared_realm(config);
     auto audit = realm->audit_context();
     REQUIRE(audit);
@@ -1507,7 +1508,7 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
         {"object", {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
     };
     config.audit_config = std::make_shared<AuditConfig>();
-    auto logger = std::make_shared<util::StderrLogger>(AUDIT_LOG_LEVEL);
+    auto logger = util::Logger::get_default_logger();
     config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(logger);
     auto realm = Realm::get_shared_realm(config);
     auto audit = realm->audit_context();
@@ -1695,8 +1696,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
     SyncTestFile config(session.app()->current_user(), bson::Bson("default"));
     config.schema = schema;
     config.audit_config = std::make_shared<AuditConfig>();
-    config.audit_config->logger =
-        std::make_shared<util::ThreadSafeLogger>(std::make_shared<util::StderrLogger>(AUDIT_LOG_LEVEL));
+    config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(util::Logger::get_default_logger());
 
     auto expect_error = [&](auto&& config, auto&& fn) -> SyncError {
         std::mutex mutex;

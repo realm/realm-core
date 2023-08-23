@@ -114,8 +114,7 @@ static std::vector<ObjectId> fill_test_data(SyncTestFile& config, std::optional<
 
 
 TEST_CASE("Test server migration and rollback", "[sync][flx][flx migration][baas]") {
-    std::shared_ptr<util::Logger> logger_ptr =
-        std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    auto logger_ptr = util::Logger::get_default_logger();
 
     const std::string base_url = get_base_url();
     const std::string partition1 = "migration-test";
@@ -264,8 +263,7 @@ TEST_CASE("Test server migration and rollback", "[sync][flx][flx migration][baas
 }
 
 TEST_CASE("Test client migration and rollback", "[sync][flx][flx migration][baas]") {
-    std::shared_ptr<util::Logger> logger_ptr =
-        std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    auto logger_ptr = util::Logger::get_default_logger();
 
     const std::string base_url = get_base_url();
     const std::string partition = "migration-test";
@@ -321,8 +319,7 @@ TEST_CASE("Test client migration and rollback", "[sync][flx][flx migration][baas
 }
 
 TEST_CASE("Test client migration and rollback with recovery", "[sync][flx][flx migration][baas]") {
-    std::shared_ptr<util::Logger> logger_ptr =
-        std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    auto logger_ptr = util::Logger::get_default_logger();
 
     const std::string base_url = get_base_url();
     const std::string partition = "migration-test";
@@ -473,8 +470,7 @@ TEST_CASE("Test client migration and rollback with recovery", "[sync][flx][flx m
 
 TEST_CASE("An interrupted migration or rollback can recover on the next session",
           "[sync][flx][flx migration][baas]") {
-    std::shared_ptr<util::Logger> logger_ptr =
-        std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    auto logger_ptr = util::Logger::get_default_logger();
 
     const std::string base_url = get_base_url();
     const std::string partition = "migration-test";
@@ -585,8 +581,7 @@ TEST_CASE("An interrupted migration or rollback can recover on the next session"
 }
 
 TEST_CASE("Update to native FLX after migration", "[sync][flx][flx migration][baas]") {
-    std::shared_ptr<util::Logger> logger_ptr =
-        std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    auto logger_ptr = util::Logger::get_default_logger();
 
     const std::string base_url = get_base_url();
     const std::string partition = "migration-test";
@@ -705,8 +700,7 @@ TEST_CASE("Update to native FLX after migration", "[sync][flx][flx migration][ba
 }
 
 TEST_CASE("New table is synced after migration", "[sync][flx][flx migration][baas]") {
-    std::shared_ptr<util::Logger> logger_ptr =
-        std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    auto logger_ptr = util::Logger::get_default_logger();
 
     const std::string base_url = get_base_url();
     const std::string partition = "migration-test";
@@ -814,8 +808,7 @@ TEST_CASE("New table is synced after migration", "[sync][flx][flx migration][baa
 // a subset of the one found on disk. Since it is not, a schema exception is thrown
 // which is eventually forwarded to the sync error handler and client reset fails.
 TEST_CASE("Async open + client reset", "[sync][flx][flx migration][baas]") {
-    std::shared_ptr<util::Logger> logger_ptr =
-        std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    auto logger_ptr = util::Logger::get_default_logger();
 
     const std::string base_url = get_base_url();
     const std::string partition = "async-open-migration-test";

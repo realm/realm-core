@@ -2187,7 +2187,7 @@ TEST_CASE("app: make distributable client file", "[sync][pbs][app][baas]") {
 }
 
 TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
-    auto logger = std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+    auto logger = util::Logger::get_default_logger();
 
     const auto schema = default_app_config("").schema;
 

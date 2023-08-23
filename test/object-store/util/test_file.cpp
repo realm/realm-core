@@ -196,8 +196,8 @@ SyncServer::SyncServer(const SyncServer::Config& config)
                    using namespace std::literals::chrono_literals;
 
 #if TEST_ENABLE_LOGGING
-                   auto logger = new util::StderrLogger(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
-                   m_logger.reset(logger);
+                   m_logger = util::Logger::get_default_logger();
+
 #else
                    // Logging is disabled, use a NullLogger to prevent printing anything
                    m_logger.reset(new util::NullLogger());
