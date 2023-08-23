@@ -16,28 +16,28 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
 
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
+#include <realm/group.hpp>
+#include <realm/table.hpp>
 
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
-
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 
-#include <realm/group.hpp>
-#include <realm/table.hpp>
 #include <realm/util/scope_exit.hpp>
+
+#include <catch2/catch_all.hpp>
 
 #ifdef _WIN32
 #include <Windows.h>
 #endif
 
 #if REALM_ENABLE_AUTH_TESTS
-#include "sync/flx_sync_harness.hpp"
+#include <util/sync/flx_sync_harness.hpp>
 #endif // REALM_ENABLE_AUTH_TESTS
 
 using namespace realm;
@@ -217,7 +217,7 @@ auto create_objects(Table& table, size_t count)
 }
 } // anonymous namespace
 
-TEST_CASE("migration: Automatic") {
+TEST_CASE("migration: Automatic", "[migration]") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
 
@@ -1235,7 +1235,7 @@ TEST_CASE("migration: Automatic") {
                 auto list = util::any_cast<List>(obj.get_property_value<std::any>(ctx, "array"));
                 REQUIRE(list.size() == 1);
 
-                CppContext list_ctx(ctx, obj.obj(), *obj.get_object_schema().property_for_name("array"));
+                CppContext list_ctx(ctx, obj.get_obj(), *obj.get_object_schema().property_for_name("array"));
                 link = util::any_cast<Object>(list.get(list_ctx, 0));
                 REQUIRE(link.is_valid());
                 REQUIRE(util::any_cast<int64_t>(link.get_property_value<std::any>(list_ctx, "value")) == 20);
@@ -1290,7 +1290,7 @@ TEST_CASE("migration: Automatic") {
                 auto list = util::any_cast<List>(obj.get_property_value<std::any>(ctx, "array"));
                 REQUIRE(list.size() == 1);
 
-                CppContext list_ctx(ctx, obj.obj(), *obj.get_object_schema().property_for_name("array"));
+                CppContext list_ctx(ctx, obj.get_obj(), *obj.get_object_schema().property_for_name("array"));
                 link = util::any_cast<Object>(list.get(list_ctx, 0));
                 REQUIRE(link.is_valid());
                 REQUIRE(util::any_cast<int64_t>(link.get_property_value<std::any>(list_ctx, "value")) == 20);
@@ -1350,11 +1350,11 @@ TEST_CASE("migration: Automatic") {
                 auto linking = util::any_cast<Results>(linked_obj.get_property_value<std::any>(ctx, "origin"));
                 REQUIRE(linking.size() == 1);
 
-                REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object")).obj().get_key() ==
-                        linked_obj.obj().get_key());
+                REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object")).get_obj().get_key() ==
+                        linked_obj.get_obj().get_key());
                 obj.set_property_value(ctx, "object", std::any(new_obj));
-                REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object")).obj().get_key() ==
-                        new_obj.obj().get_key());
+                REQUIRE(util::any_cast<Object>(obj.get_property_value<std::any>(ctx, "object")).get_obj().get_key() ==
+                        new_obj.get_obj().get_key());
 
                 REQUIRE(linking.size() == 0);
             });
@@ -1804,7 +1804,7 @@ TEST_CASE("migration: Automatic") {
     }
 }
 
-TEST_CASE("migration: Immutable") {
+TEST_CASE("migration: Immutable", "[migration]") {
     TestFile config;
 
     auto realm_with_schema = [&](Schema schema) {
@@ -1920,7 +1920,7 @@ TEST_CASE("migration: Immutable") {
     }
 }
 
-TEST_CASE("migration: ReadOnly") {
+TEST_CASE("migration: ReadOnly", "[migration]") {
     TestFile config;
 
     auto realm_with_schema = [&](Schema schema) {
@@ -2022,7 +2022,7 @@ TEST_CASE("migration: ReadOnly") {
     }
 }
 
-TEST_CASE("migration: SoftResetFile") {
+TEST_CASE("migration: SoftResetFile", "[migration]") {
     TestFile config;
     config.schema_mode = SchemaMode::SoftResetFile;
 
@@ -2096,7 +2096,7 @@ TEST_CASE("migration: SoftResetFile") {
     }
 }
 
-TEST_CASE("migration: HardResetFile") {
+TEST_CASE("migration: HardResetFile", "[migration]") {
     TestFile config;
 
     Schema schema = {
@@ -2145,7 +2145,7 @@ TEST_CASE("migration: HardResetFile") {
     }
 }
 
-TEST_CASE("migration: Additive") {
+TEST_CASE("migration: Additive", "[migration]") {
     Schema schema = {
         {"object",
          {
@@ -2470,7 +2470,7 @@ TEST_CASE("migration: Additive") {
     }
 }
 
-TEST_CASE("migration: Manual") {
+TEST_CASE("migration: Manual", "[migration]") {
     TestFile config;
     config.schema_mode = SchemaMode::Manual;
     auto realm = Realm::get_shared_realm(config);
@@ -2649,128 +2649,5 @@ TEST_CASE("migration: Manual") {
         Schema new_schema = remove_property(schema, "object", "value");
         REQUIRE_EXCEPTION(realm->update_schema(new_schema, 1, nullptr), SchemaMismatch,
                           Catch::Matchers::ContainsSubstring("Property 'object.value' has been removed."));
-    }
-}
-
-TEST_CASE("migration nested collection automatic") {
-    TestFile config;
-    config.schema_mode = SchemaMode::Automatic;
-    auto realm = Realm::get_shared_realm(config);
-
-    Schema schema = {
-        {"nested_object", {{"nested_list", PropertyType::Array | PropertyType::Int, {CollectionType::List}}}}};
-    REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 0);
-
-    SECTION("Remove nested list") {
-        Schema new_schema = remove_property(schema, "nested_object", "nested_list");
-        REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
-    }
-
-    SECTION("Add nested collection") {
-        Schema new_schema =
-            add_property(schema, "nested_object",
-                         {"another_nested_list", PropertyType::Array | PropertyType::Int, {CollectionType::List}});
-        REQUIRE_UPDATE_SUCCEEDS(*realm, new_schema, 1);
-    }
-
-    SECTION("Reorder property") {
-        Schema new_schema =
-            add_property(schema, "nested_object",
-                         {"another_nested_list", PropertyType::Array | PropertyType::Int, {CollectionType::List}});
-        REQUIRE_UPDATE_SUCCEEDS(*realm, new_schema, 1);
-        auto& properties = new_schema.find("nested_object")->persisted_properties;
-        std::swap(properties[0], properties[1]);
-        REQUIRE_UPDATE_SUCCEEDS(*realm, new_schema, 2);
-    }
-
-    SECTION("Change property type should fail with schema in automatic mode") {
-        Schema new_schema = set_type(schema, "nested_object", "nested_list", PropertyType::Int);
-        REQUIRE_UPDATE_FAILS(
-            *realm, new_schema,
-            "Property 'nested_object.nested_list' has been changed from 'array<array<int>>' to 'int'.");
-    }
-
-    SECTION("add nested collection to same object") {
-        Schema new_schema =
-            add_property(schema, "nested_object",
-                         {"another_nested_list", PropertyType::Array | PropertyType::Int, {CollectionType::List}});
-        REQUIRE_UPDATE_SUCCEEDS(*realm, new_schema, 1);
-    }
-
-    SECTION("add nested collection with nullable type") {
-        Schema schema = {
-            {"nested_object", {{"nested_list", PropertyType::Array | PropertyType::Int, {CollectionType::List}}}},
-            {"nested_object2",
-             {{"nested_list_optional",
-               PropertyType::Array | PropertyType::Int | PropertyType::Nullable,
-               {CollectionType::List}}}},
-        };
-        REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
-    }
-
-    SECTION("change inner type") {
-        Schema new_schema = {
-            {"nested_object",
-             {{"nested_list",
-               PropertyType::Array | PropertyType::String | PropertyType::Nullable,
-               {CollectionType::List}}}},
-        };
-        REQUIRE_UPDATE_SUCCEEDS(*realm, new_schema, 1);
-    }
-
-    SECTION("change type of nested collection") {
-        Schema new_schema = {
-            {"nested_object",
-             {{"nested_list",
-               PropertyType::Array | PropertyType::Int | PropertyType::Nullable,
-               {CollectionType::Dictionary}}}},
-        };
-        REQUIRE_UPDATE_SUCCEEDS(*realm, new_schema, 1);
-    }
-}
-
-TEST_CASE("migration nested collection additive") {
-
-    TestFile config;
-    config.schema_mode = SchemaMode::AdditiveExplicit;
-    config.schema_subset_mode = SchemaSubsetMode::Strict; // ignore reporting complete schema
-    auto realm = Realm::get_shared_realm(config);
-
-    Schema schema = {
-        {"nested_object", {{"nested_list", PropertyType::Array | PropertyType::Int, {CollectionType::List}}}}};
-    REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 0);
-
-    SECTION("Add new column") {
-        Schema new_schema =
-            add_property(schema, "nested_object",
-                         {"another_nested_list", PropertyType::Array | PropertyType::Int, {CollectionType::List}});
-        REQUIRE_UPDATE_SUCCEEDS(*realm, new_schema, 1);
-    }
-
-    SECTION("Remove column") {
-        auto new_schema = remove_property(schema, "nested_object", "nested_list");
-        REQUIRE_UPDATE_SUCCEEDS(*realm, new_schema, 1);
-    }
-
-    SECTION("Change inner type") {
-        Schema new_schema = {
-            {"nested_object",
-             {{"nested_list",
-               PropertyType::Array | PropertyType::String | PropertyType::Nullable,
-               {CollectionType::List}}}},
-        };
-        INVALID_SCHEMA_CHANGE(*realm, new_schema,
-                              "Property 'nested_object.nested_list' has been changed from 'array<array<int>>' to "
-                              "'array<array<string>>'");
-    }
-
-    SECTION("Change type of nested collection") {
-        Schema new_schema = {
-            {"nested_object",
-             {{"nested_list", PropertyType::Array | PropertyType::Int, {CollectionType::Dictionary}}}},
-        };
-        INVALID_SCHEMA_CHANGE(*realm, new_schema,
-                              "Property 'nested_object.nested_list' has been changed from 'array<array<int>>' to "
-                              "'dictionary<string,array<int>>'");
     }
 }

@@ -1,4 +1,23 @@
+////////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2023 Realm Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+////////////////////////////////////////////////////////////////////////////
+
 #include <realm/transaction.hpp>
+
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/migration_store.hpp>
 
@@ -114,7 +133,7 @@ static void check_subscription(const sync::SubscriptionSet& sub_set, const std::
     REQUIRE(table_sub->name == sub_name);
 }
 
-TEST_CASE("Migration store", "[flx][migration][local]") {
+TEST_CASE("Migration store", "[sync][flx migration]") {
     std::string file_path = util::make_temp_dir() + "/migration_store.realm";
     auto mig_db = DB::create(sync::make_client_replication(), file_path);
     auto migration_store = sync::MigrationStore::create(mig_db);

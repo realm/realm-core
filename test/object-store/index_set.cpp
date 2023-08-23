@@ -22,7 +22,7 @@
 
 #include "util/index_helpers.hpp"
 
-TEST_CASE("index_set: contains()") {
+TEST_CASE("index_set: contains()", "[index set]") {
     SECTION("returns false if the index is before the first entry in the set") {
         realm::IndexSet set = {1, 2, 5};
         REQUIRE_FALSE(set.contains(0));
@@ -46,7 +46,7 @@ TEST_CASE("index_set: contains()") {
     }
 }
 
-TEST_CASE("index_set: count()") {
+TEST_CASE("index_set: count()", "[index set]") {
     SECTION("returns the number of indices in the set in the given range") {
         realm::IndexSet set = {1, 2, 3, 5};
         REQUIRE(set.count(0, 6) == 4);
@@ -91,7 +91,7 @@ TEST_CASE("index_set: count()") {
     }
 }
 
-TEST_CASE("index_set: add()") {
+TEST_CASE("index_set: add()", "[index set]") {
     realm::IndexSet set;
 
     SECTION("extends existing ranges when next to an edge") {
@@ -151,7 +151,7 @@ TEST_CASE("index_set: add()") {
     }
 }
 
-TEST_CASE("index_set: add_shifted()") {
+TEST_CASE("index_set: add_shifted()", "[index set]") {
     realm::IndexSet set;
 
     SECTION("on an empty set is just add()") {
@@ -198,7 +198,7 @@ TEST_CASE("index_set: add_shifted()") {
     }
 }
 
-TEST_CASE("index_set: add_shifted_by()") {
+TEST_CASE("index_set: add_shifted_by()", "[index set]") {
     realm::IndexSet set;
 
     SECTION("does nothing given an empty set to add") {
@@ -249,7 +249,7 @@ TEST_CASE("index_set: add_shifted_by()") {
     }
 }
 
-TEST_CASE("index_set: set()") {
+TEST_CASE("index_set: set()", "[index set]") {
     realm::IndexSet set;
 
     SECTION("clears the existing indices and replaces with the range [0, value)") {
@@ -259,7 +259,7 @@ TEST_CASE("index_set: set()") {
     }
 }
 
-TEST_CASE("index_set: insert_at()") {
+TEST_CASE("index_set: insert_at()", "[index set]") {
     realm::IndexSet set;
 
     SECTION("on an empty set is add()") {
@@ -323,7 +323,7 @@ TEST_CASE("index_set: insert_at()") {
     }
 }
 
-TEST_CASE("index_set: shift_for_insert_at()") {
+TEST_CASE("index_set: shift_for_insert_at()", "[index set]") {
     realm::IndexSet set;
 
     SECTION("does nothing given an empty set of insertion points") {
@@ -390,7 +390,7 @@ TEST_CASE("index_set: shift_for_insert_at()") {
     }
 }
 
-TEST_CASE("index_set: erase_at()") {
+TEST_CASE("index_set: erase_at()", "[index set]") {
     realm::IndexSet set;
 
     SECTION("is a no-op on an empty set") {
@@ -470,7 +470,7 @@ TEST_CASE("index_set: erase_at()") {
     }
 }
 
-TEST_CASE("index_set: erase_or_unshift()") {
+TEST_CASE("index_set: erase_or_unshift()", "[index set]") {
     realm::IndexSet set;
 
     SECTION("removes the given index") {
@@ -501,7 +501,7 @@ TEST_CASE("index_set: erase_or_unshift()") {
     }
 }
 
-TEST_CASE("index_set: remove()") {
+TEST_CASE("index_set: remove()", "[index set]") {
     realm::IndexSet set;
 
     SECTION("is a no-op if the set is empty") {
@@ -573,7 +573,7 @@ TEST_CASE("index_set: remove()") {
     }
 }
 
-TEST_CASE("index_set: shift()") {
+TEST_CASE("index_set: shift()", "[index set]") {
     realm::IndexSet set;
 
     SECTION("is ind + count(0, ind), but adds the count-so-far to the stop index") {
@@ -586,7 +586,7 @@ TEST_CASE("index_set: shift()") {
     }
 }
 
-TEST_CASE("index_set: unshift()") {
+TEST_CASE("index_set: unshift()", "[index set]") {
     realm::IndexSet set;
 
     SECTION("is index - count(0, index)") {
@@ -599,7 +599,7 @@ TEST_CASE("index_set: unshift()") {
     }
 }
 
-TEST_CASE("index_set: clear()") {
+TEST_CASE("index_set: clear()", "[index set]") {
     realm::IndexSet set;
 
     SECTION("removes all indices from the set") {

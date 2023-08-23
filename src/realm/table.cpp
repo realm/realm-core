@@ -391,7 +391,7 @@ Table::Table(Replication* const* repl, Allocator& alloc)
     m_cookie = cookie_created;
 }
 
-ColKey Table::add_column(DataType type, StringData name, bool nullable, std::vector<CollectionType> collection_types,
+ColKey Table::add_column(DataType type, StringData name, bool nullable, std::optional<CollectionType> collection_type,
                          DataType key_type)
 {
     REALM_ASSERT(!is_link_type(ColumnType(type)));
@@ -400,8 +400,8 @@ ColKey Table::add_column(DataType type, StringData name, bool nullable, std::vec
     }
 
     ColumnAttrMask attr;
-    if (!collection_types.empty()) {
-        switch (collection_types.back()) {
+    if (collection_type) {
+        switch (*collection_type) {
             case CollectionType::List:
                 attr.set(col_attr_List);
                 break;
@@ -418,18 +418,10 @@ ColKey Table::add_column(DataType type, StringData name, bool nullable, std::vec
     ColKey col_key = generate_col_key(ColumnType(type), attr);
 
     Table* invalid_link = nullptr;
-    col_key = do_insert_column(col_key, type, name, invalid_link, key_type); // Throws
-    if (collection_types.size() > 1) {
-        if (type == type_Mixed) {
-            throw IllegalOperation("Collections of Mixed cannot be statically nested");
-        }
-        collection_types.pop_back();
-        m_spec.set_nested_column_types(m_leaf_ndx2spec_ndx[col_key.get_index().val], collection_types);
-    }
-    return col_key;
+    return do_insert_column(col_key, type, name, invalid_link, key_type); // Throws
 }
 
-ColKey Table::add_column(Table& target, StringData name, std::vector<CollectionType> collection_types,
+ColKey Table::add_column(Table& target, StringData name, std::optional<CollectionType> collection_type,
                          DataType key_type)
 {
     // Both origin and target must be group-level tables, and in the same group.
@@ -450,8 +442,8 @@ ColKey Table::add_column(Table& target, StringData name, std::vector<CollectionT
 
     DataType data_type = type_Link;
     ColumnAttrMask attr;
-    if (!collection_types.empty()) {
-        switch (collection_types.back()) {
+    if (collection_type) {
+        switch (*collection_type) {
             case CollectionType::List:
                 attr.set(col_attr_List);
                 data_type = type_LinkList;
@@ -470,12 +462,7 @@ ColKey Table::add_column(Table& target, StringData name, std::vector<CollectionT
     }
     ColKey col_key = generate_col_key(ColumnType(data_type), attr);
 
-    auto retval = do_insert_column(col_key, data_type, name, &target, key_type); // Throws
-    if (collection_types.size() > 1) {
-        collection_types.pop_back();
-        m_spec.set_nested_column_types(m_leaf_ndx2spec_ndx[col_key.get_index().val], collection_types);
-    }
-    return retval;
+    return do_insert_column(col_key, data_type, name, &target, key_type); // Throws
 }
 
 void Table::remove_recursive(CascadeState& cascade_state)
@@ -517,11 +504,8 @@ void Table::nullify_links(CascadeState& cascade_state)
     }
 }
 
-CollectionType Table::get_collection_type(ColKey col_key, size_t level) const
+CollectionType Table::get_collection_type(ColKey col_key) const
 {
-    if (level < get_nesting_levels(col_key)) {
-        return get_nested_column_type(col_key, level);
-    }
     if (col_key.is_list()) {
         return CollectionType::List;
     }
@@ -1947,14 +1931,12 @@ void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::s
         }
         if (col_key.is_list()) {
             out << ",\"isArray\":true";
-            out << ",\"isNested\":" << (get_nesting_levels(col_key) > 0 ? "true" : "false");
         }
         else if (col_key.is_set()) {
             out << ",\"isSet\":true";
         }
         else if (col_key.is_dictionary()) {
             out << ",\"isMap\":true";
-            out << ",\"isNested\":" << (get_nesting_levels(col_key) > 0 ? "true" : "false");
             auto key_type = get_dictionary_key_type(col_key);
             out << ",\"keyType\":\"" << get_data_type_name(key_type) << "\"";
         }

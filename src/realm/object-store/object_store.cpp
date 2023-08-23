@@ -45,6 +45,9 @@ const char* const c_versionColumnName = "version";
 
 const char c_object_table_prefix[] = "class_";
 
+const char* const c_development_mode_msg =
+    "If your app is running in development mode, you can delete the realm and restart the app to update your schema.";
+
 void create_metadata_tables(Group& group)
 {
     // The 'metadata' table is simply ignored by Sync
@@ -98,28 +101,19 @@ DataType to_core_type(PropertyType type)
     }
 }
 
-std::vector<CollectionType> process_nested_collection(const Property& property)
+std::optional<CollectionType> process_collection(const Property& property)
 {
-    std::vector<CollectionType> collection_types;
-    // process the list of nested levels
-    for (const auto& prop_type : property.nested_types) {
-        collection_types.push_back(prop_type);
-    }
-
     // check if the final type is itself a collection.
     if (is_array(property.type)) {
-        collection_types.push_back(CollectionType::List);
+        return CollectionType::List;
     }
     else if (is_set(property.type)) {
-        collection_types.push_back(CollectionType::Set);
+        return CollectionType::Set;
     }
     else if (is_dictionary(property.type)) {
-        collection_types.push_back(CollectionType::Dictionary);
+        return CollectionType::Dictionary;
     }
-    else if (!collection_types.empty()) {
-        throw InvalidColumnKey("Not a valid nested collection type");
-    }
-    return collection_types;
+    return {};
 }
 
 ColKey add_column(Group& group, Table& table, Property const& property)
@@ -134,16 +128,16 @@ ColKey add_column(Group& group, Table& table, Property const& property)
             return col;
         }
     }
-    auto collection_types = process_nested_collection(property);
+    auto collection_type = process_collection(property);
     if (property.type == PropertyType::Object) {
         auto target_name = ObjectStore::table_name_for_object_type(property.object_type);
         TableRef link_table = group.get_table(target_name);
         REALM_ASSERT(link_table);
-        return table.add_column(*link_table, property.name, collection_types);
+        return table.add_column(*link_table, property.name, collection_type);
     }
     else {
-        auto key = table.add_column(to_core_type(property.type), property.name, is_nullable(property.type),
-                                    collection_types);
+        auto key =
+            table.add_column(to_core_type(property.type), property.name, is_nullable(property.type), collection_type);
         if (property.requires_index())
             table.add_search_index(key);
         if (property.requires_fulltext_index())
@@ -680,8 +674,9 @@ void ObjectStore::apply_additive_changes(Group& group, std::vector<SchemaChange>
         }
         void operator()(AddIndex op)
         {
-            if (update_indexes)
-                table(op.object).add_search_index(op.property->column_key);
+            if (update_indexes) {
+                add_search_index(table(op.object), *op.property, op.type);
+            }
         }
         void operator()(RemoveIndex op)
         {
@@ -1057,6 +1052,12 @@ static void append_errors(std::string& message, std::vector<ObjectSchemaValidati
     }
 }
 
+static void append_line(std::string& message, std::string_view line)
+{
+    message += "\n";
+    message += line;
+}
+
 SchemaValidationException::SchemaValidationException(std::vector<ObjectSchemaValidationException> const& errors)
     : LogicError(ErrorCodes::SchemaValidationFailed, [&] {
         std::string message = "Schema validation failed due to the following errors:";
@@ -1090,6 +1091,7 @@ InvalidAdditiveSchemaChangeException::InvalidAdditiveSchemaChangeException(
     : LogicError(ErrorCodes::InvalidSchemaChange, [&] {
         std::string message = "The following changes cannot be made in additive-only schema mode:";
         append_errors(message, errors);
+        append_line(message, c_development_mode_msg);
         return message;
     }())
 {
@@ -1100,6 +1102,7 @@ InvalidExternalSchemaChangeException::InvalidExternalSchemaChangeException(
     : LogicError(ErrorCodes::InvalidSchemaChange, [&] {
         std::string message = "Unsupported schema changes were made by another client or process:";
         append_errors(message, errors);
+        append_line(message, c_development_mode_msg);
         return message;
     }())
 {

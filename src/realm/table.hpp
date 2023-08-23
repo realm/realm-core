@@ -145,9 +145,11 @@ public:
     size_t get_column_count() const noexcept;
     DataType get_column_type(ColKey column_key) const;
     StringData get_column_name(ColKey column_key) const;
+    StringData get_column_name(ColIndex) const;
     ColumnAttrMask get_column_attr(ColKey column_key) const noexcept;
     DataType get_dictionary_key_type(ColKey column_key) const noexcept;
     ColKey get_column_key(StringData name) const noexcept;
+    ColKey get_column_key(ColIndex) const noexcept;
     ColKeys get_column_keys() const;
     typedef util::Optional<std::pair<ConstTableRef, ColKey>> BacklinkOrigin;
     BacklinkOrigin find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const noexcept;
@@ -166,16 +168,14 @@ public:
     static const size_t max_column_name_length = 63;
     static const uint64_t max_num_columns = 0xFFFFUL; // <-- must be power of two -1
 
-    // Add column holding primitive values. The vector of CollectionType specifies if the
-    // property is a collection and if the collection is nested in other collections.
-    // If the vector is empty, the property is a single value. If the vector contains
-    // a single value - eg. CollectionType::Dictionary, the property is a dictionary of
-    // the type specified. If the vector contains {CollectionType::List, CollectionType::Dictionary}
-    // the property is a list of dictionaries.
-    ColKey add_column(DataType type, StringData name, bool nullable = false, std::vector<CollectionType> = {},
+    // Add column holding primitive values. The optional CollectionType specifies if the
+    // property is a collection. If collection type is not specified, the property is a single value.
+    // If the vector contains a value - eg. CollectionType::Dictionary, the property is a dictionary
+    // of the type specified.
+    ColKey add_column(DataType type, StringData name, bool nullable = false, std::optional<CollectionType> = {},
                       DataType key_type = type_String);
     // As above, but the values are links to objects in the target table.
-    ColKey add_column(Table& target, StringData name, std::vector<CollectionType> = {},
+    ColKey add_column(Table& target, StringData name, std::optional<CollectionType> = {},
                       DataType key_type = type_String);
 
     // Map old functions to the more general interface above
@@ -205,20 +205,7 @@ public:
         return add_column(target, name, {CollectionType::Dictionary}, key_type);
     }
 
-    CollectionType get_nested_column_type(ColKey col_key, size_t level) const
-    {
-        auto spec_ndx = colkey2spec_ndx(col_key);
-        REALM_ASSERT_3(spec_ndx, <, get_column_count());
-        return m_spec.get_nested_column_type(spec_ndx, level);
-    }
-
-    size_t get_nesting_levels(ColKey col_key) const
-    {
-        auto spec_ndx = colkey2spec_ndx(col_key);
-        return m_spec.get_nesting_levels(spec_ndx);
-    }
-
-    CollectionType get_collection_type(ColKey col_key, size_t level) const;
+    CollectionType get_collection_type(ColKey col_key) const;
 
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);
@@ -1023,10 +1010,38 @@ public:
         return *this;
     }
 
+    void pop_back()
+    {
+        m_link_cols.pop_back();
+        // Recalculate m_current_table
+        m_current_table = m_base_table;
+        for (auto col : m_link_cols) {
+            m_current_table = m_current_table->get_opposite_table(col);
+        }
+    }
+
     bool link(std::string col_name)
     {
         if (auto ck = m_current_table->get_column_key(col_name)) {
             return add(ck);
+        }
+        return false;
+    }
+
+    bool index(PathElement index)
+    {
+        if (!m_link_cols.empty() && !m_link_cols.back().has_index()) {
+            if (index.is_all())
+                return true;
+            ColKey last_col = m_link_cols.back();
+            if (index.is_ndx() && last_col.is_list()) {
+                m_link_cols.back().set_index(index);
+                return true;
+            }
+            if (index.is_key() && last_col.is_dictionary()) {
+                m_link_cols.back().set_index(index);
+                return true;
+            }
         }
         return false;
     }
@@ -1074,7 +1089,7 @@ public:
         auto backlink_col_key = origin.get_opposite_column(origin_col_key);
         m_link_cols.push_back(backlink_col_key);
 
-        return Columns<T>(backlink_col_key, m_base_table, std::move(m_link_cols));
+        return Columns<T>(backlink_col_key, m_base_table, m_link_cols);
     }
     template <class T>
     SubQuery<T> column(ColKey col_key, Query subquery)
@@ -1100,7 +1115,7 @@ private:
     friend class Table;
     friend class query_parser::ParserDriver;
 
-    std::vector<ColKey> m_link_cols;
+    std::vector<ExtendedColumnKey> m_link_cols;
     ConstTableRef m_current_table;
     ConstTableRef m_base_table;
     util::Optional<ExpressionComparisonType> m_comparison_type;
@@ -1186,12 +1201,22 @@ inline StringData Table::get_column_name(ColKey column_key) const
     return m_spec.get_column_name(spec_ndx);
 }
 
+inline StringData Table::get_column_name(ColIndex index) const
+{
+    return m_spec.get_column_name(m_leaf_ndx2spec_ndx[index.get_index().val]);
+}
+
 inline ColKey Table::get_column_key(StringData name) const noexcept
 {
     size_t spec_ndx = m_spec.get_column_index(name);
     if (spec_ndx == npos)
         return ColKey();
     return spec_ndx2colkey(spec_ndx);
+}
+
+inline ColKey Table::get_column_key(ColIndex index) const noexcept
+{
+    return m_leaf_ndx2colkey[index.get_index().val];
 }
 
 inline ColumnType Table::get_real_column_type(ColKey col_key) const noexcept

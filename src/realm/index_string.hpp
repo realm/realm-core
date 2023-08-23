@@ -86,6 +86,10 @@ public:
     FindRes index_string_find_all_no_copy(const Mixed& value, const ClusterColumn& column,
                                           InternalFindResult& result) const;
     size_t index_string_count(const Mixed& value, const ClusterColumn& column) const;
+    void index_string_find_all_prefix(std::set<int64_t>& result, StringData str) const
+    {
+        _index_string_find_all_prefix(result, str, NodeHeader::get_header_from_data(m_data));
+    }
 
 private:
     template <IndexMethod>
@@ -104,6 +108,7 @@ private:
     void index_string_all(const Mixed& value, std::vector<ObjKey>& result, const ClusterColumn& column) const;
 
     void index_string_all_ins(StringData value, std::vector<ObjKey>& result, const ClusterColumn& column) const;
+    void _index_string_find_all_prefix(std::set<int64_t>& result, StringData str, const char* header) const;
 };
 
 // 16 is the biggest element size of any non-string/binary Realm type

@@ -41,6 +41,7 @@ void ListNotifier::release_data() noexcept
 
 void ListNotifier::reattach()
 {
+    REALM_ASSERT(m_list);
     attach(*m_list);
 }
 

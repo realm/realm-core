@@ -184,7 +184,7 @@ RLM_API bool realm_get_value_by_property_index(const realm_object_t* object, siz
         auto& peristed_properties = object->get_object_schema().persisted_properties;
         REALM_ASSERT(prop_index < peristed_properties.size());
         auto col_key = peristed_properties[prop_index].column_key;
-        auto o = object->obj();
+        auto o = object->get_obj();
         auto val = o.get_any(col_key);
         auto converted = objkey_to_typed_link(val, col_key, *o.get_table());
         *out_value = to_capi(converted);

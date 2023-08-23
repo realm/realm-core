@@ -21,7 +21,7 @@
 
 #include <realm/alloc.hpp>
 #include <realm/table_ref.hpp>
-#include <realm/keys.hpp>
+#include <realm/path.hpp>
 #include <realm/mixed.hpp>
 
 #include <external/mpark/variant.hpp>
@@ -49,7 +49,6 @@ using CollectionPtr = std::shared_ptr<Collection>;
 using LstBasePtr = std::unique_ptr<LstBase>;
 using SetBasePtr = std::unique_ptr<SetBase>;
 using CollectionBasePtr = std::shared_ptr<CollectionBase>;
-using CollectionListPtr = std::shared_ptr<CollectionList>;
 using ListMixedPtr = std::shared_ptr<Lst<Mixed>>;
 using DictionaryPtr = std::shared_ptr<Dictionary>;
 using SetMixedPtr = std::shared_ptr<Set<Mixed>>;
@@ -72,156 +71,56 @@ enum class UpdateStatus {
     NoChange,
 };
 
-// Given an object as starting point, a collection can be identified by
-// a sequence of PathElements. The first element should always be a
-// column key. The next elements are either an index into a list or a key
-// to an entry in a dictionary
-struct PathElement {
-    union {
-        std::string string_val;
-        int64_t int_val;
-    };
-    enum Type { column, key, index, all } m_type;
-    struct AllTag {};
-
-    PathElement()
-        : int_val(-1)
-        , m_type(Type::column)
+/*
+ * In order to detect stale collection objects (objects referring to entities that have
+ * been deleted from the DB) nested directly in an Obj object, we need a structure that
+ * both holds an index of the relevant column as well as a somewhat unique key. The key
+ * is generated when the collection is assigned to the property and stored alongside the
+ * ref of the collection. The stored key is regenerated/cleared when a new value is
+ * assigned to the property.
+ */
+class ColIndex {
+public:
+    ColIndex()
     {
+        value.col_index = 0x7fff;
     }
-    PathElement(ColKey col_key)
-        : int_val(col_key.value)
-        , m_type(Type::column)
+    ColIndex(ColKey col_key, int64_t key)
     {
+        value.col_index = col_key.get_index().val;
+        value.is_collection = col_key.is_collection();
+        value.key = uint16_t(key);
     }
-    PathElement(int ndx)
-        : int_val(ndx)
-        , m_type(Type::index)
+    ColKey::Idx get_index() const noexcept
     {
-        REALM_ASSERT(ndx >= 0);
+        return {unsigned(value.col_index)};
     }
-    PathElement(size_t ndx)
-        : int_val(int64_t(ndx))
-        , m_type(Type::index)
+    int64_t get_key() const noexcept
     {
+        return int16_t(value.key);
     }
-    PathElement(StringData str)
-        : string_val(str)
-        , m_type(Type::key)
+    bool is_collection() const noexcept
     {
-    }
-    PathElement(const char* str)
-        : string_val(str)
-        , m_type(Type::key)
-    {
-    }
-    PathElement(AllTag)
-        : int_val(0)
-        , m_type(Type::all)
-    {
-    }
-    PathElement(const std::string& str)
-        : string_val(str)
-        , m_type(Type::key)
-    {
-    }
-    PathElement(const PathElement& other)
-        : m_type(other.m_type)
-    {
-        if (other.m_type == Type::key) {
-            new (&string_val) std::string(other.string_val);
-        }
-        else {
-            int_val = other.int_val;
-        }
+        return value.is_collection;
     }
 
-    PathElement(PathElement&& other) noexcept
-        : m_type(other.m_type)
+    bool operator==(const ColIndex& other) const noexcept
     {
-        if (other.m_type == Type::key) {
-            new (&string_val) std::string(std::move(other.string_val));
-        }
-        else {
-            int_val = other.int_val;
-        }
-    }
-    ~PathElement()
-    {
-        if (m_type == Type::key) {
-            string_val.std::string::~string();
-        }
+        // Compare only index
+        return value.col_index == other.value.col_index;
     }
 
-    bool is_col_key() const noexcept
-    {
-        return m_type == Type::column;
-    }
-    bool is_ndx() const noexcept
-    {
-        return m_type == Type::index;
-    }
-    bool is_key() const noexcept
-    {
-        return m_type == Type::key;
-    }
-    bool is_all() const noexcept
-    {
-        return m_type == Type::all;
-    }
-
-    ColKey get_col_key() const noexcept
-    {
-        REALM_ASSERT(is_col_key());
-        return ColKey(int_val);
-    }
-    size_t get_ndx() const noexcept
-    {
-        REALM_ASSERT(is_ndx());
-        return size_t(int_val);
-    }
-    const std::string& get_key() const noexcept
-    {
-        REALM_ASSERT(is_key());
-        return string_val;
-    }
-
-    PathElement& operator=(const PathElement& other) = delete;
-
-    bool operator==(const PathElement& other) const
-    {
-        if (m_type == other.m_type) {
-            return (m_type == Type::key) ? string_val == other.string_val : int_val == other.int_val;
-        }
-        return false;
-    }
-    bool operator==(const char* str) const
-    {
-        return (m_type == Type::key) ? string_val == str : false;
-    }
-    bool operator==(size_t i) const
-    {
-        return (m_type == Type::index) ? size_t(int_val) == i : false;
-    }
-    bool operator==(ColKey ck) const
-    {
-        return (m_type == Type::column) ? int_val == ck.value : false;
-    }
+private:
+    struct {
+        uint32_t col_index : 15;
+        uint32_t is_collection : 1;
+        uint32_t key : 16;
+    } value;
 };
 
-using Path = std::vector<PathElement>;
+static_assert(sizeof(ColIndex) == sizeof(uint32_t));
 
-std::ostream& operator<<(std::ostream& ostr, const PathElement& elem);
-std::ostream& operator<<(std::ostream& ostr, const Path& path);
-
-// Path from the group level.
-struct FullPath {
-    TableKey top_table;
-    ObjKey top_objkey;
-    Path path_from_top;
-};
-
-using StableIndex = mpark::variant<ColKey, int64_t, std::string>;
+using StableIndex = mpark::variant<ColIndex, int64_t, std::string>;
 using StablePath = std::vector<StableIndex>;
 
 class CollectionParent : public std::enable_shared_from_this<CollectionParent> {
@@ -275,6 +174,11 @@ protected:
     virtual const Obj& get_object() const noexcept = 0;
     /// Get the top ref from pareht
     virtual ref_type get_collection_ref(Index, CollectionType) const = 0;
+    /// Check if we can possibly get a ref
+    virtual bool check_collection_ref(Index, CollectionType) const noexcept
+    {
+        return true;
+    }
     /// Set the top ref in parent
     virtual void set_collection_ref(Index, ref_type ref, CollectionType) = 0;
 

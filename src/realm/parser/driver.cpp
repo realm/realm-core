@@ -844,6 +844,9 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
     }
     m_link_chain = path->visit(drv, comp_type);
     if (!path->at_end()) {
+        if (!path->current_path_elem->is_key()) {
+            throw InvalidQueryError(util::format("[%1] not expected", *path->current_path_elem));
+        }
         identifier = path->current_path_elem->get_key();
     }
     std::unique_ptr<Subexpr> subexpr{drv->column(m_link_chain, path)};
@@ -873,12 +876,12 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
                     subexpr = std::make_unique<ColumnDictionaryKeys>(*dict);
                 }
                 else {
-                    dict->key(indexes);
+                    dict->path(indexes);
                 }
             }
             else if (first_index.is_all()) {
                 ok = true;
-                dict->key(indexes);
+                dict->path(indexes);
             }
         }
         else if (auto coll = dynamic_cast<Columns<Lst<Mixed>>*>(subexpr.get())) {
@@ -1089,6 +1092,21 @@ std::unique_ptr<Subexpr> AggrNode::aggregate(Subexpr* subexpr)
     return agg;
 }
 
+void ConstantNode::decode_b64(util::FunctionRef<void(StringData)> callback)
+{
+    const size_t encoded_size = text.size() - 5;
+    size_t buffer_size = util::base64_decoded_size(encoded_size);
+    std::string decode_buffer(buffer_size, char(0));
+    StringData window(text.c_str() + 4, encoded_size);
+    util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer.data(), buffer_size);
+    if (!decoded_size) {
+        throw SyntaxError("Invalid base64 value");
+    }
+    REALM_ASSERT_DEBUG_EX(*decoded_size <= encoded_size, *decoded_size, encoded_size);
+    decode_buffer.resize(*decoded_size); // truncate
+    callback(StringData(decode_buffer.data(), decode_buffer.size()));
+}
+
 std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
 {
     std::unique_ptr<Subexpr> ret;
@@ -1200,26 +1218,10 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             }
             break;
         }
-        case Type::BASE64: {
-            const size_t encoded_size = text.size() - 5;
-            size_t buffer_size = util::base64_decoded_size(encoded_size);
-            std::string decode_buffer(buffer_size, char(0));
-            StringData window(text.c_str() + 4, encoded_size);
-            util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer.data(), buffer_size);
-            if (!decoded_size) {
-                throw SyntaxError("Invalid base64 value");
-            }
-            REALM_ASSERT_DEBUG_EX(*decoded_size <= encoded_size, *decoded_size, encoded_size);
-            decode_buffer.resize(*decoded_size); // truncate
-            if (hint == type_String) {
-                ret = std::make_unique<ConstantStringValue>(StringData(decode_buffer.data(), decode_buffer.size()));
-            }
-            if (hint == type_Binary) {
-                ret = std::make_unique<ConstantBinaryValue>(BinaryData(decode_buffer.data(), decode_buffer.size()));
-            }
-            if (hint == type_Mixed) {
-                ret = std::make_unique<ConstantBinaryValue>(BinaryData(decode_buffer.data(), decode_buffer.size()));
-            }
+        case Type::STRING_BASE64: {
+            decode_b64([&](StringData decoded) {
+                ret = std::make_unique<ConstantStringValue>(decoded);
+            });
             break;
         }
         case Type::TIMESTAMP: {
@@ -1321,6 +1323,16 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             }
             break;
         }
+        case BINARY_STR: {
+            std::string str = text.substr(1, text.size() - 2);
+            ret = std::make_unique<ConstantBinaryValue>(BinaryData(str.data(), str.size()));
+            break;
+        }
+        case BINARY_BASE64:
+            decode_b64([&](StringData decoded) {
+                ret = std::make_unique<ConstantBinaryValue>(BinaryData(decoded.data(), decoded.size()));
+            });
+            break;
     }
     if (!ret) {
         throw InvalidQueryError(
@@ -1528,13 +1540,17 @@ LinkChain PathNode::visit(ParserDriver* drv, util::Optional<ExpressionComparison
                 continue; // this element has been removed, this happens in subqueries
             }
 
-            if (!link_chain.link(path_elem)) {
+            // Check if it is a link
+            if (link_chain.link(path_elem)) {
+                continue;
+            }
+            // The next identifier being a property on the linked to object takes precedence
+            if (link_chain.get_current_table()->get_column_key(path_elem)) {
                 break;
             }
         }
-        else {
-            throw InvalidQueryError("Index not supported here");
-        }
+        if (!link_chain.index(*current_path_elem))
+            break;
     }
     return link_chain;
 }
@@ -1706,7 +1722,14 @@ auto ParserDriver::cmp(const std::vector<ExpressionNode*>& values) -> std::pair<
 auto ParserDriver::column(LinkChain& link_chain, PathNode* path) -> SubexprPtr
 {
     if (path->at_end()) {
-        return link_chain.create_subexpr<Link>(link_chain.m_link_cols.back());
+        // This is a link property. However Columns<Link> does not handle @keys and indexes
+        auto extended_col_key = link_chain.m_link_cols.back();
+        if (!extended_col_key.has_index()) {
+            return link_chain.create_subexpr<Link>(ColKey(extended_col_key));
+        }
+        link_chain.pop_back();
+        --path->current_path_elem;
+        --path->current_path_elem;
     }
     auto identifier = m_mapping.translate(link_chain, path->next_identifier());
     if (auto col = link_chain.column(identifier)) {
@@ -1837,15 +1860,15 @@ std::unique_ptr<Subexpr> LinkChain::column(const std::string& col)
     }
 
     auto col_type{col_key.get_type()};
+    if (col_key.is_dictionary()) {
+        return create_subexpr<Dictionary>(col_key);
+    }
     if (Table::is_link_type(col_type)) {
         add(col_key);
         return create_subexpr<Link>(col_key);
     }
 
-    if (col_key.is_dictionary()) {
-        return create_subexpr<Dictionary>(col_key);
-    }
-    else if (col_key.is_set()) {
+    if (col_key.is_set()) {
         switch (col_type) {
             case col_type_Int:
                 return create_subexpr<Set<Int>>(col_key);

@@ -29,7 +29,6 @@
 #include "realm/array_fixed_bytes.hpp"
 #include "realm/array_backlink.hpp"
 #include "realm/array_typed_link.hpp"
-#include "realm/collection_list.hpp"
 #include "realm/cluster_tree.hpp"
 #include "realm/list.hpp"
 #include "realm/set.hpp"
@@ -49,76 +48,11 @@
 namespace realm {
 namespace {
 
-struct NestedCollectionInfo {
-    NestedCollectionInfo(CollectionListPtr l)
-        : list(std::move(l))
-        , index(0)
-        , sz(list->size())
-    {
-    }
-    CollectionListPtr list;
-    size_t index;
-    size_t sz;
-};
-
-std::vector<NestedCollectionInfo> init_levels(Obj& obj, ColKey origin_col_key, size_t nesting_levels)
-{
-    std::vector<NestedCollectionInfo> levels;
-    levels.reserve(nesting_levels);
-
-    levels.emplace_back(obj.get_collection_list(origin_col_key));
-    for (size_t i = 1; i < nesting_levels; i++) {
-        levels.emplace_back(levels.back().list->get_collection_list(0));
-    }
-
-    return levels;
-}
-
-bool advance(std::vector<NestedCollectionInfo>& levels)
-{
-    levels.pop_back();
-
-    if (levels.empty()) {
-        return false;
-    }
-
-    NestedCollectionInfo& current = levels.back();
-    current.index++;
-    if (current.index == current.sz) {
-        if (!advance(levels)) {
-            return false;
-        }
-    }
-    levels.emplace_back(levels.back().list->get_collection_list(levels.back().index));
-
-    return true;
-}
-
 template <class T, class U>
 size_t find_link_value_in_collection(T& coll, Obj& obj, ColKey origin_col_key, U link)
 {
-    auto nesting_levels = obj.get_table()->get_nesting_levels(origin_col_key);
-    if (nesting_levels == 0) {
-        coll.set_owner(obj, origin_col_key);
-        return coll.find_first(link);
-    }
-
-    // Iterate through all leaf arrays until link is found
-    std::vector<NestedCollectionInfo> levels = init_levels(obj, origin_col_key, nesting_levels);
-
-    bool give_up = false;
-    while (!give_up) {
-        NestedCollectionInfo& current = levels.back();
-        for (size_t i = 0; i < current.sz; i++) {
-            coll.set_owner(current.list, current.list->get_index(i));
-            size_t ndx = coll.find_first(link);
-            if (ndx != realm::not_found) {
-                return ndx;
-            }
-        }
-        give_up = !advance(levels);
-    }
-    return realm::not_found;
+    coll.set_owner(obj, origin_col_key);
+    return coll.find_first(link);
 }
 
 template <class T>
@@ -162,15 +96,6 @@ inline void nullify_set(Obj& obj, ColKey origin_col_key, T target)
     // the object that we in the process of removing.
     BPlusTree<T>& tree = const_cast<BPlusTree<T>&>(link_set.get_tree());
     tree.erase(ndx);
-}
-
-inline void nullify_dictionary(Obj& obj, ColKey origin_col_key, Mixed target)
-{
-    Dictionary dict(origin_col_key);
-    size_t ndx = find_link_value_in_collection(dict, obj, origin_col_key, target);
-
-    REALM_ASSERT(ndx != realm::npos); // There has to be one
-    dict.nullify(ndx);
 }
 
 } // namespace
@@ -226,6 +151,31 @@ Allocator& Obj::_get_alloc() const noexcept
 const Spec& Obj::get_spec() const
 {
     return m_table.unchecked_ptr()->m_spec;
+}
+
+ColIndex Obj::build_index(ColKey col_key) const
+{
+    if (col_key.is_collection()) {
+        return {col_key, 0};
+    }
+    REALM_ASSERT(col_key.get_type() == col_type_Mixed);
+    ArrayMixed values(_get_alloc());
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
+    values.init_from_ref(ref);
+    auto key = values.get_key(m_row_ndx);
+    return {col_key, key};
+}
+
+bool Obj::check_index(ColIndex index) const
+{
+    if (index.is_collection()) {
+        return true;
+    }
+    ArrayMixed values(_get_alloc());
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), index.get_index().val + 1));
+    values.init_from_ref(ref);
+    auto key = values.get_key(m_row_ndx);
+    return key == index.get_key();
 }
 
 Replication* Obj::get_replication() const
@@ -654,7 +604,7 @@ Mixed Obj::get_any(ColKey col_key) const
     auto col_ndx = col_key.get_index();
     if (col_key.is_collection()) {
         ref_type ref = to_ref(_get<int64_t>(col_ndx));
-        return Mixed(ref, get_table()->get_collection_type(col_key, 0));
+        return Mixed(ref, get_table()->get_collection_type(col_key));
     }
     switch (col_key.get_type()) {
         case col_type_Int:
@@ -1097,12 +1047,12 @@ StablePath Obj::get_stable_path() const noexcept
 
 void Obj::add_index(Path& path, Index index) const
 {
-    auto col_key = mpark::get<ColKey>(index);
+    auto col_index = mpark::get<ColIndex>(index);
     if (path.empty()) {
-        path.emplace_back(col_key);
+        path.emplace_back(get_table()->get_column_key(col_index));
     }
     else {
-        StringData col_name = get_table()->get_column_name(col_key);
+        StringData col_name = get_table()->get_column_name(col_index);
         path.emplace_back(col_name);
     }
 }
@@ -1701,11 +1651,10 @@ INSTANTIATE_OBJ_SET(BinaryData);
 INSTANTIATE_OBJ_SET(ObjectId);
 INSTANTIATE_OBJ_SET(UUID);
 
-void Obj::set_int(ColKey col_key, int64_t value)
+void Obj::set_int(ColKey::Idx col_ndx, int64_t value)
 {
     update_if_needed();
 
-    ColKey::Idx col_ndx = col_key.get_index();
     Allocator& alloc = get_alloc();
     alloc.bump_content_version();
     Array fallback(alloc);
@@ -1719,11 +1668,10 @@ void Obj::set_int(ColKey col_key, int64_t value)
     sync(fields);
 }
 
-void Obj::set_ref(ColKey col_key, ref_type value, CollectionType type)
+void Obj::set_ref(ColKey::Idx col_ndx, ref_type value, CollectionType type)
 {
     update_if_needed();
 
-    ColKey::Idx col_ndx = col_key.get_index();
     Allocator& alloc = get_alloc();
     alloc.bump_content_version();
     Array fallback(alloc);
@@ -1856,12 +1804,7 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
         }
         void on_dictionary(Dictionary& dict) final
         {
-            if (m_origin_obj.get_table()->get_nesting_levels(m_origin_col_key)) {
-                nullify_dictionary(m_origin_obj, m_origin_col_key, m_target_link);
-            }
-            else {
-                dict.nullify(m_target_link);
-            }
+            dict.nullify(m_target_link);
         }
         void on_link_property(ColKey origin_col_key) final
         {
@@ -1986,9 +1929,18 @@ void Obj::set_collection(ColKey col_key, CollectionType type)
     REALM_ASSERT(col_key.get_type() == col_type_Mixed);
     update_if_needed();
     Mixed new_val(0, type);
-    auto old_val = get<Mixed>(col_key);
+
+    ArrayMixed values(_get_alloc());
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
+    values.init_from_ref(ref);
+    auto old_val = values.get(m_row_ndx);
+
     if (old_val != new_val) {
         set(col_key, Mixed(0, type));
+        // Update ref after write
+        ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
+        values.init_from_ref(ref);
+        values.set_key(m_row_ndx, generate_key(0x10));
     }
 }
 
@@ -2007,73 +1959,14 @@ Dictionary Obj::get_dictionary(StringData col_name) const
     return get_dictionary(get_column_key(col_name));
 }
 
-CollectionListPtr Obj::get_collection_list(ColKey col_key) const
-{
-    REALM_ASSERT(m_table->get_nesting_levels(col_key) > 0);
-    auto coll_type = m_table->get_nested_column_type(col_key, 0);
-    return CollectionList::create(std::make_shared<Obj>(*this), col_key, col_key, coll_type);
-}
-
 CollectionPtr Obj::get_collection_ptr(const Path& path) const
 {
     REALM_ASSERT(path.size() > 0);
     // First element in path must be column name
     auto col_key = path[0].is_col_key() ? path[0].get_col_key() : m_table->get_column_key(path[0].get_key());
     REALM_ASSERT(col_key);
-    size_t nesting_levels = m_table->get_nesting_levels(col_key);
-    CollectionListPtr list;
-    size_t level = 0;
-    while (nesting_levels > 0) {
-        if (!list) {
-            list = get_collection_list(col_key);
-        }
-        else {
-            if (level == path.size()) {
-                return list;
-            }
-            auto& path_elem = path[level];
-            if (list->get_collection_type() == CollectionType::List) {
-                // if list and index is one past last,'
-                // then we can insert automatically
-                if (path_elem.get_ndx() == list->size()) {
-                    list->insert_collection(path_elem);
-                }
-            }
-            else {
-                // If dictionary, inserting an already
-                // existing element is idempotent
-                list->insert_collection(path_elem);
-            }
-            list = list->get_collection_list(path_elem);
-        }
-        level++;
-        nesting_levels--;
-    }
-    CollectionBasePtr collection;
-    if (list) {
-        if (level == path.size()) {
-            return list;
-        }
-        auto& path_elem = path[level];
-        if (list->get_collection_type() == CollectionType::List) {
-            // if list and index is one past last,'
-            // then we can insert automatically
-            if (path_elem.get_ndx() == list->size()) {
-                list->insert_collection(path_elem);
-            }
-        }
-        else {
-            // If dictionary, inserting an already
-            // existing element is idempotent
-            list->insert_collection(path_elem);
-        }
-        collection = list->get_collection(path_elem);
-    }
-    else {
-        collection = get_collection_ptr(col_key);
-    }
-
-    level++;
+    size_t level = 1;
+    CollectionBasePtr collection = get_collection_ptr(col_key);
 
     while (level < path.size()) {
         auto& path_elem = path[level];
@@ -2086,6 +1979,9 @@ CollectionPtr Obj::get_collection_ptr(const Path& path) const
         }
         if (ref.is_type(type_List)) {
             collection = collection->get_list(path_elem);
+        }
+        else if (ref.is_type(type_Set)) {
+            collection = collection->get_set(path_elem);
         }
         else if (ref.is_type(type_Dictionary)) {
             collection = collection->get_dictionary(path_elem);
@@ -2101,30 +1997,10 @@ CollectionPtr Obj::get_collection_ptr(const Path& path) const
 
 CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
 {
-    // First element in path is column key
-    auto col_key = mpark::get<ColKey>(path[0]);
-    size_t nesting_levels = m_table->get_nesting_levels(col_key);
-    CollectionListPtr list;
-    size_t level = 0;
-    while (nesting_levels > 0) {
-        if (!list) {
-            list = get_collection_list(col_key);
-        }
-        else {
-            list = list->get_collection_list_by_index(path[level]);
-        }
-        level++;
-        nesting_levels--;
-    }
-    CollectionBasePtr collection;
-    if (list) {
-        collection = list->get_collection_by_index(path[level]);
-    }
-    else {
-        collection = get_collection_ptr(col_key);
-    }
-
-    level++;
+    // First element in path is phony column key
+    ColKey col_key = m_table->get_column_key(mpark::get<ColIndex>(path[0]));
+    size_t level = 1;
+    CollectionBasePtr collection = get_collection_ptr(col_key);
 
     while (level < path.size()) {
         auto& index = path[level];
@@ -2133,6 +2009,11 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
                 auto list_of_mixed = dynamic_cast<Lst<Mixed>*>(collection.get());
                 size_t ndx = list_of_mixed->find_key(mpark::get<int64_t>(index));
                 return {list_of_mixed->get(ndx), PathElement(ndx)};
+            }
+            else if (collection->get_collection_type() == CollectionType::Set) {
+                auto set_of_mixed = dynamic_cast<Set<Mixed>*>(collection.get());
+                size_t ndx = set_of_mixed->find_any(mpark::get<int64_t>(index));
+                return {set_of_mixed->get(ndx), PathElement(ndx)};
             }
             else {
                 std::string key = mpark::get<std::string>(index);
@@ -2143,6 +2024,9 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
         auto [ref, path_elem] = get_ref();
         if (ref.is_type(type_List)) {
             collection = collection->get_list(path_elem);
+        }
+        else if (ref.is_type(type_Set)) {
+            collection = collection->get_set(path_elem);
         }
         else if (ref.is_type(type_Dictionary)) {
             collection = collection->get_dictionary(path_elem);
@@ -2159,7 +2043,6 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
 CollectionBasePtr Obj::get_collection_ptr(ColKey col_key) const
 {
     if (col_key.is_collection()) {
-        REALM_ASSERT(m_table->get_nesting_levels(col_key) == 0);
         auto collection = CollectionParent::get_collection_ptr(col_key);
         collection->set_owner(*this, col_key);
         return collection;
@@ -2259,13 +2142,7 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
         }
         void on_dictionary(Dictionary& dict) final
         {
-            if (m_origin_obj.get_table()->get_nesting_levels(m_origin_col_key)) {
-                replace_in_dictionary(m_origin_obj, m_origin_col_key, m_dest_orig.get_link(),
-                                      m_dest_replace.get_link());
-            }
-            else {
-                dict.replace_link(m_dest_orig.get_link(), m_dest_replace.get_link());
-            }
+            dict.replace_link(m_dest_orig.get_link(), m_dest_replace.get_link());
         }
         void on_link_property(ColKey col) final
         {
@@ -2470,29 +2347,40 @@ ref_type Obj::Internal::get_ref(const Obj& obj, ColKey col_key)
 
 ref_type Obj::get_collection_ref(Index index, CollectionType type) const
 {
-    ColKey col_key = mpark::get<ColKey>(index);
-    if (col_key.is_collection()) {
-        return to_ref(_get<int64_t>(col_key.get_index()));
+    ColIndex col_index = mpark::get<ColIndex>(index);
+    if (col_index.is_collection()) {
+        return to_ref(_get<int64_t>(col_index.get_index()));
     }
-    if (col_key.get_type() == col_type_Mixed) {
-        auto val = _get<Mixed>(col_key.get_index());
-        if (val.is_null() || !val.is_type(DataType(int(type)))) {
-            throw IllegalOperation("Not proper collection type");
+    if (check_index(col_index)) {
+        auto val = _get<Mixed>(col_index.get_index());
+        if (val.is_type(DataType(int(type)))) {
+            return val.get_ref();
         }
-        return val.get_ref();
     }
-    return 0;
+    // This exception should never escape to the application
+    throw StaleAccessor("This collection has joined the choir invisible");
+}
+
+bool Obj::check_collection_ref(Index index, CollectionType type) const noexcept
+{
+    ColIndex col_index = mpark::get<ColIndex>(index);
+    if (col_index.is_collection()) {
+        return true;
+    }
+    if (check_index(col_index)) {
+        return _get<Mixed>(col_index.get_index()).is_type(DataType(int(type)));
+    }
+    return false;
 }
 
 void Obj::set_collection_ref(Index index, ref_type ref, CollectionType type)
 {
-    ColKey col_key = mpark::get<ColKey>(index);
-    if (col_key.is_collection()) {
-        set_int(col_key, from_ref(ref));
+    ColIndex col_index = mpark::get<ColIndex>(index);
+    if (col_index.is_collection()) {
+        set_int(col_index.get_index(), from_ref(ref));
         return;
     }
-    REALM_ASSERT(col_key.get_type() == col_type_Mixed);
-    set_ref(col_key, ref, type);
+    set_ref(col_index.get_index(), ref, type);
 }
 
 } // namespace realm

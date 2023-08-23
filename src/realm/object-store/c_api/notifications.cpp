@@ -202,7 +202,8 @@ RLM_API void realm_collection_changes_get_num_ranges(const realm_collection_chan
 RLM_API void realm_collection_changes_get_num_changes(const realm_collection_changes_t* changes,
                                                       size_t* out_num_deletions, size_t* out_num_insertions,
                                                       size_t* out_num_modifications, size_t* out_num_moves,
-                                                      bool* out_collection_was_cleared)
+                                                      bool* out_collection_was_cleared,
+                                                      bool* out_collection_was_deleted)
 {
     // FIXME: This has O(n) performance, which seems ridiculous.
 
@@ -216,6 +217,8 @@ RLM_API void realm_collection_changes_get_num_changes(const realm_collection_cha
         *out_num_moves = changes->moves.size();
     if (out_collection_was_cleared)
         *out_collection_was_cleared = changes->collection_was_cleared;
+    if (out_collection_was_deleted)
+        *out_collection_was_deleted = changes->collection_root_was_deleted;
 }
 
 static inline void copy_index_ranges(const IndexSet& index_set, realm_index_range_t* out_ranges, size_t max)
@@ -259,7 +262,8 @@ RLM_API void realm_collection_changes_get_ranges(
 }
 
 RLM_API void realm_dictionary_get_changes(const realm_dictionary_changes_t* changes, size_t* out_deletions_size,
-                                          size_t* out_insertion_size, size_t* out_modification_size)
+                                          size_t* out_insertion_size, size_t* out_modification_size,
+                                          bool* out_was_deleted)
 {
     if (out_deletions_size)
         *out_deletions_size = changes->deletions.size();
@@ -267,6 +271,8 @@ RLM_API void realm_dictionary_get_changes(const realm_dictionary_changes_t* chan
         *out_insertion_size = changes->insertions.size();
     if (out_modification_size)
         *out_modification_size = changes->modifications.size();
+    if (out_was_deleted)
+        *out_was_deleted = changes->collection_root_was_deleted;
 }
 
 RLM_API void realm_dictionary_get_changed_keys(const realm_dictionary_changes_t* changes,

@@ -633,114 +633,6 @@ TEST(List_AggOps)
     test_lists_numeric_agg<Decimal128>(test_context, sg, type_Decimal, Decimal128(realm::null()), true);
 }
 
-TEST(List_NestedListColumns)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    DBRef db = DB::create(make_in_realm_history(), path);
-    auto tr = db->start_write();
-    auto table = tr->add_table("table");
-    auto int_col = table->add_column(type_Int, "int");
-    auto int_list_col = table->add_column(type_Int, "int_list", false, {CollectionType::List});
-    auto list_col1 =
-        table->add_column(type_Int, "int_list_list", false, {CollectionType::List, CollectionType::List});
-    auto list_col2 = table->add_column(type_Int, "int_dict_list_list", false,
-                                       {CollectionType::Dictionary, CollectionType::List, CollectionType::List});
-
-    tr->commit_and_continue_as_read();
-    CHECK_EQUAL(table->get_nesting_levels(int_col), 0);
-    CHECK(!int_col.is_list());
-    CHECK_EQUAL(table->get_nesting_levels(int_list_col), 0);
-    CHECK(int_list_col.is_list());
-    CHECK_EQUAL(table->get_nesting_levels(list_col1), 1);
-    CHECK_EQUAL(table->get_nesting_levels(list_col2), 2);
-
-    tr->promote_to_write();
-    Obj obj = table->create_object();
-    auto int_lst = obj.get_list_ptr<Int>({"int_list"});
-    CHECK_EQUAL(int_lst->size(), 0);
-    int_lst = obj.get_list_ptr<Int>({"int_dict_list_list", "Foo", 0});
-    int_lst->add(7);
-    int_lst = obj.get_list_ptr<Int>({"int_dict_list_list", "Bar", 0});
-    int_lst->add(5);
-    tr->commit_and_continue_as_read();
-
-    tr->promote_to_write();
-    table->remove_column(list_col2);
-    tr->verify();
-    tr->commit_and_continue_as_read();
-}
-
-TEST(List_NestedList_Insert)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    DBRef db = DB::create(make_in_realm_history(), path);
-    auto tr = db->start_write();
-    auto table = tr->add_table("table");
-    auto list_col1 =
-        table->add_column(type_Int, "int_list_list", false, {CollectionType::List, CollectionType::List});
-    auto list_col2 = table->add_column(type_Int, "int_dict_list_list", false,
-                                       {CollectionType::Dictionary, CollectionType::List, CollectionType::List});
-    CHECK_EQUAL(table->get_nesting_levels(list_col1), 1);
-    CHECK_EQUAL(table->get_nesting_levels(list_col2), 2);
-    Obj obj = table->create_object();
-
-    CollectionListPtr list = obj.get_collection_list(list_col1);
-    CHECK(list->is_empty());
-    list->insert_collection(0);
-    auto collection = list->get_collection(0);
-    auto val = list->get_any(0);
-    CHECK(val.is_type(type_List));
-    dynamic_cast<Lst<Int>*>(collection.get())->add(5);
-
-    auto dict = obj.get_collection_list(list_col2);
-    dict->insert_collection("Foo");
-    auto list_foo = dict->get_collection_list("Foo");
-    val = obj.get_any(list_col2);
-    CHECK(val.is_type(type_Dictionary));
-    list_foo->insert_collection(0);
-    auto list_foo_0 = list_foo->get_collection(0);
-    dynamic_cast<Lst<Int>*>(list_foo_0.get())->add(5);
-
-    // Get collection by path
-    auto int_lst = obj.get_list_ptr<Int>({"int_dict_list_list", "Foo", 0});
-    CHECK_EQUAL(int_lst->get(0), 5);
-
-    dict->insert_collection("Foo");
-    auto list3 = dict->get_collection_list("Foo");
-    // list3 points to the same list as list2
-    list3->insert_collection(0);
-    auto collection3 = list3->get_collection(0);
-    dynamic_cast<Lst<Int>*>(collection3.get())->insert(0, 8);
-    // list2 must now update so that the following get() does not return 8
-    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(list_foo_0.get())->get(0), 5);
-
-    tr->commit_and_continue_as_read();
-    CHECK_NOT(list->is_empty());
-    CHECK_EQUAL(obj.get_collection_list(list_col1)->get_collection(0)->get_any(0).get_int(), 5);
-    // tr->to_json(std::cout);
-    tr->promote_to_write();
-    {
-        list->insert_collection(0);
-        auto lst = list->get_collection(0);
-        dynamic_cast<Lst<Int>*>(lst.get())->add(47);
-
-        obj.get_list_ptr<Int>({"int_dict_list_list", "Foo", 1})->set(0, 100);
-    }
-    tr->commit_and_continue_as_read();
-    // tr->to_json(std::cout);
-    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(collection.get())->get(0), 5);
-    CHECK_EQUAL(dynamic_cast<Lst<Int>*>(list_foo_0.get())->get(0), 100);
-
-    tr->promote_to_write();
-    obj.remove();
-    tr->commit_and_continue_as_read();
-    CHECK_EQUAL(list->size(), 0);
-    CHECK_EQUAL(dict->size(), 0);
-    CHECK_EQUAL(list_foo->size(), 0);
-    CHECK_EQUAL(collection->size(), 0);
-    CHECK_EQUAL(list_foo_0->size(), 0);
-}
-
 TEST(List_Nested_InMixed)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -883,230 +775,40 @@ TEST(List_Nested_InMixed)
       ]
     }
     */
+    std::string message;
     CHECK_EQUAL(list2->get(1), Mixed("Hello"));
     tr->promote_to_write();
     list2->remove(1);
     CHECK_EQUAL(dict2->get("Hello"), Mixed("World"));
     obj.set(col_any, Mixed());
     CHECK_EQUAL(dict->size(), 0);
-    CHECK_THROW_ANY(dict->insert("Five", 5)); // This dictionary ceased to be
+    CHECK_THROW_ANY_GET_MESSAGE(dict->insert("Five", 5), message); // This dictionary ceased to be
+    CHECK_EQUAL(message, "This is an ex-dictionary");
+    CHECK_THROW_ANY_GET_MESSAGE(dict->get("Five"), message);
+    CHECK_EQUAL(message, "This is an ex-dictionary");
 
     obj.set_collection(col_any, CollectionType::List);
     auto list3 = obj.get_list_ptr<Mixed>(col_any);
     list3->add(5);
     obj.set(col_any, Mixed());
     CHECK_EQUAL(list3->size(), 0);
-    CHECK_THROW_ANY(list3->add(42));
+    CHECK_THROW_ANY_GET_MESSAGE(list3->add(42), message);
+    CHECK_EQUAL(message, "This is an ex-list");
+    CHECK_THROW_ANY_GET_MESSAGE(list3->insert(5, 42), message);
+    CHECK_EQUAL(message, "This is an ex-list");
+    CHECK_THROW_ANY_GET_MESSAGE(list3->get(5), message);
+    CHECK_EQUAL(message, "This is an ex-list");
+    // Try creating a new list. list3 should still be stale
+    obj.set_collection(col_any, CollectionType::List);
+    CHECK_THROW_ANY_GET_MESSAGE(list3->add(42), message);
+    CHECK_EQUAL(message, "This is an ex-list");
     tr->verify();
     obj.set_json(col_any,
                  "[{\"Seven\":7, \"Six\":6}, \"Hello\", {\"Points\": [1.25, 4.5, 6.75], \"Hello\": \"World\"}]");
-    CHECK_EQUAL(list3->size(), 3);
+    CHECK_EQUAL(obj.get_list_ptr<Mixed>(col_any)->size(), 3);
     // tr->to_json(std::cout);
 }
 
-TEST(List_NestedList_Remove)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    DBRef db = DB::create(make_in_realm_history(), path);
-    auto tr = db->start_write();
-    auto table = tr->add_table("table");
-    auto list_col = table->add_column(type_Int, "int_list_list", false, {CollectionType::List, CollectionType::List});
-    auto list_col2 = table->add_column(type_Int, "int_dict_list_list", false,
-                                       {CollectionType::Dictionary, CollectionType::List, CollectionType::List});
-
-    CHECK_EQUAL(table->get_nesting_levels(list_col), 1);
-    CHECK_EQUAL(table->get_nesting_levels(list_col2), 2);
-
-    Obj obj = table->create_object();
-    auto list1 = obj.get_list_ptr<Int>({"int_list_list", 0});
-    list1->add(5);
-    auto list2 = obj.get_list_ptr<Int>({"int_dict_list_list", "Foo", 0});
-    list2->add(5);
-
-    tr->commit_and_continue_as_read();
-    CHECK_NOT(list1->is_empty());
-    CHECK_NOT(list2->is_empty());
-    CHECK_EQUAL(obj.get_collection_list(list_col)->get_collection(0)->get_any(0).get_int(), 5);
-    CHECK_EQUAL(list2->get(0), 5);
-    // transaction
-    {
-        tr->promote_to_write();
-
-        list1->add(47);
-        list2->set(0, 100);
-
-        tr->commit_and_continue_as_read();
-    }
-    CHECK_EQUAL(list1->get(0), 5);
-    CHECK_EQUAL(list1->get(1), 47);
-    CHECK_EQUAL(list2->get(0), 100);
-
-    tr->promote_to_write();
-    obj.get_collection_list(list_col)->remove(0);
-    CHECK_THROW_ANY(obj.get_collection_list(list_col2)->remove("Bar"));
-    auto list_foo = obj.get_collection_list(list_col2)->get_collection_list("Foo");
-    obj.get_collection_list(list_col2)->remove("Foo");
-    // The above operation removed list_foo
-    CHECK_THROW_ANY(list_foo->insert_collection(1));
-    tr->verify();
-    tr->commit_and_continue_as_read();
-
-    CHECK_EQUAL(list1->size(), 0);
-    CHECK_EQUAL(list2->size(), 0);
-    tr->promote_to_write();
-    obj.remove();
-    tr->commit_and_continue_as_read();
-}
-
-TEST(List_NestedList_Links)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    DBRef db = DB::create(make_in_realm_history(), path);
-    auto tr = db->start_write();
-    auto target = tr->add_table("target");
-    auto origin = tr->add_table("origin");
-    auto list_col = origin->add_column(*target, "obj_list_list", {CollectionType::List, CollectionType::List});
-
-    Obj o = origin->create_object();
-    Obj t = target->create_object();
-
-    auto list = o.get_collection_list(list_col);
-    CHECK(list->is_empty());
-    list->insert_collection(0);
-    dynamic_cast<LnkLst*>(list->get_collection(0).get())->add(target->create_object().get_key());
-    list->insert_collection(1);
-    auto collection = list->get_collection(1);
-    auto ll = dynamic_cast<LnkLst*>(collection.get());
-    ll->add(t.get_key());
-    CHECK_EQUAL(t.get_backlink_count(), 1);
-    tr->commit_and_continue_as_read();
-    tr->promote_to_write();
-    t.remove();
-    tr->commit_and_continue_as_read();
-    CHECK_EQUAL(ll->size(), 0);
-    tr->promote_to_write();
-    t = target->create_object();
-    ll->add(t.get_key());
-    CHECK_EQUAL(t.get_backlink_count(), 1);
-    list->remove(1);
-    CHECK_EQUAL(t.get_backlink_count(), 0);
-}
-
-TEST(List_NestedList_Embedded)
-{
-    Group g;
-    auto target = g.add_table("target", Table::Type::Embedded);
-    auto origin = g.add_table("origin");
-    auto list_col = origin->add_column(*target, "embedded", {CollectionType::List, CollectionType::List});
-
-    Obj o = origin->create_object();
-
-    {
-        // Remove entry in parent list
-        auto list = o.get_collection_list(list_col);
-        CHECK(list->is_empty());
-        list->insert_collection(0);
-        auto collection = list->get_collection(0);
-        auto ll = dynamic_cast<LnkLst*>(collection.get());
-        ll->create_and_insert_linked_object(0);
-        CHECK_EQUAL(target->size(), 1);
-        list->remove(0);
-        CHECK_EQUAL(target->size(), 0);
-    }
-    {
-        // Remove object
-        auto list = o.get_collection_list(list_col);
-        CHECK(list->is_empty());
-        list->insert_collection(0);
-        auto collection = list->get_collection(0);
-        auto ll = dynamic_cast<LnkLst*>(collection.get());
-        ll->create_and_insert_linked_object(0);
-        CHECK_EQUAL(target->size(), 1);
-        o.remove();
-        CHECK_EQUAL(target->size(), 0);
-    }
-    o = origin->create_object();
-    {
-        // Clear table
-        auto list = o.get_collection_list(list_col);
-        CHECK(list->is_empty());
-        list->insert_collection(0);
-        auto collection = list->get_collection(0);
-        auto ll = dynamic_cast<LnkLst*>(collection.get());
-        ll->create_and_insert_linked_object(0);
-        CHECK_EQUAL(target->size(), 1);
-        origin->clear();
-        CHECK_EQUAL(target->size(), 0);
-    }
-}
-
-TEST(List_NestedSet_Links)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    DBRef db = DB::create(make_in_realm_history(), path);
-    auto tr = db->start_write();
-    auto target = tr->add_table("target");
-    auto origin = tr->add_table("origin");
-    auto list_col = origin->add_column(*target, "obj_list_set", {CollectionType::List, CollectionType::Set});
-
-    Obj o = origin->create_object();
-    Obj t = target->create_object();
-
-    auto list = o.get_collection_list(list_col);
-    CHECK(list->is_empty());
-    list->insert_collection(0);
-    dynamic_cast<LnkSet*>(list->get_collection(0).get())->insert(target->create_object().get_key());
-    list->insert_collection(1);
-    auto collection = list->get_collection(1);
-    auto ll = dynamic_cast<LnkSet*>(collection.get());
-    ll->insert(t.get_key());
-    CHECK_EQUAL(t.get_backlink_count(), 1);
-    tr->commit_and_continue_as_read();
-    tr->promote_to_write();
-    t.remove();
-    tr->commit_and_continue_as_read();
-    CHECK_EQUAL(ll->size(), 0);
-    tr->promote_to_write();
-    t = target->create_object();
-    ll->insert(t.get_key());
-    CHECK_EQUAL(t.get_backlink_count(), 1);
-    list->remove(1);
-    CHECK_EQUAL(t.get_backlink_count(), 0);
-}
-
-TEST(List_NestedDict_Links)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    DBRef db = DB::create(make_in_realm_history(), path);
-    auto tr = db->start_write();
-    auto target = tr->add_table("target");
-    auto origin = tr->add_table("origin");
-    auto list_col = origin->add_column(*target, "obj_list_dict", {CollectionType::List, CollectionType::Dictionary});
-
-    Obj o = origin->create_object();
-    Obj t = target->create_object();
-
-    auto list = o.get_collection_list(list_col);
-    CHECK(list->is_empty());
-    list->insert_collection(0);
-    dynamic_cast<Dictionary*>(list->get_collection(0).get())->insert("Key", target->create_object().get_key());
-    list->insert_collection(1);
-    auto collection = list->get_collection(1);
-    auto dict = dynamic_cast<Dictionary*>(collection.get());
-    dict->insert("Hello", t.get_key());
-    CHECK_EQUAL(t.get_backlink_count(), 1);
-    tr->commit_and_continue_as_read();
-    tr->promote_to_write();
-    t.remove();
-    tr->commit_and_continue_as_read();
-    CHECK_EQUAL(dict->get("Hello"), Mixed());
-    tr->promote_to_write();
-    t = target->create_object();
-    dict->insert("Hello", t.get_key());
-    CHECK_EQUAL(t.get_backlink_count(), 1);
-    list->remove(1);
-    CHECK_EQUAL(t.get_backlink_count(), 0);
-}
 
 TEST(List_NestedCollection_Links)
 {
@@ -1174,134 +876,6 @@ TEST(List_NestedCollection_Links)
     CHECK_EQUAL(target_obj2.get_backlink_count(), 0);
 }
 
-TEST(List_NestedDictList_Links)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    DBRef db = DB::create(make_in_realm_history(), path);
-    auto tr = db->start_write();
-    auto target = tr->add_table("target");
-    auto origin = tr->add_table("origin");
-    origin->add_column(*target, "obj_list_list",
-                       {CollectionType::Dictionary, CollectionType::List, CollectionType::List});
-
-    Obj o = origin->create_object();
-    Obj t = target->create_object();
-
-    auto foo_coll_0 = o.get_collection_ptr({"obj_list_list", "Foo", 0});
-    auto foo_coll_1 = o.get_collection_ptr({"obj_list_list", "Foo", 1});
-    auto bar_coll_0 = o.get_collection_ptr({"obj_list_list", "Bar", 0});
-    auto bar_coll_1 = o.get_collection_ptr({"obj_list_list", "Bar", 1});
-    auto foo_ll0 = dynamic_cast<LnkLst*>(foo_coll_0.get());
-    auto foo_ll1 = dynamic_cast<LnkLst*>(foo_coll_1.get());
-    auto bar_ll0 = dynamic_cast<LnkLst*>(bar_coll_0.get());
-    auto bar_ll1 = dynamic_cast<LnkLst*>(bar_coll_1.get());
-
-    foo_ll0->add(t.get_key());
-    foo_ll1->add(target->create_object().get_key());
-    bar_ll0->add(target->create_object().get_key());
-    bar_ll1->add(target->create_object().get_key());
-    CHECK_EQUAL(t.get_backlink_count(), 1);
-    t.remove();
-    CHECK_EQUAL(foo_ll0->size(), 0);
-}
-
-TEST(List_NestedList_Unresolved)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    DBRef db = DB::create(make_in_realm_history(), path);
-    auto tr = db->start_write();
-    auto target = tr->add_table_with_primary_key("target", type_String, "_id");
-    auto origin = tr->add_table("origin");
-    origin->add_column(*target, "links", {CollectionType::Dictionary, CollectionType::List, CollectionType::List});
-
-    Obj o = origin->create_object();
-    Obj t = target->create_object_with_primary_key("Adam");
-
-    auto foo_coll_0 = o.get_collection_ptr({"links", "Foo", 0});
-    auto foo_coll_1 = o.get_collection_ptr({"links", "Foo", 1});
-    auto bar_coll_0 = o.get_collection_ptr({"links", "Bar", 0});
-    auto bar_coll_1 = o.get_collection_ptr({"links", "Bar", 1});
-    auto foo_ll0 = dynamic_cast<LnkLst*>(foo_coll_0.get());
-    auto foo_ll1 = dynamic_cast<LnkLst*>(foo_coll_1.get());
-    auto bar_ll0 = dynamic_cast<LnkLst*>(bar_coll_0.get());
-    auto bar_ll1 = dynamic_cast<LnkLst*>(bar_coll_1.get());
-
-    foo_ll0->add(t.get_key());
-    foo_ll1->add(target->create_object_with_primary_key("Brian").get_key());
-    bar_ll0->add(target->create_object_with_primary_key("Charlie").get_key());
-    bar_ll1->add(target->create_object_with_primary_key("Daniel").get_key());
-    CHECK_EQUAL(t.get_backlink_count(), 1);
-    target->invalidate_object(t.get_key());
-    CHECK_EQUAL(foo_ll0->size(), 0);
-    target->create_object_with_primary_key("Adam");
-    CHECK_EQUAL(foo_ll0->size(), 1);
-}
-
-TEST(List_NestedSet_Unresolved)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    DBRef db = DB::create(make_in_realm_history(), path);
-    auto tr = db->start_write();
-    auto target = tr->add_table_with_primary_key("target", type_String, "_id");
-    auto origin = tr->add_table("origin");
-    origin->add_column(*target, "links", {CollectionType::Dictionary, CollectionType::List, CollectionType::Set});
-
-    Obj o = origin->create_object();
-    Obj t = target->create_object_with_primary_key("Adam");
-
-    auto foo_coll_0 = o.get_collection_ptr({"links", "Foo", 0});
-    auto foo_coll_1 = o.get_collection_ptr({"links", "Foo", 1});
-    auto bar_coll_0 = o.get_collection_ptr({"links", "Bar", 0});
-    auto bar_coll_1 = o.get_collection_ptr({"links", "Bar", 1});
-    auto foo_ll0 = dynamic_cast<LnkSet*>(foo_coll_0.get());
-    auto foo_ll1 = dynamic_cast<LnkSet*>(foo_coll_1.get());
-    auto bar_ll0 = dynamic_cast<LnkSet*>(bar_coll_0.get());
-    auto bar_ll1 = dynamic_cast<LnkSet*>(bar_coll_1.get());
-
-    foo_ll0->insert(t.get_key());
-    foo_ll1->insert(target->create_object_with_primary_key("Brian").get_key());
-    bar_ll0->insert(target->create_object_with_primary_key("Charlie").get_key());
-    bar_ll1->insert(target->create_object_with_primary_key("Daniel").get_key());
-    CHECK_EQUAL(t.get_backlink_count(), 1);
-    target->invalidate_object(t.get_key());
-    auto obj = target->create_object_with_primary_key("Adam");
-    CHECK_EQUAL(obj.get_backlink_count(), 1);
-}
-
-TEST(List_NestedDict_Unresolved)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    DBRef db = DB::create(make_in_realm_history(), path);
-    auto tr = db->start_write();
-    auto target = tr->add_table_with_primary_key("target", type_String, "_id");
-    auto origin = tr->add_table("origin");
-    origin->add_column(*target, "links",
-                       {CollectionType::Dictionary, CollectionType::List, CollectionType::Dictionary});
-
-    Obj o = origin->create_object();
-    Obj t = target->create_object_with_primary_key("Adam");
-
-    auto foo_coll_0 = o.get_collection_ptr({"links", "Foo", 0});
-    auto foo_coll_1 = o.get_collection_ptr({"links", "Foo", 1});
-    auto bar_coll_0 = o.get_collection_ptr({"links", "Bar", 0});
-    auto bar_coll_1 = o.get_collection_ptr({"links", "Bar", 1});
-    auto foo_ll0 = dynamic_cast<Dictionary*>(foo_coll_0.get());
-    auto foo_ll1 = dynamic_cast<Dictionary*>(foo_coll_1.get());
-    auto bar_ll0 = dynamic_cast<Dictionary*>(bar_coll_0.get());
-    auto bar_ll1 = dynamic_cast<Dictionary*>(bar_coll_1.get());
-
-    foo_ll0->insert("A", t.get_key());
-    foo_ll1->insert("A", target->create_object_with_primary_key("Brian").get_key());
-    bar_ll0->insert("A", target->create_object_with_primary_key("Charlie").get_key());
-    bar_ll1->insert("A", target->create_object_with_primary_key("Daniel").get_key());
-    CHECK_EQUAL(t.get_backlink_count(), 1);
-    target->invalidate_object(t.get_key());
-    CHECK(foo_ll0->get("A").is_null());
-    auto obj = target->create_object_with_primary_key("Adam");
-    CHECK_EQUAL(obj.get_backlink_count(), 1);
-    CHECK_EQUAL(foo_ll0->get("A"), Mixed(obj.get_link()));
-}
-
 TEST(List_NestedCollection_Unresolved)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -1348,15 +922,10 @@ TEST(List_NestedList_Path)
     Group g;
     auto top_table = g.add_table_with_primary_key("top", type_String, "_id");
     auto embedded_table = g.add_table("embedded", Table::Type::Embedded);
-    auto list_col =
-        top_table->add_column(*embedded_table, "embedded_list", {CollectionType::List, CollectionType::List});
-    auto dict_col =
-        top_table->add_column(*embedded_table, "embedded_dict", {CollectionType::Dictionary, CollectionType::List});
     auto string_col = top_table->add_column_list(type_String, "strings");
-    auto float_col =
-        top_table->add_column(type_Float, "floats", false, {CollectionType::Dictionary, CollectionType::List});
-    embedded_table->add_column(type_Int, "integers", false, {CollectionType::Dictionary, CollectionType::List});
+    auto col_embedded_any = embedded_table->add_column(type_Mixed, "Any");
     auto col_any = top_table->add_column(type_Mixed, "Any");
+    auto col_child = top_table->add_column(*embedded_table, "Child");
 
     Obj o = top_table->create_object_with_primary_key("Adam");
 
@@ -1368,57 +937,20 @@ TEST(List_NestedList_Path)
         CHECK_EQUAL(path.path_from_top[0], string_col);
     }
 
-    // List nested in Dictionary
+    // List nested in Dictionary contained in embedded object
     {
-        auto list_float = o.get_list_ptr<Float>({"floats", "Foo"});
-        list_float->add(5.f);
-        auto path = list_float->get_path();
-        CHECK_EQUAL(path.path_from_top.size(), 2);
-        CHECK_EQUAL(path.path_from_top[0], float_col);
-        CHECK_EQUAL(path.path_from_top[1], "Foo");
-    }
-
-    // List nested in Dictionary contained in embedded object contained in list of list
-    {
-        auto list = o.get_collection_list(list_col);
-        list->insert_collection(0);
-        list->insert_collection(1);
-        list->insert_collection(2);
-        auto coll = list->get_collection(2);
-        auto ll = dynamic_cast<LnkLst*>(coll.get());
-        ll->create_and_insert_linked_object(0);
-        auto embedded_obj = ll->create_and_insert_linked_object(1);
-        auto list_int = embedded_obj.get_list_ptr<Int>({"integers", "Foo"});
+        auto embedded_obj = o.create_and_set_linked_object(col_child);
+        embedded_obj.set_collection(col_embedded_any, CollectionType::Dictionary);
+        embedded_obj.get_dictionary(col_embedded_any).insert_collection("Foo", CollectionType::List);
+        auto list_int = embedded_obj.get_list_ptr<Mixed>({"Any", "Foo"});
         list_int->add(5);
         auto path = list_int->get_path();
-        CHECK_EQUAL(path.path_from_top.size(), 5);
-        CHECK_EQUAL(path.path_from_top[0], list_col);
-        CHECK_EQUAL(path.path_from_top[1], 2);
-        CHECK_EQUAL(path.path_from_top[2], 1);
-        CHECK_EQUAL(path.path_from_top[3], "integers");
-        CHECK_EQUAL(path.path_from_top[4], "Foo");
+        CHECK_EQUAL(path.path_from_top.size(), 3);
+        CHECK_EQUAL(path.path_from_top[0], col_child);
+        CHECK_EQUAL(path.path_from_top[1], "Any");
+        CHECK_EQUAL(path.path_from_top[2], "Foo");
     }
 
-    // List nested in Dictionary contained in embedded object contained in Dictionary of list
-    {
-        auto list = o.get_collection_list(dict_col);
-        list->insert_collection("A");
-        list->insert_collection("B");
-        list->insert_collection("C");
-        auto coll = list->get_collection("C");
-        auto ll = dynamic_cast<LnkLst*>(coll.get());
-        ll->create_and_insert_linked_object(0);
-        auto embedded_obj = ll->create_and_insert_linked_object(1);
-        auto list_int = embedded_obj.get_list_ptr<Int>({"integers", "Foo"});
-        list_int->add(5);
-        auto path = list_int->get_path();
-        CHECK_EQUAL(path.path_from_top.size(), 5);
-        CHECK_EQUAL(path.path_from_top[0], dict_col);
-        CHECK_EQUAL(path.path_from_top[1], "C");
-        CHECK_EQUAL(path.path_from_top[2], 1);
-        CHECK_EQUAL(path.path_from_top[3], "integers");
-        CHECK_EQUAL(path.path_from_top[4], "Foo");
-    }
     // Collections contained in Mixed
     {
         o.set_collection(col_any, CollectionType::Dictionary);
@@ -1427,7 +959,7 @@ TEST(List_NestedList_Path)
         auto list = dict->get_list("List");
         list->add(Mixed(5));
         list->insert_collection(1, CollectionType::Dictionary);
-        auto dict2 = list->get_dictionary(1);
+        auto dict2 = o.get_collection_ptr({"Any", "List", 1});
         auto path = dict2->get_path();
         CHECK_EQUAL(path.path_from_top.size(), 3);
         CHECK_EQUAL(path.path_from_top[0], col_any);

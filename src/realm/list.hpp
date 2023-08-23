@@ -212,8 +212,8 @@ public:
     {
         if (Base::should_update() || !(m_tree && m_tree->is_attached())) {
             bool attached = init_from_parent(true);
-            Base::update_content_version();
             REALM_ASSERT(attached);
+            Base::update_content_version();
         }
     }
 
@@ -350,6 +350,7 @@ public:
     DictionaryPtr get_dictionary(const PathElement& path_elem) const override;
     SetMixedPtr get_set(const PathElement& path_elem) const override;
     ListMixedPtr get_list(const PathElement& path_elem) const override;
+
     int64_t get_key(size_t ndx)
     {
         return m_tree->get_key(ndx);
@@ -479,9 +480,8 @@ public:
     void ensure_created()
     {
         if (Base::should_update() || !(m_tree && m_tree->is_attached())) {
-            if (!init_from_parent(true)) {
-                throw IllegalOperation("This is an ex-list");
-            }
+            init_from_parent(true);
+            ensure_attached();
             Base::update_content_version();
         }
     }
@@ -523,6 +523,7 @@ public:
         return get_obj();
     }
     ref_type get_collection_ref(Index, CollectionType) const override;
+    bool check_collection_ref(Index, CollectionType) const noexcept override;
     void set_collection_ref(Index, ref_type ref, CollectionType) override;
 
     void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
@@ -621,9 +622,16 @@ private:
             return Mixed{};
         return value;
     }
+    void ensure_attached() const
+    {
+        if (!m_tree->is_attached()) {
+            throw IllegalOperation("This is an ex-list");
+        }
+    }
     Mixed do_get(size_t ndx, const char* msg) const
     {
         const auto current_size = size();
+        ensure_attached();
         CollectionBase::validate_index(msg, ndx, current_size);
 
         return unresolved_to_null(m_tree->get(ndx));
@@ -709,6 +717,13 @@ public:
         // FIXME: Should this add to the end of the unresolved list?
         insert(size(), value);
     }
+    void add(const Obj& obj)
+    {
+        if (get_target_table()->get_key() != obj.get_table_key()) {
+            throw InvalidArgument("LnkLst::add: Wrong object type");
+        }
+        add(obj.get_key());
+    }
 
     // Overriding members of CollectionBase:
     using CollectionBase::get_owner_key;
@@ -724,6 +739,10 @@ public:
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
     const Obj& get_obj() const noexcept final;
+    bool is_attached() const noexcept final
+    {
+        return m_list.is_attached();
+    }
     bool has_changed() const noexcept final;
     ColKey get_col_key() const noexcept final;
     CollectionType get_collection_type() const noexcept override
@@ -1215,9 +1234,7 @@ void Lst<T>::insert(size_t ndx, T value)
 
     auto sz = size();
     CollectionBase::validate_index("insert()", ndx, sz + 1);
-
     ensure_created();
-
     if (Replication* repl = Base::get_replication()) {
         repl->list_insert(*this, ndx, value, sz);
     }

@@ -210,6 +210,7 @@ public:
         return get_obj();
     }
     ref_type get_collection_ref(Index, CollectionType) const override;
+    bool check_collection_ref(Index, CollectionType) const noexcept override;
     void set_collection_ref(Index, ref_type ref, CollectionType) override;
 
     void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
@@ -249,6 +250,7 @@ private:
     void do_accumulate(size_t* return_ndx, AggregateType& agg) const;
 
     void ensure_created();
+    void ensure_attached() const;
     inline bool update() const
     {
         return update_if_needed_with_status() != UpdateStatus::Detached;
