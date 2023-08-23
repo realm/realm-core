@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Crash when querying the size of a Object property in a linked/linked to object ([#6915](https://github.com/realm/realm-core/issues/6915), since v13.17.2)
 
 ### Breaking changes
 * None.

@@ -5640,6 +5640,7 @@ TEST(Query_NestedLinkCount)
     table->add_column_list(*table, "children");
     table->add_column_dictionary(*table, "dictionary");
     table->add_column_list(*table, "list");
+    table->add_column(*table, "Object");
 
     Obj o1 = table->create_object_with_primary_key(1);
     Obj o2 = table->create_object_with_primary_key(2);
@@ -5649,6 +5650,10 @@ TEST(Query_NestedLinkCount)
     auto dict = o2.get_dictionary("dictionary");
     dict.insert("key", o3);
     o3.get_linklist("children").add(o2.get_key());
+
+    o1.set("Object", o1.get_key());
+    o2.set("Object", o2.get_key());
+    o3.set("Object", o2.get_key());
 
     auto q = table->query("children.list.@size == 0");
     CHECK_EQUAL(q.count(), 2);
@@ -5676,7 +5681,13 @@ TEST(Query_NestedLinkCount)
     dict.insert("key4", o3);
     q = table->query("@links.TestClass.children.dictionary.@size == 5");
     CHECK_EQUAL(q.count(), 1); // Only o2
-}
 
+    q = table->query("@links.TestClass.Object.@size > 0");
+    CHECK_EQUAL(q.count(), 2);
+    q = table->query("@links.TestClass.Object.Object.@size > 0");
+    CHECK_EQUAL(q.count(), 2);
+    q = table->query("Object.@links.TestClass.Object.@size > 0");
+    CHECK_EQUAL(q.count(), 3);
+}
 
 #endif // TEST_QUERY
