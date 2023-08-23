@@ -712,7 +712,7 @@ public:
                     return;
                 REALM_ASSERT(error);
                 unit_test::TestContext& test_context = m_test_context;
-                test_context.logger->error("Client disconnect: %1 (is_fatal=%3)", error->status, error->is_fatal);
+                test_context.logger->error("Client disconnect: %1 (is_fatal=%2)", error->status, error->is_fatal);
                 bool client_error_occurred = true;
                 CHECK_NOT(client_error_occurred);
                 stop();
