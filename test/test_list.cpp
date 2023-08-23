@@ -1020,7 +1020,7 @@ TEST(List_Nested_Replication)
         StablePath expected_path;
     } parser(test_context);
 
-    parser.expected_path.push_back(KeyIndex());
+    parser.expected_path.push_back(StableIndex());
     parser.expected_path.push_back(dict->build_index("level1"));
     tr->advance_read(&parser);
 }

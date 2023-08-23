@@ -645,7 +645,7 @@ Dictionary::Iterator Dictionary::find(Mixed key) const noexcept
 
 void Dictionary::add_index(Path& path, const Index& index) const
 {
-    auto ndx = m_values->find_key(mpark::get<KeyIndex>(index).get_key());
+    auto ndx = m_values->find_key(index.get_salt());
     auto keys = static_cast<BPlusTree<StringData>*>(m_keys.get());
     path.emplace_back(keys->get(ndx));
 }
@@ -653,7 +653,7 @@ void Dictionary::add_index(Path& path, const Index& index) const
 size_t Dictionary::find_index(const Index& index) const
 {
     update();
-    return m_values->find_key(mpark::get<KeyIndex>(index).get_key());
+    return m_values->find_key(index.get_salt());
 }
 
 UpdateStatus Dictionary::update_if_needed_with_status() const noexcept
@@ -1055,11 +1055,11 @@ Mixed Dictionary::find_value(Mixed value) const noexcept
     return (ndx == realm::npos) ? Mixed{} : do_get_key(ndx);
 }
 
-KeyIndex Dictionary::build_index(Mixed key) const
+StableIndex Dictionary::build_index(Mixed key) const
 {
     auto it = find(key);
     int64_t index = (it != end()) ? m_values->get_key(it.index()) : 0;
-    return {key.get_string(), index};
+    return {index};
 }
 
 
@@ -1184,7 +1184,7 @@ void Dictionary::to_json(std::ostream& out, size_t link_depth, JSONOutputMode ou
 
 ref_type Dictionary::get_collection_ref(Index index, CollectionType type) const
 {
-    auto ndx = m_values->find_key(mpark::get<KeyIndex>(index).get_key());
+    auto ndx = m_values->find_key(index.get_salt());
     if (ndx != realm::not_found) {
         auto val = m_values->get(ndx);
         if (val.is_type(DataType(int(type)))) {
@@ -1198,7 +1198,7 @@ ref_type Dictionary::get_collection_ref(Index index, CollectionType type) const
 
 bool Dictionary::check_collection_ref(Index index, CollectionType type) const noexcept
 {
-    auto ndx = m_values->find_key(mpark::get<KeyIndex>(index).get_key());
+    auto ndx = m_values->find_key(index.get_salt());
     if (ndx != realm::not_found) {
         return m_values->get(ndx).is_type(DataType(int(type)));
     }
@@ -1207,7 +1207,7 @@ bool Dictionary::check_collection_ref(Index index, CollectionType type) const no
 
 void Dictionary::set_collection_ref(Index index, ref_type ref, CollectionType type)
 {
-    auto ndx = m_values->find_key(mpark::get<KeyIndex>(index).get_key());
+    auto ndx = m_values->find_key(index.get_salt());
     if (ndx == realm::not_found) {
         throw StaleAccessor("Collection has been deleted");
     }

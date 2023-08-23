@@ -693,7 +693,7 @@ void Lst<Mixed>::to_json(std::ostream& out, size_t link_depth, JSONOutputMode ou
 
 ref_type Lst<Mixed>::get_collection_ref(Index index, CollectionType type) const
 {
-    auto ndx = m_tree->find_key(mpark::get<int64_t>(index));
+    auto ndx = m_tree->find_key(index.get_salt());
     if (ndx != realm::not_found) {
         auto val = get(ndx);
         if (val.is_type(DataType(int(type)))) {
@@ -707,7 +707,7 @@ ref_type Lst<Mixed>::get_collection_ref(Index index, CollectionType type) const
 
 bool Lst<Mixed>::check_collection_ref(Index index, CollectionType type) const noexcept
 {
-    auto ndx = m_tree->find_key(mpark::get<int64_t>(index));
+    auto ndx = m_tree->find_key(index.get_salt());
     if (ndx != realm::not_found) {
         return get(ndx).is_type(DataType(int(type)));
     }
@@ -716,7 +716,7 @@ bool Lst<Mixed>::check_collection_ref(Index index, CollectionType type) const no
 
 void Lst<Mixed>::set_collection_ref(Index index, ref_type ref, CollectionType type)
 {
-    auto ndx = m_tree->find_key(mpark::get<int64_t>(index));
+    auto ndx = m_tree->find_key(index.get_salt());
     if (ndx == realm::not_found) {
         throw StaleAccessor("Collection has been deleted");
     }
@@ -725,15 +725,15 @@ void Lst<Mixed>::set_collection_ref(Index index, ref_type ref, CollectionType ty
 
 void Lst<Mixed>::add_index(Path& path, const Index& index) const
 {
-    auto ndx = m_tree->find_key(mpark::get<int64_t>(index));
+    auto ndx = m_tree->find_key(index.get_salt());
     REALM_ASSERT(ndx != realm::not_found);
     path.emplace_back(ndx);
 }
 
-size_t Lst<Mixed>::find_index(const Index& ndx) const
+size_t Lst<Mixed>::find_index(const Index& index) const
 {
     update();
-    return m_tree->find_key(mpark::get<int64_t>(ndx));
+    return m_tree->find_key(index.get_salt());
 }
 
 bool Lst<Mixed>::nullify(ObjLink link)

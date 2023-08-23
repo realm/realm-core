@@ -153,7 +153,7 @@ const Spec& Obj::get_spec() const
     return m_table.unchecked_ptr()->m_spec;
 }
 
-ColIndex Obj::build_index(ColKey col_key) const
+StableIndex Obj::build_index(ColKey col_key) const
 {
     if (col_key.is_collection()) {
         return {col_key, 0};
@@ -166,7 +166,7 @@ ColIndex Obj::build_index(ColKey col_key) const
     return {col_key, key};
 }
 
-bool Obj::check_index(ColIndex index) const
+bool Obj::check_index(StableIndex index) const
 {
     if (index.is_collection()) {
         return true;
@@ -175,7 +175,7 @@ bool Obj::check_index(ColIndex index) const
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), index.get_index().val + 1));
     values.init_from_ref(ref);
     auto key = values.get_key(m_row_ndx);
-    return key == index.get_key();
+    return key == index.get_salt();
 }
 
 Replication* Obj::get_replication() const
@@ -1044,12 +1044,11 @@ StablePath Obj::get_stable_path() const noexcept
 
 void Obj::add_index(Path& path, const Index& index) const
 {
-    auto col_index = mpark::get<ColIndex>(index);
     if (path.empty()) {
-        path.emplace_back(get_table()->get_column_key(col_index));
+        path.emplace_back(get_table()->get_column_key(index));
     }
     else {
-        StringData col_name = get_table()->get_column_name(col_index);
+        StringData col_name = get_table()->get_column_name(index);
         path.emplace_back(col_name);
     }
 }
@@ -1995,7 +1994,7 @@ CollectionPtr Obj::get_collection_ptr(const Path& path) const
 CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
 {
     // First element in path is phony column key
-    ColKey col_key = m_table->get_column_key(mpark::get<ColIndex>(path[0]));
+    ColKey col_key = m_table->get_column_key(path[0]);
     size_t level = 1;
     CollectionBasePtr collection = get_collection_ptr(col_key);
 
@@ -2339,12 +2338,11 @@ ref_type Obj::Internal::get_ref(const Obj& obj, ColKey col_key)
 
 ref_type Obj::get_collection_ref(Index index, CollectionType type) const
 {
-    ColIndex col_index = mpark::get<ColIndex>(index);
-    if (col_index.is_collection()) {
-        return to_ref(_get<int64_t>(col_index.get_index()));
+    if (index.is_collection()) {
+        return to_ref(_get<int64_t>(index.get_index()));
     }
-    if (check_index(col_index)) {
-        auto val = _get<Mixed>(col_index.get_index());
+    if (check_index(index)) {
+        auto val = _get<Mixed>(index.get_index());
         if (val.is_type(DataType(int(type)))) {
             return val.get_ref();
         }
@@ -2355,24 +2353,22 @@ ref_type Obj::get_collection_ref(Index index, CollectionType type) const
 
 bool Obj::check_collection_ref(Index index, CollectionType type) const noexcept
 {
-    ColIndex col_index = mpark::get<ColIndex>(index);
-    if (col_index.is_collection()) {
+    if (index.is_collection()) {
         return true;
     }
-    if (check_index(col_index)) {
-        return _get<Mixed>(col_index.get_index()).is_type(DataType(int(type)));
+    if (check_index(index)) {
+        return _get<Mixed>(index.get_index()).is_type(DataType(int(type)));
     }
     return false;
 }
 
 void Obj::set_collection_ref(Index index, ref_type ref, CollectionType type)
 {
-    ColIndex col_index = mpark::get<ColIndex>(index);
-    if (col_index.is_collection()) {
-        set_int(col_index.get_index(), from_ref(ref));
+    if (index.is_collection()) {
+        set_int(index.get_index(), from_ref(ref));
         return;
     }
-    set_ref(col_index.get_index(), ref, type);
+    set_ref(index.get_index(), ref, type);
 }
 
 } // namespace realm

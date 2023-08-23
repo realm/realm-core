@@ -793,17 +793,10 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             ObjKey key = ObjKey(read_int<int64_t>());     // Throws
             size_t nesting_level = instr == instr_SelectCollectionByPath ? read_int<uint32_t>() : 0;
             StablePath path;
-            path.push_back(ColIndex(col_key, 0));
+            path.push_back(StableIndex(col_key, 0));
             for (size_t l = 0; l < nesting_level; l++) {
                 auto ndx = read_int<int64_t>();
-                if (ndx == 0) {
-                    auto str = read_string(m_string_buffer);
-                    auto key = read_int<int64_t>();
-                    path.emplace_back(KeyIndex(str, key));
-                }
-                else {
-                    path.emplace_back(ndx);
-                }
+                path.emplace_back(ndx);
             }
             if (!handler.select_collection(col_key, key, path)) // Throws
                 parser_error();
