@@ -16,10 +16,20 @@ export REALM_CORE_REVISION="<realm-core-revision-to-test>"
 export GITHUB_KNOWN_HOSTS="github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk="
 ```
 
-**NOTE**: The `install_baas.sh` and `setup_baas_host.sh` files from the
-local _evergreen/_ directory will be transferred to the remote host. The `REALM_CORE_REVISION`
-specifies which Realm Core branch/commit to use for other auxillary files used during baas_server
-and baas_proxy setup.
+Here are descriptions of the different parameters in the `baas_host_vars.sh` file:
+
+* `AWS_ACCESS_KEY_ID` - The AWS Access Key ID used to run the baas server.
+* `AWS_SECRET_ACCESS_KEY` - The AWS Secret Key used to run the baas server.
+* `BAAS_HOST_NAME` - The hostname of the Linux host to download and run the baas server.
+* `REALM_CORE_REVISION` - The commit/branch of Realm Core to use for other files from the
+  _evergreen/_ directory when running the baas server.
+* `GITHUB_KNOWN_HOSTS` - The public server key to authenticate ssh with Github for downloading
+  files from Github. This is a fixed value that is provided by Github.
+
+**NOTE**: The `baas_host_vars.sh` and the `install_baas.sh` and `setup_baas_host.sh` files from the
+local _evergreen/_ directory will be transferred to the remote host. The `setup_baas_host.sh` script
+will check out Realm Core using the branch/commit provided to use for other auxillary files needed
+when starting the baas_server.
 
 3. CD into the _realm-core/_ directory.
 4. Run the _evergreen/setup_baas_host_local.sh_ script with the following arguments:
@@ -80,10 +90,20 @@ export REALM_CORE_REVISION="<realm-core-revision-to-test>"
 export GITHUB_KNOWN_HOSTS="github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk="
 ```
 
-**NOTE**: The `install_baas.sh` and `setup_baas_host.sh` files from the
-local _evergreen/_ directory will be transferred to the remote host. The `REALM_CORE_REVISION`
-specifies which Realm Core branch/commit to use for other auxillary files used during baas_server
-and baas_proxy setup.
+Here are descriptions of the different parameters in the `baas_host_vars.sh` file:
+
+* `AWS_ACCESS_KEY_ID` - The AWS Access Key ID used to run the baas server.
+* `AWS_SECRET_ACCESS_KEY` - The AWS Secret Key used to run the baas server.
+* `BAAS_HOST_NAME` - The hostname of the Linux host to download and run the baas server and proxy.
+* `REALM_CORE_REVISION` - The commit/branch of Realm Core to use for other files from the
+  _evergreen/_ directory when running the baas server.
+* `GITHUB_KNOWN_HOSTS` - The public server key to authenticate ssh with Github for downloading
+  files from Github. This is a fixed value that is provided by Github.
+
+**NOTE**: The `baas_host_vars.sh` and the `install_baas.sh`, `setup_baas_host.sh` and
+`setup_baas_proxy.sh` files from the local _evergreen/_ directory will be transferred to the
+remote host. The `setup_baas_host.sh` script will check out Realm Core using the branch/commit
+provided to use for other auxillary files needed when starting the baas_server.
 
 3. CD into the _realm-core/_ directory.
 4. Run the _evergreen/setup_baas_host_local.sh_ script with the following arguments:
@@ -96,11 +116,11 @@ Running setup script (with forward tunnel on :9090 to 127.0.0.1:9092)
 - Baas direct connection on port :9098
 . . .
 Starting baas app server
-Adding roles to admin user
 Starting baas proxy: 127.0.0.1:9092 => 127.0.0.1:9090
 ---------------------------------------------
 Baas proxy ready
 ---------------------------------------------
+Adding roles to admin user
 ---------------------------------------------
 Baas server ready
 ---------------------------------------------
