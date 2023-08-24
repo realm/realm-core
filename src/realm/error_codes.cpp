@@ -33,7 +33,6 @@ ErrorCategory ErrorCodes::error_categories(Error code)
             break;
 
         case AddressSpaceExhausted:
-        case BadChangeset:
         case BadVersion:
         case BrokenInvariant:
         case CallbackFailed:
@@ -53,6 +52,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
             return ErrorCategory().set(ErrorCategory::runtime_error);
 
         case AutoClientResetFailed:
+        case BadChangeset:
         case ConnectionClosed:
         case SyncProtocolInvariantFailed:
         case SyncClientResetRequired:
