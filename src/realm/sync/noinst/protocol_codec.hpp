@@ -244,6 +244,9 @@ public:
                 connection.receive_error_message(sync::ProtocolErrorInfo{error_code, message, is_fatal},
                                                  session_ident); // Throws
             }
+            else if (message_type == "log_message") { // introduced in protocol version 10
+                parse_log_message(connection, msg);
+            }
             else if (message_type == "json_error") { // introduced in protocol 4
                 sync::ProtocolErrorInfo info{};
                 info.raw_error_code = msg.read_next<int>();
@@ -491,6 +494,66 @@ private:
         return action::ApplicationBug;
     }
 
+    template <typename Connection>
+    void parse_log_message(Connection& connection, HeaderLineParser& msg)
+    {
+        auto report_error = [&](const auto fmt, auto&&... args) {
+            auto msg = util::format(fmt, std::forward<decltype(args)>(args)...);
+            connection.handle_protocol_error(Status{ErrorCodes::SyncProtocolInvariantFailed, std::move(msg)});
+        };
+
+        auto session_ident = msg.read_next<session_ident_type>();
+        auto message_length = msg.read_next<size_t>('\n');
+        auto message_body_str = msg.read_sized_data<std::string_view>(message_length);
+        nlohmann::json message_body;
+        try {
+            message_body = nlohmann::json::parse(message_body_str);
+        }
+        catch (const nlohmann::json::exception& e) {
+            return report_error("Malformed json in log_message message: \"%1\": %2", message_body_str, e.what());
+        }
+        static const std::unordered_map<std::string_view, util::Logger::Level> name_to_level = {
+            {"fatal", util::Logger::Level::fatal},   {"error", util::Logger::Level::error},
+            {"warn", util::Logger::Level::warn},     {"info", util::Logger::Level::info},
+            {"detail", util::Logger::Level::detail}, {"debug", util::Logger::Level::debug},
+            {"trace", util::Logger::Level::trace},
+        };
+
+        // See if the log_message contains the appservices_request_id
+        if (auto it = message_body.find("co_id"); it != message_body.end() && it->is_string()) {
+            connection.receive_appservices_request_id(it->get<std::string_view>());
+        }
+
+        std::string_view log_level;
+        bool has_level = false;
+        if (auto it = message_body.find("level"); it != message_body.end() && it->is_string()) {
+            log_level = it->get<std::string_view>();
+            has_level = !log_level.empty();
+        }
+
+        std::string_view msg_text;
+        if (auto it = message_body.find("msg"); it != message_body.end() && it->is_string()) {
+            msg_text = it->get<std::string_view>();
+        }
+
+        // If there is no message text, then we're done
+        if (msg_text.empty()) {
+            return;
+        }
+
+        // If a log level wasn't provided, default to debug
+        util::Logger::Level parsed_level = util::Logger::Level::debug;
+        if (has_level) {
+            if (auto it = name_to_level.find(log_level); it != name_to_level.end()) {
+                parsed_level = it->second;
+            }
+            else {
+                return report_error("Unknown log level found in log_message: \"%1\"", log_level);
+            }
+        }
+        connection.receive_server_log_message(session_ident, parsed_level, msg_text);
+    }
+
     static constexpr std::size_t s_max_body_size = std::numeric_limits<std::size_t>::max();
 
     // Permanent buffer to use for building messages.
@@ -551,6 +614,9 @@ public:
                             std::size_t message_size, bool try_again, session_ident_type session_ident);
 
     void make_pong(OutputBuffer&, milliseconds_type timestamp);
+
+    void make_log_message(OutputBuffer& out, util::Logger::Level level, std::string message,
+                          session_ident_type sess_id = 0, std::optional<std::string> co_id = std::nullopt);
 
     // Messages received by the server.
 
