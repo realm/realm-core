@@ -46,7 +46,6 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case RangeError:
         case RuntimeError:
         case SchemaVersionMismatch:
-        case SubscriptionFailed:
         case UnsupportedFileFormatVersion:
         case OperationAborted:
             return ErrorCategory().set(ErrorCategory::runtime_error);
@@ -54,10 +53,11 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case AutoClientResetFailed:
         case BadChangeset:
         case ConnectionClosed:
-        case SyncProtocolInvariantFailed:
+        case SubscriptionFailed:
         case SyncClientResetRequired:
         case SyncCompensatingWrite:
         case SyncPermissionDenied:
+        case SyncProtocolInvariantFailed:
         case SyncServerPermissionsChanged:
         case SyncUserMismatch:
         case SyncWriteNotAllowed:
