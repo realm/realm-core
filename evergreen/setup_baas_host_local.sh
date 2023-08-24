@@ -119,7 +119,7 @@ if [[ -f ~/.ssh/id_rsa ]]; then
     ssh-add ~/.ssh/id_rsa
 fi
 ssh-add "${BAAS_HOST_KEY}"
-SSH_OPTIONS=(-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i "${BAAS_HOST_KEY}")
+SSH_OPTIONS=(-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -i "${BAAS_HOST_KEY}")
 
 echo "running ssh with ${SSH_OPTIONS[*]}"
 
@@ -131,7 +131,7 @@ CONNECT_COUNT=2
 # Check for remote connectivity - try to connect twice to verify server is "really" ready
 # The tests failed one time due to this ssh command passing, but the next scp command failed
 while [[ ${CONNECT_COUNT} -gt 0 ]]; do
-    until ssh "${SSH_OPTIONS[@]}" "${SSH_USER}" "echo -n 'hello from '; hostname" ; do
+    until ssh "${SSH_OPTIONS[@]}" -o ConnectTimeout=10 "${SSH_USER}" "echo -n 'hello from '; hostname" ; do
         if [[ ${WAIT_COUNTER} -ge ${RETRY_COUNT} ]] ; then
             secs_spent_waiting=$(($(date -u +'%s') - WAIT_START))
             echo "Timed out after waiting ${secs_spent_waiting} seconds for host ${BAAS_HOST_NAME} to start"
@@ -148,11 +148,11 @@ done
 
 echo "Transferring setup scripts to ${SSH_USER}:${FILE_DEST_DIR}"
 # Copy the baas host vars script to the baas remote host
-scp "${SSH_OPTIONS[@]}" "${BAAS_HOST_VARS}" "${SSH_USER}:${FILE_DEST_DIR}/"
+scp "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${BAAS_HOST_VARS}" "${SSH_USER}:${FILE_DEST_DIR}/"
 # Copy the current host and baas scripts from the working copy of realm-core
 # This ensures they have the latest copy, esp when running evergreen patches
-scp "${SSH_OPTIONS[@]}" "${EVERGREEN_PATH}/setup_baas_host.sh" "${SSH_USER}:${FILE_DEST_DIR}/"
-scp "${SSH_OPTIONS[@]}" "${EVERGREEN_PATH}/install_baas.sh" "${SSH_USER}:${FILE_DEST_DIR}/"
+scp "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${EVERGREEN_PATH}/setup_baas_host.sh" "${SSH_USER}:${FILE_DEST_DIR}/"
+scp "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${EVERGREEN_PATH}/install_baas.sh" "${SSH_USER}:${FILE_DEST_DIR}/"
 
 echo "Starting remote baas with branch/commit: '${BAAS_BRANCH}'"
 SETUP_BAAS_OPTS=()
@@ -166,4 +166,5 @@ fi
 # Run the setup baas host script and provide the location of the baas host vars script
 # Also sets up a forward tunnel for port 9090 through the ssh connection to the baas remote host
 echo "Running setup script (with forward tunnel to 127.0.0.1:9090)"
-ssh "${SSH_OPTIONS[@]}" -L 9090:127.0.0.1:9090 "${SSH_USER}" "${FILE_DEST_DIR}/setup_baas_host.sh" "${SETUP_BAAS_OPTS[@]}" "${FILE_DEST_DIR}/baas_host_vars.sh"
+ssh "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 -L 9090:127.0.0.1:9090 "${SSH_USER}" \
+"${FILE_DEST_DIR}/setup_baas_host.sh" "${SETUP_BAAS_OPTS[@]}" "${FILE_DEST_DIR}/baas_host_vars.sh"
