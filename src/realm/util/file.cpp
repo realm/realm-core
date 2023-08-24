@@ -1098,7 +1098,10 @@ static void _unlock(int m_fd)
     do {
         r = flock(m_fd, LOCK_UN);
     } while (r != 0 && errno == EINTR);
-    REALM_ASSERT_RELEASE_EX(r == 0 && "File::unlock()", r, errno);
+    if (r && errno) {
+        throw RuntimeError(ErrorCodes::RuntimeError,
+                           "File::unlock() has failed, this is likely due to some limitation in the OS file system.");
+    }
 }
 #endif
 
