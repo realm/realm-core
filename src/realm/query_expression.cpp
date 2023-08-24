@@ -519,11 +519,16 @@ void LinkCount::evaluate(size_t index, ValueBase& destination)
                 const Obj obj = m_link_map.get_target_table()->get_object(links[i]);
                 auto val = obj._get<int64_t>(m_column_key.get_index());
                 size_t s;
-                if (val & 1) {
+                if (m_column_key.get_type() == col_type_Link && !m_column_key.is_collection()) {
+                    // It is a single link column
+                    s = (val == 0) ? 0 : 1;
+                }
+                else if (val & 1) {
                     // It is a backlink column with just one value
                     s = 1;
                 }
                 else {
+                    // This is some kind of collection or backlink column
                     s = _impl::get_collection_size_from_ref(to_ref(val), alloc);
                 }
                 destination.set(i, int64_t(s));
