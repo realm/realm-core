@@ -19,6 +19,7 @@
 #ifndef REALM_TIMESTAMP_HPP
 #define REALM_TIMESTAMP_HPP
 
+#include <array>
 #include <cstdint>
 #include <ostream>
 #include <chrono>
