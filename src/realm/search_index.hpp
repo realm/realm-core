@@ -72,7 +72,8 @@ private:
 };
 
 
-struct SearchIndex {
+class SearchIndex {
+public:
     SearchIndex(const ClusterColumn& target_column, Array* root)
         : m_target_column(target_column)
         , m_root_array(root)

@@ -1656,15 +1656,12 @@ void StringIndex::insert(ObjKey key, const Mixed& value)
     constexpr size_t offset = 0; // First key from beginning of string
 
     if (this->m_target_column.is_fulltext()) {
-        StringData str_value;
         if (value.is_type(type_String)) {
-            str_value = value.get<StringData>();
-        }
-        auto words = Tokenizer::get_instance()->reset(std::string_view(str_value)).get_all_tokens();
-
-        for (auto& word : words) {
-            Mixed m(word);
-            insert_with_offset(key, m.get_index_data(buffer), m, offset); // Throws
+            auto words = Tokenizer::get_instance()->reset(std::string_view(value.get<StringData>())).get_all_tokens();
+            for (auto& word : words) {
+                Mixed m(word);
+                insert_with_offset(key, m.get_index_data(buffer), m, offset); // Throws
+            }
         }
     }
     else {
@@ -1686,13 +1683,10 @@ void StringIndex::set(ObjKey key, const Mixed& new_value)
             tokenizer->reset({old_string.data(), old_string.size()});
             old_words = tokenizer->get_all_tokens();
         }
-        StringData str_value;
+        std::set<std::string> new_words;
         if (new_value.is_type(type_String)) {
-            str_value = new_value.get<StringData>();
+            new_words = tokenizer->reset(std::string_view(new_value.get<StringData>())).get_all_tokens();
         }
-
-        tokenizer->reset({str_value.data(), str_value.size()});
-        auto new_words = tokenizer->get_all_tokens();
 
         auto w1 = old_words.begin();
         auto w2 = new_words.begin();
@@ -1891,7 +1885,7 @@ namespace {
 
 namespace {
 
-bool is_chars(uint32_t val)
+bool is_chars(uint64_t val)
 {
     if (val == 0)
         return true;
@@ -1904,7 +1898,7 @@ bool is_chars(uint32_t val)
     return false;
 }
 
-void out_char(std::ostream& out, uint32_t val)
+void out_char(std::ostream& out, uint64_t val)
 {
     if (val) {
         out_char(out, val >> 8);
@@ -1915,7 +1909,7 @@ void out_char(std::ostream& out, uint32_t val)
     }
 }
 
-void out_hex(std::ostream& out, uint32_t val)
+void out_hex(std::ostream& out, uint64_t val)
 {
     if (is_chars(val)) {
         out_char(out, val);

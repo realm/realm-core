@@ -48,21 +48,20 @@ namespace realm {
 class BacklinkColumn;
 template <class>
 class BacklinkCount;
-class TableView;
-class Group;
-struct SearchIndex;
-class SortDescriptor;
-class TableView;
+class ColKeys;
 template <class>
 class Columns;
+class DictionaryLinkValues;
+struct GlobalKey;
+class Group;
+class LinkChain;
+class SearchIndex;
+class SortDescriptor;
+class StringIndex;
+class Subexpr;
 template <class>
 class SubQuery;
-class ColKeys;
-struct GlobalKey;
-class LinkChain;
-class Subexpr;
-class StringIndex;
-class DictionaryLinkValues;
+class TableView;
 
 struct Link {
 };
