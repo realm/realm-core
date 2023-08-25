@@ -470,6 +470,11 @@ ${CURL} 'http://localhost:9090/api/admin/v3.0/auth/providers/local-userpass/logi
 
 "${MONGO_BINARIES_DIR}/bin/${MONGOSH}"  --quiet mongodb://localhost:26000/auth "${BASE_PATH}/add_admin_roles.js"
 
+# Based on https://github.com/10gen/baas/pull/10665
+# Add a version to the schema change history store so that the drop optimization does not take place
+# This caused issues with this test failing once app deletions starting being done asynchronously
+"${MONGO_BINARIES_DIR}/bin/${MONGOSH}"  --quiet mongodb://localhost:26000/__realm_sync "${BASE_PATH}/add_dummy_app.js"
+
 # All done! the 'baas_ready' file indicates the baas server has finished initializing
 touch "${BAAS_READY_FILE}"
 
