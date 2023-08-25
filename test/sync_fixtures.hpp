@@ -581,24 +581,21 @@ public:
         }
     }
 
-    using ErrorHandler = void(std::error_code ec, bool is_fatal, const std::string& detailed_message);
+    using ErrorHandler = void(Status status, bool is_fatal);
 
     // Set an error handler to be used for all sessions of the specified client
     // (\a handler will be copied for each session). Must be called before
     // make_session().
     void set_client_side_error_handler(int client_index, std::function<ErrorHandler> handler)
     {
-        auto handler_2 = [handler = std::move(handler)](ConnectionState state,
-                                                        std::optional<SessionErrorInfo> error_info) {
+        auto handler_wrapped = [handler = std::move(handler)](ConnectionState state,
+                                                              std::optional<SessionErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
-            std::error_code ec = error_info->error_code;
-            bool is_fatal = error_info->is_fatal();
-            const std::string& detailed_message = error_info->message;
-            handler(ec, is_fatal, detailed_message);
+            handler(error_info->status, error_info->is_fatal);
         };
-        m_connection_state_change_listeners[client_index] = std::move(handler_2);
+        m_connection_state_change_listeners[client_index] = std::move(handler_wrapped);
     }
 
     void set_client_side_error_rate(int client_index, int n, int m)
@@ -715,8 +712,7 @@ public:
                     return;
                 REALM_ASSERT(error);
                 unit_test::TestContext& test_context = m_test_context;
-                test_context.logger->error("Client disconnect: %1: %2 (is_fatal=%3)", error->error_code,
-                                           error->message, error->is_fatal());
+                test_context.logger->error("Client disconnect: %1 (is_fatal=%2)", error->status, error->is_fatal);
                 bool client_error_occurred = true;
                 CHECK_NOT(client_error_occurred);
                 stop();
@@ -1081,10 +1077,7 @@ inline void RealmFixture::setup_error_handler(util::UniqueFunction<ErrorHandler>
         if (state != ConnectionState::disconnected)
             return;
         REALM_ASSERT(error_info);
-        std::error_code ec = error_info->error_code;
-        bool is_fatal = error_info->is_fatal();
-        const std::string& detailed_message = error_info->message;
-        handler(ec, is_fatal, detailed_message);
+        handler(error_info->status, error_info->is_fatal);
     };
     m_session.set_connection_state_change_listener(std::move(listener));
 }

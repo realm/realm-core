@@ -7,6 +7,7 @@
 #include <realm/error_codes.h>
 #include <realm/mixed.hpp>
 #include <realm/replication.hpp>
+#include <realm/util/tagged_bool.hpp>
 
 
 // NOTE: The protocol specification is in `/doc/protocol.md`
@@ -43,6 +44,9 @@ namespace sync {
 //     realms - this informs the server to not send the schema before sending the
 //     migrate to FLX server action
 //
+//   10 Update BIND message to send information to the server about the reason a
+//      synchronization session is used for; add support for server log messages
+//
 //  XX Changes:
 //     - TBD
 //
@@ -50,7 +54,7 @@ constexpr int get_current_protocol_version() noexcept
 {
     // Also update the current protocol version test in flx_sync.cpp when
     // updating this value
-    return 9;
+    return 10;
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
@@ -247,6 +251,9 @@ struct ResumptionDelayInfo {
     int delay_jitter_divisor = 4;
 };
 
+class IsFatalTag {};
+using IsFatal = util::TaggedBool<class IsFatalTag>;
+
 struct ProtocolErrorInfo {
     enum class Action {
         NoAction,
@@ -258,14 +265,19 @@ struct ProtocolErrorInfo {
         ClientReset,
         ClientResetNoRecovery,
         MigrateToFLX,
-        RevertToPBS
+        RevertToPBS,
+        // The RefreshUser/RefreshLocation/LogOutUser actions are currently generated internally when the
+        // sync websocket is closed with specific error codes.
+        RefreshUser,
+        RefreshLocation,
+        LogOutUser,
     };
 
     ProtocolErrorInfo() = default;
-    ProtocolErrorInfo(int error_code, const std::string& msg, bool do_try_again)
+    ProtocolErrorInfo(int error_code, const std::string& msg, IsFatal is_fatal)
         : raw_error_code(error_code)
         , message(msg)
-        , try_again(do_try_again)
+        , is_fatal(is_fatal)
         , client_reset_recovery_is_disabled(false)
         , should_client_reset(util::none)
         , server_requests_action(Action::NoAction)
@@ -273,7 +285,7 @@ struct ProtocolErrorInfo {
     }
     int raw_error_code = 0;
     std::string message;
-    bool try_again = false;
+    IsFatal is_fatal = IsFatal{true};
     bool client_reset_recovery_is_disabled = false;
     std::optional<bool> should_client_reset;
     std::optional<std::string> log_url;
@@ -283,11 +295,6 @@ struct ProtocolErrorInfo {
     std::optional<ResumptionDelayInfo> resumption_delay_interval;
     Action server_requests_action;
     std::optional<std::string> migration_query_string;
-
-    bool is_fatal() const
-    {
-        return !try_again;
-    }
 };
 
 
@@ -361,31 +368,14 @@ enum class ProtocolError {
     // clang-format on
 };
 
+Status protocol_error_to_status(ProtocolError raw_error_code, std::string_view msg);
+
 constexpr bool is_session_level_error(ProtocolError);
 
 /// Returns null if the specified protocol error code is not defined by
 /// ProtocolError.
 const char* get_protocol_error_message(int error_code) noexcept;
-
-const std::error_category& protocol_error_category() noexcept;
-
-std::error_code make_error_code(ProtocolError) noexcept;
-
-} // namespace sync
-} // namespace realm
-
-namespace std {
-
-template <>
-struct is_error_code_enum<realm::sync::ProtocolError> {
-    static const bool value = true;
-};
-
-} // namespace std
-
-namespace realm {
-namespace sync {
-
+std::ostream& operator<<(std::ostream&, ProtocolError protocol_error);
 
 // Implementation
 
@@ -445,6 +435,12 @@ inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action actio
             return o << "MigrateToFLX";
         case ProtocolErrorInfo::Action::RevertToPBS:
             return o << "RevertToPBS";
+        case ProtocolErrorInfo::Action::RefreshUser:
+            return o << "RefreshUser";
+        case ProtocolErrorInfo::Action::RefreshLocation:
+            return o << "RefreshLocation";
+        case ProtocolErrorInfo::Action::LogOutUser:
+            return o << "LogOutUser";
     }
     return o << "Invalid error action: " << int64_t(action);
 }

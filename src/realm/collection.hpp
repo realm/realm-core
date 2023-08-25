@@ -765,6 +765,10 @@ private:
     size_t m_ndx = size_t(-1);
 };
 
+namespace _impl {
+size_t get_collection_size_from_ref(ref_type, Allocator& alloc);
+}
+
 } // namespace realm
 
 #endif // REALM_COLLECTION_HPP

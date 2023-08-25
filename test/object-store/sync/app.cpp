@@ -2661,7 +2661,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         SyncTestFile r_config(user1, partition, schema);
         // Override the default
         r_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-            if (error.get_system_error() == sync::make_error_code(realm::sync::ProtocolError::bad_authentication)) {
+            if (error.status == ErrorCodes::AuthError) {
                 util::format(std::cerr, "Websocket redirect test: User logged out\n");
                 std::unique_lock lk(logout_mutex);
                 logged_out = true;
@@ -2669,7 +2669,7 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 return;
             }
             util::format(std::cerr, "An unexpected sync error was caught by the default SyncTestFile handler: '%1'\n",
-                         error.what());
+                         error.status);
             abort();
         };
 
@@ -2958,9 +2958,9 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             std::atomic<bool> sync_error_handler_called{false};
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 sync_error_handler_called.store(true);
-                REQUIRE(error.get_system_error() ==
-                        sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                REQUIRE(error.reason() == "Unable to refresh the user access token.");
+                REQUIRE(error.status.code() == ErrorCodes::AuthError);
+                REQUIRE_THAT(std::string{error.status.reason()},
+                             Catch::Matchers::StartsWith("Unable to refresh the user access token"));
             };
             auto r = Realm::get_shared_realm(config);
             timed_wait_for([&] {
@@ -3054,21 +3054,19 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             user->update_access_token(encode_fake_jwt("fake_access_token"));
             REQUIRE(!app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
 
-            std::atomic<bool> sync_error_handler_called{false};
-            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                std::lock_guard<std::mutex> lock(mtx);
-                sync_error_handler_called.store(true);
-                REQUIRE(error.get_system_error() ==
-                        sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                REQUIRE(error.reason() == "Unable to refresh the user access token.");
-            };
+            auto [sync_error_promise, sync_error] = util::make_promise_future<SyncError>();
+            config.sync_config->error_handler =
+                [promise = util::CopyablePromiseHolder(std::move(sync_error_promise))](std::shared_ptr<SyncSession>,
+                                                                                       SyncError error) mutable {
+                    promise.get_promise().emplace_value(std::move(error));
+                };
 
             auto transport = static_cast<SynchronousTestTransport*>(session.transport());
             transport->block(); // don't let the token refresh happen until we're ready for it
             auto r = Realm::get_shared_realm(config);
             auto session = user->session_for_on_disk_path(config.path);
             REQUIRE(user->is_logged_in());
-            REQUIRE(!sync_error_handler_called.load());
+            REQUIRE(!sync_error.is_ready());
             {
                 std::atomic<bool> called{false};
                 session->wait_for_upload_completion([&](Status stat) {
@@ -3083,9 +3081,11 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                 std::lock_guard<std::mutex> lock(mtx);
                 REQUIRE(called);
             }
-            timed_wait_for([&] {
-                return sync_error_handler_called.load();
-            });
+
+            auto sync_error_res = wait_for_future(std::move(sync_error)).get();
+            REQUIRE(sync_error_res.status == ErrorCodes::AuthError);
+            REQUIRE_THAT(std::string{sync_error_res.status.reason()},
+                         Catch::Matchers::StartsWith("Unable to refresh the user access token"));
 
             // the failed refresh logs out the user
             std::lock_guard<std::mutex> lock(mtx);
@@ -3248,9 +3248,9 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
                            CreatePolicy::ForceCreate);
             r->commit_transaction();
         }
-        r->sync_session()->wait_for_upload_completion([&](Status ec) {
+        r->sync_session()->wait_for_upload_completion([&](Status status) {
             std::lock_guard lk(mutex);
-            REQUIRE(!ec.get_std_error_code());
+            REQUIRE(status.is_ok());
             done = true;
         });
         r->sync_session()->resume();
@@ -3289,9 +3289,10 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
         r->commit_transaction();
 
         auto error = wait_for_future(std::move(pf.future), std::chrono::minutes(5)).get();
-        REQUIRE(error.get_system_error() == make_error_code(sync::ProtocolError::limits_exceeded));
-        REQUIRE(error.reason() == "Sync websocket closed because the server received a message that was too large: "
-                                  "read limited at 16777217 bytes");
+        REQUIRE(error.status == ErrorCodes::LimitExceeded);
+        REQUIRE(error.status.reason() ==
+                "Sync websocket closed because the server received a message that was too large: "
+                "read limited at 16777217 bytes");
         REQUIRE(error.is_client_reset_requested());
         REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ClientReset);
     }
@@ -3371,8 +3372,9 @@ TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
             config.sync_config->partition_value = "not a bson serialized string";
             std::atomic<bool> error_did_occur = false;
             config.sync_config->error_handler = [&error_did_occur](std::shared_ptr<SyncSession>, SyncError error) {
-                CHECK(error.reason().find("Illegal Realm path (BIND): serialized partition 'not a bson serialized "
-                                          "string' is invalid") != std::string::npos);
+                CHECK(error.status.reason().find(
+                          "Illegal Realm path (BIND): serialized partition 'not a bson serialized "
+                          "string' is invalid") != std::string::npos);
                 error_did_occur.store(true);
             };
             auto r = Realm::get_shared_realm(config);
@@ -3894,7 +3896,6 @@ private:
         CHECK(nlohmann::json::parse(request.body)["options"] ==
               nlohmann::json({{"device",
                                {{"appId", "app_id"},
-                                {"appVersion", "A Local App Version"},
                                 {"platform", util::get_library_platform()},
                                 {"platformVersion", "Object Store Test Platform Version"},
                                 {"sdk", "SDK Name"},
@@ -5088,18 +5089,18 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]")
                                                         "Connection refused"};
             auto expected =
                 std::find_if(expected_errors.begin(), expected_errors.end(), [error](const char* err_msg) {
-                    return error.reason().find(err_msg) != std::string::npos;
+                    return error.status.reason().find(err_msg) != std::string::npos;
                 });
             if (expected != expected_errors.end()) {
                 util::format(std::cerr,
                              "An expected possible WebSocket error was caught during test: 'app destroyed during "
                              "token refresh': '%1' for '%2'",
-                             error.what(), session->path());
+                             error.status, session->path());
             }
             else {
                 std::string err_msg(util::format("An unexpected sync error was caught during test: 'app destroyed "
                                                  "during token refresh': '%1' for '%2'",
-                                                 error.what(), session->path()));
+                                                 error.status, session->path()));
                 std::cerr << err_msg << std::endl;
                 throw std::runtime_error(err_msg);
             }

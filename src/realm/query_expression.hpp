@@ -1628,6 +1628,14 @@ public:
         return !m_link_column_keys.empty();
     }
 
+    ColKey pop_last()
+    {
+        ColKey col = m_link_column_keys.back();
+        m_link_column_keys.pop_back();
+        m_tables.pop_back();
+        return col;
+    }
+
 private:
     bool map_links(size_t column, ObjKey key, LinkMapFunction lm) const;
     void map_links(size_t column, size_t row, LinkMapFunction lm) const;
@@ -2199,10 +2207,14 @@ public:
     LinkCount(const LinkMap& link_map)
         : m_link_map(link_map)
     {
+        if (m_link_map.get_nb_hops() > 1) {
+            m_column_key = m_link_map.pop_last();
+        }
     }
     LinkCount(LinkCount const& other)
         : Subexpr2<Int>(other)
         , m_link_map(other.m_link_map)
+        , m_column_key(other.m_column_key)
     {
     }
 
@@ -2231,19 +2243,13 @@ public:
         m_link_map.collect_dependencies(tables);
     }
 
-    void evaluate(size_t index, ValueBase& destination) override
-    {
-        size_t count = m_link_map.count_links(index);
-        destination = Value<int64_t>(count);
-    }
+    void evaluate(size_t index, ValueBase& destination) override;
 
-    std::string description(util::serializer::SerialisationState& state) const override
-    {
-        return state.describe_columns(m_link_map, ColKey()) + util::serializer::value_separator + "@count";
-    }
+    std::string description(util::serializer::SerialisationState& state) const override;
 
 private:
     LinkMap m_link_map;
+    ColKey m_column_key;
 };
 
 // Gives a count of all backlinks across all columns for the specified row.
