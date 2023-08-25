@@ -1098,9 +1098,15 @@ static void _unlock(int m_fd)
     do {
         r = flock(m_fd, LOCK_UN);
     } while (r != 0 && errno == EINTR);
-    if (r && errno) {
-        throw RuntimeError(ErrorCodes::RuntimeError,
-                           "File::unlock() has failed, this is likely due to some limitation in the OS file system.");
+    if (r) {
+        std::string message =
+            "File::unlock() has failed, this is likely due to some limitation in the OS file system.";
+#ifdef REALM_ANDROID
+        message +=
+            " The most common cause is trying to use Realm on external storage. From Android API 30 this is no "
+            "longer supported. See https://developer.android.com/about/versions/11/privacy/storage for more details.";
+#endif
+        throw SystemError(errno, message);
     }
 }
 #endif
