@@ -997,7 +997,7 @@ struct MergeUtils {
     bool same_path_element(const Instruction::Path::Element& left,
                            const Instruction::Path::Element& right) const noexcept
     {
-        const auto& pred = util::overload{
+        auto pred = util::overload{
             [&](uint32_t lhs, uint32_t rhs) {
                 return lhs == rhs;
             },
