@@ -852,7 +852,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     size_t prior_num_tables = m_tables.size();
     Replication* repl = *get_repl();
     if (repl)
-        repl->erase_class(key, prior_num_tables); // Throws
+        repl->erase_class(key, table->get_name(), prior_num_tables); // Throws
 
     int64_t ref_64 = m_tables.get(table_ndx);
     REALM_ASSERT(!int_cast_has_overflow<ref_type>(ref_64));

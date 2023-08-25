@@ -51,7 +51,7 @@ public:
     void create_object(const Table*, GlobalKey) final;
     void create_object_with_primary_key(const Table*, ObjKey, Mixed) final;
 
-    void erase_class(TableKey table_key, size_t num_tables) final;
+    void erase_class(TableKey table_key, StringData table_name, size_t num_tables) final;
     void rename_class(TableKey table_key, StringData new_name) final;
     void insert_column(const Table*, ColKey col_key, DataType type, StringData name, Table* target_table) final;
     void erase_column(const Table*, ColKey col_key) final;

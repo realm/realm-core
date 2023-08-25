@@ -173,15 +173,15 @@ int search_ref(FILE* fp, int64_t ref, int64_t target, size_t level, int* stack)
     if (header.has_refs) {
         assert(header.width >= 8);
         size_t byte_size = header.width / 8;
-        char buffer[byte_size * header.size];
+        void* buffer = malloc(byte_size * header.size);
         do_seek(fp, ref + 8, SEEK_SET);
         fread(buffer, byte_size * header.size, 1, fp);
-        for (size_t i = 0; i < header.size; i++) {
+        for (int i = 0; i < header.size; i++) {
             stack[level] = i;
             int64_t subref = 1;
             switch (byte_size) {
                 case 1:
-                    subref = buffer[i];
+                    subref = ((int8_t*)buffer)[i];
                     break;
                 case 2:
                     subref = ((int16_t*)buffer)[i];
@@ -209,6 +209,7 @@ int search_ref(FILE* fp, int64_t ref, int64_t target, size_t level, int* stack)
                     return 1;
             }
         }
+        free(buffer);
     }
     return 0;
 }
@@ -216,7 +217,7 @@ int search_ref(FILE* fp, int64_t ref, int64_t target, size_t level, int* stack)
 void dump_index(FILE* fp, int64_t ref, const char* arr)
 {
     char* p = (char*)arr;
-    unsigned idx = strtoll(arr, &p, 0);
+    unsigned idx = (unsigned)strtoll(arr, &p, 0);
     NodeHeader header;
     get_header(&header, fp, ref);
     if (!header.has_refs) {
@@ -238,7 +239,7 @@ void dump_index(FILE* fp, int64_t ref, const char* arr)
     fread(&subref, byte_size, 1, fp);
 
     if (subref & 1) {
-        printf("Value '%ld' is not a subref\n", subref);
+        printf("Value '%lld' is not a subref\n", subref);
         exit(1);
     }
     while (isspace(*p))

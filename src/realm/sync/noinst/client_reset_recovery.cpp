@@ -434,7 +434,7 @@ void RecoverLocalChangesetsHandler::process_changesets(const std::vector<ClientH
         }
 #endif
 
-        InstructionApplier::begin_apply(parsed_changeset, &m_logger);
+        InstructionApplier::begin_apply(parsed_changeset);
         for (auto instr : parsed_changeset) {
             if (!instr)
                 continue;

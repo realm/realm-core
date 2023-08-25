@@ -1775,7 +1775,10 @@ std::string Query::get_description_safe() const noexcept
         util::serializer::SerialisationState state(m_table->get_parent_group());
         return get_description(state);
     }
-    catch (...) {
+    catch (const Exception& e) {
+        if (auto logger = m_table->get_logger()) {
+            logger->log(util::Logger::Level::warn, "Query::get_description() failed: '%1'", e.what());
+        }
     }
     return "Unknown Query";
 }

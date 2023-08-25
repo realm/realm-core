@@ -802,7 +802,7 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
                 out << util::serializer::print_value(m.binary_val);
                 break;
             case type_Timestamp:
-                out << util::serializer::print_value(m.date_val);
+                out << m.date_val;
                 break;
             case type_Decimal:
                 out << m.decimal_val;
@@ -822,6 +822,17 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
             case type_Mixed:
             case type_LinkList:
                 REALM_ASSERT(false);
+            default:
+                if (m.is_type(type_List)) {
+                    out << "list";
+                }
+                else if (m.is_type(type_Set)) {
+                    out << "set";
+                }
+                else if (m.is_type(type_Dictionary)) {
+                    out << "dictionary";
+                }
+                break;
         }
     }
     return out;
