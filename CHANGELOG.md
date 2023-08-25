@@ -3,6 +3,9 @@
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Added support for server log messages that are enabled by sync protocol version 10. Appservices request id will be provided in a server log message in a future server release. ([PR #6476](https://github.com/realm/realm-core/pull/6476))
+* A new `ErrorCategory::sync_error` has been added. All errors related to the Sync client, protocol or session will have this category.
+  Note that websocket errors will have both the `websocket_error` and `sync_error` category, similar to `app_error` and `http_error`
+  for failed HTTP requests from the App. ([#6916](https://github.com/realm/realm-core/issues/6916))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
