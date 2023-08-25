@@ -297,7 +297,7 @@ functions:
         export BAAS_HOST_NAME
 
         ssh_user="$(printf "ubuntu@%s" "$BAAS_HOST_NAME")"
-        ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i .baas_ssh_key"
+        ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i .baas_ssh_key"
 
         # Copy the baas_server.log and mongod.log files from the remote baas host
         REMOTE_PATH=/data/baas-remote/baas-work-dir
