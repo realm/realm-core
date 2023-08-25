@@ -23,6 +23,11 @@
 ### Compatibility
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
 
+-----------
+
+### Internals
+* Refactoring of the StringIndex interface.
+
 ----------------------------------------------
 
 # 13.18.0 Release notes

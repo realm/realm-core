@@ -429,6 +429,9 @@ T Obj::get(ColKey col_key) const
     return _get<T>(col_key.get_index());
 }
 
+template UUID Obj::_get(ColKey::Idx col_ndx) const;
+template util::Optional<UUID> Obj::_get(ColKey::Idx col_ndx) const;
+
 #if REALM_ENABLE_GEOSPATIAL
 
 template <>
@@ -1138,11 +1141,11 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
         set_backlink(col_key, new_link);
     }
 
-    StringIndex* index = m_table->get_search_index(col_key);
+    SearchIndex* index = m_table->get_search_index(col_key);
     // The following check on unresolved is just a precaution as it should not
     // be possible to hit that while Mixed is not a supported primary key type.
     if (index && !m_key.is_unresolved()) {
-        index->set<Mixed>(m_key, value);
+        index->set(m_key, value);
     }
 
     Allocator& alloc = get_alloc();
@@ -1237,9 +1240,9 @@ Obj& Obj::set<int64_t>(ColKey col_key, int64_t value, bool is_default)
         throw InvalidArgument(ErrorCodes::TypeMismatch,
                               util::format("Property not a %1", ColumnTypeTraits<int64_t>::column_id));
 
-    StringIndex* index = m_table->get_search_index(col_key);
+    SearchIndex* index = m_table->get_search_index(col_key);
     if (index && !m_key.is_unresolved()) {
-        index->set<int64_t>(m_key, value);
+        index->set(m_key, value);
     }
 
     Allocator& alloc = get_alloc();
@@ -1296,8 +1299,8 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
         Mixed old = values.get(m_row_ndx);
         if (old.is_type(type_Int)) {
             Mixed new_val = Mixed(add_wrap(old.get_int(), value));
-            if (StringIndex* index = m_table->get_search_index(col_key)) {
-                index->set<Mixed>(m_key, new_val);
+            if (SearchIndex* index = m_table->get_search_index(col_key)) {
+                index->set(m_key, new_val);
             }
             values.set(m_row_ndx, Mixed(new_val));
         }
@@ -1317,8 +1320,8 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
             util::Optional<int64_t> old = values.get(m_row_ndx);
             if (old) {
                 auto new_val = add_wrap(*old, value);
-                if (StringIndex* index = m_table->get_search_index(col_key)) {
-                    index->set<int64_t>(m_key, new_val);
+                if (SearchIndex* index = m_table->get_search_index(col_key)) {
+                    index->set(m_key, new_val);
                 }
                 values.set(m_row_ndx, new_val);
             }
@@ -1332,8 +1335,8 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
             values.init_from_parent();
             int64_t old = values.get(m_row_ndx);
             auto new_val = add_wrap(old, value);
-            if (StringIndex* index = m_table->get_search_index(col_key)) {
-                index->set<int64_t>(m_key, new_val);
+            if (SearchIndex* index = m_table->get_search_index(col_key)) {
+                index->set(m_key, new_val);
             }
             values.set(m_row_ndx, new_val);
         }
@@ -1611,9 +1614,9 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
 
     check_range(value);
 
-    StringIndex* index = m_table->get_search_index(col_key);
+    SearchIndex* index = m_table->get_search_index(col_key);
     if (index && !m_key.is_unresolved()) {
-        index->set<T>(m_key, value);
+        index->set(m_key, value);
     }
 
     Allocator& alloc = get_alloc();
@@ -2269,7 +2272,7 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
 
         update_if_needed();
 
-        StringIndex* index = m_table->get_search_index(col_key);
+        SearchIndex* index = m_table->get_search_index(col_key);
         if (index && !m_key.is_unresolved()) {
             index->set(m_key, null{});
         }

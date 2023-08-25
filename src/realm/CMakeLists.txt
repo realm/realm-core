@@ -178,6 +178,7 @@ set(REALM_INSTALL_HEADERS
     query_value.hpp
     realm_nmmintrin.h
     replication.hpp
+    search_index.hpp
     set.hpp
     sort_descriptor.hpp
     spec.hpp
