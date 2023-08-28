@@ -444,6 +444,12 @@ echo "Building baas app server"
 [[ -f "${BAAS_PID_FILE}" ]] && rm "${BAAS_PID_FILE}"
 go build -o "${WORK_PATH}/baas_server" cmd/server/main.go
 
+# Based on https://github.com/10gen/baas/pull/10665
+# Add a version to the schema change history store so that the drop optimization does not take place
+# This caused issues with this test failing once app deletions starting being done asynchronously
+echo "Adding fake appid to skip baas server drop optimization"
+"${MONGO_BINARIES_DIR}/bin/${MONGOSH}"  --quiet mongodb://localhost:26000/__realm_sync "${BASE_PATH}/add_fake_appid.js"
+
 # Start the baas server on port *:9090 with the provided config JSON files
 echo "Starting baas app server"
 
@@ -469,11 +475,6 @@ ${CURL} 'http://localhost:9090/api/admin/v3.0/auth/providers/local-userpass/logi
   --data-raw '{"username":"unique_user@domain.com","password":"password"}'
 
 "${MONGO_BINARIES_DIR}/bin/${MONGOSH}"  --quiet mongodb://localhost:26000/auth "${BASE_PATH}/add_admin_roles.js"
-
-# Based on https://github.com/10gen/baas/pull/10665
-# Add a version to the schema change history store so that the drop optimization does not take place
-# This caused issues with this test failing once app deletions starting being done asynchronously
-"${MONGO_BINARIES_DIR}/bin/${MONGOSH}"  --quiet mongodb://localhost:26000/__realm_sync "${BASE_PATH}/add_dummy_app.js"
 
 # All done! the 'baas_ready' file indicates the baas server has finished initializing
 touch "${BAAS_READY_FILE}"
