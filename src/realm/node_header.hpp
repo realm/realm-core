@@ -20,6 +20,7 @@
 #define REALM_NODE_HEADER_HPP
 
 #include <realm/util/assert.hpp>
+#include <realm/utilities.hpp>
 
 namespace realm {
 
@@ -52,7 +53,7 @@ public:
         wtype_Bits = 0,     // width indicates how many bits every element occupies
         wtype_Multiply = 1, // width indicates how many bytes every element occupies
         wtype_Ignore = 2,   // each element is 1 byte
-        // the following encodings use the width field (bits 0-2) of byte 4 to specify layouts
+        // the following encodings use the width field (bits 0-2) of byte 4 to specify layouts.
         // the header stores enough data to a) compute the total size of a block,
         // and b) determine which part of a block may hold refs, which may need to be
         // scanned/updated for example during write to disk.
@@ -131,7 +132,7 @@ public:
     // For wtype lower than wtype_extend, the element width is given by
     // bits 0-2 in byte 4 of the header and only powers of two is supported.
     // For new wtypes these bits are already used to extend the wtype and the
-    // element width is instead placed in bits 0-4 of byte 3.
+    // element width is instead placed in bits 0-4 of byte 5.
     // These 5 bits encode the following element widths (all widths in bits)
     //
     // Encoding:    Sizes: (in bits)
@@ -146,43 +147,68 @@ public:
     // 29-31     reserved
     // Some layouts may not support all sizes. But for element sizes which are not
     // powers of two, dense/unaligned packing is assumed.
+    static int get_width_encoding_from_header(const char* header) noexcept
+    {
+        const unsigned char* h = reinterpret_cast<const unsigned char*>(header);
+        return h[5] & 0x1F;
+    }
+
+    static void set_width_encoding_in_header(char* header, int width_encoding) noexcept
+    {
+        unsigned char* h = reinterpret_cast<unsigned char*>(header);
+        h[5] = (h[5] & ~0x1F) | (width_encoding & 0x1F);
+    }
+
     static int width_encoding_to_num_bits(int encoding)
     {
         int factor = 1;
+        if (encoding > 9) {
+            factor <<= ((encoding - 6) / 4);
+        }
+        /* code above should give same result as code below but faster:
         while (encoding >= 9) {
             factor <<= 1;
             encoding -= 4;
         }
+        */
         return factor * encoding;
     }
     static int num_bits_to_width_encoding(int num_bits)
     {
         int encoding_offset = 0;
-        bool bit_lost = false;
+        int bit_lost = 0;
         while (num_bits >= 9) {
-            if (num_bits & 1)
-                bit_lost = true;
+            bit_lost += num_bits & 1;
             num_bits >>= 1;
             encoding_offset += 4;
         }
         int encoding_guess = encoding_offset + num_bits;
         // if a set bit was lost, pick the next higher encoding:
-        return encoding_guess + bit_lost ? 1 : 0;
+        return encoding_guess + (bit_lost != 0) ? 1 : 0;
     }
 
+    static int unsigned_to_num_bits(uint64_t value)
+    {
+        return log2(value);
+    }
+
+    static int signed_to_num_bits(int64_t value)
+    {
+        if (value >= 0)
+            return 1 + unsigned_to_num_bits(value);
+        else
+            return 1 + unsigned_to_num_bits(~value); // <-- is this correct????
+    }
+
+    // Helper functions for old layouts only:
+    //
     static uint_least8_t get_width_from_header(const char* header) noexcept
     {
         auto wtype = get_wtype_from_header(header);
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
-        if (wtype < wtype_extend) {
-            return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
-        }
-        else {
-            // handle new layouts, simply return the encoded width, caller can
-            // map it to number of bits as desired
-            return h[5] & 0x1F;
-        }
+        REALM_ASSERT_RELEASE(wtype < wtype_extend);
+        return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
     }
 
     static size_t get_size_from_header(const char* header) noexcept
@@ -286,10 +312,13 @@ public:
         return num_bytes;
     }
 
+
+    // This one needs to be correct for all layouts, both old and new:
     static size_t calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept
     {
         size_t num_bytes = 0;
         switch (wtype) {
+            case wtype_Wide:
             case wtype_Bits: {
                 // Current assumption is that size is at most 2^24 and that width is at most 64.
                 // In that case the following will never overflow. (Assuming that size_t is at least 32 bits)
@@ -305,6 +334,10 @@ public:
             case wtype_Ignore:
                 num_bytes = size;
                 break;
+            default: {
+                REALM_ASSERT(false);
+                break;
+            }
         }
 
         // Ensure 8-byte alignment
