@@ -22,7 +22,7 @@
 #include <realm/collection.hpp>
 #include <realm/obj.hpp>
 #include <realm/mixed.hpp>
-#include <realm/array_mixed.hpp>
+#include <realm/column_mixed.hpp>
 
 namespace realm {
 
@@ -198,7 +198,9 @@ public:
         return Base::get_stable_path();
     }
 
-    void add_index(Path& path, Index ndx) const final;
+    void add_index(Path& path, const Index& ndx) const final;
+    size_t find_index(const Index&) const final;
+
     TableRef get_table() const noexcept override
     {
         return get_obj().get_table();
@@ -212,6 +214,7 @@ public:
     ref_type get_collection_ref(Index, CollectionType) const override;
     bool check_collection_ref(Index, CollectionType) const noexcept override;
     void set_collection_ref(Index, ref_type ref, CollectionType) override;
+    StableIndex build_index(Mixed key) const;
 
     void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
@@ -223,7 +226,7 @@ private:
 
     mutable std::unique_ptr<Array> m_dictionary_top;
     mutable std::unique_ptr<BPlusTreeBase> m_keys;
-    mutable std::unique_ptr<BPlusTree<Mixed>> m_values;
+    mutable std::unique_ptr<BPlusTreeMixed> m_values;
     DataType m_key_type = type_String;
 
     Dictionary(Allocator& alloc, ColKey col_key, ref_type ref);

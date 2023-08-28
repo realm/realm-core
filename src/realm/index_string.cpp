@@ -1955,7 +1955,7 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
         for (size_t i = 0; i != subnode.size(); ++i) {
             if (i != 0)
                 out << ", ";
-            out_hex(out, subnode.get(i));
+            out_hex(out, uint32_t(subnode.get(i)));
         }
     }
     out << ")\n";

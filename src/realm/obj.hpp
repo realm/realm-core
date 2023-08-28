@@ -76,7 +76,11 @@ public:
     FullPath get_path() const final;
     Path get_short_path() const noexcept final;
     StablePath get_stable_path() const noexcept final;
-    void add_index(Path& path, Index ndx) const final;
+    void add_index(Path& path, const Index& ndx) const final;
+    size_t find_index(const Index&) const final
+    {
+        return realm::npos;
+    }
 
     bool update_if_needed() const final;
     TableRef get_table() const noexcept final
@@ -90,8 +94,8 @@ public:
     ref_type get_collection_ref(Index, CollectionType) const final;
     bool check_collection_ref(Index, CollectionType) const noexcept final;
     void set_collection_ref(Index, ref_type, CollectionType) final;
-    ColIndex build_index(ColKey) const;
-    bool check_index(ColIndex) const;
+    StableIndex build_index(ColKey) const;
+    bool check_index(StableIndex) const;
 
     // Operator overloads
     bool operator==(const Obj& other) const;

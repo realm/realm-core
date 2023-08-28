@@ -66,7 +66,7 @@ Dictionary::Dictionary(Allocator& alloc, ColKey col_key, ref_type ref)
     m_dictionary_top.reset(new Array(alloc));
     m_dictionary_top->init_from_ref(ref);
     m_keys.reset(new BPlusTree<StringData>(alloc));
-    m_values.reset(new BPlusTree<Mixed>(alloc));
+    m_values.reset(new BPlusTreeMixed(alloc));
     m_keys->set_parent(m_dictionary_top.get(), 0);
     m_values->set_parent(m_dictionary_top.get(), 1);
     m_keys->init_from_parent();
@@ -433,7 +433,14 @@ Obj Dictionary::create_and_insert_linked_object(Mixed key)
 void Dictionary::insert_collection(const PathElement& path_elem, CollectionType dict_or_list)
 {
     check_level();
-    insert(path_elem.get_key(), Mixed(0, dict_or_list));
+    ensure_created();
+    m_values->ensure_keys();
+    auto [it, inserted] = insert(path_elem.get_key(), Mixed(0, dict_or_list));
+    int64_t key = generate_key(size());
+    while (m_values->find_key(key) != realm::not_found) {
+        key++;
+    }
+    m_values->set_key(it.index(), key);
 }
 
 DictionaryPtr Dictionary::get_dictionary(const PathElement& path_elem) const
@@ -442,7 +449,7 @@ DictionaryPtr Dictionary::get_dictionary(const PathElement& path_elem) const
     auto weak = const_cast<Dictionary*>(this)->weak_from_this();
     auto shared = weak.expired() ? std::make_shared<Dictionary>(*this) : weak.lock();
     DictionaryPtr ret = std::make_shared<Dictionary>(m_col_key, get_level() + 1);
-    ret->set_owner(shared, path_elem.get_key());
+    ret->set_owner(shared, build_index(path_elem.get_key()));
     return ret;
 }
 
@@ -452,7 +459,7 @@ SetMixedPtr Dictionary::get_set(const PathElement& path_elem) const
     auto weak = const_cast<Dictionary*>(this)->weak_from_this();
     auto shared = weak.expired() ? std::make_shared<Dictionary>(*this) : weak.lock();
     auto ret = std::make_shared<Set<Mixed>>(m_obj_mem, m_col_key);
-    ret->set_owner(shared, path_elem.get_key());
+    ret->set_owner(shared, build_index(path_elem.get_key()));
     return ret;
 }
 
@@ -462,7 +469,7 @@ std::shared_ptr<Lst<Mixed>> Dictionary::get_list(const PathElement& path_elem) c
     auto weak = const_cast<Dictionary*>(this)->weak_from_this();
     auto shared = weak.expired() ? std::make_shared<Dictionary>(*this) : weak.lock();
     std::shared_ptr<Lst<Mixed>> ret = std::make_shared<Lst<Mixed>>(m_col_key, get_level() + 1);
-    ret->set_owner(shared, path_elem.get_key());
+    ret->set_owner(shared, build_index(path_elem.get_key()));
     return ret;
 }
 
@@ -636,9 +643,17 @@ Dictionary::Iterator Dictionary::find(Mixed key) const noexcept
     return end();
 }
 
-void Dictionary::add_index(Path& path, Index index) const
+void Dictionary::add_index(Path& path, const Index& index) const
 {
-    path.emplace_back(mpark::get<std::string>(index));
+    auto ndx = m_values->find_key(index.get_salt());
+    auto keys = static_cast<BPlusTree<StringData>*>(m_keys.get());
+    path.emplace_back(keys->get(ndx));
+}
+
+size_t Dictionary::find_index(const Index& index) const
+{
+    update();
+    return m_values->find_key(index.get_salt());
 }
 
 UpdateStatus Dictionary::update_if_needed_with_status() const noexcept
@@ -671,6 +686,7 @@ void Dictionary::ensure_created()
     if (Base::should_update() || !(m_dictionary_top && m_dictionary_top->is_attached())) {
         init_from_parent(true);
         ensure_attached();
+        Base::update_content_version();
     }
 }
 
@@ -860,7 +876,7 @@ bool Dictionary::init_from_parent(bool allow_create) const
                     break;
             }
             m_keys->set_parent(m_dictionary_top.get(), 0);
-            m_values.reset(new BPlusTree<Mixed>(alloc));
+            m_values.reset(new BPlusTreeMixed(alloc));
             m_values->set_parent(m_dictionary_top.get(), 1);
         }
 
@@ -1039,6 +1055,14 @@ Mixed Dictionary::find_value(Mixed value) const noexcept
     return (ndx == realm::npos) ? Mixed{} : do_get_key(ndx);
 }
 
+StableIndex Dictionary::build_index(Mixed key) const
+{
+    auto it = find(key);
+    int64_t index = (it != end()) ? m_values->get_key(it.index()) : 0;
+    return {index};
+}
+
+
 void Dictionary::verify() const
 {
     m_keys->verify();
@@ -1160,7 +1184,7 @@ void Dictionary::to_json(std::ostream& out, size_t link_depth, JSONOutputMode ou
 
 ref_type Dictionary::get_collection_ref(Index index, CollectionType type) const
 {
-    auto ndx = do_find_key(StringData(mpark::get<std::string>(index)));
+    auto ndx = m_values->find_key(index.get_salt());
     if (ndx != realm::not_found) {
         auto val = m_values->get(ndx);
         if (val.is_type(DataType(int(type)))) {
@@ -1174,7 +1198,7 @@ ref_type Dictionary::get_collection_ref(Index index, CollectionType type) const
 
 bool Dictionary::check_collection_ref(Index index, CollectionType type) const noexcept
 {
-    auto ndx = do_find_key(StringData(mpark::get<std::string>(index)));
+    auto ndx = m_values->find_key(index.get_salt());
     if (ndx != realm::not_found) {
         return m_values->get(ndx).is_type(DataType(int(type)));
     }
@@ -1183,7 +1207,7 @@ bool Dictionary::check_collection_ref(Index index, CollectionType type) const no
 
 void Dictionary::set_collection_ref(Index index, ref_type ref, CollectionType type)
 {
-    auto ndx = do_find_key(StringData(mpark::get<std::string>(index)));
+    auto ndx = m_values->find_key(index.get_salt());
     if (ndx == realm::not_found) {
         throw StaleAccessor("Collection has been deleted");
     }

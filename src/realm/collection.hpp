@@ -35,7 +35,11 @@ public:
     {
         return {};
     }
-    void add_index(Path&, Index) const noexcept final {}
+    void add_index(Path&, const Index&) const noexcept final {}
+    size_t find_index(const Index&) const noexcept final
+    {
+        return realm::npos;
+    }
 
     TableRef get_table() const noexcept final
     {

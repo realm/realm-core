@@ -636,6 +636,7 @@ TEST(List_AggOps)
 TEST(List_Nested_InMixed)
 {
     SHARED_GROUP_TEST_PATH(path);
+    std::string message;
     DBRef db = DB::create(make_in_realm_history(), path);
     auto tr = db->start_write();
     auto table = tr->add_table("table");
@@ -727,6 +728,13 @@ TEST(List_Nested_InMixed)
     CHECK_EQUAL(dynamic_cast<Lst<Mixed>*>(list.get())->get(0).get_int(), 8);
 
     tr->promote_to_write();
+    dict->insert("Dict", Mixed());
+    CHECK_THROW_ANY_GET_MESSAGE(dict2->insert("Five", 5), message); // This dictionary ceased to be
+    CHECK_EQUAL(message, "This is an ex-dictionary");
+    // Try to insert a new dictionary. The old dict2 shoulg still be stale
+    dict->insert_collection("Dict", CollectionType::Dictionary);
+    CHECK_THROW_ANY_GET_MESSAGE(dict2->insert("Five", 5), message); // This dictionary ceased to be
+    CHECK_EQUAL(message, "This is an ex-dictionary");
     // Assign another value. The old dictionary should be disposed.
     obj.set(col_any, Mixed(5));
     tr->verify();
@@ -775,7 +783,6 @@ TEST(List_Nested_InMixed)
       ]
     }
     */
-    std::string message;
     CHECK_EQUAL(list2->get(1), Mixed("Hello"));
     tr->promote_to_write();
     list2->remove(1);
@@ -1013,7 +1020,7 @@ TEST(List_Nested_Replication)
         StablePath expected_path;
     } parser(test_context);
 
-    parser.expected_path.push_back("");
-    parser.expected_path.push_back("level1");
+    parser.expected_path.push_back(StableIndex());
+    parser.expected_path.push_back(dict->build_index("level1"));
     tr->advance_read(&parser);
 }

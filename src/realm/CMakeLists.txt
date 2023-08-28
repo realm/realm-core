@@ -143,6 +143,7 @@ set(REALM_INSTALL_HEADERS
     column_binary.hpp
     column_fwd.hpp
     column_integer.hpp
+    column_mixed.hpp
     column_type.hpp
     column_type_traits.hpp
     data_type.hpp
