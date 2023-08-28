@@ -116,6 +116,7 @@ public:
         SyncClientResetRequired = RLM_ERR_SYNC_CLIENT_RESET_REQUIRED,
         SyncCompensatingWrite = RLM_ERR_SYNC_COMPENSATING_WRITE,
         SyncConnectFailed = RLM_ERR_SYNC_CONNECT_FAILED,
+        SyncConnectTimeout = RLM_ERR_SYNC_CONNECT_TIMEOUT,
         SyncInvalidSchemaChange = RLM_ERR_SYNC_INVALID_SCHEMA_CHANGE,
         SyncPermissionDenied = RLM_ERR_SYNC_PERMISSION_DENIED,
         SyncProtocolInvariantFailed = RLM_ERR_SYNC_PROTOCOL_INVARIANT_FAILED,
