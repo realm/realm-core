@@ -1390,10 +1390,11 @@ TEST_CASE("audit management", "[sync][pbs][audit]") {
     SECTION("custom audit event") {
         // Verify that each of the completion handlers is called in the expected order
         std::atomic<size_t> completions = 0;
+        std::array<std::pair<size_t, bool>, 5> completion_results;
         auto expect_completion = [&](size_t expected) {
-            return [&completions, expected](std::exception_ptr e) {
-                REQUIRE_FALSE(e);
-                REQUIRE(completions++ == expected);
+            return [&, expected](std::exception_ptr e) {
+                completion_results[expected].second = bool(e);
+                completion_results[expected].first = completions++;
             };
         };
 
@@ -1408,6 +1409,11 @@ TEST_CASE("audit management", "[sync][pbs][audit]") {
         util::EventLoop::main().run_until([&] {
             return completions == 5;
         });
+
+        for (size_t i = 0; i < 5; ++i) {
+            REQUIRE(i == completion_results[i].first);
+            REQUIRE_FALSE(completion_results[i].second);
+        }
 
         auto events = get_audit_events(test_session, false);
         REQUIRE(events.size() == 4);

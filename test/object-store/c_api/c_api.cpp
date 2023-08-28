@@ -6203,12 +6203,12 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
 
     auto free_fn = [](realm_userdata_t user_ptr) {
         auto test_data = static_cast<TestData*>(user_ptr);
-        REQUIRE(test_data);
+        REALM_ASSERT(test_data);
         test_data->free_count++;
     };
     auto post_fn = [](realm_userdata_t userdata, realm_sync_socket_callback_t* callback) {
         auto test_data = static_cast<TestData*>(userdata);
-        REQUIRE(test_data);
+        REALM_ASSERT(test_data);
         auto cb = [callback_copy = callback](Status s) {
             realm_sync_socket_callback_complete(callback_copy, static_cast<realm_errno_e>(s.code()),
                                                 s.reason().c_str());
@@ -6218,13 +6218,13 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
     auto create_timer_fn = [](realm_userdata_t userdata, uint64_t delay_ms,
                               realm_sync_socket_callback_t* callback) -> realm_sync_socket_timer_t {
         auto test_data = static_cast<TestData*>(userdata);
-        REQUIRE(test_data);
+        REALM_ASSERT(test_data);
         return static_cast<realm_sync_socket_timer_t>(new TestSyncTimer(
             *test_data->socket_provider, std::chrono::milliseconds(delay_ms), std::move(**callback)));
     };
     auto cancel_timer_fn = [](realm_userdata_t, realm_sync_socket_timer_t sync_timer) {
         auto timer = static_cast<TestSyncTimer*>(sync_timer);
-        REQUIRE(timer);
+        REALM_ASSERT(timer);
         timer->cancel();
     };
     auto free_timer_fn = [](realm_userdata_t, realm_sync_socket_timer_t sync_timer) {
@@ -6234,14 +6234,14 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
         [](realm_userdata_t userdata, realm_websocket_endpoint_t endpoint,
            realm_websocket_observer_t* realm_websocket_observer) -> realm_sync_socket_websocket_t {
         auto test_data = static_cast<TestData*>(userdata);
-        REQUIRE(test_data);
+        REALM_ASSERT(test_data);
         return static_cast<realm_sync_socket_websocket_t>(
             new TestWebSocket(*test_data->socket_provider, endpoint, realm_websocket_observer));
     };
     auto websocket_async_write_fn = [](realm_userdata_t, realm_sync_socket_websocket_t sync_websocket,
                                        const char* data, size_t size, realm_sync_socket_callback_t* callback) {
         auto websocket = static_cast<TestWebSocket*>(sync_websocket);
-        REQUIRE(websocket);
+        REALM_ASSERT(websocket);
         websocket->async_write_binary(util::Span{data, size}, std::move(**callback));
         realm_release(callback);
     };
