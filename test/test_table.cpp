@@ -3401,7 +3401,7 @@ TEST(Table_object_by_index)
 }
 
 // String query benchmark
-TEST(Table_QuickSort2)
+NONCONCURRENT_TEST(Table_QuickSort2)
 {
     Table ttt;
     auto strings = ttt.add_column(type_String, "2");
@@ -4007,7 +4007,7 @@ TEST(Table_PrimaryKeyIndexBug)
     CHECK_EQUAL(cnt, 1);
 }
 
-TEST(Table_PrimaryKeyString)
+NONCONCURRENT_TEST(Table_PrimaryKeyString)
 {
 #ifdef REALM_DEBUG
     int nb_rows = 1000;
