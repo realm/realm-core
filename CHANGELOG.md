@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Add a version to schema change history store to prevent server drop optimization from running. ([PR #6927](https://github.com/realm/realm-core/pull/6927))
 
 ----------------------------------------------
 
@@ -42,7 +42,6 @@
 * Add information about the reason a synchronization session is used for to flexible sync client BIND message. ([PR #6902](https://github.com/realm/realm-core/pull/6902))
 * Sync protocol version bumped to 10. ([PR #6902](https://github.com/realm/realm-core/pull/6902))
 * Handle badchangeset error when printing changeset contents in debug. ([PR #6921](https://github.com/realm/realm-core/pull/6921))
-* Add a version to schema change history store to prevent server drop optimization from running. ([PR #6927](https://github.com/realm/realm-core/pull/6927))
 
 ----------------------------------------------
 
