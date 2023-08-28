@@ -327,7 +327,7 @@ TEST(ChangesetParser_BadInstruction)
 {
     util::AppendBuffer<char> buffer;
     encode_instruction(buffer, 0x3e);
-    CHECK_BADCHANGESET(buffer, "unknown instruction");
+    CHECK_BADCHANGESET(buffer, "Unknown instruction type");
 }
 
 TEST(ChangesetParser_GoodInternString)

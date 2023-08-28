@@ -461,6 +461,10 @@ void Connection::websocket_connected_handler(const std::string& protocol)
                     (value_2 >= get_oldest_supported_protocol_version() && value_2 <= get_current_protocol_version());
                 if (good_version) {
                     logger.detail("Negotiated protocol version: %1", value_2);
+                    // For now, grab the connection ID from the websocket if it supports it. In the future, the server
+                    // will provide the appservices connection ID via a log message.
+                    // TODO: Remove once the server starts sending the connection ID
+                    receive_appservices_request_id(m_websocket->get_appservices_request_id());
                     m_negotiated_protocol_version = value_2;
                     handle_connection_established(); // Throws
                     return;
@@ -811,11 +815,6 @@ void Connection::handle_connection_established()
     m_connect_timer.reset();
 
     m_state = ConnectionState::connected;
-
-    // TODO(RCORE-1380) get this information in-band rather than from the websocket.
-    if (auto coid = m_websocket->get_appservices_request_id(); !coid.empty()) {
-        logger.info("Connected to app services with request id: \"%1\"", coid);
-    }
 
     milliseconds_type now = monotonic_clock_now();
     m_pong_wait_started_at = now; // Initially, no time was spent waiting for a PONG message
@@ -1405,6 +1404,41 @@ void Connection::receive_test_command_response(session_ident_type session_ident,
 }
 
 
+void Connection::receive_server_log_message(session_ident_type session_ident, util::Logger::Level level,
+                                            std::string_view message)
+{
+    std::string prefix;
+    if (REALM_LIKELY(!m_appservices_coid.empty())) {
+        prefix = util::format("Server[%1]", m_appservices_coid);
+    }
+    else {
+        prefix = "Server";
+    }
+
+    if (session_ident != 0) {
+        if (auto sess = get_session(session_ident)) {
+            sess->logger.log(level, "%1 log: %2", prefix, message);
+            return;
+        }
+
+        logger.log(level, "%1 log for unknown session %2: %3", prefix, session_ident, message);
+        return;
+    }
+
+    logger.log(level, "%1 log: %2", prefix, message);
+}
+
+
+void Connection::receive_appservices_request_id(std::string_view coid)
+{
+    // Only set once per connection
+    if (!coid.empty() && m_appservices_coid.empty()) {
+        m_appservices_coid = coid;
+        logger.info("Connected to app services with request id: \"%1\"", m_appservices_coid);
+    }
+}
+
+
 void Connection::handle_protocol_error(Status status)
 {
     close_due_to_protocol_error(std::move(status));
@@ -1430,11 +1464,7 @@ void Connection::enlist_to_send(Session* sess)
 
 std::string Connection::get_active_appservices_connection_id()
 {
-    if (!m_websocket) {
-        return {};
-    }
-
-    return std::string{m_websocket->get_appservices_request_id()};
+    return m_appservices_coid;
 }
 
 void Session::cancel_resumption_delay()
@@ -1852,6 +1882,7 @@ void Session::send_bind_message()
         if (auto migrated_partition = get_migration_store()->get_migrated_partition()) {
             bind_json_data["migratedPartition"] = *migrated_partition;
         }
+        bind_json_data["sessionReason"] = static_cast<uint64_t>(get_session_reason());
         if (logger.would_log(util::Logger::Level::debug)) {
             std::string json_data_dump;
             if (!bind_json_data.empty()) {
@@ -2022,10 +2053,15 @@ void Session::send_upload_message()
 #if REALM_DEBUG
             ChunkedBinaryInputStream in{changeset_data};
             Changeset log;
-            parse_changeset(in, log);
-            std::stringstream ss;
-            log.print(ss);
-            logger.trace("Changeset (parsed):\n%1", ss.str());
+            try {
+                parse_changeset(in, log);
+                std::stringstream ss;
+                log.print(ss);
+                logger.trace("Changeset (parsed):\n%1", ss.str());
+            }
+            catch (const BadChangesetError& err) {
+                logger.error("Unable to parse changeset: %1", err.what());
+            }
 #endif
         }
 

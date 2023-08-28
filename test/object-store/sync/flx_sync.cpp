@@ -2369,7 +2369,7 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][baas]") {
 TEST_CASE("flx: verify websocket protocol number and prefixes", "[sync][protocol]") {
     // Update the expected value whenever the protocol version is updated - this ensures
     // that the current protocol version does not change unexpectedly.
-    REQUIRE(9 == sync::get_current_protocol_version());
+    REQUIRE(10 == sync::get_current_protocol_version());
     // This was updated in Protocol V8 to use '#' instead of '/' to support the Web SDK
     REQUIRE("com.mongodb.realm-sync#" == sync::get_pbs_websocket_protocol_prefix());
     REQUIRE("com.mongodb.realm-query-sync#" == sync::get_flx_websocket_protocol_prefix());
@@ -3797,7 +3797,6 @@ TEST_CASE("flx: open realm + register subscription callack while bootstrapping",
     }
 
     SECTION("Async open") {
-
         SECTION("Initial async open with no rerun on open set") {
             // subscription will be run since this is the first time we are opening the realm file.
             auto open_realm_pf = util::make_promise_future<bool>();

@@ -789,10 +789,16 @@ struct ExpectChangesetError {
     }
 };
 
-void test_schema_mismatch(unit_test::TestContext& test_context, util::FunctionRef<void(WriteTransaction&)> fn_1,
-                          util::FunctionRef<void(WriteTransaction&)> fn_2, const char* expected_error_1,
+void test_schema_mismatch(unit_test::TestContext& test_context, util::FunctionRef<void(WriteTransaction&)>&& fn_1,
+                          util::FunctionRef<void(WriteTransaction&)>&& fn_2, const char* expected_error_1,
                           const char* expected_error_2 = nullptr)
 {
+    auto perform_write_transaction = [](DBRef db, util::FunctionRef<void(WriteTransaction&)>&& function) {
+        WriteTransaction wt(db);
+        function(wt);
+        return wt.commit();
+    };
+
     TEST_CLIENT_DB(db_1);
     TEST_CLIENT_DB(db_2);
 
@@ -813,8 +819,14 @@ void test_schema_mismatch(unit_test::TestContext& test_context, util::FunctionRe
     session_1.bind();
     session_2.bind();
 
-    write_transaction_notifying_session(db_1, session_1, fn_1);
-    write_transaction_notifying_session(db_2, session_2, fn_2);
+    // NOTE: There was a race condition with `write_transaction_notifying_session` where session_2
+    // was completing sync before the write transaction was completed, leading to a
+    // `realm::TableNameInUse` exception. Broke up this function and moved the call to
+    // `nonsync_transact_notify()` to after the write transactions.
+    auto version_1 = perform_write_transaction(db_1, std::move(fn_1));
+    auto version_2 = perform_write_transaction(db_2, std::move(fn_2));
+    session_1.nonsync_transact_notify(version_1);
+    session_2.nonsync_transact_notify(version_2);
 
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_upload_complete_or_client_stopped();

@@ -22,7 +22,6 @@
 
 ### Compatibility
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
-
 -----------
 
 ### Internals
@@ -30,12 +29,35 @@
 
 ----------------------------------------------
 
+# 13.19.0 Release notes
+
+### Enhancements
+* Added support for server log messages that are enabled by sync protocol version 10. Appservices request id will be provided in a server log message in a future server release. ([PR #6476](https://github.com/realm/realm-core/pull/6476))
+* A new `ErrorCategory::sync_error` has been added. All errors related to the Sync client, protocol or session will have this category. Note that websocket errors will have both the `websocket_error` and `sync_error` category, similar to `app_error` and `http_error` for failed HTTP requests from the App. ([#6916](https://github.com/realm/realm-core/issues/6916))
+
+### Fixed
+* Crash when querying the size of a Object property through a link chain ([#6915](https://github.com/realm/realm-core/issues/6915), since v13.17.2)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Add information about the reason a synchronization session is used for to flexible sync client BIND message. ([PR #6902](https://github.com/realm/realm-core/pull/6902))
+* Sync protocol version bumped to 10. ([PR #6902](https://github.com/realm/realm-core/pull/6902))
+* Handle badchangeset error when printing changeset contents in debug. ([PR #6921](https://github.com/realm/realm-core/pull/6921))
+
+----------------------------------------------
+
 # 13.18.0 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Full text search supports searching for prefix only. Eg. "description TEXT 'alex*'" ([#6860](https://github.com/realm/realm-core/issues/6860))
-* Unknown protocol errors received from the baas server will no longer cause the application to crash if a valid error action is also received. Unknown error actions will be treated as an ApplicationBug error action and will cause sync to fail with an error via the sync error handler. [PR #6885](https://github.com/realm/realm-core/pull/6885))
+* Unknown protocol errors received from the baas server will no longer cause the application to crash if a valid error action is also received. Unknown error actions will be treated as an ApplicationBug error action and will cause sync to fail with an error via the sync error handler. ([PR #6885](https://github.com/realm/realm-core/pull/6885))
 
 ### Fixed
 * Made binding a `sync::Session` exception safe so if a `MultipleSyncAgents` exception is thrown you can safely tear down the sync client. ([PR #6868](https://github.com/realm/realm-core/pull/6868), since v13.4.1)
