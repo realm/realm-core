@@ -2,13 +2,33 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Added support for server log messages that are enabled by sync protocol version 10. Appservices request id will be provided in a server log message in a future server release. ([PR #6476](https://github.com/realm/realm-core/pull/6476))
-* A new `ErrorCategory::sync_error` has been added. All errors related to the Sync client, protocol or session will have this category. Note that websocket errors will have both the `websocket_error` and `sync_error` category, similar to `app_error` and `http_error` for failed HTTP requests from the App. ([#6916](https://github.com/realm/realm-core/issues/6916))
 * Throw an exception if `File::unlock` has failed, in order to inform the SDK that we are likely hitting some limitation on the OS filesystem, instead of crashing  the application.([PR #6926](https://github.com/realm/realm-core/pull/6926))
 
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.19.0 Release notes
+
+### Enhancements
+* Added support for server log messages that are enabled by sync protocol version 10. Appservices request id will be provided in a server log message in a future server release. ([PR #6476](https://github.com/realm/realm-core/pull/6476))
+* A new `ErrorCategory::sync_error` has been added. All errors related to the Sync client, protocol or session will have this category. Note that websocket errors will have both the `websocket_error` and `sync_error` category, similar to `app_error` and `http_error` for failed HTTP requests from the App. ([#6916](https://github.com/realm/realm-core/issues/6916))
+
+### Fixed
 * Crash when querying the size of a Object property through a link chain ([#6915](https://github.com/realm/realm-core/issues/6915), since v13.17.2)
 
 ### Breaking changes
