@@ -3646,16 +3646,13 @@ TEST_CASE("results: knnsearch") {
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
-    r->update_schema({
-        {"object",
-            {{"id", PropertyType::Int},
-             {"embedding", PropertyType::Array | PropertyType::Float}}}
-    });
+    r->update_schema(
+        {{"object", {{"id", PropertyType::Int}, {"embedding", PropertyType::Array | PropertyType::Float}}}});
 
     auto table = r->read_group().get_table("class_object");
     ColKey col_id = table->get_column_key("id");
     ColKey col_lst = table->get_column_key("embedding");
-    
+
     r->begin_transaction();
     {
         Obj o1 = table->create_object();
@@ -3667,7 +3664,7 @@ TEST_CASE("results: knnsearch") {
         lst.add(0.100);
         lst.add(0.010);
     }
-    
+
     {
         Obj o1 = table->create_object();
         o1.set(col_id, 2);
@@ -3678,7 +3675,7 @@ TEST_CASE("results: knnsearch") {
         lst.add(0.100);
         lst.add(0.010);
     }
-    
+
     {
         Obj o1 = table->create_object();
         o1.set(col_id, 3);
@@ -3689,7 +3686,7 @@ TEST_CASE("results: knnsearch") {
         lst.add(0.100);
         lst.add(0.010);
     }
-    
+
     {
         Obj o1 = table->create_object();
         o1.set(col_id, 4);
@@ -3700,7 +3697,7 @@ TEST_CASE("results: knnsearch") {
         lst.add(0.025);
         lst.add(0.100);
     }
-    
+
     {
         Obj o1 = table->create_object();
         o1.set(col_id, 5);
@@ -3720,7 +3717,7 @@ TEST_CASE("results: knnsearch") {
         REQUIRE(v.get(0).get<Int>(col_id) == 4);
         REQUIRE(v.get(1).get<Int>(col_id) == 5);
     }
-    
+
     SECTION("Knn combined with regular query") {
         Results results(r, table->where().less(col_id, 5));
         auto v2 = results.knn_search(col_lst, {0.003, 0.005, 0.010, 0.020, 0.100}, 2);

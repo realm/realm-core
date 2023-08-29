@@ -4033,25 +4033,3 @@ ColKey Table::find_opposite_column(ColKey col_key) const
     }
     return ColKey();
 }
-
-float Table::dist_knn(const std::vector<float>& query_data, ColKey column, ObjKey row, hnswlib::SpaceInterface<float>& s) const
-{
-    size_t dim = query_data.size();
-    
-    Obj o = get_object(row);
-    Lst<float> lst = o.get_list<float>(column);
-    if (lst.size() != dim)
-        throw IllegalOperation("Knn distance can only be calculated on lists of matching length");
-    
-    // Create sequential buffer of list values
-    std::vector<float> buf;
-    for (size_t i = 0; i < dim; i++) {
-        buf.push_back(lst.get(i));
-    }
-    
-    hnswlib::DISTFUNC<float> fstdistfunc = s.get_dist_func();
-    void* dist_func_param = s.get_dist_func_param();
-    
-    float dist = fstdistfunc(query_data.data(), buf.data(), dist_func_param);
-    return dist;
-}

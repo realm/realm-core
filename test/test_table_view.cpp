@@ -2838,7 +2838,7 @@ TEST(TableView_VectorSearch)
     Table table;
     auto col_id = table.add_column(type_Int, "id");
     auto col_lst = table.add_column_list(type_Float, "embeddings");
-    
+
     {
         Obj o1 = table.create_object();
         o1.set(col_id, 1);
@@ -2848,8 +2848,9 @@ TEST(TableView_VectorSearch)
         lst.add(0.005);
         lst.add(0.100);
         lst.add(0.010);
+        // dist = 0.996921
     }
-    
+
     {
         Obj o1 = table.create_object();
         o1.set(col_id, 2);
@@ -2859,8 +2860,9 @@ TEST(TableView_VectorSearch)
         lst.add(0.005);
         lst.add(0.100);
         lst.add(0.010);
+        // dist = 0.996927
     }
-    
+
     {
         Obj o1 = table.create_object();
         o1.set(col_id, 3);
@@ -2870,8 +2872,9 @@ TEST(TableView_VectorSearch)
         lst.add(0.005);
         lst.add(0.100);
         lst.add(0.010);
+        // dist = 0.996927
     }
-    
+
     {
         Obj o1 = table.create_object();
         o1.set(col_id, 4);
@@ -2881,8 +2884,9 @@ TEST(TableView_VectorSearch)
         lst.add(0.010);
         lst.add(0.025);
         lst.add(0.100);
+        // dist = 0.989363
     }
-    
+
     {
         Obj o1 = table.create_object();
         o1.set(col_id, 5);
@@ -2892,6 +2896,7 @@ TEST(TableView_VectorSearch)
         lst.add(0.008);
         lst.add(0.020);
         lst.add(0.100);
+        // dist = 0.989476
     }
 
     // Test single knn query
@@ -2900,7 +2905,7 @@ TEST(TableView_VectorSearch)
     CHECK_EQUAL(2, v.size());
     CHECK_EQUAL(4, v[0].get<Int>(col_id));
     CHECK_EQUAL(5, v[1].get<Int>(col_id));
-    
+
     // Test knn combined with regular query
     TableView v2 = table.where().less(col_id, 5).find_all();
     v2.knnsearch(col_lst, {0.003, 0.005, 0.010, 0.020, 0.100}, 2);

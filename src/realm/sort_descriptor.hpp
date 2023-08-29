@@ -218,8 +218,11 @@ public:
     }
 
     std::unique_ptr<BaseDescriptor> clone() const override;
-    
-    bool need_indexpair() const noexcept override { return true; }
+
+    bool need_indexpair() const noexcept override
+    {
+        return true;
+    }
 
     DescriptorType get_type() const override
     {
@@ -228,7 +231,7 @@ public:
 
     Sorter sorter(Table const& table, const IndexPairs& indexes) const override;
     void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const override;
-    void execute(const Table&, KeyValues&) const override { }
+    void execute(const Table&, KeyValues&) const override {}
 
     std::string get_description(ConstTableRef attached_table) const override;
 };
@@ -244,8 +247,11 @@ public:
     SortDescriptor() = default;
     ~SortDescriptor() = default;
     std::unique_ptr<BaseDescriptor> clone() const override;
-    
-    bool need_indexpair() const noexcept override { return true; }
+
+    bool need_indexpair() const noexcept override
+    {
+        return true;
+    }
 
     DescriptorType get_type() const override
     {
@@ -278,8 +284,8 @@ public:
     Sorter sorter(Table const& table, const IndexPairs& indexes) const override;
 
     void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const override;
-    
-    void execute(const Table&, KeyValues&) const override { }
+
+    void execute(const Table&, KeyValues&) const override {}
 
     std::string get_description(ConstTableRef attached_table) const override;
 
@@ -306,8 +312,11 @@ public:
     {
         return m_limit;
     }
-    
-    bool need_indexpair() const noexcept override { return true; }
+
+    bool need_indexpair() const noexcept override
+    {
+        return true;
+    }
 
     DescriptorType get_type() const override
     {
@@ -323,8 +332,8 @@ public:
     {
     }
     void execute(IndexPairs&, const Sorter&, const BaseDescriptor*) const override;
-    
-    void execute(const Table&, KeyValues&) const override { }
+
+    void execute(const Table&, KeyValues&) const override {}
 
 private:
     size_t m_limit = size_t(-1);
@@ -333,18 +342,30 @@ private:
 class SemanticSearchDescriptor : public BaseDescriptor {
 public:
     SemanticSearchDescriptor(const std::vector<float>& query_data, size_t k, ColKey column)
-        : m_query_data(query_data), m_k(k), m_column(column), m_sp(query_data.size())
+        : m_query_data(query_data)
+        , m_k(k)
+        , m_column(column)
+        , m_sp(query_data.size())
     {
     }
-    
-    bool is_valid() const noexcept override { return true; }
-    bool need_indexpair() const noexcept override { return false; }
-    Sorter sorter(Table const&, const IndexPairs&) const override { return Sorter(); }
-    void collect_dependencies(const Table*, std::vector<TableKey>&) const override { }
-    void execute(IndexPairs&, const Sorter&, const BaseDescriptor*) const override { }
-    
+
+    bool is_valid() const noexcept override
+    {
+        return true;
+    }
+    bool need_indexpair() const noexcept override
+    {
+        return false;
+    }
+    Sorter sorter(Table const&, const IndexPairs&) const override
+    {
+        return Sorter();
+    }
+    void collect_dependencies(const Table*, std::vector<TableKey>&) const override {}
+    void execute(IndexPairs&, const Sorter&, const BaseDescriptor*) const override {}
+
     void execute(const Table& table, KeyValues& keyvalues) const override;
-    
+
     std::string get_description(ConstTableRef) const override;
     DescriptorType get_type() const override
     {
@@ -354,17 +375,29 @@ public:
     {
         return std::unique_ptr<BaseDescriptor>(new SemanticSearchDescriptor(*this));
     }
-    
-    size_t get_k() const { return m_k; }
-    ColKey get_column() const { return m_column; }
-    const std::vector<float>& get_query_data() const { return m_query_data; }
-    hnswlib::SpaceInterface<float>& get_sp() const { return m_sp; }
-    
+
+    size_t get_k() const
+    {
+        return m_k;
+    }
+    ColKey get_column() const
+    {
+        return m_column;
+    }
+    const std::vector<float>& get_query_data() const
+    {
+        return m_query_data;
+    }
+    hnswlib::SpaceInterface<float>& get_sp() const
+    {
+        return m_sp;
+    }
+
 private:
     std::vector<float> m_query_data;
     size_t m_k;
     ColKey m_column;
-    
+
     // We are going to default to measure distance by Inner Product for now
     mutable hnswlib::InnerProductSpace m_sp;
 };
