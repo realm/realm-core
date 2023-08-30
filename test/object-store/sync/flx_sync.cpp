@@ -3796,6 +3796,43 @@ TEST_CASE("flx: open realm + register subscription callack while bootstrapping",
         REQUIRE(verify_subscription(realm));
     }
 
+    SECTION("Sync Open + Async Open") {
+
+        {
+            // Sync path
+            subscription_invoked = false;
+            config.sync_config->subscription_initializer = init_subscription_callback;
+            auto realm = Realm::get_shared_realm(config);
+            REQUIRE(subscription_pf.future.get());
+            auto sb = realm->get_latest_subscription_set();
+            auto future = sb.get_state_change_notification(realm::sync::SubscriptionSet::State::Complete);
+            auto state = future.get();
+            REQUIRE(state == realm::sync::SubscriptionSet::State::Complete);
+            realm->refresh(); // refresh is needed otherwise table_ref->size() would be 0
+            REQUIRE(verify_subscription(realm));
+        }
+        {
+            auto open_realm_pf = util::make_promise_future<bool>();
+            auto open_realm_completed_callback =
+                [&, promise_holder = util::CopyablePromiseHolder(std::move(open_realm_pf.promise))](
+                    ThreadSafeReference ref, std::exception_ptr err) mutable {
+                    auto promise = promise_holder.get_promise();
+                    if (err)
+                        promise.emplace_value(false);
+                    else
+                        promise.emplace_value(verify_subscription(Realm::get_shared_realm(std::move(ref))));
+                };
+
+            subscription_invoked = false;
+            config.sync_config->subscription_initializer = init_subscription_callback;
+            config.sync_config->rerun_init_subscription_on_open = true;
+            auto async_open = Realm::get_synchronized_realm(config);
+            async_open->start(open_realm_completed_callback);
+            REQUIRE(open_realm_pf.future.get());
+            REQUIRE(subscription_pf.future.get());
+        }
+    }
+
     SECTION("Async open") {
         SECTION("Initial async open with no rerun on open set") {
             // subscription will be run since this is the first time we are opening the realm file.
