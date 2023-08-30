@@ -645,6 +645,8 @@ TEST(List_Nested_InMixed)
     Obj obj = table->create_object();
 
     obj.set_collection(col_any, CollectionType::Dictionary);
+    auto set = obj.get_set_ptr<Mixed>(col_any);
+    CHECK_THROW(set->insert("xyz"), IllegalOperation);
     auto dict = obj.get_dictionary_ptr(col_any);
     CHECK(dict->is_empty());
     dict->insert("Four", 4);
@@ -730,11 +732,11 @@ TEST(List_Nested_InMixed)
     tr->promote_to_write();
     dict->insert("Dict", Mixed());
     CHECK_THROW_ANY_GET_MESSAGE(dict2->insert("Five", 5), message); // This dictionary ceased to be
-    CHECK_EQUAL(message, "This is an ex-dictionary");
+    CHECK_EQUAL(message, "This collection is no more");
     // Try to insert a new dictionary. The old dict2 shoulg still be stale
     dict->insert_collection("Dict", CollectionType::Dictionary);
     CHECK_THROW_ANY_GET_MESSAGE(dict2->insert("Five", 5), message); // This dictionary ceased to be
-    CHECK_EQUAL(message, "This is an ex-dictionary");
+    CHECK_EQUAL(message, "This collection is no more");
     // Assign another value. The old dictionary should be disposed.
     obj.set(col_any, Mixed(5));
     tr->verify();
@@ -788,27 +790,28 @@ TEST(List_Nested_InMixed)
     list2->remove(1);
     CHECK_EQUAL(dict2->get("Hello"), Mixed("World"));
     obj.set(col_any, Mixed());
-    CHECK_EQUAL(dict->size(), 0);
+    CHECK_THROW_ANY_GET_MESSAGE(dict->size(), message);
+    CHECK_EQUAL(message, "This collection is no more");
     CHECK_THROW_ANY_GET_MESSAGE(dict->insert("Five", 5), message); // This dictionary ceased to be
-    CHECK_EQUAL(message, "This is an ex-dictionary");
+    CHECK_EQUAL(message, "This collection is no more");
     CHECK_THROW_ANY_GET_MESSAGE(dict->get("Five"), message);
-    CHECK_EQUAL(message, "This is an ex-dictionary");
+    CHECK_EQUAL(message, "This collection is no more");
 
     obj.set_collection(col_any, CollectionType::List);
     auto list3 = obj.get_list_ptr<Mixed>(col_any);
     list3->add(5);
     obj.set(col_any, Mixed());
-    CHECK_EQUAL(list3->size(), 0);
+    CHECK_THROW_ANY(list3->size());
     CHECK_THROW_ANY_GET_MESSAGE(list3->add(42), message);
-    CHECK_EQUAL(message, "This is an ex-list");
+    CHECK_EQUAL(message, "This collection is no more");
     CHECK_THROW_ANY_GET_MESSAGE(list3->insert(5, 42), message);
-    CHECK_EQUAL(message, "This is an ex-list");
+    CHECK_EQUAL(message, "This collection is no more");
     CHECK_THROW_ANY_GET_MESSAGE(list3->get(5), message);
-    CHECK_EQUAL(message, "This is an ex-list");
+    CHECK_EQUAL(message, "This collection is no more");
     // Try creating a new list. list3 should still be stale
     obj.set_collection(col_any, CollectionType::List);
     CHECK_THROW_ANY_GET_MESSAGE(list3->add(42), message);
-    CHECK_EQUAL(message, "This is an ex-list");
+    CHECK_EQUAL(message, "This collection is no more");
     tr->verify();
     obj.set_json(col_any,
                  "[{\"Seven\":7, \"Six\":6}, \"Hello\", {\"Points\": [1.25, 4.5, 6.75], \"Hello\": \"World\"}]");

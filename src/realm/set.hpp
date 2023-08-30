@@ -167,7 +167,7 @@ public:
         return *m_tree;
     }
 
-    UpdateStatus update_if_needed_with_status() const noexcept final
+    UpdateStatus update_if_needed_with_status() const final
     {
         auto status = Base::get_update_status();
         switch (status) {
@@ -194,10 +194,10 @@ public:
     void ensure_created()
     {
         if (Base::should_update() || !(m_tree && m_tree->is_attached())) {
-            bool attached = init_from_parent(true);
-            if (!attached) {
-                throw IllegalOperation("This is an ex-set");
-            }
+            // When allow_create is true, init_from_parent will always succeed
+            // In case of errors, an exception is thrown.
+            constexpr bool allow_create = true;
+            init_from_parent(allow_create); // Throws
             Base::update_content_version();
         }
     }
@@ -245,7 +245,7 @@ private:
         }
         catch (...) {
             m_tree->detach();
-            return false;
+            throw;
         }
         return true;
     }

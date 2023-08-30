@@ -69,7 +69,7 @@ public:
     Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
 
     // Overriding members of CollectionParent:
-    UpdateStatus update_if_needed_with_status() const noexcept final;
+    UpdateStatus update_if_needed_with_status() const final;
     // Get the path in a minimal format without including object accessors.
     // If you need to obtain additional information for each object in the path,
     // you should use get_fat_path() or traverse_path() instead (see below).

@@ -172,9 +172,9 @@ protected:
     }
 
     virtual ~CollectionParent();
-    /// Update the accessor (and return `UpdateStatus::Detached` if the parent
-    /// is no longer valid, rather than throwing an exception).
-    virtual UpdateStatus update_if_needed_with_status() const noexcept = 0;
+    /// Update the accessor (and return `UpdateStatus::Detached` if the
+    // collection is not initialized.
+    virtual UpdateStatus update_if_needed_with_status() const = 0;
     /// Check if the storage version has changed and update if it has
     /// Return true if the object was updated
     virtual bool update_if_needed() const = 0;

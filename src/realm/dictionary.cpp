@@ -115,7 +115,6 @@ Mixed Dictionary::get_any(size_t ndx) const
 {
     // Note: `size()` calls `update_if_needed()`.
     auto current_size = size();
-    ensure_attached();
     CollectionBase::validate_index("get_any()", ndx, current_size);
     return do_get(ndx);
 }
@@ -124,7 +123,6 @@ std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx) const
 {
     // Note: `size()` calls `update_if_needed()`.
     auto current_size = size();
-    ensure_attached();
     CollectionBase::validate_index("get_pair()", ndx, current_size);
     return do_get_pair(ndx);
 }
@@ -478,11 +476,10 @@ Mixed Dictionary::get(Mixed key) const
     if (auto opt_val = try_get(key)) {
         return *opt_val;
     }
-    ensure_attached();
     throw KeyNotFound("Dictionary::get");
 }
 
-util::Optional<Mixed> Dictionary::try_get(Mixed key) const noexcept
+util::Optional<Mixed> Dictionary::try_get(Mixed key) const
 {
     if (update()) {
         auto ndx = do_find_key(key);
@@ -656,7 +653,7 @@ size_t Dictionary::find_index(const Index& index) const
     return m_values->find_key(index.get_salt());
 }
 
-UpdateStatus Dictionary::update_if_needed_with_status() const noexcept
+UpdateStatus Dictionary::update_if_needed_with_status() const
 {
     auto status = Base::get_update_status();
     switch (status) {
@@ -673,6 +670,8 @@ UpdateStatus Dictionary::update_if_needed_with_status() const noexcept
             [[fallthrough]];
         }
         case UpdateStatus::Updated: {
+            // Try to initialize. If the dictionary is not initialized
+            // the function will return false;
             bool attached = init_from_parent(false);
             Base::update_content_version();
             return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
@@ -684,16 +683,11 @@ UpdateStatus Dictionary::update_if_needed_with_status() const noexcept
 void Dictionary::ensure_created()
 {
     if (Base::should_update() || !(m_dictionary_top && m_dictionary_top->is_attached())) {
-        init_from_parent(true);
-        ensure_attached();
+        // When allow_create is true, init_from_parent will always succeed
+        // In case of errors, an exception is thrown.
+        constexpr bool allow_create = true;
+        init_from_parent(allow_create); // Throws
         Base::update_content_version();
-    }
-}
-
-void Dictionary::ensure_attached() const
-{
-    if (!m_dictionary_top) {
-        throw IllegalOperation("This is an ex-dictionary");
     }
 }
 
@@ -717,7 +711,6 @@ bool Dictionary::try_erase(Mixed key)
 void Dictionary::erase(Mixed key)
 {
     if (!try_erase(key)) {
-        ensure_attached();
         throw KeyNotFound(util::format("Cannot remove key %1 from dictionary: key not found", key));
     }
 }
@@ -901,9 +894,9 @@ bool Dictionary::init_from_parent(bool allow_create) const
 
         return true;
     }
-    catch (const StaleAccessor&) {
+    catch (...) {
         m_dictionary_top.reset();
-        return false;
+        throw;
     }
 }
 
@@ -1190,9 +1183,9 @@ ref_type Dictionary::get_collection_ref(Index index, CollectionType type) const
         if (val.is_type(DataType(int(type)))) {
             return val.get_ref();
         }
+        throw realm::IllegalOperation(util::format("Not a %1", type));
     }
-    // This exception should never escape to the application
-    throw StaleAccessor("This collection has run down the curtain");
+    throw StaleAccessor("This collection is no more");
     return 0;
 }
 

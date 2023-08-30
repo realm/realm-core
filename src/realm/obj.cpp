@@ -392,7 +392,7 @@ inline bool Obj::_update_if_needed() const
     return false;
 }
 
-UpdateStatus Obj::update_if_needed_with_status() const noexcept
+UpdateStatus Obj::update_if_needed_with_status() const
 {
     if (!m_table) {
         // Table deleted
@@ -2349,9 +2349,9 @@ ref_type Obj::get_collection_ref(Index index, CollectionType type) const
         if (val.is_type(DataType(int(type)))) {
             return val.get_ref();
         }
+        throw realm::IllegalOperation(util::format("Not a %1", type));
     }
-    // This exception should never escape to the application
-    throw StaleAccessor("This collection has joined the choir invisible");
+    throw StaleAccessor("This collection is no more");
 }
 
 bool Obj::check_collection_ref(Index index, CollectionType type) const noexcept
