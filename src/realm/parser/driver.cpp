@@ -797,12 +797,49 @@ Query GeoWithinNode::visit(ParserDriver* drv)
     else {
         size_t arg_no = size_t(strtol(argument.substr(1).c_str(), nullptr, 10));
         auto right_type = drv->m_args.is_argument_null(arg_no) ? DataType(-1) : drv->m_args.type_for_argument(arg_no);
-        if (right_type != type_Geospatial) {
+
+        Geospatial geo;
+        if (right_type == type_Geospatial) {
+            geo = drv->m_args.geospatial_for_argument(arg_no);
+        }
+        else if (right_type == type_String) {
+            // This is a "hack" to allow users to pass in geospatial objects
+            // serialized as a string instead of as a native type. This is because
+            // the CAPI doesn't have support for marshalling polygons (of variable length)
+            // yet and that project was deprioritized to geospatial phase 2. This should be
+            // removed once SDKs are all using the binding generator.
+            std::string str_val = drv->m_args.string_for_argument(arg_no);
+            const std::string simulated_prefix = "simulated GEOWITHIN ";
+            str_val = simulated_prefix + str_val;
+            ParserDriver sub_driver;
+            try {
+                sub_driver.parse(str_val);
+            }
+            catch (const std::exception& ex) {
+                std::string doctored_err = ex.what();
+                size_t prefix_location = doctored_err.find(simulated_prefix);
+                if (prefix_location != std::string::npos) {
+                    doctored_err.erase(prefix_location, simulated_prefix.size());
+                }
+                throw InvalidQueryError(util::format(
+                    "Invalid syntax in serialized geospatial object at argument %1: '%2'", arg_no, doctored_err));
+            }
+            if (GeoWithinNode* node = dynamic_cast<GeoWithinNode*>(sub_driver.result)) {
+                if (node->geo) {
+                    if (node->geo->m_geo.get_type() != Geospatial::Type::Invalid) {
+                        geo = node->geo->m_geo;
+                    }
+                    else {
+                        geo = GeoPolygon{node->geo->m_points};
+                    }
+                }
+            }
+        }
+        else {
             throw InvalidQueryError(util::format("The right hand side of 'geoWithin' must be a geospatial constant "
                                                  "value. But the provided type is '%1'",
                                                  get_data_type_name(right_type)));
         }
-        Geospatial geo = drv->m_args.geospatial_for_argument(arg_no);
 
         if (geo.get_type() == Geospatial::Type::Invalid) {
             throw InvalidQueryError(
