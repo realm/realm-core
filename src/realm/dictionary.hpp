@@ -69,6 +69,10 @@ public:
 
     std::pair<Mixed, Mixed> get_pair(size_t ndx) const;
     Mixed get_key(size_t ndx) const;
+    PathElement get_path_element(size_t ndx) const override
+    {
+        return {get_key(ndx).get_string()};
+    }
 
     // Overriding members of CollectionBase:
     CollectionBasePtr clone_collection() const final;

@@ -455,6 +455,39 @@ Mixed Results::get_any(size_t ndx)
     throw OutOfBounds{"get_any() on Results", ndx, do_size()};
 }
 
+List Results::get_list(size_t ndx)
+{
+    util::CheckedUniqueLock lock(m_mutex);
+    REALM_ASSERT(m_mode == Mode::Collection);
+    ensure_up_to_date();
+    if (size_t actual = actual_index(ndx); actual < m_collection->size()) {
+        return List{m_realm, m_collection->get_list(m_collection->get_path_element(actual))};
+    }
+    throw OutOfBounds{"get_list() on Results", ndx, m_collection->size()};
+}
+
+object_store::Set Results::get_set(size_t ndx)
+{
+    util::CheckedUniqueLock lock(m_mutex);
+    REALM_ASSERT(m_mode == Mode::Collection);
+    ensure_up_to_date();
+    if (size_t actual = actual_index(ndx); actual < m_collection->size()) {
+        return object_store::Set{m_realm, m_collection->get_list(m_collection->get_path_element(actual))};
+    }
+    throw OutOfBounds{"get_set() on Results", ndx, m_collection->size()};
+}
+
+object_store::Dictionary Results::get_dictionary(size_t ndx)
+{
+    util::CheckedUniqueLock lock(m_mutex);
+    REALM_ASSERT(m_mode == Mode::Collection);
+    ensure_up_to_date();
+    if (size_t actual = actual_index(ndx); actual < m_collection->size()) {
+        return object_store::Dictionary{m_realm, m_collection->get_list(m_collection->get_path_element(actual))};
+    }
+    throw OutOfBounds{"get_dictionary() on Results", ndx, m_collection->size()};
+}
+
 std::pair<StringData, Mixed> Results::get_dictionary_element(size_t ndx)
 {
     util::CheckedUniqueLock lock(m_mutex);

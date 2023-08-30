@@ -173,6 +173,11 @@ public:
     /// Get the column key for this collection.
     virtual ColKey get_col_key() const noexcept = 0;
 
+    virtual PathElement get_path_element(size_t ndx) const
+    {
+        return PathElement(ndx);
+    }
+
     /// Return true if the collection has changed since the last call to
     /// `has_changed()`. Note that this function is not idempotent and updates
     /// the internal state of the accessor if it has changed.
