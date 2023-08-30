@@ -305,12 +305,36 @@ bool Lst<Mixed>::init_from_parent(bool allow_create) const
             REALM_ASSERT(m_tree->is_attached());
         }
     }
-    catch (const StaleAccessor&) {
+    catch (...) {
         m_tree->detach();
-        return false;
+        throw;
     }
 
     return true;
+}
+
+UpdateStatus Lst<Mixed>::update_if_needed_with_status() const
+{
+    auto status = Base::get_update_status();
+    switch (status) {
+        case UpdateStatus::Detached: {
+            m_tree.reset();
+            return UpdateStatus::Detached;
+        }
+        case UpdateStatus::NoChange:
+            if (m_tree && m_tree->is_attached()) {
+                return UpdateStatus::NoChange;
+            }
+            // The tree has not been initialized yet for this accessor, so
+            // perform lazy initialization by treating it as an update.
+            [[fallthrough]];
+        case UpdateStatus::Updated: {
+            bool attached = init_from_parent(false);
+            Base::update_content_version();
+            return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
+        }
+    }
+    REALM_UNREACHABLE();
 }
 
 size_t Lst<Mixed>::find_first(const Mixed& value) const
@@ -699,8 +723,8 @@ ref_type Lst<Mixed>::get_collection_ref(Index index, CollectionType type) const
         if (val.is_type(DataType(int(type)))) {
             return val.get_ref();
         }
+        throw realm::IllegalOperation(util::format("Not a %1", type));
     }
-    // This exception should never escape to the application
     throw StaleAccessor("This collection is no more");
     return 0;
 }

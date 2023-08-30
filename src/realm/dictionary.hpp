@@ -117,7 +117,7 @@ public:
     // throws std::out_of_range if key is not found
     Mixed get(Mixed key) const;
     // Noexcept version
-    util::Optional<Mixed> try_get(Mixed key) const noexcept;
+    util::Optional<Mixed> try_get(Mixed key) const;
     // adds entry if key is not found
     const Mixed operator[](Mixed key);
 
@@ -205,7 +205,7 @@ public:
     {
         return get_obj().get_table();
     }
-    UpdateStatus update_if_needed_with_status() const noexcept override;
+    UpdateStatus update_if_needed_with_status() const override;
     bool update_if_needed() const override;
     const Obj& get_object() const noexcept override
     {
@@ -253,7 +253,6 @@ private:
     void do_accumulate(size_t* return_ndx, AggregateType& agg) const;
 
     void ensure_created();
-    void ensure_attached() const;
     inline bool update() const
     {
         return update_if_needed_with_status() != UpdateStatus::Detached;
