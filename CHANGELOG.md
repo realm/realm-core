@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Add a fake app id to the baas server's schema change history store to prevent server drop optimization from running during integration tests. ([PR #6927](https://github.com/realm/realm-core/pull/6927))
 
 ----------------------------------------------
 
