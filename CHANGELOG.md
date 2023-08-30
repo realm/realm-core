@@ -2,6 +2,7 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* Add a distinct error code for timeouts (SyncConnectTimeout) rather than using the same one as for less transient failures ([PR #6932](https://github.com/realm/realm-core/pull/6932)).
 * Throw an exception if `File::unlock` has failed, in order to inform the SDK that we are likely hitting some limitation on the OS filesystem, instead of crashing  the application.([PR #6926](https://github.com/realm/realm-core/pull/6926))
 
 
