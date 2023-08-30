@@ -423,7 +423,7 @@ void DefaultWebSocketImpl::handle_ssl_handshake(std::error_code ec)
         REALM_ASSERT(ec != util::error::operation_aborted);
         constexpr bool was_clean = false;
         WebSocketError parsed_error_code;
-        if (ec == network::ssl::Errors::certificate_rejected) {
+        if (ec == network::ssl::Errors::tls_handshake_failed) {
             parsed_error_code = WebSocketError::websocket_tls_handshake_failed;
         }
         else {
