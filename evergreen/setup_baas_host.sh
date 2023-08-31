@@ -87,20 +87,16 @@ if [[ -z "${AWS_SECRET_ACCESS_KEY}" ]]; then
     exit 1
 fi
 
-if [[ -z "${REALM_CORE_REVISION}" ]]; then
-    echo "REALM_CORE_REVISION was not provided by baas host vars script, using 'master'"
-    REALM_CORE_REVISION='master'
+if [[ -z "${GITHUB_KNOWN_HOSTS}" ]]; then
+    # Use a default if not defined, but this may become outdated one day...
+    GITHUB_KNOWN_HOSTS="github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk="
+    echo "Info: GITHUB_KNOWN_HOSTS not defined in baas host vars script - using default"
 fi
-
-if [[ -n "${GITHUB_KNOWN_HOSTS}" ]]; then
-    KNOWN_HOSTS_FILE="${HOME}/.ssh/known_hosts"
-    if [[ -f "${KNOWN_HOSTS_FILE}" ]] && grep "${GITHUB_KNOWN_HOSTS}" < "${KNOWN_HOSTS_FILE}"; then
-        echo "Github known hosts entry found - skipping known_hosts update"
-    else
-        echo "${GITHUB_KNOWN_HOSTS}" | tee -a "${KNOWN_HOSTS_FILE}"
-    fi
+KNOWN_HOSTS_FILE="${HOME}/.ssh/known_hosts"
+if [[ -f "${KNOWN_HOSTS_FILE}" ]] && grep "${GITHUB_KNOWN_HOSTS}" < "${KNOWN_HOSTS_FILE}"; then
+    echo "Github known hosts entry found - skipping known_hosts update"
 else
-    echo "Warning: GITHUB_KNOWN_HOSTS not defined in baas host vars script - 'github clone' may hang or fail during setup"
+    echo "${GITHUB_KNOWN_HOSTS}" | tee -a "${KNOWN_HOSTS_FILE}"
 fi
 
 function init_data_device()
@@ -247,20 +243,11 @@ setup_data_dir
 
 pushd "${BAAS_REMOTE_DIR}" > /dev/null
 
-# Clone the realm core repo and check out the specified version
-if [[ ! -d "realm-core/.git" ]]; then
-    git clone git@github.com:realm/realm-core.git realm-core
-    pushd realm-core > /dev/null
+if [[ -d "${HOME}/evergreen/" ]]; then
+    cp -R "${HOME}/evergreen/" ./evergreen/
 else
-    pushd realm-core > /dev/null
-    git fetch
-fi
-
-git checkout "${REALM_CORE_REVISION}"
-git submodule update --init --recursive
-
-if [[ -f "${HOME}/install_baas.sh" ]]; then
-    cp "${HOME}/install_baas.sh" evergreen/
+    echo "evergreen/ directory not found in ${HOME}"
+    exit 1
 fi
 
 # Set up the cleanup function that runs at exit and stops baas server and proxy (if run)
@@ -289,5 +276,4 @@ until [[ -f "${BAAS_STOPPED_FILE}" || -f "${PROXY_STOPPED_FILE}" ]]; do
     sleep 1
 done
 
-popd > /dev/null  # realm-core
 popd > /dev/null  # /data/baas-remote

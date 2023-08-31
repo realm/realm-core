@@ -42,6 +42,7 @@ struct ErrorCategory {
         http_error = RLM_ERR_CAT_HTTP_ERROR,
         custom_error = RLM_ERR_CAT_CUSTOM_ERROR,
         websocket_error = RLM_ERR_CAT_WEBSOCKET_ERROR,
+        sync_error = RLM_ERR_CAT_SYNC_ERROR,
     };
     constexpr ErrorCategory() = default;
     constexpr bool test(Type cat)
@@ -115,6 +116,7 @@ public:
         SyncClientResetRequired = RLM_ERR_SYNC_CLIENT_RESET_REQUIRED,
         SyncCompensatingWrite = RLM_ERR_SYNC_COMPENSATING_WRITE,
         SyncConnectFailed = RLM_ERR_SYNC_CONNECT_FAILED,
+        SyncConnectTimeout = RLM_ERR_SYNC_CONNECT_TIMEOUT,
         SyncInvalidSchemaChange = RLM_ERR_SYNC_INVALID_SCHEMA_CHANGE,
         SyncPermissionDenied = RLM_ERR_SYNC_PERMISSION_DENIED,
         SyncProtocolInvariantFailed = RLM_ERR_SYNC_PROTOCOL_INVARIANT_FAILED,

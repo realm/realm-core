@@ -37,6 +37,7 @@ function usage()
     echo -e "\t-d PORT\t\tPort for direct connection to baas - skips proxy (default ${DIRECT_PORT})"
     echo -e "\t-l PORT\t\tBaas proxy listen port on remote host (default ${LISTEN_PORT})"
     echo -e "\t-c PORT\t\tLocal configuration port for proxy HTTP API (default ${CONFIG_PORT})"
+    echo "Note: This script must be run from a cloned realm-core/ repository directory."
     # Default to 0 if exit code not provided
     exit "${1:0}"
 }
@@ -86,6 +87,7 @@ elif [[ ! -f "${BAAS_HOST_KEY}" ]]; then
     usage 1
 fi
 FILE_DEST_DIR="/home/${BAAS_USER}"
+EVERGREEN_DEST_DIR="${FILE_DEST_DIR}/evergreen"
 
 function check_port()
 {
@@ -162,13 +164,18 @@ if [[ -n "${VERBOSE}" ]]; then
 fi
 
 if [[ -z "${BAAS_HOST_NAME}" ]]; then
-    echo "Error: BAAS_HOST_NAME was not exported by baas host vars script"
+    echo "Baas remote hostname (BAAS_HOST_NAME) not provided in baas host vars script"
     usage 1
 fi
 
 if [[ -z "${BAAS_USER}" ]]; then
     echo "Error: Baas host username was empty"
     usage 1
+fi
+
+if [[ ! -d "${EVERGREEN_PATH}/" ]]; then
+    echo "This script must be run from the realm-core directory for accessing files in '${EVERGREEN_PATH}/'"
+    exit 1 
 fi
 
 SSH_USER="$(printf "%s@%s" "${BAAS_USER}" "${BAAS_HOST_NAME}")"
@@ -182,7 +189,7 @@ if [[ -f ~/.ssh/id_rsa ]]; then
     ssh-add ~/.ssh/id_rsa
 fi
 ssh-add "${BAAS_HOST_KEY}"
-SSH_OPTIONS=(-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i "${BAAS_HOST_KEY}")
+SSH_OPTIONS=(-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -i "${BAAS_HOST_KEY}")
 
 echo "running ssh with ${SSH_OPTIONS[*]}"
 
@@ -194,7 +201,7 @@ CONNECT_COUNT=4
 # Check for remote connectivity - try to connect twice to verify server is "really" ready
 # The tests failed one time due to this ssh command passing, but the next scp command failed
 while [[ ${CONNECT_COUNT} -gt 0 ]]; do
-    until ssh "${SSH_OPTIONS[@]}" "${SSH_USER}" "echo -n 'hello from '; hostname" ; do
+    until ssh "${SSH_OPTIONS[@]}" -o ConnectTimeout=10 "${SSH_USER}" "echo -n 'hello from '; hostname" ; do
         if [[ ${WAIT_COUNTER} -ge ${RETRY_COUNT} ]] ; then
             secs_spent_waiting=$(($(date -u +'%s') - WAIT_START))
             echo "Timed out after waiting ${secs_spent_waiting} seconds for host ${BAAS_HOST_NAME} to start"
@@ -211,11 +218,10 @@ done
 
 echo "Transferring setup scripts to ${SSH_USER}:${FILE_DEST_DIR}"
 # Copy the baas host vars script to the baas remote host
-scp "${SSH_OPTIONS[@]}" "${BAAS_HOST_VARS}" "${SSH_USER}:${FILE_DEST_DIR}/"
-# Copy the current host and baas scripts from the working copy of realm-core
-# This ensures they have the latest copy, esp when running evergreen patches
-scp "${SSH_OPTIONS[@]}" "${EVERGREEN_PATH}/setup_baas_host.sh" "${SSH_USER}:${FILE_DEST_DIR}/"
-scp "${SSH_OPTIONS[@]}" "${EVERGREEN_PATH}/install_baas.sh" "${SSH_USER}:${FILE_DEST_DIR}/"
+scp "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${BAAS_HOST_VARS}" "${SSH_USER}:${FILE_DEST_DIR}/"
+# Copy the entire evergreen/ directory from the working copy of realm-core to the remote host
+# This ensures the remote host the latest copy, esp when running evergreen patches
+scp -r "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${EVERGREEN_PATH}/" "${SSH_USER}:${FILE_DEST_DIR}/"
 
 BAAS_TUNNELS=()
 EXTRA_OPTIONS=()
@@ -258,5 +264,5 @@ if [[ -n "${BAAS_PROXY}" ]]; then
 fi
 
 # shellcheck disable=SC2029
-ssh -t "${SSH_OPTIONS[@]}" "${BAAS_TUNNELS[@]}" "${SSH_USER}" \
-    "${FILE_DEST_DIR}/setup_baas_host.sh" "${EXTRA_OPTIONS[@]}" "${FILE_DEST_DIR}/baas_host_vars.sh"
+ssh -t "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${BAAS_TUNNELS[@]}" "${SSH_USER}" \
+    "${EVERGREEN_DEST_DIR}/setup_baas_host.sh" "${EXTRA_OPTIONS[@]}" "${FILE_DEST_DIR}/baas_host_vars.sh"

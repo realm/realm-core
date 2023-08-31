@@ -804,8 +804,10 @@ void Connection::handle_connect_wait(Status status)
 
     REALM_ASSERT_EX(m_state == ConnectionState::connecting, m_state);
     logger.info("Connect timeout"); // Throws
-    involuntary_disconnect(SessionErrorInfo{Status{ErrorCodes::SyncConnectFailed, status.reason()}, IsFatal{false}},
-                           ConnectionTerminationReason::sync_connect_timeout); // Throws
+    involuntary_disconnect(
+        SessionErrorInfo{Status{ErrorCodes::SyncConnectTimeout, "Sync connection was not fully established in time"},
+                         IsFatal{false}},
+        ConnectionTerminationReason::sync_connect_timeout); // Throws
 }
 
 
@@ -2053,10 +2055,15 @@ void Session::send_upload_message()
 #if REALM_DEBUG
             ChunkedBinaryInputStream in{changeset_data};
             Changeset log;
-            parse_changeset(in, log);
-            std::stringstream ss;
-            log.print(ss);
-            logger.trace("Changeset (parsed):\n%1", ss.str());
+            try {
+                parse_changeset(in, log);
+                std::stringstream ss;
+                log.print(ss);
+                logger.trace("Changeset (parsed):\n%1", ss.str());
+            }
+            catch (const BadChangesetError& err) {
+                logger.error("Unable to parse changeset: %1", err.what());
+            }
 #endif
         }
 
