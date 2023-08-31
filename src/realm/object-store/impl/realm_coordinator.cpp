@@ -278,7 +278,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::O
     return realm;
 }
 
-std::shared_ptr<Realm> RealmCoordinator::get_realm(std::shared_ptr<util::Scheduler> scheduler)
+std::shared_ptr<Realm> RealmCoordinator::get_realm(std::shared_ptr<util::Scheduler> scheduler, bool first_time_open)
 {
     std::shared_ptr<Realm> realm;
     util::CheckedUniqueLock lock(m_realm_mutex);
@@ -287,7 +287,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(std::shared_ptr<util::Schedul
     if ((realm = do_get_cached_realm(config))) {
         return realm;
     }
-    do_get_realm(std::move(config), realm, none, lock);
+    do_get_realm(std::move(config), realm, none, lock, first_time_open);
     return realm;
 }
 
@@ -319,9 +319,10 @@ ThreadSafeReference RealmCoordinator::get_unbound_realm()
 }
 
 void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>& realm,
-                                    util::Optional<VersionID> version, util::CheckedUniqueLock& realm_lock)
+                                    util::Optional<VersionID> version, util::CheckedUniqueLock& realm_lock,
+                                    bool first_time_open)
 {
-    const auto db_opened_first_time = open_db();
+    const auto db_created = open_db();
 #ifdef REALM_ENABLE_SYNC
     SyncConfig::SubscriptionInitializerCallback subscription_function = nullptr;
     bool rerun_on_open = false;
@@ -379,7 +380,8 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
     // rerun_on_open was set
     if (subscription_function) {
         const auto current_subscription = realm->get_latest_subscription_set();
-        if ((current_subscription.version() == 0) || (rerun_on_open && db_opened_first_time)) {
+        const auto open_for_the_first_time = db_created || first_time_open;
+        if ((current_subscription.version() == 0) || (rerun_on_open && open_for_the_first_time)) {
             subscription_function(realm);
         }
     }

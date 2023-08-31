@@ -130,7 +130,7 @@ void AsyncOpenTask::attach_to_subscription_initializer(AsyncOpenCallback&& async
     // 2. we are instructed to run the subscription initializer via sync_config->rerun_init_subscription_on_open.
     //    But we do that only if this is the first time we open realm.
 
-    auto shared_realm = coordinator->get_realm();
+    auto shared_realm = coordinator->get_realm(nullptr, m_db_first_open);
     const auto init_subscription = shared_realm->get_latest_subscription_set();
 
     if (init_subscription.version() == 1 || (rerun_on_launch && m_db_first_open)) {
