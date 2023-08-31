@@ -97,3 +97,7 @@ compile_commands.json
 # Swift package manager
 /.swiftpm
 /.build
+
+# Ignore artifacts from setup_baas_host_local.sh
+/baas-work-dir
+ssh_agent_commands.sh

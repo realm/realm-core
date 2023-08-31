@@ -2399,8 +2399,7 @@ TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][baa
 #endif
 
 TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][baas]") {
-    const std::string base_url = get_base_url();
-    auto server_app_config = minimal_app_config(base_url, "flx_connect_as_pbs", g_minimal_schema);
+    auto server_app_config = minimal_app_config("flx_connect_as_pbs", g_minimal_schema);
     TestAppSession session(create_app(server_app_config));
     SyncTestFile config(session.app(), bson::Bson{}, g_minimal_schema);
 
@@ -2443,9 +2442,7 @@ TEST_CASE("flx: connect to FLX with partition value returns an error", "[sync][f
 }
 
 TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][protocol][baas]") {
-    const std::string base_url = get_base_url();
-
-    auto server_app_config = minimal_app_config(base_url, "flx_connect_as_pbs", g_minimal_schema);
+    auto server_app_config = minimal_app_config("flx_connect_as_pbs", g_minimal_schema);
     TestAppSession session(create_app(server_app_config));
     auto app = session.app();
     auto user = app->current_user();
@@ -3446,7 +3443,7 @@ TEST_CASE("flx: convert flx sync realm to bundled realm", "[app][flx][baas]") {
         create_user_and_log_in(harness->app());
         SyncTestFile target_config(harness->app()->current_user(), harness->schema(), SyncConfig::FLXSyncEnabled{});
 
-        auto pbs_app_config = minimal_app_config(harness->app()->base_url(), "pbs_to_flx_convert", harness->schema());
+        auto pbs_app_config = minimal_app_config("pbs_to_flx_convert", harness->schema());
 
         TestAppSession pbs_app_session(create_app(pbs_app_config));
         SyncTestFile source_config(pbs_app_session.app()->current_user(), "54321"s, pbs_app_config.schema);

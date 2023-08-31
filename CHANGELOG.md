@@ -18,6 +18,7 @@
 
 ### Internals
 * Add a fake app id to the baas server's schema change history store to prevent server drop optimization from running during integration tests. ([PR #6927](https://github.com/realm/realm-core/pull/6927))
+* Add baas-network-tests nightly task for (future) testing sync client operation with non-ideal network conditions. ([PR #6852](https://github.com/realm/realm-core/pull/6852))
 
 ----------------------------------------------
 

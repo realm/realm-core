@@ -5264,9 +5264,7 @@ TEST_CASE("C API - client reset", "[sync][pbs][c_api][client reset][baas]") {
          }},
     };
 
-    std::string base_url = get_base_url();
-    REQUIRE(!base_url.empty());
-    auto server_app_config = minimal_app_config(base_url, "c_api_client_reset_tests", schema);
+    auto server_app_config = minimal_app_config("c_api_client_reset_tests", schema);
     server_app_config.partition_key = partition_prop;
     TestAppSession test_app_session(create_app(server_app_config));
 
@@ -5504,7 +5502,7 @@ TEST_CASE("C API app: link_user integration w/c_api transport", "[sync][app][c_a
     // user_data will be deleted when user_data_free() is called
     auto user_data = new TestTransportUserData();
     auto http_transport = realm_http_transport_new(send_request_to_server, user_data, user_data_free);
-    auto app_session = get_runtime_app_session(get_base_url());
+    auto app_session = get_runtime_app_session();
     TestAppSession session(app_session, *http_transport, DeleteApp{false});
     realm_app app(session.app());
 

@@ -3,7 +3,7 @@
 # and will import a given app into it.
 #
 # Usage:
-# ./evergreen/install_baas.sh -w {path to working directory} [-b git revision of baas] [-v] [-h]
+# ./evergreen/install_baas.sh -w PATH [-b BRANCH] [-v] [-h]
 #
 
 # shellcheck disable=SC1091
@@ -12,6 +12,16 @@
 set -o errexit
 set -o pipefail
 set -o functrace
+
+# Set up catch function that runs when an error occurs
+trap 'catch $? ${LINENO}' ERR
+trap "exit" INT TERM
+
+function catch()
+{
+    # Usage: catch EXIT_CODE LINE_NUM
+    echo "${BASH_SOURCE[0]}: $2: Error $1 occurred while starting baas"
+}
 
 case $(uname -s) in
     Darwin)
@@ -123,7 +133,8 @@ REALPATH="${BASE_PATH}/abspath.sh"
 function usage()
 {
     echo "Usage: install_baas.sh -w PATH [-b BRANCH] [-v] [-h]"
-    echo -e "\t-w PATH\t\tPath to working dir"
+    echo -e "\t-w PATH\t\tPath to working directory"
+    echo "Options:"
     echo -e "\t-b BRANCH\tOptional branch or git spec of baas to checkout/build"
     echo -e "\t-v\t\tEnable verbose script debugging"
     echo -e "\t-h\t\tShow this usage summary and exit"
@@ -139,33 +150,45 @@ while getopts "w:b:vh" opt; do
     case "${opt}" in
         w) WORK_PATH="$($REALPATH "${OPTARG}")";;
         b) BAAS_VERSION="${OPTARG}";;
-        v) VERBOSE="yes"; set -o verbose; set -o xtrace;;
+        v) VERBOSE="yes";;
         h) usage 0;;
         *) usage 1;;
     esac
 done
 
 if [[ -z "${WORK_PATH}" ]]; then
-    echo "Must specify working directory"
+    echo "Error: Baas working directory was empty or not provided"
     usage 1
 fi
 
-# Check the mongodb and baas_server port availability first
-MONGODB_PORT=26000
-BAAS_PORT=9090
-
-MONGODB_PORT_CHECK=$(lsof -P -i:${MONGODB_PORT} | grep "LISTEN" || true)
-if [[ -n "${MONGODB_PORT_CHECK}" ]]; then
-    echo "Error: mongodb port (${MONGODB_PORT}) is already in use"
-    echo -e "${MONGODB_PORT_CHECK}"
+if [[ -z "${AWS_ACCESS_KEY_ID}" || -z "${AWS_SECRET_ACCESS_KEY}" ]]; then
+    echo "Error: AWS_ACCESS_KEY_ID and/or AWS_SECRET_ACCESS_KEY are not set"
     exit 1
 fi
 
-BAAS_PORT_CHECK=$(lsof -P -i:${BAAS_PORT} | grep "LISTEN" || true)
-if [[ -n "${BAAS_PORT_CHECK}" ]]; then
-    echo "Error: baas server port (${BAAS_PORT}) is already in use"
-    echo -e "${BAAS_PORT_CHECK}"
-    exit 1
+function check_port_in_use()
+{
+    # Usage: check_port_in_use PORT PORT_NAME
+    port_num="${1}"
+    port_check=$(lsof -P "-i:${port_num}" | grep "LISTEN" || true)
+    if [[ -n "${port_check}" ]]; then
+        echo "Error: ${2} port (${port_num}) is already in use"
+        echo -e "${port_check}"
+        exit 1
+    fi
+}
+
+# Check the mongodb and baas_server port availability first
+MONGODB_PORT=26000
+check_port_in_use "${MONGODB_PORT}" "mongodb"
+
+BAAS_PORT=9090
+check_port_in_use "${BAAS_PORT}" "baas server"
+
+# Wait to enable verbosity logging, if enabled
+if [[ -n "${VERBOSE}" ]]; then
+    set -o verbose
+    set -o xtrace
 fi
 
 # Create and cd into the working directory
@@ -191,6 +214,7 @@ BAAS_STOPPED_FILE="${WORK_PATH}/baas_stopped"
 BAAS_PID_FILE="${WORK_PATH}/baas_server.pid"
 MONGOD_PID_FILE="${WORK_PATH}/mongod.pid"
 MONGOD_LOG="${MONGODB_PATH}/mongod.log"
+GO_ROOT_FILE="${WORK_PATH}/go_root"
 
 # Delete the mongod working directory if it exists from a previous run
 # Wait to create this directory until just before mongod is started
@@ -200,29 +224,32 @@ fi
 
 # Remove some files from a previous run if they exist
 if [[ -f "${BAAS_SERVER_LOG}" ]]; then
-    rm "${BAAS_SERVER_LOG}"
+    rm -f "${BAAS_SERVER_LOG}"
 fi
 if [[ -f "${BAAS_READY_FILE}" ]]; then
-    rm "${BAAS_READY_FILE}"
+    rm -f "${BAAS_READY_FILE}"
 fi
 if [[ -f "${BAAS_STOPPED_FILE}" ]]; then
-    rm "${BAAS_STOPPED_FILE}"
+    rm -f "${BAAS_STOPPED_FILE}"
 fi
 if [[ -f "${BAAS_PID_FILE}" ]]; then
-    rm "${BAAS_PID_FILE}"
+    rm -f "${BAAS_PID_FILE}"
 fi
 if [[ -f "${MONGOD_PID_FILE}" ]]; then
-    rm "${MONGOD_PID_FILE}"
+    rm -f "${MONGOD_PID_FILE}"
 fi
 
 # Set up the cleanup function that runs at exit and stops mongod and the baas server
-function cleanup()
-{
-    # The baas server is being stopped (or never started), create a 'baas_stopped' file
-    touch "${BAAS_STOPPED_FILE}"
+trap 'on_exit' EXIT
 
-    baas_pid=""
-    mongod_pid=""
+function on_exit()
+{
+    # Usage: on_exit
+    # The baas server is being stopped (or never started), create a 'baas_stopped' file
+    touch "${BAAS_STOPPED_FILE}" || true
+
+    baas_pid=
+    mongod_pid=
     if [[ -f "${BAAS_PID_FILE}" ]]; then
         baas_pid="$(< "${BAAS_PID_FILE}")"
     fi
@@ -233,21 +260,20 @@ function cleanup()
 
     if [[ -n "${baas_pid}" ]]; then
         echo "Stopping baas ${baas_pid}"
-        kill "${baas_pid}"
+        kill "${baas_pid}" || true
         echo "Waiting for baas to stop"
         wait "${baas_pid}"
+        rm -f "${BAAS_PID_FILE}" || true
     fi
 
     if [[ -n "${mongod_pid}" ]]; then
-        echo "Killing mongod ${mongod_pid}"
-        kill "${mongod_pid}"
+        echo "Stopping mongod ${mongod_pid}"
+        kill "${mongod_pid}" || true
         echo "Waiting for processes to exit"
         wait
+        rm -f "${MONGOD_PID_FILE}" || true
     fi
 }
-
-trap "exit" INT TERM ERR
-trap 'cleanup $?' EXIT
 
 echo "Installing node and go to build baas and its dependencies"
 
@@ -265,7 +291,10 @@ echo "Node version: $(node --version)"
 # Download go if it's not found and set up the GOROOT for building/running baas
 [[ -x ${WORK_PATH}/go/bin/go ]] || (${CURL} -sL $GO_URL | tar -xz)
 export GOROOT="${WORK_PATH}/go"
-export PATH="${WORK_PATH}/go/bin":${PATH}
+export PATH="${GOROOT}/bin":${PATH}
+# Write the GOROOT to a file after the download completes so the baas proxy
+# can use the same path.
+echo "${GOROOT}" > "${GO_ROOT_FILE}"
 echo "Go version: $(go version)"
 
 # Create the <work_path>/baas_dep_binaries/ directory
@@ -374,16 +403,21 @@ if [ ! -x "${MONGO_BINARIES_DIR}/bin/mongod" ]; then
     mv mongodb* mongodb-binaries
     chmod +x "${MONGO_BINARIES_DIR}/bin"/*
 fi
+echo "mongod version: $("${MONGO_BINARIES_DIR}/bin/mongod" --version --quiet | sed 1q)"
 
-if [[ -n "${MONGOSH_DOWNLOAD_URL}" ]] && [[ ! -x "${MONGO_BINARIES_DIR}/bin/mongosh" ]]; then
-    echo "Downloading mongosh"
-    ${CURL} -sLS "${MONGOSH_DOWNLOAD_URL}" --output mongosh-binaries.zip
-    unzip -jnqq mongosh-binaries.zip '*/bin/*' -d "${MONGO_BINARIES_DIR}/bin/"
-    rm mongosh-binaries.zip
+if [[ -n "${MONGOSH_DOWNLOAD_URL}" ]]; then
+    if [[ ! -x "${MONGO_BINARIES_DIR}/bin/mongosh" ]]; then
+        echo "Downloading mongosh"
+        ${CURL} -sLS "${MONGOSH_DOWNLOAD_URL}" --output mongosh-binaries.zip
+        unzip -jnqq mongosh-binaries.zip '*/bin/*' -d "${MONGO_BINARIES_DIR}/bin/"
+        rm mongosh-binaries.zip
+        MONGOSH="mongosh"
+    fi
+else
+    # Use the mongo shell provided with mongod
+    MONGOSH="mongo"
 fi
-
-[[ -n "${MONGOSH_DOWNLOAD_URL}" ]] && MONGOSH="mongosh" || MONGOSH="mongo"
-
+echo "${MONGOSH} version: $("${MONGO_BINARIES_DIR}/bin/${MONGOSH}" --version)"
 
 # Start mongod on port 26000 and listening on all network interfaces
 echo "Starting mongodb"
@@ -402,7 +436,6 @@ mkdir -p "${MONGODB_PATH}"
     --logpath "${MONGOD_LOG}" \
     --dbpath "${MONGODB_PATH}/" \
     --pidfilepath "${MONGOD_PID_FILE}" &
-
 
 # Wait for mongod to start (up to 40 secs) while attempting to initialize the replica set
 echo "Initializing replica set"
@@ -457,12 +490,7 @@ echo "Starting baas app server"
     --configFile=etc/configs/test_config.json --configFile="${BASE_PATH}/config_overrides.json" > "${BAAS_SERVER_LOG}" 2>&1 &
 echo $! > "${BAAS_PID_FILE}"
 
-WAIT_BAAS_OPTS=()
-if [[ -n "${VERBOSE}" ]]; then
-    WAIT_BAAS_OPTS=("-v")
-fi
-
-"${BASE_PATH}/wait_for_baas.sh" "${WAIT_BAAS_OPTS[@]}" -w "${WORK_PATH}"
+"${BASE_PATH}/wait_for_baas.sh" -w "${WORK_PATH}"
 
 # Create the admin user and set up the allowed roles
 echo "Adding roles to admin user"
@@ -483,4 +511,5 @@ echo "---------------------------------------------"
 echo "Baas server ready"
 echo "---------------------------------------------"
 wait
+
 popd > /dev/null  # baas

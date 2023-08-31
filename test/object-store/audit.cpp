@@ -1687,7 +1687,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
     const Schema no_audit_event_schema{
         {"object", {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"value", PropertyType::Int}}}};
 
-    auto app_create_config = default_app_config(get_base_url());
+    auto app_create_config = default_app_config();
     app_create_config.schema = schema;
     app_create_config.dev_mode_enabled = false;
     TestAppSession session = create_app(app_create_config);
