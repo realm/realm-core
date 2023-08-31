@@ -189,31 +189,13 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) noexcept
     REALM_TEMPEX(return get_direct, width, (data, ndx));
 }
 
-// Read a bit field of up to 256 bits. Three functions:
-// read_large_bitfield: handles field of 64 bit or more.
-// read_small_bitfield: handles field of 64 bit or less.
-// read_bitfield: handles both cases
-// - If more than 64 bits, the bitfield must be byte aligned in both start and size.
-// - If not any alignment and size is supported
+// Read a bit field of up to 64 bits.
+// - Any alignment and size is supported
 // - The start of the 'data' area must be 64 bit aligned in all cases.
-// - 'result' is a 64-bit aligned pointer to where the extracted value should be placed.
 // - For fields of 64-bit or less, the first 64-bit word is filled with the zero-extended
 //   value of the bitfield.
-// - For fields larger than 64-bit (which should always be an integral number of bytes),
-//   the field is copied into the first *bytes* of the result area. The remaining bytes
-//   are untouched. The caller may or may not choose to zero them, depending on contex.
-inline void read_large_bitfield(const char* data_area, size_t field_position, size_t width, uint64_t* result)
+inline uint64_t read_bitfield(const char* data_area, size_t field_position, size_t width)
 {
-    // entries more than 64 bit (8 bytes)
-    // everything is byte aligned, so just find the right bytes and copy
-    // them out.
-    size_t first_byte_offset = field_position >> 3;
-    memcpy(result, data_area + first_byte_offset, width >> 3);
-}
-
-inline uint64_t read_small_bitfield(const char* data_area, size_t field_position, size_t width)
-{
-    // entries 64 bit or less:
     // ectract data based on 64-bit word memory access and some bit fiddling
     size_t offset_begin = field_position;
     size_t offset_end = offset_begin + width - 1;
@@ -237,26 +219,7 @@ inline uint64_t read_small_bitfield(const char* data_area, size_t field_position
     return begin_word;
 }
 
-inline void read_bitfield(const char* data_area, size_t field_position, size_t width, uint64_t* result)
-{
-    if (width <= 64) {
-        result[0] = read_small_bitfield(data_area, field_position, width);
-    }
-    else {
-        read_large_bitfield(data_area, field_position, width, result);
-    }
-}
-
-inline void write_large_bitfield(char* data_area, size_t field_position, size_t width, uint64_t* value)
-{
-    // entries more than 64 bit (8 bytes)
-    // everything is byte aligned, so just find the right bytes and copy
-    // them out.
-    size_t first_byte_offset = field_position >> 3;
-    memcpy(data_area + first_byte_offset, value, width >> 3);
-}
-
-inline void write_small_bitfield(char* data_area, size_t field_position, size_t width, uint64_t value)
+inline void write_bitfield(char* data_area, size_t field_position, size_t width, uint64_t value)
 {
     // entries 64 bit or less:
     // ectract data based on 64-bit word memory access and some bit fiddling
@@ -285,17 +248,6 @@ inline void write_small_bitfield(char* data_area, size_t field_position, size_t 
         ((uint64_t*)data_area)[offset_end_word] = end_word;
     }
 }
-
-inline void write_bitfield(char* data_area, size_t field_position, size_t width, uint64_t* value)
-{
-    if (width <= 64) {
-        write_small_bitfield(data_area, field_position, width, value[0]);
-    }
-    else {
-        write_large_bitfield(data_area, field_position, width, value);
-    }
-}
-
 
 inline int64_t sign_extend_field(size_t width, uint64_t value)
 {

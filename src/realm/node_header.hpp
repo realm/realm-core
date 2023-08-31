@@ -54,25 +54,44 @@ public:
         wtype_Multiply = 1, // width indicates how many bytes every element occupies
         wtype_Ignore = 2,   // each element is 1 byte
         // the following encodings use the width field (bits 0-2) of byte 4 to specify layouts.
+        // byte 5 of the header holds one or two element sizes.
+        // byte 6 and 7 holds one or two array sizes (element counts).
+        //
         // the header stores enough data to a) compute the total size of a block,
         // and b) determine which part of a block may hold refs, which may need to be
         // scanned/updated for example during write to disk.
-        // the element width is given by bits 0-4 of byte 5. Detailed encoding described later.
-        wtype_Wide = 3,     // smaller arrays with wider/better packed elements:
-                            // number of elements given by bytes 6 (hi) and 7 (lo)
-        wtype_LocalDir = 4, // two combined arrays, second one indexes first one:
-                            // the header specifies the element size of the first
-                            // array. The element size of the second array is derived
-                            // from the number of entries in the first one.
-                            // number of entries in the directory (first array) given
-                            // by byte 7. number of elements given by byte 6 (lo) and
-                            // bits 5-7 of byte 5 (hi)
-        wtype_Sparse = 5,   // sparse array controlled by a bitvector:
-                            // size of the bitvector and other metadata given by byte 7
-                            // only some sizes (for example 8-bytes) may be valid,
-                            // depending on context.
-                            // number of elements given by byte 6 (lo) and bits (5-7) of
-                            // byte 5 (hi).
+        //
+        wtype_Packed = 3, // Array with better packed elements.
+                          // Use for denser packaging of existing arrays up to 65535 elements
+                          // bits 0-3 of byte 5 holds element size.
+                          // byte 6 and 7 holds number of elements.
+                          //
+        wtype_AofP = 4,   // Array of pairs. Each pair has elements of two different sizes.
+                          // Use for better spatial locality if you often access both members of a pair
+                          // bits 0-3 of byte 5 holds size of first element in each pair
+                          // bits 4-7 of byte 5 holds size of snd element in each pair
+                          // byte 6 and 7 holds number of pairs
+                          // if HasRefs is set, it applies to snd element.
+                          //
+        wtype_PofA = 5,   // Pair of arrays. Each arrays may hold elements of different sizes.
+                          // Use for better spatial locality if you often access only one of the arrays,
+                          // but want to represent stuff from two arrays in one memory block to
+                          // save allocation and ref-translation overhead
+                          // bits 0-3 of byte 5 holds size of elements in first array
+                          // bits 4-7 of byte 5 holds size of elements in second array
+                          // byte 6 and 7 holds number of elements in both arrays
+                          // if HasRefs is set, it applies to snd array
+                          //
+        wtype_Flex = 6,   // Pair of arrays possibly of different length and with different sizes.
+                          // Use for situations where array lengths may differ, for example
+                          // if one array is used to index the other, or if one array is used
+                          // for metadata which cannot hold refs. Note the number of elements
+                          // is limited to 255.
+                          // bits 0-3 of byte 5 holds size of elements in first array
+                          // bits 4-7 of byte 5 holds size of elements in second array
+                          // byte 6 holds number of elements in first array
+                          // byte 7 holds number of elements in second array
+                          // if HasRefs is set, it applies to snd array
         // possibly more....
     };
     static const int wtype_extend = 3; // value held in wtype field for wtypes after wtype_Wide
@@ -131,22 +150,28 @@ public:
 
     // For wtype lower than wtype_extend, the element width is given by
     // bits 0-2 in byte 4 of the header and only powers of two is supported.
-    // For new wtypes these bits are already used to extend the wtype and the
-    // element width is instead placed in bits 0-4 of byte 5.
-    // These 5 bits encode the following element widths (all widths in bits)
+    // For new wtypes we support 16 different element sizes and in some
+    // cases two of them.
+    // This is the extended encoding of the element widths (all widths in bits)
     //
-    // Encoding:    Sizes: (in bits)
-    // 0         -> 0
-    // 1-4       -> 1,2,3,4
-    // 5-8       -> 5,6,7,8
-    // 9-12      -> 10,12,14,16
-    // 13-16     -> 20,24,28,32
-    // 17-20     -> 40,48,56,64
-    // 21-24     -> 80,96,112,128
-    // 25-28     -> 160,192,224,256
-    // 29-31     reserved
-    // Some layouts may not support all sizes. But for element sizes which are not
-    // powers of two, dense/unaligned packing is assumed.
+    // Encoding:    Sizes:
+    // 0            -> 0
+    // 1            -> 1
+    // 2            -> 2
+    // 3            -> 3
+    // 4            -> 4
+    // 5            -> 5
+    // 6            -> 6
+    // 7            -> 8
+    // 8            -> 10
+    // 9            -> 13
+    // 10           -> 17
+    // 11           -> 22
+    // 12           -> 29
+    // 13           -> 38
+    // 14           -> 49
+    // 15           -> 64
+
     static int get_width_encoding_from_header(const char* header) noexcept
     {
         const unsigned char* h = reinterpret_cast<const unsigned char*>(header);
