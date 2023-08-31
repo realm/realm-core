@@ -627,9 +627,9 @@ public:
     class Streambuf;
 
 private:
+    bool m_have_lock = false; // Only valid when m_fd is not null
 #ifdef _WIN32
     HANDLE m_fd = nullptr;
-    bool m_have_lock = false; // Only valid when m_fd is not null
 #else
     int m_fd = -1;
 #ifdef REALM_FILELOCK_EMULATION
@@ -983,9 +983,12 @@ inline File::File(File&& f) noexcept
 #ifdef _WIN32
     m_fd = f.m_fd;
     m_have_lock = f.m_have_lock;
+    f.m_have_lock = false;
     f.m_fd = nullptr;
 #else
     m_fd = f.m_fd;
+    m_have_lock = f.m_have_lock;
+    f.m_have_lock = false;
 #ifdef REALM_FILELOCK_EMULATION
     m_pipe_fd = f.m_pipe_fd;
     m_has_exclusive_lock = f.m_has_exclusive_lock;
@@ -1003,10 +1006,13 @@ inline File& File::operator=(File&& f) noexcept
 #ifdef _WIN32
     m_fd = f.m_fd;
     m_have_lock = f.m_have_lock;
+    f.m_have_lock = false;
     f.m_fd = nullptr;
 #else
     m_fd = f.m_fd;
     f.m_fd = -1;
+    m_have_lock = f.m_have_lock;
+    f.m_have_lock = false;
 #ifdef REALM_FILELOCK_EMULATION
     m_pipe_fd = f.m_pipe_fd;
     f.m_pipe_fd = -1;
