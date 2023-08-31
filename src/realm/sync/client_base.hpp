@@ -282,6 +282,14 @@ inline std::ostream& operator<<(std::ostream& os, ConnectionState state)
     REALM_TERMINATE("Invalid ConnectionState value");
 }
 
+// The reason a synchronization session is used for.
+enum class SessionReason {
+    // Regular synchronization
+    Sync = 0,
+    // Download a fresh realm
+    ClientReset,
+};
+
 } // namespace realm::sync
 
 #endif // REALM_SYNC_CLIENT_BASE_HPP

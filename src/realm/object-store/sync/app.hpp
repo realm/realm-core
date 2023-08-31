@@ -83,8 +83,6 @@ public:
         std::string app_id;
         std::shared_ptr<GenericNetworkTransport> transport;
         util::Optional<std::string> base_url;
-        util::Optional<std::string> local_app_name;
-        util::Optional<std::string> local_app_version;
         util::Optional<uint64_t> default_request_timeout_ms;
         DeviceInfo device_info;
     };

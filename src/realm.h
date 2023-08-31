@@ -443,9 +443,10 @@ RLM_API bool realm_get_last_error(realm_error_t* err);
  *
  * @param err A pointer to a `realm_error_t` struct that will be populated with
  *            information about the error. May not be NULL.
+ * @return A bool indicating whether or not an error is available to be returned
  * @see realm_get_last_error()
  */
-RLM_API void realm_get_async_error(const realm_async_error_t* err, realm_error_t* out_err);
+RLM_API bool realm_get_async_error(const realm_async_error_t* err, realm_error_t* out_err);
 
 /**
  * Convert the last error to `realm_async_error_t`, which can safely be passed
@@ -2850,8 +2851,6 @@ RLM_API realm_app_config_t* realm_app_config_new(const char* app_id,
                                                  const realm_http_transport_t* http_transport) RLM_API_NOEXCEPT;
 
 RLM_API void realm_app_config_set_base_url(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_local_app_name(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_local_app_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t*, uint64_t ms) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_platform_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_sdk_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;

@@ -82,7 +82,14 @@ std::pair<std::set<std::string>, std::set<std::string>> Tokenizer::get_search_to
     for (auto& tok : incl) {
         reset(tok);
         next();
-        includes.emplace(get_token());
+        if (tok.back() == '*') {
+            std::string str(get_token());
+            str += '*';
+            includes.insert(str);
+        }
+        else {
+            includes.emplace(get_token());
+        }
         if (next()) {
             throw InvalidArgument("Non alphanumeric characters not allowed inside search word");
         }

@@ -374,7 +374,6 @@ private:
         CHECK(nlohmann::json::parse(request.body)["options"] ==
               nlohmann::json({{"device",
                                {{"appId", "app_id_123"},
-                                {"appVersion", "some_app_version"},
                                 {"platform", util::get_library_platform()},
                                 {"platformVersion", "some_platform_version"},
                                 {"sdk", "some_sdk_name"},
@@ -484,7 +483,8 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         CHECK(async_err);
 
         realm_error_t err;
-        realm_get_async_error(async_err, &err);
+        CHECK(realm_get_async_error(async_err, &err));
+        CHECK_FALSE(realm_get_async_error(nullptr, &err));
 
         CHECK(err.error == RLM_ERR_RUNTIME);
         CHECK(std::string{err.message} == "Synthetic error");
@@ -493,7 +493,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             auto cloned = clone_cptr(async_err);
             CHECK(realm_equals(async_err, cloned.get()));
             realm_error_t err2;
-            realm_get_async_error(cloned.get(), &err2);
+            CHECK(realm_get_async_error(cloned.get(), &err2));
             CHECK(err2.error == RLM_ERR_RUNTIME);
             CHECK(std::string{err2.message} == "Synthetic error");
         }
@@ -657,12 +657,6 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
         realm_app_config_set_base_url(app_config.get(), "https://path/to/app");
         CHECK(app_config->base_url == "https://path/to/app");
-
-        realm_app_config_set_local_app_name(app_config.get(), "some_app_name");
-        CHECK(app_config->local_app_name == "some_app_name");
-
-        realm_app_config_set_local_app_version(app_config.get(), "some_app_version");
-        CHECK(app_config->local_app_version == "some_app_version");
 
         realm_app_config_set_default_request_timeout(app_config.get(), request_timeout);
         CHECK(app_config->default_request_timeout_ms == request_timeout);
@@ -5044,9 +5038,7 @@ static void task_completion_func(void* p, realm_thread_safe_reference_t* realm,
     auto userdata_p = static_cast<Userdata*>(p);
 
     userdata_p->realm_ref = realm;
-    userdata_p->has_error = async_error != nullptr;
-    if (userdata_p->has_error)
-        realm_get_async_error(async_error, &userdata_p->error);
+    userdata_p->has_error = realm_get_async_error(async_error, &userdata_p->error);
     userdata_p->called = true;
 }
 
