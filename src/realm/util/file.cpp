@@ -1285,13 +1285,11 @@ void File::unlock() noexcept
     overlapped.Offset = 0;
     overlapped.Pointer = 0;
     BOOL r = UnlockFileEx(m_fd, 0, 1, 0, &overlapped);
-
     REALM_ASSERT_RELEASE(r);
-    m_have_lock = false;
 #else
     _unlock(m_fd);
-    m_have_lock = false;
 #endif
+    m_have_lock = false;
 }
 
 void File::rw_unlock() noexcept

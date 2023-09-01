@@ -982,13 +982,9 @@ inline File::File(File&& f) noexcept
 {
 #ifdef _WIN32
     m_fd = f.m_fd;
-    m_have_lock = f.m_have_lock;
-    f.m_have_lock = false;
     f.m_fd = nullptr;
 #else
     m_fd = f.m_fd;
-    m_have_lock = f.m_have_lock;
-    f.m_have_lock = false;
 #ifdef REALM_FILELOCK_EMULATION
     m_pipe_fd = f.m_pipe_fd;
     m_has_exclusive_lock = f.m_has_exclusive_lock;
@@ -997,6 +993,8 @@ inline File::File(File&& f) noexcept
 #endif
     f.m_fd = -1;
 #endif
+    m_have_lock = f.m_have_lock;
+    f.m_have_lock = false;
     m_encryption_key = std::move(f.m_encryption_key);
 }
 
@@ -1005,14 +1003,10 @@ inline File& File::operator=(File&& f) noexcept
     close();
 #ifdef _WIN32
     m_fd = f.m_fd;
-    m_have_lock = f.m_have_lock;
-    f.m_have_lock = false;
     f.m_fd = nullptr;
 #else
     m_fd = f.m_fd;
     f.m_fd = -1;
-    m_have_lock = f.m_have_lock;
-    f.m_have_lock = false;
 #ifdef REALM_FILELOCK_EMULATION
     m_pipe_fd = f.m_pipe_fd;
     f.m_pipe_fd = -1;
@@ -1020,6 +1014,8 @@ inline File& File::operator=(File&& f) noexcept
     f.m_has_exclusive_lock = false;
 #endif
 #endif
+    m_have_lock = f.m_have_lock;
+    f.m_have_lock = false;
     m_encryption_key = std::move(f.m_encryption_key);
     return *this;
 }
