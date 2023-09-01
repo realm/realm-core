@@ -570,6 +570,7 @@ void TableView::do_sort(const DescriptorOrdering& ordering)
                 using_indexpairs = false;
             }
             base_descr->execute(*m_table, m_key_values);
+            sz = size();
         }
     }
     // Apply the results
@@ -601,5 +602,5 @@ bool TableView::is_in_table_order() const
 
 void TableView::knnsearch(ColKey column, const std::vector<float>& query_data, size_t k)
 {
-    knnsearch(SemanticSearchDescriptor(query_data, k, column));
+    knnsearch(SemanticSearchDescriptor(column, query_data, k));
 }

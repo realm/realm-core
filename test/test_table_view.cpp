@@ -2912,6 +2912,15 @@ TEST(TableView_VectorSearch)
     CHECK_EQUAL(2, v2.size());
     CHECK_EQUAL(4, v2[0].get<Int>(col_id));
     CHECK_EQUAL(1, v2[1].get<Int>(col_id));
+
+    TableView v3 = table.where().find_all();
+    DescriptorOrdering ordering;
+    ordering.append_knn(SemanticSearchDescriptor(col_lst, {0.003, 0.005, 0.010, 0.020, 0.100}, 2));
+    ordering.append_sort(SortDescriptor({{col_id}}, {false}));
+    v3.apply_descriptor_ordering(ordering);
+    CHECK_EQUAL(2, v3.size());
+    CHECK_EQUAL(5, v3[0].get<Int>(col_id));
+    CHECK_EQUAL(4, v3[1].get<Int>(col_id));
 }
 
 #endif // TEST_TABLE_VIEW

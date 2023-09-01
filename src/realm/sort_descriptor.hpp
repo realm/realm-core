@@ -341,7 +341,7 @@ private:
 
 class SemanticSearchDescriptor : public BaseDescriptor {
 public:
-    SemanticSearchDescriptor(const std::vector<float>& query_data, size_t k, ColKey column)
+    SemanticSearchDescriptor(ColKey column, const std::vector<float>& query_data, size_t k)
         : m_query_data(query_data)
         , m_k(k)
         , m_column(column)
