@@ -363,7 +363,7 @@ public:
     void distinct(ColKey column);
     void distinct(DistinctDescriptor columns);
     void limit(LimitDescriptor limit);
-    
+
     // Vector search. Semantic nearest neighbour search over lists of doubles (vector embeddings)
     void knnsearch(ColKey column, const std::vector<float>& query_data, size_t k);
     void knnsearch(SemanticSearchDescriptor knn);
