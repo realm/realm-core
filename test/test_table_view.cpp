@@ -2843,11 +2843,11 @@ TEST(TableView_VectorSearch)
         Obj o1 = table.create_object();
         o1.set(col_id, 1);
         Lst<float> lst = o1.get_list<float>(col_lst);
-        lst.add(0.003);
-        lst.add(0.004);
-        lst.add(0.005);
-        lst.add(0.100);
-        lst.add(0.010);
+        lst.add(0.003f);
+        lst.add(0.004f);
+        lst.add(0.005f);
+        lst.add(0.100f);
+        lst.add(0.010f);
         // dist = 0.996921
     }
 
@@ -2855,11 +2855,11 @@ TEST(TableView_VectorSearch)
         Obj o1 = table.create_object();
         o1.set(col_id, 2);
         Lst<float> lst = o1.get_list<float>(col_lst);
-        lst.add(0.001);
-        lst.add(0.004);
-        lst.add(0.005);
-        lst.add(0.100);
-        lst.add(0.010);
+        lst.add(0.001f);
+        lst.add(0.004f);
+        lst.add(0.005f);
+        lst.add(0.100f);
+        lst.add(0.010f);
         // dist = 0.996927
     }
 
@@ -2867,11 +2867,11 @@ TEST(TableView_VectorSearch)
         Obj o1 = table.create_object();
         o1.set(col_id, 3);
         Lst<float> lst = o1.get_list<float>(col_lst);
-        lst.add(0.001);
-        lst.add(0.004);
-        lst.add(0.005);
-        lst.add(0.100);
-        lst.add(0.010);
+        lst.add(0.001f);
+        lst.add(0.004f);
+        lst.add(0.005f);
+        lst.add(0.100f);
+        lst.add(0.010f);
         // dist = 0.996927
     }
 
@@ -2879,11 +2879,11 @@ TEST(TableView_VectorSearch)
         Obj o1 = table.create_object();
         o1.set(col_id, 4);
         Lst<float> lst = o1.get_list<float>(col_lst);
-        lst.add(0.004);
-        lst.add(0.005);
-        lst.add(0.010);
-        lst.add(0.025);
-        lst.add(0.100);
+        lst.add(0.004f);
+        lst.add(0.005f);
+        lst.add(0.010f);
+        lst.add(0.025f);
+        lst.add(0.100f);
         // dist = 0.989363
     }
 
@@ -2891,31 +2891,31 @@ TEST(TableView_VectorSearch)
         Obj o1 = table.create_object();
         o1.set(col_id, 5);
         Lst<float> lst = o1.get_list<float>(col_lst);
-        lst.add(0.003);
-        lst.add(0.007);
-        lst.add(0.008);
-        lst.add(0.020);
-        lst.add(0.100);
+        lst.add(0.003f);
+        lst.add(0.007f);
+        lst.add(0.008f);
+        lst.add(0.020f);
+        lst.add(0.100f);
         // dist = 0.989476
     }
 
     // Test single knn query
     TableView v = table.where().find_all();
-    v.knnsearch(col_lst, {0.003, 0.005, 0.010, 0.020, 0.100}, 2);
+    v.knnsearch(col_lst, {0.003f, 0.005f, 0.010f, 0.020f, 0.100f}, 2);
     CHECK_EQUAL(2, v.size());
     CHECK_EQUAL(4, v[0].get<Int>(col_id));
     CHECK_EQUAL(5, v[1].get<Int>(col_id));
 
     // Test knn combined with regular query
     TableView v2 = table.where().less(col_id, 5).find_all();
-    v2.knnsearch(col_lst, {0.003, 0.005, 0.010, 0.020, 0.100}, 2);
+    v2.knnsearch(col_lst, {0.003f, 0.005f, 0.010f, 0.020f, 0.100f}, 2);
     CHECK_EQUAL(2, v2.size());
     CHECK_EQUAL(4, v2[0].get<Int>(col_id));
     CHECK_EQUAL(1, v2[1].get<Int>(col_id));
 
     TableView v3 = table.where().find_all();
     DescriptorOrdering ordering;
-    ordering.append_knn(SemanticSearchDescriptor(col_lst, {0.003, 0.005, 0.010, 0.020, 0.100}, 2));
+    ordering.append_knn(SemanticSearchDescriptor(col_lst, {0.003f, 0.005f, 0.010f, 0.020f, 0.100f}, 2));
     ordering.append_sort(SortDescriptor({{col_id}}, {false}));
     v3.apply_descriptor_ordering(ordering);
     CHECK_EQUAL(2, v3.size());

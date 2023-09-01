@@ -347,6 +347,9 @@ public:
         , m_column(column)
         , m_sp(query_data.size())
     {
+        if (!(column.get_type() == col_type_Float && column.is_list())) {
+            throw InvalidArgument("Knn distance can only be calculated on lists of floats");
+        }
     }
 
     bool is_valid() const noexcept override
