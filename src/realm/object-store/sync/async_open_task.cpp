@@ -133,7 +133,7 @@ void AsyncOpenTask::attach_to_subscription_initializer(AsyncOpenCallback&& async
     auto shared_realm = coordinator->get_realm(nullptr, m_db_first_open);
     const auto init_subscription = shared_realm->get_latest_subscription_set();
 
-    if (init_subscription.version() == 1 || (rerun_on_launch && m_db_first_open)) {
+    if (init_subscription.version() == 1 || (m_db_first_open && rerun_on_launch)) {
         // We need to wait until subscription initializer completes
         std::shared_ptr<AsyncOpenTask> self(shared_from_this());
         init_subscription.get_state_change_notification(sync::SubscriptionSet::State::Complete)

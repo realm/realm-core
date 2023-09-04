@@ -332,7 +332,8 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
         rerun_on_open = config.sync_config->rerun_init_subscription_on_open;
     }
 #else
-    static_cast<void>(db_opened_first_time);
+    static_cast<void>(first_time_open);
+    static_cast<void>(db_created);
 #endif
 
     auto schema = std::move(config.schema);
@@ -380,8 +381,17 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
     // rerun_on_open was set
     if (subscription_function) {
         const auto current_subscription = realm->get_latest_subscription_set();
-        const auto open_for_the_first_time = db_created || first_time_open;
-        if ((current_subscription.version() == 0) || (rerun_on_open && open_for_the_first_time)) {
+        const auto subscription_version = current_subscription.version();
+        // in case we are hitting this check while during a normal open, we need to take in
+        // consideration if the db was created during this call. Since this may be the first time
+        // we are actually creating a realm. For async open this does not apply, infact db_created
+        // will always be false.
+        first_time_open |= db_created;
+        if (subscription_version == 0 || (first_time_open && rerun_on_open)) {
+            // there is a small chance that if there are multiple async open tasks running, and one of the tasks
+            // is cancelled before the subscription is committed, the second task won't run the init subscription
+            // callback. This can be solved adding a second flag that stores whether the subscription was actually
+            // committed.
             subscription_function(realm);
         }
     }
