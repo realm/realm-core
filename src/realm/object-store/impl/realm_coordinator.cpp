@@ -563,6 +563,13 @@ void RealmCoordinator::delete_and_reopen()
     util::CheckedLockGuard lock(m_realm_mutex);
     close();
     util::File::remove(m_config.path);
+#if REALM_ENABLE_SYNC
+    // Close the sync session.
+    if (m_sync_session) {
+        m_sync_session->force_close();
+        m_sync_session = nullptr;
+    }
+#endif
     open_db();
 }
 

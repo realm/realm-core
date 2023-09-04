@@ -82,6 +82,7 @@ typedef enum realm_errno {
     RLM_ERR_TLS_HANDSHAKE_FAILED = 1041,
     RLM_ERR_WRONG_SYNC_TYPE = 1042,
     RLM_ERR_SYNC_WRITE_NOT_ALLOWED = 1043,
+    RLM_ERR_SYNC_SCHEMA_MIGRATION_ERROR = 1044,
 
     RLM_ERR_SYSTEM_ERROR = 1999,
 
@@ -261,6 +262,8 @@ typedef enum realm_sync_errno_session {
     RLM_SYNC_ERR_SESSION_MIGRATE_TO_FLX = 232,
     RLM_SYNC_ERR_SESSION_BAD_PROGRESS = 233,
     RLM_SYNC_ERR_SESSION_REVERT_TO_PBS = 234,
+    RLM_SYNC_ERR_SESSION_BAD_SCHEMA_VERSION = 235,
+    RLM_SYNC_ERR_SESSION_SCHEMA_VERSION_CHANGED = 236,
     // Error code 299 is reserved as an "unknown session error" in tests
 } realm_sync_errno_session_e;
 
