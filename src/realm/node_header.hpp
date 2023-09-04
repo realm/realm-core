@@ -151,26 +151,27 @@ public:
     // For wtype lower than wtype_extend, the element width is given by
     // bits 0-2 in byte 4 of the header and only powers of two is supported.
     // For new wtypes we support 16 different element sizes and in some
-    // cases two of them.
+    // cases two of them. Element sizes of zero is not supported in the new
+    // format - pick an old format for that.
     // This is the extended encoding of the element widths (all widths in bits)
     //
     // Encoding:    Sizes:
-    // 0            -> 0
-    // 1            -> 1
-    // 2            -> 2
-    // 3            -> 3
-    // 4            -> 4
-    // 5            -> 5
-    // 6            -> 6
-    // 7            -> 8
-    // 8            -> 10
-    // 9            -> 13
-    // 10           -> 17
-    // 11           -> 22
-    // 12           -> 29
-    // 13           -> 38
-    // 14           -> 49
-    // 15           -> 64
+    // 0            -> 1
+    // 1            -> 2
+    // 2            -> 3
+    // 3            -> 4
+    // 4            -> 5
+    // 5            -> 6
+    // 6            -> 8
+    // 7            -> 10
+    // 8            -> 12 (+2)
+    // 9            -> 16 (+4)
+    // 10           -> 20 (+4)
+    // 11           -> 24 (+4)
+    // 12           -> 32 (+8)
+    // 13           -> 40 (+8)
+    // 14           -> 52 (+12)
+    // 15           -> 64 (+12)
 
     static int get_width_encoding_from_header(const char* header) noexcept
     {
@@ -343,7 +344,7 @@ public:
     {
         size_t num_bytes = 0;
         switch (wtype) {
-            case wtype_Wide:
+            case wtype_Packed:
             case wtype_Bits: {
                 // Current assumption is that size is at most 2^24 and that width is at most 64.
                 // In that case the following will never overflow. (Assuming that size_t is at least 32 bits)
