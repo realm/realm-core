@@ -311,7 +311,7 @@ void SortDescriptor::execute(IndexPairs& v, const Sorter& predicate, const BaseD
         IndexPairs buffer;
         buffer.reserve(limit + 1);
         for (auto& elem : v) {
-            auto it = std::lower_bound(buffer.begin(), buffer.end(), elem, predicate);
+            auto it = std::lower_bound(buffer.begin(), buffer.end(), elem, std::ref(predicate));
             buffer.insert(it, elem);
             if (buffer.size() > limit) {
                 buffer.pop_back();
