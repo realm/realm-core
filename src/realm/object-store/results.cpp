@@ -472,7 +472,7 @@ object_store::Set Results::get_set(size_t ndx)
     REALM_ASSERT(m_mode == Mode::Collection);
     ensure_up_to_date();
     if (size_t actual = actual_index(ndx); actual < m_collection->size()) {
-        return object_store::Set{m_realm, m_collection->get_list(m_collection->get_path_element(actual))};
+        return object_store::Set{m_realm, m_collection->get_set(m_collection->get_path_element(actual))};
     }
     throw OutOfBounds{"get_set() on Results", ndx, m_collection->size()};
 }
@@ -483,7 +483,8 @@ object_store::Dictionary Results::get_dictionary(size_t ndx)
     REALM_ASSERT(m_mode == Mode::Collection);
     ensure_up_to_date();
     if (size_t actual = actual_index(ndx); actual < m_collection->size()) {
-        return object_store::Dictionary{m_realm, m_collection->get_list(m_collection->get_path_element(actual))};
+        return object_store::Dictionary{m_realm,
+                                        m_collection->get_dictionary(m_collection->get_path_element(actual))};
     }
     throw OutOfBounds{"get_dictionary() on Results", ndx, m_collection->size()};
 }
