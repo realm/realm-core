@@ -20,6 +20,7 @@ function usage()
     echo -e "\t-b BRANCH\tOptional branch or git spec of baas to checkout/build"
     echo -e "\t-v\t\tEnable verbose script debugging"
     echo -e "\t-h\t\tShow this usage summary and exit"
+    echo "Note: This script must be run from a cloned realm-core/ repository directory."
     # Default to 0 if exit code not provided
     exit "${1:0}"
 }
@@ -88,7 +89,7 @@ if [[ -n "${VERBOSE}" ]]; then
 fi
 
 if [[ -z "${BAAS_HOST_NAME}" ]]; then
-    echo "Baas hostname not found in baas host vars script: ${BAAS_HOST_VARS}"
+    echo "Baas remote hostname (BAAS_HOST_NAME) not provided in baas host vars script"
     usage 1
 fi
 
@@ -104,9 +105,15 @@ if [[ -z "${BAAS_USER}" ]]; then
     usage 1
 fi
 
+if [[ ! -d "${EVERGREEN_PATH}/" ]]; then
+    echo "This script must be run from the realm-core directory for accessing files in '${EVERGREEN_PATH}/'"
+    exit 1 
+fi
+
 if [[ -z "${FILE_DEST_DIR}" ]]; then
     FILE_DEST_DIR="/home/${BAAS_USER}"
 fi
+EVERGREEN_DEST_DIR="${FILE_DEST_DIR}/evergreen"
 
 SSH_USER="$(printf "%s@%s" "${BAAS_USER}" "${BAAS_HOST_NAME}")"
 
@@ -149,10 +156,9 @@ done
 echo "Transferring setup scripts to ${SSH_USER}:${FILE_DEST_DIR}"
 # Copy the baas host vars script to the baas remote host
 scp "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${BAAS_HOST_VARS}" "${SSH_USER}:${FILE_DEST_DIR}/"
-# Copy the current host and baas scripts from the working copy of realm-core
-# This ensures they have the latest copy, esp when running evergreen patches
-scp "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${EVERGREEN_PATH}/setup_baas_host.sh" "${SSH_USER}:${FILE_DEST_DIR}/"
-scp "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${EVERGREEN_PATH}/install_baas.sh" "${SSH_USER}:${FILE_DEST_DIR}/"
+# Copy the entire evergreen/ directory from the working copy of realm-core to the remote host
+# This ensures the remote host the latest copy, esp when running evergreen patches
+scp -r "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${EVERGREEN_PATH}/" "${SSH_USER}:${FILE_DEST_DIR}/"
 
 echo "Starting remote baas with branch/commit: '${BAAS_BRANCH}'"
 SETUP_BAAS_OPTS=()
@@ -167,4 +173,4 @@ fi
 # Also sets up a forward tunnel for port 9090 through the ssh connection to the baas remote host
 echo "Running setup script (with forward tunnel to 127.0.0.1:9090)"
 ssh "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 -L 9090:127.0.0.1:9090 "${SSH_USER}" \
-"${FILE_DEST_DIR}/setup_baas_host.sh" "${SETUP_BAAS_OPTS[@]}" "${FILE_DEST_DIR}/baas_host_vars.sh"
+    "${EVERGREEN_DEST_DIR}/setup_baas_host.sh" "${SETUP_BAAS_OPTS[@]}" "${FILE_DEST_DIR}/baas_host_vars.sh"

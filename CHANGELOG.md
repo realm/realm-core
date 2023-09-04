@@ -29,6 +29,28 @@
 
 ----------------------------------------------
 
+# 13.20.0 Release notes
+
+### Enhancements
+* Add a distinct error code for timeouts (SyncConnectTimeout) rather than using the same one as for less transient failures ([PR #6932](https://github.com/realm/realm-core/pull/6932)).
+* Allow arguments to RQL to be a string representation of a geospatial object for GEOWITHIN queries. This enables SDKs using the CAPI to marshal geo objects to strings. ([PR 6934](https://github.com/realm/realm-core/issues/6934))
+
+### Fixed
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Add a fake app id to the baas server's schema change history store to prevent server drop optimization from running during integration tests. ([PR #6927](https://github.com/realm/realm-core/pull/6927))
+
+----------------------------------------------
+
 # 13.19.0 Release notes
 
 ### Enhancements
