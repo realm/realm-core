@@ -411,6 +411,39 @@ RLM_API bool realm_results_get(realm_results_t* results, size_t index, realm_val
     });
 }
 
+RLM_API realm_list_t* realm_results_get_list(realm_results_t* results, size_t index)
+{
+    return wrap_err([&]() {
+        realm_list_t* out = nullptr;
+        auto result_list = results->get_list(index);
+        if (result_list.is_valid())
+            out = new realm_list_t{result_list};
+        return out;
+    });
+}
+
+RLM_API realm_set_t* realm_results_get_set(realm_results_t* results, size_t index)
+{
+    return wrap_err([&]() {
+        realm_set_t* out = nullptr;
+        auto result_set = results->get_set(index);
+        if (result_set.is_valid())
+            out = new realm_set_t{result_set};
+        return out;
+    });
+}
+
+RLM_API realm_dictionary_t* realm_results_get_dictionary(realm_results_t* results, size_t index)
+{
+    return wrap_err([&]() {
+        realm_dictionary_t* out = nullptr;
+        auto result_dictionary = results->get_dictionary(index);
+        if (result_dictionary.is_valid())
+            out = new realm_dictionary_t{result_dictionary};
+        return out;
+    });
+}
+
 RLM_API bool realm_results_find(realm_results_t* results, realm_value_t* value, size_t* out_index, bool* out_found)
 {
     if (out_index)

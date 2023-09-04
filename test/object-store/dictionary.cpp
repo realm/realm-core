@@ -183,14 +183,17 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
         auto val = results.get<Mixed>(0);
         REQUIRE(val.is_type(type_Dictionary));
         auto dict = results.get_dictionary(0);
+        REQUIRE(dict.is_valid());
 
         val = results.get<Mixed>(1);
         REQUIRE(val.is_type(type_List));
         auto list = results.get_list(1);
+        REQUIRE(list.is_valid());
 
         val = results.get<Mixed>(2);
         REQUIRE(val.is_type(type_Set));
         auto set = results.get_set(2);
+        REQUIRE(set.is_valid());
     }
 }
 
