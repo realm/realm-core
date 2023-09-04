@@ -103,7 +103,7 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident, syn
         std::move(on_flx_version_complete)); // throws
 
     if (m_notify_after) {
-        m_notify_after(previous_state->get_version_of_current_transaction(), did_recover_out);
+        m_notify_after(frozen_before_state_version, did_recover_out);
     }
 
     m_client_reset_old_version = local_version_ids.old_version;
