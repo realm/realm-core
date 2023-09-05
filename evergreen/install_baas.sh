@@ -444,6 +444,12 @@ echo "Building baas app server"
 [[ -f "${BAAS_PID_FILE}" ]] && rm "${BAAS_PID_FILE}"
 go build -o "${WORK_PATH}/baas_server" cmd/server/main.go
 
+# Based on https://github.com/10gen/baas/pull/10665
+# Add a version to the schema change history store so that the drop optimization does not take place
+# This caused issues with this test failing once app deletions starting being done asynchronously
+echo "Adding fake appid to skip baas server drop optimization"
+"${MONGO_BINARIES_DIR}/bin/${MONGOSH}"  --quiet mongodb://localhost:26000/__realm_sync "${BASE_PATH}/add_fake_appid.js"
+
 # Start the baas server on port *:9090 with the provided config JSON files
 echo "Starting baas app server"
 

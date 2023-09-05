@@ -98,7 +98,7 @@ std::vector<ObjKey> ClusterColumn::get_all_keys() const
 }
 
 template <>
-int64_t IndexArray::from_list<index_FindFirst>(Mixed value, InternalFindResult& /* result_ref */,
+int64_t IndexArray::from_list<index_FindFirst>(const Mixed& value, InternalFindResult& /* result_ref */,
                                                const IntegerColumn& key_values, const ClusterColumn& column) const
 {
     SortedListComparator slc(column);
@@ -118,7 +118,7 @@ int64_t IndexArray::from_list<index_FindFirst>(Mixed value, InternalFindResult& 
 }
 
 template <>
-int64_t IndexArray::from_list<index_Count>(Mixed value, InternalFindResult& /* result_ref */,
+int64_t IndexArray::from_list<index_Count>(const Mixed& value, InternalFindResult& /* result_ref */,
                                            const IntegerColumn& key_values, const ClusterColumn& column) const
 {
     SortedListComparator slc(column);
@@ -141,7 +141,7 @@ int64_t IndexArray::from_list<index_Count>(Mixed value, InternalFindResult& /* r
 }
 
 template <>
-int64_t IndexArray::from_list<index_FindAll_nocopy>(Mixed value, InternalFindResult& result_ref,
+int64_t IndexArray::from_list<index_FindAll_nocopy>(const Mixed& value, InternalFindResult& result_ref,
                                                     const IntegerColumn& key_values,
                                                     const ClusterColumn& column) const
 {
@@ -189,7 +189,8 @@ int64_t IndexArray::from_list<index_FindAll_nocopy>(Mixed value, InternalFindRes
 
 
 template <IndexMethod method>
-int64_t IndexArray::index_string(Mixed value, InternalFindResult& result_ref, const ClusterColumn& column) const
+int64_t IndexArray::index_string(const Mixed& value, InternalFindResult& result_ref,
+                                 const ClusterColumn& column) const
 {
     // Return`realm::not_found`, or an index to the (any) match
     constexpr bool first(method == index_FindFirst);
@@ -332,7 +333,7 @@ void IndexArray::from_list_all_ins(StringData upper_value, std::vector<ObjKey>& 
 }
 
 
-void IndexArray::from_list_all(Mixed value, std::vector<ObjKey>& result, const IntegerColumn& rows,
+void IndexArray::from_list_all(const Mixed& value, std::vector<ObjKey>& result, const IntegerColumn& rows,
                                const ClusterColumn& column) const
 {
     SortedListComparator slc(column);
@@ -544,7 +545,7 @@ void IndexArray::index_string_all_ins(StringData value, std::vector<ObjKey>& res
 }
 
 
-void IndexArray::index_string_all(Mixed value, std::vector<ObjKey>& result, const ClusterColumn& column) const
+void IndexArray::index_string_all(const Mixed& value, std::vector<ObjKey>& result, const ClusterColumn& column) const
 {
     const char* data = m_data;
     const char* header;
@@ -730,14 +731,14 @@ void IndexArray::_index_string_find_all_prefix(std::set<int64_t>& result, String
     }
 }
 
-ObjKey IndexArray::index_string_find_first(Mixed value, const ClusterColumn& column) const
+ObjKey IndexArray::index_string_find_first(const Mixed& value, const ClusterColumn& column) const
 {
     InternalFindResult unused;
     return ObjKey(index_string<index_FindFirst>(value, unused, column));
 }
 
 
-void IndexArray::index_string_find_all(std::vector<ObjKey>& result, Mixed value, const ClusterColumn& column,
+void IndexArray::index_string_find_all(std::vector<ObjKey>& result, const Mixed& value, const ClusterColumn& column,
                                        bool case_insensitive) const
 {
     if (case_insensitive && value.is_type(type_String)) {
@@ -748,13 +749,13 @@ void IndexArray::index_string_find_all(std::vector<ObjKey>& result, Mixed value,
     }
 }
 
-FindRes IndexArray::index_string_find_all_no_copy(Mixed value, const ClusterColumn& column,
+FindRes IndexArray::index_string_find_all_no_copy(const Mixed& value, const ClusterColumn& column,
                                                   InternalFindResult& result) const
 {
     return static_cast<FindRes>(index_string<index_FindAll_nocopy>(value, result, column));
 }
 
-size_t IndexArray::index_string_count(Mixed value, const ClusterColumn& column) const
+size_t IndexArray::index_string_count(const Mixed& value, const ClusterColumn& column) const
 {
     InternalFindResult unused;
     return to_size_t(index_string<index_Count>(value, unused, column));
@@ -778,12 +779,6 @@ std::unique_ptr<IndexArray> StringIndex::create_node(Allocator& alloc, bool is_l
 
     return top;
 }
-
-void StringIndex::set_target(const ClusterColumn& target_column) noexcept
-{
-    m_target_column = target_column;
-}
-
 
 StringIndex::key_type StringIndex::get_last_key() const
 {
@@ -1655,31 +1650,29 @@ bool StringIndex::is_empty() const
     return m_array->size() == 1; // first entry in refs points to offsets
 }
 
-template <>
-void StringIndex::insert<StringData>(ObjKey key, StringData value)
+void StringIndex::insert(ObjKey key, const Mixed& value)
 {
     StringConversionBuffer buffer;
+    constexpr size_t offset = 0; // First key from beginning of string
 
     if (this->m_target_column.is_fulltext()) {
-        auto words = Tokenizer::get_instance()->reset(std::string_view(value)).get_all_tokens();
-
-        for (auto& word : words) {
-            Mixed m(word);
-            insert_with_offset(key, m.get_index_data(buffer), m, 0); // Throws
+        if (value.is_type(type_String)) {
+            auto words = Tokenizer::get_instance()->reset(std::string_view(value.get<StringData>())).get_all_tokens();
+            for (auto& word : words) {
+                Mixed m(word);
+                insert_with_offset(key, m.get_index_data(buffer), m, offset); // Throws
+            }
         }
     }
     else {
-        Mixed m(value);
-        insert_with_offset(key, m.get_index_data(buffer), m, 0); // Throws
+        insert_with_offset(key, value.get_index_data(buffer), value, offset); // Throws
     }
 }
 
-template <>
-void StringIndex::set<StringData>(ObjKey key, StringData new_value)
+void StringIndex::set(ObjKey key, const Mixed& new_value)
 {
     StringConversionBuffer buffer;
     Mixed old_value = get(key);
-    Mixed new_value2 = Mixed(new_value);
 
     if (this->m_target_column.is_fulltext()) {
         auto tokenizer = Tokenizer::get_instance();
@@ -1690,9 +1683,10 @@ void StringIndex::set<StringData>(ObjKey key, StringData new_value)
             tokenizer->reset({old_string.data(), old_string.size()});
             old_words = tokenizer->get_all_tokens();
         }
-
-        tokenizer->reset({new_value.data(), new_value.size()});
-        auto new_words = tokenizer->get_all_tokens();
+        std::set<std::string> new_words;
+        if (new_value.is_type(type_String)) {
+            new_words = tokenizer->reset(std::string_view(new_value.get<StringData>())).get_all_tokens();
+        }
 
         auto w1 = old_words.begin();
         auto w2 = new_words.begin();
@@ -1726,13 +1720,13 @@ void StringIndex::set<StringData>(ObjKey key, StringData new_value)
         }
     }
     else {
-        if (REALM_LIKELY(new_value2 != old_value)) {
+        if (REALM_LIKELY(new_value != old_value)) {
             // We must erase this row first because erase uses find_first which
             // might find the duplicate if we insert before erasing.
             erase(key); // Throws
 
-            auto index_data = new_value2.get_index_data(buffer);
-            insert_with_offset(key, index_data, new_value2, 0); // Throws
+            auto index_data = new_value.get_index_data(buffer);
+            insert_with_offset(key, index_data, new_value, 0); // Throws
         }
     }
 }
@@ -1793,6 +1787,12 @@ bool SortedListComparator::operator()(Mixed needle, int64_t key_value) // used i
 
 // LCOV_EXCL_START ignore debug functions
 
+#ifdef REALM_DEBUG
+void StringIndex::print() const
+{
+    dump_node_structure(*m_array, std::cout, 0);
+}
+#endif // REALM_DEBUG
 
 void StringIndex::verify() const
 {
@@ -1883,15 +1883,43 @@ void StringIndex::verify_entries(const ClusterColumn& column) const
 
 namespace {
 
-void out_hex(std::ostream& out, uint64_t val)
+namespace {
+
+bool is_chars(uint64_t val)
+{
+    if (val == 0)
+        return true;
+    if (is_chars(val >> 8)) {
+        char c = val & 0xFF;
+        if (!c || std::isalpha(c)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void out_char(std::ostream& out, uint64_t val)
 {
     if (val) {
-        out_hex(out, val >> 8);
-        if (char c = val & 0xFF) {
+        out_char(out, val >> 8);
+        char c = val & 0xFF;
+        if (c && c != 'X') {
             out << c;
         }
     }
 }
+
+void out_hex(std::ostream& out, uint64_t val)
+{
+    if (is_chars(val)) {
+        out_char(out, val);
+    }
+    else {
+        out << int(val);
+    }
+}
+
+} // namespace
 
 } // namespace
 
@@ -1927,7 +1955,7 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
         for (size_t i = 0; i != subnode.size(); ++i) {
             if (i != 0)
                 out << ", ";
-            out_hex(out, subnode.get(i));
+            out_hex(out, uint32_t(subnode.get(i)));
         }
     }
     out << ")\n";

@@ -35,7 +35,11 @@ public:
     {
         return {};
     }
-    void add_index(Path&, Index) const noexcept final {}
+    void add_index(Path&, const Index&) const noexcept final {}
+    size_t find_index(const Index&) const noexcept final
+    {
+        return realm::npos;
+    }
 
     TableRef get_table() const noexcept final
     {
@@ -49,7 +53,7 @@ public:
 protected:
     Obj m_obj;
     ref_type m_ref;
-    UpdateStatus update_if_needed_with_status() const noexcept final
+    UpdateStatus update_if_needed_with_status() const final
     {
         return UpdateStatus::Updated;
     }
@@ -470,15 +474,30 @@ public:
         return m_obj_mem;
     }
 
+    // The tricky thing here is that we should return true, even if the
+    // collection has not yet been created.
     bool is_attached() const noexcept final
     {
-        UpdateStatus status = m_parent ? m_parent->update_if_needed_with_status() : UpdateStatus::Detached;
-        if (status == UpdateStatus::Updated) {
-            // Make sure to update next time around
-            m_content_version = 0;
+        if (m_parent) {
+            try {
+                // Update the parent. Will throw if parent is not existing.
+                switch (m_parent->update_if_needed_with_status()) {
+                    case UpdateStatus::Updated:
+                        // Make sure to update next time around
+                        m_content_version = 0;
+                        [[fallthrough]];
+                    case UpdateStatus::NoChange:
+                        // Check if it would be legal to try and get a ref from parent
+                        // Will return true even if the current ref is 0.
+                        return m_parent->check_collection_ref(m_index, Interface::s_collection_type);
+                    case UpdateStatus::Detached:
+                        break;
+                }
+            }
+            catch (...) {
+            }
         }
-        return (status != UpdateStatus::Detached) &&
-               m_parent->check_collection_ref(m_index, Interface::s_collection_type);
+        return false;
     }
 
     /// Returns true if the accessor has changed since the last time
@@ -488,16 +507,19 @@ public:
     ///
     /// Note: This involves a call to `update_if_needed()`.
     ///
-    /// Note: This function does not return true for an accessor that became
-    /// detached since the last call, even though it may look to the caller as
-    /// if the size of the collection suddenly became zero.
+    /// Note: This function returns false for an accessor that became
+    /// detached since the last call
     bool has_changed() const noexcept final
     {
-        // `has_changed()` sneakily modifies internal state.
-        update_if_needed_with_status();
-        if (m_last_content_version != m_content_version) {
-            m_last_content_version = m_content_version;
-            return true;
+        try {
+            // `has_changed()` sneakily modifies internal state.
+            update_if_needed_with_status();
+            if (m_last_content_version != m_content_version) {
+                m_last_content_version = m_content_version;
+                return true;
+            }
+        }
+        catch (...) {
         }
         return false;
     }
@@ -622,7 +644,7 @@ protected:
         m_parent->set_collection_ref(m_index, ref, Interface::s_collection_type);
     }
 
-    UpdateStatus get_update_status() const noexcept
+    UpdateStatus get_update_status() const
     {
         UpdateStatus status = m_parent ? m_parent->update_if_needed_with_status() : UpdateStatus::Detached;
 
@@ -763,13 +785,12 @@ private:
     /// must invoke `init_from_parent()` or similar on its internal state
     /// accessors to refresh its view of the data.
     ///
-    /// If the owning object (or parent container) was deleted, this returns
-    /// `UpdateStatus::Detached`, and the caller is allowed to enter a
-    /// degenerate state.
+    /// If the owning object (or parent container) was deleted, an exception will
+    /// be thrown and the caller should enter a degenerate state.
     ///
     /// If no change has happened to the data, this function returns
     /// `UpdateStatus::NoChange`, and the caller is allowed to not do anything.
-    virtual UpdateStatus update_if_needed_with_status() const noexcept = 0;
+    virtual UpdateStatus update_if_needed_with_status() const = 0;
 };
 
 namespace _impl {

@@ -24,8 +24,6 @@
 #include <realm/path.hpp>
 #include <realm/mixed.hpp>
 
-#include <external/mpark/variant.hpp>
-
 namespace realm {
 
 class Obj;
@@ -49,7 +47,6 @@ using CollectionPtr = std::shared_ptr<Collection>;
 using LstBasePtr = std::unique_ptr<LstBase>;
 using SetBasePtr = std::unique_ptr<SetBase>;
 using CollectionBasePtr = std::shared_ptr<CollectionBase>;
-using CollectionListPtr = std::shared_ptr<CollectionList>;
 using ListMixedPtr = std::shared_ptr<Lst<Mixed>>;
 using DictionaryPtr = std::shared_ptr<Dictionary>;
 using SetMixedPtr = std::shared_ptr<Set<Mixed>>;
@@ -74,54 +71,62 @@ enum class UpdateStatus {
 
 /*
  * In order to detect stale collection objects (objects referring to entities that have
- * been deleted from the DB) nested directly in an Obj object, we need a structure that
- * both holds an index of the relevant column as well as a somewhat unique key. The key
- * is generated when the collection is assigned to the property and stored alongside the
- * ref of the collection. The stored key is regenerated/cleared when a new value is
- * assigned to the property.
+ * been deleted from the DB), we need a structure that both holds a somewhat unique salt
+ * and possibly an index of the relevant column. The salt is generated when the collection
+ * is assigned to the property and stored alongside the ref of the collection. The stored
+ * salt is regenerated/cleared when a new value is assigned to the property/collection
+ * element.
  */
-class ColIndex {
+class StableIndex {
 public:
-    ColIndex()
+    StableIndex()
     {
-        value.col_index = 0x7fff;
+        value.raw = 0;
     }
-    ColIndex(ColKey col_key, int64_t key)
+    StableIndex(ColKey col_key, int64_t salt)
     {
         value.col_index = col_key.get_index().val;
         value.is_collection = col_key.is_collection();
-        value.key = uint16_t(key);
+        value.is_column = true;
+        value.salt = int32_t(salt);
+    }
+    StableIndex(int64_t salt)
+    {
+        value.raw = 0;
+        value.salt = int32_t(salt);
+    }
+    int64_t get_salt() const
+    {
+        return value.salt;
     }
     ColKey::Idx get_index() const noexcept
     {
         return {unsigned(value.col_index)};
-    }
-    int64_t get_key() const noexcept
-    {
-        return int16_t(value.key);
     }
     bool is_collection() const noexcept
     {
         return value.is_collection;
     }
 
-    bool operator==(const ColIndex& other) const noexcept
+    bool operator==(const StableIndex& other) const noexcept
     {
-        // Compare only index
-        return value.col_index == other.value.col_index;
+        return value.is_column ? value.col_index == other.value.col_index : value.salt == other.value.salt;
     }
 
 private:
-    struct {
-        uint32_t col_index : 15;
-        uint32_t is_collection : 1;
-        uint32_t key : 16;
+    union {
+        struct {
+            bool is_column;
+            bool is_collection;
+            int16_t col_index;
+            int32_t salt;
+        };
+        int64_t raw;
     } value;
 };
 
-static_assert(sizeof(ColIndex) == sizeof(uint32_t));
+static_assert(sizeof(StableIndex) == 8);
 
-using StableIndex = mpark::variant<ColIndex, int64_t, std::string>;
 using StablePath = std::vector<StableIndex>;
 
 class CollectionParent : public std::enable_shared_from_this<CollectionParent> {
@@ -142,7 +147,9 @@ public:
     // Return path from owning object
     virtual StablePath get_stable_path() const = 0;
     // Add a translation of Index to PathElement
-    virtual void add_index(Path& path, Index ndx) const = 0;
+    virtual void add_index(Path& path, const Index& ndx) const = 0;
+    // Return position of Index held by child
+    virtual size_t find_index(const Index& ndx) const = 0;
     /// Get table of owning object
     virtual TableRef get_table() const noexcept = 0;
 
@@ -165,9 +172,9 @@ protected:
     }
 
     virtual ~CollectionParent();
-    /// Update the accessor (and return `UpdateStatus::Detached` if the parent
-    /// is no longer valid, rather than throwing an exception).
-    virtual UpdateStatus update_if_needed_with_status() const noexcept = 0;
+    /// Update the accessor (and return `UpdateStatus::Detached` if the
+    // collection is not initialized.
+    virtual UpdateStatus update_if_needed_with_status() const = 0;
     /// Check if the storage version has changed and update if it has
     /// Return true if the object was updated
     virtual bool update_if_needed() const = 0;

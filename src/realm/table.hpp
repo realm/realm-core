@@ -48,20 +48,20 @@ namespace realm {
 class BacklinkColumn;
 template <class>
 class BacklinkCount;
-class TableView;
-class Group;
-class SortDescriptor;
-class TableView;
+class ColKeys;
 template <class>
 class Columns;
+class DictionaryLinkValues;
+struct GlobalKey;
+class Group;
+class LinkChain;
+class SearchIndex;
+class SortDescriptor;
+class StringIndex;
+class Subexpr;
 template <class>
 class SubQuery;
-class ColKeys;
-struct GlobalKey;
-class LinkChain;
-class Subexpr;
-class StringIndex;
-class DictionaryLinkValues;
+class TableView;
 
 struct Link {
 };
@@ -145,11 +145,11 @@ public:
     size_t get_column_count() const noexcept;
     DataType get_column_type(ColKey column_key) const;
     StringData get_column_name(ColKey column_key) const;
-    StringData get_column_name(ColIndex) const;
+    StringData get_column_name(StableIndex) const;
     ColumnAttrMask get_column_attr(ColKey column_key) const noexcept;
     DataType get_dictionary_key_type(ColKey column_key) const noexcept;
     ColKey get_column_key(StringData name) const noexcept;
-    ColKey get_column_key(ColIndex) const noexcept;
+    ColKey get_column_key(StableIndex) const noexcept;
     ColKeys get_column_keys() const;
     typedef util::Optional<std::pair<ConstTableRef, ColKey>> BacklinkOrigin;
     BacklinkOrigin find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const noexcept;
@@ -168,16 +168,14 @@ public:
     static const size_t max_column_name_length = 63;
     static const uint64_t max_num_columns = 0xFFFFUL; // <-- must be power of two -1
 
-    // Add column holding primitive values. The vector of CollectionType specifies if the
-    // property is a collection and if the collection is nested in other collections.
-    // If the vector is empty, the property is a single value. If the vector contains
-    // a single value - eg. CollectionType::Dictionary, the property is a dictionary of
-    // the type specified. If the vector contains {CollectionType::List, CollectionType::Dictionary}
-    // the property is a list of dictionaries.
-    ColKey add_column(DataType type, StringData name, bool nullable = false, std::vector<CollectionType> = {},
+    // Add column holding primitive values. The optional CollectionType specifies if the
+    // property is a collection. If collection type is not specified, the property is a single value.
+    // If the vector contains a value - eg. CollectionType::Dictionary, the property is a dictionary
+    // of the type specified.
+    ColKey add_column(DataType type, StringData name, bool nullable = false, std::optional<CollectionType> = {},
                       DataType key_type = type_String);
     // As above, but the values are links to objects in the target table.
-    ColKey add_column(Table& target, StringData name, std::vector<CollectionType> = {},
+    ColKey add_column(Table& target, StringData name, std::optional<CollectionType> = {},
                       DataType key_type = type_String);
 
     // Map old functions to the more general interface above
@@ -207,20 +205,7 @@ public:
         return add_column(target, name, {CollectionType::Dictionary}, key_type);
     }
 
-    CollectionType get_nested_column_type(ColKey col_key, size_t level) const
-    {
-        auto spec_ndx = colkey2spec_ndx(col_key);
-        REALM_ASSERT_3(spec_ndx, <, get_column_count());
-        return m_spec.get_nested_column_type(spec_ndx, level);
-    }
-
-    size_t get_nesting_levels(ColKey col_key) const
-    {
-        auto spec_ndx = colkey2spec_ndx(col_key);
-        return m_spec.get_nesting_levels(spec_ndx);
-    }
-
-    CollectionType get_collection_type(ColKey col_key, size_t level) const;
+    CollectionType get_collection_type(ColKey col_key) const;
 
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);
@@ -454,11 +439,9 @@ public:
     std::optional<Mixed> avg(ColKey col_key, size_t* value_count = nullptr) const;
 
     // Will return pointer to search index accessor. Will return nullptr if no index
-    StringIndex* get_search_index(ColKey col) const noexcept
-    {
-        check_column(col);
-        return m_index_accessors[col.get_index().val].get();
-    }
+    SearchIndex* get_search_index(ColKey col) const noexcept;
+    StringIndex* get_string_index(ColKey col) const noexcept;
+
     template <class T>
     ObjKey find_first(ColKey col_key, T value) const;
 
@@ -747,7 +730,7 @@ private:
     Array m_index_refs;                             // 5th slot in m_top
     Array m_opposite_table;                         // 7th slot in m_top
     Array m_opposite_column;                        // 8th slot in m_top
-    std::vector<std::unique_ptr<StringIndex>> m_index_accessors;
+    std::vector<std::unique_ptr<SearchIndex>> m_index_accessors;
     ColKey m_primary_key_col;
     Replication* const* m_repl;
     static Replication* g_dummy_replication;
@@ -762,6 +745,8 @@ private:
     void erase_from_search_indexes(ObjKey key);
     void update_indexes(ObjKey key, const FieldValues& values);
     void clear_indexes();
+    template <typename T>
+    void do_populate_index(StringIndex* index, ColKey::Idx col_ndx);
 
     // Migration support
     void migrate_sets_and_dictionaries();
@@ -1217,7 +1202,7 @@ inline StringData Table::get_column_name(ColKey column_key) const
     return m_spec.get_column_name(spec_ndx);
 }
 
-inline StringData Table::get_column_name(ColIndex index) const
+inline StringData Table::get_column_name(StableIndex index) const
 {
     return m_spec.get_column_name(m_leaf_ndx2spec_ndx[index.get_index().val]);
 }
@@ -1230,7 +1215,7 @@ inline ColKey Table::get_column_key(StringData name) const noexcept
     return spec_ndx2colkey(spec_ndx);
 }
 
-inline ColKey Table::get_column_key(ColIndex index) const noexcept
+inline ColKey Table::get_column_key(StableIndex index) const noexcept
 {
     return m_leaf_ndx2colkey[index.get_index().val];
 }

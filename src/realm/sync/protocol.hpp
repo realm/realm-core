@@ -44,6 +44,9 @@ namespace sync {
 //     realms - this informs the server to not send the schema before sending the
 //     migrate to FLX server action
 //
+//   10 Update BIND message to send information to the server about the reason a
+//      synchronization session is used for; add support for server log messages
+//
 //  XX Changes:
 //     - TBD
 //
@@ -51,7 +54,7 @@ constexpr int get_current_protocol_version() noexcept
 {
     // Also update the current protocol version test in flx_sync.cpp when
     // updating this value
-    return 9;
+    return 10;
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept

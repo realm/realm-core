@@ -308,15 +308,7 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
     }
 
     m_types.insert(column_ndx, int(type)); // Throws
-    m_attr.insert(column_ndx, attr); // Throws
-    if (type != col_type_BackLink) {
-        if (auto ref = m_top.get_as_ref(s_nested_types_ndx)) {
-            Array coll_types(m_top.get_alloc());
-            coll_types.set_parent(&m_top, s_nested_types_ndx);
-            coll_types.init_from_ref(ref);
-            coll_types.insert(column_ndx, 0); // Throws
-        }
-    }
+    m_attr.insert(column_ndx, attr);       // Throws
     m_keys.insert(column_ndx, col_key.value);
 
     if (m_enumkeys.is_attached() && type != col_type_BackLink) {
@@ -331,15 +323,6 @@ void Spec::erase_column(size_t column_ndx)
     REALM_ASSERT(column_ndx < m_types.size());
 
     if (ColumnType(int(m_types.get(column_ndx))) != col_type_BackLink) {
-        if (auto ref = m_top.get_as_ref(s_nested_types_ndx)) {
-            Array coll_types(m_top.get_alloc());
-            coll_types.set_parent(&m_top, s_nested_types_ndx);
-            coll_types.init_from_ref(ref);
-            if (auto ref2 = coll_types.get_as_ref(column_ndx)) {
-                Array::destroy_deep(ref2, m_top.get_alloc());
-            }
-            coll_types.erase(column_ndx);
-        }
         if (is_string_enum_type(column_ndx)) {
             // Enum columns do also have a separate key list
             ref_type keys_ref = m_enumkeys.get_as_ref(column_ndx);
@@ -373,69 +356,6 @@ void Spec::erase_column(size_t column_ndx)
 
     update_internals();
 }
-
-
-void Spec::set_nested_column_types(size_t column_ndx, const std::vector<CollectionType>& types)
-{
-    Array coll_types(m_top.get_alloc());
-    coll_types.set_parent(&m_top, s_nested_types_ndx);
-    if (auto ref = m_top.get_as_ref(s_nested_types_ndx)) {
-        coll_types.init_from_ref(ref);
-    }
-    else {
-        coll_types.create(Node::type_HasRefs, false, m_num_public_columns, 0);
-        coll_types.update_parent();
-    }
-    Array arr(m_top.get_alloc());
-    arr.set_parent(&coll_types, column_ndx);
-    auto mem = Array::create_empty_array(Node::type_Normal, false, m_top.get_alloc());
-    arr.init_from_mem(mem);
-    for (auto t : types) {
-        if (t == CollectionType::Set)
-            throw InvalidColumnKey("Sets cannot contain any nested collections");
-        arr.add(int64_t(t));
-    }
-    arr.update_parent();
-}
-
-CollectionType Spec::get_nested_column_type(size_t column_ndx, size_t level) const
-{
-    ref_type ref2 = 0;
-    if (auto ref = m_top.get_as_ref(s_nested_types_ndx)) {
-        Array coll_types(m_top.get_alloc());
-        coll_types.init_from_ref(ref);
-        ref2 = coll_types.get_as_ref(column_ndx);
-    }
-
-    if (!ref2) {
-        throw LogicError(ErrorCodes::IllegalOperation, "Property has no nested collections");
-    }
-    Array arr(m_top.get_alloc());
-    arr.init_from_ref(ref2);
-    if (level >= arr.size()) {
-        throw OutOfBounds("Nesting level too deep", level, arr.size());
-    }
-
-    return CollectionType(arr.get(level));
-}
-
-size_t Spec::get_nesting_levels(size_t column_ndx) const
-{
-    if (column_ndx < m_num_public_columns) {
-        if (auto ref = m_top.get_as_ref(s_nested_types_ndx)) {
-            Array coll_types(m_top.get_alloc());
-            coll_types.init_from_ref(ref);
-            if (auto ref = coll_types.get_as_ref(column_ndx)) {
-                Array arr(m_top.get_alloc());
-                arr.init_from_ref(ref);
-                return arr.size();
-            }
-        }
-    }
-
-    return 0;
-}
-
 
 // For link and link list columns the old subspec array contain an entry which
 // is the group-level table index of the target table, and for backlink

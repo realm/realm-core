@@ -106,6 +106,7 @@ public:
     static std::shared_ptr<util::Logger>& get_default_logger() noexcept;
     static void set_default_level_threshold(Level level) noexcept;
     static Level get_default_level_threshold() noexcept;
+    static const std::string_view level_to_string(Level level) noexcept;
 
 protected:
     // Used by subclasses that link to a base logger
@@ -367,36 +368,7 @@ void Logger::do_log(Level level, const char* message, Params&&... params)
 template <class C, class T>
 std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, Logger::Level level)
 {
-    switch (level) {
-        case Logger::Level::all:
-            out << "all";
-            return out;
-        case Logger::Level::trace:
-            out << "trace";
-            return out;
-        case Logger::Level::debug:
-            out << "debug";
-            return out;
-        case Logger::Level::detail:
-            out << "detail";
-            return out;
-        case Logger::Level::info:
-            out << "info";
-            return out;
-        case Logger::Level::warn:
-            out << "warn";
-            return out;
-        case Logger::Level::error:
-            out << "error";
-            return out;
-        case Logger::Level::fatal:
-            out << "fatal";
-            return out;
-        case Logger::Level::off:
-            out << "off";
-            return out;
-    }
-    REALM_ASSERT(false);
+    out << Logger::level_to_string(level);
     return out;
 }
 

@@ -307,7 +307,7 @@ size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
 }
 
 
-void IndexEvaluator::init(StringIndex* index, Mixed value)
+void IndexEvaluator::init(SearchIndex* index, Mixed value)
 {
     REALM_ASSERT(index);
     m_matching_keys = nullptr;
@@ -494,7 +494,7 @@ StringNodeFulltext::StringNodeFulltext(const StringNodeFulltext& other)
 
 void StringNodeFulltext::_search_index_init()
 {
-    auto index = m_link_map->get_target_table()->get_search_index(ParentNode::m_condition_column_key);
+    StringIndex* index = m_link_map->get_target_table()->get_string_index(ParentNode::m_condition_column_key);
     REALM_ASSERT(index && index->is_fulltext_index());
     m_index_matches.clear();
     index->find_all_fulltext(m_index_matches, StringData(StringNodeBase::m_value));

@@ -1620,14 +1620,14 @@ InstructionApplier::PathResolver::resolve_dictionary_element(Dictionary& dict, I
         auto val = dict.get(string_key);
         if (val.is_type(type_Dictionary)) {
             if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
-                Dictionary d(dict, string_key);
+                Dictionary d(dict, dict.build_index(string_key));
                 ++m_it_begin;
                 return resolve_dictionary_element(d, *pfield);
             }
         }
         if (val.is_type(type_List)) {
             if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
-                Lst<Mixed> l(dict, string_key);
+                Lst<Mixed> l(dict, dict.build_index(string_key));
                 ++m_it_begin;
                 return resolve_list_element(l, *pindex);
             }

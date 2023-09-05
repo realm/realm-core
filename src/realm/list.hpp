@@ -22,7 +22,7 @@
 #include <realm/collection.hpp>
 
 #include <realm/obj.hpp>
-#include <realm/bplustree.hpp>
+#include <realm/column_mixed.hpp>
 #include <realm/obj_list.hpp>
 #include <realm/array_basic.hpp>
 #include <realm/array_integer.hpp>
@@ -34,7 +34,6 @@
 #include <realm/array_ref.hpp>
 #include <realm/array_fixed_bytes.hpp>
 #include <realm/array_decimal128.hpp>
-#include <realm/array_mixed.hpp>
 #include <realm/array_typed_link.hpp>
 #include <realm/replication.hpp>
 
@@ -184,7 +183,7 @@ public:
         return *m_tree;
     }
 
-    UpdateStatus update_if_needed_with_status() const noexcept final
+    UpdateStatus update_if_needed_with_status() const final
     {
         auto status = Base::get_update_status();
         switch (status) {
@@ -211,8 +210,10 @@ public:
     void ensure_created()
     {
         if (Base::should_update() || !(m_tree && m_tree->is_attached())) {
-            bool attached = init_from_parent(true);
-            REALM_ASSERT(attached);
+            // When allow_create is true, init_from_parent will always succeed
+            // In case of errors, an exception is thrown.
+            constexpr bool allow_create = true;
+            init_from_parent(allow_create); // Throws
             Base::update_content_version();
         }
     }
@@ -355,11 +356,6 @@ public:
     {
         return m_tree->get_key(ndx);
     }
-    size_t find_key(int64_t key)
-    {
-        update();
-        return m_tree->find_key(key);
-    }
 
     // Overriding members of CollectionBase:
     size_t size() const final
@@ -453,35 +449,15 @@ public:
         return *m_tree;
     }
 
-    UpdateStatus update_if_needed_with_status() const noexcept final
-    {
-        auto status = Base::get_update_status();
-        switch (status) {
-            case UpdateStatus::Detached: {
-                m_tree.reset();
-                return UpdateStatus::Detached;
-            }
-            case UpdateStatus::NoChange:
-                if (m_tree && m_tree->is_attached()) {
-                    return UpdateStatus::NoChange;
-                }
-                // The tree has not been initialized yet for this accessor, so
-                // perform lazy initialization by treating it as an update.
-                [[fallthrough]];
-            case UpdateStatus::Updated: {
-                bool attached = init_from_parent(false);
-                Base::update_content_version();
-                return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
-            }
-        }
-        REALM_UNREACHABLE();
-    }
+    UpdateStatus update_if_needed_with_status() const final;
 
     void ensure_created()
     {
         if (Base::should_update() || !(m_tree && m_tree->is_attached())) {
-            init_from_parent(true);
-            ensure_attached();
+            // When allow_create is true, init_from_parent will always succeed
+            // In case of errors, an exception is thrown.
+            constexpr bool allow_create = true;
+            init_from_parent(allow_create); // Throws
             Base::update_content_version();
         }
     }
@@ -509,7 +485,9 @@ public:
         return Base::get_stable_path();
     }
 
-    void add_index(Path& path, Index ndx) const final;
+    void add_index(Path& path, const Index& ndx) const final;
+    size_t find_index(const Index& ndx) const final;
+
     bool nullify(ObjLink);
     bool replace_link(ObjLink old_link, ObjLink replace_link);
     void remove_backlinks(CascadeState& state) const;
@@ -529,64 +507,6 @@ public:
     void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
 private:
-    class BPlusTreeMixed : public BPlusTree<Mixed> {
-    public:
-        BPlusTreeMixed(Allocator& alloc)
-            : BPlusTree<Mixed>(alloc)
-        {
-        }
-
-        void ensure_keys()
-        {
-            auto func = [&](BPlusTreeNode* node, size_t) {
-                return static_cast<LeafNode*>(node)->ensure_keys() ? IteratorControl::Stop
-                                                                   : IteratorControl::AdvanceToNext;
-            };
-
-            m_root->bptree_traverse(func);
-        }
-        size_t find_key(int64_t key) const noexcept
-        {
-            size_t ret = realm::npos;
-            auto func = [&](BPlusTreeNode* node, size_t offset) {
-                LeafNode* leaf = static_cast<LeafNode*>(node);
-                auto pos = leaf->find_key(key);
-                if (pos != realm::not_found) {
-                    ret = pos + offset;
-                    return IteratorControl::Stop;
-                }
-                else {
-                    return IteratorControl::AdvanceToNext;
-                }
-            };
-
-            m_root->bptree_traverse(func);
-            return ret;
-        }
-
-        void set_key(size_t ndx, int64_t key) const noexcept
-        {
-            auto func = [key](BPlusTreeNode* node, size_t ndx) {
-                LeafNode* leaf = static_cast<LeafNode*>(node);
-                leaf->set_key(ndx, key);
-            };
-
-            m_root->bptree_access(ndx, func);
-        }
-
-        int64_t get_key(size_t ndx) const noexcept
-        {
-            int64_t ret = 0;
-            auto func = [&ret](BPlusTreeNode* node, size_t ndx) {
-                LeafNode* leaf = static_cast<LeafNode*>(node);
-                ret = leaf->get_key(ndx);
-            };
-
-            m_root->bptree_access(ndx, func);
-            return ret;
-        }
-    };
-
     // `do_` methods here perform the action after preconditions have been
     // checked (bounds check, writability, etc.).
     void do_set(size_t ndx, Mixed value);
@@ -615,23 +535,15 @@ private:
         }
     }
 
-private:
     static Mixed unresolved_to_null(Mixed value) noexcept
     {
         if (value.is_type(type_TypedLink) && value.is_unresolved_link())
             return Mixed{};
         return value;
     }
-    void ensure_attached() const
-    {
-        if (!m_tree->is_attached()) {
-            throw IllegalOperation("This is an ex-list");
-        }
-    }
     Mixed do_get(size_t ndx, const char* msg) const
     {
         const auto current_size = size();
-        ensure_attached();
         CollectionBase::validate_index(msg, ndx, current_size);
 
         return unresolved_to_null(m_tree->get(ndx));

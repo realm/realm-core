@@ -305,12 +305,36 @@ bool Lst<Mixed>::init_from_parent(bool allow_create) const
             REALM_ASSERT(m_tree->is_attached());
         }
     }
-    catch (const StaleAccessor&) {
+    catch (...) {
         m_tree->detach();
-        return false;
+        throw;
     }
 
     return true;
+}
+
+UpdateStatus Lst<Mixed>::update_if_needed_with_status() const
+{
+    auto status = Base::get_update_status();
+    switch (status) {
+        case UpdateStatus::Detached: {
+            m_tree.reset();
+            return UpdateStatus::Detached;
+        }
+        case UpdateStatus::NoChange:
+            if (m_tree && m_tree->is_attached()) {
+                return UpdateStatus::NoChange;
+            }
+            // The tree has not been initialized yet for this accessor, so
+            // perform lazy initialization by treating it as an update.
+            [[fallthrough]];
+        case UpdateStatus::Updated: {
+            bool attached = init_from_parent(false);
+            Base::update_content_version();
+            return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
+        }
+    }
+    REALM_UNREACHABLE();
 }
 
 size_t Lst<Mixed>::find_first(const Mixed& value) const
@@ -693,21 +717,21 @@ void Lst<Mixed>::to_json(std::ostream& out, size_t link_depth, JSONOutputMode ou
 
 ref_type Lst<Mixed>::get_collection_ref(Index index, CollectionType type) const
 {
-    auto ndx = m_tree->find_key(mpark::get<int64_t>(index));
+    auto ndx = m_tree->find_key(index.get_salt());
     if (ndx != realm::not_found) {
         auto val = get(ndx);
         if (val.is_type(DataType(int(type)))) {
             return val.get_ref();
         }
+        throw realm::IllegalOperation(util::format("Not a %1", type));
     }
-    // This exception should never escape to the application
     throw StaleAccessor("This collection is no more");
     return 0;
 }
 
 bool Lst<Mixed>::check_collection_ref(Index index, CollectionType type) const noexcept
 {
-    auto ndx = m_tree->find_key(mpark::get<int64_t>(index));
+    auto ndx = m_tree->find_key(index.get_salt());
     if (ndx != realm::not_found) {
         return get(ndx).is_type(DataType(int(type)));
     }
@@ -716,18 +740,24 @@ bool Lst<Mixed>::check_collection_ref(Index index, CollectionType type) const no
 
 void Lst<Mixed>::set_collection_ref(Index index, ref_type ref, CollectionType type)
 {
-    auto ndx = m_tree->find_key(mpark::get<int64_t>(index));
+    auto ndx = m_tree->find_key(index.get_salt());
     if (ndx == realm::not_found) {
         throw StaleAccessor("Collection has been deleted");
     }
     m_tree->set(ndx, Mixed(ref, type));
 }
 
-void Lst<Mixed>::add_index(Path& path, Index index) const
+void Lst<Mixed>::add_index(Path& path, const Index& index) const
 {
-    auto ndx = m_tree->find_key(mpark::get<int64_t>(index));
+    auto ndx = m_tree->find_key(index.get_salt());
     REALM_ASSERT(ndx != realm::not_found);
     path.emplace_back(ndx);
+}
+
+size_t Lst<Mixed>::find_index(const Index& index) const
+{
+    update();
+    return m_tree->find_key(index.get_salt());
 }
 
 bool Lst<Mixed>::nullify(ObjLink link)

@@ -1795,7 +1795,7 @@ public:
                 result.push_back(k);
         }
         else {
-            StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
+            SearchIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
             REALM_ASSERT(index);
             if (value.is_null()) {
                 index->find_all(result, realm::null{});

@@ -69,14 +69,18 @@ public:
     Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
 
     // Overriding members of CollectionParent:
-    UpdateStatus update_if_needed_with_status() const noexcept final;
+    UpdateStatus update_if_needed_with_status() const final;
     // Get the path in a minimal format without including object accessors.
     // If you need to obtain additional information for each object in the path,
     // you should use get_fat_path() or traverse_path() instead (see below).
     FullPath get_path() const final;
     Path get_short_path() const noexcept final;
     StablePath get_stable_path() const noexcept final;
-    void add_index(Path& path, Index ndx) const final;
+    void add_index(Path& path, const Index& ndx) const final;
+    size_t find_index(const Index&) const final
+    {
+        return realm::npos;
+    }
 
     bool update_if_needed() const final;
     TableRef get_table() const noexcept final
@@ -90,8 +94,8 @@ public:
     ref_type get_collection_ref(Index, CollectionType) const final;
     bool check_collection_ref(Index, CollectionType) const noexcept final;
     void set_collection_ref(Index, ref_type, CollectionType) final;
-    ColIndex build_index(ColKey) const;
-    bool check_index(ColIndex) const;
+    StableIndex build_index(ColKey) const;
+    bool check_index(StableIndex) const;
 
     // Operator overloads
     bool operator==(const Obj& other) const;
@@ -313,9 +317,6 @@ public:
     CollectionPtr get_collection_ptr(const Path& path) const;
     CollectionPtr get_collection_by_stable_path(const StablePath& path) const;
     LinkCollectionPtr get_linkcollection_ptr(ColKey col_key) const;
-
-    // Get a collection to hold other collections
-    CollectionListPtr get_collection_list(ColKey col_key) const;
 
     void assign_pk_and_backlinks(const Obj& other);
 
