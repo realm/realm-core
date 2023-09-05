@@ -185,32 +185,36 @@ public:
         h[5] = (h[5] & ~0x1F) | (width_encoding & 0x1F);
     }
 
+    static constexpr int width_enc_to_bits_table[16] = {1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32, 40, 52, 64};
+    // from any number of bits to the encoding capable of holding them (0 should not be used)
+    static constexpr int bits_to_width_enc[65] = {
+        -1, 0,  1,  2,  // 0-3 bits
+        3,  4,  5,  6,  // 4-7
+        6,  7,  7,  8,  // 8-11
+        8,  9,  9,  9,  // 12-15
+        9,  10, 10, 10, // 16-19
+        10, 11, 11, 11, // 20-23
+        11, 12, 12, 12, // 24-27
+        12, 12, 12, 12, // 28-31
+        12, 13, 13, 13, // 32-35
+        13, 13, 13, 13, // 36-39
+        13, 14, 14, 14, // 40-43
+        14, 14, 14, 14, // 44-47
+        14, 14, 14, 14, // 48-51
+        14, 15, 15, 15, // 52-25
+        15, 15, 15, 15, // 56-59
+        15, 15, 15, 15, // 60-63
+        15              // 64
+    };
+
     static int width_encoding_to_num_bits(int encoding)
     {
-        int factor = 1;
-        if (encoding > 9) {
-            factor <<= ((encoding - 6) / 4);
-        }
-        /* code above should give same result as code below but faster:
-        while (encoding >= 9) {
-            factor <<= 1;
-            encoding -= 4;
-        }
-        */
-        return factor * encoding;
+        return width_enc_to_bits_table[encoding];
     }
+
     static int num_bits_to_width_encoding(int num_bits)
     {
-        int encoding_offset = 0;
-        int bit_lost = 0;
-        while (num_bits >= 9) {
-            bit_lost += num_bits & 1;
-            num_bits >>= 1;
-            encoding_offset += 4;
-        }
-        int encoding_guess = encoding_offset + num_bits;
-        // if a set bit was lost, pick the next higher encoding:
-        return encoding_guess + (bit_lost != 0) ? 1 : 0;
+        return bits_to_width_enc[num_bits];
     }
 
     static int unsigned_to_num_bits(uint64_t value)
