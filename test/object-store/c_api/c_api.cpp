@@ -4996,6 +4996,73 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         checked(realm_refresh(realm, nullptr));
     };
 
+    SECTION("results of mixed") {
+        SECTION("dictionary") {
+            REQUIRE(realm_set_dictionary(obj1.get(), foo_any_col_key));
+            realm_value_t value;
+            realm_get_value(obj1.get(), foo_any_col_key, &value);
+            REQUIRE(value.type == RLM_TYPE_DICTIONARY);
+            auto dict = cptr_checked(realm_get_dictionary(obj1.get(), foo_any_col_key));
+            auto nlist = cptr_checked(realm_dictionary_insert_list(dict.get(), rlm_str_val("A")));
+            auto ndict = cptr_checked(realm_dictionary_insert_dictionary(dict.get(), rlm_str_val("B")));
+            auto nset = cptr_checked(realm_dictionary_insert_set(dict.get(), rlm_str_val("C")));
+
+            // verify that we can fetch a collection from a result of mixed
+            auto results = cptr_checked(realm_dictionary_to_results(dict.get()));
+            const auto sz = results->size();
+            REQUIRE(sz == dict->size());
+            REQUIRE(results->is_valid());
+            realm_value_t val;
+            realm_results_get(results.get(), 0, &val);
+            REQUIRE(val.type == RLM_TYPE_LIST);
+            realm_results_get(results.get(), 1, &val);
+            REQUIRE(val.type == RLM_TYPE_DICTIONARY);
+            realm_results_get(results.get(), 2, &val);
+            REQUIRE(val.type == RLM_TYPE_SET);
+            auto result_list = cptr_checked(realm_results_get_list(results.get(), 0));
+            REQUIRE(result_list);
+            REQUIRE(result_list->size() == nlist->size());
+            auto result_dictionary = cptr_checked(realm_results_get_dictionary(results.get(), 1));
+            REQUIRE(result_dictionary);
+            REQUIRE(result_dictionary->size() == ndict->size());
+            auto result_set = cptr_checked(realm_results_get_set(results.get(), 2));
+            REQUIRE(result_set);
+            REQUIRE(result_set->size() == nset->size());
+        }
+        SECTION("list") {
+            REQUIRE(realm_set_list(obj1.get(), foo_any_col_key));
+            realm_value_t value;
+            realm_get_value(obj1.get(), foo_any_col_key, &value);
+            REQUIRE(value.type == RLM_TYPE_LIST);
+            auto list = cptr_checked(realm_get_list(obj1.get(), foo_any_col_key));
+            auto nlist = cptr_checked(realm_list_insert_list(list.get(), 0));
+            auto ndict = cptr_checked(realm_list_insert_dictionary(list.get(), 1));
+            auto nset = cptr_checked(realm_list_insert_set(list.get(), 2));
+
+            // verify that we can fetch a collection from a result of mixed
+            auto results = cptr_checked(realm_list_to_results(list.get()));
+            const auto sz = results->size();
+            REQUIRE(sz == list->size());
+            REQUIRE(results->is_valid());
+            realm_value_t val;
+            realm_results_get(results.get(), 0, &val);
+            REQUIRE(val.type == RLM_TYPE_LIST);
+            realm_results_get(results.get(), 1, &val);
+            REQUIRE(val.type == RLM_TYPE_DICTIONARY);
+            realm_results_get(results.get(), 2, &val);
+            REQUIRE(val.type == RLM_TYPE_SET);
+            auto result_list = cptr_checked(realm_results_get_list(results.get(), 0));
+            REQUIRE(result_list);
+            REQUIRE(result_list->size() == nlist->size());
+            auto result_dictionary = cptr_checked(realm_results_get_dictionary(results.get(), 1));
+            REQUIRE(result_dictionary);
+            REQUIRE(result_dictionary->size() == ndict->size());
+            auto result_set = cptr_checked(realm_results_get_set(results.get(), 2));
+            REQUIRE(result_set);
+            REQUIRE(result_set->size() == nset->size());
+        }
+    }
+
     SECTION("dictionary") {
         struct UserData {
             size_t deletions;
@@ -5063,6 +5130,7 @@ TEST_CASE("C API: nested collections", "[c_api]") {
         size_t size;
         checked(realm_dictionary_size(dict.get(), &size));
         REQUIRE(size == 4);
+        checked(realm_commit(realm));
     }
 
     SECTION("list") {
