@@ -115,6 +115,8 @@ public:
         return get_data_from_header(const_cast<char*>(header));
     }
 
+    // Helpers for NodeHeader::Type
+    // handles all header formats
     static bool get_is_inner_bptree_node_from_header(const char* header) noexcept
     {
         typedef unsigned char uchar;
@@ -129,30 +131,50 @@ public:
         return (int(h[4]) & 0x40) != 0;
     }
 
+    static Type get_type_from_header(const char* header) noexcept
+    {
+        if (get_is_inner_bptree_node_from_header(header))
+            return type_InnerBptreeNode;
+        if (get_hasrefs_from_header(header))
+            return type_HasRefs;
+        return type_Normal;
+    }
+
     static bool get_context_flag_from_header(const char* header) noexcept
     {
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         return (int(h[4]) & 0x20) != 0;
     }
-
-    static WidthType get_wtype_from_header(const char* header) noexcept
+    static void set_is_inner_bptree_node_in_header(bool value, char* header) noexcept
     {
         typedef unsigned char uchar;
-        const uchar* h = reinterpret_cast<const uchar*>(header);
-        int h4 = h[4];
-        if ((h4 & 0x18) == 0x18) {
-            return WidthType(wtype_extend + (h4 & 0x18));
-        }
-        else
-            return WidthType((h4 & 0x18) >> 3);
+        uchar* h = reinterpret_cast<uchar*>(header);
+        h[4] = uchar((int(h[4]) & ~0x80) | int(value) << 7);
     }
 
+    static void set_hasrefs_in_header(bool value, char* header) noexcept
+    {
+        typedef unsigned char uchar;
+        uchar* h = reinterpret_cast<uchar*>(header);
+        h[4] = uchar((int(h[4]) & ~0x40) | int(value) << 6);
+    }
+
+    static void set_context_flag_in_header(bool value, char* header) noexcept
+    {
+        typedef unsigned char uchar;
+        uchar* h = reinterpret_cast<uchar*>(header);
+        h[4] = uchar((int(h[4]) & ~0x20) | int(value) << 5);
+    }
+
+
+
     // For wtype lower than wtype_extend, the element width is given by
-    // bits 0-2 in byte 4 of the header and only powers of two is supported.
+    // bits 0-2 in byte 4 of the header and only powers of two is supported:
+    //   0,1,2,4,8,16,32,64.
     // For new wtypes we support 16 different element sizes and in some
-    // cases two of them. Element sizes of zero is not supported in the new
-    // format - pick an old format for that.
+    // cases two of them -- for arrays of pairs or pairs of arrays. 
+    // Element sizes of zero is not supported in the new format - pick an old format for that.
     // This is the extended encoding of the element widths (all widths in bits)
     //
     // Encoding:    Sizes:
@@ -173,18 +195,35 @@ public:
     // 14           -> 52 (+12)
     // 15           -> 64 (+12)
 
-    static int get_width_encoding_from_header(const char* header) noexcept
+    // Helpers for NodeHeader::WidthType:
+    // handles all header formats
+    static WidthType get_wtype_from_header(const char* header) noexcept
     {
-        const unsigned char* h = reinterpret_cast<const unsigned char*>(header);
-        return h[5] & 0x1F;
+        typedef unsigned char uchar;
+        const uchar* h = reinterpret_cast<const uchar*>(header);
+        int h4 = h[4];
+        if ((h4 & 0x18) == 0x18) {
+            return WidthType(wtype_extend + (h4 & 0x7));
+        }
+        else
+            return WidthType((h4 & 0x18) >> 3);
     }
 
-    static void set_width_encoding_in_header(char* header, int width_encoding) noexcept
+    static void set_wtype_in_header(WidthType value, char* header) noexcept
     {
-        unsigned char* h = reinterpret_cast<unsigned char*>(header);
-        h[5] = (h[5] & ~0x1F) | (width_encoding & 0x1F);
+        typedef unsigned char uchar;
+        uchar* h = reinterpret_cast<uchar*>(header);
+        auto h4 = h[4];
+        if (value < wtype_extend) {
+            h4 = (h4 & ~0x18) | int(value) << 3;
+        }
+        else {
+            h4 = (h4 & ~0x1F) | (int(wtype_extend) << 3) | int(value - wtype_extend);
+        }
+        h[4] = h4;
     }
 
+    // Helpers for the new width encoding (for wtype >= wtype_extend)
     static constexpr int width_enc_to_bits_table[16] = {1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32, 40, 52, 64};
     // from any number of bits to the encoding capable of holding them (0 should not be used)
     static constexpr int bits_to_width_enc[65] = {
@@ -230,8 +269,10 @@ public:
             return 1 + unsigned_to_num_bits(~value); // <-- is this correct????
     }
 
+
+
     // Helper functions for old layouts only:
-    //
+    // Handling width and sizes:
     static uint_least8_t get_width_from_header(const char* header) noexcept
     {
         auto wtype = get_wtype_from_header(header);
@@ -246,54 +287,6 @@ public:
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         return (size_t(h[5]) << 16) + (size_t(h[6]) << 8) + h[7];
-    }
-
-    static size_t get_capacity_from_header(const char* header) noexcept
-    {
-        typedef unsigned char uchar;
-        const uchar* h = reinterpret_cast<const uchar*>(header);
-        return (size_t(h[0]) << 19) + (size_t(h[1]) << 11) + (h[2] << 3);
-    }
-
-    static Type get_type_from_header(const char* header) noexcept
-    {
-        if (get_is_inner_bptree_node_from_header(header))
-            return type_InnerBptreeNode;
-        if (get_hasrefs_from_header(header))
-            return type_HasRefs;
-        return type_Normal;
-    }
-
-    static void set_is_inner_bptree_node_in_header(bool value, char* header) noexcept
-    {
-        typedef unsigned char uchar;
-        uchar* h = reinterpret_cast<uchar*>(header);
-        h[4] = uchar((int(h[4]) & ~0x80) | int(value) << 7);
-    }
-
-    static void set_hasrefs_in_header(bool value, char* header) noexcept
-    {
-        typedef unsigned char uchar;
-        uchar* h = reinterpret_cast<uchar*>(header);
-        h[4] = uchar((int(h[4]) & ~0x40) | int(value) << 6);
-    }
-
-    static void set_context_flag_in_header(bool value, char* header) noexcept
-    {
-        typedef unsigned char uchar;
-        uchar* h = reinterpret_cast<uchar*>(header);
-        h[4] = uchar((int(h[4]) & ~0x20) | int(value) << 5);
-    }
-
-    static void set_wtype_in_header(WidthType value, char* header) noexcept
-    {
-        // Indicates how to calculate size in bytes based on width
-        // 0: bits      (width/8) * size
-        // 1: multiply  width * size
-        // 2: ignore    1 * size
-        typedef unsigned char uchar;
-        uchar* h = reinterpret_cast<uchar*>(header);
-        h[4] = uchar((int(h[4]) & ~0x18) | int(value) << 3);
     }
 
     static void set_width_in_header(int value, char* header) noexcept
@@ -319,6 +312,65 @@ public:
         h[5] = uchar((value >> 16) & 0x000000FF);
         h[6] = uchar((value >> 8) & 0x000000FF);
         h[7] = uchar(value & 0x000000FF);
+    }
+
+    // Helper functions for layouts above wtype_extend:
+    // Element width:
+    static int get_width_A_from_header(const char* header) noexcept
+    {
+        auto wtype = get_wtype_from_header(header);
+        typedef unsigned char uchar;
+        const uchar* h = reinterpret_cast<const uchar*>(header);
+        REALM_ASSERT_RELEASE(wtype >= wtype_extend);
+        return width_encoding_to_num_bits(h[5] & 0xF);
+    }
+
+    // should not be used for wtype_Packed which has only one element size
+    static int get_width_B_from_header(const char* header) noexcept
+    {
+        auto wtype = get_wtype_from_header(header);
+        typedef unsigned char uchar;
+        const uchar* h = reinterpret_cast<const uchar*>(header);
+        REALM_ASSERT_RELEASE(wtype >= wtype_extend);
+        return width_encoding_to_num_bits((h[5] >> 4) & 0xF);
+    }
+
+
+
+    // Helper functions for array sizes for layouts above wtype_extend:
+    // should only be used for wtype_Flex
+    static size_t get_size_A_from_header(const char* header) noexcept
+    {
+        typedef unsigned char uchar;
+        const uchar* h = reinterpret_cast<const uchar*>(header);
+        return size_t(h[6]);
+    }
+
+    // should only be used for wtype_Flex
+    static size_t get_size_B_from_header(const char* header) noexcept
+    {
+        typedef unsigned char uchar;
+        const uchar* h = reinterpret_cast<const uchar*>(header);
+        return size_t(h[7]);
+    }
+
+    // shold be used for wtype_Packed, wtype_AofP, wtype_PofA
+    static size_t get_size_AB_from_header(const char* header) noexcept
+    {
+        typedef unsigned char uchar;
+        const uchar* h = reinterpret_cast<const uchar*>(header);
+        return size_t(h[7] | (size_t(h[6]) << 8));
+    }
+
+
+
+
+    // Helpers shared for all formats:
+    static size_t get_capacity_from_header(const char* header) noexcept
+    {
+        typedef unsigned char uchar;
+        const uchar* h = reinterpret_cast<const uchar*>(header);
+        return (size_t(h[0]) << 19) + (size_t(h[1]) << 11) + (h[2] << 3);
     }
 
     // Note: There is a copy of this function is test_alloc.cpp
