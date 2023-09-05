@@ -84,7 +84,7 @@ struct QueryGroup {
 
 class Query final {
 public:
-    Query(ConstTableRef table, TableView* tv = nullptr);
+    Query(ConstTableRef table);
     Query(ConstTableRef table, std::unique_ptr<TableView>);
     Query(ConstTableRef table, const ObjList& list);
     Query(ConstTableRef table, LinkCollectionPtr&& list_ptr);

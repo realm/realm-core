@@ -542,14 +542,14 @@ public:
     // Queries
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not
     // need to be sorted, and, resulting view retains its order.
-    Query where(TableView* tv = nullptr)
+    Query where()
     {
-        return Query(m_own_ref, tv);
+        return Query(m_own_ref);
     }
 
-    Query where(TableView* tv = nullptr) const
+    Query where() const
     {
-        return Query(m_own_ref, tv);
+        return Query(m_own_ref);
     }
 
     // Perform queries on a Link Collection. The returned Query holds a reference to collection.

@@ -3275,9 +3275,7 @@ TEST(Query_Float3_where)
     t.create_object().set_all(float(1.8), double(2.8), 8);
     t.create_object().set_all(float(1.9), double(2.9), 9);
 
-    TableView v = t.where().find_all();
-
-    Query q1 = t.where(&v).greater(col_float, 1.35f).less(col_double, 2.65);
+    Query q1 = t.where().greater(col_float, 1.35f).less(col_double, 2.65);
     auto a1 = q1.sum(col_int);
     CHECK_EQUAL(15, a1);
 
@@ -3286,31 +3284,31 @@ TEST(Query_Float3_where)
     CHECK_EQUAL(k.value, 0xc001ede1b0);
     CHECK_EQUAL(a1, 6);
 
-    Query q2 = t.where(&v).less(col_double, 2.65).greater(col_float, 1.35f);
+    Query q2 = t.where().less(col_double, 2.65).greater(col_float, 1.35f);
     auto a2 = q2.sum(col_int);
     CHECK_EQUAL(15, a2);
 
-    Query q3 = t.where(&v).less(col_double, 2.65).greater(col_float, 1.35f);
+    Query q3 = t.where().less(col_double, 2.65).greater(col_float, 1.35f);
     auto a3 = q3.sum(col_float)->get_double();
     double sum3 = double(1.4f) + double(1.5f) + double(1.6f);
     CHECK_EQUAL(sum3, a3);
 
-    Query q4 = t.where(&v).greater(col_float, 1.35f).less(col_double, 2.65);
+    Query q4 = t.where().greater(col_float, 1.35f).less(col_double, 2.65);
     auto a4 = q4.sum(col_float)->get_double();
     CHECK_EQUAL(sum3, a4);
 
-    Query q5 = t.where(&v).greater_equal(col_int, 4).less(col_double, 2.65);
+    Query q5 = t.where().greater_equal(col_int, 4).less(col_double, 2.65);
     auto a5 = q5.sum(col_float)->get_double();
     CHECK_EQUAL(sum3, a5);
 
-    Query q6 = t.where(&v).less(col_double, 2.65).greater_equal(col_int, 4);
+    Query q6 = t.where().less(col_double, 2.65).greater_equal(col_int, 4);
     auto a6 = q6.sum(col_float)->get_double();
     CHECK_EQUAL(sum3, a6);
 
-    Query q7 = t.where(&v).greater(col_int, 3).less(col_int, 7);
+    Query q7 = t.where().greater(col_int, 3).less(col_int, 7);
     auto a7 = q7.sum(col_int);
     CHECK_EQUAL(15, a7);
-    Query q8 = t.where(&v).greater(col_int, 3).less(col_int, 7);
+    Query q8 = t.where().greater(col_int, 3).less(col_int, 7);
     auto a8 = q8.sum(col_int);
     CHECK_EQUAL(15, a8);
 }

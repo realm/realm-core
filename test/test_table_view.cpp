@@ -1482,11 +1482,6 @@ TEST(TableView_IsInTableOrder)
     tv.sort(col_id, true);
     CHECK_EQUAL(false, tv.is_in_table_order());
 
-    // Queries restricted by views are not guaranteed to be in table order.
-    TableView restricting_view = target->where().equal(col_id, 0).find_all();
-    tv = target->where(&restricting_view).find_all();
-    CHECK_EQUAL(false, tv.is_in_table_order());
-
     // Backlinks are not guaranteed to be in table order.
     tv = obj7.get_backlink_view(source, col_link);
     CHECK_EQUAL(false, tv.is_in_table_order());

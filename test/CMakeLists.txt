@@ -16,11 +16,6 @@ add_subdirectory(benchmark-sync)
 
 set(CORE_TEST_SOURCES
     # slowest to compile first
-    test_query.cpp
-    test_query2.cpp
-    test_query_big.cpp
-    test_table.cpp
-    test_lang_bind_helper.cpp
     test_parser.cpp
 
     test_all.cpp

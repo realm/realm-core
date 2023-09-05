@@ -58,10 +58,10 @@ Query::Query(ConstTableRef table, LinkCollectionPtr&& list_ptr)
     create();
 }
 
-Query::Query(ConstTableRef table, TableView* tv)
+Query::Query(ConstTableRef table)
     : m_table(table.cast_away_const())
-    , m_view(tv)
-    , m_source_table_view(tv)
+    , m_view(nullptr)
+    , m_source_table_view(nullptr)
 {
     create();
 }
