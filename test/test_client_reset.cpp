@@ -65,6 +65,7 @@ TEST(ClientReset_TransferGroupWithDanglingLinks)
     _impl::client_reset::transfer_group(*rt, *wt, *test_context.logger, allow_schema_additions);
 }
 
+#if !REALM_MOBILE
 TEST(ClientReset_NoLocalChanges)
 {
     TEST_DIR(dir_1);                // The original server dir.
@@ -860,5 +861,6 @@ TEST(ClientReset_PinnedVersion)
         session.wait_for_download_complete_or_client_stopped();
     }
 }
+#endif // !REALM_MOBILE
 
 } // unnamed namespace

@@ -31,6 +31,8 @@
 #elif REALM_PLATFORM_APPLE
 #include <realm/util/cf_ptr.hpp>
 #include <CoreFoundation/CoreFoundation.h>
+#elif REALM_ANDROID
+// TODO: implement event loop for android: see Scheduler::make_alooper()
 #elif defined(__EMSCRIPTEN__)
 // TODO: implement event loop for Emscripten
 #else

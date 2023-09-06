@@ -47,6 +47,7 @@ using namespace realm::test_util;
 
 namespace {
 
+#if !REALM_MOBILE
 TEST(Sync_HistoryMigration)
 {
     // Set to true to produce new versions of client and server-side files in
@@ -438,6 +439,8 @@ TEST(Sync_HistoryMigration)
 
     CHECK_NOT(produce_new_files); // Should not be enabled under normal circumstances
 }
+
+#endif // !REALM_MOBILE
 
 TEST(Sync_HistoryCompression)
 {

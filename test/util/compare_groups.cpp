@@ -48,9 +48,9 @@ private:
 
 class ObjectCompareLogger : public util::Logger {
 public:
-    ObjectCompareLogger(sync::PrimaryKey oid, util::Logger& base_logger) noexcept
+    ObjectCompareLogger(Mixed pk, util::Logger& base_logger) noexcept
         : util::Logger(base_logger.get_level_threshold())
-        , m_oid{oid}
+        , m_pk{pk}
         , m_base_logger{base_logger}
     {
     }
@@ -61,7 +61,7 @@ public:
     }
 
 private:
-    const sync::PrimaryKey m_oid;
+    const Mixed m_pk;
     util::Logger& m_base_logger;
     std::string m_prefix;
     void ensure_prefix()
@@ -69,7 +69,7 @@ private:
         if (REALM_LIKELY(!m_prefix.empty()))
             return;
         std::ostringstream out;
-        out << sync::format_pk(m_oid) << ": "; // Throws
+        out << m_pk << ": ";                   // Throws
         m_prefix = out.str();                  // Throws
     }
 };
@@ -167,100 +167,15 @@ struct Column {
     }
 };
 
-sync::PrimaryKey primary_key_for_row(const Obj& obj)
-{
-    auto table = obj.get_table();
-    ColKey pk_col = table->get_primary_key_column();
-    if (pk_col) {
-        ColumnType pk_type = pk_col.get_type();
-        if (obj.is_null(pk_col)) {
-            return mpark::monostate{};
-        }
-
-        if (pk_type == col_type_Int) {
-            return obj.get<int64_t>(pk_col);
-        }
-
-        if (pk_type == col_type_String) {
-            return obj.get<StringData>(pk_col);
-        }
-
-        if (pk_type == col_type_ObjectId) {
-            return obj.get<ObjectId>(pk_col);
-        }
-
-        if (pk_type == col_type_UUID) {
-            return obj.get<UUID>(pk_col);
-        }
-
-        REALM_TERMINATE("Missing primary key type support");
-    }
-
-    GlobalKey global_key = obj.get_object_id();
-    return global_key;
-}
-
-sync::PrimaryKey primary_key_for_row(const Table& table, ObjKey key)
-{
-    auto obj = table.get_object(key);
-    return primary_key_for_row(obj);
-}
-
-ObjKey row_for_primary_key(const Table& table, sync::PrimaryKey key)
+ObjKey row_for_primary_key(const Table& table, Mixed pk)
 {
     ColKey pk_col = table.get_primary_key_column();
     if (pk_col) {
-        ColumnType pk_type = pk_col.get_type();
-
-        if (auto pk = mpark::get_if<mpark::monostate>(&key)) {
-            static_cast<void>(pk);
-            if (!pk_col.is_nullable()) {
-                REALM_TERMINATE("row_for_primary_key with null on non-nullable primary key column");
-            }
-            return table.find_primary_key({});
-        }
-
-        if (pk_type == col_type_Int) {
-            if (auto pk = mpark::get_if<int64_t>(&key)) {
-                return table.find_primary_key(*pk);
-            }
-            else {
-                REALM_TERMINATE("row_for_primary_key mismatching primary key type (expected int)");
-            }
-        }
-
-        if (pk_type == col_type_String) {
-            if (auto pk = mpark::get_if<StringData>(&key)) {
-                return table.find_primary_key(*pk);
-            }
-            else {
-                REALM_TERMINATE("row_for_primary_key mismatching primary key type (expected string)");
-            }
-        }
-
-        if (pk_type == col_type_ObjectId) {
-            if (auto pk = mpark::get_if<ObjectId>(&key)) {
-                return table.find_primary_key(*pk);
-            }
-            else {
-                REALM_TERMINATE("row_for_primary_key mismatching primary key type (expected ObjectId)");
-            }
-        }
-
-        if (pk_type == col_type_UUID) {
-            if (auto pk = mpark::get_if<UUID>(&key)) {
-                return table.find_primary_key(*pk);
-            }
-            else {
-                REALM_TERMINATE("row_for_primary_key mismatching primary key type (expected UUID)");
-            }
-        }
-
-        REALM_TERMINATE("row_for_primary_key missing primary key type support");
+        return table.find_primary_key(pk); // will assert on type mismatch
     }
 
-    if (auto global_key = mpark::get_if<GlobalKey>(&key)) {
-        return table.get_objkey(*global_key);
+    if (pk.is_type(type_Link, type_TypedLink)) {
+        return pk.get<ObjKey>();
     }
     else {
         REALM_TERMINATE("row_for_primary_key() with primary key, expected GlobalKey");
@@ -269,8 +184,8 @@ ObjKey row_for_primary_key(const Table& table, sync::PrimaryKey key)
 }
 
 bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Column>& columns, util::Logger& logger);
-bool compare_objects(sync::PrimaryKey& oid, const Table& table_1, const Table& table_2,
-                     const std::vector<Column>& columns, util::Logger& logger);
+bool compare_objects(Mixed& oid, const Table& table_1, const Table& table_2, const std::vector<Column>& columns,
+                     util::Logger& logger);
 
 bool compare_schemas(const Table& table_1, const Table& table_2, util::Logger& logger,
                      std::vector<Column>* out_columns = nullptr)
@@ -526,8 +441,8 @@ bool compare_lists(const Column& col, const Obj& obj_1, const Obj& obj_2, util::
                         }
                     }
                     else {
-                        sync::PrimaryKey target_oid_1 = primary_key_for_row(*target_table_1, link_1);
-                        sync::PrimaryKey target_oid_2 = primary_key_for_row(*target_table_2, link_2);
+                        Mixed target_oid_1 = target_table_1->get_primary_key(link_1);
+                        Mixed target_oid_2 = target_table_2->get_primary_key(link_2);
                         if (target_oid_1 != target_oid_2) {
                             logger.error("Value mismatch in column '%1' at index %2 of the link "
                                          "list (%3 vs %4)",
@@ -685,8 +600,8 @@ bool compare_sets(const Column& col, const Obj& obj_1, const Obj& obj_2, util::L
                     }
                 }
                 else {
-                    sync::PrimaryKey target_oid_1 = primary_key_for_row(*target_table_1, link_1);
-                    sync::PrimaryKey target_oid_2 = primary_key_for_row(*target_table_2, link_2);
+                    Mixed target_oid_1 = target_table_1->get_primary_key(link_1);
+                    Mixed target_oid_2 = target_table_2->get_primary_key(link_2);
                     if (target_oid_1 != target_oid_2) {
                         logger.error("Value mismatch in column '%1' at index %2 of the link "
                                      "set (%3 vs %4)",
@@ -919,11 +834,11 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
                         }
                     }
                     else {
-                        sync::PrimaryKey target_oid_1 = primary_key_for_row(*target_table_1, link_1);
-                        sync::PrimaryKey target_oid_2 = primary_key_for_row(*target_table_2, link_2);
+                        Mixed target_oid_1 = target_table_1->get_primary_key(link_1);
+                        Mixed target_oid_2 = target_table_2->get_primary_key(link_2);
                         if (target_oid_1 != target_oid_2) {
-                            logger.error("Value mismatch in column '%1' (%2 vs %3)", col.name,
-                                         sync::format_pk(target_oid_1), sync::format_pk(target_oid_2));
+                            logger.error("Value mismatch in column '%1' (%2 vs %3)", col.name, target_oid_1,
+                                         target_oid_2);
                             equal = false;
                         }
                     }
@@ -939,17 +854,17 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
     return equal;
 }
 
-bool compare_objects(sync::PrimaryKey& oid, const Table& table_1, const Table& table_2,
-                     const std::vector<Column>& columns, util::Logger& logger)
+bool compare_objects(Mixed& pk, const Table& table_1, const Table& table_2, const std::vector<Column>& columns,
+                     util::Logger& logger)
 {
-    ObjKey row_1 = row_for_primary_key(table_1, oid);
-    ObjKey row_2 = row_for_primary_key(table_2, oid);
+    ObjKey oid_1 = row_for_primary_key(table_1, pk);
+    ObjKey oid_2 = row_for_primary_key(table_2, pk);
 
     // Note: This is ensured by the inventory handling in compare_tables().
-    REALM_ASSERT(row_1);
-    REALM_ASSERT(row_2);
-    const Obj obj_1 = table_1.get_object(row_1);
-    const Obj obj_2 = table_2.get_object(row_2);
+    REALM_ASSERT(oid_1);
+    REALM_ASSERT(oid_2);
+    const Obj obj_1 = table_1.get_object(oid_1);
+    const Obj obj_2 = table_2.get_object(oid_2);
     return compare_objects(obj_1, obj_2, columns, logger);
 }
 
@@ -986,18 +901,17 @@ bool compare_tables(const Table& table_1, const Table& table_2, util::Logger& lo
     }
 
     // Compare row sets
-    using Objects = std::set<sync::PrimaryKey>;
+    using Objects = std::set<Mixed>;
     auto make_inventory = [](const Table& table, Objects& objects) {
         for (const Obj& obj : table) {
-            auto oid = primary_key_for_row(obj);
-            objects.insert(oid);
+            objects.insert(obj.get_primary_key());
         }
     };
     Objects objects_1, objects_2;
     make_inventory(table_1, objects_1);
     make_inventory(table_2, objects_2);
     auto report_missing = [&](const char* hand_2, Objects& objects_1, Objects& objects_2) {
-        std::vector<sync::PrimaryKey> missing;
+        std::vector<Mixed> missing;
         for (auto oid : objects_1) {
             if (objects_2.find(oid) == objects_2.end())
                 missing.push_back(oid);
@@ -1006,15 +920,15 @@ bool compare_tables(const Table& table_1, const Table& table_2, util::Logger& lo
             return;
         std::size_t n = missing.size();
         if (n == 1) {
-            logger.error("One object missing in %1 side table: %2", hand_2, sync::format_pk(missing[0]));
+            logger.error("One object missing in %1 side table: %2", hand_2, missing[0]);
             equal = false;
             return;
         }
         std::ostringstream out;
-        out << sync::format_pk(missing[0]);
+        out << missing[0];
         std::size_t m = std::min<std::size_t>(4, n);
         for (std::size_t i = 1; i < m; ++i)
-            out << ", " << sync::format_pk(missing[i]);
+            out << ", " << missing[i];
         if (m < n)
             out << ", ...";
         logger.error("%1 objects missing in %2 side table: %3", n, hand_2, out.str());
@@ -1024,10 +938,10 @@ bool compare_tables(const Table& table_1, const Table& table_2, util::Logger& lo
     report_missing("left-hand", objects_2, objects_1);
 
     // Compare individual rows
-    for (auto oid : objects_1) {
-        if (objects_2.find(oid) != objects_2.end()) {
-            ObjectCompareLogger sublogger{oid, logger};
-            if (!compare_objects(oid, table_1, table_2, columns, sublogger)) {
+    for (auto pk : objects_1) {
+        if (objects_2.find(pk) != objects_2.end()) {
+            ObjectCompareLogger sublogger{pk, logger};
+            if (!compare_objects(pk, table_1, table_2, columns, sublogger)) {
                 equal = false;
             }
         }
