@@ -20,6 +20,9 @@ set_target_properties(RealmTrawler PROPERTIES
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
 target_link_libraries(RealmTrawler Storage)
+if (EMSCRIPTEN)
+    set_target_properties(RealmTrawler PROPERTIES EXCLUDE_FROM_ALL TRUE)
+endif()
 
 add_executable(RealmEnumerate realm_enumerate.cpp)
 set_target_properties(RealmEnumerate PROPERTIES
@@ -38,6 +41,9 @@ set_target_properties(RealmDecrypt PROPERTIES
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
 target_link_libraries(RealmDecrypt Storage)
+if (NOT REALM_ENABLE_ENCRYPTION)
+    set_target_properties(RealmDecrypt PROPERTIES EXCLUDE_FROM_ALL TRUE)
+endif()
 
 add_executable(RealmEncrypt realm_encrypt.cpp)
 set_target_properties(RealmEncrypt PROPERTIES
