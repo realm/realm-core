@@ -60,6 +60,7 @@ set(SYNC_NETWORK_INSTALL_HEADERS
     network/network.hpp
     network/network_ssl.hpp
     network/websocket.hpp
+    network/websocket_error.hpp
 )
 
 set(NOINST_HEADERS
