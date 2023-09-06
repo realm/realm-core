@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Fix build of most internal tools, also build them by default. ([PR #6475](https://github.com/realm/realm-core/pull/6475))
 
 ----------------------------------------------
 
