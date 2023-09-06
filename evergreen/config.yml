@@ -415,8 +415,8 @@ functions:
         set -o verbose
 
         TOP_DIR=$(pwd)/realm-core
-        REQUIREMENTS_PATH=$TOP_DIR/evergreen/hang_analyzer/requirements.txt
         HANG_ANALYZER_PATH=$TOP_DIR/evergreen/hang_analyzer
+        REQUIREMENTS_PATH=$HANG_ANALYZER_PATH/requirements.txt
 
         if [[ ! -d $TOP_DIR || ! -d $REQUIREMENTS_PATH ]]; then
           echo "No source directory exists. Not running hang analyzer"
