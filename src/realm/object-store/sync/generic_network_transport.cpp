@@ -61,19 +61,20 @@ const char* httpmethod_to_string(HttpMethod method)
     return "UNKNOWN";
 }
 
-AppError::AppError(ErrorCodes::Error error_code, std::string message, std::string link,
-                   util::Optional<int> additional_error_code)
-    : RuntimeError(error_code,
-                   error_code == ErrorCodes::HTTPError ? http_message(message, *additional_error_code) : message)
+AppError::AppError(ErrorCodes::Error ec, std::string message, std::string link,
+                   std::optional<int> additional_error_code, std::optional<std::string> server_err)
+    : Exception(ec, ec == ErrorCodes::HTTPError ? http_message(message, *additional_error_code) : message)
     , additional_status_code(additional_error_code)
     , link_to_server_logs(link)
+    , server_error(server_err ? *server_err : "")
 {
-    REALM_ASSERT(ErrorCodes::error_categories(error_code).test(ErrorCategory::app_error));
+    // For these errors, the server_error string is empty
+    REALM_ASSERT(ErrorCodes::error_categories(ec).test(ErrorCategory::app_error));
 }
 
 std::ostream& operator<<(std::ostream& os, AppError error)
 {
-    return os << ErrorCodes::error_string(error.code()) << ": " << error.what();
+    return os << error.server_error << ": " << error.what();
 }
 
 } // namespace realm::app

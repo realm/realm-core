@@ -9,18 +9,35 @@ using OutputBuffer = util::ResettableExpandableBufferOutputStream;
 
 // Client protocol
 
-void ClientProtocol::make_bind_message(int protocol_version, OutputBuffer& out, session_ident_type session_ident,
-                                       const std::string& server_path, const std::string& signed_user_token,
-                                       bool need_client_file_ident, bool is_subserver)
+void ClientProtocol::make_pbs_bind_message(int protocol_version, OutputBuffer& out, session_ident_type session_ident,
+                                           const std::string& server_path, const std::string& signed_user_token,
+                                           bool need_client_file_ident, bool is_subserver)
 {
     static_cast<void>(protocol_version);
     out << "bind " << session_ident << " " << server_path.size() << " " << signed_user_token.size() << " "
-        << int(need_client_file_ident); // Throws
-    out << " " << int(is_subserver);    // Throws
-    out << "\n";                        // Throws
+        << int(need_client_file_ident) << " " << int(is_subserver) << "\n"; // Throws
     REALM_ASSERT(!out.fail());
 
     out.write(server_path.data(), server_path.size());             // Throws
+    out.write(signed_user_token.data(), signed_user_token.size()); // Throws
+}
+
+void ClientProtocol::make_flx_bind_message(int protocol_version, OutputBuffer& out, session_ident_type session_ident,
+                                           const nlohmann::json& json_data, const std::string& signed_user_token,
+                                           bool need_client_file_ident, bool is_subserver)
+{
+    static_cast<void>(protocol_version);
+    std::string json_data_stg;
+    // Protocol version v8 and above accepts stringified json_data for the first data argument
+    if (!json_data.empty()) {
+        json_data_stg = json_data.dump();
+    }
+
+    out << "bind " << session_ident << " " << json_data_stg.size() << " " << signed_user_token.size() << " "
+        << int(need_client_file_ident) << " " << int(is_subserver) << "\n"; // Throws
+    REALM_ASSERT(!out.fail());
+
+    out.write(json_data_stg.data(), json_data_stg.size());         // Throws
     out.write(signed_user_token.data(), signed_user_token.size()); // Throws
 }
 
@@ -269,6 +286,18 @@ void ServerProtocol::make_pong(OutputBuffer& out, milliseconds_type timestamp)
     out << "pong " << timestamp << "\n"; // Throws
 }
 
+void ServerProtocol::make_log_message(OutputBuffer& out, util::Logger::Level level, std::string message,
+                                      session_ident_type sess_id, std::optional<std::string> co_id)
+{
+    nlohmann::json log_msg_json;
+    log_msg_json["level"] = util::Logger::level_to_string(level);
+    log_msg_json["msg"] = message;
+    if (co_id) {
+        log_msg_json["co_id"] = *co_id;
+    }
+    std::string json_data_stg = log_msg_json.dump();
+    out << "log_message " << sess_id << " " << json_data_stg.length() << "\n" << json_data_stg;
+}
 
 std::string make_authorization_header(const std::string& signed_user_token)
 {

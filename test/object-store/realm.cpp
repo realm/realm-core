@@ -16,16 +16,17 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
-#include <catch2/matchers/catch_matchers_string.hpp>
+#include <util/event_loop.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
+#include <../util/semaphore.hpp>
 
-#include "util/event_loop.hpp"
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
-#include "../util/semaphore.hpp"
+#include <realm/db.hpp>
+#include <realm/history.hpp>
+
+#include <realm/impl/simulated_failure.hpp>
 
 #include <realm/object-store/binding_context.hpp>
-#include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/keypath_helpers.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
@@ -33,22 +34,26 @@
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
-#include <realm/object-store/util/scheduler.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/util/event_loop_dispatcher.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
-#if REALM_ENABLE_SYNC
-#include <realm/object-store/sync/async_open_task.hpp>
-#include <realm/object-store/sync/impl/sync_metadata.hpp>
-#include <realm/sync/noinst/client_history_impl.hpp>
-#include "sync/flx_sync_harness.hpp"
-#endif
-
-#include <realm/db.hpp>
-#include <realm/history.hpp>
-#include <realm/impl/simulated_failure.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/fifo_helper.hpp>
 #include <realm/util/scope_exit.hpp>
+
+#if REALM_ENABLE_SYNC
+#include <util/sync/flx_sync_harness.hpp>
+
+#include <realm/object-store/sync/async_open_task.hpp>
+#include <realm/object-store/sync/impl/sync_metadata.hpp>
+
+#include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/subscriptions.hpp>
+#endif
+
+#include <catch2/catch_all.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include <external/json/json.hpp>
 
@@ -843,11 +848,19 @@ TEST_CASE("SharedRealm: schema_subset_mode") {
     SECTION("obtaining a frozen realm with an incompatible schema throws") {
         config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
         auto old_realm = Realm::get_shared_realm(config);
+        {
+            auto tr = db->start_write();
+            auto table = tr->get_table("class_object");
+            table->create_object();
+            tr->commit();
+        }
         old_realm->read_group();
 
         {
             auto tr = db->start_write();
-            tr->add_table("class_object 2")->add_column(type_Int, "value");
+            auto table = tr->add_table("class_object 2");
+            ColKey val_col = table->add_column(type_Int, "value");
+            table->create_object().set(val_col, 1);
             tr->commit();
         }
 
@@ -861,15 +874,51 @@ TEST_CASE("SharedRealm: schema_subset_mode") {
         REQUIRE(old_realm->freeze()->schema().size() == 1);
         REQUIRE(new_realm->freeze()->schema().size() == 2);
         REQUIRE(Realm::get_frozen_realm(config, new_realm->read_transaction_version())->schema().size() == 2);
-        // Fails because the requested version doesn't have the "object 2" table
-        // required by the config
+        // An additive change is allowed, the unknown table is empty
+        REQUIRE(Realm::get_frozen_realm(config, old_realm->read_transaction_version())->schema().size() == 2);
+
+        config.schema = Schema{{"object", {{"value", PropertyType::String}}}}; // int -> string
+        // Fails because the schema has an invalid breaking change
+        REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, new_realm->read_transaction_version()),
+                          InvalidReadOnlySchemaChangeException);
         REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, old_realm->read_transaction_version()),
-                          InvalidExternalSchemaChangeException);
+                          InvalidReadOnlySchemaChangeException);
+        config.schema = Schema{
+            {"object", {{"value", PropertyType::Int}}},
+            {"object 2", {{"value", PropertyType::String}}}, // int -> string
+        };
+        // fails due to invalid change on object 2 type
+        REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, new_realm->read_transaction_version()),
+                          InvalidReadOnlySchemaChangeException);
+        // opening the old state does not fail because the schema is an additive change
+        auto frozen_old = Realm::get_frozen_realm(config, old_realm->read_transaction_version());
+        REQUIRE(frozen_old->schema().size() == 2);
+        {
+            TableRef table = frozen_old->read_group().get_table("class_object");
+            Results results(frozen_old, table);
+            REQUIRE(results.is_frozen());
+            REQUIRE(results.size() == 1);
+        }
+        {
+            TableRef table = frozen_old->read_group().get_table("class_object 2");
+            REQUIRE(!table);
+            Results results(frozen_old, table);
+            REQUIRE(results.is_frozen());
+            REQUIRE(results.size() == 0);
+        }
+        config.schema = Schema{
+            {"object", {{"value", PropertyType::Int}, {"value 2", PropertyType::String}}}, // add property
+        };
+        // fails due to additional property on object
+        REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, old_realm->read_transaction_version()),
+                          InvalidReadOnlySchemaChangeException);
+        REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, new_realm->read_transaction_version()),
+                          InvalidReadOnlySchemaChangeException);
     }
 }
 
 #if REALM_ENABLE_SYNC
-TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
+TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
     if (!util::EventLoop::has_implementation())
         return;
 
@@ -1144,8 +1193,9 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         task->start([&](auto ref, auto error) {
             std::lock_guard<std::mutex> lock(mutex);
             REQUIRE(error);
-            REQUIRE_EXCEPTION(std::rethrow_exception(error), HTTPError,
-                              "http error code considered fatal. Client Error: 403");
+            REQUIRE_EXCEPTION(
+                std::rethrow_exception(error), HTTPError,
+                "Unable to refresh the user access token: http error code considered fatal. Client Error: 403");
             REQUIRE(!ref);
             called = true;
         });
@@ -1290,7 +1340,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     }
 }
 
-TEST_CASE("SharedRealm: convert") {
+TEST_CASE("SharedRealm: convert", "[sync][pbs][convert]") {
     TestSyncManager tsm;
     ObjectSchema object_schema = {"object",
                                   {
@@ -1386,7 +1436,7 @@ TEST_CASE("SharedRealm: convert") {
     }
 }
 
-TEST_CASE("SharedRealm: convert - embedded objects") {
+TEST_CASE("SharedRealm: convert - embedded objects", "[sync][pbs][convert][embedded objects]") {
     TestSyncManager tsm;
     ObjectSchema object_schema = {"object",
                                   {
@@ -1894,6 +1944,7 @@ TEST_CASE("SharedRealm: async writes") {
                                   "an error");
         REQUIRE(realm->is_closed());
     }
+#endif
     SECTION("exception thrown from async commit completion callback with error handler") {
         Realm::AsyncHandle h;
         realm->set_async_error_handler([&](Realm::AsyncHandle handle, std::exception_ptr error) {
@@ -1911,6 +1962,7 @@ TEST_CASE("SharedRealm: async writes") {
         wait_for_done();
         verify_persisted_count(1);
     }
+#ifndef _WIN32
     SECTION("exception thrown from async commit completion callback without error handler") {
         realm->begin_transaction();
         table->create_object();
@@ -1923,6 +1975,7 @@ TEST_CASE("SharedRealm: async writes") {
                                   "an error");
         REQUIRE(table->size() == 1);
     }
+#endif
 
     if (_impl::SimulatedFailure::is_enabled()) {
         SECTION("error in the synchronous part of async commit") {
@@ -2339,15 +2392,38 @@ TEST_CASE("SharedRealm: async writes") {
         REQUIRE(table->size() == 6);
     }
 
+    SECTION("async writes which would run inside sync writes are deferred") {
+        realm->async_begin_transaction([&] {
+            done = true;
+        });
+
+        // Wait for the background thread to hold the write lock (without letting
+        // the event loop run so that the scheduled task isn't run)
+        DBOptions options;
+        options.encryption_key = config.encryption_key.data();
+        auto db = DB::create(make_in_realm_history(), config.path, options);
+        while (db->start_write(true))
+            millisleep(1);
+
+        realm->begin_transaction();
+
+        // Invoke the pending callback
+        util::EventLoop::main().run_pending();
+        // Should not have run the async write block
+        REQUIRE(done == false);
+
+        // Should run the async write block once the synchronous transaction is done
+        realm->cancel_transaction();
+        REQUIRE(done == false);
+        util::EventLoop::main().run_pending();
+        REQUIRE(done == true);
+    }
+
     util::EventLoop::main().run_until([&] {
         return !realm || !realm->has_pending_async_work();
     });
-#endif
 
-
-#ifdef _WIN32
     _impl::RealmCoordinator::clear_all_caches();
-#endif
 }
 // Our libuv scheduler currently does not support background threads, so we can
 // only run this on apple platforms
@@ -3034,19 +3110,22 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
     table->create_object();
     r1->commit_transaction();
 
-    // Cannot be a member var of Context since Realm.close will free the context.
-    static SharedRealm* shared_realm;
-    shared_realm = &r1;
     struct Context : public BindingContext {
+        Context(std::shared_ptr<Realm>& realm)
+            : realm(&realm)
+        {
+        }
+        std::shared_ptr<Realm>* realm;
         void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
         {
-            (*shared_realm)->close();
-            (*shared_realm).reset();
+            auto realm = this->realm; // close() will delete `this`
+            (*realm)->close();
+            realm->reset();
         }
     };
 
     SECTION("did_change") {
-        r1->m_binding_context.reset(new Context());
+        r1->m_binding_context.reset(new Context(r1));
         r1->invalidate();
 
         auto r2 = Realm::get_shared_realm(config);
@@ -3059,7 +3138,7 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
     }
 
     SECTION("did_change with async results") {
-        r1->m_binding_context.reset(new Context());
+        r1->m_binding_context.reset(new Context(r1));
         Results results(r1, table->where());
         auto token = results.add_notification_callback([&](CollectionChangeSet) {
             // Should not be called.
@@ -3079,7 +3158,7 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
     }
 
     SECTION("refresh") {
-        r1->m_binding_context.reset(new Context());
+        r1->m_binding_context.reset(new Context(r1));
 
         auto r2 = Realm::get_shared_realm(config);
         r2->begin_transaction();
@@ -3089,8 +3168,6 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
 
         REQUIRE_FALSE(r1->refresh());
     }
-
-    shared_realm = nullptr;
 }
 
 TEST_CASE("RealmCoordinator: schema cache") {
@@ -3662,7 +3739,7 @@ struct ModeHardResetFile {
     static constexpr bool should_call_init_on_version_bump = true;
 };
 
-TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function", "[init][update_schema]", ModeAutomatic,
+TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function", "[init][update schema]", ModeAutomatic,
                    ModeAdditive, ModeManual, ModeSoftResetFile, ModeHardResetFile)
 {
     TestFile config;

@@ -2,6 +2,7 @@
 
 #include <realm/binary_data.hpp>
 #include <realm/impl/simulated_failure.hpp>
+#include <realm/object_id.hpp>
 #include <realm/string_data.hpp>
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/trigger.hpp>
@@ -104,6 +105,11 @@ namespace {
 
 enum class SchedStatus { done = 0, pending, in_progress };
 
+// Only used by the Sync Server to support older pbs sync clients (prior to protocol v8)
+constexpr std::string_view get_old_pbs_websocket_protocol_prefix() noexcept
+{
+    return "com.mongodb.realm-sync/";
+}
 
 std::string short_token_fmt(const std::string& str, size_t cutoff = 30)
 {
@@ -1073,10 +1079,15 @@ public:
     const std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
 
+    // Clients with sync protocol version 8 or greater support pbs->flx migration
+    static constexpr int PBS_FLX_MIGRATION_PROTOCOL_VERSION = 8;
+    // Clients with sync protocol version less than 10 do not support log messages
+    static constexpr int SERVER_LOG_PROTOCOL_VERSION = 10;
+
     SyncConnection(ServerImpl& serv, std::int_fast64_t id, std::unique_ptr<network::Socket>&& socket,
                    std::unique_ptr<network::ssl::Stream>&& ssl_stream,
                    std::unique_ptr<network::ReadAheadBuffer>&& read_ahead_buffer, int client_protocol_version,
-                   std::string client_user_agent, std::string remote_endpoint)
+                   std::string client_user_agent, std::string remote_endpoint, std::string appservices_request_id)
         : logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(id), serv.logger_ptr)} // Throws
         , logger{*logger_ptr}
         , m_server{serv}
@@ -1088,6 +1099,7 @@ public:
         , m_client_protocol_version{client_protocol_version}
         , m_client_user_agent{std::move(client_user_agent)}
         , m_remote_endpoint{std::move(remote_endpoint)}
+        , m_appservices_request_id{std::move(appservices_request_id)}
     {
         // Make the output buffer stream throw std::bad_alloc if it fails to
         // expand the buffer
@@ -1142,11 +1154,10 @@ public:
 
     bool websocket_binary_message_received(const char* data, size_t size) final override
     {
-        std::error_code ec;
         using sf = _impl::SimulatedFailure;
-        if (sf::trigger(sf::sync_server__read_head, ec)) {
+        if (sf::check_trigger(sf::sync_server__read_head)) {
             // Suicide
-            read_error(ec);
+            read_error(sf::sync_server__read_head);
             return false;
         }
         // After a connection level error has occurred, all incoming messages
@@ -1269,7 +1280,7 @@ public:
 
     void initiate_pong_output_buffer();
 
-    void handle_protocol_error(ServerProtocol::Error error);
+    void handle_protocol_error(Status status);
 
     void receive_bind_message(session_ident_type, std::string path, std::string signed_user_token,
                               bool need_client_file_ident, bool is_subserver);
@@ -1297,6 +1308,9 @@ public:
 
     void discard_session(session_ident_type) noexcept;
 
+    void send_log_message(util::Logger::Level level, const std::string&& message, session_ident_type sess_ident = 0,
+                          std::optional<std::string> co_id = std::nullopt);
+
 private:
     ServerImpl& m_server;
     const int_fast64_t m_id;
@@ -1316,6 +1330,8 @@ private:
     const std::string m_client_user_agent;
 
     const std::string m_remote_endpoint;
+
+    const std::string m_appservices_request_id;
 
     // A queue of sessions that have enlisted for an opportunity to send a
     // message. Sessions will be served in the order that they enlist. A session
@@ -1357,6 +1373,16 @@ private:
     ProtocolError m_error_code = {};
     session_ident_type m_error_session_ident = 0;
 
+    struct LogMessage {
+        session_ident_type sess_ident;
+        util::Logger::Level level;
+        std::string message;
+        std::optional<std::string> co_id;
+    };
+
+    std::mutex m_log_mutex;
+    std::queue<LogMessage> m_log_messages;
+
     static std::string make_logger_prefix(int_fast64_t id)
     {
         std::ostringstream out;
@@ -1375,6 +1401,7 @@ private:
 
     void send_next_message();
     void send_pong(milliseconds_type timestamp);
+    void send_log_message(const LogMessage& log_msg);
 
     void handle_write_output_buffer();
     void handle_pong_output_buffer();
@@ -1575,9 +1602,15 @@ public:
         }
     }
 
+    std::string get_appservices_request_id() const
+    {
+        return m_appservices_request_id.to_string();
+    }
+
 private:
     ServerImpl& m_server;
     const int_fast64_t m_id;
+    const ObjectId m_appservices_request_id = ObjectId::gen();
     std::unique_ptr<network::Socket> m_socket;
     std::unique_ptr<network::ssl::Stream> m_ssl_stream;
     std::unique_ptr<network::ReadAheadBuffer> m_read_ahead_buffer;
@@ -1586,6 +1619,7 @@ private:
     bool m_is_sending = false;
     SteadyTimePoint m_last_activity_at;
     std::string m_remote_endpoint;
+    int m_negotiated_protocol_version = 0;
 
     void initiate_ssl_handshake()
     {
@@ -1683,11 +1717,14 @@ private:
             HttpListHeaderValueParser parser{value};
             std::string_view elem;
             while (parser.next(elem)) {
-                auto prefix = get_pbs_websocket_protocol_prefix();
                 // FIXME: Use std::string_view::begins_with() in C++20.
-                bool begins_with = (elem.size() >= prefix.size() &&
-                                    std::equal(elem.data(), elem.data() + prefix.size(), prefix.data()));
-                if (begins_with) {
+                const StringData protocol{elem};
+                std::string_view prefix;
+                if (protocol.begins_with(get_pbs_websocket_protocol_prefix()))
+                    prefix = get_pbs_websocket_protocol_prefix();
+                else if (protocol.begins_with(get_old_pbs_websocket_protocol_prefix()))
+                    prefix = get_old_pbs_websocket_protocol_prefix();
+                if (!prefix.empty()) {
                     auto parse_version = [&](std::string_view str) {
                         in.set_buffer(str.data(), str.data() + str.size());
                         int version = 0;
@@ -1731,7 +1768,6 @@ private:
                 return;
             }
         }
-        int negotiated_protocol_version = 0;
         {
             ProtocolVersionRange server_range = m_server.get_protocol_version_range();
             int server_min = server_range.first;
@@ -1745,8 +1781,9 @@ private:
                 if (client_max >= server_min && client_min <= server_max) {
                     // Overlap
                     int version = std::min(client_max, server_max);
-                    if (version > best_match)
+                    if (version > best_match) {
                         best_match = version;
+                    }
                 }
                 if (client_min < overall_client_min)
                     overall_client_min = client_min;
@@ -1780,6 +1817,7 @@ private:
                         nonfirst = true;
                     }
                 };
+                using Range = ProtocolVersionRange;
                 formatter.reset();
                 format_ranges(protocol_version_ranges); // Throws
                 logger.error("Protocol version negotiation failed: %1 "
@@ -1788,8 +1826,7 @@ private:
                 formatter.reset();
                 formatter << "Protocol version negotiation failed: "
                              ""
-                          << elaboration << ".\n\n"; // Throws
-                using Range = ProtocolVersionRange;
+                          << elaboration << ".\n\n";                                   // Throws
                 formatter << "Server supports: ";                                      // Throws
                 format_ranges(std::initializer_list<Range>{{server_min, server_max}}); // Throws
                 formatter << "\n";                                                     // Throws
@@ -1803,17 +1840,21 @@ private:
                 handle_400_bad_request({formatter.data(), formatter.size()}); // Throws
                 return;
             }
-            negotiated_protocol_version = best_match;
+            m_negotiated_protocol_version = best_match;
             logger.debug("Received: Sync HTTP request (negotiated_protocol_version=%1)",
-                         negotiated_protocol_version); // Throws
+                         m_negotiated_protocol_version); // Throws
             formatter.reset();
         }
 
         std::string sec_websocket_protocol_2;
         {
+            std::string_view prefix =
+                m_negotiated_protocol_version < SyncConnection::PBS_FLX_MIGRATION_PROTOCOL_VERSION
+                    ? get_old_pbs_websocket_protocol_prefix()
+                    : get_pbs_websocket_protocol_prefix();
             std::ostringstream out;
             out.imbue(std::locale::classic());
-            out << get_pbs_websocket_protocol_prefix() << negotiated_protocol_version; // Throws
+            out << prefix << m_negotiated_protocol_version; // Throws
             sec_websocket_protocol_2 = std::move(out).str();
         }
 
@@ -1851,7 +1892,8 @@ private:
                 user_agent = i->second; // Throws (copy)
         }
 
-        auto handler = [negotiated_protocol_version, user_agent = std::move(user_agent), this](std::error_code ec) {
+        auto handler = [protocol_version = m_negotiated_protocol_version, user_agent = std::move(user_agent),
+                        this](std::error_code ec) {
             // If the operation is aborted, the socket object may have been destroyed.
             if (ec != util::error::operation_aborted) {
                 if (ec) {
@@ -1861,8 +1903,8 @@ private:
 
                 std::unique_ptr<SyncConnection> sync_conn = std::make_unique<SyncConnection>(
                     m_server, m_id, std::move(m_socket), std::move(m_ssl_stream), std::move(m_read_ahead_buffer),
-                    negotiated_protocol_version, std::move(user_agent),
-                    std::move(m_remote_endpoint)); // Throws
+                    protocol_version, std::move(user_agent), std::move(m_remote_endpoint),
+                    get_appservices_request_id()); // Throws
                 SyncConnection& sync_conn_ref = *sync_conn;
                 m_server.add_sync_connection(m_id, std::move(sync_conn));
                 m_server.remove_http_connection(m_id);
@@ -1920,6 +1962,10 @@ private:
     void add_common_http_response_headers(HTTPResponse& response)
     {
         response.headers["Server"] = "RealmSync/" REALM_VERSION_STRING; // Throws
+        if (m_negotiated_protocol_version < SyncConnection::SERVER_LOG_PROTOCOL_VERSION) {
+            // This isn't a real X-Appservices-Request-Id, but it should be enough to test with
+            response.headers["X-Appservices-Request-Id"] = get_appservices_request_id();
+        }
     }
 
     void read_error(std::error_code ec)
@@ -2386,6 +2432,9 @@ public:
         }
 
         logger.info("Bound to client file (client_file_ident=%1)", client_file_ident); // Throws
+
+        send_log_message(util::Logger::Level::debug, util::format("Session %1 bound to client file ident %2",
+                                                                  m_session_ident, client_file_ident));
 
         m_server_file->identify_session(this, client_file_ident); // Throws
 
@@ -3084,6 +3133,15 @@ private:
 
         m_error_message_sent = true;
         // Protocol state is now WaitForUnbindErr
+    }
+
+    void send_log_message(util::Logger::Level level, const std::string&& message)
+    {
+        if (m_connection.get_client_protocol_version() < SyncConnection::SERVER_LOG_PROTOCOL_VERSION) {
+            return logger.log(level, message.c_str());
+        }
+
+        m_connection.send_log_message(level, std::move(message), m_session_ident);
     }
 
     // Idempotent
@@ -4185,6 +4243,8 @@ void SyncConnection::initiate()
     m_last_activity_at = steady_clock_now();
     logger.debug("Sync Connection initiated");
     m_websocket.initiate_server_websocket_after_handshake();
+    send_log_message(util::Logger::Level::info, "Client connection established with server", 0,
+                     m_appservices_request_id);
 }
 
 
@@ -4232,30 +4292,21 @@ void SyncConnection::enlist_to_send(Session* sess) noexcept
 }
 
 
-void SyncConnection::handle_protocol_error(ServerProtocol::Error error)
+void SyncConnection::handle_protocol_error(Status status)
 {
-    switch (error) {
-        case ServerProtocol::Error::unknown_message:
-            protocol_error(ProtocolError::unknown_message); // Throws
-            break;
-        case ServerProtocol::Error::bad_syntax:
+    logger.error("%1", status);
+    switch (status.code()) {
+        case ErrorCodes::SyncProtocolInvariantFailed:
             protocol_error(ProtocolError::bad_syntax); // Throws
             break;
-        case ServerProtocol::Error::limits_exceeded:
+        case ErrorCodes::LimitExceeded:
             protocol_error(ProtocolError::limits_exceeded); // Throws
             break;
-        case ServerProtocol::Error::bad_decompression:
-            protocol_error(ProtocolError::bad_decompression); // Throws
-            break;
-        case ServerProtocol::Error::bad_changeset_header_syntax:
-            protocol_error(ProtocolError::bad_changeset_header_syntax); // Throws
-            break;
-        case ServerProtocol::Error::bad_changeset_size:
-            protocol_error(ProtocolError::bad_changeset_size); // Throws
+        default:
+            protocol_error(ProtocolError::other_error);
             break;
     }
 }
-
 
 void SyncConnection::receive_bind_message(session_ident_type session_ident, std::string path,
                                           std::string signed_user_token, bool need_client_file_ident,
@@ -4435,6 +4486,21 @@ void SyncConnection::receive_error_message(session_ident_type session_ident, int
     sess.receive_error_message(session_ident, error_code, error_body); // Throws
 }
 
+void SyncConnection::send_log_message(util::Logger::Level level, const std::string&& message,
+                                      session_ident_type sess_ident, std::optional<std::string> co_id)
+{
+    if (get_client_protocol_version() < SyncConnection::SERVER_LOG_PROTOCOL_VERSION) {
+        return logger.log(level, message.c_str());
+    }
+
+    LogMessage log_msg{sess_ident, level, std::move(message), std::move(co_id)};
+    {
+        std::lock_guard lock(m_log_mutex);
+        m_log_messages.push(std::move(log_msg));
+    }
+    m_send_trigger->trigger();
+}
+
 
 void SyncConnection::bad_session_ident(const char* message_type, session_ident_type session_ident)
 {
@@ -4492,7 +4558,7 @@ void SyncConnection::send_next_message()
         if (!sess) {
             // No sessions were enlisted to send
             if (REALM_LIKELY(!m_is_closing))
-                return; // Nothing more to do right now
+                break; // Check to see if there are any log messages to go out
             // Send a connection level ERROR
             REALM_ASSERT(!is_session_level_error(m_error_code));
             initiate_write_error(m_error_code, m_error_session_ident); // Throws
@@ -4508,6 +4574,14 @@ void SyncConnection::send_next_message()
         if (m_is_sending)
             return;
     }
+    {
+        std::lock_guard lock(m_log_mutex);
+        if (!m_log_messages.empty()) {
+            send_log_message(m_log_messages.front());
+            m_log_messages.pop();
+        }
+    }
+    // Otherwise, nothing to do
 }
 
 
@@ -4550,6 +4624,15 @@ void SyncConnection::send_pong(milliseconds_type timestamp)
     get_server_protocol().make_pong(out, timestamp); // Throws
 
     initiate_pong_output_buffer(); // Throws
+}
+
+void SyncConnection::send_log_message(const LogMessage& log_msg)
+{
+    OutputBuffer& out = get_output_buffer();
+    get_server_protocol().make_log_message(out, log_msg.level, log_msg.message, log_msg.sess_ident,
+                                           log_msg.co_id); // Throws
+
+    initiate_write_output_buffer(); // Throws
 }
 
 

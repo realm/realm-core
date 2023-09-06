@@ -32,7 +32,7 @@ RLM_API bool realm_object_get_parent(const realm_object_t* object, realm_object_
                                      realm_class_key_t* class_key)
 {
     return wrap_err([&]() {
-        auto obj = object->obj().get_parent_object();
+        const auto& obj = object->get_obj().get_parent_object();
         if (class_key)
             *class_key = obj.get_table()->get_key().value;
 
@@ -145,7 +145,7 @@ RLM_API bool realm_object_delete(realm_object_t* obj)
 {
     return wrap_err([&]() {
         obj->verify_attached();
-        obj->obj().remove();
+        obj->get_obj().remove();
         return true;
     });
 }
@@ -209,7 +209,7 @@ RLM_API bool realm_object_add_int(realm_object_t* object, realm_property_key_t p
     REALM_ASSERT(object);
     return wrap_err([&]() {
         object->verify_attached();
-        object->obj().add_int(ColKey(property_key), value);
+        object->get_obj().add_int(ColKey(property_key), value);
         return true;
     });
 }
@@ -222,17 +222,17 @@ RLM_API bool realm_object_is_valid(const realm_object_t* obj)
 
 RLM_API realm_object_key_t realm_object_get_key(const realm_object_t* obj)
 {
-    return obj->obj().get_key().value;
+    return obj->get_obj().get_key().value;
 }
 
 RLM_API realm_class_key_t realm_object_get_table(const realm_object_t* obj)
 {
-    return obj->obj().get_table()->get_key().value;
+    return obj->get_obj().get_table()->get_key().value;
 }
 
 RLM_API realm_link_t realm_object_as_link(const realm_object_t* object)
 {
-    auto obj = object->obj();
+    const auto& obj = object->get_obj();
     auto table = obj.get_table();
     auto table_key = table->get_key();
     auto obj_key = obj.get_key();
@@ -264,7 +264,7 @@ RLM_API bool realm_get_values(const realm_object_t* obj, size_t num_values, cons
     return wrap_err([&]() {
         obj->verify_attached();
 
-        auto o = obj->obj();
+        auto o = obj->get_obj();
 
         for (size_t i = 0; i < num_values; ++i) {
             auto col_key = ColKey(properties[i]);
@@ -296,7 +296,7 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
 {
     return wrap_err([&]() {
         obj->verify_attached();
-        auto o = obj->obj();
+        auto o = obj->get_obj();
         auto table = o.get_table();
 
         // Perform validation up front to avoid partial updates. This is
@@ -332,7 +332,7 @@ RLM_API realm_object_t* realm_set_embedded(realm_object_t* obj, realm_property_k
 {
     return wrap_err([&]() {
         obj->verify_attached();
-        auto o = obj->obj();
+        auto& o = obj->get_obj();
         return new realm_object_t({obj->get_realm(), o.create_and_set_linked_object(ColKey(col))});
     });
 }
@@ -341,7 +341,7 @@ RLM_API realm_object_t* realm_get_linked_object(realm_object_t* obj, realm_prope
 {
     return wrap_err([&]() {
         obj->verify_attached();
-        auto o = obj->obj().get_linked_object(ColKey(col));
+        const auto& o = obj->get_obj().get_linked_object(ColKey(col));
         return o ? new realm_object_t({obj->get_realm(), o}) : nullptr;
     });
 }
@@ -351,7 +351,7 @@ RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_property_key_
     return wrap_err([&]() {
         object->verify_attached();
 
-        auto obj = object->obj();
+        const auto& obj = object->get_obj();
         auto table = obj.get_table();
 
         auto col_key = ColKey(key);
@@ -370,7 +370,7 @@ RLM_API realm_set_t* realm_get_set(realm_object_t* object, realm_property_key_t 
     return wrap_err([&]() {
         object->verify_attached();
 
-        auto obj = object->obj();
+        const auto& obj = object->get_obj();
         auto table = obj.get_table();
 
         auto col_key = ColKey(key);
@@ -389,7 +389,7 @@ RLM_API realm_dictionary_t* realm_get_dictionary(realm_object_t* object, realm_p
     return wrap_err([&]() {
         object->verify_attached();
 
-        auto obj = object->obj();
+        const auto& obj = object->get_obj();
         auto table = obj.get_table();
         auto col_key = ColKey(key);
         table->check_column(col_key);
@@ -407,7 +407,7 @@ RLM_API char* realm_object_to_string(realm_object_t* object)
     return wrap_err([&]() {
         object->verify_attached();
 
-        auto obj = object->obj();
+        const auto& obj = object->get_obj();
         return duplicate_string(obj.to_string());
     });
 }

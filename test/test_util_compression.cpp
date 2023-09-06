@@ -247,7 +247,7 @@ TEST_IF(Compression_Allocate_And_Compress_Large, false)
 }
 
 namespace {
-struct ChunkingStream : NoCopyInputStream {
+struct ChunkingStream : InputStream {
     Span<const char> input;
     size_t block_size;
     Span<const char> next_block() override
@@ -262,7 +262,7 @@ struct ChunkingStream : NoCopyInputStream {
 // Check a fibonacci sequence of block sizes to validate everything works
 // with weirdly sized blocks. Note that the loop conditional is misleading
 // and it actually does one call with block_size > uncompressed_size.
-void for_each_fib_block_size(size_t size, Span<const char> input, FunctionRef<void(NoCopyInputStream&)> fn)
+void for_each_fib_block_size(size_t size, Span<const char> input, FunctionRef<void(InputStream&)> fn)
 {
     ChunkingStream stream;
     size_t f1 = 0, f2 = 1;
@@ -284,7 +284,7 @@ TEST(Compression_Decompress_Stream_SmallBlocks)
     auto compressed_buf = compress_buffer(test_context, uncompressed_buf);
     Buffer<char> decompressed_buf(uncompressed_size);
 
-    for_each_fib_block_size(uncompressed_size, compressed_buf, [&](NoCopyInputStream& stream) {
+    for_each_fib_block_size(uncompressed_size, compressed_buf, [&](InputStream& stream) {
         auto ec = compression::decompress(stream, decompressed_buf);
         CHECK_NOT(ec);
         compare(test_context, uncompressed_buf, decompressed_buf);
@@ -325,7 +325,7 @@ TEST(Compression_AllocateAndCompressWithHeader_Compressible)
         auto compressed = compression::allocate_and_compress_nonportable(std::array<char, 0>());
         CHECK_EQUAL(compressed.size(), 0);
 
-        util::SimpleNoCopyInputStream compressed_stream(compressed);
+        util::SimpleInputStream compressed_stream(compressed);
         auto ec = compression::decompress_nonportable(compressed_stream, decompressed);
         CHECK_NOT(ec);
         CHECK_EQUAL(decompressed.size(), 0);
@@ -339,7 +339,7 @@ TEST(Compression_AllocateAndCompressWithHeader_Compressible)
         CHECK_EQUAL(compressed.size(), uncompressed.size() + 2);
         compare(test_context, uncompressed, Span(compressed).sub_span(2));
 
-        util::SimpleNoCopyInputStream compressed_stream(compressed);
+        util::SimpleInputStream compressed_stream(compressed);
         auto ec = compression::decompress_nonportable(compressed_stream, decompressed);
         CHECK_NOT(ec);
         compare(test_context, uncompressed, decompressed);
@@ -352,7 +352,7 @@ TEST(Compression_AllocateAndCompressWithHeader_Compressible)
         auto compressed = compression::allocate_and_compress_nonportable(uncompressed);
         CHECK_LESS(compressed.size(), uncompressed.size());
 
-        util::SimpleNoCopyInputStream compressed_stream(compressed);
+        util::SimpleInputStream compressed_stream(compressed);
         auto ec = compression::decompress_nonportable(compressed_stream, decompressed);
         CHECK_NOT(ec);
         compare(test_context, uncompressed, decompressed);
@@ -372,7 +372,7 @@ TEST(Compression_AllocateAndCompressWithHeader_Noncompressible)
         CHECK_EQUAL(compressed.size(), uncompressed.size() + expected_header_width);
         compare(test_context, uncompressed, Span(compressed).sub_span(expected_header_width));
 
-        util::SimpleNoCopyInputStream compressed_stream(compressed);
+        util::SimpleInputStream compressed_stream(compressed);
         auto ec = compression::decompress_nonportable(compressed_stream, decompressed);
         CHECK_NOT(ec);
         compare(test_context, uncompressed, decompressed);
@@ -402,7 +402,7 @@ TEST(Compression_AllocateAndCompressWithHeader_Invalid)
     {
         auto compressed = compression::allocate_and_compress_nonportable(uncompressed);
         set_invalid_compression_algorithm(compressed);
-        util::SimpleNoCopyInputStream compressed_stream(compressed);
+        util::SimpleInputStream compressed_stream(compressed);
         auto ec = compression::decompress_nonportable(compressed_stream, decompressed);
         CHECK_EQUAL(ec, compression::error::decompress_unsupported);
     }
@@ -410,13 +410,13 @@ TEST(Compression_AllocateAndCompressWithHeader_Invalid)
     {
         auto compressed = compression::allocate_and_compress_nonportable(uncompressed);
         set_invalid_size_width(compressed);
-        util::SimpleNoCopyInputStream compressed_stream(compressed);
+        util::SimpleInputStream compressed_stream(compressed);
         auto ec = compression::decompress_nonportable(compressed_stream, decompressed);
         CHECK_EQUAL(ec, compression::error::out_of_memory);
     }
 }
 
-static void copy_stream(Span<char> dest, NoCopyInputStream& stream)
+static void copy_stream(Span<char> dest, InputStream& stream)
 {
     Span out = dest;
     Span<const char> block;
@@ -431,7 +431,7 @@ static void test_decompress_stream(test_util::unit_test::TestContext& test_conte
 {
     Buffer<char> decompressed(uncompressed.size());
 
-    for_each_fib_block_size(uncompressed.size(), compressed, [&](NoCopyInputStream& stream) {
+    for_each_fib_block_size(uncompressed.size(), compressed, [&](InputStream& stream) {
         size_t total_size = 0;
         auto decompress_stream = compression::decompress_nonportable_input_stream(stream, total_size);
         CHECK_EQUAL(total_size, uncompressed.size());
@@ -445,7 +445,7 @@ static void test_decompress_stream(test_util::unit_test::TestContext& test_conte
 static void test_failed_compress_stream(test_util::unit_test::TestContext& test_context, Span<const char> compressed)
 {
     size_t total_size;
-    SimpleNoCopyInputStream stream(compressed);
+    SimpleInputStream stream(compressed);
     auto decompress_stream = compression::decompress_nonportable_input_stream(stream, total_size);
     CHECK_NOT(decompress_stream);
 }

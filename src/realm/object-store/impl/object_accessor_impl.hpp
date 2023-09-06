@@ -22,6 +22,9 @@
 #include <realm/object-store/object_accessor.hpp>
 #include <realm/object-store/schema.hpp>
 
+#if REALM_ENABLE_GEOSPATIAL
+#include <realm/geospatial.hpp>
+#endif
 #include <realm/util/any.hpp>
 
 namespace realm {
@@ -65,6 +68,24 @@ public:
     util::Optional<std::any> value_for_property(std::any& dict, const Property& prop,
                                                 size_t /* property_index */) const
     {
+#if REALM_ENABLE_GEOSPATIAL
+        if (auto geo = std::any_cast<Geospatial>(&dict)) {
+            if (prop.name == Geospatial::c_geo_point_type_col_name) {
+                return geo->get_type_string();
+            }
+            else if (prop.name == Geospatial::c_geo_point_coords_col_name) {
+                std::vector<std::any> coords;
+                auto&& point = geo->get<GeoPoint>(); // throws
+                coords.push_back(point.longitude);
+                coords.push_back(point.latitude);
+                if (point.has_altitude()) {
+                    coords.push_back(*point.get_altitude());
+                }
+                return coords;
+            }
+            REALM_ASSERT_EX(false, prop.name); // unexpected property type
+        }
+#endif
         auto const& v = util::any_cast<AnyDict&>(dict);
         auto it = v.find(prop.name);
         return it == v.end() ? util::none : util::make_optional(it->second);
@@ -302,14 +323,14 @@ template <>
 inline Obj CppContext::unbox(std::any& v, CreatePolicy policy, ObjKey current_obj) const
 {
     if (auto object = std::any_cast<Object>(&v))
-        return object->obj();
+        return object->get_obj();
     if (auto obj = std::any_cast<Obj>(&v))
         return *obj;
     if (!policy.create)
         return Obj();
 
     REALM_ASSERT(object_schema);
-    return Object::create(const_cast<CppContext&>(*this), realm, *object_schema, v, policy, current_obj).obj();
+    return Object::create(const_cast<CppContext&>(*this), realm, *object_schema, v, policy, current_obj).get_obj();
 }
 
 template <>

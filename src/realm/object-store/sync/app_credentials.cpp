@@ -30,8 +30,7 @@ IdentityProvider const IdentityProviderApple = "oauth2-apple";
 IdentityProvider const IdentityProviderUsernamePassword = "local-userpass";
 IdentityProvider const IdentityProviderCustom = "custom-token";
 IdentityProvider const IdentityProviderFunction = "custom-function";
-IdentityProvider const IdentityProviderUserAPIKey = "api-key";
-IdentityProvider const IdentityProviderServerAPIKey = "api-key";
+IdentityProvider const IdentityProviderAPIKey = "api-key";
 
 IdentityProvider provider_type_from_enum(AuthProvider provider)
 {
@@ -51,10 +50,8 @@ IdentityProvider provider_type_from_enum(AuthProvider provider)
             return IdentityProviderUsernamePassword;
         case AuthProvider::FUNCTION:
             return IdentityProviderFunction;
-        case AuthProvider::USER_API_KEY:
-            return IdentityProviderUserAPIKey;
-        case AuthProvider::SERVER_API_KEY:
-            return IdentityProviderServerAPIKey;
+        case AuthProvider::API_KEY:
+            return IdentityProviderAPIKey;
     }
     throw InvalidArgument("unknown provider type in provider_type_from_enum");
 }
@@ -82,11 +79,8 @@ AuthProvider enum_from_provider_type(const IdentityProvider& provider)
     else if (provider == IdentityProviderFunction) {
         return AuthProvider::FUNCTION;
     }
-    else if (provider == IdentityProviderUserAPIKey) {
-        return AuthProvider::USER_API_KEY;
-    }
-    else if (provider == IdentityProviderServerAPIKey) {
-        return AuthProvider::SERVER_API_KEY;
+    else if (provider == IdentityProviderAPIKey) {
+        return AuthProvider::API_KEY;
     }
     else {
         REALM_UNREACHABLE();
@@ -179,14 +173,9 @@ AppCredentials AppCredentials::function(const std::string& serialized_payload)
 }
 
 
-AppCredentials AppCredentials::user_api_key(std::string api_key)
+AppCredentials AppCredentials::api_key(std::string api_key)
 {
-    return AppCredentials(AuthProvider::USER_API_KEY, {{"key", api_key}});
-}
-
-AppCredentials AppCredentials::server_api_key(std::string api_key)
-{
-    return AppCredentials(AuthProvider::SERVER_API_KEY, {{"key", api_key}});
+    return AppCredentials(AuthProvider::API_KEY, {{"key", api_key}});
 }
 
 AppCredentials::AppCredentials(const AppCredentials& credentials)

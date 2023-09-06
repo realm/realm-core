@@ -20,6 +20,7 @@
 #define REALM_UTIL_SERIALIZER_HPP
 
 #include <realm/table_ref.hpp>
+#include <realm/util/features.h>
 #include <realm/util/optional.hpp>
 
 #include <string>
@@ -42,9 +43,11 @@ class TypeOfValue;
 class Group;
 enum class ExpressionComparisonType : unsigned char;
 
-namespace util {
-namespace serializer {
+#if REALM_ENABLE_GEOSPATIAL
+class Geospatial;
+#endif // REALM_ENABLE_GEOSPATIAL
 
+namespace util::serializer {
 
 // Definitions
 template <typename T>
@@ -53,7 +56,7 @@ std::string print_value(T value);
 template <typename T>
 std::string print_value(Optional<T> value);
 
-const static std::string value_separator = ".";
+constexpr static const char value_separator[] = ".";
 
 // Specializations declared here to be defined in the cpp file
 template <> std::string print_value<>(BinaryData);
@@ -76,6 +79,11 @@ template <>
 std::string print_value<>(realm::UUID);
 template <>
 std::string print_value<>(realm::TypeOfValue);
+
+#if REALM_ENABLE_GEOSPATIAL
+template <>
+std::string print_value<>(const realm::Geospatial&);
+#endif // REALM_ENABLE_GEOSPATIAL
 
 // General implementation for most types
 template <typename T>
@@ -112,8 +120,7 @@ struct SerialisationState {
     ConstTableRef target_table;
 };
 
-} // namespace serializer
-} // namespace util
+} // namespace util::serializer
 } // namespace realm
 
 #endif // REALM_UTIL_SERIALIZER_HPP

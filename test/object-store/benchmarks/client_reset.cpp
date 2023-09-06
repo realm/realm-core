@@ -18,15 +18,15 @@
 
 #define CATCH_CONFIG_ENABLE_BENCHMARKING
 
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
-
-#include "sync/sync_test_utils.hpp"
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
+
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_recovery.hpp>
@@ -144,10 +144,10 @@ struct BenchmarkLocalClientReset : public reset_utils::TestClientReset {
             auto history_local = dynamic_cast<sync::ClientHistory*>(wt_local.get_replication()->_get_history_write());
             std::vector<sync::ClientHistory::LocalChange> local_changes =
                 history_local->get_local_changes(current_local_version.version);
-            _impl::client_reset::RecoverLocalChangesetsHandler handler{wt_remote, frozen_local, logger};
+            _impl::client_reset::RecoverLocalChangesetsHandler handler{wt_remote, frozen_local, logger, nullptr};
             handler.process_changesets(local_changes, {}); // throws on error
         }
-        _impl::client_reset::transfer_group(wt_remote, wt_local, logger);
+        _impl::client_reset::transfer_group(wt_remote, wt_local, logger, m_mode == ClientResyncMode::Recover);
         if (m_on_post_reset) {
             m_on_post_reset(m_local);
         }
@@ -160,7 +160,7 @@ struct BenchmarkLocalClientReset : public reset_utils::TestClientReset {
     ClientResyncMode m_mode;
 };
 
-TEST_CASE("client reset", "[benchmark]") {
+TEST_CASE("client reset", "[sync][pbs][benchmark][client reset]") {
     const std::string valid_pk_name = "_id";
     const std::string partition_value = "partition_foo";
     Property partition_prop = {"realm_id", PropertyType::String | PropertyType::Nullable};

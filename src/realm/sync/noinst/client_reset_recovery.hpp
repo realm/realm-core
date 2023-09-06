@@ -23,12 +23,11 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/sync/instruction_applier.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/subscriptions.hpp>
 
-namespace realm {
-namespace _impl {
-namespace client_reset {
+namespace realm::_impl::client_reset {
 
 // State tracking of operations on list indices. All list operations in a recovered changeset
 // must apply to a "known" index. An index is known if the element at that position was added
@@ -155,7 +154,8 @@ private:
 };
 
 struct RecoverLocalChangesetsHandler : public sync::InstructionApplier {
-    RecoverLocalChangesetsHandler(Transaction& dest_wt, Transaction& frozen_pre_local_state, util::Logger& logger);
+    RecoverLocalChangesetsHandler(Transaction& dest_wt, Transaction& frozen_pre_local_state, util::Logger& logger,
+                                  Replication* repl);
     virtual ~RecoverLocalChangesetsHandler();
     void process_changesets(const std::vector<sync::ClientHistory::LocalChange>& changesets,
                             std::vector<sync::SubscriptionSet>&& pending_subs);
@@ -213,10 +213,9 @@ private:
     // Track any recovered operations on lists to make sure that they are allowed.
     // If not, the lists here will be copied verbatim from the local state to the remote.
     util::FlatMap<ListPath, ListTracker> m_lists;
+    Replication* m_replication;
 };
 
-} // namespace client_reset
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl::client_reset
 
 #endif // REALM_NOINST_CLIENT_RESET_RECOVERY_HPP

@@ -1,31 +1,7 @@
 #include <realm/sync/protocol.hpp>
 
 
-namespace {
-
-class ErrorCategoryImpl : public std::error_category {
-public:
-    const char* name() const noexcept override final
-    {
-        return "realm::sync::ProtocolError";
-    }
-    std::string message(int error_code) const override final
-    {
-        const char* msg = realm::sync::get_protocol_error_message(error_code);
-        if (!msg)
-            msg = "Unknown error";
-        std::string msg_2{msg}; // Throws (copy)
-        return msg_2;
-    }
-};
-
-ErrorCategoryImpl g_error_category;
-
-} // unnamed namespace
-
-
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 const char* get_protocol_error_message(int error_code) noexcept
 {
@@ -151,15 +127,127 @@ const char* get_protocol_error_message(int error_code) noexcept
     return nullptr;
 }
 
-const std::error_category& protocol_error_category() noexcept
+std::ostream& operator<<(std::ostream& os, ProtocolError error)
 {
-    return g_error_category;
+    if (auto str = get_protocol_error_message(static_cast<int>(error))) {
+        return os << str;
+    }
+    return os << "Unknown protocol error " << static_cast<int>(error);
 }
 
-std::error_code make_error_code(ProtocolError error_code) noexcept
+Status protocol_error_to_status(ProtocolError error_code, std::string_view msg)
 {
-    return std::error_code(int(error_code), g_error_category);
+    auto translated_error_code = [&] {
+        switch (error_code) {
+            case ProtocolError::connection_closed:
+                return ErrorCodes::ConnectionClosed;
+            case ProtocolError::other_error:
+                return ErrorCodes::RuntimeError;
+            case ProtocolError::unknown_message:
+                [[fallthrough]];
+            case ProtocolError::bad_syntax:
+                [[fallthrough]];
+            case ProtocolError::wrong_protocol_version:
+                [[fallthrough]];
+            case ProtocolError::bad_session_ident:
+                [[fallthrough]];
+            case ProtocolError::reuse_of_session_ident:
+                [[fallthrough]];
+            case ProtocolError::bound_in_other_session:
+                [[fallthrough]];
+            case ProtocolError::bad_changeset_header_syntax:
+                [[fallthrough]];
+            case ProtocolError::bad_changeset_size:
+                [[fallthrough]];
+            case ProtocolError::bad_message_order:
+                return ErrorCodes::SyncProtocolInvariantFailed;
+            case ProtocolError::bad_decompression:
+                return ErrorCodes::RuntimeError;
+            case ProtocolError::switch_to_flx_sync:
+                [[fallthrough]];
+            case ProtocolError::switch_to_pbs:
+                return ErrorCodes::WrongSyncType;
+
+            case ProtocolError::session_closed:
+                return ErrorCodes::ConnectionClosed;
+            case ProtocolError::other_session_error:
+                return ErrorCodes::RuntimeError;
+            case ProtocolError::illegal_realm_path:
+                return ErrorCodes::BadSyncPartitionValue;
+            case ProtocolError::permission_denied:
+                return ErrorCodes::SyncPermissionDenied;
+            case ProtocolError::bad_client_file_ident:
+                [[fallthrough]];
+            case ProtocolError::bad_server_version:
+                [[fallthrough]];
+            case ProtocolError::bad_client_version:
+                [[fallthrough]];
+            case ProtocolError::diverging_histories:
+                [[fallthrough]];
+            case ProtocolError::client_file_expired:
+                [[fallthrough]];
+            case ProtocolError::bad_client_file:
+                return ErrorCodes::SyncClientResetRequired;
+            case ProtocolError::bad_changeset:
+                return ErrorCodes::BadChangeset;
+            case ProtocolError::bad_origin_file_ident:
+                return ErrorCodes::SyncProtocolInvariantFailed;
+            case ProtocolError::user_mismatch:
+                return ErrorCodes::SyncUserMismatch;
+            case ProtocolError::invalid_schema_change:
+                return ErrorCodes::InvalidSchemaChange;
+            case ProtocolError::bad_query:
+                return ErrorCodes::InvalidSubscriptionQuery;
+            case ProtocolError::object_already_exists:
+                return ErrorCodes::ObjectAlreadyExists;
+            case ProtocolError::server_permissions_changed:
+                return ErrorCodes::SyncServerPermissionsChanged;
+            case ProtocolError::initial_sync_not_completed:
+                return ErrorCodes::ConnectionClosed;
+            case ProtocolError::write_not_allowed:
+                return ErrorCodes::SyncWriteNotAllowed;
+            case ProtocolError::compensating_write:
+                return ErrorCodes::SyncCompensatingWrite;
+            case ProtocolError::bad_progress:
+                return ErrorCodes::SyncProtocolInvariantFailed;
+            case ProtocolError::migrate_to_flx:
+                [[fallthrough]];
+            case ProtocolError::revert_to_pbs:
+                return ErrorCodes::WrongSyncType;
+
+            case ProtocolError::limits_exceeded:
+                [[fallthrough]];
+            case ProtocolError::token_expired:
+                [[fallthrough]];
+            case ProtocolError::bad_authentication:
+                [[fallthrough]];
+            case ProtocolError::no_such_realm:
+                [[fallthrough]];
+            case ProtocolError::bad_server_file_ident:
+                [[fallthrough]];
+            case ProtocolError::partial_sync_disabled:
+                [[fallthrough]];
+            case ProtocolError::unsupported_session_feature:
+                [[fallthrough]];
+            case ProtocolError::too_many_sessions:
+                [[fallthrough]];
+            case ProtocolError::server_file_deleted:
+                [[fallthrough]];
+            case ProtocolError::client_file_blacklisted:
+                [[fallthrough]];
+            case ProtocolError::user_blacklisted:
+                [[fallthrough]];
+            case ProtocolError::transact_before_upload:
+                REALM_UNREACHABLE();
+        }
+        return ErrorCodes::UnknownError;
+    }();
+
+    if (translated_error_code == ErrorCodes::UnknownError) {
+        return {ErrorCodes::UnknownError,
+                util::format("Unknown sync protocol error code %1: %2", static_cast<int>(error_code), msg)};
+    }
+    return {translated_error_code, msg};
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync

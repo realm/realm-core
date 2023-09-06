@@ -16,16 +16,18 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include <realm/sync/noinst/client_reset_recovery.hpp>
+
 #include <realm/db.hpp>
 #include <realm/dictionary.hpp>
 #include <realm/object_converter.hpp>
 #include <realm/set.hpp>
+#include <realm/transaction.hpp>
 
 #include <realm/sync/history.hpp>
 #include <realm/sync/changeset_parser.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
-#include <realm/sync/noinst/client_reset_recovery.hpp>
 #include <realm/sync/subscriptions.hpp>
 
 #include <realm/util/compression.hpp>
@@ -362,10 +364,11 @@ std::string ListPath::path_to_string(Transaction& remote, const InterningBuffer&
 
 RecoverLocalChangesetsHandler::RecoverLocalChangesetsHandler(Transaction& dest_wt,
                                                              Transaction& frozen_pre_local_state,
-                                                             util::Logger& logger)
+                                                             util::Logger& logger, Replication* repl)
     : InstructionApplier(dest_wt)
     , m_frozen_pre_local_state{frozen_pre_local_state}
     , m_logger{logger}
+    , m_replication{repl}
 {
 }
 
@@ -704,7 +707,23 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::AddTable& inst
     // Rely on InstructionApplier to validate existing tables
     StringData class_name = get_string(instr.table);
     try {
+        auto table = table_for_class_name(class_name);
         InstructionApplier::operator()(instr);
+
+        // if the table already existed then no instruction was
+        // added to the history so we need to add one now
+        if (m_replication && table) {
+            if (table->is_embedded()) {
+                m_replication->add_class(table->get_key(), table->get_name(), table->get_table_type());
+            }
+            else {
+                ColKey pk_col = table->get_primary_key_column();
+                REALM_ASSERT_EX(pk_col, class_name);
+                m_replication->add_class_with_primary_key(table->get_key(), table->get_name(),
+                                                          DataType(pk_col.get_type()), table->get_column_name(pk_col),
+                                                          pk_col.is_nullable(), table->get_table_type());
+            }
+        }
     }
     catch (const std::runtime_error& err) {
         handle_error(util::format(
@@ -833,7 +852,21 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::AddColumn& ins
     // that happens when adding a preexisting column and if there is a problem catch
     // the BadChangesetError and stop recovery
     try {
+        const TableRef table = get_table(instr, "AddColumn");
+        auto col_name = get_string(instr.field);
+        ColKey col_key = table->get_column_key(col_name);
+
         InstructionApplier::operator()(instr);
+
+        // if the column already existed then no instruction was
+        // added to the history so we need to add one now
+        if (m_replication && col_key) {
+            REALM_ASSERT(col_key);
+            TableRef linked_table = table->get_opposite_table(col_key);
+            DataType new_type = get_data_type(instr.type);
+            m_replication->insert_column(table.unchecked_ptr(), col_key, new_type, col_name,
+                                         linked_table.unchecked_ptr()); // Throws
+        }
     }
     catch (const BadChangesetError& err) {
         handle_error(

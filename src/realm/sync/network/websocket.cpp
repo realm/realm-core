@@ -944,10 +944,10 @@ private:
         return true;
     }
 
-    std::pair<std::error_code, StringData> parse_close_message(const char* data, size_t size)
+    std::pair<WebSocketError, std::string_view> parse_close_message(const char* data, size_t size)
     {
         uint16_t error_code;
-        StringData error_message;
+        std::string_view error_message;
         if (size < 2) {
             // Error code 1005 is defined as
             //     1005 is a reserved value and MUST NOT be set as a status code in a
@@ -962,11 +962,36 @@ private:
             // network byte order. See https://tools.ietf.org/html/rfc6455#section-5.5.1 for more
             // details.
             error_code = ntohs((uint8_t(data[1]) << 8) | uint8_t(data[0]));
-            error_message = StringData(data + 2, size - 2);
+            error_message = std::string_view(data + 2, size - 2);
         }
 
-        std::error_code error_code_with_category{error_code, websocket::websocket_error_category()};
-        return std::make_pair(error_code_with_category, error_message);
+        switch (static_cast<WebSocketError>(error_code)) {
+            case WebSocketError::websocket_ok:
+            case WebSocketError::websocket_going_away:
+            case WebSocketError::websocket_protocol_error:
+            case WebSocketError::websocket_unsupported_data:
+            case WebSocketError::websocket_reserved:
+            case WebSocketError::websocket_no_status_received:
+            case WebSocketError::websocket_abnormal_closure:
+            case WebSocketError::websocket_invalid_payload_data:
+            case WebSocketError::websocket_policy_violation:
+            case WebSocketError::websocket_message_too_big:
+            case WebSocketError::websocket_invalid_extension:
+            case WebSocketError::websocket_internal_server_error:
+            case WebSocketError::websocket_tls_handshake_failed:
+
+            case WebSocketError::websocket_unauthorized:
+            case WebSocketError::websocket_forbidden:
+            case WebSocketError::websocket_moved_permanently:
+            case WebSocketError::websocket_client_too_old:
+            case WebSocketError::websocket_client_too_new:
+            case WebSocketError::websocket_protocol_mismatch:
+                break;
+            default:
+                error_code = 1008;
+        }
+
+        return std::make_pair(static_cast<WebSocketError>(error_code), error_message);
     }
 
     // frame_reader_loop() uses the frame_reader to read and process the incoming
@@ -1116,85 +1141,82 @@ public:
     }
 };
 
-std::string error_string(WebSocketError code)
-{
-    /// WebSocket error codes
-    switch (code) {
-        case WebSocketError::websocket_ok:
-            return "WebSocket: OK";
-        case WebSocketError::websocket_going_away:
-            return "WebSocket: Going Away";
-        case WebSocketError::websocket_protocol_error:
-            return "WebSocket: Protocol Error";
-        case WebSocketError::websocket_unsupported_data:
-            return "WebSocket: Unsupported Data";
-        case WebSocketError::websocket_reserved:
-            return "WebSocket: Reserved";
-        case WebSocketError::websocket_no_status_received:
-            return "WebSocket: No Status Received";
-        case WebSocketError::websocket_abnormal_closure:
-            return "WebSocket: Abnormal Closure";
-        case WebSocketError::websocket_invalid_payload_data:
-            return "WebSocket: Invalid Payload Data";
-        case WebSocketError::websocket_policy_violation:
-            return "WebSocket: Policy Violation";
-        case WebSocketError::websocket_message_too_big:
-            return "WebSocket: Message Too Big";
-        case WebSocketError::websocket_invalid_extension:
-            return "WebSocket: Invalid Extension";
-        case WebSocketError::websocket_internal_server_error:
-            return "WebSocket: Internal Server Error";
-        case WebSocketError::websocket_tls_handshake_failed:
-            return "WebSocket: TLS Handshake Failed";
-
-        /// WebSocket Errors - reported by server
-        case WebSocketError::websocket_unauthorized:
-            return "WebSocket: Unauthorized";
-        case WebSocketError::websocket_forbidden:
-            return "WebSocket: Forbidden";
-        case WebSocketError::websocket_moved_permanently:
-            return "WebSocket: Moved Permanently";
-        case WebSocketError::websocket_client_too_old:
-            return "WebSocket: Client Too Old";
-        case WebSocketError::websocket_client_too_new:
-            return "WebSocket: Client Too New";
-        case WebSocketError::websocket_protocol_mismatch:
-            return "WebSocket: Protocol Mismatch";
-
-        case WebSocketError::websocket_resolve_failed:
-            return "WebSocket: Resolve Failed";
-        case WebSocketError::websocket_connection_failed:
-            return "WebSocket: Connection Failed";
-        case WebSocketError::websocket_read_error:
-            return "WebSocket: Read Error";
-        case WebSocketError::websocket_write_error:
-            return "WebSocket: Write Error";
-        case WebSocketError::websocket_retry_error:
-            return "WebSocket: Retry Error";
-        case WebSocketError::websocket_fatal_error:
-            return "WebSocket: Fatal Error";
-    }
-    return "";
-}
-
-class WebSocketErrorCategory : public std::error_category {
-    const char* name() const noexcept final
-    {
-        return "realm::sync::websocket::WebSocketError";
-    }
-    std::string message(int error_code) const final
-    {
-        // Converts an error_code to one of the pre-defined status codes in
-        // https://tools.ietf.org/html/rfc6455#section-7.4.1
-        auto msg = error_string(static_cast<WebSocketError>(error_code));
-        if (msg.empty())
-            msg = "Unknown error";
-        return msg;
-    }
-};
-
 } // unnamed namespace
 
+namespace realm::sync::websocket {
+
+std::ostream& operator<<(std::ostream& os, WebSocketError code)
+{
+    /// WebSocket error codes
+    auto str = [&]() -> const char* {
+        switch (code) {
+            case WebSocketError::websocket_ok:
+                return "WebSocket: OK";
+            case WebSocketError::websocket_going_away:
+                return "WebSocket: Going Away";
+            case WebSocketError::websocket_protocol_error:
+                return "WebSocket: Protocol Error";
+            case WebSocketError::websocket_unsupported_data:
+                return "WebSocket: Unsupported Data";
+            case WebSocketError::websocket_reserved:
+                return "WebSocket: Reserved";
+            case WebSocketError::websocket_no_status_received:
+                return "WebSocket: No Status Received";
+            case WebSocketError::websocket_abnormal_closure:
+                return "WebSocket: Abnormal Closure";
+            case WebSocketError::websocket_invalid_payload_data:
+                return "WebSocket: Invalid Payload Data";
+            case WebSocketError::websocket_policy_violation:
+                return "WebSocket: Policy Violation";
+            case WebSocketError::websocket_message_too_big:
+                return "WebSocket: Message Too Big";
+            case WebSocketError::websocket_invalid_extension:
+                return "WebSocket: Invalid Extension";
+            case WebSocketError::websocket_internal_server_error:
+                return "WebSocket: Internal Server Error";
+            case WebSocketError::websocket_tls_handshake_failed:
+                return "WebSocket: TLS Handshake Failed";
+
+            /// WebSocket Errors - reported by server
+            case WebSocketError::websocket_unauthorized:
+                return "WebSocket: Unauthorized";
+            case WebSocketError::websocket_forbidden:
+                return "WebSocket: Forbidden";
+            case WebSocketError::websocket_moved_permanently:
+                return "WebSocket: Moved Permanently";
+            case WebSocketError::websocket_client_too_old:
+                return "WebSocket: Client Too Old";
+            case WebSocketError::websocket_client_too_new:
+                return "WebSocket: Client Too New";
+            case WebSocketError::websocket_protocol_mismatch:
+                return "WebSocket: Protocol Mismatch";
+
+            case WebSocketError::websocket_resolve_failed:
+                return "WebSocket: Resolve Failed";
+            case WebSocketError::websocket_connection_failed:
+                return "WebSocket: Connection Failed";
+            case WebSocketError::websocket_read_error:
+                return "WebSocket: Read Error";
+            case WebSocketError::websocket_write_error:
+                return "WebSocket: Write Error";
+            case WebSocketError::websocket_retry_error:
+                return "WebSocket: Retry Error";
+            case WebSocketError::websocket_fatal_error:
+                return "WebSocket: Fatal Error";
+        }
+        return nullptr;
+    }();
+
+    if (str == nullptr) {
+        os << "WebSocket: Unknown Error (" << static_cast<std::underlying_type_t<WebSocketError>>(code) << ")";
+    }
+    else {
+        os << str;
+    }
+    return os;
+}
+
+} // namespace realm::sync::websocket
 
 bool websocket::Config::websocket_text_message_received(const char*, size_t)
 {
@@ -1206,7 +1228,7 @@ bool websocket::Config::websocket_binary_message_received(const char*, size_t)
     return true;
 }
 
-bool websocket::Config::websocket_close_message_received(std::error_code, StringData)
+bool websocket::Config::websocket_close_message_received(WebSocketError, std::string_view)
 {
     return true;
 }
@@ -1314,17 +1336,6 @@ util::Optional<HTTPResponse> websocket::make_http_response(const HTTPRequest& re
     return do_make_http_response(request, sec_websocket_protocol, ec);
 }
 
-const std::error_category& websocket::websocket_error_category() noexcept
-{
-    static const WebSocketErrorCategory category = {};
-    return category;
-}
-
-std::error_code websocket::make_error_code(WebSocketError error) noexcept
-{
-    return std::error_code{int(error), websocket_error_category()};
-}
-
 const std::error_category& websocket::http_error_category() noexcept
 {
     static const HttpErrorCategory category = {};
@@ -1334,26 +1345,4 @@ const std::error_category& websocket::http_error_category() noexcept
 std::error_code websocket::make_error_code(HttpError error_code) noexcept
 {
     return std::error_code{int(error_code), http_error_category()};
-}
-
-ErrorCodes::Error websocket::get_simplified_websocket_error(WebSocketError error)
-{
-    if (error == sync::websocket::WebSocketError::websocket_resolve_failed) {
-        return ErrorCodes::WebSocketResolveFailedError;
-    }
-    else if (error == sync::websocket::WebSocketError::websocket_connection_failed ||
-             error == sync::websocket::WebSocketError::websocket_unauthorized ||
-             error == sync::websocket::WebSocketError::websocket_forbidden ||
-             error == sync::websocket::WebSocketError::websocket_moved_permanently ||
-             error == sync::websocket::WebSocketError::websocket_client_too_old ||
-             error == sync::websocket::WebSocketError::websocket_client_too_new ||
-             error == sync::websocket::WebSocketError::websocket_protocol_mismatch ||
-             error == sync::websocket::WebSocketError::websocket_read_error ||
-             error == sync::websocket::WebSocketError::websocket_write_error ||
-             error == sync::websocket::WebSocketError::websocket_retry_error ||
-             error == sync::websocket::WebSocketError::websocket_fatal_error) {
-        return ErrorCodes::WebSocketConnectionClosedClientError;
-    }
-
-    return ErrorCodes::WebSocketConnectionClosedServerError;
 }
