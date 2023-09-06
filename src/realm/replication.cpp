@@ -132,7 +132,7 @@ void Replication::insert_column(const Table* t, ColKey col_key, DataType type, S
 void Replication::erase_column(const Table* t, ColKey col_key)
 {
     if (auto logger = get_logger()) {
-        logger->log(util::Logger::Level::debug, "On class '%1': Remove property '%2' %3of %4", t->get_class_name(),
+        logger->log(util::Logger::Level::debug, "On class '%1': Remove property '%2'", t->get_class_name(),
                     t->get_column_name(col_key));
     }
     select_table(t);                 // Throws
@@ -218,17 +218,21 @@ void Replication::set(const Table* t, ColKey col_key, ObjKey key, Mixed value, _
     do_set(t, col_key, key, variant); // Throws
     if (auto logger = get_logger()) {
         if (logger->would_log(util::Logger::Level::trace)) {
-            if (col_key.get_type() == col_type_Link) {
+            if (col_key.get_type() == col_type_Link && value.is_type(type_Link)) {
                 auto target_table = t->get_opposite_table(col_key);
                 if (target_table->is_embedded()) {
                     logger->log(util::Logger::Level::trace, "   Creating embedded object '%1' in '%2'",
                                 target_table->get_class_name(), t->get_column_name(col_key));
                 }
-                else {
+                else if (target_table->get_primary_key_column()) {
                     auto link = value.get<ObjKey>();
                     auto pk = target_table->get_primary_key(link);
                     logger->log(util::Logger::Level::trace, "   Linking object '%1' with primary key %2 from '%3'",
                                 target_table->get_class_name(), pk, t->get_column_name(col_key));
+                }
+                else {
+                    logger->log(util::Logger::Level::trace, "   Linking object '%1'[%2] from '%3'",
+                                target_table->get_class_name(), key, t->get_column_name(col_key));
                 }
             }
             else {
@@ -278,17 +282,22 @@ void Replication::log_collection_operation(const char* operation, const Collecti
     if (!index.is_null()) {
         position = util::format(" at position %1", index);
     }
-    if (Table::is_link_type(col_key.get_type())) {
+    if (Table::is_link_type(col_key.get_type()) && value.is_type(type_Link)) {
         auto target_table = m_selected_table->get_opposite_table(col_key);
         if (target_table->is_embedded()) {
             logger->log(util::Logger::Level::trace, "   %1 embedded object '%2' in %3%4 ", operation,
                         target_table->get_class_name(), path, position);
         }
-        else {
+        else if (target_table->get_primary_key_column()) {
             auto link = value.get<ObjKey>();
             auto pk = target_table->get_primary_key(link);
-            logger->log(util::Logger::Level::trace, "   %1 object '%2' with primary key %3 at %4%5", operation,
+            logger->log(util::Logger::Level::trace, "   %1 object '%2' with primary key %3 in %4%5", operation,
                         target_table->get_class_name(), pk, path, position);
+        }
+        else {
+            auto link = value.get<ObjKey>();
+            logger->log(util::Logger::Level::trace, "   %1 object '%2'[%3] in %4%5", operation,
+                        target_table->get_class_name(), link, path, position);
         }
     }
     else {
@@ -357,7 +366,7 @@ void Replication::set_erase(const CollectionBase& set, size_t set_ndx, Mixed val
     }
 }
 
-inline void Replication::set_clear(const CollectionBase& set)
+void Replication::set_clear(const CollectionBase& set)
 {
     select_collection(set);                 // Throws
     m_encoder.collection_clear(set.size()); // Throws

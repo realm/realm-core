@@ -802,7 +802,7 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
                 out << util::serializer::print_value(m.binary_val);
                 break;
             case type_Timestamp:
-                out << m.date_val;
+                out << util::serializer::print_value(m.date_val);
                 break;
             case type_Decimal:
                 out << m.decimal_val;

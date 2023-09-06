@@ -164,6 +164,11 @@ public:
         return static_cast<bool>(m_oldest_version_not_persisted);
     }
 
+    util::Logger* get_logger() const noexcept
+    {
+        return db->m_logger.get();
+    }
+
 private:
     enum class AsyncState { Idle, Requesting, HasLock, HasCommits, Syncing };
 
