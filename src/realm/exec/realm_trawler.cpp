@@ -248,9 +248,9 @@ public:
         return str;
     }
 
-    size_t mem_usage(realm::Allocator& alloc) const
+    uint64_t mem_usage(realm::Allocator& alloc) const
     {
-        size_t mem = 0;
+        uint64_t mem = 0;
         _mem_usage(alloc, mem);
         return mem;
     }
@@ -259,7 +259,7 @@ private:
     char* m_data;
     bool m_has_refs = false;
 
-    void _mem_usage(realm::Allocator& alloc, size_t& mem) const
+    void _mem_usage(realm::Allocator& alloc, uint64_t& mem) const
     {
         if (m_has_refs) {
             for (size_t i = 0; i < m_size; ++i) {
@@ -336,11 +336,11 @@ public:
             }
             else {
                 if (uint64_t key_ref = m_clusters.get_ref(0)) {
-                    auto header = alloc.translate(key_ref);
+                    auto header = alloc.translate(realm::to_ref(key_ref));
                     ret = realm::NodeHeader::get_size_from_header(header);
                 }
                 else {
-                    ret = m_clusters.get_val(0);
+                    ret = (size_t)m_clusters.get_val(0);
                 }
             }
         }
@@ -662,7 +662,7 @@ void Group::print_schema() const
 void Node::init(realm::Allocator& alloc, uint64_t ref)
 {
     m_ref = ref;
-    m_header = alloc.translate(ref);
+    m_header = alloc.translate(realm::to_ref(ref));
 
     if (memcmp(m_header, &signature, 4)) {
     }
@@ -895,8 +895,8 @@ void RealmFile::free_list_info() const
     std::map<uint64_t, unsigned> pinned_sizes;
     std::cout << "Free space:" << std::endl;
     auto free_list = m_group->get_free_list();
-    size_t pinned_free_list_size = 0;
-    size_t total_free_list_size = 0;
+    uint64_t pinned_free_list_size = 0;
+    uint64_t total_free_list_size = 0;
     auto it = free_list.begin();
     auto end = free_list.end();
     while (it != end) {

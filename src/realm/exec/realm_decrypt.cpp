@@ -33,7 +33,7 @@ int main(int argc, const char* argv[])
                 util::File file;
                 file.open(path);
                 file.set_encryption_key(key);
-                auto size = file.get_size();
+                auto size = (off_t)file.get_size();
                 decltype(size) pos = 0;
                 util::AESCryptor cryptor(key_ptr);
                 cryptor.set_file_size(size);

@@ -72,7 +72,7 @@ static void dump_buffer(unsigned char* buffer, uint64_t addr, size_t sz)
 static void dump(FILE* fp, int64_t offset, size_t sz)
 {
     if (sz) {
-        do_seek(fp, offset, SEEK_SET);
+        do_seek(fp, (size_t)offset, SEEK_SET);
         unsigned char* buffer = malloc(sz);
         size_t actual = fread(buffer, 1, sz, fp);
         if (actual != sz) {
@@ -93,7 +93,7 @@ static int get_header(NodeHeader* node_header, FILE* fp, int64_t offset)
 {
     memset(node_header, 0, sizeof(NodeHeader));
     unsigned char header[8];
-    do_seek(fp, offset, SEEK_SET);
+    do_seek(fp, (size_t)offset, SEEK_SET);
     fread(header, 1, 8, fp);
     if (strncmp((const char*)header, "AAAA", 4) != 0) {
         printf("Ref '0x%llx' does not point to an array\n", (ULL)offset);
@@ -178,7 +178,7 @@ static int search_ref(FILE* fp, int64_t ref, int64_t target, size_t level, size_
         assert(header.width >= 8);
         size_t byte_size = header.width / 8;
         char* buffer = malloc(byte_size * header.size);
-        do_seek(fp, ref + 8, SEEK_SET);
+        do_seek(fp, (size_t)(ref + 8), SEEK_SET);
         fread(buffer, byte_size * header.size, 1, fp);
         for (size_t i = 0; i < header.size; i++) {
             stack[level] = i;
@@ -242,7 +242,7 @@ static void dump_index(FILE* fp, int64_t ref, const char* arr)
     assert(header.width >= 8);
     size_t byte_size = header.width / 8;
     int64_t offset = ref + 8 + byte_size * idx;
-    do_seek(fp, offset, SEEK_SET);
+    do_seek(fp, (size_t)offset, SEEK_SET);
     fread(&subref, byte_size, 1, fp);
 
     if (subref & 1) {
