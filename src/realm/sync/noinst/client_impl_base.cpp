@@ -1683,9 +1683,11 @@ void Session::activate()
     REALM_ASSERT_3(m_last_version_available, >=, m_progress.upload.client_version);
 
     logger.debug("last_version_available  = %1", m_last_version_available);           // Throws
-    logger.debug("progress_server_version = %1", m_progress.download.server_version); // Throws
-    logger.debug("progress_client_version = %1",
-                 m_progress.download.last_integrated_client_version); // Throws
+    logger.debug("progress_download_server_version = %1", m_progress.download.server_version); // Throws
+    logger.debug("progress_download_client_version = %1",
+                 m_progress.download.last_integrated_client_version);                                      // Throws
+    logger.debug("progress_upload_server_version = %1", m_progress.upload.last_integrated_server_version); // Throws
+    logger.debug("progress_upload_client_version = %1", m_progress.upload.client_version);                 // Throws
 
     reset_protocol_state();
     m_state = Active;
@@ -2004,8 +2006,6 @@ void Session::send_upload_message()
                 m_last_sent_flx_query_version, m_upload_progress.client_version);
         }
         if (m_pending_flx_sub_set && m_pending_flx_sub_set->snapshot_version < m_upload_target_version) {
-            logger.trace("Limiting UPLOAD message up to version %1 to send QUERY version %2",
-                         m_pending_flx_sub_set->snapshot_version, m_pending_flx_sub_set->query_version);
             target_upload_version = m_pending_flx_sub_set->snapshot_version;
         }
     }
@@ -2020,9 +2020,20 @@ void Session::send_upload_message()
     if (uploadable_changesets.empty()) {
         // Nothing more to upload right now
         check_for_upload_completion(); // Throws
+        // If we need to limit upload up to some version other than the last client version available and there are no
+        // changes to upload, then there is no point in sending an empty message.
+        if (target_upload_version != m_upload_target_version) {
+            // Other messages may be waiting to be sent
+            return enlist_to_send(); // Throws
+        }
     }
     else {
         m_last_version_selected_for_upload = uploadable_changesets.back().progress.client_version;
+    }
+
+    if (m_is_flx_sync_session && m_pending_flx_sub_set && target_upload_version != m_upload_target_version) {
+        logger.trace("Limiting UPLOAD message up to version %1 to send QUERY version %2",
+                     m_pending_flx_sub_set->snapshot_version, m_pending_flx_sub_set->query_version);
     }
 
     version_type progress_client_version = m_upload_progress.client_version;
@@ -2335,6 +2346,7 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
                                          DownloadBatchState batch_state, int64_t query_version,
                                          const ReceivedChangesets& received_changesets)
 {
+    REALM_ASSERT_EX(query_version >= 0, query_version);
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm and SessionWrapper must
     // not be accessed any longer.
