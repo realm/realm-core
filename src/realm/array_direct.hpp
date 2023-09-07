@@ -249,6 +249,84 @@ inline void write_bitfield(char* data_area, size_t field_position, size_t width,
     }
 }
 
+// iterator useful for scanning arrays faster than by indexing each element
+// supports arrays of pairs by differentiating field size and step size.
+class bf_ref;
+class bf_iterator {
+    uint64_t* data_area;
+    uint64_t* first_word_ptr;
+    int field_position;
+    uint8_t field_size;
+    uint8_t step_size; // may be different than field_size if used for arrays of pairs
+
+public:
+    bf_iterator(uint64_t* data_area, int initial_offset, int field_size, int step_size, int index)
+        : data_area(data_area)
+        , field_size(field_size)
+        , step_size(step_size)
+    {
+        field_position = initial_offset + index * step_size;
+        first_word_ptr = data_area + (field_position >> 6);
+    }
+    uint64_t get_value() const
+    {
+        auto in_word_position = field_position & 0x3F;
+        auto first_word = first_word_ptr[0];
+        uint64_t result = first_word >> in_word_position;
+        // note: above shifts in zeroes above the bitfield
+        if (in_word_position + field_size > 64) {
+            auto first_word_size = 64 - in_word_position;
+            auto second_word = first_word_ptr[1];
+            result |= second_word << first_word_size;
+            // note: above shifts in zeroes below the bits we want
+        }
+        // discard any bits above the field we want
+        result &= (1ULL << field_size) - 1;
+        return result;
+    }
+    void set_value(uint64_t value) const
+    {
+        static_cast<void>(value);
+    }
+    void operator++()
+    {
+        auto next_field_position = field_position + step_size;
+        if ((next_field_position >> 6) > (field_position >> 6)) {
+            first_word_ptr = data_area + (next_field_position >> 6);
+        }
+        field_position = next_field_position;
+    }
+    uint64_t operator*() const
+    {
+        return get_value();
+    }
+    bf_ref operator*();
+};
+
+class bf_ref {
+    bf_iterator it;
+
+public:
+    bf_ref(bf_iterator& it)
+        : it(it)
+    {
+    }
+    operator uint64_t() const
+    {
+        return it.get_value();
+    }
+    uint64_t operator=(uint64_t value)
+    {
+        it.set_value(value);
+        return value;
+    }
+};
+
+inline bf_ref bf_iterator::operator*()
+{
+    return bf_ref(*this);
+}
+
 inline int64_t sign_extend_field(size_t width, uint64_t value)
 {
     uint64_t sign_mask = 1ULL << (width - 1);

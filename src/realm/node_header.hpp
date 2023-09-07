@@ -384,30 +384,34 @@ public:
     static size_t get_byte_size_from_header(const char* header) noexcept
     {
         WidthType wtype = get_wtype_from_header(header);
-        int width;
-        int size;
+        size_t width;
+        size_t size;
         switch (wtype) {
             case wtype_Bits:
             case wtype_Multiply:
-            case wtype_Ignore:
+            case wtype_Ignore: {
                 width = get_width_from_header(header);
                 size = get_size_from_header(header);
                 return calc_byte_size(wtype, size, width);
-            case wtype_Packed:
+            }
+            case wtype_Packed: {
                 width = get_width_A_from_header(header);
                 size = get_size_AB_from_header(header);
                 return calc_byte_size(wtype, size, width);
+            }
             case wtype_AofP:
-            case wtype_PofA:
+            case wtype_PofA: {
                 width = get_width_A_from_header(header) + get_width_B_from_header(header);
                 size = get_size_AB_from_header(header);
                 return calc_byte_size(wtype, size, width);
-            case wtype_Flex:
-                int widthA = get_width_A_from_header(header);
-                int widthB = get_width_B_from_header(header);
-                int sizeA = get_size_A_from_header(header);
-                int sizeB = get_size_B_from_header(header);
+            }
+            case wtype_Flex: {
+                auto widthA = get_width_A_from_header(header);
+                auto widthB = get_width_B_from_header(header);
+                auto sizeA = get_size_A_from_header(header);
+                auto sizeB = get_size_B_from_header(header);
                 return calc_byte_size_extended(wtype, sizeA, sizeB, widthA, widthB);
+            }
             default:
                 REALM_ASSERT(false);
         }
