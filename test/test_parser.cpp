@@ -514,6 +514,8 @@ TEST(Parser_empty_input)
 
 TEST(Parser_ConstrainedQuery)
 {
+    // We no longer throw when serializing a constrained query,
+    // but the description cannot be used to build a new query
     Group g;
     std::string table_name = "table";
     TableRef t = g.add_table(table_name);
@@ -534,13 +536,13 @@ TEST(Parser_ConstrainedQuery)
     CHECK_EQUAL(q.count(), 1);
     q.and_query(t->column<Int>(int_col) <= 0);
     CHECK_EQUAL(q.count(), 1);
-    CHECK_THROW(q.get_description(), SerializationError);
+    CHECK_THROW(t->query(q.get_description()), query_parser::SyntaxError);
 
     Query q2(t, list_0);
     CHECK_EQUAL(q2.count(), 2);
     q2.and_query(t->column<Int>(int_col) <= 0);
     CHECK_EQUAL(q2.count(), 1);
-    CHECK_THROW(q2.get_description(), SerializationError);
+    CHECK_THROW(t->query(q2.get_description()), query_parser::SyntaxError);
 }
 
 TEST(Parser_basic_serialisation)

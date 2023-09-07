@@ -1027,9 +1027,11 @@ TEST_CASE("embedded dictionary", "[dictionary]") {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
-    config.schema = Schema{
-        {"origin", {{"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
-        {"target", ObjectSchema::ObjectType::Embedded, {{"value", PropertyType::Int}}}};
+    config.schema =
+        Schema{{"origin",
+                {{"_id", PropertyType::Int, Property::IsPrimary{true}},
+                 {"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
+               {"target", ObjectSchema::ObjectType::Embedded, {{"value", PropertyType::Int}}}};
 
     auto r = Realm::get_shared_realm(config);
 
@@ -1037,7 +1039,7 @@ TEST_CASE("embedded dictionary", "[dictionary]") {
     auto target = r->read_group().get_table("class_target");
 
     r->begin_transaction();
-    Obj obj = origin->create_object();
+    Obj obj = origin->create_object_with_primary_key(1);
     ColKey col_links = origin->get_column_key("links");
     ColKey col_value = target->get_column_key("value");
 

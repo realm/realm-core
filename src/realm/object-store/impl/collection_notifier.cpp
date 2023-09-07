@@ -26,6 +26,7 @@
 #include <realm/dictionary.hpp>
 #include <realm/list.hpp>
 #include <realm/set.hpp>
+#include <realm/util/logger.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -129,6 +130,12 @@ CollectionNotifier::CollectionNotifier(std::shared_ptr<Realm> realm)
     : m_realm(std::move(realm))
     , m_transaction(Realm::Internal::get_transaction_ref(*m_realm))
 {
+    if (auto logger = m_transaction->get_logger()) {
+        // We only have logging at debug and trace levels
+        if (logger->would_log(util::LogCategory::notification, util::Logger::Level::debug)) {
+            m_logger = logger;
+        }
+    }
 }
 
 CollectionNotifier::~CollectionNotifier()
@@ -136,6 +143,9 @@ CollectionNotifier::~CollectionNotifier()
     // Need to do this explicitly to ensure m_realm is destroyed with the mutex
     // held to avoid potential double-deletion
     unregister();
+    if (m_logger) {
+        m_logger->log(util::LogCategory::notification, util::Logger::Level::debug, "Notifier %1 gone", m_description);
+    }
 }
 
 VersionID CollectionNotifier::version() const noexcept
@@ -320,6 +330,9 @@ void CollectionNotifier::before_advance()
 
 void CollectionNotifier::after_advance()
 {
+    using namespace std::chrono;
+    auto t1 = steady_clock::now();
+
     for_each_callback([&](auto& lock, auto& callback) {
         if (callback.initial_delivered && callback.changes_to_deliver.empty()) {
             return;
@@ -332,6 +345,50 @@ void CollectionNotifier::after_advance()
         // callback from within it can't result in a dangling pointer
         auto cb = callback.fn;
         lock.unlock_unchecked();
+        if (m_logger) {
+            m_logger->log(util::LogCategory::notification, util::Logger::Level::debug,
+                          "Delivering notifications for %1 after %2 us", m_description,
+                          duration_cast<microseconds>(t1 - m_run_time_point).count());
+            if (m_logger->would_log(util::Logger::Level::trace)) {
+                if (changes.empty()) {
+                    m_logger->log(util::LogCategory::notification, util::Logger::Level::trace, "   No changes");
+                }
+                else {
+                    if (changes.collection_root_was_deleted) {
+                        m_logger->log(util::LogCategory::notification, util::Logger::Level::trace,
+                                      "   collection deleted");
+                    }
+                    else if (changes.collection_was_cleared) {
+                        m_logger->log(util::LogCategory::notification, util::Logger::Level::trace,
+                                      "   collection cleared");
+                    }
+                    else {
+                        auto log = [this](const char* change, const IndexSet& index_set) {
+                            if (auto cnt = index_set.count()) {
+                                std::ostringstream ostr;
+                                bool first = true;
+                                for (auto [a, b] : index_set) {
+                                    if (!first)
+                                        ostr << ',';
+                                    if (b > a + 1) {
+                                        ostr << '[' << a << ',' << b - 1 << ']';
+                                    }
+                                    else {
+                                        ostr << a;
+                                    }
+                                    first = false;
+                                }
+                                m_logger->log(util::LogCategory::notification, util::Logger::Level::trace,
+                                              "   %1 %2: %3", cnt, change, ostr.str().c_str());
+                            }
+                        };
+                        log("deletions", changes.deletions);
+                        log("insertions", changes.insertions);
+                        log("modifications", changes.modifications);
+                    }
+                }
+            }
+        }
         cb.after(changes);
     });
 }
