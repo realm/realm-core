@@ -73,7 +73,8 @@ public:
                           // byte 6 and 7 holds number of pairs
                           // if HasRefs is set, it applies to snd element.
                           //
-        wtype_PofA = 5,   // Pair of arrays. Each arrays may hold elements of different sizes.
+        wtype_PofA = 5,   // Pair of arrays. Each array may hold elements of different sizes.
+                          // Arrays are the same length. Use wtype_Flex if you need different lengths
                           // Use for better spatial locality if you often access only one of the arrays,
                           // but want to represent stuff from two arrays in one memory block to
                           // save allocation and ref-translation overhead
@@ -82,7 +83,7 @@ public:
                           // byte 6 and 7 holds number of elements in both arrays
                           // if HasRefs is set, it applies to snd array
                           //
-        wtype_Flex = 6,   // Pair of arrays possibly of different length and with different sizes.
+        wtype_Flex = 6,   // Pair of arrays possibly of different length and different element sizes.
                           // Use for situations where array lengths may differ, for example
                           // if one array is used to index the other, or if one array is used
                           // for metadata which cannot hold refs. Note the number of elements
@@ -168,12 +169,11 @@ public:
     }
 
 
-
     // For wtype lower than wtype_extend, the element width is given by
     // bits 0-2 in byte 4 of the header and only powers of two is supported:
     //   0,1,2,4,8,16,32,64.
     // For new wtypes we support 16 different element sizes and in some
-    // cases two of them -- for arrays of pairs or pairs of arrays. 
+    // cases two of them -- for arrays of pairs or pairs of arrays.
     // Element sizes of zero is not supported in the new format - pick an old format for that.
     // This is the extended encoding of the element widths (all widths in bits)
     //
@@ -270,7 +270,6 @@ public:
     }
 
 
-
     // Helper functions for old layouts only:
     // Handling width and sizes:
     static uint_least8_t get_width_from_header(const char* header) noexcept
@@ -336,7 +335,6 @@ public:
     }
 
 
-
     // Helper functions for array sizes for layouts above wtype_extend:
     // should only be used for wtype_Flex
     static size_t get_size_A_from_header(const char* header) noexcept
@@ -363,8 +361,6 @@ public:
     }
 
 
-
-
     // Helpers shared for all formats:
     static size_t get_capacity_from_header(const char* header) noexcept
     {
@@ -384,37 +380,69 @@ public:
         h[2] = uchar(value >> 3 & 0x000000FF);
     }
 
+    // This one needs to be correct for all layouts, both old and new:
     static size_t get_byte_size_from_header(const char* header) noexcept
     {
-        size_t size = get_size_from_header(header);
-        uint_least8_t width = get_width_from_header(header);
         WidthType wtype = get_wtype_from_header(header);
-        size_t num_bytes = calc_byte_size(wtype, size, width);
-
-        return num_bytes;
+        int width;
+        int size;
+        switch (wtype) {
+            case wtype_Bits:
+            case wtype_Multiply:
+            case wtype_Ignore:
+                width = get_width_from_header(header);
+                size = get_size_from_header(header);
+                return calc_byte_size(wtype, size, width);
+            case wtype_Packed:
+                width = get_width_A_from_header(header);
+                size = get_size_AB_from_header(header);
+                return calc_byte_size(wtype, size, width);
+            case wtype_AofP:
+            case wtype_PofA:
+                width = get_width_A_from_header(header) + get_width_B_from_header(header);
+                size = get_size_AB_from_header(header);
+                return calc_byte_size(wtype, size, width);
+            case wtype_Flex:
+                int widthA = get_width_A_from_header(header);
+                int widthB = get_width_B_from_header(header);
+                int sizeA = get_size_A_from_header(header);
+                int sizeB = get_size_B_from_header(header);
+                return calc_byte_size_extended(wtype, sizeA, sizeB, widthA, widthB);
+            default:
+                REALM_ASSERT(false);
+        }
     }
 
 
-    // This one needs to be correct for all layouts, both old and new:
     static size_t calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept
+    {
+        REALM_ASSERT(wtype != wtype_Flex);
+        return calc_byte_size_extended(wtype, size, 0, width, 0);
+    }
+
+    static size_t calc_byte_size_extended(WidthType wtype, size_t sizeA, size_t sizeB, uint8_t widthA,
+                                          uint8_t widthB) noexcept
     {
         size_t num_bytes = 0;
         switch (wtype) {
             case wtype_Packed:
+            case wtype_AofP:
+            case wtype_PofA:
+            case wtype_Flex:
             case wtype_Bits: {
                 // Current assumption is that size is at most 2^24 and that width is at most 64.
                 // In that case the following will never overflow. (Assuming that size_t is at least 32 bits)
-                REALM_ASSERT_3(size, <, 0x1000000);
-                size_t num_bits = size * width;
+                REALM_ASSERT_3(sizeA, <, 0x1000000);
+                size_t num_bits = sizeA * widthA + sizeB * widthB;
                 num_bytes = (num_bits + 7) >> 3;
                 break;
             }
             case wtype_Multiply: {
-                num_bytes = size * width;
+                num_bytes = sizeA * widthA;
                 break;
             }
             case wtype_Ignore:
-                num_bytes = size;
+                num_bytes = sizeA;
                 break;
             default: {
                 REALM_ASSERT(false);
