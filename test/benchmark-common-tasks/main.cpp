@@ -1391,6 +1391,49 @@ struct BenchmarkSortIntDictionary : Benchmark {
     std::vector<size_t> m_indices;
 };
 
+struct BenchmarkSortThenLimit : Benchmark {
+    const char* name() const
+    {
+        return "SortThenLimit";
+    }
+
+    void before_all(DBRef group)
+    {
+        WriteTransaction tr(group);
+        TableRef t = tr.add_table(name());
+        m_col = t->add_column(type_Int, "first");
+
+        std::vector<int> values(10000);
+        std::iota(values.begin(), values.end(), 0);
+        std::shuffle(values.begin(), values.end(), std::mt19937(std::random_device()()));
+
+        for (auto i : values) {
+            t->create_object().set(m_col, i);
+        }
+        tr.commit();
+    }
+
+    void after_all(DBRef db)
+    {
+        WriteTransaction tr(db);
+        tr.get_group().remove_table(name());
+        tr.commit();
+    }
+
+    void operator()(DBRef db)
+    {
+        realm::ReadTransaction tr(db);
+        auto tv = tr.get_group().get_table(name())->where().find_all();
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor({{m_col}}));
+        ordering.append_limit(100);
+
+        tv.apply_descriptor_ordering(ordering);
+    }
+
+    ColKey m_col;
+};
+
 struct BenchmarkInsert : BenchmarkWithStringsTable {
     const char* name() const
     {
@@ -2249,7 +2292,6 @@ int benchmark_common_tasks_main()
 
 #define BENCH(B) run_benchmark<B>(results)
 #define BENCH2(B, mode) run_benchmark<B>(results, mode)
-
     BENCH2(BenchmarkEmptyCommit, true);
     BENCH2(BenchmarkEmptyCommit, false);
     BENCH2(BenchmarkNonInitiatorOpen, true);
@@ -2267,6 +2309,7 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkSortInt);
     BENCH(BenchmarkSortIntList);
     BENCH(BenchmarkSortIntDictionary);
+    BENCH(BenchmarkSortThenLimit);
 
     BENCH(BenchmarkUnorderedTableViewClear);
     BENCH(BenchmarkUnorderedTableViewClearIndexed);
