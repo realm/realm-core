@@ -24,6 +24,7 @@
 #include <sstream>
 #include <ostream>
 #include <cwchar>
+#include <chrono>
 
 #include <realm.hpp>
 
@@ -32,8 +33,12 @@
 #include "test.hpp"
 #include "test_table_helper.hpp"
 
+using namespace std::chrono;
+
 using namespace realm;
 using namespace test_util;
+
+extern unsigned int unit_test_random_seed;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -2831,6 +2836,37 @@ TEST(TableView_CopyKeyValues)
     TestTableView yet_another_view(get_table_view(view)); // Using move constructor
     CHECK_EQUAL(yet_another_view.size(), 10);
     CHECK_EQUAL(yet_another_view.get_key(0), ObjKey(0));
+}
+
+TEST(TableView_SortFollowedByLimit)
+{
+    constexpr int limit = 100;
+    Table table;
+    auto col = table.add_column(type_Int, "first");
+    std::vector<int> values(10000);
+    std::iota(values.begin(), values.end(), 0);
+    std::shuffle(values.begin(), values.end(), std::mt19937(unit_test_random_seed));
+
+    for (auto i : values) {
+        table.create_object().set(col, i);
+    }
+
+    auto tv = table.where().find_all();
+    DescriptorOrdering ordering;
+    ordering.append_sort(SortDescriptor({{col}}));
+    ordering.append_limit(limit);
+
+    auto t1 = steady_clock::now();
+    tv.apply_descriptor_ordering(ordering);
+    auto t2 = steady_clock::now();
+
+    CHECK(t2 > t1);
+    // std::cout << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+
+    CHECK_EQUAL(tv.size(), limit);
+    for (int i = 0; i < limit; i++) {
+        CHECK_EQUAL(tv.get_object(i).get<Int>(col), i);
+    }
 }
 
 #endif // TEST_TABLE_VIEW
