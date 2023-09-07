@@ -1709,19 +1709,19 @@ std::string Query::validate() const
 
 std::string Query::get_description(util::serializer::SerialisationState& state) const
 {
-    if (m_view) {
-        throw SerializationError("Serialization of a query constrained by a view is not currently supported");
-    }
     std::string description;
     if (auto root = root_node()) {
         description = root->describe_expression(state);
     }
-    else {
+    if (m_view) {
+        description += util::format(" VIEW { %1 element(s) }", m_view->size());
+    }
+    if (description.length() == 0) {
         // An empty query returns all results and one way to indicate this
         // is to serialise TRUEPREDICATE which is functionally equivalent
         description = "TRUEPREDICATE";
     }
-    if (this->m_ordering) {
+    if (m_ordering) {
         description += " " + m_ordering->get_description(m_table);
     }
     return description;

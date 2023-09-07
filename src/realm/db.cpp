@@ -1494,7 +1494,7 @@ private:
 void DB::set_logger(const std::shared_ptr<util::Logger>& logger) noexcept
 {
     if (logger)
-        m_logger = std::make_unique<DBLogger>(logger, m_log_id);
+        m_logger = std::make_shared<DBLogger>(logger, m_log_id);
 }
 
 void DB::open(Replication& repl, const DBOptions options)

@@ -164,9 +164,9 @@ public:
         return static_cast<bool>(m_oldest_version_not_persisted);
     }
 
-    util::Logger* get_logger() const noexcept
+    std::shared_ptr<util::Logger> get_logger() const noexcept
     {
-        return db->m_logger.get();
+        return db->m_logger;
     }
 
 private:

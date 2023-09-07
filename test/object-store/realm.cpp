@@ -4241,3 +4241,30 @@ TEST_CASE("Concurrent operations") {
         _impl::RealmCoordinator::assert_no_open_realms();
     }
 }
+
+TEST_CASE("Notification logging") {
+    using namespace std::chrono_literals;
+    TestFile config;
+    // util::LogCategory::realm.set_default_level_threshold(util::Logger::Level::all);
+    config.schema_version = 1;
+    config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_object");
+    int changed = 0;
+    Results res(realm, table->query("value == 5"));
+    auto token = res.add_notification_callback([&changed](CollectionChangeSet const&) {
+        changed++;
+    });
+
+    int commit_nr = 0;
+    util::EventLoop::main().run_until([&] {
+        for (int64_t i = 0; i < 10; i++) {
+            realm->begin_transaction();
+            table->create_object().set("value", i);
+            realm->commit_transaction();
+            std::this_thread::sleep_for(2ms);
+        }
+        return ++commit_nr == 10;
+    });
+}

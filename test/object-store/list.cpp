@@ -1431,7 +1431,9 @@ TEST_CASE("embedded List", "[list]") {
          {{"pk", PropertyType::Int, Property::IsPrimary{true}},
           {"array", PropertyType::Array | PropertyType::Object, "target"}}},
         {"target", ObjectSchema::ObjectType::Embedded, {{"value", PropertyType::Int}}},
-        {"other_origin", {{"array", PropertyType::Array | PropertyType::Object, "other_target"}}},
+        {"other_origin",
+         {{"id", PropertyType::Int, Property::IsPrimary{true}},
+          {"array", PropertyType::Array | PropertyType::Object, "other_target"}}},
         {"other_target", ObjectSchema::ObjectType::Embedded, {{"value", PropertyType::Int}}},
     });
 
@@ -1455,7 +1457,7 @@ TEST_CASE("embedded List", "[list]") {
         lv2->create_and_insert_linked_object(i).set_all(i);
 
 
-    Obj other_obj = other_origin->create_object();
+    Obj other_obj = other_origin->create_object_with_primary_key(1);
     auto other_lv = other_obj.get_linklist_ptr(other_col_link);
     for (int i = 0; i < 10; ++i)
         other_lv->create_and_insert_linked_object(i).set_all(i);
