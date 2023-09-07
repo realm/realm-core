@@ -575,6 +575,13 @@ TEST(File_GetUniqueID)
     uid4_1 = uid4_2;
     CHECK_NOT(uid4_1 < uid4_2);
     CHECK_NOT(uid4_2 < uid4_1);
+
+    file1_1.resize(0);
+    file2_1.resize(0);
+    file2_1.resize(1);
+    file1_1.resize(1);
+    CHECK(uid1_1 == file1_1.get_unique_id());
+    CHECK(uid2_1 == file2_1.get_unique_id());
 }
 
 TEST(File_Temp)
