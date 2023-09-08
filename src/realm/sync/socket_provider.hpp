@@ -199,9 +199,10 @@ struct WebSocketInterface {
     /// during the write operation.
     /// @param data A util::Span containing the data to be sent to the server.
     /// @param handler The handler function to be called when the data has been sent
-    ///                successfully. If the WebSocket readyState is anything other
-    ///                than OPEN, the handler function should be called with a
-    ///                Status of ErrorCodes::RuntimeError.
+    ///                successfully or the websocket has been closed (with
+    ///                ErrorCodes::OperationAborted). If an error occurs during the
+    ///                write operation, the websocket will be closed and the error
+    ///                will be provided via the websocket_closed_handler() function.
     virtual void async_write_binary(util::Span<const char> data, SyncSocketProvider::FunctionHandler&& handler) = 0;
 };
 
