@@ -194,61 +194,6 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) noexcept
 // - The start of the 'data' area must be 64 bit aligned in all cases.
 // - For fields of 64-bit or less, the first 64-bit word is filled with the zero-extended
 //   value of the bitfield.
-inline uint64_t read_bitfield(const char* data_area, size_t field_position, size_t width)
-{
-    // ectract data based on 64-bit word memory access and some bit fiddling
-    size_t offset_begin = field_position;
-    size_t offset_end = offset_begin + width - 1;
-    size_t offset_begin_word = offset_begin >> 6;
-    size_t offset_end_word = offset_end >> 6;
-    uint64_t begin_word = ((const uint64_t*)data_area)[offset_begin_word];
-    begin_word >>= (offset_begin - offset_begin_word);
-    // take into account possible crossing of alignment boundary
-    if (offset_begin_word != offset_end_word) {
-        auto bits_in_end_word = offset_end - (offset_end_word << 6);
-        auto bits_in_begin_word = width - bits_in_end_word;
-        begin_word &= ~((1ULL << bits_in_begin_word) - 1);
-        uint64_t end_word = ((const uint64_t*)data_area)[offset_end_word];
-        end_word <<= bits_in_begin_word;
-        begin_word |= end_word;
-    }
-    // mask out anything above the bits we need:
-    // technically this is undef for width=64 bit, but should in practice
-    // give the correct result.
-    begin_word &= (1ULL << width) - 1;
-    return begin_word;
-}
-
-inline void write_bitfield(char* data_area, size_t field_position, size_t width, uint64_t value)
-{
-    // entries 64 bit or less:
-    // ectract data based on 64-bit word memory access and some bit fiddling
-    size_t offset_begin = field_position;
-    size_t offset_end = offset_begin + width - 1;
-    size_t offset_begin_word = offset_begin >> 6;
-    size_t offset_end_word = offset_end >> 6;
-    // ensure all zeroes outside the bits we're interested in:
-    value &= ((1ULL << width) - 1);
-    // place low part (or all of) value in proper position within target word
-    auto rot_first_word = offset_begin - (offset_begin_word << 6);
-    auto mask = (size_t(-1) & ((1ULL << width) - 1)) << rot_first_word;
-    uint64_t begin_word = ((const uint64_t*)data_area)[offset_begin_word];
-    begin_word &= ~mask;
-    begin_word |= value << rot_first_word;
-    ((uint64_t*)data_area)[offset_begin_word] = begin_word;
-    // take into account possible crossing of alignment boundary
-    if (offset_begin_word != offset_end_word) {
-        auto bits_in_end_word = offset_end - (offset_end_word << 6);
-        auto bits_in_begin_word = width - bits_in_end_word;
-        value >>= bits_in_begin_word;
-        mask = (size_t(-1)) & ((1ULL << bits_in_end_word) - 1);
-        uint64_t end_word = ((const uint64_t*)data_area)[offset_end_word];
-        end_word &= ~mask;
-        end_word |= value;
-        ((uint64_t*)data_area)[offset_end_word] = end_word;
-    }
-}
-
 // iterator useful for scanning arrays faster than by indexing each element
 // supports arrays of pairs by differentiating field size and step size.
 class bf_ref;
@@ -286,7 +231,28 @@ public:
     }
     void set_value(uint64_t value) const
     {
-        static_cast<void>(value);
+        auto in_word_position = field_position & 0x3F;
+        auto first_word = first_word_ptr[0];
+        size_t mask = (1ULL << field_size) - 1;
+        value &= mask;
+        // zero out field in first word:
+        auto first_word_mask = mask << in_word_position;
+        first_word &= ~first_word_mask;
+        // or in relevant part of value
+        first_word |= value << in_word_position;
+        first_word_ptr[0] = first_word;
+        if (in_word_position + field_size > 64) {
+            // bitfield crosses word boundary.
+            // discard the lowest bits of value (it has been written to the first word)
+            auto bits_written_to_first_word = 64 - in_word_position;
+            value >>= bits_written_to_first_word;
+            auto second_word_mask = mask >> bits_written_to_first_word;
+            auto second_word = first_word_ptr[1];
+            // zero out the field in second word, then or in the (high part of) value
+            second_word &= ~second_word_mask;
+            second_word |= value;
+            first_word_ptr[1] = second_word;
+        }
     }
     void operator++()
     {
@@ -296,12 +262,24 @@ public:
         }
         field_position = next_field_position;
     }
-    uint64_t operator*() const
-    {
-        return get_value();
-    }
+    // The compiler should be able to generate code matching this
+    // from operator* and the bf_ref declared below:
+    //
+    //    uint64_t operator*() const
+    //    {
+    //        return get_value();
+    //    }
     bf_ref operator*();
+    friend bool operator<(const bf_iterator&, const bf_iterator&);
 };
+
+
+inline bool operator<(const bf_iterator& a, const bf_iterator& b)
+{
+    REALM_ASSERT(a.data_area == b.data_area);
+    return a.field_position < b.field_position;
+}
+
 
 class bf_ref {
     bf_iterator it;
@@ -326,6 +304,20 @@ inline bf_ref bf_iterator::operator*()
 {
     return bf_ref(*this);
 }
+
+
+inline uint64_t read_bitfield(uint64_t* data_area, int field_position, int width)
+{
+    bf_iterator it(data_area, field_position, width, 0, 0);
+    return *it;
+}
+
+inline void write_bitfield(uint64_t* data_area, int field_position, int width, uint64_t value)
+{
+    bf_iterator it(data_area, field_position, width, 0, 0);
+    *it = value;
+}
+
 
 inline int64_t sign_extend_field(size_t width, uint64_t value)
 {
