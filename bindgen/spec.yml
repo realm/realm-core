@@ -3,6 +3,7 @@
 headers:
   - "realm/sync/config.hpp"
   - "realm/sync/subscriptions.hpp"
+  - "realm/status.hpp"
   - "realm/object-store/shared_realm.hpp"
   - "realm/object-store/object_store.hpp"
   - "realm/object-store/object_schema.hpp"
@@ -66,6 +67,7 @@ typeAliases:
   Email: std::string
   SchemaVersion: int64_t # is uint64_t in C++ but -1 is used as a sentinel.
   PortType: int32_t # is uint_fast16_t in C++ but we don't want to add more primitive types and expect SDKs to reject port number > 65535
+  ErrorCodes::Error: int32_t
 
 templates: # value tells you how many arguments it takes ('*' means any number)
   util::Optional: 1
@@ -384,7 +386,7 @@ records:
   GeoPolygon:
     fields:
       points: std::vector<std::vector<GeoPoint>>
-
+      
   RealmConfig:
     fields:
       path: std::string
@@ -574,9 +576,7 @@ records:
 
   SyncError:
    fields:
-     system_error:
-       type: std::error_code
-       cppName: get_system_error()
+     status: Status
      is_fatal: bool
      simple_message: StringData
      logURL: StringData
@@ -631,8 +631,6 @@ records:
       app_id: std::string
       transport: SharedGenericNetworkTransport
       base_url: util::Optional<std::string>
-      local_app_name: util::Optional<std::string>
-      local_app_version: util::Optional<std::string>
       default_request_timeout_ms: util::Optional<uint64_t>
       device_info: DeviceInfo
 
