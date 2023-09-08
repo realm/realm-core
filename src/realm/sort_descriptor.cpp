@@ -301,7 +301,29 @@ BaseDescriptor::Sorter SortDescriptor::sorter(Table const& table, const IndexPai
 
 void SortDescriptor::execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const
 {
-    std::sort(v.begin(), v.end(), std::ref(predicate));
+    size_t limit = size_t(-1);
+    if (next && next->get_type() == DescriptorType::Limit) {
+        limit = static_cast<const LimitDescriptor*>(next)->get_limit();
+    }
+    // Measurements shows that if limit is smaller than size / 16, then
+    // it is quicker to make a sorted insert into a smaller vector
+    if (limit < (v.size() >> 4)) {
+        IndexPairs buffer;
+        buffer.reserve(limit + 1);
+        for (auto& elem : v) {
+            auto it = std::lower_bound(buffer.begin(), buffer.end(), elem, std::ref(predicate));
+            buffer.insert(it, elem);
+            if (buffer.size() > limit) {
+                buffer.pop_back();
+            }
+        }
+        v.m_removed_by_limit += v.size() - limit;
+        v.erase(v.begin() + limit, v.end());
+        std::move(buffer.begin(), buffer.end(), v.begin());
+    }
+    else {
+        std::sort(v.begin(), v.end(), std::ref(predicate));
+    }
 
     // not doing this on the last step is an optimisation
     if (next) {

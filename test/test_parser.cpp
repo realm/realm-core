@@ -5775,11 +5775,21 @@ TEST(Parser_Geospatial)
         GeoPolygon{{{GeoPoint{0, 0}, GeoPoint{1, 0}, GeoPoint{1, 1}, GeoPoint{0, 1}, GeoPoint{0, 0}}}}};
     Geospatial invalid;
     Geospatial point{GeoPoint{0, 0}};
-    std::vector<Mixed> args = {Mixed{&box},          Mixed{&circle}, Mixed{&polygon}, Mixed{&invalid},
-                               Mixed{realm::null()}, Mixed{1.2},     Mixed{1000},     Mixed{"string value"}};
+    std::string str_of_box = box.to_string();
+    std::string str_of_circle = circle.to_string();
+    std::string str_of_polygon = polygon.to_string();
+    std::string str_of_point = point.to_string();
+    std::vector<Mixed> args = {Mixed{&box},          Mixed{&circle},        Mixed{&polygon},
+                               Mixed{&invalid},      Mixed{realm::null()},  Mixed{1.2},
+                               Mixed{1000},          Mixed{"string value"}, Mixed{str_of_box},
+                               Mixed{str_of_circle}, Mixed{str_of_polygon}, Mixed{str_of_point}};
+
     verify_query_sub(test_context, table, "location GEOWITHIN $0", args, 1);
     verify_query_sub(test_context, table, "location GEOWITHIN $1", args, 4);
     verify_query_sub(test_context, table, "location GEOWITHIN $2", args, 1);
+    verify_query_sub(test_context, table, "location GEOWITHIN $8", args, 1);
+    verify_query_sub(test_context, table, "location GEOWITHIN $9", args, 4);
+    verify_query_sub(test_context, table, "location GEOWITHIN $10", args, 1);
 
     GeoCircle c = circle.get<GeoCircle>();
     std::vector<Mixed> coord_args = {Mixed{c.center.longitude}, Mixed{c.center.latitude}, Mixed{c.radius_radians}};
@@ -5837,8 +5847,18 @@ TEST(Parser_Geospatial)
                                          "But the provided type is 'int'") != std::string::npos));
     CHECK_THROW_EX(
         verify_query_sub(test_context, table, "location GEOWITHIN $7", args, 1), query_parser::InvalidQueryError,
-        CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
-                                         "But the provided type is 'string'") != std::string::npos));
+        CHECK(std::string(e.what()).find(
+                  "Invalid syntax in serialized geospatial object at argument 7: 'Invalid predicate: 'string value': "
+                  "syntax error, unexpected identifier, expecting geobox or geopolygon or geocircle or argument'") !=
+              std::string::npos));
+
+    CHECK_THROW_EX(verify_query_sub(test_context, table, "location GEOWITHIN $11", args, 1),
+                   query_parser::InvalidQueryError,
+                   CHECK(std::string(e.what()).find(
+                             "Invalid syntax in serialized geospatial object at argument 11: 'Invalid predicate: "
+                             "'GeoPoint([0, 0])': syntax error, unexpected identifier, expecting geobox or "
+                             "geopolygon or geocircle or argument'") != std::string::npos));
+
     CHECK_THROW_EX(verify_query_sub(test_context, table, "location GEOWITHIN $3", args, 0),
                    query_parser::InvalidQueryError,
                    CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a valid "

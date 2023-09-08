@@ -804,8 +804,10 @@ void Connection::handle_connect_wait(Status status)
 
     REALM_ASSERT_EX(m_state == ConnectionState::connecting, m_state);
     logger.info("Connect timeout"); // Throws
-    involuntary_disconnect(SessionErrorInfo{Status{ErrorCodes::SyncConnectFailed, status.reason()}, IsFatal{false}},
-                           ConnectionTerminationReason::sync_connect_timeout); // Throws
+    involuntary_disconnect(
+        SessionErrorInfo{Status{ErrorCodes::SyncConnectTimeout, "Sync connection was not fully established in time"},
+                         IsFatal{false}},
+        ConnectionTerminationReason::sync_connect_timeout); // Throws
 }
 
 

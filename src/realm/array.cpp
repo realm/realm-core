@@ -550,18 +550,6 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
     }
 }
 
-void Array::set_all_to_zero()
-{
-    if (m_size == 0 || m_width == 0)
-        return;
-
-    copy_on_write(); // Throws
-
-    set_width_in_header(0, get_header());
-    update_width_cache_from_header();
-}
-
-
 namespace {
 
 template <size_t width>
@@ -646,7 +634,6 @@ size_t find_zero(uint64_t v)
 }
 
 } // namespace
-
 
 
 int64_t Array::sum(size_t start, size_t end) const
