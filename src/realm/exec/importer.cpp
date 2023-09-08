@@ -65,13 +65,13 @@ const char* DataTypeToText(DataType t)
 void print_col_names(Table& table)
 {
     std::cout << "\n";
-    for (size_t t = 0; t < table.get_column_count(); t++) {
+    for (auto t : table.get_column_keys()) {
         std::string s = std::string(table.get_column_name(t).data());
         s = set_width(s, print_width);
         std::cout << s.c_str() << " ";
     }
     std::cout << "\n";
-    for (size_t t = 0; t < table.get_column_count(); t++) {
+    for (auto t : table.get_column_keys()) {
         std::string s = "Type: " + std::string(DataTypeToText(table.get_column_type(t)));
         s = set_width(s, print_width);
         std::cout << s.c_str() << " ";
@@ -83,23 +83,33 @@ void print_col_names(Table& table)
 // Prints row 'r' of a Realm table
 void print_row(Table& table, size_t r)
 {
-    for (size_t c = 0; c < table.get_column_count(); c++) {
+    auto&& obj = table.get_object(r);
+    for (auto k : table.get_column_keys()) {
         char buf[print_width];
+        auto type = table.get_column_type(k);
 
-        if (table.get_column_type(c) == type_Bool)
-            sprintf(buf, "%s", table.get_bool(c, r) ? "true" : "false");
-        if (table.get_column_type(c) == type_Double)
-            sprintf(buf, "%f", table.get_double(c, r));
-        if (table.get_column_type(c) == type_Float)
-            sprintf(buf, "%f", table.get_float(c, r));
-        if (table.get_column_type(c) == type_Int)
-            sprintf(buf, "%lld", static_cast<long long>(table.get_int(c, r)));
-        if (table.get_column_type(c) == type_String) {
+        switch (type) {
+            case type_Bool:
+                snprintf(buf, print_width, "%s", obj.get<bool>(k) ? "true" : "false");
+                break;
+            case type_Double:
+                snprintf(buf, print_width, "%f", obj.get<double>(k));
+                break;
+            case type_Float:
+                snprintf(buf, print_width, "%f", obj.get<float>(k));
+                break;
+            case type_Int:
+                snprintf(buf, print_width, "%lld", static_cast<long long>(obj.get<int64_t>(k)));
+                break;
+            case type_String:
 #if defined(_MSC_VER) && _MSC_VER
-            _snprintf(buf, sizeof(buf), "%s", table.get_string(c, r).data());
+                _snprintf(buf, sizeof(buf), "%s", obj.get<StringData>(k).data());
 #else
-            snprintf(buf, sizeof(buf), "%s", table.get_string(c, r).data());
+                snprintf(buf, sizeof(buf), "%s", obj.get<StringData>(k).data());
 #endif
+                break;
+            default:
+                break;
         }
         std::string s = std::string(buf);
         s = set_width(s, print_width);
@@ -528,10 +538,10 @@ nextfield:
                 std::string s = payload[payload.size() - 1][0];
                 if (s.length() > 100)
                     s = s.substr(0, 100);
-                sprintf(buf,
-                        "Wrong number of delimitors around line %lld (+|- 3) in csv file. First few characters "
-                        "of line: %s",
-                        static_cast<unsigned long long>(m_row - 1), s.c_str());
+                snprintf(buf, 500,
+                         "Wrong number of delimitors around line %lld (+|- 3) in csv file. First few characters "
+                         "of line: %s",
+                         static_cast<unsigned long long>(m_row - 1), s.c_str());
                 throw std::runtime_error(buf);
             }
         }
@@ -615,7 +625,7 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType>* imp
                 // occurences by a string
                 if (header[t] == "") {
                     char buf[10];
-                    sprintf(buf, "Column%d", static_cast<int>(t));
+                    snprintf(buf, 10, "Column%d", static_cast<int>(t));
                     header[t] = buf;
                 }
             }
@@ -624,7 +634,7 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType>* imp
             // Use "1", "2", "3", ... for column names
             for (size_t i = 0; i < scheme1.size(); i++) {
                 char buf[10];
-                sprintf(buf, "%d", static_cast<int>(i));
+                snprintf(buf, 10, "%d", static_cast<int>(i));
                 header.push_back(buf);
             }
         }
@@ -663,33 +673,40 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType>* imp
             if (!Quiet && imported_rows % 123 == 0)
                 std::cout << imported_rows << " rows\r";
 
-            // Add empty row to Realm
-            REALM_ASSERT(false); // unimplemented
-            // table.add_empty_row();
-
-            // Add all fields to new row
-            for (size_t col = 0; col < scheme.size(); col++) {
+            FieldValues values;
+            auto keys = table.get_column_keys();
+            size_t col = 0;
+            for (auto key = keys.begin(); key != keys.end(); ++key, ++col) {
                 bool success = true;
 
-                if (scheme[col] == type_String)
-                    table.set_string(col, imported_rows, StringData(payload[row][col]));
-                else if (scheme[col] == type_Int)
-                    table.set_int(col, imported_rows, parse_integer<true>(payload[row][col].c_str(), &success));
-                else if (scheme[col] == type_Double)
-                    table.set_double(col, imported_rows, parse_double<true>(payload[row][col].c_str(), &success));
-                else if (scheme[col] == type_Float)
-                    table.set_float(col, imported_rows, parse_float<true>(payload[row][col].c_str(), &success));
-                else if (scheme[col] == type_Bool)
-                    table.set_bool(col, imported_rows, parse_bool<true>(payload[row][col].c_str(), &success));
-                else
-                    REALM_ASSERT(false);
+                switch (scheme[col]) {
+                    case type_String:
+                        values.insert(*key, StringData(payload[row][col]));
+                        break;
+                    case type_Int:
+                        values.insert(*key, parse_integer<true>(payload[row][col].c_str(), &success));
+                        break;
+                    case type_Double:
+                        values.insert(*key, parse_double<true>(payload[row][col].c_str(), &success));
+                        break;
+                    case type_Float:
+                        values.insert(*key, parse_float<true>(payload[row][col].c_str(), &success));
+                        break;
+                    case type_Bool:
+                        values.insert(*key, parse_bool<true>(payload[row][col].c_str(), &success));
+                        break;
+                    default:
+                        REALM_ASSERT(false);
+                        break;
+                }
 
                 if (!success) {
                     // Remove all columns so that user can call csv_import() on it again
                     table.clear();
 
-                    for (size_t t = 0; t < table.get_column_count(); t++)
-                        table.remove_column(0);
+                    auto keys = table.get_column_keys();
+                    for (size_t i = keys.size(); i != 0;)
+                        table.remove_column(keys[--i]);
 
                     std::stringstream sstm;
 
@@ -718,6 +735,7 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType>* imp
                 }
             }
 
+            (void)table.create_object(ObjKey(import_rows), values);
 
             if (!Quiet) {
                 if (imported_rows < 10)

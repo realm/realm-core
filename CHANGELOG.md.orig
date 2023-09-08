@@ -6,8 +6,10 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* realm/sync/network/websocket_error.hpp was missing from the install package ([PR #6954](https://github.com/realm/realm-core/pull/6954), since v13.18.0).
+<<<<<<< HEAD
 * Fix open async in order to invoke the subscription callback correctly when rerun_on_open is set to true. ([#6937](https://github.com/realm/realm-core/pull/6937), since v13.16.0).
+=======
+* realm/sync/network/websocket_error.hpp was missing from the install package ([PR #6954](https://github.com/realm/realm-core/pull/6954), since v13.18.0).
 
 ### Breaking changes
 * None.
@@ -31,6 +33,7 @@
 
 ### Fixed
 * None.
+>>>>>>> 75cc43e9521a0e4928deb98f5765333c9a2f8be0
 
 ### Breaking changes
 * None.

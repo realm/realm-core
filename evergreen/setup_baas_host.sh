@@ -54,11 +54,12 @@ fi
 # shellcheck disable=SC1090
 source "${BAAS_HOST_VARS}"
 
-if [[ -n "${GITHUB_KNOWN_HOSTS}" ]]; then
-    echo "${GITHUB_KNOWN_HOSTS}" | tee -a "${HOME}/.ssh/known_hosts"
-else
-    echo "Warning: GITHUB_KNOWN_HOSTS not defined in baas host vars script - github clone may hang or fail during setup"
+if [[ -z "${GITHUB_KNOWN_HOSTS}" ]]; then
+    # Use a default if not defined, but this may become outdated one day...
+    GITHUB_KNOWN_HOSTS="github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk="
+    echo "Info: GITHUB_KNOWN_HOSTS not defined in baas host vars script"
 fi
+echo "${GITHUB_KNOWN_HOSTS}" | tee -a "${HOME}/.ssh/known_hosts"
 
 DATA_DIR=/data
 DATA_TEMP_DIR="${DATA_DIR}/tmp"
@@ -70,7 +71,7 @@ function setup_data_dir()
     data_device=
 
     # Find /data ebs device to be mounted
-    devices=$(sudo lsblk | grep disk| awk '{print $1}')
+    devices=$(sudo lsblk | grep disk | awk '{print $1}')
     for device in ${devices}; do
         is_data=$(sudo file -s "/dev/${device}" | awk '{print $2}')
         if [ "${is_data}" == "data" ]; then
@@ -127,13 +128,12 @@ sudo chmod 600 "${HOME}/.ssh"/*
 setup_data_dir
 
 pushd "${BAAS_REMOTE_DIR}" > /dev/null
-git clone git@github.com:realm/realm-core.git realm-core
-pushd realm-core > /dev/null
 
-git checkout "${REALM_CORE_REVISION}"
-git submodule update --init --recursive
-if [[ -f "${HOME}/install_baas.sh" ]]; then
-    cp "${HOME}/install_baas.sh" evergreen/
+if [[ -d "${HOME}/evergreen/" ]]; then
+    cp -R "${HOME}/evergreen/" ./evergreen/
+else
+    echo "evergreen/ directory not found in ${HOME}"
+    exit 1
 fi
 
 INSTALL_BAAS_OPTS=()
@@ -146,5 +146,4 @@ fi
 
 ./evergreen/install_baas.sh -w "${BAAS_WORK_DIR}" "${INSTALL_BAAS_OPTS[@]}" 2>&1
 
-popd > /dev/null  # realm-core
 popd > /dev/null  # /data/baas-remote
