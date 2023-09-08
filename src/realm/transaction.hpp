@@ -349,7 +349,8 @@ inline void Transaction::advance_read(O* observer, VersionID version_id)
     auto old_version = m_read_lock.m_version;
     internal_advance_read(observer, version_id, *hist, false); // Throws
     if (db->m_logger) {
-        db->m_logger->log(util::Logger::Level::trace, "Advance read: %1 -> %2", old_version, m_read_lock.m_version);
+        db->m_logger->log(util::Logger::Level::trace, "Advance read: %1 -> %2 ref %3", old_version,
+                          m_read_lock.m_version, m_read_lock.m_top_ref);
     }
 }
 

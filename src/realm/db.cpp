@@ -909,7 +909,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
     REALM_ASSERT(path.size());
 
     m_db_path = path;
-    m_path_hash = StringData(path).hash() & 0xffff;
+    m_path_hash = (size_t(this) >> 4) & 0xffff;
     set_logger(options.logger);
     if (m_replication) {
         m_replication->set_logger(m_logger.get());
@@ -2311,6 +2311,10 @@ bool DB::do_try_begin_write()
 
 void DB::do_begin_write()
 {
+    if (m_logger) {
+        m_logger->log(util::Logger::Level::trace, "acquire writemutex");
+    }
+
     SharedInfo* info = m_info;
 
     // Get write lock - the write lock is held until do_end_write().
@@ -2369,6 +2373,9 @@ void DB::do_begin_write()
     // should take this situation into account by comparing with '>' instead of '!='
     info->next_served = my_ticket;
     finish_begin_write();
+    if (m_logger) {
+        m_logger->log(util::Logger::Level::trace, "writemutex acquired");
+    }
 }
 
 void DB::finish_begin_write()
@@ -2396,6 +2403,9 @@ void DB::do_end_write() noexcept
     m_write_transaction_open = false;
     m_pick_next_writer.notify_all();
     m_writemutex.unlock();
+    if (m_logger) {
+        m_logger->log(util::Logger::Level::trace, "writemutex released");
+    }
 }
 
 
@@ -2553,8 +2563,9 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     }
     auto t2 = std::chrono::steady_clock::now();
     if (m_logger) {
-        m_logger->log(util::Logger::Level::debug, "Commit of size %1 done in %2 us", commit_size,
-                      std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+        std::string to_disk_str = commit_to_disk ? util::format(" ref %1", new_top_ref) : " (no commit to disk)";
+        m_logger->log(util::Logger::Level::debug, "Commit of size %1 done in %2 us%3", commit_size,
+                      std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count(), to_disk_str);
     }
 }
 

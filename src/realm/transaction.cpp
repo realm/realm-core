@@ -105,9 +105,9 @@ void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInf
 namespace realm {
 
 std::map<DB::TransactStage, const char*> log_messages = {
-    {DB::TransactStage::transact_Frozen, "Start frozen: %1"},
-    {DB::TransactStage::transact_Writing, "Start write: %1"},
-    {DB::TransactStage::transact_Reading, "Start read: %1"},
+    {DB::TransactStage::transact_Frozen, "Start frozen: %1 ref %2"},
+    {DB::TransactStage::transact_Writing, "Start write: %1 ref %2"},
+    {DB::TransactStage::transact_Reading, "Start read: %1 ref %2"},
 };
 
 Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage)
@@ -115,9 +115,6 @@ Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB:
     , db(_db)
     , m_read_lock(rli)
 {
-    if (db->m_logger) {
-        db->m_logger->log(util::Logger::Level::trace, log_messages[stage], rli.m_version);
-    }
     bool writable = stage == DB::transact_Writing;
     m_transact_stage = DB::transact_Ready;
     set_metrics(db->m_metrics);
@@ -125,6 +122,9 @@ Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB:
     m_alloc.note_reader_start(this);
     attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable,
                   VersionID{rli.m_version, rli.m_reader_idx});
+    if (db->m_logger) {
+        db->m_logger->log(util::Logger::Level::trace, log_messages[stage], rli.m_version, m_read_lock.m_top_ref);
+    }
 }
 
 Transaction::~Transaction()
@@ -722,6 +722,9 @@ void Transaction::complete_async_commit()
     DB::ReadLockInfo read_lock;
     try {
         read_lock = db->grab_read_lock(DB::ReadLockInfo::Live, VersionID());
+        if (db->m_logger) {
+            db->m_logger->log(util::Logger::Level::trace, "Comitting ref %1 to disk", read_lock.m_top_ref);
+        }
         GroupWriter out(*this);
         out.commit(read_lock.m_top_ref); // Throws
         // we must release the write mutex before the callback, because the callback
