@@ -70,7 +70,7 @@ private:
 
 
 // Class controlling a memory mapped window into a file
-class GroupWriter::MapWindow {
+class GroupComitter::MapWindow {
 public:
     MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t initial_size,
               util::WriteMarker* write_marker = nullptr);
@@ -101,7 +101,7 @@ private:
 };
 
 // True if a requested block fall within a memory mapping.
-bool GroupWriter::MapWindow::matches(ref_type start_ref, size_t size)
+bool GroupComitter::MapWindow::matches(ref_type start_ref, size_t size)
 {
     if (start_ref < m_base_ref)
         return false;
@@ -117,14 +117,14 @@ bool GroupWriter::MapWindow::matches(ref_type start_ref, size_t size)
 //
 // In cases where a 1MB window would stretch beyond the end of the file, we choose
 // a smaller window. Anything mapped after the end of file would be undefined anyways.
-ref_type GroupWriter::MapWindow::aligned_to_mmap_block(ref_type start_ref)
+ref_type GroupComitter::MapWindow::aligned_to_mmap_block(ref_type start_ref)
 {
     // align to 1MB boundary
     size_t page_mask = m_alignment - 1;
     return start_ref & ~page_mask;
 }
 
-size_t GroupWriter::MapWindow::get_window_size(util::File& f, ref_type start_ref, size_t size)
+size_t GroupComitter::MapWindow::get_window_size(util::File& f, ref_type start_ref, size_t size)
 {
     size_t window_size = start_ref + size - m_base_ref;
     // always map at least to match alignment
@@ -146,7 +146,7 @@ size_t GroupWriter::MapWindow::get_window_size(util::File& f, ref_type start_ref
 //
 // extends_to_match() will extend an existing mapping to accomodate a new request if possible
 // and return true. If the request falls in a different 1MB window, it'll return false.
-bool GroupWriter::MapWindow::extends_to_match(util::File& f, ref_type start_ref, size_t size)
+bool GroupComitter::MapWindow::extends_to_match(util::File& f, ref_type start_ref, size_t size)
 {
     size_t aligned_ref = aligned_to_mmap_block(start_ref);
     if (aligned_ref != m_base_ref)
@@ -158,8 +158,8 @@ bool GroupWriter::MapWindow::extends_to_match(util::File& f, ref_type start_ref,
     return true;
 }
 
-GroupWriter::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t size,
-                                  util::WriteMarker* write_marker)
+GroupComitter::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t size,
+                                    util::WriteMarker* write_marker)
     : m_alignment(alignment)
 {
     m_base_ref = aligned_to_mmap_block(start_ref);
@@ -173,47 +173,43 @@ GroupWriter::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type star
 #endif
 }
 
-GroupWriter::MapWindow::~MapWindow()
+GroupComitter::MapWindow::~MapWindow()
 {
     m_map.sync();
     m_map.unmap();
 }
 
-void GroupWriter::MapWindow::flush()
+void GroupComitter::MapWindow::flush()
 {
     m_map.flush();
 }
 
-void GroupWriter::MapWindow::sync()
+void GroupComitter::MapWindow::sync()
 {
     flush();
     m_map.sync();
 }
 
-char* GroupWriter::MapWindow::translate(ref_type ref)
+char* GroupComitter::MapWindow::translate(ref_type ref)
 {
     return m_map.get_addr() + (ref - m_base_ref);
 }
 
-void GroupWriter::MapWindow::encryption_read_barrier(void* start_addr, size_t size)
+void GroupComitter::MapWindow::encryption_read_barrier(void* start_addr, size_t size)
 {
     realm::util::encryption_read_barrier_for_write(start_addr, size, m_map.get_encrypted_mapping());
 }
 
-void GroupWriter::MapWindow::encryption_write_barrier(void* start_addr, size_t size)
+void GroupComitter::MapWindow::encryption_write_barrier(void* start_addr, size_t size)
 {
     realm::util::encryption_write_barrier(start_addr, size, m_map.get_encrypted_mapping());
 }
 
-
-GroupWriter::GroupWriter(Group& group, Durability dura, WriteMarker* write_marker)
+GroupComitter::GroupComitter(Group& group, Durability dura, WriteMarker* write_marker)
     : m_group(group)
     , m_alloc(group.m_alloc)
-    , m_free_positions(m_alloc)
-    , m_free_lengths(m_alloc)
-    , m_free_versions(m_alloc)
-    , m_durability(dura)
     , m_write_marker(write_marker)
+    , m_durability(dura)
 {
     m_map_windows.reserve(num_map_windows);
 #if REALM_PLATFORM_APPLE && REALM_MOBILE
@@ -235,6 +231,16 @@ GroupWriter::GroupWriter(Group& group, Durability dura, WriteMarker* write_marke
         m_window_alignment = wanted_size;
     }
 #endif
+}
+
+GroupComitter::~GroupComitter() = default;
+
+GroupWriter::GroupWriter(Group& group, Durability dura, WriteMarker* write_marker)
+    : GroupComitter(group, dura, write_marker)
+    , m_free_positions(m_alloc)
+    , m_free_lengths(m_alloc)
+    , m_free_versions(m_alloc)
+{
     Array& top = m_group.m_top;
     m_logical_size = size_t(top.get_as_ref_or_tagged(Group::s_file_size_ndx).get_as_int());
 
@@ -332,14 +338,14 @@ size_t GroupWriter::get_file_size() const noexcept
     return sz;
 }
 
-void GroupWriter::flush_all_mappings()
+void GroupComitter::flush_all_mappings()
 {
     for (const auto& window : m_map_windows) {
         window->flush();
     }
 }
 
-void GroupWriter::sync_all_mappings()
+void GroupComitter::sync_all_mappings()
 {
     if (m_durability == Durability::Unsafe)
         return;
@@ -352,7 +358,7 @@ void GroupWriter::sync_all_mappings()
 // existing one (possibly extended to accomodate the new request). Maintain a
 // cache of open windows which are sync'ed and closed following a least recently
 // used policy. Entries in the cache are kept in MRU order.
-GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
+GroupComitter::MapWindow* GroupComitter::get_window(ref_type start_ref, size_t size)
 {
     auto match = std::find_if(m_map_windows.begin(), m_map_windows.end(), [&](const auto& window) {
         return window->matches(start_ref, size) || window->extends_to_match(m_alloc.get_file(), start_ref, size);
@@ -1335,7 +1341,7 @@ void GroupWriter::write_array_at(T* translator, ref_type ref, const char* data, 
 }
 
 
-void GroupWriter::commit(ref_type new_top_ref)
+void GroupComitter::commit(ref_type new_top_ref)
 {
     using _impl::SimulatedFailure;
     SimulatedFailure::trigger(SimulatedFailure::group_writer__commit); // Throws
