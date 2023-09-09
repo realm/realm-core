@@ -16,12 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <util/test_file.hpp>
+#include "util/test_file.hpp"
 
-#include <util/test_utils.hpp>
-#include <util/sync/baas_admin_api.hpp>
-
-#include <../util/crypt_key.hpp>
+#include "util/test_utils.hpp"
+#include "util/sync/baas_admin_api.hpp"
+#include "../util/crypt_key.hpp"
+#include "../util/test_path.hpp"
 
 #include <realm/db.hpp>
 #include <realm/disable_sync_to_disk.hpp>
@@ -203,17 +203,23 @@ SyncServer::SyncServer(const SyncServer::Config& config)
                    m_logger.reset(new util::NullLogger());
 #endif
 
-                   sync::Server::Config config;
-                   config.logger = m_logger;
-                   config.token_expiration_clock = this;
-                   config.listen_address = "127.0.0.1";
-                   config.disable_sync_to_disk = true;
+                   sync::Server::Config c;
+                   c.logger = m_logger;
+                   c.token_expiration_clock = this;
+                   c.listen_address = "127.0.0.1";
+                   c.disable_sync_to_disk = true;
+                   c.ssl = config.ssl;
+                   if (c.ssl) {
+                       c.ssl_certificate_path = test_util::get_test_resource_path() + "test_util_network_ssl_ca.pem";
+                       c.ssl_certificate_key_path =
+                           test_util::get_test_resource_path() + "test_util_network_ssl_key.pem";
+                   }
 
-                   return config;
+                   return c;
                })())
 {
     m_server.start();
-    m_url = util::format("ws://127.0.0.1:%1", m_server.listen_endpoint().port());
+    m_url = util::format("%1://127.0.0.1:%2", config.ssl ? "wss" : "ws", m_server.listen_endpoint().port());
     if (config.start_immediately)
         start();
 }
