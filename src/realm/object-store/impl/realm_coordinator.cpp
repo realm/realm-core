@@ -45,6 +45,7 @@
 #include <realm/history.hpp>
 #include <realm/string_data.hpp>
 #include <realm/util/fifo_helper.hpp>
+#include <realm/util/logger.hpp>
 #include <realm/sync/config.hpp>
 
 #include <algorithm>
@@ -387,11 +388,17 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
         // we are actually creating a realm. For async open this does not apply, infact db_created
         // will always be false.
         first_time_open |= db_created;
-        if (subscription_version == 0 || (first_time_open && rerun_on_open)) {
+
+        std::shared_ptr<util::Logger> logger_ptr =
+            std::make_shared<util::StderrLogger>(realm::util::Logger::Level::debug);
+        logger_ptr->trace("Getting Realm ==>", first_time_open, subscription_version, rerun_on_open);
+
+        if ((first_time_open && subscription_version == 0) || (first_time_open && rerun_on_open)) {
             // there is a small chance that if there are multiple async open tasks running, and one of the tasks
             // is cancelled before the subscription is committed, the second task won't run the init subscription
             // callback. This can be solved adding a second flag that stores whether the subscription was actually
             // committed.
+            logger_ptr->trace("Calling init subscription");
             subscription_function(realm);
         }
     }

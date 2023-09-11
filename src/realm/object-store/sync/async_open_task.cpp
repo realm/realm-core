@@ -24,6 +24,8 @@
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 
+#include <realm/util/logger.hpp>
+
 namespace realm {
 
 AsyncOpenTask::AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinator,
@@ -132,10 +134,17 @@ void AsyncOpenTask::attach_to_subscription_initializer(AsyncOpenCallback&& async
 
     auto shared_realm = coordinator->get_realm(nullptr, m_db_first_open);
     const auto init_subscription = shared_realm->get_latest_subscription_set();
+    const auto sub_state = init_subscription.state();
 
-    if (init_subscription.version() == 1 || (m_db_first_open && rerun_on_launch)) {
+    std::shared_ptr<util::Logger> logger_ptr =
+        std::make_shared<util::StderrLogger>(realm::util::Logger::Level::debug);
+    logger_ptr->trace("Task: ", (sub_state != sync::SubscriptionSet::State::Complete), m_db_first_open,
+                      rerun_on_launch);
+
+    if ((sub_state != sync::SubscriptionSet::State::Complete) || (m_db_first_open && rerun_on_launch)) {
         // We need to wait until subscription initializer completes
         std::shared_ptr<AsyncOpenTask> self(shared_from_this());
+        logger_ptr->trace("Wait for init sb");
         init_subscription.get_state_change_notification(sync::SubscriptionSet::State::Complete)
             .get_async([self, coordinator, async_open_callback = std::move(async_open_callback)](
                            StatusWith<realm::sync::SubscriptionSet::State> state) mutable {
