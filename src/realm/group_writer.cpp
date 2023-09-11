@@ -307,6 +307,19 @@ GroupWriter::GroupWriter(Group& group, Durability dura, WriteMarker* write_marke
     m_backoff = 0;
 }
 
+
+void GroupWriter::sync_according_to_durability()
+{
+    switch (m_durability) {
+        case Durability::Full:
+        case Durability::Unsafe:
+            m_window_mgr.sync_all_mappings();
+            break;
+        case Durability::MemOnly:
+            m_window_mgr.flush_all_mappings();
+    }
+}
+
 GroupWriter::~GroupWriter() = default;
 
 size_t GroupWriter::get_file_size() const noexcept

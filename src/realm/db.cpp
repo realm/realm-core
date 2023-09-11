@@ -2509,23 +2509,12 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         m_locked_space = out.get_locked_space_size();
         m_used_space = out.get_logical_size() - m_free_space;
         m_evac_stage.store(EvacStage(out.get_evacuation_stage()));
-        switch (Durability(info->durability)) {
-            case Durability::Full:
-            case Durability::Unsafe:
-                if (commit_to_disk) {
-                    out.commit(new_top_ref); // Throws
-                }
-                else {
-                    out.sync_all_mappings();
-                }
-                break;
-            case Durability::MemOnly:
-                // In Durability::MemOnly mode, we just use the file as backing for
-                // the shared memory. So we never actually sync the data to disk
-                // (the OS may do so opportinisticly, or when swapping).
-                // however, we still need to flush any private caches into the buffer cache
-                out.flush_all_mappings();
-                break;
+        out.sync_according_to_durability();
+        if (Durability(info->durability) == Durability::Full || Durability(info->durability) == Durability::Unsafe) {
+            if (commit_to_disk) {
+                GroupComitter cm(transaction, Durability(info->durability), m_marker_observer.get());
+                cm.commit(new_top_ref);
+            }
         }
         size_t new_file_size = out.get_logical_size();
         // We must reset the allocators free space tracking before communicating the new

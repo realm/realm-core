@@ -193,6 +193,7 @@ public:
             }
         }
     }
+    void sync_according_to_durability();
 
 private:
     friend class InMemoryWriter;
