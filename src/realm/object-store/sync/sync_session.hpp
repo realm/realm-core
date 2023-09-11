@@ -280,6 +280,7 @@ public:
     class Internal {
         friend class _impl::RealmCoordinator;
         friend struct OnlyForTesting;
+        friend class AsyncOpenTask;
 
         static void nonsync_transact_notify(SyncSession& session, VersionID::version_type version)
         {
@@ -289,6 +290,11 @@ public:
         static std::shared_ptr<DB> get_db(SyncSession& session)
         {
             return session.m_db;
+        }
+
+        static void set_sync_schema_migration_callback(SyncSession& session, std::function<void()>&& callback)
+        {
+            session.set_sync_schema_migration_callback(std::move(callback));
         }
 
         static util::Future<void> pause_async(SyncSession& session);
@@ -396,6 +402,8 @@ private:
 
     void nonsync_transact_notify(VersionID::version_type) REQUIRES(!m_state_mutex);
 
+    void set_sync_schema_migration_callback(std::function<void()>&&) REQUIRES(!m_state_mutex);
+
     void create_sync_session() REQUIRES(m_state_mutex, !m_config_mutex);
     void did_drop_external_reference()
         REQUIRES(!m_state_mutex, !m_config_mutex, !m_external_reference_mutex, !m_connection_state_mutex);
@@ -429,6 +437,8 @@ private:
     util::Future<std::string> send_test_command(std::string body) REQUIRES(!m_state_mutex);
 
     std::function<TransactionCallback> m_sync_transact_callback GUARDED_BY(m_state_mutex);
+
+    std::function<void()> m_sync_schema_migration_callback GUARDED_BY(m_state_mutex);
 
     template <typename Field>
     auto config(Field f) REQUIRES(!m_config_mutex)

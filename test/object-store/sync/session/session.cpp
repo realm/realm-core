@@ -312,8 +312,7 @@ TEST_CASE("SyncSession: internal pause_async API", "[sync][session]") {
     TestSyncManager init_sync_manager;
     auto app = init_sync_manager.app();
     auto user = app->sync_manager()->get_user("close-api-tests-user", ENCODE_FAKE_JWT("fake_refresh_token"),
-                                              ENCODE_FAKE_JWT("fake_access_token"), "https://realm.example.org",
-                                              dummy_device_id);
+                                              ENCODE_FAKE_JWT("fake_access_token"), dummy_device_id);
 
     auto session = sync_session(
         user, "/test-close-for-active", [](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded);

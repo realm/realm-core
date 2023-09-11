@@ -490,6 +490,7 @@ private:
             {"RefreshUser", action::RefreshUser},
             {"RefreshLocation", action::RefreshLocation},
             {"LogOutUser", action::LogOutUser},
+            {"MigrateSchema", action::MigrateSchema},
         };
 
         if (auto action_it = mapping.find(action_string); action_it != mapping.end()) {

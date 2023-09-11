@@ -271,6 +271,7 @@ struct ProtocolErrorInfo {
         RefreshUser,
         RefreshLocation,
         LogOutUser,
+        MigrateSchema,
     };
 
     ProtocolErrorInfo() = default;
@@ -364,6 +365,8 @@ enum class ProtocolError {
     migrate_to_flx               = RLM_SYNC_ERR_SESSION_MIGRATE_TO_FLX,             // Server migrated from PBS to FLX - migrate client to FLX (BIND)
     bad_progress                 = RLM_SYNC_ERR_SESSION_BAD_PROGRESS,               // Bad progress information (ERROR)
     revert_to_pbs                = RLM_SYNC_ERR_SESSION_REVERT_TO_PBS,              // Server rolled back to PBS after FLX migration - revert FLX client migration (BIND)
+    bad_schema_version           = RLM_SYNC_ERR_SESSION_BAD_SCHEMA_VERSION,         // Client tried to open a session with an invalid schema version (BIND)
+    schema_version_changed       = RLM_SYNC_ERR_SESSION_SCHEMA_VERSION_CHANGED,     // Client opened a session with a new valid schema version - migrate client to use new schema version (BIND)
 
     // clang-format on
 };
@@ -441,6 +444,8 @@ inline std::ostream& operator<<(std::ostream& o, ProtocolErrorInfo::Action actio
             return o << "RefreshLocation";
         case ProtocolErrorInfo::Action::LogOutUser:
             return o << "LogOutUser";
+        case ProtocolErrorInfo::Action::MigrateSchema:
+            return o << "MigrateSchema";
     }
     return o << "Invalid error action: " << int64_t(action);
 }
