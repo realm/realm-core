@@ -4265,7 +4265,6 @@ private:
 };
 } // namespace realm::util
 
-#if 0
 TEST_CASE("Concurrent commits") {
     TestFile config;
     config.schema_version = 1;
@@ -4307,7 +4306,7 @@ TEST_CASE("Concurrent commits") {
         shed->idle(runner, [](uv_idle_t* handle) {
             auto done = static_cast<Runner*>(handle->data)->step();
             if (done) {
-                uv_idle_stop(handle);
+                uv_stop(handle->loop);
             }
         });
         shed->run();
@@ -4319,7 +4318,7 @@ TEST_CASE("Concurrent commits") {
 
     std::thread t0(func);
 
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     int commit_nr = 0;
     for (int i = 0; i < 10; i++) {
@@ -4336,5 +4335,4 @@ TEST_CASE("Concurrent commits") {
     runner->stop();
     t0.join();
 }
-#endif
 #endif
