@@ -169,7 +169,7 @@ const char* ErrorCategory::name() const noexcept
 std::string ErrorCategory::message(int value) const
 {
     switch (Errors(value)) {
-        case Errors::certificate_rejected:
+        case Errors::tls_handshake_failed:
             return "SSL certificate rejected"; // Throws
     }
     REALM_ASSERT(false);
@@ -180,28 +180,15 @@ std::string ErrorCategory::message(int value) const
 bool ErrorCategory::equivalent(const std::error_code& ec, int condition) const noexcept
 {
     switch (Errors(condition)) {
-        case Errors::certificate_rejected:
+        case Errors::tls_handshake_failed:
 #if REALM_HAVE_OPENSSL
-            if (ec.category() == openssl_error_category) {
-                // FIXME: Why use string comparison here? Seems like it would
-                // suffice to compare the underlying numerical error codes.
-                std::string message = ec.message();
-                return ((message == "certificate verify failed" || message == "sslv3 alert bad certificate" ||
-                         message == "sslv3 alert certificate expired" ||
-                         message == "sslv3 alert certificate revoked"));
-            }
+            return ec.category() == openssl_error_category;
 #elif REALM_HAVE_SECURE_TRANSPORT
-            if (ec.category() == secure_transport_error_category) {
-                switch (ec.value()) {
-                    case errSSLXCertChainInvalid:
-                        return true;
-                    default:
-                        break;
-                }
-            }
-#endif
+            return ec.category() == secure_transport_error_category;
+#else
             static_cast<void>(ec);
             return false;
+#endif
     }
     return false;
 }
@@ -220,11 +207,12 @@ const char* OpensslErrorCategory::name() const noexcept
 
 std::string OpensslErrorCategory::message(int value) const
 {
+    const char* message = "Unknown error";
 #if REALM_HAVE_OPENSSL
     if (const char* s = ERR_reason_error_string(value))
-        return std::string(s); // Throws
+        message = s;
 #endif
-    return "Unknown OpenSSL error (" + util::to_string(value) + ")"; // Throws
+    return util::format("OpenSSL error: %1 (%2)", message, value); // Throws
 }
 
 
@@ -239,18 +227,19 @@ const char* SecureTransportErrorCategory::name() const noexcept
 
 std::string SecureTransportErrorCategory::message(int value) const
 {
+    std::string message = "Unknown error";
 #if REALM_HAVE_SECURE_TRANSPORT
 #if __has_builtin(__builtin_available)
     if (__builtin_available(iOS 11.3, macOS 10.3, tvOS 11.3, watchOS 4.3, *)) {
         auto status = OSStatus(value);
         void* reserved = nullptr;
-        if (auto message = adoptCF(SecCopyErrorMessageString(status, reserved)))
-            return cfstring_to_std_string(message.get());
+        if (auto cf_message = adoptCF(SecCopyErrorMessageString(status, reserved)))
+            message = cfstring_to_std_string(cf_message.get());
     }
 #endif // __has_builtin(__builtin_available)
 #endif // REALM_HAVE_SECURE_TRANSPORT
 
-    return std::string("Unknown SecureTransport error (") + util::to_string(value) + ")"; // Throws
+    return util::format("SecureTransport error: %1 (%2)", message, value); // Throws
 }
 
 
@@ -1206,7 +1195,7 @@ std::pair<OSStatus, std::size_t> Stream::do_ssl_handshake() noexcept
         return {status, 0};
     }
 
-    // Verification suceeded. Resume the handshake.
+    // Verification succeeded. Resume the handshake.
     return do_ssl_handshake();
 }
 

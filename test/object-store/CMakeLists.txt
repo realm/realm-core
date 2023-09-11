@@ -45,7 +45,8 @@ if (REALM_ENABLE_GEOSPATIAL)
 endif()
 
 file(GLOB RESOURCES RELATIVE ${CMAKE_CURRENT_BINARY_DIR}
-     "*.realm")
+    ../*.pem
+     *.realm)
 
 if(REALM_ENABLE_AUTH_TESTS)
     list(APPEND SOURCES util/sync/baas_admin_api.cpp)
