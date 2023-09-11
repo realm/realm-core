@@ -2021,7 +2021,7 @@ void Session::send_upload_message()
         // Nothing more to upload right now
         check_for_upload_completion(); // Throws
         // If we need to limit upload up to some version other than the last client version available and there are no
-        // changes to upload, then there is no point in sending an empty message.
+        // changes to upload, then there is no need to send an empty message.
         if (target_upload_version != m_upload_target_version) {
             // Other messages may be waiting to be sent
             return enlist_to_send(); // Throws
@@ -2697,6 +2697,12 @@ Status ClientImpl::Session::check_received_sync_progress(const SyncProgress& pro
                                "of the download cursor cannot be greater than the latest client version integrated "
                                "on the server (download: %1, upload: %2)",
                                b.download.last_integrated_client_version, b.upload.client_version);
+    }
+    if (b.download.server_version < b.upload.last_integrated_server_version) {
+        message = util::format(
+            "The server version of the download cursor cannot be less than the server version integrated in the "
+            "latest client version acknowledged by the server (download: %1, upload: %2)",
+            b.download.server_version, b.upload.last_integrated_server_version);
     }
 
     if (message.empty()) {
