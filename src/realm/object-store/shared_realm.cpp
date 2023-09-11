@@ -330,6 +330,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
     REALM_COMPILER_HINT_UNREACHABLE();
 }
 
+// Schema version is not allowed to decrease for local realms.
 void Realm::verify_schema_version_not_decreasing(uint64_t version)
 {
 #if REALM_ENABLE_SYNC

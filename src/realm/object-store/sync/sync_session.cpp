@@ -746,7 +746,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                 std::function<void()> callback;
                 {
                     util::CheckedLockGuard l(m_state_mutex);
-                    callback = m_sync_schema_migration_callback;
+                    callback = std::move(m_sync_schema_migration_callback);
                 }
                 if (callback) {
                     callback();
