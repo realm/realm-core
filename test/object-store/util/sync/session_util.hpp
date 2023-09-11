@@ -98,15 +98,19 @@ inline std::string conn_id_for_realm(const SharedRealm& realm)
     return SyncSession::OnlyForTesting::get_appservices_connection_id(*realm->sync_session());
 }
 
+inline void require_no_error(std::shared_ptr<SyncSession>, SyncError error)
+{
+    FAIL(util::format("Unexpected sync error: %1", error.simple_message));
+}
+
 // Convenience function for creating and configuring sync sessions for test use.
 // Many of the optional arguments can be used to pass information about the
 // session back out to the test, or configure the session more precisely.
-template <typename ErrorHandler>
-std::shared_ptr<SyncSession>
-sync_session(std::shared_ptr<SyncUser> user, const std::string& path, ErrorHandler&& error_handler,
-             SyncSessionStopPolicy stop_policy = SyncSessionStopPolicy::AfterChangesUploaded,
-             std::string* on_disk_path = nullptr, util::Optional<Schema> schema = none,
-             Realm::Config* out_config = nullptr)
+template <typename ErrorHandler = decltype(&require_no_error)>
+std::shared_ptr<SyncSession> sync_session(
+    std::shared_ptr<SyncUser> user, const std::string& path, ErrorHandler&& error_handler = &require_no_error,
+    SyncSessionStopPolicy stop_policy = SyncSessionStopPolicy::AfterChangesUploaded,
+    std::string* on_disk_path = nullptr, util::Optional<Schema> schema = none, Realm::Config* out_config = nullptr)
 {
     SyncTestFile config(SyncConfig{user, path}, std::move(stop_policy), std::forward<ErrorHandler>(error_handler));
 
