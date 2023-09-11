@@ -232,7 +232,7 @@ WriteWindowMgr::WriteWindowMgr(SlabAlloc& alloc, Durability dura, WriteMarker* w
 #endif
 }
 
-GroupComitter::GroupComitter(Group& group, Durability dura, WriteMarker* write_marker)
+GroupCommitter::GroupCommitter(Group& group, Durability dura, WriteMarker* write_marker)
     : m_group(group)
     , m_alloc(group.m_alloc)
     , m_durability(dura)
@@ -240,7 +240,7 @@ GroupComitter::GroupComitter(Group& group, Durability dura, WriteMarker* write_m
 {
 }
 
-GroupComitter::~GroupComitter() = default;
+GroupCommitter::~GroupCommitter() = default;
 
 GroupWriter::GroupWriter(Group& group, Durability dura, WriteMarker* write_marker)
     : m_group(group)
@@ -1369,7 +1369,7 @@ void GroupWriter::write_array_at(T* translator, ref_type ref, const char* data, 
 }
 
 
-void GroupComitter::commit(ref_type new_top_ref)
+void GroupCommitter::commit(ref_type new_top_ref)
 {
     using _impl::SimulatedFailure;
     SimulatedFailure::trigger(SimulatedFailure::group_writer__commit); // Throws

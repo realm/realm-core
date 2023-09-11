@@ -2512,7 +2512,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         out.sync_according_to_durability();
         if (Durability(info->durability) == Durability::Full || Durability(info->durability) == Durability::Unsafe) {
             if (commit_to_disk) {
-                GroupComitter cm(transaction, Durability(info->durability), m_marker_observer.get());
+                GroupCommitter cm(transaction, Durability(info->durability), m_marker_observer.get());
                 cm.commit(new_top_ref);
             }
         }

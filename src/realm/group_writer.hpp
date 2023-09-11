@@ -87,12 +87,12 @@ protected:
     util::WriteMarker* m_write_marker = nullptr;
 };
 
-class GroupComitter {
+class GroupCommitter {
 public:
     using Durability = DBOptions::Durability;
     using MapWindow = WriteWindowMgr::MapWindow;
-    GroupComitter(Group&, Durability dura = Durability::Full, util::WriteMarker* write_marker = nullptr);
-    ~GroupComitter();
+    GroupCommitter(Group&, Durability dura = Durability::Full, util::WriteMarker* write_marker = nullptr);
+    ~GroupCommitter();
     /// Flush changes to physical medium, then write the new top ref
     /// to the file header, then flush again. Pass the top ref
     /// returned by write_group().
