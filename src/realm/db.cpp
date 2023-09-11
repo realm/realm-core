@@ -2482,6 +2482,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
 
     GroupWriter out(transaction, Durability(info->durability), m_marker_observer.get()); // Throws
     out.set_versions(new_version, top_refs, any_new_unreachables);
+    out.check_evacuation();
     auto t1 = std::chrono::steady_clock::now();
     auto commit_size = m_alloc.get_commit_size();
     if (m_logger) {

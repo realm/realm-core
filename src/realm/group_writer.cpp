@@ -295,39 +295,6 @@ GroupWriter::GroupWriter(Group& group, Durability dura, WriteMarker* write_marke
     }
     m_evacuation_limit = 0;
     m_backoff = 0;
-    if (top.size() > Group::s_evacuation_point_ndx) {
-        if (auto val = top.get(Group::s_evacuation_point_ndx)) {
-            Array arr(m_alloc);
-            if (val & 1) {
-                m_evacuation_limit = size_t(val >> 1);
-                arr.create(Node::type_Normal);
-                arr.add(uint64_t(m_evacuation_limit));
-                arr.add(0); // Backoff = false
-                top.set_as_ref(Group::s_evacuation_point_ndx, arr.get_ref());
-            }
-            else {
-                arr.init_from_ref(to_ref(val));
-                auto sz = arr.size();
-                REALM_ASSERT(sz >= 2);
-                m_evacuation_limit = size_t(arr.get(0));
-                m_backoff = arr.get(1);
-                if (m_backoff > 0) {
-                    --m_backoff;
-                }
-                else {
-                    for (size_t i = 2; i < sz; i++) {
-                        m_evacuation_progress.push_back(size_t(arr.get(i)));
-                    }
-                }
-                // We give up if the freelists were allocated above the evacuation limit
-                if (m_evacuation_limit > 0 && free_positions_ref > m_evacuation_limit) {
-                    // Wait 10 commits until trying again
-                    m_backoff = 10;
-                    m_evacuation_limit = 0;
-                }
-            }
-        }
-    }
 }
 
 GroupWriter::~GroupWriter() = default;
@@ -611,6 +578,44 @@ void GroupWriter::backdate()
 #endif
     for (auto&& entry : m_not_free_in_file) {
         backdate_single_entry(entry);
+    }
+}
+
+void GroupWriter::check_evacuation()
+{
+    Array& top = m_group.m_top;
+    if (top.size() > Group::s_evacuation_point_ndx) {
+        if (auto val = top.get(Group::s_evacuation_point_ndx)) {
+            Array arr(m_alloc);
+            if (val & 1) {
+                m_evacuation_limit = size_t(val >> 1);
+                arr.create(Node::type_Normal);
+                arr.add(uint64_t(m_evacuation_limit));
+                arr.add(0); // Backoff = false
+                top.set_as_ref(Group::s_evacuation_point_ndx, arr.get_ref());
+            }
+            else {
+                arr.init_from_ref(to_ref(val));
+                auto sz = arr.size();
+                REALM_ASSERT(sz >= 2);
+                m_evacuation_limit = size_t(arr.get(0));
+                m_backoff = arr.get(1);
+                if (m_backoff > 0) {
+                    --m_backoff;
+                }
+                else {
+                    for (size_t i = 2; i < sz; i++) {
+                        m_evacuation_progress.push_back(size_t(arr.get(i)));
+                    }
+                }
+                // We give up if the freelists were allocated above the evacuation limit
+                if (m_evacuation_limit > 0 && m_free_positions.get_ref() > m_evacuation_limit) {
+                    // Wait 10 commits until trying again
+                    m_backoff = 10;
+                    m_evacuation_limit = 0;
+                }
+            }
+        }
     }
 }
 

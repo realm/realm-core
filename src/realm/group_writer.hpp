@@ -153,6 +153,9 @@ public:
         return m_free_positions.size() * size_per_free_list_entry();
     }
 
+    /// Check if evacuation is in progress
+    void check_evacuation();
+
     std::vector<size_t>& get_evacuation_progress()
     {
         return m_evacuation_progress;
