@@ -30,6 +30,8 @@
 ### Enhancements
 * Add a distinct error code for timeouts (SyncConnectTimeout) rather than using the same one as for less transient failures ([PR #6932](https://github.com/realm/realm-core/pull/6932)).
 * Allow arguments to RQL to be a string representation of a geospatial object for GEOWITHIN queries. This enables SDKs using the CAPI to marshal geo objects to strings. ([PR 6934](https://github.com/realm/realm-core/issues/6934))
+* Throw an exception if `File::unlock` has failed, in order to inform the SDK that we are likely hitting some limitation on the OS filesystem, instead of crashing  the application and use the same file locking logic for all the platforms.([PR #6926](https://github.com/realm/realm-core/pull/6926))
+
 
 ### Fixed
 * None.
