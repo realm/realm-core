@@ -2548,6 +2548,17 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
         return Status::OK();
     }
 
+    if (protocol_error == ProtocolError::schema_version_changed) {
+        // Enable upload immediately if the session is still active.
+        if (m_state == Active) {
+            m_allow_upload = true;
+            // Notify SyncSession a schema migration is required.
+            on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{info});
+        }
+        // Keep the session active to upload any unsynced changes.
+        return Status::OK();
+    }
+
     m_error_message_received = true;
     suspend(SessionErrorInfo{info, std::move(status)});
     return Status::OK();

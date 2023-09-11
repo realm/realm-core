@@ -742,6 +742,16 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                 next_state = NextStateAfterError::inactive;
                 log_out_user = true;
                 break;
+            case sync::ProtocolErrorInfo::Action::MigrateSchema:
+                std::function<void()> callback;
+                {
+                    util::CheckedLockGuard l(m_state_mutex);
+                    callback = std::move(m_sync_schema_migration_callback);
+                }
+                if (callback) {
+                    callback();
+                }
+                return; // do not propgate the error to the user at this point
         }
     }
     else {
@@ -893,6 +903,7 @@ void SyncSession::create_sync_session()
     session_config.proxy_config = sync_config.proxy_config;
     session_config.simulate_integration_error = sync_config.simulate_integration_error;
     session_config.flx_bootstrap_batch_size_bytes = sync_config.flx_bootstrap_batch_size_bytes;
+    session_config.schema_version = m_config.schema_version;
     session_config.session_reason = ClientResetOperation::is_fresh_path(m_config.path)
                                         ? sync::SessionReason::ClientReset
                                         : sync::SessionReason::Sync;
@@ -1001,6 +1012,12 @@ void SyncSession::set_sync_transact_callback(std::function<sync::Session::SyncTr
 {
     util::CheckedLockGuard l(m_state_mutex);
     m_sync_transact_callback = std::move(callback);
+}
+
+void SyncSession::set_sync_schema_migration_callback(std::function<void()>&& callback)
+{
+    util::CheckedLockGuard l(m_state_mutex);
+    m_sync_schema_migration_callback = std::move(callback);
 }
 
 void SyncSession::nonsync_transact_notify(sync::version_type version)
