@@ -563,8 +563,9 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
             break;
         }
         case WebSocketError::websocket_tls_handshake_failed: {
-            close_due_to_client_side_error(Status(ErrorCodes::TlsHandshakeFailed, msg), IsFatal{false},
-                                           ConnectionTerminationReason::ssl_certificate_rejected); // Throws
+            close_due_to_client_side_error(
+                Status(ErrorCodes::TlsHandshakeFailed, util::format("TLS handshake failed: %1", msg)), IsFatal{false},
+                ConnectionTerminationReason::ssl_certificate_rejected); // Throws
             break;
         }
         case WebSocketError::websocket_client_too_old:

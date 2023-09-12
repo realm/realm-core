@@ -27,11 +27,10 @@
 #include <realm/table.hpp>
 #include <realm/timestamp.hpp>
 #include <realm/util/base64.hpp>
-#include <realm/table.hpp>
 
 #include <cctype>
 #include <cmath>
-
+#include <iomanip>
 
 namespace realm {
 
