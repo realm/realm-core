@@ -909,7 +909,12 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
     REALM_ASSERT(path.size());
 
     m_db_path = path;
+
+    // Derive an id for this DB to be used in logging. We will just use some bits from the pointer.
+    // The path cannot be used as this would not allow us to distinguish between two DBs opening
+    // the same realm.
     m_path_hash = (size_t(this) >> 4) & 0xffff;
+
     set_logger(options.logger);
     if (m_replication) {
         m_replication->set_logger(m_logger.get());

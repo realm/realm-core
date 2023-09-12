@@ -4177,162 +4177,64 @@ TEST_CASE("KeyPathMapping generation") {
     }
 }
 
-#if REALM_HAVE_UV
-namespace realm::util {
-class UvLoopScheduler final : public util::Scheduler {
-public:
-    UvLoopScheduler()
-        : m_loop(std::make_unique<uv_loop_t>())
-        , m_handle(std::make_unique<uv_async_t>())
-    {
-        uv_loop_init(m_loop.get());
-        int err = uv_async_init(m_loop.get(), m_handle.get(), [](uv_async_t* handle) {
-            if (!handle->data) {
-                return;
+TEST_CASE("Concurrent operations") {
+    SECTION("Async commits together with online compaction") {
+        // This is a reproduction test for issue https://github.com/realm/realm-dart/issues/1396
+        // First create a relatively large realm, then delete the content and do some more
+        // commits using async commits. If a compaction is started when doing an async commit
+        // then the subsequent committing done in the helper thread will illegally COW the
+        // top array. When the next mutation is done, the top array will be reported as being
+        // already freed.
+        TestFile config;
+        config.schema_version = 1;
+        config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
+
+        auto realm_1 = Realm::get_shared_realm(config);
+        Results res(realm_1, realm_1->read_group().get_table("class_object")->where());
+        auto realm_2 = Realm::get_shared_realm(config);
+
+        {
+            // Create a lot of objects
+            realm_2->begin_transaction();
+            auto table = realm_2->read_group().get_table("class_object");
+            for (int i = 0; i < 400000; i++) {
+                table->create_object().set("value", i);
             }
-            auto& data = *static_cast<Data*>(handle->data);
-            if (data.close_requested) {
-                uv_close(reinterpret_cast<uv_handle_t*>(handle), [](uv_handle_t* handle) {
-                    delete reinterpret_cast<Data*>(handle->data);
-                    delete reinterpret_cast<uv_async_t*>(handle);
+            realm_2->commit_transaction();
+        }
+
+        int commit_1 = 0;
+        int commit_2 = 0;
+
+        for (int i = 0; i < 4; i++) {
+            realm_1->async_begin_transaction([&]() {
+                // Clearing the DB will reduce the need for space
+                // This will trigger an online compaction
+                // Before the fix, the probram would crash here next time around.
+                res.clear();
+                realm_1->async_commit_transaction([&](std::exception_ptr) {
+                    commit_1++;
                 });
-            }
-            else {
-                data.queue.invoke_all();
-            }
-        });
-        if (err < 0) {
-            throw std::runtime_error(util::format("uv_async_init failed: %1", uv_strerror(err)));
-        }
-        m_handle->data = new Data;
-    }
-
-    ~UvLoopScheduler()
-    {
-        if (m_handle && m_handle->data) {
-            static_cast<Data*>(m_handle->data)->close_requested = true;
-            uv_async_send(m_handle.get());
-            // Don't delete anything here as we need to delete it from within the event loop instead
-            m_handle.release();
-        }
-    }
-
-    bool is_on_thread() const noexcept override
-    {
-        return m_id == std::this_thread::get_id();
-    }
-    bool is_same_as(const Scheduler* other) const noexcept override
-    {
-        auto o = dynamic_cast<const UvLoopScheduler*>(other);
-        return (o && (o->m_id == m_id));
-    }
-    bool can_invoke() const noexcept override
-    {
-        return true;
-    }
-
-    void invoke(util::UniqueFunction<void()>&& fn) override
-    {
-        auto& data = *static_cast<Data*>(m_handle->data);
-        data.queue.push(std::move(fn));
-        uv_async_send(m_handle.get());
-    }
-    template <class F>
-    void idle(void* data, F fn)
-    {
-        idle_handle.data = data;
-        uv_idle_init(m_loop.get(), &idle_handle);
-        uv_idle_start(&idle_handle, fn);
-    }
-    void run()
-    {
-        uv_run(m_loop.get(), UV_RUN_DEFAULT);
-    }
-    void stop()
-    {
-        uv_stop(m_loop.get());
-    }
-
-private:
-    struct Data {
-        InvocationQueue queue;
-        std::atomic<bool> close_requested = {false};
-    };
-    std::unique_ptr<uv_loop_t> m_loop;
-    std::unique_ptr<uv_async_t> m_handle;
-    uv_idle_t idle_handle;
-    std::thread::id m_id = std::this_thread::get_id();
-};
-} // namespace realm::util
-
-TEST_CASE("Concurrent commits") {
-    TestFile config;
-    config.schema_version = 1;
-    config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
-
-    class Runner {
-    public:
-        Runner(SharedRealm r)
-            : m_realm(r)
-        {
-        }
-        bool step()
-        {
-            m_realm->async_begin_transaction([this]() {
-                auto table = m_realm->read_group().get_table("class_object");
-                for (int i = 0; i < 100000; i++) {
+            });
+            realm_2->async_begin_transaction([&]() {
+                // Make sure we will continue to have something to delete
+                auto table = realm_2->read_group().get_table("class_object");
+                for (int i = 0; i < 100; i++) {
                     table->create_object().set("value", i);
                 }
-                m_realm->async_commit_transaction();
+                realm_2->async_commit_transaction([&](std::exception_ptr) {
+                    commit_2++;
+                });
             });
-            return m_stop;
         }
-        void stop()
-        {
-            m_stop = true;
-        }
-    private:
-        SharedRealm m_realm;
-        bool m_stop = false;
-    };
 
-    Runner* runner;
-
-    auto func = [&config, &runner] {
-        auto shed = std::make_shared<util::UvLoopScheduler>();
-        config.scheduler = shed;
-        runner = new Runner(Realm::get_shared_realm(config));
-
-        shed->idle(runner, [](uv_idle_t* handle) {
-            auto done = static_cast<Runner*>(handle->data)->step();
-            if (done) {
-                uv_stop(handle->loop);
-            }
-        });
-        shed->run();
-    };
-
-    auto realm = Realm::get_shared_realm(config);
-    auto table = realm->read_group().get_table("class_object");
-    Results res(realm, table->where());
-
-    std::thread t0(func);
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-    int commit_nr = 0;
-    for (int i = 0; i < 10; i++) {
-        realm->async_begin_transaction([&]() {
-            res.clear();
-            realm->async_commit_transaction();
-            commit_nr++;
+        util::EventLoop::main().run_until([&] {
+            return commit_1 == 4 && commit_2 == 4;
         });
     }
-    util::EventLoop::main().run_until([&] {
-        return commit_nr == 4;
-    });
 
-    runner->stop();
-    t0.join();
+    SECTION("No open realms") {
+        // This is just to check that the section above did not leave any realms open
+        _impl::RealmCoordinator::assert_no_open_realms();
+    }
 }
-#endif
