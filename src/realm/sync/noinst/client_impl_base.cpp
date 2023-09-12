@@ -2024,6 +2024,8 @@ void Session::send_upload_message()
         // If we need to limit upload up to some version other than the last client version available and there are no
         // changes to upload, then there is no need to send an empty message.
         if (target_upload_version != m_upload_target_version) {
+            logger.debug("Empty UPLOAD was skipped (progress_client_version=%1, progress_server_version=%2)",
+                         m_upload_progress.client_version, m_upload_progress.last_integrated_server_version);
             // Other messages may be waiting to be sent
             return enlist_to_send(); // Throws
         }
