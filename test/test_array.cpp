@@ -1630,4 +1630,36 @@ NONCONCURRENT_TEST(Array_count)
     c.destroy();
 }
 
+TEST(DirectBitFields)
+{
+    uint64_t a[2];
+    a[0] = a[1] = 0;
+    {
+        bf_iterator it(a, 0, 7, 7, 8);
+        REALM_ASSERT(*it == 0);
+        auto it2(it);
+        ++it2;
+        *it2 = 127 + 128;
+        REALM_ASSERT(*it == 0);
+        ++it;
+        REALM_ASSERT(*it == 127);
+        ++it;
+        REALM_ASSERT(*it == 0);
+    }
+    // reverse polarity
+    a[0] = a[1] = -1ULL;
+    {
+        bf_iterator it(a, 0, 7, 7, 8);
+        REALM_ASSERT(*it == 127);
+        auto it2(it);
+        ++it2;
+        *it2 = 42 + 128;
+        REALM_ASSERT(*it == 127);
+        ++it;
+        REALM_ASSERT(*it == 42);
+        ++it;
+        REALM_ASSERT(*it == 127);
+    }
+}
+
 #endif // TEST_ARRAY

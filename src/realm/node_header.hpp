@@ -30,6 +30,7 @@ const size_t max_array_payload_aligned = 0x07ffffc0L; // Maximum number of bytes
 // the maximum allocation size is smaller as it must fit within a memory section
 // (a contiguous virtual address range). This limitation is enforced in SlabAlloc::do_alloc().
 
+// Newer array headers
 class NodeHeader {
 public:
     enum Type {
@@ -50,11 +51,14 @@ public:
     };
 
     enum WidthType {
+        // The first 3 encodings where the only one used as far as Core v13.
         wtype_Bits = 0,     // width indicates how many bits every element occupies
         wtype_Multiply = 1, // width indicates how many bytes every element occupies
         wtype_Ignore = 2,   // each element is 1 byte
-        // the following encodings use the width field (bits 0-2) of byte 4 to specify layouts.
-        // byte 5 of the header holds one or two element sizes.
+        // The following encodings were added to provide better compression of integral values.
+        // These encodings use the width field (bits 0-2) of byte 4 to specify layouts.
+        // byte 5 of the header holds one or two element sizes. These new element size encodings
+        // are given below.
         // byte 6 and 7 holds one or two array sizes (element counts).
         //
         // the header stores enough data to a) compute the total size of a block,
@@ -168,7 +172,8 @@ public:
         h[4] = uchar((int(h[4]) & ~0x20) | int(value) << 5);
     }
 
-
+    // Element width encoding:
+    //
     // For wtype lower than wtype_extend, the element width is given by
     // bits 0-2 in byte 4 of the header and only powers of two is supported:
     //   0,1,2,4,8,16,32,64.
@@ -184,8 +189,8 @@ public:
     // 3            -> 4
     // 4            -> 5
     // 5            -> 6
-    // 6            -> 8
-    // 7            -> 10
+    // 6            -> 8 (+2)
+    // 7            -> 10 (+2)
     // 8            -> 12 (+2)
     // 9            -> 16 (+4)
     // 10           -> 20 (+4)
