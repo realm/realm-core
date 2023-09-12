@@ -323,6 +323,7 @@ TEST_CASE("audit object serialization", "[sync][pbs][audit]") {
     auto serializer = std::make_shared<CustomSerializer>();
     config.audit_config->serializer = serializer;
     config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(util::Logger::get_default_logger());
+    config.audit_config->logger->set_level_threshold(AUDIT_LOG_LEVEL);
     auto realm = Realm::get_shared_realm(config);
     auto audit = realm->audit_context();
     REQUIRE(audit);
@@ -1508,8 +1509,9 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
         {"object", {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
     };
     config.audit_config = std::make_shared<AuditConfig>();
-    auto logger = util::Logger::get_default_logger();
-    config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(logger);
+    auto logger = std::make_shared<util::ThreadSafeLogger>(util::Logger::get_default_logger());
+    logger->set_level_threshold(AUDIT_LOG_LEVEL);
+    config.audit_config->logger = logger;
     auto realm = Realm::get_shared_realm(config);
     auto audit = realm->audit_context();
     REQUIRE(audit);
@@ -1612,7 +1614,7 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
         // Open a different Realm with the same user and audit prefix
         SyncTestFile config(test_session.app(), "other");
         config.audit_config = std::make_shared<AuditConfig>();
-        config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(logger);
+        config.audit_config->logger = logger;
         auto realm = Realm::get_shared_realm(config);
         auto audit2 = realm->audit_context();
         REQUIRE(audit2);
@@ -1639,7 +1641,7 @@ TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
         // Open the same Realm with a different audit prefix
         SyncTestFile config(test_session.app(), "parent");
         config.audit_config = std::make_shared<AuditConfig>();
-        config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(logger);
+        config.audit_config->logger = logger;
         config.audit_config->partition_value_prefix = "other";
         auto realm = Realm::get_shared_realm(config);
         auto audit2 = realm->audit_context();
@@ -1697,6 +1699,7 @@ TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
     config.schema = schema;
     config.audit_config = std::make_shared<AuditConfig>();
     config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(util::Logger::get_default_logger());
+    config.audit_config->logger->set_level_threshold(AUDIT_LOG_LEVEL);
 
     auto expect_error = [&](auto&& config, auto&& fn) -> SyncError {
         std::mutex mutex;

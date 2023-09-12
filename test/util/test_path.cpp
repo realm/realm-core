@@ -327,8 +327,7 @@ std::shared_ptr<DB> get_test_db(const std::string& path, const char* crypt_key)
     }
 
     DBOptions options;
-    options.logger = util::Logger::get_default_logger();
-    util::Logger::set_default_level_threshold(core_log_level);
+    options.logger = std::make_shared<util::StderrLogger>(core_log_level);
     options.encryption_key = crypt_key;
     return DB::create(make_in_realm_history(), path, options);
 }
