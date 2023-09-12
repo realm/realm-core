@@ -57,25 +57,24 @@ public:
 using TopRefMap = std::map<uint64_t, VersionInfo>;
 using VersionVector = std::vector<uint64_t>;
 
-class GroupComitter {
+class WriteWindowMgr {
 public:
     using Durability = DBOptions::Durability;
-    GroupComitter(Group&, Durability dura = Durability::Full, util::WriteMarker* write_marker = nullptr);
-    ~GroupComitter();
-    /// Flush changes to physical medium, then write the new top ref
-    /// to the file header, then flush again. Pass the top ref
-    /// returned by write_group().
-    void commit(ref_type new_top_ref);
+    WriteWindowMgr(SlabAlloc& alloc, Durability dura, util::WriteMarker* write_marker);
     // Flush all cached memory mappings
     // Sync all cached memory mappings to disk - includes flush if needed
     void sync_all_mappings();
     // Flush all cached memory mappings from private to shared cache.
     void flush_all_mappings();
+    class MapWindow;
+    // Get a suitable memory mapping for later access:
+    // potentially adding it to the cache, potentially closing
+    // the least recently used and sync'ing it to disk
+    MapWindow* get_window(ref_type start_ref, size_t size);
 
 protected:
-    class MapWindow;
-    Group& m_group;
     SlabAlloc& m_alloc;
+    Durability m_durability;
     // Currently cached memory mappings. We keep as many as 16 1MB windows
     // open for writing. The allocator will favor sequential allocation
     // from a modest number of windows, depending upon fragmentation, so
@@ -85,19 +84,33 @@ protected:
     const static int num_map_windows = 16;
     std::vector<std::unique_ptr<MapWindow>> m_map_windows;
     size_t m_window_alignment;
-    util::WriteMarker* m_write_marker;
-    Durability m_durability;
+    util::WriteMarker* m_write_marker = nullptr;
+};
 
-    // Get a suitable memory mapping for later access:
-    // potentially adding it to the cache, potentially closing
-    // the least recently used and sync'ing it to disk
-    MapWindow* get_window(ref_type start_ref, size_t size);
+class GroupCommitter {
+public:
+    using Durability = DBOptions::Durability;
+    using MapWindow = WriteWindowMgr::MapWindow;
+    GroupCommitter(Group&, Durability dura = Durability::Full, util::WriteMarker* write_marker = nullptr);
+    ~GroupCommitter();
+    /// Flush changes to physical medium, then write the new top ref
+    /// to the file header, then flush again. Pass the top ref
+    /// returned by write_group().
+    void commit(ref_type new_top_ref);
+
+protected:
+    Group& m_group;
+    SlabAlloc& m_alloc;
+    Durability m_durability;
+    WriteWindowMgr m_window_mgr;
 };
 
 /// This class is not supposed to be reused for multiple write sessions. In
 /// particular, do not reuse it in case any of the functions throw.
-class GroupWriter : public GroupComitter, public _impl::ArrayWriterBase {
+class GroupWriter : public _impl::ArrayWriterBase {
 public:
+    using Durability = DBOptions::Durability;
+    using MapWindow = WriteWindowMgr::MapWindow;
     enum class EvacuationStage { idle, evacuating, waiting, blocked };
     // For groups in transactional mode (Group::m_is_shared), this constructor
     // must be called while a write transaction is in progress.
@@ -153,8 +166,8 @@ public:
         return m_free_positions.size() * size_per_free_list_entry();
     }
 
-    /// Check if evacuation is in progress
-    void check_evacuation();
+    /// Prepare for a round of evacuation (if applicable)
+    void prepare_evacuation();
 
     std::vector<size_t>& get_evacuation_progress()
     {
@@ -180,6 +193,7 @@ public:
             }
         }
     }
+    void sync_according_to_durability();
 
 private:
     friend class InMemoryWriter;
@@ -199,6 +213,10 @@ private:
     static void move_free_in_file_to_size_map(const std::vector<GroupWriter::FreeSpaceEntry>& list,
                                               std::multimap<size_t, size_t>& size_map);
 
+    Group& m_group;
+    SlabAlloc& m_alloc;
+    Durability m_durability;
+    WriteWindowMgr m_window_mgr;
     Array m_free_positions; // 4th slot in Group::m_top
     Array m_free_lengths;   // 5th slot in Group::m_top
     Array m_free_versions;  // 6th slot in Group::m_top

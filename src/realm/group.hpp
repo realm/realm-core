@@ -834,7 +834,7 @@ private:
 
     friend class Table;
     friend class GroupWriter;
-    friend class GroupComitter;
+    friend class GroupCommitter;
     friend class DB;
     friend class _impl::GroupFriend;
     friend class metrics::QueryInfo;
