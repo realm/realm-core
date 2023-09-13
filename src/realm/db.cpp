@@ -909,7 +909,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
     REALM_ASSERT(path.size());
 
     m_db_path = path;
-    m_path_hash = StringData(path).hash() & 0xffff;
+
     set_logger(options.logger);
     if (m_replication) {
         m_replication->set_logger(m_logger.get());
@@ -1475,7 +1475,7 @@ void DB::open(Replication& repl, const std::string& file, const DBOptions& optio
 }
 class DBLogger : public Logger {
 public:
-    DBLogger(const std::shared_ptr<Logger>& base_logger, size_t hash) noexcept
+    DBLogger(const std::shared_ptr<Logger>& base_logger, unsigned hash) noexcept
         : Logger(base_logger)
         , m_hash(hash)
     {
@@ -1491,13 +1491,13 @@ protected:
     }
 
 private:
-    size_t m_hash;
+    unsigned m_hash;
 };
 
 void DB::set_logger(const std::shared_ptr<util::Logger>& logger) noexcept
 {
     if (logger)
-        m_logger = std::make_shared<DBLogger>(logger, m_path_hash);
+        m_logger = std::make_shared<DBLogger>(logger, m_log_id);
 }
 
 void DB::open(Replication& repl, const DBOptions options)
@@ -1507,6 +1507,11 @@ void DB::open(Replication& repl, const DBOptions options)
     set_replication(&repl);
 
     m_alloc.init_in_memory_buffer();
+
+    set_logger(options.logger);
+    m_replication->set_logger(m_logger.get());
+    if (m_logger)
+        m_logger->log(util::Logger::Level::detail, "Open memory-only realm");
 
     auto hist_type = repl.get_history_type();
     m_in_memory_info =
@@ -2311,6 +2316,10 @@ bool DB::do_try_begin_write()
 
 void DB::do_begin_write()
 {
+    if (m_logger) {
+        m_logger->log(util::Logger::Level::trace, "acquire writemutex");
+    }
+
     SharedInfo* info = m_info;
 
     // Get write lock - the write lock is held until do_end_write().
@@ -2369,6 +2378,9 @@ void DB::do_begin_write()
     // should take this situation into account by comparing with '>' instead of '!='
     info->next_served = my_ticket;
     finish_begin_write();
+    if (m_logger) {
+        m_logger->log(util::Logger::Level::trace, "writemutex acquired");
+    }
 }
 
 void DB::finish_begin_write()
@@ -2396,6 +2408,9 @@ void DB::do_end_write() noexcept
     m_write_transaction_open = false;
     m_pick_next_writer.notify_all();
     m_writemutex.unlock();
+    if (m_logger) {
+        m_logger->log(util::Logger::Level::trace, "writemutex released");
+    }
 }
 
 
@@ -2703,7 +2718,7 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
         tr->m_async_stage = Transaction::AsyncState::Requesting;
         tr->m_request_time_point = std::chrono::steady_clock::now();
         if (tr->db->m_logger) {
-            tr->db->m_logger->log(util::Logger::Level::trace, "Async request write lock");
+            tr->db->m_logger->log(util::Logger::Level::trace, "Tr %1: Async request write lock", tr->m_log_id);
         }
     }
     std::weak_ptr<Transaction> weak_tr = tr;
@@ -2718,7 +2733,7 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
             if (tr->db->m_logger) {
                 auto t2 = std::chrono::steady_clock::now();
                 tr->db->m_logger->log(
-                    util::Logger::Level::trace, "Got write lock in %1 us",
+                    util::Logger::Level::trace, "Tr %1, Got write lock in %2 us", tr->m_log_id,
                     std::chrono::duration_cast<std::chrono::microseconds>(t2 - tr->m_request_time_point).count());
             }
             if (tr->m_waiting_for_write_lock) {
@@ -2735,6 +2750,7 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
 
 inline DB::DB(const DBOptions& options)
     : m_upgrade_callback(std::move(options.upgrade_callback))
+    , m_log_id(util::gen_log_id(this))
 {
     if (options.enable_async_writes) {
         m_commit_helper = std::make_unique<AsyncCommitHelper>(this);

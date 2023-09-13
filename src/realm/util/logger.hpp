@@ -499,6 +499,11 @@ inline LocalThresholdLogger::LocalThresholdLogger(const std::shared_ptr<Logger>&
     REALM_ASSERT(m_chained_logger);
 }
 
+// Intended to be used to get a somewhat smaller number derived from 'this' pointer
+inline unsigned gen_log_id(void* p)
+{
+    return (size_t(p) >> 4) & 0xffff;
+}
 } // namespace realm::util
 
 #endif // REALM_UTIL_LOGGER_HPP
