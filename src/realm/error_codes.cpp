@@ -65,6 +65,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
             return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::sync_error);
 
         case SyncConnectFailed:
+        case SyncConnectTimeout:
         case SyncProtocolNegotiationFailed:
         case TlsHandshakeFailed:
             return ErrorCategory()
@@ -384,6 +385,7 @@ static const MapElem string_to_error_code[] = {
     {"SyncClientResetRequired", ErrorCodes::SyncClientResetRequired},
     {"SyncCompensatingWrite", ErrorCodes::SyncCompensatingWrite},
     {"SyncConnectFailed", ErrorCodes::SyncConnectFailed},
+    {"SyncConnectTimeout", ErrorCodes::SyncConnectTimeout},
     {"SyncInvalidSchemaChange", ErrorCodes::SyncInvalidSchemaChange},
     {"SyncPermissionDenied", ErrorCodes::SyncPermissionDenied},
     {"SyncProtocolInvariantFailed", ErrorCodes::SyncProtocolInvariantFailed},

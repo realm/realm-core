@@ -2463,7 +2463,9 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         // Cleanup any stale mappings
         m_alloc.purge_old_mappings(oldest_version, new_version);
     }
-
+    // save number of live versions for later:
+    // (top_refs is std::moved into GroupWriter so we'll loose it in the call to set_versions below)
+    auto live_versions = top_refs.size();
     // Do the actual commit
     REALM_ASSERT(oldest_version <= new_version);
 #if REALM_METRICS
@@ -2541,12 +2543,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         // must release m_mutex before this point to obey lock order
         std::lock_guard<InterprocessMutex> lock(m_controlmutex);
 
-        // this is not correct .. but what should we return instead?
-        // just returning the number of reachable versions is also misleading,
-        // because we retain a transaction history stretching all the way from
-        // oldest live version to newest version - even though we may have reclaimed
-        // individual versions within this range
-        info->number_of_versions = new_version - oldest_version + 1;
+        info->number_of_versions = live_versions + 1;
         info->latest_version_number = new_version;
 
         m_new_commit_available.notify_all();

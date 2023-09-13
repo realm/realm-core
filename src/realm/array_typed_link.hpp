@@ -19,9 +19,10 @@
 #ifndef REALM_ARRAY_TYPED_LINK_HPP
 #define REALM_ARRAY_TYPED_LINK_HPP
 
+#include <realm/array.hpp>
 #include <realm/data_type.hpp>
 #include <realm/keys.hpp>
-#include <realm/array.hpp>
+#include <realm/mixed.hpp>
 
 namespace realm {
 
