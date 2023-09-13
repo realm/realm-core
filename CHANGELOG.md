@@ -6,6 +6,28 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.20.1 Release notes
+
+### Enhancements
+* Throw an exception if `File::unlock` has failed, in order to inform the SDK that we are likely hitting some limitation on the OS filesystem, instead of crashing  the application and use the same file locking logic for all the platforms.([PR #6926](https://github.com/realm/realm-core/pull/6926))
+
+### Fixed
+* Fixed crash in slab allocator (Assertion failed: ref + size <= next->first) Many issues like ([#6340](https://github.com/realm/realm-core/issues/6340), since 13.0.0)
 * realm/sync/network/websocket_error.hpp was missing from the install package ([PR #6954](https://github.com/realm/realm-core/pull/6954), since v13.18.0).
 * DB::get_number_of_versions() will now report the number of versions alive in the realm file. Before it reported the number of versions committed since the oldest live version. Metrics get_num_available_versions() is changed accordingly.
 * When using OpenSSL (i.e. on non-Apple platforms) the `TlsHandshakeFailed` error code would never be reported and instead TLS errors would be reported as `SyncConnectFailed` ([PR #6938](https://github.com/realm/realm-core/pull/6938)).
@@ -33,8 +55,6 @@
 ### Enhancements
 * Add a distinct error code for timeouts (SyncConnectTimeout) rather than using the same one as for less transient failures ([PR #6932](https://github.com/realm/realm-core/pull/6932)).
 * Allow arguments to RQL to be a string representation of a geospatial object for GEOWITHIN queries. This enables SDKs using the CAPI to marshal geo objects to strings. ([PR 6934](https://github.com/realm/realm-core/issues/6934))
-* Throw an exception if `File::unlock` has failed, in order to inform the SDK that we are likely hitting some limitation on the OS filesystem, instead of crashing  the application and use the same file locking logic for all the platforms.([PR #6926](https://github.com/realm/realm-core/pull/6926))
-
 
 ### Fixed
 * None.
