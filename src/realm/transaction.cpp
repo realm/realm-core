@@ -279,7 +279,11 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
         remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false); // Throws
         return VersionID{version, new_read_lock.m_reader_idx};
     }
-    catch (...) {
+    catch (std::exception& e) {
+        if (db->m_logger) {
+            db->m_logger->log(util::Logger::Level::error, "Tr %1: Commit failed with exception: \"%2\"", m_log_id,
+                              e.what());
+        }
         // In case of failure, further use of the transaction for reading is unsafe
         set_transact_stage(DB::transact_Ready);
         throw;
@@ -725,7 +729,7 @@ void Transaction::complete_async_commit()
     try {
         read_lock = db->grab_read_lock(DB::ReadLockInfo::Live, VersionID());
         if (db->m_logger) {
-            db->m_logger->log(util::Logger::Level::trace, "Tr %1: Comitting ref %2 to disk", m_log_id,
+            db->m_logger->log(util::Logger::Level::trace, "Tr %1: Committing ref %2 to disk", m_log_id,
                               read_lock.m_top_ref);
         }
         GroupWriter out(*this);
@@ -738,8 +742,12 @@ void Transaction::complete_async_commit()
             m_oldest_version_not_persisted.reset();
         }
     }
-    catch (...) {
+    catch (const std::exception& e) {
         m_commit_exception = std::current_exception();
+        if (db->m_logger) {
+            db->m_logger->log(util::Logger::Level::error, "Tr %1: Committing to disk failed with exception: \"%2\"",
+                              m_log_id, e.what());
+        }
         m_async_commit_has_failed = true;
         db->release_read_lock(read_lock);
     }
