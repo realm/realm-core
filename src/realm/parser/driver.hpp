@@ -453,6 +453,7 @@ static std::string_view string_for_op(CompareType op)
         case CompareType::TEXT:
             return "text";
     }
+    return ""; // appease MSVC warnings
 }
 
 class CompareNode : public QueryNode {};
