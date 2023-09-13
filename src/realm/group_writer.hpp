@@ -33,7 +33,7 @@
 namespace realm {
 
 // Pre-declarations
-class Group;
+class Transaction;
 class SlabAlloc;
 
 class Reachable {
@@ -72,7 +72,7 @@ public:
     // information to the group, if it is not already present (6th and 7th entry
     // in Group::m_top).
     using Durability = DBOptions::Durability;
-    GroupWriter(Group&, Durability dura = Durability::Full, util::WriteMarker* write_marker = nullptr);
+    GroupWriter(Transaction&, Durability dura = Durability::Full, util::WriteMarker* write_marker = nullptr);
     ~GroupWriter();
 
     void set_versions(uint64_t current, TopRefMap& top_refs, bool any_num_unreachables) noexcept;
@@ -172,7 +172,7 @@ private:
                                               std::multimap<size_t, size_t>& size_map);
 
     class MapWindow;
-    Group& m_group;
+    Transaction& m_group;
     SlabAlloc& m_alloc;
     Array m_free_positions; // 4th slot in Group::m_top
     Array m_free_lengths;   // 5th slot in Group::m_top
