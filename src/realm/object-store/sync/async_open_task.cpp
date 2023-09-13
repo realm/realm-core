@@ -61,7 +61,8 @@ void AsyncOpenTask::start(AsyncOpenCallback async_open_complete)
         }
 
         auto config = coordinator->get_config();
-        if (config.sync_config && config.sync_config->flx_sync_requested) {
+        if (config.sync_config && config.sync_config->flx_sync_requested &&
+            config.sync_config->subscription_initializer) {
             const bool rerun_on_launch = config.sync_config->rerun_init_subscription_on_open;
             self->attach_to_subscription_initializer(std::move(async_open_complete), coordinator, rerun_on_launch);
         }
