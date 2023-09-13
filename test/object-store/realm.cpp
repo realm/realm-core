@@ -1193,8 +1193,9 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         task->start([&](auto ref, auto error) {
             std::lock_guard<std::mutex> lock(mutex);
             REQUIRE(error);
-            REQUIRE_EXCEPTION(std::rethrow_exception(error), HTTPError,
-                              "http error code considered fatal. Client Error: 403");
+            REQUIRE_EXCEPTION(
+                std::rethrow_exception(error), HTTPError,
+                "Unable to refresh the user access token: http error code considered fatal. Client Error: 403");
             REQUIRE(!ref);
             called = true;
         });

@@ -297,7 +297,7 @@ functions:
         export BAAS_HOST_NAME
 
         ssh_user="$(printf "ubuntu@%s" "$BAAS_HOST_NAME")"
-        ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i .baas_ssh_key"
+        ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i .baas_ssh_key"
 
         # Copy the baas_server.log and mongod.log files from the remote baas host
         REMOTE_PATH=/data/baas-remote/baas-work-dir
@@ -509,13 +509,11 @@ functions:
         export AWS_ACCESS_KEY_ID="${baas_secrets_aws_access_key}"
         export AWS_SECRET_ACCESS_KEY="${baas_secrets_aws_secret_key}"
         export BAAS_HOST_NAME="$BAAS_HOST_NAME"
-        export REALM_CORE_REVISION="${revision}"
         export GITHUB_KNOWN_HOSTS="github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk="
         EOF
 
         chmod 700 baas_host_vars.sh
         echo "baas remote host created: $BAAS_HOST_NAME"
-        echo "- using Realm Core revision: ${revision}"
 
   - command: shell.exec
     params:
@@ -864,7 +862,7 @@ tasks:
   commands:
   - func: "launch remote baas"
     vars:
-      baas_branch: 1a0d1c021460d2215b21bc4f7c7f668714ce81c7
+      baas_branch: 3f31617aacfe5d31b9057fc298b735b60acd6424
   - func: "compile"
     vars:
       target_to_build: ObjectStoreTests
