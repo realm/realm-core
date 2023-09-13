@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Update History Command tool to work with realms with fileformat v23 ([PR #6970](https://github.com/realm/realm-core/pull/6970))
 
 ----------------------------------------------
 
