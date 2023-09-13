@@ -3863,14 +3863,13 @@ TEST_CASE("flx: open realm + register subscription callack while bootstrapping",
                         promise.emplace_value(verify_subscription(Realm::get_shared_realm(std::move(ref))));
                 };
 
-            subscription_invoked = false;
             config.sync_config->subscription_initializer = init_subscription_callback_with_promise;
             auto async_open = Realm::get_synchronized_realm(config);
             async_open->start(open_realm_completed_callback);
             REQUIRE(open_realm_pf.future.get());
             REQUIRE(subscription_pf.future.get());
 
-            SECTION("subscription not run because realm alredy opened no error") {
+            SECTION("rerun on open = false. Subscription not run") {
                 subscription_invoked = false;
                 auto async_open = Realm::get_synchronized_realm(config);
                 auto open_realm_pf = util::make_promise_future<bool>();
@@ -3886,9 +3885,21 @@ TEST_CASE("flx: open realm + register subscription callack while bootstrapping",
                 REQUIRE_FALSE(subscription_invoked.load());
             }
 
-            SECTION("rerun on open set, but this is not the first time the file is opened") {
+            SECTION("rerun on open = true. Subscription not run cause realm already opened once") {
                 subscription_invoked = false;
+                auto realm = Realm::get_shared_realm(config);
+                auto init_subscription = [&subscription_invoked](std::shared_ptr<Realm> realm) mutable {
+                    REQUIRE(realm);
+                    auto table = realm->read_group().get_table("class_TopLevel");
+                    Query query(table);
+                    auto subscription = realm->get_latest_subscription_set();
+                    auto mutable_subscription = subscription.make_mutable_copy();
+                    mutable_subscription.insert_or_assign(query);
+                    mutable_subscription.commit();
+                    subscription_invoked.store(true);
+                };
                 config.sync_config->rerun_init_subscription_on_open = true;
+                config.sync_config->subscription_initializer = init_subscription;
                 auto async_open = Realm::get_synchronized_realm(config);
                 auto open_realm_pf = util::make_promise_future<bool>();
                 auto open_realm_completed_callback =
@@ -3901,14 +3912,12 @@ TEST_CASE("flx: open realm + register subscription callack while bootstrapping",
                 async_open->start(open_realm_completed_callback);
                 REQUIRE(open_realm_pf.future.get());
                 REQUIRE_FALSE(subscription_invoked.load());
+                REQUIRE(realm->get_latest_subscription_set().version() == 1);
+                REQUIRE(realm->get_active_subscription_set().version() == 1);
             }
         }
 
         SECTION("rerun on open set for multiple async open tasks (subscription runs only once)") {
-            config.sync_config->rerun_init_subscription_on_open = true;
-            auto open_task1_pf = util::make_promise_future<SharedRealm>();
-            auto open_task2_pf = util::make_promise_future<SharedRealm>();
-
             auto init_subscription = [](std::shared_ptr<Realm> realm) mutable {
                 REQUIRE(realm);
                 auto table = realm->read_group().get_table("class_TopLevel");
@@ -3919,12 +3928,13 @@ TEST_CASE("flx: open realm + register subscription callack while bootstrapping",
                 mutable_subscription.commit();
             };
 
+            auto open_task1_pf = util::make_promise_future<SharedRealm>();
+            auto open_task2_pf = util::make_promise_future<SharedRealm>();
             auto open_callback1 = [promise_holder = util::CopyablePromiseHolder(std::move(open_task1_pf.promise))](
                                       ThreadSafeReference ref, std::exception_ptr err) mutable {
                 REQUIRE_FALSE(err);
                 auto realm = Realm::get_shared_realm(std::move(ref));
                 REQUIRE(realm);
-                realm->refresh();
                 promise_holder.get_promise().emplace_value(realm);
             };
             auto open_callback2 = [promise_holder = util::CopyablePromiseHolder(std::move(open_task2_pf.promise))](
@@ -3932,14 +3942,15 @@ TEST_CASE("flx: open realm + register subscription callack while bootstrapping",
                 REQUIRE_FALSE(err);
                 auto realm = Realm::get_shared_realm(std::move(ref));
                 REQUIRE(realm);
-                realm->refresh();
                 promise_holder.get_promise().emplace_value(realm);
             };
 
-            SECTION("Realm was already created, but we want to rerun on first open using multiple tasks") {
+            config.sync_config->rerun_init_subscription_on_open = true;
+            config.sync_config->subscription_initializer = init_subscription;
+            
+            SECTION("Realm was already created, but we want to rerun on first open using multiple tasks") { 
                 {
                     subscription_invoked = false;
-                    config.sync_config->subscription_initializer = init_subscription;
                     auto realm = Realm::get_shared_realm(config);
                     auto sb = realm->get_latest_subscription_set();
                     auto future = sb.get_state_change_notification(realm::sync::SubscriptionSet::State::Complete);
@@ -3951,61 +3962,43 @@ TEST_CASE("flx: open realm + register subscription callack while bootstrapping",
                     REQUIRE(realm->get_active_subscription_set().version() == 1);
                 }
 
-                auto init_sb_pf = util::make_promise_future<bool>();
-                config.sync_config->subscription_initializer =
-                    [&, promise_holder = util::CopyablePromiseHolder(std::move(init_sb_pf.promise))](
-                        std::shared_ptr<Realm> realm) mutable {
-                        init_subscription(realm);
-                        promise_holder.get_promise().emplace_value(true);
-                    };
-
-                config.sync_config->rerun_init_subscription_on_open = true;
-
                 auto async_open_task1 = Realm::get_synchronized_realm(config);
                 auto async_open_task2 = Realm::get_synchronized_realm(config);
-
                 async_open_task1->start(open_callback1);
                 async_open_task2->start(open_callback2);
 
                 auto realm1 = open_task1_pf.future.get();
                 auto realm2 = open_task2_pf.future.get();
+                
                 const auto version_expected = 2;
                 auto r1_latest = realm1->get_latest_subscription_set().version();
                 auto r1_active = realm1->get_active_subscription_set().version();
-                auto r2_latest = realm2->get_latest_subscription_set().version();
-                auto r2_active = realm2->get_active_subscription_set().version();
+                REQUIRE(realm2->get_latest_subscription_set().version() == r1_latest);
+                REQUIRE(realm2->get_active_subscription_set().version() == r1_active);
                 REQUIRE(r1_latest == version_expected);
-                REQUIRE(r2_latest == version_expected);
                 REQUIRE(r1_active == version_expected);
-                REQUIRE(r2_active == version_expected);
             }
-            SECTION("First time realm is created but opened via open async") {
-                auto init_sb_pf = util::make_promise_future<bool>();
-                config.sync_config->subscription_initializer =
-                    [&, promise_holder = util::CopyablePromiseHolder(std::move(init_sb_pf.promise))](
-                        std::shared_ptr<Realm> realm) mutable {
-                        init_subscription(realm);
-                        promise_holder.get_promise().emplace_value(true);
-                    };
+            SECTION("First time realm is created but opened via open async. Both tasks could run the subscription") { 
                 auto async_open_task1 = Realm::get_synchronized_realm(config);
                 auto async_open_task2 = Realm::get_synchronized_realm(config);
-
                 async_open_task1->start(open_callback1);
                 async_open_task2->start(open_callback2);
-
                 auto realm1 = open_task1_pf.future.get();
                 auto realm2 = open_task2_pf.future.get();
-                REQUIRE(init_sb_pf.future.get());
 
-                const auto version_expected = 1;
                 auto r1_latest = realm1->get_latest_subscription_set().version();
                 auto r1_active = realm1->get_active_subscription_set().version();
-                auto r2_latest = realm2->get_latest_subscription_set().version();
-                auto r2_active = realm2->get_active_subscription_set().version();
-                REQUIRE(r1_latest == version_expected);
-                REQUIRE(r2_latest == version_expected);
-                REQUIRE(r1_active == version_expected);
-                REQUIRE(r2_active == version_expected);
+                REQUIRE(realm2->get_latest_subscription_set().version() == r1_latest);
+                REQUIRE(realm2->get_active_subscription_set().version() == r1_active);
+                //the callback may be run twice, if task1 is the first task to open realm
+                //but it is scheduled after tasks2, which have opened realm later but
+                //by the time it runs, subscription version is equal to 0 (realm creation).
+                //This can only happen the first time that realm is created. All the other times
+                //the init_sb callback is guaranteed to run once.
+                REQUIRE(r1_latest >= 1); 
+                REQUIRE(r1_latest <= 2);
+                REQUIRE(r1_active >= 1); 
+                REQUIRE(r1_active <= 2);
             }
         }
     }
