@@ -2489,6 +2489,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
 
     GroupWriter out(transaction, Durability(info->durability), m_marker_observer.get()); // Throws
     out.set_versions(new_version, top_refs, any_new_unreachables);
+    out.prepare_evacuation();
     auto t1 = std::chrono::steady_clock::now();
     auto commit_size = m_alloc.get_commit_size();
     if (m_logger) {
@@ -2515,23 +2516,12 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         m_locked_space = out.get_locked_space_size();
         m_used_space = out.get_logical_size() - m_free_space;
         m_evac_stage.store(EvacStage(out.get_evacuation_stage()));
-        switch (Durability(info->durability)) {
-            case Durability::Full:
-            case Durability::Unsafe:
-                if (commit_to_disk) {
-                    out.commit(new_top_ref); // Throws
-                }
-                else {
-                    out.sync_all_mappings();
-                }
-                break;
-            case Durability::MemOnly:
-                // In Durability::MemOnly mode, we just use the file as backing for
-                // the shared memory. So we never actually sync the data to disk
-                // (the OS may do so opportinisticly, or when swapping).
-                // however, we still need to flush any private caches into the buffer cache
-                out.flush_all_mappings();
-                break;
+        out.sync_according_to_durability();
+        if (Durability(info->durability) == Durability::Full || Durability(info->durability) == Durability::Unsafe) {
+            if (commit_to_disk) {
+                GroupCommitter cm(transaction, Durability(info->durability), m_marker_observer.get());
+                cm.commit(new_top_ref);
+            }
         }
         size_t new_file_size = out.get_logical_size();
         // We must reset the allocators free space tracking before communicating the new
@@ -2565,8 +2555,9 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     }
     auto t2 = std::chrono::steady_clock::now();
     if (m_logger) {
-        m_logger->log(util::Logger::Level::debug, "Commit of size %1 done in %2 us", commit_size,
-                      std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+        std::string to_disk_str = commit_to_disk ? util::format(" ref %1", new_top_ref) : " (no commit to disk)";
+        m_logger->log(util::Logger::Level::debug, "Commit of size %1 done in %2 us%3", commit_size,
+                      std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count(), to_disk_str);
     }
 }
 

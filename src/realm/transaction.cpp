@@ -732,7 +732,7 @@ void Transaction::complete_async_commit()
             db->m_logger->log(util::Logger::Level::trace, "Tr %1: Committing ref %2 to disk", m_log_id,
                               read_lock.m_top_ref);
         }
-        GroupWriter out(*this);
+        GroupCommitter out(*this);
         out.commit(read_lock.m_top_ref); // Throws
         // we must release the write mutex before the callback, because the callback
         // is allowed to re-request it.
