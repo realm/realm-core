@@ -84,6 +84,32 @@ const char* Logger::get_level_prefix(Level level) noexcept
     return "";
 }
 
+const std::string_view Logger::level_to_string(Level level) noexcept
+{
+    switch (level) {
+        case Logger::Level::all:
+            return "all";
+        case Logger::Level::trace:
+            return "trace";
+        case Logger::Level::debug:
+            return "debug";
+        case Logger::Level::detail:
+            return "detail";
+        case Logger::Level::info:
+            return "info";
+        case Logger::Level::warn:
+            return "warn";
+        case Logger::Level::error:
+            return "error";
+        case Logger::Level::fatal:
+            return "fatal";
+        case Logger::Level::off:
+            return "off";
+    }
+    REALM_ASSERT(false);
+    return "";
+}
+
 void StderrLogger::do_log(Level level, const std::string& message)
 {
     // std::cerr is unbuffered, so no need to flush

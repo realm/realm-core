@@ -59,12 +59,14 @@ const char* legend =
     " -q: Quiet, only print upon errors\n"
     " -f: Overwrite destination file if existing (default is to abort)\n"
     " -l: Name of the resulting table (default is 'table')\n"
+    " -p: Separator to use (default: ',')"
     "\n"
     "Examples:\n"
     "  csv file.csv file.realm\n"
     "  csv -a=200000 -e file.csv file.realm\n"
     "  csv -t=ssdbi Name Email Height Gender Age file.csv -s=1 file.realm\n"
-    "  csv -stdin file.realm < cat file.csv";
+    "  csv -stdin file.realm < cat file.csv\n"
+    "  csv -p=$'\\t' file.tsv file.realm";
 
 namespace {
 
@@ -158,6 +160,11 @@ int main(int argc, char* argv[])
             abort2(a >= argc - 4, "Too few arguments");
             tablename = argv[++a];
         }
+        else if (strncmp(argv[a], "-p", 2) == 0) {
+            std::cout << "separator: [" << argv[a][3] << "]" << std::endl;
+            abort2(strlen(argv[a]) != 4, "Set exactly one character for delimeter!");
+            separator_flag = argv[a][3];
+        }
         else {
             abort2(true, legend);
         }
@@ -186,7 +193,7 @@ int main(int argc, char* argv[])
 
     Importer importer;
     importer.Quiet = quiet_flag;
-    importer.Separator = ',';
+    importer.Separator = separator_flag;
     importer.Empty_as_string = empty_as_string_flag;
 
     try {
@@ -206,7 +213,7 @@ int main(int argc, char* argv[])
         }
     }
     catch (const std::runtime_error& error) {
-        std::cerr << error.what();
+        std::cerr << error.what() << std::endl;
         exit(-1);
     }
 

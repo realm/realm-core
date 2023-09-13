@@ -45,7 +45,8 @@ if (REALM_ENABLE_GEOSPATIAL)
 endif()
 
 file(GLOB RESOURCES RELATIVE ${CMAKE_CURRENT_BINARY_DIR}
-     "*.realm")
+    ../*.pem
+     *.realm)
 
 if(REALM_ENABLE_AUTH_TESTS)
     list(APPEND SOURCES util/sync/baas_admin_api.cpp)
@@ -190,11 +191,18 @@ if(NOT APPLE AND NOT EMSCRIPTEN AND NOT WINDOWS_STORE)
         add_subdirectory(${libuv_SOURCE_DIR} ${libuv_BINARY_DIR} EXCLUDE_FROM_ALL)
         set(libuv_target uv_a)
     endif()
+
     target_link_libraries(ObjectStoreTests ${libuv_target})
     # FIXME: ObjectStore itself shouldn't care about this, but we need to refactor scheduler.cpp to make it happen
     target_compile_definitions(ObjectStore PUBLIC REALM_HAVE_UV=1)
     get_property(libuv_include_dir TARGET ${libuv_target} PROPERTY INCLUDE_DIRECTORIES)
     target_include_directories(ObjectStore PRIVATE ${libuv_include_dir})
+
+    if (MSVC)
+        get_target_property(comp_opts ${libuv_target} COMPILE_OPTIONS)
+        string(REGEX REPLACE "/W[1234]" "/W1" comp_opts "${comp_opts}")
+        set_target_properties(${libuv_target} PROPERTIES COMPILE_OPTIONS "${comp_opts}")
+    endif()
 endif()
 
 add_subdirectory(notifications-fuzzer)

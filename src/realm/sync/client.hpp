@@ -23,8 +23,6 @@ class Client {
 public:
     using port_type = sync::port_type;
 
-    using Error = ClientError;
-
     static constexpr milliseconds_type default_connect_timeout = sync::default_connect_timeout;
     static constexpr milliseconds_type default_connection_linger_time = sync::default_connection_linger_time;
     static constexpr milliseconds_type default_ping_keepalive_period = sync::default_ping_keepalive_period;
@@ -350,6 +348,11 @@ public:
         bool simulate_integration_error = false;
 
         std::function<SyncClientHookAction(const SyncClientHookData&)> on_sync_client_event_hook;
+
+        /// The reason this synchronization session is used for.
+        ///
+        /// Note: Currently only used in FLX sync.
+        SessionReason session_reason = SessionReason::Sync;
     };
 
     /// \brief Start a new session for the specified client-side Realm.

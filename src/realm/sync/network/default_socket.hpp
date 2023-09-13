@@ -82,6 +82,14 @@ public:
         return std::unique_ptr<Timer>(new DefaultSocketProvider::Timer(m_service, delay, std::move(handler)));
     }
 
+    struct OnlyForTesting {
+        // Runs the event loop as though start() was called on the current thread so that the caller
+        // can catch and handle any thrown exceptions in tests.
+        static void run_event_loop_on_current_thread(DefaultSocketProvider* provider);
+
+        static void prep_event_loop_for_restart(DefaultSocketProvider* provider);
+    };
+
 private:
     enum class State { Starting, Running, Stopping, Stopped };
 

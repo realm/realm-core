@@ -24,7 +24,7 @@
 #include <realm/group_writer.hpp>
 
 #include <realm/alloc_slab.hpp>
-#include <realm/db.hpp>
+#include <realm/transaction.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/impl/simulated_failure.hpp>
@@ -232,7 +232,7 @@ WriteWindowMgr::WriteWindowMgr(SlabAlloc& alloc, Durability dura, WriteMarker* w
 #endif
 }
 
-GroupCommitter::GroupCommitter(Group& group, Durability dura, WriteMarker* write_marker)
+GroupCommitter::GroupCommitter(Transaction& group, Durability dura, WriteMarker* write_marker)
     : m_group(group)
     , m_alloc(group.m_alloc)
     , m_durability(dura)
@@ -242,7 +242,7 @@ GroupCommitter::GroupCommitter(Group& group, Durability dura, WriteMarker* write
 
 GroupCommitter::~GroupCommitter() = default;
 
-GroupWriter::GroupWriter(Group& group, Durability dura, WriteMarker* write_marker)
+GroupWriter::GroupWriter(Transaction& group, Durability dura, WriteMarker* write_marker)
     : m_group(group)
     , m_alloc(group.m_alloc)
     , m_durability(dura)
@@ -636,6 +636,9 @@ void GroupWriter::prepare_evacuation()
                     // Wait 10 commits until trying again
                     m_backoff = 10;
                     m_evacuation_limit = 0;
+                    if (auto logger = m_group.get_logger()) {
+                        logger->log(util::Logger::Level::detail, "Give up compaction");
+                    }
                 }
             }
         }
@@ -793,7 +796,9 @@ ref_type GroupWriter::write_group()
             top.set(Group::s_evacuation_point_ndx, 0);
             m_evacuation_limit = 0;
 
-            // std::cout << "New logical size = " << m_logical_size << std::endl;
+            if (auto logger = m_group.get_logger()) {
+                logger->log(util::Logger::Level::detail, "New logical size %1", m_logical_size);
+            }
         }
     }
 
@@ -871,7 +876,9 @@ ref_type GroupWriter::write_group()
                 top.add(0);
             }
             top.set(Group::s_evacuation_point_ndx, RefOrTagged::make_tagged(m_evacuation_limit));
-            // std::cout << "Evacuation point = " << std::hex << m_evacuation_limit << std::dec << std::endl;
+            if (auto logger = m_group.get_logger()) {
+                logger->log(util::Logger::Level::detail, "Start compaction with limit %1", m_evacuation_limit);
+            }
         }
     }
 
@@ -1240,7 +1247,9 @@ GroupWriter::FreeListElement GroupWriter::reserve_free_space(size_t size)
             m_under_evacuation.clear();
             m_evacuation_limit = 0;
             m_backoff = 10;
-            // std::cout << "Give up" << std::endl;
+            if (auto logger = m_group.get_logger()) {
+                logger->log(util::Logger::Level::detail, "Give up compaction");
+            }
             chunk = search_free_space_in_part_of_freelist(size);
         }
         else {

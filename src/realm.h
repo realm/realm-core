@@ -443,9 +443,10 @@ RLM_API bool realm_get_last_error(realm_error_t* err);
  *
  * @param err A pointer to a `realm_error_t` struct that will be populated with
  *            information about the error. May not be NULL.
+ * @return A bool indicating whether or not an error is available to be returned
  * @see realm_get_last_error()
  */
-RLM_API void realm_get_async_error(const realm_async_error_t* err, realm_error_t* out_err);
+RLM_API bool realm_get_async_error(const realm_async_error_t* err, realm_error_t* out_err);
 
 /**
  * Convert the last error to `realm_async_error_t`, which can safely be passed
@@ -2850,8 +2851,6 @@ RLM_API realm_app_config_t* realm_app_config_new(const char* app_id,
                                                  const realm_http_transport_t* http_transport) RLM_API_NOEXCEPT;
 
 RLM_API void realm_app_config_set_base_url(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_local_app_name(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_local_app_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t*, uint64_t ms) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_platform_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_sdk_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
@@ -3334,26 +3333,6 @@ typedef enum realm_sync_progress_direction {
     RLM_SYNC_PROGRESS_DIRECTION_DOWNLOAD,
 } realm_sync_progress_direction_e;
 
-/**
- * Possible error categories realm_sync_error_code_t can fall in.
- */
-typedef enum realm_sync_error_category {
-    RLM_SYNC_ERROR_CATEGORY_CLIENT,
-    RLM_SYNC_ERROR_CATEGORY_CONNECTION,
-    RLM_SYNC_ERROR_CATEGORY_SESSION,
-    RLM_SYNC_ERROR_CATEGORY_WEBSOCKET,
-
-    /**
-     * System error - POSIX errno, Win32 HRESULT, etc.
-     */
-    RLM_SYNC_ERROR_CATEGORY_SYSTEM,
-
-    /**
-     * Unknown source of error.
-     */
-    RLM_SYNC_ERROR_CATEGORY_UNKNOWN,
-} realm_sync_error_category_e;
-
 typedef enum realm_sync_error_action {
     RLM_SYNC_ERROR_ACTION_NO_ACTION,
     RLM_SYNC_ERROR_ACTION_PROTOCOL_VIOLATION,
@@ -3369,17 +3348,6 @@ typedef enum realm_sync_error_action {
 
 typedef struct realm_sync_session realm_sync_session_t;
 typedef struct realm_async_open_task realm_async_open_task_t;
-
-// This type should never be returned from a function.
-// It's only meant as an asynchronous callback argument.
-// Pointers to this struct and its pointer members are only valid inside the scope
-// of the callback they were passed to.
-typedef struct realm_sync_error_code {
-    realm_sync_error_category_e category;
-    int value;
-    const char* message;
-    const char* category_name;
-} realm_sync_error_code_t;
 
 typedef struct realm_sync_error_user_info {
     const char* key;
@@ -3397,8 +3365,7 @@ typedef struct realm_sync_error_compensating_write_info {
 // Pointers to this struct and its pointer members are only valid inside the scope
 // of the callback they were passed to.
 typedef struct realm_sync_error {
-    realm_sync_error_code_t error_code;
-    const char* detailed_message;
+    realm_error_t status;
     const char* c_original_file_path_key;
     const char* c_recovery_file_path_key;
     bool is_fatal;
@@ -3422,7 +3389,7 @@ typedef struct realm_sync_error {
  *
  * @param error Null, if the operation completed successfully.
  */
-typedef void (*realm_sync_wait_for_completion_func_t)(realm_userdata_t userdata, realm_sync_error_code_t* error);
+typedef void (*realm_sync_wait_for_completion_func_t)(realm_userdata_t userdata, realm_error_t* error);
 typedef void (*realm_sync_connection_state_changed_func_t)(realm_userdata_t userdata,
                                                            realm_sync_connection_state_e old_state,
                                                            realm_sync_connection_state_e new_state);
@@ -3864,13 +3831,13 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
 /**
  * Wrapper for SyncSession::OnlyForTesting::handle_error. This routine should be used only for testing.
  * @param session ptr to a valid sync session
- * @param error_code error code to simulate
- * @param category category of the error to simulate
- * @param error_message string representing the error
+ * @param error_code realm_errno_e representing the error to simulate
+ * @param error_str error message to be included with Status
  * @param is_fatal boolean to signal if the error is fatal or not
  */
-RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session, int error_code,
-                                                         int category, const char* error_message, bool is_fatal);
+RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session,
+                                                         realm_errno_e error_code, const char* error_str,
+                                                         bool is_fatal);
 
 /**
  * In case of exception thrown in user code callbacks, this api will allow the sdk to store the user code exception
@@ -4106,8 +4073,8 @@ RLM_API realm_sync_socket_t* realm_sync_socket_new(
     realm_sync_socket_websocket_async_write_func_t websocket_write_func,
     realm_sync_socket_websocket_free_func_t websocket_free_func);
 
-RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback_t* realm_callback,
-                                                 realm_web_socket_errno_e status, const char* reason);
+RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback_t* realm_callback, realm_errno_e status,
+                                                 const char* reason);
 
 RLM_API void realm_sync_socket_websocket_connected(realm_websocket_observer_t* realm_websocket_observer,
                                                    const char* protocol);

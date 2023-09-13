@@ -40,96 +40,6 @@ using connection_ident_type           = std::int_fast64_t;
 using ProxyConfig                     = SyncConfig::ProxyConfig;
 // clang-format on
 
-
-const char* get_error_message(ClientError error_code)
-{
-    switch (error_code) {
-        case ClientError::connection_closed:
-            return "Connection closed (no error)";
-        case ClientError::unknown_message:
-            return "Unknown type of input message";
-        case ClientError::bad_syntax:
-            return "Bad syntax in input message head";
-        case ClientError::limits_exceeded:
-            return "Limits exceeded in input message";
-        case ClientError::bad_session_ident:
-            return "Bad session identifier in input message";
-        case ClientError::bad_message_order:
-            return "Bad input message order";
-        case ClientError::bad_client_file_ident:
-            return "Bad client file identifier (IDENT)";
-        case ClientError::bad_progress:
-            return "Bad progress information (DOWNLOAD)";
-        case ClientError::bad_changeset_header_syntax:
-            return "Bad progress information (DOWNLOAD)";
-        case ClientError::bad_changeset_size:
-            return "Bad changeset size in changeset header (DOWNLOAD)";
-        case ClientError::bad_origin_file_ident:
-            return "Bad origin file identifier in changeset header (DOWNLOAD)";
-        case ClientError::bad_server_version:
-            return "Bad server version in changeset header (DOWNLOAD)";
-        case ClientError::bad_changeset:
-            return "Bad changeset (DOWNLOAD)";
-        case ClientError::bad_request_ident:
-            return "Bad request identifier (MARK)";
-        case ClientError::bad_error_code:
-            return "Bad error code (ERROR)";
-        case ClientError::bad_compression:
-            return "Bad compression (DOWNLOAD)";
-        case ClientError::bad_client_version:
-            return "Bad last integrated client version in changeset header (DOWNLOAD)";
-        case ClientError::ssl_server_cert_rejected:
-            return "SSL server certificate rejected";
-        case ClientError::pong_timeout:
-            return "Timeout on reception of PONG respone message";
-        case ClientError::bad_client_file_ident_salt:
-            return "Bad client file identifier salt (IDENT)";
-        case ClientError::bad_file_ident:
-            return "Bad file identifier (ALLOC)";
-        case ClientError::connect_timeout:
-            return "Sync connection was not fully established in time";
-        case ClientError::bad_timestamp:
-            return "Bad timestamp (PONG)";
-        case ClientError::bad_protocol_from_server:
-            return "Bad or missing protocol version information from server";
-        case ClientError::client_too_old_for_server:
-            return "Protocol version negotiation failed: Client is too old for server";
-        case ClientError::client_too_new_for_server:
-            return "Protocol version negotiation failed: Client is too new for server";
-        case ClientError::protocol_mismatch:
-            return ("Protocol version negotiation failed: No version supported by both "
-                    "client and server");
-        case ClientError::bad_state_message:
-            return "Bad state message (STATE)";
-        case ClientError::missing_protocol_feature:
-            return "Requested feature missing in negotiated protocol version";
-        case ClientError::http_tunnel_failed:
-            return "Failure to establish HTTP tunnel with configured proxy";
-        case ClientError::auto_client_reset_failure:
-            return "Automatic recovery from client reset failed";
-    }
-    return nullptr;
-}
-
-
-class ErrorCategoryImpl : public std::error_category {
-public:
-    const char* name() const noexcept override final
-    {
-        return "realm::sync::ClientError";
-    }
-    std::string message(int error_code) const override final
-    {
-        const char* msg = get_error_message(ClientError(error_code));
-        if (!msg)
-            msg = "Unknown error";
-        std::string msg_2{msg}; // Throws (copy)
-        return msg_2;
-    }
-};
-
-ErrorCategoryImpl g_error_category;
-
 } // unnamed namespace
 
 
@@ -259,6 +169,8 @@ private:
 
     std::function<SyncClientHookAction(SyncClientHookData data)> m_debug_hook;
     bool m_in_debug_hook = false;
+
+    SessionReason m_session_reason;
 
     std::shared_ptr<SubscriptionStore> m_flx_subscription_store;
     int64_t m_flx_active_version = 0;
@@ -803,6 +715,13 @@ util::Optional<ClientReset>& SessionImpl::get_client_reset_config() noexcept
     return m_wrapper.m_client_reset_config;
 }
 
+SessionReason SessionImpl::get_session_reason() noexcept
+{
+    // Can only be called if the session is active or being activated
+    REALM_ASSERT_EX(m_state == State::Active || m_state == State::Unactivated, m_state);
+    return m_wrapper.m_session_reason;
+}
+
 void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes, DownloadBatchState batch_state,
                                                 const SyncProgress& progress, const ReceivedChangesets& changesets)
 {
@@ -814,7 +733,7 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
     try {
         bool simulate_integration_error = (m_wrapper.m_simulate_integration_error && !changesets.empty());
         if (simulate_integration_error) {
-            throw IntegrationException(ClientError::bad_changeset, "simulated failure");
+            throw IntegrationException(ErrorCodes::BadChangeset, "simulated failure", ProtocolError::bad_changeset);
         }
         version_type client_version;
         if (REALM_LIKELY(!get_client().is_dry_run())) {
@@ -905,8 +824,9 @@ bool SessionImpl::process_flx_bootstrap_message(const SyncProgress& progress, Do
     }
     catch (const LogicError& ex) {
         if (ex.code() == ErrorCodes::LimitExceeded) {
-            IntegrationException ex(ClientError::bad_changeset_size,
-                                    "bootstrap changeset too large to store in pending bootstrap store");
+            IntegrationException ex(ErrorCodes::LimitExceeded,
+                                    "bootstrap changeset too large to store in pending bootstrap store",
+                                    ProtocolError::bad_changeset_size);
             on_integration_failure(ex);
             return true;
         }
@@ -986,7 +906,7 @@ void SessionImpl::process_pending_flx_bootstrap()
         bool simulate_integration_error =
             (m_wrapper.m_simulate_integration_error && !pending_batch.changesets.empty());
         if (simulate_integration_error) {
-            throw IntegrationException(ClientError::bad_changeset, "simulated failure");
+            throw IntegrationException(ErrorCodes::BadChangeset, "simulated failure", ProtocolError::bad_changeset);
         }
 
         history.integrate_server_changesets(
@@ -1089,12 +1009,11 @@ SyncClientHookAction SessionImpl::call_debug_hook(const SyncClientHookData& data
     auto action = m_wrapper.m_debug_hook(data);
     switch (action) {
         case realm::SyncClientHookAction::SuspendWithRetryableError: {
-            SessionErrorInfo err_info(make_error_code(ProtocolError::other_session_error), "hook requested error",
-                                      true);
+            SessionErrorInfo err_info(Status{ErrorCodes::RuntimeError, "hook requested error"}, IsFatal{false});
             err_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
 
             auto err_processing_err = receive_error_message(err_info);
-            REALM_ASSERT_EX(!err_processing_err, err_processing_err.message());
+            REALM_ASSERT_EX(err_processing_err.is_ok(), err_processing_err);
             return SyncClientHookAction::EarlyReturn;
         }
         case realm::SyncClientHookAction::TriggerReconnect: {
@@ -1230,6 +1149,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_client_reset_config{std::move(config.client_reset_config)}
     , m_proxy_config{config.proxy_config} // Throws
     , m_debug_hook(std::move(config.on_sync_client_event_hook))
+    , m_session_reason(config.session_reason)
     , m_flx_subscription_store(std::move(flx_sub_store))
     , m_migration_store(std::move(migration_store))
 {
@@ -1631,7 +1551,13 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
     // Cannot be actualized if it's already been finalized or force closed
     REALM_ASSERT(!m_finalized);
     REALM_ASSERT(!m_force_closed);
-    m_db->claim_sync_agent();
+    try {
+        m_db->claim_sync_agent();
+    }
+    catch (const MultipleSyncAgents&) {
+        finalize_before_actualization();
+        throw;
+    }
     auto sync_mode = endpoint.server_mode;
 
     bool was_created = false;
@@ -1650,15 +1576,16 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         sess->logger.info("Binding '%1' to '%2'", m_db->get_path(), m_virt_path); // Throws
         m_sess = sess.get();
         conn.activate_session(std::move(sess)); // Throws
-
-        m_actualized = true;
     }
     catch (...) {
         if (was_created)
             m_client.remove_connection(conn);
+
+        finalize_before_actualization();
         throw;
     }
 
+    m_actualized = true;
     if (was_created)
         conn.activate(); // Throws
 
@@ -2229,88 +2156,6 @@ util::Future<std::string> Session::send_test_command(std::string body)
 std::string Session::get_appservices_connection_id()
 {
     return m_impl->get_appservices_connection_id();
-}
-
-const std::error_category& client_error_category() noexcept
-{
-    return g_error_category;
-}
-
-std::error_code make_error_code(ClientError error_code) noexcept
-{
-    return std::error_code{int(error_code), g_error_category};
-}
-
-ProtocolError client_error_to_protocol_error(ClientError error_code)
-{
-    switch (error_code) {
-        case ClientError::bad_changeset:
-            return ProtocolError::bad_changeset;
-        case ClientError::bad_progress:
-            return ProtocolError::bad_progress;
-        case ClientError::bad_changeset_size:
-            return ProtocolError::bad_changeset_size;
-        case ClientError::connection_closed:
-            return ProtocolError::connection_closed;
-        case ClientError::unknown_message:
-            return ProtocolError::unknown_message;
-        case ClientError::bad_syntax:
-            return ProtocolError::bad_syntax;
-        case ClientError::limits_exceeded:
-            return ProtocolError::limits_exceeded;
-        case ClientError::bad_session_ident:
-            return ProtocolError::bad_session_ident;
-        case ClientError::bad_message_order:
-            return ProtocolError::bad_message_order;
-        case ClientError::bad_client_file_ident:
-            return ProtocolError::bad_client_file_ident;
-        case ClientError::bad_changeset_header_syntax:
-            return ProtocolError::bad_changeset_header_syntax;
-        case ClientError::bad_origin_file_ident:
-            return ProtocolError::bad_origin_file_ident;
-        case ClientError::bad_server_version:
-            return ProtocolError::bad_server_version;
-        case ClientError::bad_client_version:
-            return ProtocolError::bad_client_version;
-
-        case ClientError::bad_error_code:
-            [[fallthrough]];
-        case ClientError::bad_request_ident:
-            [[fallthrough]];
-        case ClientError::bad_compression:
-            [[fallthrough]];
-        case ClientError::ssl_server_cert_rejected:
-            [[fallthrough]];
-        case ClientError::bad_client_file_ident_salt:
-            [[fallthrough]];
-        case ClientError::bad_file_ident:
-            [[fallthrough]];
-        case ClientError::connect_timeout:
-            [[fallthrough]];
-        case ClientError::bad_timestamp:
-            [[fallthrough]];
-        case ClientError::bad_protocol_from_server:
-            [[fallthrough]];
-        case ClientError::client_too_old_for_server:
-            [[fallthrough]];
-        case ClientError::client_too_new_for_server:
-            [[fallthrough]];
-        case ClientError::protocol_mismatch:
-            [[fallthrough]];
-        case ClientError::missing_protocol_feature:
-            [[fallthrough]];
-        case ClientError::http_tunnel_failed:
-            return ProtocolError::other_error;
-
-        case ClientError::auto_client_reset_failure:
-            [[fallthrough]];
-        case ClientError::pong_timeout:
-            [[fallthrough]];
-        case ClientError::bad_state_message:
-            return ProtocolError::other_session_error;
-    }
-
-    return ProtocolError::other_error;
 }
 
 std::ostream& operator<<(std::ostream& os, ProxyConfig::Type proxyType)

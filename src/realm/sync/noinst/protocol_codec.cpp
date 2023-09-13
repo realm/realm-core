@@ -286,6 +286,18 @@ void ServerProtocol::make_pong(OutputBuffer& out, milliseconds_type timestamp)
     out << "pong " << timestamp << "\n"; // Throws
 }
 
+void ServerProtocol::make_log_message(OutputBuffer& out, util::Logger::Level level, std::string message,
+                                      session_ident_type sess_id, std::optional<std::string> co_id)
+{
+    nlohmann::json log_msg_json;
+    log_msg_json["level"] = util::Logger::level_to_string(level);
+    log_msg_json["msg"] = message;
+    if (co_id) {
+        log_msg_json["co_id"] = *co_id;
+    }
+    std::string json_data_stg = log_msg_json.dump();
+    out << "log_message " << sess_id << " " << json_data_stg.length() << "\n" << json_data_stg;
+}
 
 std::string make_authorization_header(const std::string& signed_user_token)
 {

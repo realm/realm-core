@@ -33,7 +33,6 @@ ErrorCategory ErrorCodes::error_categories(Error code)
             break;
 
         case AddressSpaceExhausted:
-        case BadChangeset:
         case BadVersion:
         case BrokenInvariant:
         case CallbackFailed:
@@ -47,10 +46,31 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case RangeError:
         case RuntimeError:
         case SchemaVersionMismatch:
-        case SubscriptionFailed:
         case UnsupportedFileFormatVersion:
         case OperationAborted:
             return ErrorCategory().set(ErrorCategory::runtime_error);
+
+        case AutoClientResetFailed:
+        case BadChangeset:
+        case ConnectionClosed:
+        case SubscriptionFailed:
+        case SyncClientResetRequired:
+        case SyncCompensatingWrite:
+        case SyncPermissionDenied:
+        case SyncProtocolInvariantFailed:
+        case SyncServerPermissionsChanged:
+        case SyncUserMismatch:
+        case SyncWriteNotAllowed:
+            return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::sync_error);
+
+        case SyncConnectFailed:
+        case SyncConnectTimeout:
+        case SyncProtocolNegotiationFailed:
+        case TlsHandshakeFailed:
+            return ErrorCategory()
+                .set(ErrorCategory::runtime_error)
+                .set(ErrorCategory::websocket_error)
+                .set(ErrorCategory::sync_error);
 
         case DecryptionFailed:
         case DeleteOnOpenRealm:
@@ -118,6 +138,15 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case UnexpectedPrimaryKey:
             return ErrorCategory().set(ErrorCategory::invalid_argument).set(ErrorCategory::logic_error);
 
+        case BadSyncPartitionValue:
+        case InvalidSubscriptionQuery:
+        case SyncInvalidSchemaChange:
+        case WrongSyncType:
+            return ErrorCategory()
+                .set(ErrorCategory::invalid_argument)
+                .set(ErrorCategory::logic_error)
+                .set(ErrorCategory::sync_error);
+
         case CustomError:
             return ErrorCategory()
                 .set(ErrorCategory::runtime_error)
@@ -182,7 +211,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case MissingAuthReq:
         case MissingParameter:
         case MongoDBError:
-        case NoMatchingRule:
+        case NoMatchingRuleFound:
         case NotCallable:
         case ReadSizeLimitExceeded:
         case RestrictedHost:
@@ -208,11 +237,6 @@ ErrorCategory ErrorCodes::error_categories(Error code)
                 .set(ErrorCategory::runtime_error)
                 .set(ErrorCategory::app_error)
                 .set(ErrorCategory::service_error);
-
-        case WebSocketResolveFailedError:
-        case WebSocketConnectionClosedClientError:
-        case WebSocketConnectionClosedServerError:
-            return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::websocket_error);
 
         case UnknownError:
             break;
@@ -240,10 +264,12 @@ static const MapElem string_to_error_code[] = {
     {"AuthProviderAlreadyExists", ErrorCodes::AuthProviderAlreadyExists},
     {"AuthProviderDuplicateName", ErrorCodes::AuthProviderDuplicateName},
     {"AuthProviderNotFound", ErrorCodes::AuthProviderNotFound},
+    {"AutoClientResetFailed", ErrorCodes::AutoClientResetFailed},
     {"BadBsonParse", ErrorCodes::BadBsonParse},
     {"BadChangeset", ErrorCodes::BadChangeset},
     {"BadRequest", ErrorCodes::BadRequest},
     {"BadServerUrl", ErrorCodes::BadServerUrl},
+    {"BadSyncPartitionValue", ErrorCodes::BadSyncPartitionValue},
     {"BadToken", ErrorCodes::BadToken},
     {"BadVersion", ErrorCodes::BadVersion},
     {"BrokenInvariant", ErrorCodes::BrokenInvariant},
@@ -255,6 +281,7 @@ static const MapElem string_to_error_code[] = {
     {"ClientUserNotFound", ErrorCodes::ClientUserNotFound},
     {"ClientUserNotLoggedIn", ErrorCodes::ClientUserNotLoggedIn},
     {"ClosedRealm", ErrorCodes::ClosedRealm},
+    {"ConnectionClosed", ErrorCodes::ConnectionClosed},
     {"CrossTableLinkTarget", ErrorCodes::CrossTableLinkTarget},
     {"CustomError", ErrorCodes::CustomError},
     {"DecryptionFailed", ErrorCodes::DecryptionFailed},
@@ -299,6 +326,7 @@ static const MapElem string_to_error_code[] = {
     {"InvalidServerResponse", ErrorCodes::InvalidServerResponse},
     {"InvalidSession", ErrorCodes::InvalidSession},
     {"InvalidSortDescriptor", ErrorCodes::InvalidSortDescriptor},
+    {"InvalidSubscriptionQuery", ErrorCodes::InvalidSubscriptionQuery},
     {"InvalidTableRef", ErrorCodes::InvalidTableRef},
     {"InvalidatedObject", ErrorCodes::InvalidatedObject},
     {"KeyAlreadyUsed", ErrorCodes::KeyAlreadyUsed},
@@ -318,7 +346,7 @@ static const MapElem string_to_error_code[] = {
     {"ModifyPrimaryKey", ErrorCodes::ModifyPrimaryKey},
     {"MongoDBError", ErrorCodes::MongoDBError},
     {"MultipleSyncAgents", ErrorCodes::MultipleSyncAgents},
-    {"NoMatchingRule", ErrorCodes::NoMatchingRule},
+    {"NoMatchingRuleFound", ErrorCodes::NoMatchingRuleFound},
     {"NoSubscriptionForWrite", ErrorCodes::NoSubscriptionForWrite},
     {"NoSuchTable", ErrorCodes::NoSuchTable},
     {"NotCallable", ErrorCodes::NotCallable},
@@ -353,9 +381,21 @@ static const MapElem string_to_error_code[] = {
     {"ServiceTypeNotFound", ErrorCodes::ServiceTypeNotFound},
     {"StaleAccessor", ErrorCodes::StaleAccessor},
     {"SubscriptionFailed", ErrorCodes::SubscriptionFailed},
+    {"SyncClientResetRequired", ErrorCodes::SyncClientResetRequired},
+    {"SyncCompensatingWrite", ErrorCodes::SyncCompensatingWrite},
+    {"SyncConnectFailed", ErrorCodes::SyncConnectFailed},
+    {"SyncConnectTimeout", ErrorCodes::SyncConnectTimeout},
+    {"SyncInvalidSchemaChange", ErrorCodes::SyncInvalidSchemaChange},
+    {"SyncPermissionDenied", ErrorCodes::SyncPermissionDenied},
+    {"SyncProtocolInvariantFailed", ErrorCodes::SyncProtocolInvariantFailed},
+    {"SyncProtocolNegotiationFailed", ErrorCodes::SyncProtocolNegotiationFailed},
+    {"SyncServerPermissionsChanged", ErrorCodes::SyncServerPermissionsChanged},
+    {"SyncUserMismatch", ErrorCodes::SyncUserMismatch},
+    {"SyncWriteNotAllowed", ErrorCodes::SyncWriteNotAllowed},
     {"SyntaxError", ErrorCodes::SyntaxError},
     {"SystemError", ErrorCodes::SystemError},
     {"TableNameInUse", ErrorCodes::TableNameInUse},
+    {"TlsHandshakeFailed", ErrorCodes::TlsHandshakeFailed},
     {"TopLevelObject", ErrorCodes::TopLevelObject},
     {"TwilioError", ErrorCodes::TwilioError},
     {"TypeMismatch", ErrorCodes::TypeMismatch},
@@ -369,9 +409,7 @@ static const MapElem string_to_error_code[] = {
     {"ValueAlreadyExists", ErrorCodes::ValueAlreadyExists},
     {"ValueDuplicateName", ErrorCodes::ValueDuplicateName},
     {"ValueNotFound", ErrorCodes::ValueNotFound},
-    {"WebSocketConnectionClosedClientError", ErrorCodes::WebSocketConnectionClosedClientError},
-    {"WebSocketConnectionClosedServerError", ErrorCodes::WebSocketConnectionClosedServerError},
-    {"WebSocketResolveFailedError", ErrorCodes::WebSocketResolveFailedError},
+    {"WrongSyncType", ErrorCodes::WrongSyncType},
     {"WrongThread", ErrorCodes::WrongThread},
     {"WrongTransactionState", ErrorCodes::WrongTransactionState},
 };

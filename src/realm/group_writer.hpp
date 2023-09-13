@@ -33,7 +33,7 @@
 namespace realm {
 
 // Pre-declarations
-class Group;
+class Transaction;
 class SlabAlloc;
 
 class Reachable {
@@ -91,7 +91,7 @@ class GroupCommitter {
 public:
     using Durability = DBOptions::Durability;
     using MapWindow = WriteWindowMgr::MapWindow;
-    GroupCommitter(Group&, Durability dura = Durability::Full, util::WriteMarker* write_marker = nullptr);
+    GroupCommitter(Transaction&, Durability dura = Durability::Full, util::WriteMarker* write_marker = nullptr);
     ~GroupCommitter();
     /// Flush changes to physical medium, then write the new top ref
     /// to the file header, then flush again. Pass the top ref
@@ -99,7 +99,7 @@ public:
     void commit(ref_type new_top_ref);
 
 protected:
-    Group& m_group;
+    Transaction& m_group;
     SlabAlloc& m_alloc;
     Durability m_durability;
     WriteWindowMgr m_window_mgr;
@@ -121,7 +121,7 @@ public:
     // (Group::m_is_shared), the constructor also adds version tracking
     // information to the group, if it is not already present (6th and 7th entry
     // in Group::m_top).
-    GroupWriter(Group&, Durability dura = Durability::Full, util::WriteMarker* write_marker = nullptr);
+    GroupWriter(Transaction&, Durability dura = Durability::Full, util::WriteMarker* write_marker = nullptr);
     ~GroupWriter();
 
     void set_versions(uint64_t current, TopRefMap& top_refs, bool any_num_unreachables) noexcept;
@@ -213,7 +213,7 @@ private:
     static void move_free_in_file_to_size_map(const std::vector<GroupWriter::FreeSpaceEntry>& list,
                                               std::multimap<size_t, size_t>& size_map);
 
-    Group& m_group;
+    Transaction& m_group;
     SlabAlloc& m_alloc;
     Durability m_durability;
     WriteWindowMgr m_window_mgr;

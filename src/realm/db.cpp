@@ -910,11 +910,6 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
 
     m_db_path = path;
 
-    // Derive an id for this DB to be used in logging. We will just use some bits from the pointer.
-    // The path cannot be used as this would not allow us to distinguish between two DBs opening
-    // the same realm.
-    m_path_hash = (size_t(this) >> 4) & 0xffff;
-
     set_logger(options.logger);
     if (m_replication) {
         m_replication->set_logger(m_logger.get());
@@ -1480,7 +1475,7 @@ void DB::open(Replication& repl, const std::string& file, const DBOptions& optio
 }
 class DBLogger : public Logger {
 public:
-    DBLogger(const std::shared_ptr<Logger>& base_logger, size_t hash) noexcept
+    DBLogger(const std::shared_ptr<Logger>& base_logger, unsigned hash) noexcept
         : Logger(base_logger)
         , m_hash(hash)
     {
@@ -1496,13 +1491,13 @@ protected:
     }
 
 private:
-    size_t m_hash;
+    unsigned m_hash;
 };
 
 void DB::set_logger(const std::shared_ptr<util::Logger>& logger) noexcept
 {
     if (logger)
-        m_logger = std::make_shared<DBLogger>(logger, m_path_hash);
+        m_logger = std::make_shared<DBLogger>(logger, m_log_id);
 }
 
 void DB::open(Replication& repl, const DBOptions options)
@@ -1512,6 +1507,11 @@ void DB::open(Replication& repl, const DBOptions options)
     set_replication(&repl);
 
     m_alloc.init_in_memory_buffer();
+
+    set_logger(options.logger);
+    m_replication->set_logger(m_logger.get());
+    if (m_logger)
+        m_logger->log(util::Logger::Level::detail, "Open memory-only realm");
 
     auto hist_type = repl.get_history_type();
     m_in_memory_info =
@@ -2478,7 +2478,9 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         // Cleanup any stale mappings
         m_alloc.purge_old_mappings(oldest_version, new_version);
     }
-
+    // save number of live versions for later:
+    // (top_refs is std::moved into GroupWriter so we'll loose it in the call to set_versions below)
+    auto live_versions = top_refs.size();
     // Do the actual commit
     REALM_ASSERT(oldest_version <= new_version);
 #if REALM_METRICS
@@ -2546,12 +2548,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         // must release m_mutex before this point to obey lock order
         std::lock_guard<InterprocessMutex> lock(m_controlmutex);
 
-        // this is not correct .. but what should we return instead?
-        // just returning the number of reachable versions is also misleading,
-        // because we retain a transaction history stretching all the way from
-        // oldest live version to newest version - even though we may have reclaimed
-        // individual versions within this range
-        info->number_of_versions = new_version - oldest_version + 1;
+        info->number_of_versions = live_versions + 1;
         info->latest_version_number = new_version;
 
         m_new_commit_available.notify_all();
@@ -2712,7 +2709,7 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
         tr->m_async_stage = Transaction::AsyncState::Requesting;
         tr->m_request_time_point = std::chrono::steady_clock::now();
         if (tr->db->m_logger) {
-            tr->db->m_logger->log(util::Logger::Level::trace, "Async request write lock");
+            tr->db->m_logger->log(util::Logger::Level::trace, "Tr %1: Async request write lock", tr->m_log_id);
         }
     }
     std::weak_ptr<Transaction> weak_tr = tr;
@@ -2727,7 +2724,7 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
             if (tr->db->m_logger) {
                 auto t2 = std::chrono::steady_clock::now();
                 tr->db->m_logger->log(
-                    util::Logger::Level::trace, "Got write lock in %1 us",
+                    util::Logger::Level::trace, "Tr %1, Got write lock in %2 us", tr->m_log_id,
                     std::chrono::duration_cast<std::chrono::microseconds>(t2 - tr->m_request_time_point).count());
             }
             if (tr->m_waiting_for_write_lock) {
@@ -2744,6 +2741,7 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
 
 inline DB::DB(const DBOptions& options)
     : m_upgrade_callback(std::move(options.upgrade_callback))
+    , m_log_id(util::gen_log_id(this))
 {
     if (options.enable_async_writes) {
         m_commit_helper = std::make_unique<AsyncCommitHelper>(this);

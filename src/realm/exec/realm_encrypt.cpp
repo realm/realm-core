@@ -5,8 +5,6 @@
 
 using namespace realm;
 
-constexpr size_t block_size = 4096;
-
 int main(int argc, const char* argv[])
 {
     if (argc > 1) {

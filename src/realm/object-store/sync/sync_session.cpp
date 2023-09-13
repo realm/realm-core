@@ -32,7 +32,7 @@
 #include <realm/sync/client.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/network/http.hpp>
-#include <realm/sync/network/websocket.hpp>
+#include <realm/sync/network/websocket_error.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/noinst/migration_store.hpp>
@@ -223,7 +223,7 @@ void SyncSession::do_become_inactive(util::CheckedUniqueLock lock, Status status
         m_connection_change_notifier.invoke_callbacks(old_state, connection_state());
     }
 
-    if (!status.get_std_error_code())
+    if (status.is_ok())
         status = Status(ErrorCodes::OperationAborted, "Sync session became inactive");
 
     // Inform any queued-up completion handlers that they were cancelled.
@@ -237,20 +237,19 @@ void SyncSession::become_waiting_for_access_token()
     m_state = State::WaitingForAccessToken;
 }
 
-void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status error_code,
-                                  std::string_view context_message)
+void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status status)
 {
     // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
     {
         util::CheckedUniqueLock lock(m_state_mutex);
-        cancel_pending_waits(std::move(lock), error_code);
+        cancel_pending_waits(std::move(lock), status);
     }
     if (user) {
         user->log_out();
     }
 
     if (auto error_handler = config(&SyncConfig::error_handler)) {
-        auto user_facing_error = SyncError(realm::sync::ProtocolError::bad_authentication, context_message, true);
+        auto user_facing_error = SyncError({ErrorCodes::AuthError, status.reason()}, true);
         error_handler(shared_from_this(), std::move(user_facing_error));
     }
 }
@@ -300,21 +299,24 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session, bool re
                 // there was a problem locally before even sending the request to the server
                 // eg. ClientErrorCode::user_not_found, ClientErrorCode::user_not_logged_in,
                 // ClientErrorCode::too_many_redirects
-                session->handle_bad_auth(session_user, error->to_status(), error->reason());
+                session->handle_bad_auth(session_user, error->to_status());
             }
             else if (check_for_auth_failure(*error)) {
                 // A 401 response on a refresh request means that the token cannot be refreshed and we should not
                 // retry. This can be because an admin has revoked this user's sessions, the user has been disabled,
                 // or the refresh token has expired according to the server's clock.
-                session->handle_bad_auth(session_user, error->to_status(),
-                                         "Unable to refresh the user access token.");
+                session->handle_bad_auth(
+                    session_user,
+                    {error->code(), util::format("Unable to refresh the user access token: %1", error->reason())});
             }
             else if (check_for_redirect_response(*error)) {
                 // A 301 or 308 response is an unhandled permanent redirect response (which should not happen) - if
                 // this is received, fail the request with an appropriate error message.
                 // Temporary redirect responses (302, 307) are not supported
-                session->handle_bad_auth(session_user, error->to_status(),
-                                         "Unhandled redirect response when trying to reach the server.");
+                session->handle_bad_auth(
+                    session_user,
+                    {error->code(), util::format("Unhandled redirect response when trying to reach the server: %1",
+                                                 error->reason())});
             }
             else {
                 // A refresh request has failed. This is an unexpected non-fatal error and we would
@@ -578,10 +580,10 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, Status status,
         }
         lock.unlock();
 
-        const bool try_again = false;
         sync::SessionErrorInfo synthetic(
-            make_error_code(sync::Client::Error::auto_client_reset_failure),
-            util::format("A fatal error occurred during client reset: '%1'", status.reason()), try_again);
+            Status{ErrorCodes::AutoClientResetFailed,
+                   util::format("A fatal error occurred during client reset: '%1'", status.reason())},
+            sync::IsFatal{true});
         handle_error(synthetic);
         return;
     }
@@ -631,28 +633,20 @@ void SyncSession::OnlyForTesting::handle_error(SyncSession& session, sync::Sessi
 void SyncSession::handle_error(sync::SessionErrorInfo error)
 {
     enum class NextStateAfterError { none, inactive, error };
-    auto next_state = error.is_fatal() ? NextStateAfterError::error : NextStateAfterError::none;
-    auto error_code = error.error_code;
+    auto next_state = error.is_fatal ? NextStateAfterError::error : NextStateAfterError::none;
     util::Optional<ShouldBackup> delete_file;
     bool log_out_user = false;
     bool unrecognized_by_client = false;
 
-    if (error_code == make_error_code(sync::Client::Error::auto_client_reset_failure)) {
+    if (error.status == ErrorCodes::AutoClientResetFailed) {
         // At this point, automatic recovery has been attempted but it failed.
         // Fallback to a manual reset and let the user try to handle it.
         next_state = NextStateAfterError::inactive;
         delete_file = ShouldBackup::yes;
     }
-    else if (error_code.category() == realm::sync::protocol_error_category()) {
+    else if (error.server_requests_action != sync::ProtocolErrorInfo::Action::NoAction) {
         switch (error.server_requests_action) {
             case sync::ProtocolErrorInfo::Action::NoAction:
-                // Although a protocol error, this is not sent by the server.
-                // Therefore, there is no action.
-                if (error_code == realm::sync::ProtocolError::bad_authentication) {
-                    next_state = NextStateAfterError::inactive;
-                    log_out_user = true;
-                    break;
-                }
                 REALM_UNREACHABLE(); // This is not sent by the MongoDB server
             case sync::ProtocolErrorInfo::Action::ApplicationBug:
                 [[fallthrough]];
@@ -709,80 +703,23 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
                 save_sync_config_after_migration_or_rollback();
                 download_fresh_realm(error.server_requests_action);
                 return;
-        }
-    }
-    else if (error_code.category() == realm::sync::client_error_category()) {
-        using ClientError = realm::sync::ClientError;
-        switch (static_cast<ClientError>(error_code.value())) {
-            case ClientError::connection_closed:
-            case ClientError::pong_timeout:
-                // Not real errors, don't need to be reported to the SDK.
-                return;
-            case ClientError::bad_changeset:
-            case ClientError::bad_changeset_header_syntax:
-            case ClientError::bad_changeset_size:
-            case ClientError::bad_client_file_ident:
-            case ClientError::bad_client_file_ident_salt:
-            case ClientError::bad_client_version:
-            case ClientError::bad_compression:
-            case ClientError::bad_error_code:
-            case ClientError::bad_file_ident:
-            case ClientError::bad_message_order:
-            case ClientError::bad_origin_file_ident:
-            case ClientError::bad_progress:
-            case ClientError::bad_protocol_from_server:
-            case ClientError::bad_request_ident:
-            case ClientError::bad_server_version:
-            case ClientError::bad_session_ident:
-            case ClientError::bad_state_message:
-            case ClientError::bad_syntax:
-            case ClientError::bad_timestamp:
-            case ClientError::client_too_new_for_server:
-            case ClientError::client_too_old_for_server:
-            case ClientError::connect_timeout:
-            case ClientError::limits_exceeded:
-            case ClientError::protocol_mismatch:
-            case ClientError::ssl_server_cert_rejected:
-            case ClientError::missing_protocol_feature:
-            case ClientError::unknown_message:
-            case ClientError::http_tunnel_failed:
-            case ClientError::auto_client_reset_failure:
-                // Don't do anything special for these errors.
-                // Future functionality may require special-case handling for existing
-                // errors, or newly introduced error codes.
+            case sync::ProtocolErrorInfo::Action::RefreshUser:
+                if (auto u = user()) {
+                    u->refresh_custom_data(false, handle_refresh(shared_from_this(), false));
+                    return;
+                }
+                break;
+            case sync::ProtocolErrorInfo::Action::RefreshLocation:
+                if (auto u = user()) {
+                    u->refresh_custom_data(true, handle_refresh(shared_from_this(), true));
+                    return;
+                }
+                break;
+            case sync::ProtocolErrorInfo::Action::LogOutUser:
+                next_state = NextStateAfterError::inactive;
+                log_out_user = true;
                 break;
         }
-    }
-    else if (error_code.category() == sync::websocket::websocket_error_category()) {
-        using WebSocketError = sync::websocket::WebSocketError;
-        auto websocket_error = static_cast<WebSocketError>(error_code.value());
-
-        // The server replies with '401: unauthorized' if the access token is invalid, expired, revoked, or the user
-        // is disabled. In this scenario we attempt an automatic token refresh and if that succeeds continue as
-        // normal. If the refresh request also fails with 401 then we need to stop retrying and pass along the error;
-        // see handle_refresh().
-        bool redirect_occurred = websocket_error == WebSocketError::websocket_moved_permanently;
-        if (redirect_occurred || websocket_error == WebSocketError::websocket_unauthorized ||
-            websocket_error == WebSocketError::websocket_abnormal_closure) {
-            if (auto u = user()) {
-                // If a redirection occurred, the location metadata will be updated before refreshing the access
-                // token.
-                u->refresh_custom_data(redirect_occurred, handle_refresh(shared_from_this(), redirect_occurred));
-                return;
-            }
-        }
-
-        // If the websocket was closed cleanly or if the socket disappeared, don't notify the user as an error
-        // since the sync client will retry.
-        if (websocket_error == WebSocketError::websocket_read_error ||
-            websocket_error == WebSocketError::websocket_write_error) {
-            return;
-        }
-
-        // Surface a simplified websocket error to the user.
-        auto simplified_error = sync::websocket::get_simplified_websocket_error(websocket_error);
-        std::error_code new_error_code(simplified_error, sync::websocket::websocket_error_category());
-        error = sync::SessionErrorInfo(new_error_code, error.message, error.try_again);
     }
     else {
         // Unrecognized error code.
@@ -790,8 +727,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     }
 
     util::CheckedUniqueLock lock(m_state_mutex);
-    SyncError sync_error{error.error_code, std::string(error.message), error.is_fatal(), error.log_url,
-                         std::move(error.compensating_writes)};
+    SyncError sync_error{error.status, error.is_fatal, error.log_url, std::move(error.compensating_writes)};
     // `action` is used over `shouldClientReset` and `isRecoveryModeDisabled`.
     sync_error.server_requests_action = error.server_requests_action;
     sync_error.is_unrecognized_by_client = unrecognized_by_client;
@@ -799,8 +735,8 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     if (delete_file)
         update_error_and_mark_file_for_deletion(sync_error, *delete_file);
 
-    if (m_state == State::Dying && error.is_fatal()) {
-        become_inactive(std::move(lock));
+    if (m_state == State::Dying && error.is_fatal) {
+        become_inactive(std::move(lock), error.status);
         return;
     }
 
@@ -813,16 +749,15 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     switch (next_state) {
         case NextStateAfterError::none:
             if (config(&SyncConfig::cancel_waits_on_nonfatal_error)) {
-                cancel_pending_waits(std::move(lock), sync_error.to_status()); // unlocks the mutex
+                cancel_pending_waits(std::move(lock), sync_error.status); // unlocks the mutex
             }
             break;
         case NextStateAfterError::inactive: {
-            become_inactive(std::move(lock), sync_error.to_status());
+            become_inactive(std::move(lock), sync_error.status);
             break;
         }
         case NextStateAfterError::error: {
-            auto error = sync_error.to_status();
-            cancel_pending_waits(std::move(lock), error);
+            cancel_pending_waits(std::move(lock), sync_error.status);
             break;
         }
     }
@@ -935,6 +870,9 @@ void SyncSession::create_sync_session()
     session_config.proxy_config = sync_config.proxy_config;
     session_config.simulate_integration_error = sync_config.simulate_integration_error;
     session_config.flx_bootstrap_batch_size_bytes = sync_config.flx_bootstrap_batch_size_bytes;
+    session_config.session_reason = ClientResetOperation::is_fresh_path(m_config.path)
+                                        ? sync::SessionReason::ClientReset
+                                        : sync::SessionReason::Sync;
 
     if (sync_config.on_sync_client_event_hook) {
         session_config.on_sync_client_event_hook = [hook = sync_config.on_sync_client_event_hook,
