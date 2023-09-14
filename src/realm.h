@@ -2655,6 +2655,24 @@ RLM_API realm_results_t* realm_results_limit(realm_results_t* results, size_t ma
 RLM_API bool realm_results_get(realm_results_t*, size_t index, realm_value_t* out_value);
 
 /**
+ * Returns an instance of realm_list at the index passed as argument.
+ * @return A valid ptr to a list instance or nullptr in case of errors
+ */
+RLM_API realm_list_t* realm_results_get_list(realm_results_t*, size_t index);
+
+/**
+ * Returns an instance of realm_set_t for the index passed as argument.
+ * @return A valid ptr to a set instance or nullptr in case of errors
+ */
+RLM_API realm_set_t* realm_results_get_set(realm_results_t*, size_t index);
+
+/**
+ * Returns an instance of realm_dictionary for the index passed as argument.
+ * @return A valid ptr to a dictionary instance or nullptr in case of errors
+ */
+RLM_API realm_dictionary_t* realm_results_get_dictionary(realm_results_t*, size_t index);
+
+/**
  * Find the index for the value passed as parameter inside realm results pointer passed a input parameter.
  *  @param value the value to find inside the realm results
  *  @param out_index the index where the object has been found, or realm::not_found

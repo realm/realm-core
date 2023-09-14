@@ -91,12 +91,14 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
     };
 
     write([&] {
-        dict_mixed.insert_collection("test", CollectionType::List);
+        dict_mixed.insert_collection("list", CollectionType::List);
+        dict_mixed.insert_collection("set", CollectionType::Set);
+        dict_mixed.insert_collection("dictionary", CollectionType::Dictionary);
     });
 
-    REQUIRE(change_dictionary.insertions.count() == 1);
+    REQUIRE(change_dictionary.insertions.count() == 3);
 
-    auto list = dict_mixed.get_list("test");
+    auto list = dict_mixed.get_list("list");
 
     SECTION("notification on nested list") {
         CollectionChangeSet change;
@@ -143,7 +145,7 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
             });
             REQUIRE_INDICES(change.insertions, 0, 1);
             write([&] {
-                dict_mixed.insert("test", 42);
+                dict_mixed.insert("list", 42);
             });
             REQUIRE_INDICES(change.deletions, 0, 1);
             REQUIRE(change.collection_root_was_deleted);
@@ -174,6 +176,24 @@ TEST_CASE("nested dictionary in mixed", "[dictionary]") {
             REQUIRE_INDICES(change.deletions, 0, 1);
             REQUIRE(change.collection_root_was_deleted);
         }
+    }
+    SECTION("dictionary as Results") {
+        auto results = dict_mixed.get_values();
+
+        auto val = results.get<Mixed>(0);
+        REQUIRE(val.is_type(type_Dictionary));
+        auto dict = results.get_dictionary(0);
+        REQUIRE(dict.is_valid());
+
+        val = results.get<Mixed>(1);
+        REQUIRE(val.is_type(type_List));
+        auto list = results.get_list(1);
+        REQUIRE(list.is_valid());
+
+        val = results.get<Mixed>(2);
+        REQUIRE(val.is_type(type_Set));
+        auto set = results.get_set(2);
+        REQUIRE(set.is_valid());
     }
 }
 
