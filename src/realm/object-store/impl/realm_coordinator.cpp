@@ -386,7 +386,8 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
         // consideration if the db was created during this call. Since this may be the first time
         // we are actually creating a realm. For async open this does not apply, infact db_created
         // will always be false.
-        first_time_open |= db_created;
+        if (!first_time_open)
+            first_time_open = db_created;
         if (subscription_version == 0 || (first_time_open && rerun_on_open)) {
             // if the tasks is cancelled, the subscription may or may not be run.
             subscription_function(realm);
