@@ -296,6 +296,37 @@ namespace realm {
 
 namespace query_parser {
 
+std::string_view string_for_op(CompareType op)
+{
+    switch (op) {
+        case CompareType::EQUAL:
+            return "=";
+        case CompareType::NOT_EQUAL:
+            return "!=";
+        case CompareType::GREATER:
+            return ">";
+        case CompareType::LESS:
+            return "<";
+        case CompareType::GREATER_EQUAL:
+            return ">=";
+        case CompareType::LESS_EQUAL:
+            return "<=";
+        case CompareType::BEGINSWITH:
+            return "beginswith";
+        case CompareType::ENDSWITH:
+            return "endswith";
+        case CompareType::CONTAINS:
+            return "contains";
+        case CompareType::LIKE:
+            return "like";
+        case CompareType::IN:
+            return "in";
+        case CompareType::TEXT:
+            return "text";
+    }
+    return ""; // appease MSVC warnings
+}
+
 NoArguments ParserDriver::s_default_args;
 query_parser::KeyPathMapping ParserDriver::s_default_mapping;
 
@@ -531,15 +562,7 @@ Query EqualityNode::visit(ParserDriver* drv)
                         return drv->m_base_table->where().equal(col_key, realm::null());
                     case CompareType::NOT_EQUAL:
                         return drv->m_base_table->where().not_equal(col_key, realm::null());
-                    case CompareType::GREATER:
-                    case CompareType::LESS:
-                    case CompareType::GREATER_EQUAL:
-                    case CompareType::LESS_EQUAL:
-                    case CompareType::BEGINSWITH:
-                    case CompareType::ENDSWITH:
-                    case CompareType::CONTAINS:
-                    case CompareType::LIKE:
-                    case CompareType::TEXT:
+                    default:
                         break;
                 }
             }

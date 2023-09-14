@@ -425,36 +425,7 @@ enum class CompareType : char {
     TEXT,
 };
 
-static std::string_view string_for_op(CompareType op)
-{
-    switch (op) {
-        case CompareType::EQUAL:
-            return "=";
-        case CompareType::NOT_EQUAL:
-            return "!=";
-        case CompareType::GREATER:
-            return ">";
-        case CompareType::LESS:
-            return "<";
-        case CompareType::GREATER_EQUAL:
-            return ">=";
-        case CompareType::LESS_EQUAL:
-            return "<=";
-        case CompareType::BEGINSWITH:
-            return "beginswith";
-        case CompareType::ENDSWITH:
-            return "endswith";
-        case CompareType::CONTAINS:
-            return "contains";
-        case CompareType::LIKE:
-            return "like";
-        case CompareType::IN:
-            return "in";
-        case CompareType::TEXT:
-            return "text";
-    }
-    return ""; // appease MSVC warnings
-}
+std::string_view string_for_op(CompareType op);
 
 class CompareNode : public QueryNode {};
 
