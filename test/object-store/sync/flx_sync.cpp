@@ -233,6 +233,18 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][baas]") {
     });
 }
 
+TEST_CASE("flx: connect to FLX-enabled app with invalid access token", "[sync][flx][baas]") {
+    FLXSyncTestHarness harness("invalid_access_token");
+    harness.do_with_new_user([&](std::shared_ptr<SyncUser> user) {
+        user->update_access_token(ENCODE_FAKE_JWT("fake_access_token"));
+        SyncTestFile config(user, harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+        // the connection will get an unauthorized error, then re-authenticate, then reconnect successfully
+        const auto realm = Realm::get_shared_realm(config);
+        wait_for_download(*realm);
+    });
+}
+
 TEST_CASE("flx: test commands work", "[sync][flx][test command][baas]") {
     FLXSyncTestHarness harness("test_commands");
     harness.do_with_new_realm([&](const SharedRealm& realm) {
