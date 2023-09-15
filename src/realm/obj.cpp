@@ -442,6 +442,10 @@ Mixed Obj::get_any(ColKey col_key) const
             return Mixed{_get<util::Optional<float>>(col_ndx)};
         case col_type_Double:
             return Mixed{_get<util::Optional<double>>(col_ndx)};
+        case col_type_EnumString: {
+            auto id = _get<int64_t>(col_ndx);
+            return Mixed(m_table->get_enum_string(col_key, id));
+        }
         case col_type_String:
             return Mixed{_get<String>(col_ndx)};
         case col_type_Binary:
@@ -551,7 +555,6 @@ inline bool Obj::do_is_null<ArrayString>(ColKey::Idx col_ndx) const
 {
     ArrayString values(get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
-    values.set_spec(const_cast<Spec*>(&get_spec()), m_table->leaf_ndx2spec_ndx(col_ndx));
     values.init_from_ref(ref);
     return values.is_null(m_row_ndx);
 }
@@ -891,6 +894,9 @@ void out_mixed_json(std::ostream& out, const Mixed& val)
             out << "\"";
             break;
         }
+        case type_EnumString: {
+            REALM_ASSERT(false);
+        }
         case type_Binary: {
             out << "\"";
             out_binary(out, val.get<Binary>());
@@ -959,6 +965,9 @@ void out_mixed_xjson(std::ostream& out, const Mixed& val)
             out_string(out, val.get<String>());
             out << "\"";
             break;
+        }
+        case type_EnumString: {
+            REALM_ASSERT(false);
         }
         case type_Binary: {
             out << "{\"$binary\": {\"base64\": \"";
@@ -1677,19 +1686,6 @@ inline void check_range(const BinaryData& val)
 }
 } // namespace
 
-// helper functions for filtering out calls to set_spec()
-template <class T>
-inline void Obj::set_spec(T&, ColKey)
-{
-}
-template <>
-inline void Obj::set_spec<ArrayString>(ArrayString& values, ColKey col_key)
-{
-    size_t spec_ndx = m_table->colkey2spec_ndx(col_key);
-    Spec* spec = const_cast<Spec*>(&get_spec());
-    values.set_spec(spec, spec_ndx);
-}
-
 template <class T>
 Obj& Obj::set(ColKey col_key, T value, bool is_default)
 {
@@ -1726,7 +1722,6 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
         using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
         LeafType values(alloc);
         values.set_parent(&fields, col_ndx.val + 1);
-        set_spec<LeafType>(values, col_key);
         values.init_from_parent();
         values.set(m_row_ndx, value);
     }
@@ -2300,7 +2295,6 @@ template <>
 inline void Obj::do_set_null<ArrayString>(ColKey col_key)
 {
     ColKey::Idx col_ndx = col_key.get_index();
-    size_t spec_ndx = m_table->leaf_ndx2spec_ndx(col_ndx);
     Allocator& alloc = get_alloc();
     alloc.bump_content_version();
     Array fallback(alloc);
@@ -2308,7 +2302,6 @@ inline void Obj::do_set_null<ArrayString>(ColKey col_key)
 
     ArrayString values(alloc);
     values.set_parent(&fields, col_ndx.val + 1);
-    values.set_spec(const_cast<Spec*>(&get_spec()), spec_ndx);
     values.init_from_parent();
     values.set_null(m_row_ndx);
 
@@ -2357,6 +2350,9 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
             case col_type_String:
                 do_set_null<ArrayString>(col_key);
                 break;
+            case col_type_EnumString: {
+                REALM_ASSERT(false);
+            }
             case col_type_Binary:
                 do_set_null<ArrayBinary>(col_key);
                 break;

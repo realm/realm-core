@@ -430,8 +430,6 @@ private:
     bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const;
     // Used when removing a backlink, return true if CascadeState contains objects to remove
     bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const;
-    template <class T>
-    inline void set_spec(T&, ColKey);
     template <class ValueType>
     inline void nullify_single_link(ColKey col, ValueType target);
 

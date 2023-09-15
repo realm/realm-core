@@ -1095,16 +1095,6 @@ void ClusterTree::update(UpdateFunction func)
     }
 }
 
-void ClusterTree::set_spec(ArrayPayload& arr, ColKey::Idx col_ndx) const
-{
-    // Check for owner. This function may be called in context of DictionaryClusterTree
-    // in which case m_owner is null (and spec never needed).
-    if (m_owner) {
-        auto spec_ndx = m_owner->leaf_ndx2spec_ndx(col_ndx);
-        arr.set_spec(&m_owner->m_spec, spec_ndx);
-    }
-}
-
 TableRef ClusterTree::get_table_ref() const
 {
     REALM_ASSERT(m_owner != nullptr);

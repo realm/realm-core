@@ -355,11 +355,6 @@ public:
     virtual void init_from_ref(ref_type) noexcept = 0;
     virtual void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept = 0;
     virtual Mixed get_any(size_t ndx) const = 0;
-    virtual bool need_spec() const
-    {
-        return false;
-    }
-    virtual void set_spec(Spec*, size_t) const {}
 };
 
 

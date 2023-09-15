@@ -247,17 +247,6 @@ size_t Cluster::node_size_from_header(Allocator& alloc, const char* header)
 }
 
 template <class T>
-inline void Cluster::set_spec(T&, ColKey::Idx) const
-{
-}
-
-template <>
-inline void Cluster::set_spec(ArrayString& arr, ColKey::Idx col_ndx) const
-{
-    m_tree_top.set_spec(arr, col_ndx);
-}
-
-template <class T>
 inline void Cluster::do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool nullable)
 {
     using U = typename util::RemoveOptional<typename T::value_type>::type;
@@ -265,7 +254,6 @@ inline void Cluster::do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool 
     T arr(m_alloc);
     auto col_ndx = col.get_index();
     arr.set_parent(this, col_ndx.val + s_first_col_index);
-    set_spec<T>(arr, col_ndx);
     arr.init_from_parent();
     if (init_val.is_null()) {
         arr.insert(ndx, T::default_value(nullable));
@@ -736,7 +724,6 @@ void Cluster::do_insert_rows(ColKey col, ValueIterator begin, size_t to_insert, 
     T arr(m_alloc);
     auto col_ndx = col.get_index();
     arr.set_parent(this, col_ndx.val + s_first_col_index);
-    set_spec<T>(arr, col_ndx);
     arr.init_from_parent();
     auto it = begin;
     for (size_t i = 0; i < to_insert; ++i, ++it) {
@@ -854,7 +841,6 @@ inline void Cluster::do_erase(size_t ndx, ColKey col_key)
     auto col_ndx = col_key.get_index();
     T values(m_alloc);
     values.set_parent(this, col_ndx.val + s_first_col_index);
-    set_spec<T>(values, col_ndx);
     values.init_from_parent();
     ObjLink link;
     if constexpr (std::is_same_v<T, ArrayTypedLink>) {
@@ -1132,9 +1118,6 @@ void Cluster::init_leaf(ColKey col_key, ArrayPayload* leaf) const
     if (auto t = m_tree_top.get_owning_table())
         t->check_column(col_key);
     ref_type ref = to_ref(Array::get(col_ndx.val + 1));
-    if (leaf->need_spec()) {
-        m_tree_top.set_spec(*leaf, col_ndx);
-    }
     leaf->init_from_ref(ref);
     leaf->set_parent(const_cast<Cluster*>(this), col_ndx.val + 1);
 }
@@ -1150,7 +1133,6 @@ template <typename ArrayType>
 void Cluster::verify(ref_type ref, size_t index, util::Optional<size_t>& sz) const
 {
     ArrayType arr(get_alloc());
-    set_spec(arr, ColKey::Idx{unsigned(index) - 1});
     arr.set_parent(const_cast<Cluster*>(this), index);
     arr.init_from_ref(ref);
     arr.verify();
