@@ -1552,20 +1552,22 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
     else {
         if (list.get_data_type() == type_Mixed) {
             auto& mixed_list = static_cast<Lst<Mixed>&>(list);
-            auto val = mixed_list.get(index);
+            if (index < mixed_list.size()) {
+                auto val = mixed_list.get(index);
 
-            if (val.is_type(type_Dictionary)) {
-                if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
-                    Dictionary d(mixed_list, mixed_list.get_key(index));
-                    ++m_it_begin;
-                    return resolve_dictionary_element(d, *pfield);
+                if (val.is_type(type_Dictionary)) {
+                    if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
+                        Dictionary d(mixed_list, mixed_list.get_key(index));
+                        ++m_it_begin;
+                        return resolve_dictionary_element(d, *pfield);
+                    }
                 }
-            }
-            if (val.is_type(type_List)) {
-                if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
-                    Lst<Mixed> l(mixed_list, mixed_list.get_key(index));
-                    ++m_it_begin;
-                    return resolve_list_element(l, *pindex);
+                if (val.is_type(type_List)) {
+                    if (auto pindex = mpark::get_if<uint32_t>(&*m_it_begin)) {
+                        Lst<Mixed> l(mixed_list, mixed_list.get_key(index));
+                        ++m_it_begin;
+                        return resolve_list_element(l, *pindex);
+                    }
                 }
             }
         }
