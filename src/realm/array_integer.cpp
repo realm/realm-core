@@ -38,12 +38,18 @@ bool ArrayInteger::try_compress()
         m_is_compressed = true;
         size_t i{0};
         // array of values
-        for (auto& value : values)
-            write_compressed_value(m_compressed_value_width, m_compressed_values, i++, value);
-        i = 0;
+        for (const auto& value : values) {
+            set_direct(m_compressed_array.get_addr(), m_compressed_value_width, i, value);
+            i += 1;
+        }
+
         // array of indices
-        for (auto& index : indices)
-            write_compressed_value(m_compressed_index_width, m_compressed_indices, i++, index);
+        i = 0;
+        const auto offset = m_compressed_values_size;
+        for (const auto& index : indices) {
+            set_direct(m_compressed_array.get_addr(), m_compressed_index_width, offset + i, index);
+            i += 1;
+        }
 
         return true;
     }
@@ -55,19 +61,23 @@ bool ArrayInteger::try_to_compress_array(std::vector<int64_t>& values, std::vect
     std::set<int64_t> s;
     const auto sz = size();
     indices.reserve(sz);
+
     for (size_t i = 0; i < sz; ++i) {
         auto item = get(i);
         indices.push_back(item);
         s.insert(item);
     }
+
     values.reserve(s.size());
     for (const auto& v : s) {
         values.push_back(v);
     }
+
     for (auto& v : indices) {
         auto pos = std::lower_bound(values.begin(), values.end(), v);
         v = std::distance(values.begin(), pos);
     }
+
     auto max = std::max_element(values.begin(), values.end());
     auto compressed_value_width = bit_width(*max);
     auto compressed_index_width = bit_width(indices.size() - 1);
@@ -81,8 +91,7 @@ bool ArrayInteger::try_to_compress_array(std::vector<int64_t>& values, std::vect
         m_compressed_index_width = compressed_index_width;
         m_compressed_values_size = compressed_values_size;
         m_compressed_indices_size = compressed_indices_size;
-        m_compressed_values = m_alloc.alloc(m_compressed_values_size);
-        m_compressed_indices = m_alloc.alloc(m_compressed_indices_size);
+        m_compressed_array = m_alloc.alloc(m_compressed_values_size + m_compressed_indices_size);
         return true;
     }
     return false;
@@ -98,9 +107,12 @@ bool ArrayInteger::decompress()
         // working
         clear();
         const auto sz = m_compressed_indices_size / m_compressed_index_width;
+        const auto offset = m_compressed_values_size;
         for (size_t i = 0; i < sz; ++i) {
-            auto index = read_compressed_value(m_compressed_index_width, m_compressed_indices, i);
-            auto value = read_compressed_value(m_compressed_value_width, m_compressed_values, index);
+            auto index = get_direct(m_compressed_array.get_addr(), m_compressed_index_width, offset + i);
+            auto value = get_direct(m_compressed_array.get_addr(), m_compressed_value_width, index);
+            // auto index = read_compressed_value(m_compressed_index_width, m_compressed_array, offset + i);
+            // auto value = read_compressed_value(m_compressed_value_width, m_compressed_array, index);
             Array::insert(i, value);
         }
         m_is_compressed = false;
@@ -113,64 +125,15 @@ bool ArrayInteger::decompress()
 int64_t ArrayInteger::get_compressed_value(size_t ndx) const
 {
     const auto sz = m_compressed_indices_size / m_compressed_index_width;
+    const auto offset = m_compressed_values_size;
     for (size_t i = 0; i < sz; ++i) {
         // this can be improved, doing binary search.
-        auto index = read_compressed_value(m_compressed_index_width, m_compressed_indices, i);
+        auto index = get_direct(m_compressed_array.get_addr(), m_compressed_index_width, offset + i);
         if (ndx == i) {
-            return read_compressed_value(m_compressed_value_width, m_compressed_values, index);
+            return get_direct(m_compressed_array.get_addr(), m_compressed_value_width, index);
         }
     }
     return realm::not_found;
-}
-
-void ArrayInteger::write_compressed_value(size_t width, MemRef mem_ref, size_t i, int_fast64_t value)
-{
-    auto addr = mem_ref.get_addr();
-    if (width == 1)
-        set_direct<1>(addr, i, value);
-
-    else if (width == 2)
-        set_direct<2>(addr, i, value);
-
-    else if (width == 4)
-        set_direct<4>(addr, i, value);
-
-    else if (width == 8)
-        set_direct<8>(addr, i, value);
-
-    else if (width == 16)
-        set_direct<16>(addr, i, value);
-
-    else if (width == 32)
-        set_direct<32>(addr, i, value);
-
-    else if (width == 64)
-        set_direct<64>(addr, i, value);
-}
-
-int64_t ArrayInteger::read_compressed_value(size_t width, MemRef mem_ref, size_t i) const
-{
-    auto addr = mem_ref.get_addr();
-    if (width == 1)
-        return get_direct<1>(addr, i++);
-
-    else if (width == 2)
-        return get_direct<2>(addr, i++);
-
-    else if (width == 4)
-        return get_direct<4>(addr, i++);
-
-    else if (width == 8)
-        return get_direct<8>(addr, i++);
-
-    else if (width == 16)
-        return get_direct<16>(addr, i++);
-
-    else if (width == 32)
-        return get_direct<32>(addr, i++);
-
-    REALM_ASSERT(width == 64);
-    return get_direct<64>(addr, i++);
 }
 
 Mixed ArrayIntNull::get_any(size_t ndx) const
