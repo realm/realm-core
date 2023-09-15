@@ -34,6 +34,7 @@
 * When using SecureTransport (i.e. on Apple platforms) only some TLS errors were reported as `TlsHandshakeFailed` and most were reported as `SyncConnectFailed` ([PR #6938](https://github.com/realm/realm-core/pull/6938)).
 * Sync errors originating from OpenSSL used the error message from the wrong end of the error stack, often resulting in very unhelpful error message ([PR #6938](https://github.com/realm/realm-core/pull/6938)).
 * Sending empty UPLOAD messages may lead to 'Bad server version' errors and client reset. ([6966](https://github.com/realm/realm-core/issues/6966), since v11.8.0)
+* Fix open async in order to invoke the subscription callback correctly when rerun_on_open is set to true. ([#6937](https://github.com/realm/realm-core/pull/6937), since v13.16.0).
 
 ### Breaking changes
 * None.
