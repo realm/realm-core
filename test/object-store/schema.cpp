@@ -416,9 +416,8 @@ TEST_CASE("Schema") {
                  ObjectSchema::ObjectType::TopLevelAsymmetric,
                  {{"_id", PropertyType::Int, Property::IsPrimary{true}},
                   {"link", PropertyType::Object | PropertyType::Nullable, "link target"}}},
-                {"link target", 
-                 {{"_id", PropertyType::Int, Property::IsPrimary{true}},
-                  {"value", PropertyType::Int}}},
+                {"link target",
+                 {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
             };
             REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::SyncFLX));
         }
