@@ -38,8 +38,7 @@ public:
     void destroy_deep() noexcept
     {
         if (m_is_compressed) {
-            Array::destroy(m_compressed_values, m_alloc);
-            Array::destroy(m_compressed_indices, m_alloc);
+            Array::destroy(m_compressed_array, m_alloc);
             m_compressed_values_size = 0;
             m_compressed_indices_size = 0;
             m_compressed_value_width = 0;
@@ -117,8 +116,6 @@ public:
     bool find(value_type value, size_t start, size_t end, QueryStateBase* state, Callback callback) const;
 
 private:
-    void write_compressed_value(size_t, MemRef, size_t, int_fast64_t);
-    int64_t read_compressed_value(size_t, MemRef, size_t) const;
     int64_t get_compressed_value(size_t ndx) const;
     // return true or false whether the compression is actually going to shrink the
     // memory footprint for this array or no.
@@ -127,8 +124,8 @@ private:
     // TODO this should be moved inside the Node class and only populated by ArrayInteger
     //  and ArrayIntNull
     bool m_is_compressed{false};
-    MemRef m_compressed_values;
-    MemRef m_compressed_indices;
+    // array compressed,  composed by [values, indices];
+    MemRef m_compressed_array;
     size_t m_compressed_value_width{0};
     size_t m_compressed_index_width{0};
     size_t m_compressed_values_size{0};
