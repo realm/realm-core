@@ -50,7 +50,7 @@ if(REALM_ENABLE_SYNC)
     )
 endif()
 
-add_library(TestUtil OBJECT ${TEST_UTIL_SOURCES} ${TEST_UTIL_HEADERS})
+add_library(TestUtil STATIC ${TEST_UTIL_SOURCES} ${TEST_UTIL_HEADERS})
 
 target_link_libraries(TestUtil Storage)
 

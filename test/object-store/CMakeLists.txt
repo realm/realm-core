@@ -90,7 +90,6 @@ enable_stdfilesystem(ObjectStoreTestLib)
 
 add_executable(ObjectStoreTests main.cpp ${RESOURCES})
 set_target_properties(ObjectStoreTests PROPERTIES OUTPUT_NAME realm-object-store-tests)
-target_sources(ObjectStoreTests PUBLIC $<TARGET_OBJECTS:ObjectStoreTestLib>)
 target_link_libraries(ObjectStoreTests ObjectStoreTestLib TestUtil)
 set_target_resources(ObjectStoreTests "${RESOURCES}")
 enable_stdfilesystem(ObjectStoreTests)

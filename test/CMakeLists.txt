@@ -138,12 +138,10 @@ file(GLOB REQUIRED_TEST_FILES
 
 add_library(CoreTestLib OBJECT ${CORE_TESTS} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
 enable_stdfilesystem(CoreTestLib)
-target_link_libraries(CoreTestLib Storage QueryParser)
+target_link_libraries(CoreTestLib QueryParser)
 
 add_executable(CoreTests main.cpp test_all.cpp ${REQUIRED_TEST_FILES})
-target_sources(CoreTests PUBLIC $<TARGET_OBJECTS:CoreTestLib>)
-target_sources(CoreTests PUBLIC $<TARGET_OBJECTS:TestUtil>)
-target_link_libraries(CoreTests QueryParser)
+target_link_libraries(CoreTests CoreTestLib TestUtil)
 set_target_resources(CoreTests "${REQUIRED_TEST_FILES}")
 set_target_properties(CoreTests PROPERTIES
     OUTPUT_NAME "realm-tests"
@@ -237,12 +235,10 @@ if(REALM_ENABLE_SYNC)
     target_link_libraries(SyncTestLib Sync SyncServer Storage)
 
     add_executable(SyncTests main.cpp test_all.cpp ${SYNC_TEST_RESOURCES})
-    target_sources(SyncTests PUBLIC $<TARGET_OBJECTS:SyncTestLib>)
-    target_sources(SyncTests PUBLIC $<TARGET_OBJECTS:TestUtil>)
     set_target_properties(SyncTests PROPERTIES OUTPUT_NAME "realm-sync-tests")
     set_target_resources(SyncTests "${SYNC_TEST_RESOURCES}")
     enable_stdfilesystem(SyncTests)
-    target_link_libraries(SyncTests Sync SyncServer)
+    target_link_libraries(SyncTests SyncTestLib TestUtil)
     add_bundled_test(SyncTests)
 
     if(UNIX AND NOT APPLE)
@@ -263,23 +259,14 @@ set_target_properties(CombinedTests PROPERTIES
 )
 target_include_directories(CombinedTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "object-store")
 
-if(MSVC)
-    # increase the number of sections supported in an obj file for the heavily templated tests
-    target_compile_options(CombinedTests PRIVATE /bigobj)
-endif()
-
 if(WINDOWS_STORE)
     target_sources(CombinedTests PRIVATE ${UWP_SOURCES})
 endif()
 
-target_sources(CombinedTests PUBLIC $<TARGET_OBJECTS:TestUtil>)
-target_sources(CombinedTests PUBLIC $<TARGET_OBJECTS:CoreTestLib>)
-target_sources(CombinedTests PUBLIC $<TARGET_OBJECTS:ObjectStoreTestLib>)
 if(REALM_ENABLE_SYNC)
-    target_sources(CombinedTests PUBLIC $<TARGET_OBJECTS:SyncTestLib>)
-    target_link_libraries(CombinedTests ObjectStoreTestLib CoreTestLib SyncTestLib Sync SyncServer Storage TestUtil)
+    target_link_libraries(CombinedTests ObjectStoreTestLib CoreTestLib SyncTestLib TestUtil)
 else()
-    target_link_libraries(CombinedTests ObjectStoreTestLib CoreTestLib Storage TestUtil)
+    target_link_libraries(CombinedTests ObjectStoreTestLib CoreTestLib TestUtil)
 endif()
 
 enable_stdfilesystem(CombinedTests)
