@@ -961,6 +961,7 @@ tasks:
             --vcs-branch="${branch_name}" \
             --ignore='external/**' \
             --ignore='src/external/**' \
+            --ignore='test/**' \
             --parallel \
             --output-path=coveralls_${task_name}.json
 
