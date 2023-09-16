@@ -1,7 +1,4 @@
 set(HEADERS
-    ../util/crypt_key.hpp
-    ../util/spawned_process.hpp
-    ../util/test_path.hpp
     util/event_loop.hpp
     util/index_helpers.hpp
     util/test_file.hpp
@@ -32,9 +29,6 @@ set(SOURCES
     c_api/c_api.cpp
     c_api/c_api.c
 
-    ../util/crypt_key.cpp
-    ../util/spawned_process.cpp
-    ../util/test_path.cpp
     util/event_loop.cpp
     util/test_file.cpp
     util/test_utils.cpp
@@ -91,7 +85,7 @@ if(MSVC)
     target_compile_options(ObjectStoreTests PRIVATE /bigobj)
 endif()
 
-target_link_libraries(ObjectStoreTests Catch2::Catch2 ObjectStore RealmFFIStatic)
+target_link_libraries(ObjectStoreTests Catch2::Catch2 ObjectStore TestUtil RealmFFIStatic)
 enable_stdfilesystem(ObjectStoreTests)
 create_coverage_target(generate-coverage ObjectStoreTests)
 
