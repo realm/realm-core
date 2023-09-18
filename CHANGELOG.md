@@ -17,6 +17,7 @@
 
 ### Internals
 * Update History Command tool to work with realms with fileformat v23 ([PR #6970](https://github.com/realm/realm-core/pull/6970))
+* Don't edit the ObjectStore target to enable the libuv scheduler in tests, just register the factory instead. ([PR #6699](https://github.com/realm/realm-core/pull/6699))
 
 ----------------------------------------------
 
