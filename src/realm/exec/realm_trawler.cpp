@@ -1012,7 +1012,7 @@ public:
         return true;
     }
 
-    bool select_collection(realm::ColKey col_key, realm::ObjKey key, const StablePath&)
+    bool select_collection(realm::ColKey col_key, realm::ObjKey key, const realm::StablePath&)
     {
         std::cout << "Select collection: " << m_table->get_column_name(col_key) << " on " << key << std::endl;
         return true;
