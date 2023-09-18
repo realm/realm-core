@@ -19,6 +19,7 @@
 #ifndef REALM_SCHEMA_HPP
 #define REALM_SCHEMA_HPP
 
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -200,6 +201,7 @@ public:
     {
         return !(a == b);
     }
+    friend std::ostream& operator<<(std::ostream&, const Schema&);
 
     using base::begin;
     using base::const_iterator;

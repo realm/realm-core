@@ -16,16 +16,17 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
-#include <catch2/matchers/catch_matchers_string.hpp>
+#include <util/event_loop.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
+#include <../util/semaphore.hpp>
 
-#include "util/event_loop.hpp"
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
-#include "../util/semaphore.hpp"
+#include <realm/db.hpp>
+#include <realm/history.hpp>
+
+#include <realm/impl/simulated_failure.hpp>
 
 #include <realm/object-store/binding_context.hpp>
-#include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/keypath_helpers.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
@@ -33,27 +34,33 @@
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
-#include <realm/object-store/util/scheduler.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/util/event_loop_dispatcher.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
-#if REALM_ENABLE_SYNC
-#include <realm/object-store/sync/async_open_task.hpp>
-#include <realm/object-store/sync/impl/sync_metadata.hpp>
-#include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/subscriptions.hpp>
-#include "sync/flx_sync_harness.hpp"
-#endif
-
-#include <realm/db.hpp>
-#include <realm/history.hpp>
-#include <realm/impl/simulated_failure.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/fifo_helper.hpp>
 #include <realm/util/scope_exit.hpp>
 
+#if REALM_ENABLE_SYNC
+#include <util/sync/flx_sync_harness.hpp>
+
+#include <realm/object-store/sync/async_open_task.hpp>
+#include <realm/object-store/sync/impl/sync_metadata.hpp>
+
+#include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/subscriptions.hpp>
+#endif
+
+#include <catch2/catch_all.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
+
 #include <external/json/json.hpp>
 
 #include <array>
+#if REALM_HAVE_UV
+#include <uv.h>
+#endif
 
 namespace realm {
 class TestHelper {
@@ -844,11 +851,19 @@ TEST_CASE("SharedRealm: schema_subset_mode") {
     SECTION("obtaining a frozen realm with an incompatible schema throws") {
         config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
         auto old_realm = Realm::get_shared_realm(config);
+        {
+            auto tr = db->start_write();
+            auto table = tr->get_table("class_object");
+            table->create_object();
+            tr->commit();
+        }
         old_realm->read_group();
 
         {
             auto tr = db->start_write();
-            tr->add_table("class_object 2")->add_column(type_Int, "value");
+            auto table = tr->add_table("class_object 2");
+            ColKey val_col = table->add_column(type_Int, "value");
+            table->create_object().set(val_col, 1);
             tr->commit();
         }
 
@@ -862,15 +877,51 @@ TEST_CASE("SharedRealm: schema_subset_mode") {
         REQUIRE(old_realm->freeze()->schema().size() == 1);
         REQUIRE(new_realm->freeze()->schema().size() == 2);
         REQUIRE(Realm::get_frozen_realm(config, new_realm->read_transaction_version())->schema().size() == 2);
-        // Fails because the requested version doesn't have the "object 2" table
-        // required by the config
+        // An additive change is allowed, the unknown table is empty
+        REQUIRE(Realm::get_frozen_realm(config, old_realm->read_transaction_version())->schema().size() == 2);
+
+        config.schema = Schema{{"object", {{"value", PropertyType::String}}}}; // int -> string
+        // Fails because the schema has an invalid breaking change
+        REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, new_realm->read_transaction_version()),
+                          InvalidReadOnlySchemaChangeException);
         REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, old_realm->read_transaction_version()),
-                          InvalidExternalSchemaChangeException);
+                          InvalidReadOnlySchemaChangeException);
+        config.schema = Schema{
+            {"object", {{"value", PropertyType::Int}}},
+            {"object 2", {{"value", PropertyType::String}}}, // int -> string
+        };
+        // fails due to invalid change on object 2 type
+        REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, new_realm->read_transaction_version()),
+                          InvalidReadOnlySchemaChangeException);
+        // opening the old state does not fail because the schema is an additive change
+        auto frozen_old = Realm::get_frozen_realm(config, old_realm->read_transaction_version());
+        REQUIRE(frozen_old->schema().size() == 2);
+        {
+            TableRef table = frozen_old->read_group().get_table("class_object");
+            Results results(frozen_old, table);
+            REQUIRE(results.is_frozen());
+            REQUIRE(results.size() == 1);
+        }
+        {
+            TableRef table = frozen_old->read_group().get_table("class_object 2");
+            REQUIRE(!table);
+            Results results(frozen_old, table);
+            REQUIRE(results.is_frozen());
+            REQUIRE(results.size() == 0);
+        }
+        config.schema = Schema{
+            {"object", {{"value", PropertyType::Int}, {"value 2", PropertyType::String}}}, // add property
+        };
+        // fails due to additional property on object
+        REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, old_realm->read_transaction_version()),
+                          InvalidReadOnlySchemaChangeException);
+        REQUIRE_THROWS_AS(Realm::get_frozen_realm(config, new_realm->read_transaction_version()),
+                          InvalidReadOnlySchemaChangeException);
     }
 }
 
 #if REALM_ENABLE_SYNC
-TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
+TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
     if (!util::EventLoop::has_implementation())
         return;
 
@@ -1145,8 +1196,9 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         task->start([&](auto ref, auto error) {
             std::lock_guard<std::mutex> lock(mutex);
             REQUIRE(error);
-            REQUIRE_EXCEPTION(std::rethrow_exception(error), HTTPError,
-                              "http error code considered fatal. Client Error: 403");
+            REQUIRE_EXCEPTION(
+                std::rethrow_exception(error), HTTPError,
+                "Unable to refresh the user access token: http error code considered fatal. Client Error: 403");
             REQUIRE(!ref);
             called = true;
         });
@@ -1291,7 +1343,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     }
 }
 
-TEST_CASE("SharedRealm: convert") {
+TEST_CASE("SharedRealm: convert", "[sync][pbs][convert]") {
     TestSyncManager tsm;
     ObjectSchema object_schema = {"object",
                                   {
@@ -1387,7 +1439,7 @@ TEST_CASE("SharedRealm: convert") {
     }
 }
 
-TEST_CASE("SharedRealm: convert - embedded objects") {
+TEST_CASE("SharedRealm: convert - embedded objects", "[sync][pbs][convert][embedded objects]") {
     TestSyncManager tsm;
     ObjectSchema object_schema = {"object",
                                   {
@@ -3690,7 +3742,7 @@ struct ModeHardResetFile {
     static constexpr bool should_call_init_on_version_bump = true;
 };
 
-TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function", "[init][update_schema]", ModeAutomatic,
+TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function", "[init][update schema]", ModeAutomatic,
                    ModeAdditive, ModeManual, ModeSoftResetFile, ModeHardResetFile)
 {
     TestFile config;
@@ -4123,5 +4175,67 @@ TEST_CASE("KeyPathMapping generation") {
         std::vector<Mixed> args{0};
         auto q = table->query("parents.value = $0", args, mapping);
         REQUIRE(q.count() == 0);
+    }
+}
+
+TEST_CASE("Concurrent operations") {
+    SECTION("Async commits together with online compaction") {
+        // This is a reproduction test for issue https://github.com/realm/realm-dart/issues/1396
+        // First create a relatively large realm, then delete the content and do some more
+        // commits using async commits. If a compaction is started when doing an async commit
+        // then the subsequent committing done in the helper thread will illegally COW the
+        // top array. When the next mutation is done, the top array will be reported as being
+        // already freed.
+        TestFile config;
+        config.schema_version = 1;
+        config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
+
+        auto realm_1 = Realm::get_shared_realm(config);
+        Results res(realm_1, realm_1->read_group().get_table("class_object")->where());
+        auto realm_2 = Realm::get_shared_realm(config);
+
+        {
+            // Create a lot of objects
+            realm_2->begin_transaction();
+            auto table = realm_2->read_group().get_table("class_object");
+            for (int i = 0; i < 400000; i++) {
+                table->create_object().set("value", i);
+            }
+            realm_2->commit_transaction();
+        }
+
+        int commit_1 = 0;
+        int commit_2 = 0;
+
+        for (int i = 0; i < 4; i++) {
+            realm_1->async_begin_transaction([&]() {
+                // Clearing the DB will reduce the need for space
+                // This will trigger an online compaction
+                // Before the fix, the probram would crash here next time around.
+                res.clear();
+                realm_1->async_commit_transaction([&](std::exception_ptr) {
+                    commit_1++;
+                });
+            });
+            realm_2->async_begin_transaction([&]() {
+                // Make sure we will continue to have something to delete
+                auto table = realm_2->read_group().get_table("class_object");
+                for (int i = 0; i < 100; i++) {
+                    table->create_object().set("value", i);
+                }
+                realm_2->async_commit_transaction([&](std::exception_ptr) {
+                    commit_2++;
+                });
+            });
+        }
+
+        util::EventLoop::main().run_until([&] {
+            return commit_1 == 4 && commit_2 == 4;
+        });
+    }
+
+    SECTION("No open realms") {
+        // This is just to check that the section above did not leave any realms open
+        _impl::RealmCoordinator::assert_no_open_realms();
     }
 }

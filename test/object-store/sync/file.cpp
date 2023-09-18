@@ -16,19 +16,20 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync_test_utils.hpp"
-#include "util/test_utils.hpp"
-#include "util/test_file.hpp"
+#include <util/test_utils.hpp>
+#include <util/test_file.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
 #include <realm/object-store/shared_realm.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
+
 #include <realm/util/file.hpp>
 
 using namespace realm;
 using namespace realm::util;
 using File = realm::util::File;
 
-TEST_CASE("sync_file: percent-encoding APIs", "[sync]") {
+TEST_CASE("sync_file: percent-encoding APIs", "[sync][file]") {
     SECTION("does not encode a string that has no restricted characters") {
         const std::string expected = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_-";
         auto actual = make_percent_encoded_string(expected);
@@ -64,7 +65,7 @@ TEST_CASE("sync_file: percent-encoding APIs", "[sync]") {
     }
 }
 
-TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
+TEST_CASE("sync_file: URL manipulation APIs", "[sync][file]") {
     SECTION("properly concatenates a path when the path has a trailing slash") {
         const std::string expected = "/foo/bar";
         const std::string path = "/foo";
@@ -130,7 +131,7 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
     }
 }
 
-TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
+TEST_CASE("sync_file: SyncFileManager APIs", "[sync][file]") {
     TestSyncManager tsm;
 
     const std::string identity = "abcdefghi";

@@ -60,6 +60,7 @@ set(SYNC_NETWORK_INSTALL_HEADERS
     network/network.hpp
     network/network_ssl.hpp
     network/websocket.hpp
+    network/websocket_error.hpp
 )
 
 set(NOINST_HEADERS
@@ -82,6 +83,7 @@ set(NOINST_HEADERS
 
 set(SYNC_HEADERS ${IMPL_INSTALL_HEADESR}
     ${SYNC_INSTALL_HEADERS}
+    ${SYNC_NETWORK_INSTALL_HEADERS}
     ${NOINST_HEADERS})
 
 add_library(Sync STATIC ${SYNC_SOURCES} ${SYNC_HEADERS})
@@ -146,6 +148,7 @@ install(FILES ../../external/json/json.hpp
 add_subdirectory(noinst/server)
 
 if(NOT REALM_BUILD_LIB_ONLY AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
-	add_subdirectory(tools)
+    add_subdirectory(tools)
+    set_macos_only(tools)
 endif()
 

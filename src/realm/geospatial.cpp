@@ -64,6 +64,33 @@ static bool type_is_valid(realm::StringData str_type)
 
 namespace realm {
 
+GeoPolygon GeoBox::to_polygon() const
+{
+    // We rely on the inversion rule here to ignore ordering of points.
+    // ie: A polygon that encompases more than a hemisphere is inverted.
+    return GeoPolygon{{{lo, GeoPoint{lo.longitude, hi.latitude}, hi, GeoPoint{hi.longitude, lo.latitude}, lo}}};
+}
+
+std::optional<GeoBox> GeoBox::from_polygon(const GeoPolygon& polygon)
+{
+    if (polygon.points.size() != 1) {
+        return {};
+    }
+    if (polygon.points[0].size() != 5) {
+        return {};
+    }
+    if (polygon.points[0][0] != polygon.points[0][4]) {
+        return {}; // closed loop
+    }
+    GeoPoint corner1{polygon.points[0][0].longitude, polygon.points[0][2].latitude};
+    GeoPoint corner2{polygon.points[0][2].longitude, polygon.points[0][0].latitude};
+    if ((polygon.points[0][1] == corner1 && polygon.points[0][3] == corner2) ||
+        (polygon.points[0][1] == corner2 && polygon.points[0][3] == corner1)) {
+        return GeoBox{polygon.points[0][0], polygon.points[0][2]};
+    }
+    return {};
+}
+
 std::string Geospatial::get_type_string() const noexcept
 {
     switch (get_type()) {
@@ -224,6 +251,22 @@ static std::string point_str(const GeoPoint& point)
     return util::format("[%1, %2]", point.longitude, point.latitude);
 }
 
+static std::string polygon_str(const GeoPolygon& poly)
+{
+    std::string points = "";
+    for (size_t i = 0; i < poly.points.size(); ++i) {
+        if (i != 0) {
+            points += ", ";
+        }
+        points += "{";
+        for (size_t j = 0; j < poly.points[i].size(); ++j) {
+            points += util::format("%1%2", j == 0 ? "" : ", ", point_str(poly.points[i][j]));
+        }
+        points += "}";
+    }
+    return util::format("GeoPolygon(%1)", points);
+}
+
 Status Geospatial::is_valid() const noexcept
 {
     switch (get_type()) {
@@ -250,34 +293,23 @@ GeoRegion& Geospatial::get_region() const
 
 std::string Geospatial::to_string() const
 {
-    return mpark::visit(
-        util::overload{[](const GeoPoint& point) {
-                           return util::format("GeoPoint(%1)", point_str(point));
-                       },
-                       [](const GeoBox& box) {
-                           return util::format("GeoBox(%1, %2)", point_str(box.lo), point_str(box.hi));
-                       },
-                       [](const GeoPolygon& poly) {
-                           std::string points = "";
-                           for (size_t i = 0; i < poly.points.size(); ++i) {
-                               if (i != 0) {
-                                   points += ", ";
-                               }
-                               points += "{";
-                               for (size_t j = 0; j < poly.points[i].size(); ++j) {
-                                   points += util::format("%1%2", j == 0 ? "" : ", ", point_str(poly.points[i][j]));
-                               }
-                               points += "}";
-                           }
-                           return util::format("GeoPolygon(%1)", points);
-                       },
-                       [](const GeoCircle& circle) {
-                           return util::format("GeoCircle(%1, %2)", point_str(circle.center), circle.radius_radians);
-                       },
-                       [](const mpark::monostate&) {
-                           return std::string("NULL");
-                       }},
-        m_value);
+    return mpark::visit(util::overload{[](const GeoPoint& point) {
+                                           return util::format("GeoPoint(%1)", point_str(point));
+                                       },
+                                       [](const GeoBox& box) {
+                                           return polygon_str(box.to_polygon());
+                                       },
+                                       [](const GeoPolygon& poly) {
+                                           return polygon_str(poly);
+                                       },
+                                       [](const GeoCircle& circle) {
+                                           return util::format("GeoCircle(%1, %2)", point_str(circle.center),
+                                                               circle.radius_radians);
+                                       },
+                                       [](const mpark::monostate&) {
+                                           return std::string("NULL");
+                                       }},
+                        m_value);
 }
 
 std::ostream& operator<<(std::ostream& ostr, const Geospatial& geo)
@@ -455,21 +487,13 @@ GeoRegion::GeoRegion(const Geospatial& geo)
             m_status_out = Status::OK();
         }
         Status& m_status_out;
+
         std::unique_ptr<S2Region> operator()(const GeoBox& box) const
         {
-            S2Point s2_lo, s2_hi;
-            m_status_out = coord_to_point(box.lo.longitude, box.lo.latitude, s2_lo);
-            if (!m_status_out.is_ok())
-                return nullptr;
-            m_status_out = coord_to_point(box.hi.longitude, box.hi.latitude, s2_hi);
-            if (!m_status_out.is_ok())
-                return nullptr;
-            auto ret = std::make_unique<S2LatLngRect>(S2LatLng(s2_lo), S2LatLng(s2_hi));
-            if (!ret->is_valid()) {
-                m_status_out = Status(ErrorCodes::InvalidQueryArg, "Invalid rectangle");
-                return nullptr;
-            }
-            return ret;
+            GeoPolygon polygon = box.to_polygon();
+            auto poly = std::make_unique<S2Polygon>();
+            m_status_out = parse_polygon_coordinates(polygon, poly.get());
+            return poly;
         }
 
         std::unique_ptr<S2Region> operator()(const GeoPolygon& polygon) const
@@ -519,8 +543,11 @@ bool GeoRegion::contains(const std::optional<GeoPoint>& geo_point) const noexcep
     if (!m_status.is_ok() || !geo_point) {
         return false;
     }
-    auto point = S2LatLng::FromDegrees(geo_point->latitude, geo_point->longitude).ToPoint();
-    return m_region->VirtualContainsPoint(point);
+    auto point = S2LatLng::FromDegrees(geo_point->latitude, geo_point->longitude);
+    if (!point.is_valid()) {
+        return false;
+    }
+    return m_region->VirtualContainsPoint(point.ToPoint());
 }
 
 Status GeoRegion::get_conversion_status() const noexcept

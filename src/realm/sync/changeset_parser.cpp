@@ -83,7 +83,7 @@ struct State {
 
     BinaryData read_buffer(size_t size);
 
-    REALM_NORETURN void parser_error(const char* complaint); // Throws
+    REALM_NORETURN void parser_error(std::string_view complaint); // Throws
     REALM_NORETURN void parser_error()
     {
         parser_error("Bad input");
@@ -333,11 +333,11 @@ void State::parse_one()
     if (t == InstrTypeInternString) {
         uint32_t index = read_int<uint32_t>();
         if (index != m_intern_strings.size()) {
-            parser_error("Unexpected intern index");
+            parser_error(util::format("Unexpected intern index: %1", index));
         }
         StringData str = read_string();
         if (!m_intern_strings.insert(str).second) {
-            parser_error("Unexpected intern string");
+            parser_error(util::format("Unexpected intern string: %1", str));
         }
         StringBufferRange range = m_handler.add_string_range(str);
         m_handler.set_intern_string(index, range);
@@ -356,7 +356,8 @@ void State::parse_one()
                     spec.pk_field = read_intern_string();
                     spec.pk_type = read_payload_type();
                     if (!is_valid_key_type(spec.pk_type)) {
-                        parser_error("Invalid primary key type in AddTable");
+                        parser_error(util::format("Invalid primary key type in AddTable: %1",
+                                                  static_cast<uint8_t>(spec.pk_type)));
                     }
                     spec.pk_nullable = read_bool();
                     spec.is_asymmetric = (table_type == Table::Type::TopLevelAsymmetric);
@@ -368,7 +369,7 @@ void State::parse_one()
                     break;
                 }
                 default:
-                    parser_error("AddTable: unknown table type");
+                    parser_error(util::format("AddTable: unknown table type: %1", table_type));
             }
             m_handler(instr);
             return;
@@ -498,7 +499,7 @@ void State::parse_one()
         }
     }
 
-    parser_error("unknown instruction");
+    parser_error(util::format("Unknown instruction type: %1", t));
 }
 
 
@@ -663,9 +664,9 @@ BinaryData State::read_buffer(size_t size)
     return BinaryData(m_buffer.data(), size);
 }
 
-void State::parser_error(const char* complaints)
+void State::parser_error(std::string_view complaints)
 {
-    throw BadChangesetError{complaints};
+    throw BadChangesetError{std::string(complaints)};
 }
 
 } // anonymous namespace

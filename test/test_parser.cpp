@@ -5040,6 +5040,7 @@ TEST(Parser_DictionaryObjects)
 
     Obj adam = persons->create_object_with_primary_key("adam");
     Obj bernie = persons->create_object_with_primary_key("bernie");
+    Obj charlie = persons->create_object_with_primary_key("charlie");
 
     Obj astro = dogs->create_object_with_primary_key("astro", {{col_age, 4}});
     Obj pluto = dogs->create_object_with_primary_key("pluto", {{col_age, 5}});
@@ -5055,17 +5056,22 @@ TEST(Parser_DictionaryObjects)
     bernie_pets.insert("dog1", astro);
     bernie_pets.insert("dog2", snoopy);
 
+    auto charlie_pets = charlie.get_dictionary(col_dict);
+    charlie_pets.insert("dog1", pluto);
+
     adam.set(col_friend, bernie.get_key());
     bernie.set(col_friend, adam.get_key());
 
     auto q = persons->link(col_dict).column<Int>(col_age) > 4;
-    CHECK_EQUAL(q.count(), 1);
+    CHECK_EQUAL(q.count(), 2);
     q = persons->link(col_friend).link(col_dict).column<Int>(col_age) > 4;
     CHECK_EQUAL(q.count(), 1);
 
-    verify_query(test_context, persons, "pets.@values.age > 4", 1);
-    verify_query(test_context, persons, "pets.@values == obj('dog', 'pluto')", 1);
-    verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'pluto'), obj('dog', 'astro') }", 2);
+    verify_query(test_context, persons, "pets.@values.age > 4", 2);
+    verify_query(test_context, persons, "pets.@values == obj('dog', 'pluto')", 2);
+    verify_query(test_context, persons, "pets.@values != obj('dog', 'pluto')", 2);
+    verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'lady'), obj('dog', 'astro') }", 2);
+    verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'astro'), NULL }", 2);
 }
 
 TEST(Parser_DictionarySorting)
@@ -5769,11 +5775,21 @@ TEST(Parser_Geospatial)
         GeoPolygon{{{GeoPoint{0, 0}, GeoPoint{1, 0}, GeoPoint{1, 1}, GeoPoint{0, 1}, GeoPoint{0, 0}}}}};
     Geospatial invalid;
     Geospatial point{GeoPoint{0, 0}};
-    std::vector<Mixed> args = {Mixed{&box},          Mixed{&circle}, Mixed{&polygon}, Mixed{&invalid},
-                               Mixed{realm::null()}, Mixed{1.2},     Mixed{1000},     Mixed{"string value"}};
+    std::string str_of_box = box.to_string();
+    std::string str_of_circle = circle.to_string();
+    std::string str_of_polygon = polygon.to_string();
+    std::string str_of_point = point.to_string();
+    std::vector<Mixed> args = {Mixed{&box},          Mixed{&circle},        Mixed{&polygon},
+                               Mixed{&invalid},      Mixed{realm::null()},  Mixed{1.2},
+                               Mixed{1000},          Mixed{"string value"}, Mixed{str_of_box},
+                               Mixed{str_of_circle}, Mixed{str_of_polygon}, Mixed{str_of_point}};
+
     verify_query_sub(test_context, table, "location GEOWITHIN $0", args, 1);
     verify_query_sub(test_context, table, "location GEOWITHIN $1", args, 4);
     verify_query_sub(test_context, table, "location GEOWITHIN $2", args, 1);
+    verify_query_sub(test_context, table, "location GEOWITHIN $8", args, 1);
+    verify_query_sub(test_context, table, "location GEOWITHIN $9", args, 4);
+    verify_query_sub(test_context, table, "location GEOWITHIN $10", args, 1);
 
     GeoCircle c = circle.get<GeoCircle>();
     std::vector<Mixed> coord_args = {Mixed{c.center.longitude}, Mixed{c.center.latitude}, Mixed{c.radius_radians}};
@@ -5786,10 +5802,10 @@ TEST(Parser_Geospatial)
     verify_query_sub(test_context, table,
                      "location GEOWITHIN geoPolygon({[$0, $1], [$2, $3], [$4, $5], [$6, $7], [$8, $9]})", coord_args,
                      1);
-    GeoBox b = box.get<GeoBox>();
-    coord_args = {b.lo.longitude, b.lo.latitude, b.hi.longitude, b.hi.latitude};
+    GeoPolygon b = box.get<GeoBox>().to_polygon();
+    coord_args = {b.points[0][0].longitude, b.points[0][0].latitude, b.points[0][2].longitude,
+                  b.points[0][2].latitude};
     verify_query_sub(test_context, table, "location GEOWITHIN geoBox([$0, $1], [$2, $3])", coord_args, 1);
-
 
     CHECK_THROW_EX(
         verify_query(test_context, table, "_id geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 1),
@@ -5801,8 +5817,9 @@ TEST(Parser_Geospatial)
     CHECK_THROW_EX(
         verify_query(test_context, table, "self_link geoWithin geoBox([0.2, 0.2], [0.7, 0.7])", 0),
         std::runtime_error,
-        CHECK(std::string(e.what()).find("Query 'self_link GEOWITHIN GeoBox([0.2, 0.2], [0.7, 0.7])' links to data "
-                                         "in the wrong format for a geoWithin query") != std::string::npos));
+        CHECK(std::string(e.what()).find(
+                  "Query 'self_link GEOWITHIN GeoPolygon({[0.2, 0.2], [0.2, 0.7], [0.7, 0.7], [0.7, 0.2], [0.2, "
+                  "0.2]})' links to data in the wrong format for a geoWithin query") != std::string::npos));
     CHECK_THROW_EX(verify_query(test_context, table, "location geoWithin NULL", 1), query_parser::SyntaxError,
                    CHECK(std::string(e.what()).find(
                              "Invalid predicate: 'location geoWithin NULL': syntax error, unexpected null") !=
@@ -5830,8 +5847,18 @@ TEST(Parser_Geospatial)
                                          "But the provided type is 'int'") != std::string::npos));
     CHECK_THROW_EX(
         verify_query_sub(test_context, table, "location GEOWITHIN $7", args, 1), query_parser::InvalidQueryError,
-        CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
-                                         "But the provided type is 'string'") != std::string::npos));
+        CHECK(std::string(e.what()).find(
+                  "Invalid syntax in serialized geospatial object at argument 7: 'Invalid predicate: 'string value': "
+                  "syntax error, unexpected identifier, expecting geobox or geopolygon or geocircle or argument'") !=
+              std::string::npos));
+
+    CHECK_THROW_EX(verify_query_sub(test_context, table, "location GEOWITHIN $11", args, 1),
+                   query_parser::InvalidQueryError,
+                   CHECK(std::string(e.what()).find(
+                             "Invalid syntax in serialized geospatial object at argument 11: 'Invalid predicate: "
+                             "'GeoPoint([0, 0])': syntax error, unexpected identifier, expecting geobox or "
+                             "geopolygon or geocircle or argument'") != std::string::npos));
+
     CHECK_THROW_EX(verify_query_sub(test_context, table, "location GEOWITHIN $3", args, 0),
                    query_parser::InvalidQueryError,
                    CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a valid "
@@ -5910,6 +5937,23 @@ TEST(Parser_RecursiveLogial)
     q = table->query(query, args, {});
     q_count = q.count();
     CHECK_EQUAL(q_count, 1);
+}
+
+TEST(Parser_issue6831)
+{
+    Group g;
+    auto plant = g.add_table_with_primary_key("Plant", type_ObjectId, "id");
+    plant->add_column(type_String, "Name");
+    auto inventory = g.add_table_with_primary_key("Inventory", type_String, "id");
+    inventory->add_column_dictionary(*plant, "Plants");
+
+    auto petunia = plant->create_object_with_primary_key(ObjectId::gen());
+    petunia.set("Name", "Petunia");
+    auto obj = inventory->create_object_with_primary_key("Inv");
+    auto dict = obj.get_dictionary("Plants");
+    dict.insert("Petunia", petunia);
+    auto q = inventory->query("Plants.@keys == 'Petunia'");
+    CHECK_EQUAL(q.count(), 1);
 }
 
 #endif // TEST_PARSER

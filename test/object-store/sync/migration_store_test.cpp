@@ -1,4 +1,23 @@
+////////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2023 Realm Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+////////////////////////////////////////////////////////////////////////////
+
 #include <realm/transaction.hpp>
+
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/migration_store.hpp>
 
@@ -114,16 +133,16 @@ static void check_subscription(const sync::SubscriptionSet& sub_set, const std::
     REQUIRE(table_sub->name == sub_name);
 }
 
-TEST_CASE("Migration store", "[flx][migration]") {
+TEST_CASE("Migration store", "[sync][flx migration]") {
     std::string file_path = util::make_temp_dir() + "/migration_store.realm";
     auto mig_db = DB::create(sync::make_client_replication(), file_path);
     auto migration_store = sync::MigrationStore::create(mig_db);
 
-    SECTION("Migration store default", "[flx][migration]") {
+    SECTION("Migration store default") {
         check_not_migrated(migration_store);
     }
 
-    SECTION("Migration store complete and cancel", "[flx][migration]") {
+    SECTION("Migration store complete and cancel") {
         // Start the migration and check the state
         migration_store->migrate_to_flx(rql_string, migrated_partition);
         check_migration_in_progress(migration_store);
@@ -141,7 +160,7 @@ TEST_CASE("Migration store", "[flx][migration]") {
         check_not_migrated(migration_store);
     }
 
-    SECTION("Migration store complete and rollback", "[flx][migration]") {
+    SECTION("Migration store complete and rollback") {
         // Start the migration and check the state
         migration_store->migrate_to_flx(rql_string, migrated_partition);
         check_migration_in_progress(migration_store);
@@ -167,7 +186,7 @@ TEST_CASE("Migration store", "[flx][migration]") {
         check_not_migrated(migration_store);
     }
 
-    SECTION("Migration store complete without in progress", "[flx][migration]") {
+    SECTION("Migration store complete without in progress") {
         check_not_migrated(migration_store);
 
         // Complete the migration and check the state - should be not migrated
@@ -175,7 +194,7 @@ TEST_CASE("Migration store", "[flx][migration]") {
         check_not_migrated(migration_store);
     }
 
-    SECTION("Migration store subscriptions", "[flx][migration]") {
+    SECTION("Migration store subscriptions") {
         auto sub_store = sync::SubscriptionStore::create(mig_db, [](int64_t) {});
         auto orig_version = sub_store->get_latest().version();
 

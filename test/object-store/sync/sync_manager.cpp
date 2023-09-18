@@ -16,14 +16,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync_test_utils.hpp"
+#include <util/event_loop.hpp>
+#include <util/test_utils.hpp>
+#include <util/sync/session_util.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
-#include <realm/sync/config.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
-#include "sync/session/session_util.hpp"
-#include "util/event_loop.hpp"
-#include "util/test_utils.hpp"
+
+#include <realm/sync/config.hpp>
 
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
@@ -52,7 +53,7 @@ bool validate_user_in_vector(std::vector<std::shared_ptr<SyncUser>> vector, cons
 }
 } // anonymous namespace
 
-TEST_CASE("sync_manager: basic properties and APIs", "[sync]") {
+TEST_CASE("sync_manager: basic properties and APIs", "[sync][sync manager]") {
     TestSyncManager init_sync_manager;
     auto app = init_sync_manager.app();
 
@@ -61,7 +62,7 @@ TEST_CASE("sync_manager: basic properties and APIs", "[sync]") {
     }
 }
 
-TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
+TEST_CASE("sync_manager: `path_for_realm` API", "[sync][sync manager]") {
     const std::string auth_server_url = "https://realm.example.org";
     const std::string raw_url = "realms://realm.example.org/a/b/~/123456/xyz";
 
@@ -179,7 +180,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
     }
 }
 
-TEST_CASE("sync_manager: user state management", "[sync]") {
+TEST_CASE("sync_manager: user state management", "[sync][sync manager]") {
     TestSyncManager init_sync_manager(SyncManager::MetadataMode::NoEncryption);
     auto sync_manager = init_sync_manager.app()->sync_manager();
 
@@ -278,7 +279,7 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
     }
 }
 
-TEST_CASE("sync_manager: persistent user state management", "[sync]") {
+TEST_CASE("sync_manager: persistent user state management", "[sync][sync manager]") {
     TestSyncManager::Config config;
     auto app_id = config.app_config.app_id = "app_id-" + random_string(10);
     config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
@@ -460,7 +461,7 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
     }
 }
 
-TEST_CASE("sync_manager: file actions", "[sync]") {
+TEST_CASE("sync_manager: file actions", "[sync][sync manager]") {
     using Action = SyncFileActionMetadata::Action;
     reset_test_directory(base_path.string());
 
@@ -728,7 +729,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
     }
 }
 
-TEST_CASE("sync_manager: set_session_multiplexing") {
+TEST_CASE("sync_manager: set_session_multiplexing", "[sync][sync manager]") {
     TestSyncManager::Config tsm_config;
     tsm_config.start_sync_client = false;
     TestSyncManager tsm(std::move(tsm_config));
@@ -764,7 +765,7 @@ TEST_CASE("sync_manager: set_session_multiplexing") {
     }
 }
 
-TEST_CASE("sync_manager: has_active_sessions", "[active_sessions]") {
+TEST_CASE("sync_manager: has_existing_sessions", "[sync][sync manager][active sessions]") {
     TestSyncManager init_sync_manager({}, {false});
     auto sync_manager = init_sync_manager.app()->sync_manager();
 

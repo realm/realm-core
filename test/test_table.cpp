@@ -5898,8 +5898,8 @@ TEST(Table_AsymmetricObjects)
     tr = sg->start_write();
     auto table2 = tr->add_table("target table");
     table = tr->get_table("mytable");
-    // Outgoing link from asymmetric object is not allowed.
-    CHECK_THROW(table->add_column(*table2, "link"), LogicError);
+    // Outgoing link from asymmetric object is allowed.
+    CHECK_NOTHROW(table->add_column(*table2, "link"));
     // Incoming link to asymmetric object is not allowed.
     CHECK_THROW(table2->add_column(*table, "link"), LogicError);
     tr->commit();

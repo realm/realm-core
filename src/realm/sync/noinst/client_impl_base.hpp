@@ -15,6 +15,7 @@
 #include <realm/util/optional.hpp>
 #include <realm/util/buffer_stream.hpp>
 #include <realm/util/logger.hpp>
+#include <realm/util/tagged_bool.hpp>
 #include <realm/sync/network/network_ssl.hpp>
 #include <realm/sync/network/default_socket.hpp>
 #include <realm/util/span.hpp>
@@ -84,14 +85,72 @@ private:
     SessionWrapper* m_back = nullptr;
 };
 
-struct ErrorTryAgainBackoffInfo {
-    void update(const ProtocolErrorInfo& info);
-    void reset();
-    std::chrono::milliseconds delay_interval();
+template <typename ErrorType, typename RandomEngine>
+struct ErrorBackoffState {
+    ErrorBackoffState() = default;
+    explicit ErrorBackoffState(ResumptionDelayInfo default_delay_info, RandomEngine& random_engine)
+        : default_delay_info(std::move(default_delay_info))
+        , m_random_engine(random_engine)
+    {
+    }
 
+    void update(ErrorType new_error, std::optional<ResumptionDelayInfo> new_delay_info)
+    {
+        if (triggering_error && *triggering_error == new_error) {
+            return;
+        }
+
+        delay_info = new_delay_info.value_or(default_delay_info);
+        cur_delay_interval = util::none;
+        triggering_error = new_error;
+    }
+
+    void reset()
+    {
+        triggering_error = util::none;
+        cur_delay_interval = util::none;
+        delay_info = default_delay_info;
+    }
+
+    std::chrono::milliseconds delay_interval()
+    {
+        if (!cur_delay_interval) {
+            cur_delay_interval = delay_info.resumption_delay_interval;
+            return jitter_value(*cur_delay_interval);
+        }
+        if (*cur_delay_interval == delay_info.max_resumption_delay_interval) {
+            return jitter_value(delay_info.max_resumption_delay_interval);
+        }
+        auto safe_delay_interval = cur_delay_interval->count();
+        if (util::int_multiply_with_overflow_detect(safe_delay_interval,
+                                                    delay_info.resumption_delay_backoff_multiplier)) {
+            *cur_delay_interval = delay_info.max_resumption_delay_interval;
+        }
+        else {
+            *cur_delay_interval =
+                std::min(delay_info.max_resumption_delay_interval, std::chrono::milliseconds(safe_delay_interval));
+        }
+        return jitter_value(*cur_delay_interval);
+    }
+
+    ResumptionDelayInfo default_delay_info;
     ResumptionDelayInfo delay_info;
     util::Optional<std::chrono::milliseconds> cur_delay_interval;
-    util::Optional<sync::ProtocolError> triggering_error;
+    util::Optional<ErrorType> triggering_error;
+
+private:
+    std::chrono::milliseconds jitter_value(std::chrono::milliseconds value)
+    {
+        if (delay_info.delay_jitter_divisor == 0) {
+            return value;
+        }
+        const auto max_jitter = value.count() / delay_info.delay_jitter_divisor;
+        auto distr = std::uniform_int_distribution<std::chrono::milliseconds::rep>(0, max_jitter);
+        std::chrono::milliseconds randomized_deduction(distr(m_random_engine.get()));
+        return value - randomized_deduction;
+    }
+
+    std::reference_wrapper<RandomEngine> m_random_engine;
 };
 
 class ClientImpl {
@@ -104,37 +163,25 @@ public:
     using OutputBuffer = util::ResettableExpandableBufferOutputStream;
     using ClientProtocol = _impl::ClientProtocol;
     using ClientResetOperation = _impl::ClientResetOperation;
+    using RandomEngine = std::mt19937_64;
 
     /// Per-server endpoint information used to determine reconnect delays.
     class ReconnectInfo {
     public:
+        explicit ReconnectInfo(ReconnectMode mode, ResumptionDelayInfo default_delay_info, RandomEngine& random)
+            : m_reconnect_mode(mode)
+            , m_backoff_state(default_delay_info, random)
+        {
+        }
+
         void reset() noexcept;
+        void update(ConnectionTerminationReason reason, std::optional<ResumptionDelayInfo> new_delay_info);
+        std::chrono::milliseconds delay_interval();
 
-    private:
-        using milliseconds_lim = std::numeric_limits<milliseconds_type>;
-
-        // When `m_reason` is present, it indicates that a connection attempt was
-        // initiated, and that a new reconnect delay must be computed before
-        // initiating another connection attempt. In this case, `m_time_point` is
-        // the point in time from which the next delay should count. It will
-        // generally be the time at which the last connection attempt was initiated,
-        // but for certain connection termination reasons, it will instead be the
-        // time at which the connection was closed. `m_delay` will generally be the
-        // duration of the delay that preceded the last connection attempt, and can
-        // be used as a basis for computing the next delay.
-        //
-        // When `m_reason` is absent, it indicates that a new reconnect delay has
-        // been computed, and `m_time_point` will be the time at which the delay
-        // expires (if equal to `milliseconds_lim::max()`, the delay is
-        // indefinite). `m_delay` will generally be the duration of the computed
-        // delay.
-        //
-        // Since `m_reason` is absent, and `m_timepoint` is zero initially, the
-        // first reconnect delay will already have expired, so the effective delay
-        // will be zero.
-        util::Optional<ConnectionTerminationReason> m_reason;
-        milliseconds_type m_time_point = 0;
-        milliseconds_type m_delay = 0;
+        const std::optional<ConnectionTerminationReason> reason() const noexcept
+        {
+            return m_backoff_state.triggering_error;
+        }
 
         // Set this flag to true to schedule a postponed invocation of reset(). See
         // Connection::cancel_reconnect_delay() for details and rationale.
@@ -142,11 +189,11 @@ public:
         // Will be set back to false when a PONG message arrives, and the
         // corresponding PING message was sent while `m_scheduled_reset` was
         // true. See receive_pong().
-        bool m_scheduled_reset = false;
+        bool scheduled_reset = false;
 
-        ErrorTryAgainBackoffInfo m_try_again_delay_info;
-
-        friend class Connection;
+    private:
+        ReconnectMode m_reconnect_mode;
+        ErrorBackoffState<ConnectionTerminationReason, RandomEngine> m_backoff_state;
     };
 
     static constexpr milliseconds_type default_connect_timeout = 120000;        // 2 minutes
@@ -179,7 +226,7 @@ public:
     using SyncTrigger = std::unique_ptr<Trigger<ClientImpl>>;
     SyncTrigger create_trigger(SyncSocketProvider::FunctionHandler&& handler);
 
-    std::mt19937_64& get_random() noexcept;
+    RandomEngine& get_random() noexcept;
 
     /// Returns false if the specified URL is invalid.
     bool decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
@@ -198,6 +245,7 @@ private:
     const milliseconds_type m_ping_keepalive_period;
     const milliseconds_type m_pong_keepalive_timeout;
     const milliseconds_type m_fast_reconnect_limit;
+    const ResumptionDelayInfo m_reconnect_backoff_info;
     const bool m_disable_upload_activation_delay;
     const bool m_dry_run; // For testing purposes only
     const bool m_enable_default_port_hack;
@@ -210,7 +258,7 @@ private:
     session_ident_type m_prev_session_ident = 0;
     const bool m_one_connection_per_session;
 
-    std::mt19937_64 m_random;
+    RandomEngine m_random;
     SyncTrigger m_actualize_and_finalize;
 
     // Note: There is one server slot per server endpoint (hostname, port,
@@ -225,6 +273,11 @@ private:
     // purposes). This disables part of the hammering protection scheme built in
     // to the client.
     struct ServerSlot {
+        explicit ServerSlot(ReconnectInfo reconnect_info)
+            : reconnect_info(std::move(reconnect_info))
+        {
+        }
+
         ReconnectInfo reconnect_info; // Applies exclusively to `connection`.
         std::unique_ptr<ClientImpl::Connection> connection;
 
@@ -430,7 +483,7 @@ public:
     void websocket_connected_handler(const std::string& protocol);
     bool websocket_binary_message_received(util::Span<const char> data);
     void websocket_error_handler();
-    bool websocket_closed_handler(bool, Status);
+    bool websocket_closed_handler(bool, websocket::WebSocketError, std::string_view msg);
 
     connection_ident_type get_ident() const noexcept;
     const ServerEndpoint& get_server_endpoint() const noexcept;
@@ -507,11 +560,11 @@ private:
     void handle_message_received(util::Span<const char> data);
     void initiate_disconnect_wait();
     void handle_disconnect_wait(Status status);
-    void read_or_write_error(std::error_code ec, std::string_view msg);
-    void close_due_to_protocol_error(std::error_code, std::optional<std::string_view> msg = std::nullopt);
-    void close_due_to_client_side_error(std::error_code, std::optional<std::string_view> msg, bool is_fatal);
+    void close_due_to_protocol_error(Status status);
+    void close_due_to_client_side_error(Status, IsFatal is_fatal, ConnectionTerminationReason reason);
+    void close_due_to_transient_error(Status status, ConnectionTerminationReason reason);
     void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
-    void involuntary_disconnect(const SessionErrorInfo& info);
+    void involuntary_disconnect(const SessionErrorInfo& info, ConnectionTerminationReason reason);
     void disconnect(const SessionErrorInfo& info);
     void change_state_to_disconnected() noexcept;
     // These are only called from ClientProtocol class.
@@ -525,7 +578,9 @@ private:
     void receive_mark_message(session_ident_type, request_ident_type);
     void receive_unbound_message(session_ident_type);
     void receive_test_command_response(session_ident_type, request_ident_type, std::string_view body);
-    void handle_protocol_error(ClientProtocol::Error);
+    void receive_server_log_message(session_ident_type, util::Logger::Level, std::string_view body);
+    void receive_appservices_request_id(std::string_view coid);
+    void handle_protocol_error(Status status);
 
     // These are only called from Session class.
     void enlist_to_send(Session*);
@@ -535,6 +590,7 @@ private:
 
     OutputBuffer& get_output_buffer() noexcept;
     Session* get_session(session_ident_type) const noexcept;
+    Session* find_and_validate_session(session_ident_type session_ident, std::string_view message) noexcept;
     static bool was_voluntary(ConnectionTerminationReason) noexcept;
 
     static std::string make_logger_prefix(connection_ident_type);
@@ -628,6 +684,9 @@ private:
     // The set of sessions associated with this connection. A session becomes
     // associated with a connection when it is activated.
     std::map<session_ident_type, std::unique_ptr<Session>> m_sessions;
+    // Keep track of previously used sessions idents to see if a stale message was
+    // received for a closed session
+    std::unordered_set<session_ident_type> m_session_history;
 
     // A queue of sessions that have enlisted for an opportunity to send a
     // message to the server. Sessions will be served in the order that they
@@ -644,6 +703,7 @@ private:
 
     const connection_ident_type m_ident;
     const ServerEndpoint m_server_endpoint;
+    std::string m_appservices_coid;
 
     /// DEPRECATED - These will be removed in a future release
     const std::string m_authorization_header_name;
@@ -865,6 +925,10 @@ private:
     // transfer from the server.
     util::Optional<ClientReset>& get_client_reset_config() noexcept;
 
+    // Get the reason a synchronization session is used for (regular sync or client reset)
+    // - Client reset state means the session is going to be used to download a fresh realm.
+    SessionReason get_session_reason() noexcept;
+
     /// \brief Initiate the integration of downloaded changesets.
     ///
     /// This function must provide for the passed changesets (if any) to
@@ -887,7 +951,7 @@ private:
     ///
     /// The synchronization progress passed to
     /// ClientReplication::integrate_server_changesets() must be obtained
-    /// by calling get_sync_progress(), and that call must occur after the last
+    /// by calling get_status(), and that call must occur after the last
     /// invocation of initiate_integrate_changesets() whose changesets are
     /// included in what is passed to
     /// ClientReplication::integrate_server_changesets().
@@ -975,7 +1039,7 @@ private:
     bool m_suspended = false;
 
     SyncSocketProvider::SyncTimer m_try_again_activation_timer;
-    ErrorTryAgainBackoffInfo m_try_again_delay_info;
+    ErrorBackoffState<sync::ProtocolError, RandomEngine> m_try_again_delay_info;
 
     // Set to true when download completion is reached. Set to false after a
     // slow reconnect, such that the upload process will become suspended until
@@ -1148,21 +1212,21 @@ private:
     void send_query_change_message();
     void send_json_error_message();
     void send_test_command_message();
-    std::error_code receive_ident_message(SaltedFileIdent);
-    void receive_download_message(const SyncProgress&, std::uint_fast64_t downloadable_bytes,
-                                  DownloadBatchState last_in_batch, int64_t query_version, const ReceivedChangesets&);
-    std::error_code receive_mark_message(request_ident_type);
-    std::error_code receive_unbound_message();
-    std::error_code receive_error_message(const ProtocolErrorInfo& info);
-    std::error_code receive_query_error_message(int error_code, std::string_view message, int64_t query_version);
-    std::error_code receive_test_command_response(request_ident_type, std::string_view body);
+    Status receive_ident_message(SaltedFileIdent);
+    Status receive_download_message(const SyncProgress&, std::uint_fast64_t downloadable_bytes,
+                                    DownloadBatchState last_in_batch, int64_t query_version,
+                                    const ReceivedChangesets&);
+    Status receive_mark_message(request_ident_type);
+    Status receive_unbound_message();
+    Status receive_error_message(const ProtocolErrorInfo& info);
+    Status receive_query_error_message(int error_code, std::string_view message, int64_t query_version);
+    Status receive_test_command_response(request_ident_type, std::string_view body);
 
     void initiate_rebind();
     void reset_protocol_state() noexcept;
     void ensure_enlisted_to_send();
     void enlist_to_send();
-    bool check_received_sync_progress(const SyncProgress&) noexcept;
-    bool check_received_sync_progress(const SyncProgress&, int&) noexcept;
+    Status check_received_sync_progress(const SyncProgress&) noexcept;
     void check_for_upload_completion();
     void check_for_download_completion();
 
@@ -1194,7 +1258,7 @@ inline bool ClientImpl::is_dry_run() const noexcept
     return m_dry_run;
 }
 
-inline std::mt19937_64& ClientImpl::get_random() noexcept
+inline ClientImpl::RandomEngine& ClientImpl::get_random() noexcept
 {
     return m_random;
 }
@@ -1204,14 +1268,6 @@ inline auto ClientImpl::get_next_session_ident() noexcept -> session_ident_type
     return ++m_prev_session_ident;
 }
 
-inline void ClientImpl::ReconnectInfo::reset() noexcept
-{
-    m_reason = util::none;
-    m_time_point = 0;
-    m_delay = 0;
-    m_scheduled_reset = false;
-    m_try_again_delay_info.reset();
-}
 
 inline ClientImpl& ClientImpl::Connection::get_client() noexcept
 {
@@ -1255,14 +1311,18 @@ void ClientImpl::Connection::for_each_active_session(H handler)
 
 inline void ClientImpl::Connection::voluntary_disconnect()
 {
-    REALM_ASSERT(m_reconnect_info.m_reason && was_voluntary(*m_reconnect_info.m_reason));
-    constexpr bool try_again = true;
-    disconnect(SessionErrorInfo{ClientError::connection_closed, try_again}); // Throws
+    m_reconnect_info.update(ConnectionTerminationReason::closed_voluntarily, std::nullopt);
+    SessionErrorInfo error_info{Status{ErrorCodes::ConnectionClosed, "Connection closed"}, IsFatal{false}};
+    error_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
+
+    disconnect(std::move(error_info)); // Throws
 }
 
-inline void ClientImpl::Connection::involuntary_disconnect(const SessionErrorInfo& info)
+inline void ClientImpl::Connection::involuntary_disconnect(const SessionErrorInfo& info,
+                                                           ConnectionTerminationReason reason)
 {
-    REALM_ASSERT(m_reconnect_info.m_reason && !was_voluntary(*m_reconnect_info.m_reason));
+    REALM_ASSERT(!was_voluntary(reason));
+    m_reconnect_info.update(reason, info.resumption_delay_interval);
     disconnect(info); // Throws
 }
 
@@ -1402,6 +1462,7 @@ inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, s
     , logger{*logger_ptr}
     , m_conn{conn}
     , m_ident{ident}
+    , m_try_again_delay_info(conn.get_client().m_reconnect_backoff_info, conn.get_client().get_random())
     , m_is_flx_sync_session(conn.is_flx_sync_connection())
     , m_fix_up_object_ids(get_client().m_fix_up_object_ids)
     , m_wrapper{wrapper}
@@ -1572,12 +1633,6 @@ inline void ClientImpl::Session::enlist_to_send()
     REALM_ASSERT(!m_enlisted_to_send);
     m_enlisted_to_send = true;
     m_conn.enlist_to_send(this); // Throws
-}
-
-inline bool ClientImpl::Session::check_received_sync_progress(const SyncProgress& progress) noexcept
-{
-    int error_code = 0; // Dummy
-    return check_received_sync_progress(progress, error_code);
 }
 
 } // namespace sync

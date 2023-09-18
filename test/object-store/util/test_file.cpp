@@ -18,10 +18,18 @@
 
 #include "util/test_file.hpp"
 
-#include "baas_admin_api.hpp"
-#include "test_utils.hpp"
+#include "util/test_utils.hpp"
+#include "util/sync/baas_admin_api.hpp"
 #include "../util/crypt_key.hpp"
+#include "../util/test_path.hpp"
+
+#include <realm/db.hpp>
+#include <realm/disable_sync_to_disk.hpp>
+#include <realm/history.hpp>
+#include <realm/string_data.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/util/base64.hpp>
+#include <realm/util/file.hpp>
 
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/sync_manager.hpp>
@@ -29,13 +37,6 @@
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/schema.hpp>
 #endif
-
-#include <realm/db.hpp>
-#include <realm/disable_sync_to_disk.hpp>
-#include <realm/history.hpp>
-#include <realm/string_data.hpp>
-#include <realm/util/base64.hpp>
-#include <realm/util/file.hpp>
 
 #include <cstdlib>
 #include <iostream>
@@ -90,10 +91,12 @@ TestFile::~TestFile()
 {
     if (!m_persist) {
         try {
+            util::Logger::get_default_logger()->detail("~TestFile() removing '%1' and '%2'", path, m_temp_dir);
             util::File::try_remove(path);
             util::try_remove_dir_recursive(m_temp_dir);
         }
-        catch (...) {
+        catch (const std::exception& e) {
+            util::Logger::get_default_logger()->warn("~TestFile() cleanup failed for '%1': %2", path, e.what());
             // clean up is best effort, ignored.
         }
     }
@@ -144,7 +147,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<SyncUser> user, bson::Bson partition,
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
         util::format(std::cerr, "An unexpected sync error was caught by the default SyncTestFile handler: '%1'\n",
-                     error.what());
+                     error.status);
         abort();
     };
     schema_version = 1;
@@ -173,7 +176,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema 
     sync_config->error_handler = [](std::shared_ptr<SyncSession> session, SyncError error) {
         util::format(std::cerr,
                      "An unexpected sync error was caught by the default SyncTestFile handler: '%1' for '%2'",
-                     error.what(), session->path());
+                     error.status, session->path());
         abort();
     };
     schema_version = 1;
@@ -200,17 +203,23 @@ SyncServer::SyncServer(const SyncServer::Config& config)
                    m_logger.reset(new util::NullLogger());
 #endif
 
-                   sync::Server::Config config;
-                   config.logger = m_logger;
-                   config.token_expiration_clock = this;
-                   config.listen_address = "127.0.0.1";
-                   config.disable_sync_to_disk = true;
+                   sync::Server::Config c;
+                   c.logger = m_logger;
+                   c.token_expiration_clock = this;
+                   c.listen_address = "127.0.0.1";
+                   c.disable_sync_to_disk = true;
+                   c.ssl = config.ssl;
+                   if (c.ssl) {
+                       c.ssl_certificate_path = test_util::get_test_resource_path() + "test_util_network_ssl_ca.pem";
+                       c.ssl_certificate_key_path =
+                           test_util::get_test_resource_path() + "test_util_network_ssl_key.pem";
+                   }
 
-                   return config;
+                   return c;
                })())
 {
     m_server.start();
-    m_url = util::format("ws://127.0.0.1:%1", m_server.listen_endpoint().port());
+    m_url = util::format("%1://127.0.0.1:%2", config.ssl ? "wss" : "ws", m_server.listen_endpoint().port());
     if (config.start_immediately)
         start();
 }
@@ -305,8 +314,6 @@ void set_app_config_defaults(app::App::Config& app_config,
         app_config.device_info.bundle_id = "Bundle Id";
     if (app_config.app_id.empty())
         app_config.app_id = "app_id";
-    if (!app_config.local_app_version)
-        app_config.local_app_version.emplace("A Local App Version");
 }
 
 // MARK: - TestAppSession
@@ -339,6 +346,10 @@ TestAppSession::TestAppSession(AppSession session,
     sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
     sc_config.reconnect_mode = reconnect_mode;
     sc_config.socket_provider = custom_socket_provider;
+    // With multiplexing enabled, the linger time controls how long a
+    // connection is kept open for reuse. In tests, we want to shut
+    // down sync clients immediately.
+    sc_config.timeouts.connection_linger_time = 0;
 
     m_app = app::App::get_uncached_app(app_config, sc_config);
 

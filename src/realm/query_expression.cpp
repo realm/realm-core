@@ -372,7 +372,7 @@ public:
         destination.init(list_refs.m_from_list, list_refs.size());
         for (size_t i = 0; i < list_refs.size(); i++) {
             ref_type ref = to_ref(list_refs[i].get_int());
-            size_t s = ClusterTree::size_from_ref(ref, alloc);
+            size_t s = _impl::get_collection_size_from_ref(ref, alloc);
             destination.set(i, int64_t(s));
         }
     }
@@ -500,6 +500,49 @@ void ColumnListBase::get_lists(size_t index, Value<int64_t>& destination, size_t
             destination.set(t, m_leaf->get(index + t));
         }
     }
+}
+
+void LinkCount::evaluate(size_t index, ValueBase& destination)
+{
+    if (m_column_key) {
+        REALM_ASSERT(m_link_map.has_links());
+        std::vector<ObjKey> links = m_link_map.get_links(index);
+        auto sz = links.size();
+
+        if (sz == 0) {
+            destination.init(true, 0);
+        }
+        else {
+            destination.init(true, sz);
+            Allocator& alloc = m_link_map.get_target_table()->get_alloc();
+            for (size_t i = 0; i < sz; i++) {
+                const Obj obj = m_link_map.get_target_table()->get_object(links[i]);
+                auto val = obj._get<int64_t>(m_column_key.get_index());
+                size_t s;
+                if (m_column_key.get_type() == col_type_Link && !m_column_key.is_collection()) {
+                    // It is a single link column
+                    s = (val == 0) ? 0 : 1;
+                }
+                else if (val & 1) {
+                    // It is a backlink column with just one value
+                    s = 1;
+                }
+                else {
+                    // This is some kind of collection or backlink column
+                    s = _impl::get_collection_size_from_ref(to_ref(val), alloc);
+                }
+                destination.set(i, int64_t(s));
+            }
+        }
+    }
+    else {
+        destination = Value<int64_t>(m_link_map.count_links(index));
+    }
+}
+
+std::string LinkCount::description(util::serializer::SerialisationState& state) const
+{
+    return state.describe_columns(m_link_map, m_column_key) + util::serializer::value_separator + "@count";
 }
 
 Query Subexpr2<StringData>::equal(StringData sd, bool case_sensitive)

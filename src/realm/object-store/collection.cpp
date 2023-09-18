@@ -34,7 +34,7 @@ Collection::Collection(PropertyType type) noexcept
 }
 
 Collection::Collection(const Object& parent_obj, const Property* prop)
-    : Collection(std::shared_ptr(parent_obj.get_realm()), parent_obj.obj().get_collection_ptr(prop->column_key),
+    : Collection(std::shared_ptr(parent_obj.get_realm()), parent_obj.get_obj().get_collection_ptr(prop->column_key),
                  prop->type)
 {
 }

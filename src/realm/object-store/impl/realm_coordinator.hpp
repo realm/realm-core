@@ -58,7 +58,7 @@ public:
     // can be read from any thread.
     std::shared_ptr<Realm> get_realm(Realm::Config config, util::Optional<VersionID> version)
         REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
-    std::shared_ptr<Realm> get_realm(std::shared_ptr<util::Scheduler> = nullptr)
+    std::shared_ptr<Realm> get_realm(std::shared_ptr<util::Scheduler> = nullptr, bool first_time_open = false)
         REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
 
     // Return a frozen copy of the source Realm. May return a cached instance
@@ -260,7 +260,8 @@ private:
 
     std::shared_ptr<AuditInterface> m_audit_context;
 
-    void open_db() REQUIRES(m_realm_mutex);
+    // returns true the first time the database is opened, false otherwise.
+    bool open_db() REQUIRES(m_realm_mutex);
 
     void set_config(const Realm::Config&) REQUIRES(m_realm_mutex, !m_schema_cache_mutex);
     void init_external_helpers() REQUIRES(m_realm_mutex);
@@ -268,7 +269,7 @@ private:
                                                std::shared_ptr<util::Scheduler> scheduler = nullptr)
         REQUIRES(m_realm_mutex);
     void do_get_realm(Realm::Config&& config, std::shared_ptr<Realm>& realm, util::Optional<VersionID> version,
-                      util::CheckedUniqueLock& realm_lock) REQUIRES(m_realm_mutex);
+                      util::CheckedUniqueLock& realm_lock, bool first_time_open = false) REQUIRES(m_realm_mutex);
     void run_async_notifiers() REQUIRES(!m_notifier_mutex, m_running_notifiers_mutex);
     void clean_up_dead_notifiers() REQUIRES(m_notifier_mutex);
 

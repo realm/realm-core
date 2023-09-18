@@ -33,9 +33,10 @@ it has sent the [IDENT](#ident) message, and the server can send
       |  ----.              .----  |             |      '--- UPLOAD ------->  |
       |      |              |      |             |                     |      |
       |      '--- UPLOAD ------->  |             |  <------ DOWNLOAD --'      |
-      |                     |      |
-      |  <------ DOWNLOAD --'      |
-
+      |                     |      |             |                            |
+      |  <------ DOWNLOAD --'      |             |  <----- LOG_MESSAGE -----  |
+      |                            |
+      |  <----- LOG_MESSAGE -----  |
 
 
 Client --> server
@@ -1024,6 +1025,38 @@ message.
 
 Param: `<timestamp>` is a copy of the timestamp carried by the corresponding
 [PING](#ping) message.
+
+### LOG_MESSAGE
+
+    head = 'log_message' <session ident> <message size>
+    body = <message>
+
+The log message is a debug message sent by the server that can be received asynchronously at
+any time after the websocket ACCEPT response and prints a message from the server in the
+client debug logs. The level value in the message JSON data indicates the "severity" of the
+message and translates to the debug log level for which this message will be printed in the
+client debug log.
+
+Param: `<session ident>` is an integer value that specifies which session should print this
+log message. This value can be `0` if the log message applies to the connection.
+
+The body of the message is required and will be in JSON format with the following keys
+currently supported:
+    - `co_id` is a string value that provides the appservices request/connection id for the
+      connection that is sending the log message. This value is optional, but cannot be empty.
+      The client debug log will output the appservices request id when first received and in
+      every subsequent server log message output.
+    - `level` is a string value that indicates the debug log level for outputting the log
+      message by the client. Valid values are: `fatal`, `error`, `warn`, `info`, `detail`,
+      `debug`, and `trace`. This value is optional and will default to `debug` if empty or not
+      provided.
+    - `msg` is a string value containing the server log message to be output in the client
+      debug log. This value is optional and nothing will be added to the client debug log if
+      empty or not provided.
+
+NOTE: The `co_id` value replaces the `X-Appservices-Request-Id` value included in the
+websocket ACCEPT response HTTP headers, which is used to display the appservices request id
+in the debug log for correlating the client connection to the connection in the server logs.
 
 Error codes
 -----------
