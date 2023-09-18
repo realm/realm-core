@@ -242,7 +242,9 @@ static void populate(DBRef sg)
     pet->add_column(type_String, "name");
     pet->add_column(*person, "owner");
 
-    auto create_pet = [&](std::string name, ObjKey owner) { pet->create_object().set_all(name, owner); };
+    auto create_pet = [&](std::string name, ObjKey owner) {
+        pet->create_object().set_all(name, owner);
+    };
 
     create_pet("Fido", k0);
     create_pet("Max", k1);
@@ -898,9 +900,12 @@ TEST(Metrics_TransactionVersions)
     CHECK_EQUAL(transactions->at(0).get_num_available_versions(), 2);
     CHECK_EQUAL(transactions->at(1).get_num_available_versions(), 2);
     CHECK_EQUAL(transactions->at(2).get_num_available_versions(), 2);
+    CHECK_EQUAL(transactions->at(3).get_num_available_versions(), 2);
 
-    for (size_t i = 0; i < num_writes_while_pinned; ++i) {
-        CHECK_EQUAL(transactions->at(3 + i).get_num_available_versions(), 2 + i);
+    // from here intermediate versions are reclaimed, leaving us
+    // with 3 active versions regardless of the number of commits
+    for (size_t i = 1; i < num_writes_while_pinned; ++i) {
+        CHECK_EQUAL(transactions->at(3 + i).get_num_available_versions(), 3);
     }
 }
 
@@ -991,7 +996,9 @@ public:
 
     util::UniqueFunction<int64_t()> current_target_getter(size_t) override
     {
-        return []() { return realm::util::PageReclaimGovernor::no_match; };
+        return []() {
+            return realm::util::PageReclaimGovernor::no_match;
+        };
     }
 
     void report_target_result(int64_t) override
@@ -1027,7 +1034,9 @@ NONCONCURRENT_TEST(Metrics_NumDecryptedPagesWithoutEncryption)
         NoPageReclaimGovernor gov;
         realm::util::set_page_reclaim_governor(&gov);
         // the remainder of the test suite should use the default.
-        auto on_exit = make_scope_exit([]() noexcept { realm::util::set_page_reclaim_governor_to_default(); });
+        auto on_exit = make_scope_exit([]() noexcept {
+            realm::util::set_page_reclaim_governor_to_default();
+        });
         CHECK(gov.has_run_twice.valid());
         REALM_ASSERT_RELEASE(gov.has_run_twice.wait_for(std::chrono::seconds(30)) == std::future_status::ready);
 #endif
@@ -1072,7 +1081,9 @@ NONCONCURRENT_TEST_IF(Metrics_NumDecryptedPagesWithEncryption, REALM_ENABLE_ENCR
         NoPageReclaimGovernor gov;
         realm::util::set_page_reclaim_governor(&gov);
         // the remainder of the test suite should use the default.
-        auto on_exit = make_scope_exit([]() noexcept { realm::util::set_page_reclaim_governor_to_default(); });
+        auto on_exit = make_scope_exit([]() noexcept {
+            realm::util::set_page_reclaim_governor_to_default();
+        });
         CHECK(gov.has_run_twice.valid());
         REALM_ASSERT_RELEASE(gov.has_run_twice.wait_for(std::chrono::seconds(30)) == std::future_status::ready);
 #endif

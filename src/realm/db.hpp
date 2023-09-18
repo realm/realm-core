@@ -134,8 +134,8 @@ public:
                         const DBOptions& options = DBOptions());
     static DBRef create(BinaryData, bool take_ownership = true);
     static DBRef create(std::unique_ptr<Replication> repl, const DBOptions& options = DBOptions());
-    // file is used to set the `db_path` used to register and associate a users's SyncSession with the Realm path (see SyncUser::register_session)
-    // SyncSession::path() relies on the registered `m_db->get_path`
+    // file is used to set the `db_path` used to register and associate a users's SyncSession with the Realm path (see
+    // SyncUser::register_session) SyncSession::path() relies on the registered `m_db->get_path`
     static DBRef create_in_memory(std::unique_ptr<Replication> repl, const std::string& file,
                                   const DBOptions& options = DBOptions());
 
@@ -182,6 +182,10 @@ public:
     }
 
     void set_logger(const std::shared_ptr<util::Logger>& logger) noexcept;
+    util::Logger* get_logger() const noexcept
+    {
+        return m_logger.get();
+    }
 
     void create_new_history(Replication& repl) REQUIRES(!m_mutex);
     void create_new_history(std::unique_ptr<Replication> repl) REQUIRES(!m_mutex);
@@ -293,7 +297,8 @@ public:
         return m_evac_stage;
     }
 
-    /// Report the number of distinct versions currently stored in the database.
+    /// Report the number of distinct versions stored in the database at the time
+    /// of latest commit.
     /// Note: the database only cleans up versions as part of commit, so ending
     /// a read transaction will not immediately release any versions.
     uint_fast64_t get_number_of_versions();
@@ -440,7 +445,7 @@ public:
     bool other_writers_waiting_for_lock() const;
 
 protected:
-    explicit DB(const DBOptions& options); // Is this ever used?
+    explicit DB(const DBOptions& options);
 
 private:
     class AsyncCommitHelper;
@@ -494,7 +499,6 @@ private:
     bool m_wait_for_change_enabled = true; // Initially wait_for_change is enabled
     bool m_write_transaction_open GUARDED_BY(m_mutex) = false;
     std::string m_db_path;
-    size_t m_path_hash = 0;
     int m_file_format_version = 0;
     util::InterprocessMutex m_writemutex;
     std::unique_ptr<ReadLockInfo> m_fake_read_lock_if_immutable;
@@ -507,6 +511,10 @@ private:
     std::unique_ptr<AsyncCommitHelper> m_commit_helper;
     std::shared_ptr<util::Logger> m_logger;
     bool m_is_sync_agent = false;
+    // Id for this DB to be used in logging. We will just use some bits from the pointer.
+    // The path cannot be used as this would not allow us to distinguish between two DBs opening
+    // the same realm.
+    unsigned m_log_id;
 
     /// Attach this DB instance to the specified database file.
     ///

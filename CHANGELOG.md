@@ -1,3 +1,31 @@
+# 13.20.1 Release notes
+
+### Enhancements
+* Throw an exception if `File::unlock` has failed, in order to inform the SDK that we are likely hitting some limitation on the OS filesystem, instead of crashing  the application and use the same file locking logic for all the platforms.([PR #6926](https://github.com/realm/realm-core/pull/6926))
+
+### Fixed
+* Fixed crash in slab allocator (Assertion failed: ref + size <= next->first) Many issues like ([#6340](https://github.com/realm/realm-core/issues/6340), since 13.0.0)
+* realm/sync/network/websocket_error.hpp was missing from the install package ([PR #6954](https://github.com/realm/realm-core/pull/6954), since v13.18.0).
+* DB::get_number_of_versions() will now report the number of versions alive in the realm file. Before it reported the number of versions committed since the oldest live version. Metrics get_num_available_versions() is changed accordingly.
+* When using OpenSSL (i.e. on non-Apple platforms) the `TlsHandshakeFailed` error code would never be reported and instead TLS errors would be reported as `SyncConnectFailed` ([PR #6938](https://github.com/realm/realm-core/pull/6938)).
+* When using SecureTransport (i.e. on Apple platforms) only some TLS errors were reported as `TlsHandshakeFailed` and most were reported as `SyncConnectFailed` ([PR #6938](https://github.com/realm/realm-core/pull/6938)).
+* Sync errors originating from OpenSSL used the error message from the wrong end of the error stack, often resulting in very unhelpful error message ([PR #6938](https://github.com/realm/realm-core/pull/6938)).
+* Sending empty UPLOAD messages may lead to 'Bad server version' errors and client reset. ([6966](https://github.com/realm/realm-core/issues/6966), since v11.8.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Add a CI job to validate that the headers in the installation package all build ([PR #6954](https://github.com/realm/realm-core/pull/6954)).
+* Fix build of most internal tools, also build them by default. ([PR #6475](https://github.com/realm/realm-core/pull/6475))
+
+----------------------------------------------
+
 # 13.20.0 Release notes
 
 ### Enhancements
