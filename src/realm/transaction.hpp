@@ -468,6 +468,7 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
 {
     DB::ReadLockInfo new_read_lock = db->grab_read_lock(DB::ReadLockInfo::Live, version_id); // Throws
     REALM_ASSERT(new_read_lock.m_version >= m_read_lock.m_version);
+    /*
     if (new_read_lock.m_version == m_read_lock.m_version) {
         db->release_read_lock(new_read_lock);
         // _impl::History::update_early_from_top_ref() was not called
@@ -475,7 +476,7 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
         update_allocator_wrappers(writable);
         return false;
     }
-
+    */
     DB::version_type old_version = m_read_lock.m_version;
     DB::ReadLockGuard g(*db, new_read_lock);
     DB::version_type new_version = new_read_lock.m_version;

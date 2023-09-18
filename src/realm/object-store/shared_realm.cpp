@@ -821,6 +821,9 @@ void Realm::run_writes()
         m_async_commit_barrier_requested = false;
         auto prev_version = m_transaction->get_version();
         try {
+            millisleep(1);
+            read_group().check_resides_in_file();
+            read_group().check_allocator_empty();
             write_desc.writer();
         }
         catch (const std::exception&) {

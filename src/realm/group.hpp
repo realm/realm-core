@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 #include <chrono>
+#include <iostream>
 
 #include <realm/alloc_slab.hpp>
 #include <realm/exceptions.hpp>
@@ -505,6 +506,19 @@ public:
     static int read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std::string& path);
     void verify() const;
     void validate_primary_columns();
+    void check_allocator_empty()
+    {
+        if (!m_alloc.is_free_space_clean()) {
+            std::cout << "Free space dirty at start of transaction" << std::endl;
+        }
+    }
+    void check_resides_in_file()
+    {
+        if (!m_alloc.is_read_only(m_top.get_ref())) {
+            std::cout << "Top has already been COW'ed at start of transaction" << std::endl;
+        }
+    }
+
 #ifdef REALM_DEBUG
     void print() const;
     void print_free() const;

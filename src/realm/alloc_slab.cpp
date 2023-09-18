@@ -1211,7 +1211,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
         schedule_refresh_of_outdated_encrypted_pages();
         return;
     }
-
+    CriticalSection cs(changes);
     const auto old_slab_base = align_size_to_section_boundary(old_baseline);
     bool replace_last_mapping = false;
     size_t old_num_mappings = get_section_index(old_slab_base);
