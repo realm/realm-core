@@ -25,9 +25,6 @@
 #include <cstring>
 #include <fstream>
 #include <cstdlib>
-#if REALM_USE_UV
-#include <uv.h>
-#endif
 
 class FuzzConfigurator;
 class FuzzEngine {
