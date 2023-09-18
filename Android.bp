@@ -130,6 +130,16 @@ cc_defaults {
     cppflags: [
         "-fexceptions",
     ],
+    debug: {
+        cflags: ["-DREALM_DEBUG"],
+    },
+    shared_libs: [
+        "liblog",
+        "libandroid",
+        "libz",
+        "libcrypto",
+        "libssl",
+    ],
 }
 
 cc_defaults {
@@ -145,9 +155,6 @@ cc_defaults {
         "-Wno-non-virtual-dtor",
         "-Wno-missing-field-initializers",
     ],
-    debug: {
-        cflags: ["-DREALM_DEBUG"],
-    },
     lto: {
         thin: true,
     },
@@ -173,6 +180,7 @@ cc_library_static {
         "src/realm/**/*.cpp",
     ],
     exclude_srcs: [
+        "src/realm/tools/**/*",
         "src/realm/exec/**/*",
         "src/realm/sync/tools/**/*",
         "src/realm/object-store/c_api/**/*",
@@ -181,13 +189,6 @@ cc_library_static {
         "src/realm/object-store/impl/generic/**/*",
         "src/realm/object-store/impl/windows/**/*",
         "src/realm/object-store/sync/impl/emscripten/**/*",
-    ],
-    shared_libs: [
-        "liblog",
-        "libandroid",
-        "libz",
-        "libcrypto",
-        "libssl",
     ],
     export_shared_lib_headers: ["libcrypto"],
 }
