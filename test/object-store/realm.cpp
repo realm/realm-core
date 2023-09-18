@@ -4174,7 +4174,7 @@ TEST_CASE("KeyPathMapping generation") {
         REQUIRE(q.count() == 0);
     }
 }
-#if 0
+#if 1
 TEST_CASE("Concurrent operations") {
     SECTION("Async commits together with online compaction") {
         // This is a reproduction test for issue https://github.com/realm/realm-dart/issues/1396
@@ -4241,7 +4241,6 @@ TEST_CASE("Concurrent operations") {
         util::EventLoop::main().run_until([&] {
             return commit_1 == target && commit_2 == target;
         });
-
     }
 
     SECTION("No open realms") {
