@@ -3998,6 +3998,76 @@ TEST_CASE("flx sync: Client reset during async open", "[sync][flx][client reset]
     REQUIRE(subscription_invoked.load());
 }
 
+// Test that resending pending subscription sets does not cause any inconsistencies in the progress cursors.
+TEST_CASE("flx sync: resend pending subscriptions when reconnecting", "[sync][flx][baas]") {
+    FLXSyncTestHarness harness("flx_pending_subscriptions", {g_large_array_schema, {"queryable_int_field"}});
+
+    std::vector<ObjectId> obj_ids_at_end = fill_large_array_schema(harness);
+    SyncTestFile interrupted_realm_config(harness.app()->current_user(), harness.schema(),
+                                          SyncConfig::FLXSyncEnabled{});
+    interrupted_realm_config.cache = false;
+
+    {
+        auto pf = util::make_promise_future<void>();
+        Realm::Config config = interrupted_realm_config;
+        config.sync_config = std::make_shared<SyncConfig>(*interrupted_realm_config.sync_config);
+        config.sync_config->on_sync_client_event_hook =
+            [promise = util::CopyablePromiseHolder(std::move(pf.promise))](std::weak_ptr<SyncSession> weak_session,
+                                                                           const SyncClientHookData& data) mutable {
+                if (data.event != SyncClientHookEvent::BootstrapMessageProcessed &&
+                    data.event != SyncClientHookEvent::BootstrapProcessed) {
+                    return SyncClientHookAction::NoAction;
+                }
+                auto session = weak_session.lock();
+                if (!session) {
+                    return SyncClientHookAction::NoAction;
+                }
+                if (data.query_version != 1) {
+                    return SyncClientHookAction::NoAction;
+                }
+
+                // Commit a subscriptions set whenever a bootstrap message is received for query version 1.
+                if (data.event == SyncClientHookEvent::BootstrapMessageProcessed) {
+                    auto latest_subs = session->get_flx_subscription_store()->get_latest().make_mutable_copy();
+                    latest_subs.commit();
+                    return SyncClientHookAction::NoAction;
+                }
+                // At least one subscription set was created.
+                CHECK(session->get_flx_subscription_store()->get_latest().version() > 1);
+                promise.get_promise().emplace_value();
+                // Reconnect once query version 1 is bootstrapped.
+                return SyncClientHookAction::TriggerReconnect;
+            };
+
+        auto realm = Realm::get_shared_realm(config);
+        {
+            auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+            auto table = realm->read_group().get_table("class_TopLevel");
+            mut_subs.insert_or_assign(Query(table));
+            mut_subs.commit();
+        }
+        pf.future.get();
+        realm->sync_session()->shutdown_and_wait();
+        realm->close();
+    }
+
+    _impl::RealmCoordinator::assert_no_open_realms();
+
+    // Check at least one subscription set needs to be resent.
+    {
+        DBOptions options;
+        options.encryption_key = test_util::crypt_key();
+        auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path, options);
+        auto sub_store = sync::SubscriptionStore::create(realm, [](int64_t) {});
+        auto version_info = sub_store->get_version_info();
+        REQUIRE(version_info.latest > version_info.active);
+    }
+
+    // Resend the pending subscriptions.
+    auto realm = Realm::get_shared_realm(interrupted_realm_config);
+    wait_for_upload(*realm);
+    wait_for_download(*realm);
+}
 
 } // namespace realm::app
 

@@ -721,6 +721,7 @@ private:
     friend class DB;
     friend class Group;
     friend class GroupWriter;
+    friend class GroupCommitter;
 };
 
 

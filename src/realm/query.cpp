@@ -1398,9 +1398,12 @@ TableView Query::find_all(size_t limit) const
 
     TableView ret(*this, limit);
     if (m_ordering) {
+        // apply_descriptor_ordering will call do_sync
         ret.apply_descriptor_ordering(*m_ordering);
     }
-    ret.do_sync();
+    else {
+        ret.do_sync();
+    }
     return ret;
 }
 
