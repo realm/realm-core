@@ -16,7 +16,6 @@ ErrorStorage::ErrorStorage(std::exception_ptr ptr) noexcept
     : m_err(none)
     , m_message_buf()
     , m_usercode_error(nullptr)
-    
 {
     assign(std::move(ptr));
 }
@@ -73,7 +72,7 @@ bool ErrorStorage::operator==(const ErrorStorage& other) const noexcept
     else if (!m_err && !other.m_err) {
         return true;
     }
-    return m_err->error == other.m_err->error && m_message_buf == other.m_message_buf; // && m_usercode_error == other.m_usercode_error; //TODO: should we compare the usercode_error here 
+    return m_err->error == other.m_err->error && m_message_buf == other.m_message_buf;
 }
 
 void ErrorStorage::assign(std::exception_ptr eptr) noexcept
