@@ -19,8 +19,9 @@
 #ifndef REALM_OS_COPYABLE_ATOMIC_HPP
 #define REALM_OS_COPYABLE_ATOMIC_HPP
 
-namespace realm {
-namespace util {
+#include <atomic>
+
+namespace realm::util {
 
 // std::atomic is not copyable because the resulting semantics are not useful
 // for many of the things atomics can be used for (in particular, anything
@@ -51,6 +52,5 @@ struct CopyableAtomic : std::atomic<T> {
     }
 };
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 #endif // REALM_OS_COPYABLE_ATOMIC_HPP
