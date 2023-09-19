@@ -164,6 +164,7 @@ check_symbol_exists(epoll_create sys/epoll.h REALM_HAVE_EPOLL)
 
 if(APPLE)
     target_sources(ObjectStore PRIVATE impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
+    target_link_options(ObjectStore INTERFACE "SHELL:-framework Security")
 elseif(REALM_HAVE_EPOLL)
     target_compile_definitions(ObjectStore PUBLIC REALM_HAVE_EPOLL=1)
     target_sources(ObjectStore PRIVATE impl/epoll/external_commit_helper.cpp)

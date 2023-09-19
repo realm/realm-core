@@ -58,6 +58,9 @@
 #include <external/json/json.hpp>
 
 #include <array>
+#if REALM_HAVE_UV
+#include <uv.h>
+#endif
 
 namespace realm {
 class TestHelper {
@@ -4172,5 +4175,67 @@ TEST_CASE("KeyPathMapping generation") {
         std::vector<Mixed> args{0};
         auto q = table->query("parents.value = $0", args, mapping);
         REQUIRE(q.count() == 0);
+    }
+}
+
+TEST_CASE("Concurrent operations") {
+    SECTION("Async commits together with online compaction") {
+        // This is a reproduction test for issue https://github.com/realm/realm-dart/issues/1396
+        // First create a relatively large realm, then delete the content and do some more
+        // commits using async commits. If a compaction is started when doing an async commit
+        // then the subsequent committing done in the helper thread will illegally COW the
+        // top array. When the next mutation is done, the top array will be reported as being
+        // already freed.
+        TestFile config;
+        config.schema_version = 1;
+        config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
+
+        auto realm_1 = Realm::get_shared_realm(config);
+        Results res(realm_1, realm_1->read_group().get_table("class_object")->where());
+        auto realm_2 = Realm::get_shared_realm(config);
+
+        {
+            // Create a lot of objects
+            realm_2->begin_transaction();
+            auto table = realm_2->read_group().get_table("class_object");
+            for (int i = 0; i < 400000; i++) {
+                table->create_object().set("value", i);
+            }
+            realm_2->commit_transaction();
+        }
+
+        int commit_1 = 0;
+        int commit_2 = 0;
+
+        for (int i = 0; i < 4; i++) {
+            realm_1->async_begin_transaction([&]() {
+                // Clearing the DB will reduce the need for space
+                // This will trigger an online compaction
+                // Before the fix, the probram would crash here next time around.
+                res.clear();
+                realm_1->async_commit_transaction([&](std::exception_ptr) {
+                    commit_1++;
+                });
+            });
+            realm_2->async_begin_transaction([&]() {
+                // Make sure we will continue to have something to delete
+                auto table = realm_2->read_group().get_table("class_object");
+                for (int i = 0; i < 100; i++) {
+                    table->create_object().set("value", i);
+                }
+                realm_2->async_commit_transaction([&](std::exception_ptr) {
+                    commit_2++;
+                });
+            });
+        }
+
+        util::EventLoop::main().run_until([&] {
+            return commit_1 == 4 && commit_2 == 4;
+        });
+    }
+
+    SECTION("No open realms") {
+        // This is just to check that the section above did not leave any realms open
+        _impl::RealmCoordinator::assert_no_open_realms();
     }
 }
