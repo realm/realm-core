@@ -82,8 +82,8 @@ void Replication::add_class_with_primary_key(TableKey tk, StringData name, DataT
                                              Table::Type table_type)
 {
     if (auto logger = get_logger()) {
-        logger->log(util::Logger::Level::debug, "Add %4 class '%1' with primary key property '%2' of %3",
-                    Group::table_name_to_class_name(name), pk_name, pk_type, table_type);
+        logger->log(util::Logger::Level::debug, "Add %1 class '%2' with primary key property '%3' of %4", table_type,
+                    Group::table_name_to_class_name(name), pk_name, pk_type);
     }
     REALM_ASSERT(table_type != Table::Type::Embedded);
     unselect_all();
@@ -168,7 +168,7 @@ void Replication::remove_object(const Table* t, ObjKey key)
                         t->get_primary_key(key));
         }
         else {
-            logger->log(util::Logger::Level::debug, "Remove object '%1'", t->get_class_name());
+            logger->log(util::Logger::Level::debug, "Remove object '%1'[%2]", t->get_class_name(), key);
         }
     }
     select_table(t);              // Throws
@@ -177,31 +177,32 @@ void Replication::remove_object(const Table* t, ObjKey key)
 
 inline void Replication::select_obj(ObjKey key)
 {
-    if (key != m_selected_obj) {
-        if (auto logger = get_logger()) {
-            if (logger->would_log(util::Logger::Level::debug)) {
-                auto class_name = m_selected_table->get_class_name();
-                if (m_selected_table->get_primary_key_column()) {
-                    auto pk = m_selected_table->get_primary_key(key);
-                    logger->log(util::Logger::Level::debug, "Mutating object '%1' with primary key %2", class_name, pk);                   
-                }
-                else if (m_selected_table->is_embedded()) {
-                    auto obj = m_selected_table->get_object(key);
-                    FullPath full_path = obj.get_path();
-                    auto top_table = m_selected_table->get_parent_group()->get_table(full_path.top_table);
-                    auto pk = top_table->get_primary_key(full_path.top_objkey);
-                    auto prop_name = top_table->get_column_name(full_path.path_from_top[0].get_col_key());
-                    full_path.path_from_top[0] = PathElement(prop_name);
-                    logger->log(util::Logger::Level::debug, "Mutating object '%1' with path '%2'[%3]%4",
-                                class_name, top_table->get_class_name(), pk, full_path.path_from_top);
-                }
-                else {
-                    logger->log(util::Logger::Level::debug, "Mutating anonymous object '%1'[%2]", class_name, key);
-                }
+    if (key == m_selected_obj) {
+        return;
+    }
+    if (auto logger = get_logger()) {
+        if (logger->would_log(util::Logger::Level::debug)) {
+            auto class_name = m_selected_table->get_class_name();
+            if (m_selected_table->get_primary_key_column()) {
+                auto pk = m_selected_table->get_primary_key(key);
+                logger->log(util::Logger::Level::debug, "Mutating object '%1' with primary key %2", class_name, pk);
+            }
+            else if (m_selected_table->is_embedded()) {
+                auto obj = m_selected_table->get_object(key);
+                FullPath full_path = obj.get_path();
+                auto top_table = m_selected_table->get_parent_group()->get_table(full_path.top_table);
+                auto pk = top_table->get_primary_key(full_path.top_objkey);
+                auto prop_name = top_table->get_column_name(full_path.path_from_top[0].get_col_key());
+                full_path.path_from_top[0] = PathElement(prop_name);
+                logger->log(util::Logger::Level::debug, "Mutating object '%1' with path '%2'[%3]%4", class_name,
+                            top_table->get_class_name(), pk, full_path.path_from_top);
+            }
+            else {
+                logger->log(util::Logger::Level::debug, "Mutating anonymous object '%1'[%2]", class_name, key);
             }
         }
-        m_selected_obj = key;
     }
+    m_selected_obj = key;
 }
 
 void Replication::do_set(const Table* t, ColKey col_key, ObjKey key, _impl::Instruction variant)
@@ -331,7 +332,7 @@ void Replication::list_erase(const CollectionBase& list, size_t link_ndx)
     select_collection(list);                                    // Throws
     m_encoder.collection_erase(list.translate_index(link_ndx)); // Throws
     if (auto logger = get_logger()) {
-        logger->log(util::Logger::Level::trace, "   Erase '%1' position %2", get_prop_name(list.get_short_path()),
+        logger->log(util::Logger::Level::trace, "   Erase '%1' at position %2", get_prop_name(list.get_short_path()),
                     link_ndx);
     }
 }
