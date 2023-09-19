@@ -509,7 +509,7 @@ private:
     std::function<void(int, int)> m_upgrade_callback;
     std::shared_ptr<metrics::Metrics> m_metrics;
     std::unique_ptr<AsyncCommitHelper> m_commit_helper;
-    std::shared_ptr<util::Logger> m_logger;
+    std::unique_ptr<util::Logger> m_logger;
     bool m_is_sync_agent = false;
     // Id for this DB to be used in logging. We will just use some bits from the pointer.
     // The path cannot be used as this would not allow us to distinguish between two DBs opening

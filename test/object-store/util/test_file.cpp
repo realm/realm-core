@@ -196,13 +196,7 @@ SyncServer::SyncServer(const SyncServer::Config& config)
     , m_server(m_local_root_dir, util::none, ([&] {
                    using namespace std::literals::chrono_literals;
 
-#if TEST_ENABLE_LOGGING
-                   auto logger = new util::StderrLogger(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
-                   m_logger.reset(logger);
-#else
-                   // Logging is disabled, use a NullLogger to prevent printing anything
-                   m_logger.reset(new util::NullLogger());
-#endif
+                   m_logger = std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
                    sync::Server::Config c;
                    c.logger = m_logger;
