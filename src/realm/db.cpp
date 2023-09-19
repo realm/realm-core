@@ -1476,8 +1476,9 @@ void DB::open(Replication& repl, const std::string& file, const DBOptions& optio
 class DBLogger : public Logger {
 public:
     DBLogger(const std::shared_ptr<Logger>& base_logger, unsigned hash) noexcept
-        : Logger(base_logger)
+        : Logger(*base_logger)
         , m_hash(hash)
+        , m_base_logger_ptr(base_logger)
     {
     }
 
@@ -1486,18 +1487,19 @@ protected:
     {
         std::ostringstream ostr;
         auto id = std::this_thread::get_id();
-        ostr << "DB: " << m_hash << " Thread " << id << ": ";
-        Logger::do_log(*m_base_logger_ptr, level, ostr.str() + message);
+        ostr << "DB: " << m_hash << " Thread " << id << ": " << message;
+        Logger::do_log(*m_base_logger_ptr, level, ostr.str());
     }
 
 private:
     unsigned m_hash;
+    std::shared_ptr<Logger> m_base_logger_ptr;
 };
 
 void DB::set_logger(const std::shared_ptr<util::Logger>& logger) noexcept
 {
     if (logger)
-        m_logger = std::make_shared<DBLogger>(logger, m_log_id);
+        m_logger = std::make_unique<DBLogger>(logger, m_log_id);
 }
 
 void DB::open(Replication& repl, const DBOptions options)
@@ -1511,7 +1513,7 @@ void DB::open(Replication& repl, const DBOptions options)
     set_logger(options.logger);
     m_replication->set_logger(m_logger.get());
     if (m_logger)
-        m_logger->log(util::Logger::Level::detail, "Open memory-only realm");
+        m_logger->detail("Open memory-only realm");
 
     auto hist_type = repl.get_history_type();
     m_in_memory_info =

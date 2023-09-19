@@ -957,12 +957,6 @@ bool compare_objects(sync::PrimaryKey& oid, const Table& table_1, const Table& t
 
 namespace realm::test_util {
 
-bool compare_tables(const Table& table_1, const Table& table_2)
-{
-    util::NullLogger logger;
-    return compare_tables(table_1, table_2, logger);
-}
-
 bool compare_tables(const Table& table_1, const Table& table_2, util::Logger& logger)
 {
     bool equal = true;
@@ -1039,7 +1033,7 @@ bool compare_tables(const Table& table_1, const Table& table_2, util::Logger& lo
 
 bool compare_groups(const Transaction& group_1, const Transaction& group_2)
 {
-    util::NullLogger logger;
+    util::StderrLogger logger;
     return compare_groups(group_1, group_2, logger);
 }
 
