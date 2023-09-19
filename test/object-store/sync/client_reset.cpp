@@ -5324,16 +5324,9 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     REQUIRE(nlist_remote.get_any(0).get_string() == "Remote");
                     REQUIRE(nlist_setup.get_any(0).get_string() == "Setup");
                     REQUIRE(list_listener.is_valid());
-                    // the issue here is that I am reusing the collection in case the type match...
-                    // probably this has to change.... however it is not trivial to decide whether we
-                    // need to delete the collection or not, because if the 2 collections are matching (eg Setup in
-                    // this case) things must not be deleted and re-inserted but just copied (for dictionaries we can
-                    // use the key, but even in that case, would it be enough?). The problem is that there is not way
-                    // to understand if there is a difference if the collection type is the same. Unless I don't visit
-                    // the elements of the collection itself.
-                    //  REQUIRE_INDICES(list_changes.deletions, 0, 1);  // removed local nlist and "Local"
-                    //  REQUIRE_INDICES(list_changes.insertions, 0, 1); // inserted remote nlist "Remote"
-                    // REQUIRE(nlist_local_changes.collection_root_was_deleted);
+                    REQUIRE_INDICES(list_changes.deletions, 0, 3);  // removed local nlist and "Local"
+                    REQUIRE_INDICES(list_changes.insertions, 0, 3); // inserted remote nlist "Remote"
+                    REQUIRE(nlist_local_changes.collection_root_was_deleted);
                     REQUIRE(!nlist_setup_changes.collection_root_was_deleted);
                     REQUIRE_INDICES(nlist_setup_changes.insertions);
                     REQUIRE_INDICES(nlist_setup_changes.deletions);
@@ -5359,17 +5352,18 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     REQUIRE(nlist_setup.get_any(0).get_string() == "Setup");
                     // notifications
                     REQUIRE(list_listener.is_valid());
-                    REQUIRE_INDICES(list_changes.deletions); // nothing deleted
-                    // the same issue applies here, since the alorithm for handling nested collections is reusing
-                    // the same collection if the type matches, the indices that are added are 4 and 5.
-                    REQUIRE_INDICES(list_changes.insertions, 4,
+                    // I think there is still something odd with the logic....
+                    REQUIRE_INDICES(list_changes.deletions, 1, 2, 3); // nothing deleted
+                    // src is [ [Local],[Remote],[Setup], Local, Setup, Remote ]
+                    // dst is [ [Local], [Setup], Setup, Local]
+                    REQUIRE_INDICES(list_changes.insertions, 1, 2, 3, 4,
                                     5); // inserted remote nlist and "Remote" (should be 1 and 5)
                     REQUIRE(!nlist_local_changes.collection_root_was_deleted);
                     REQUIRE_INDICES(nlist_local_changes.insertions);
                     REQUIRE_INDICES(nlist_local_changes.deletions);
-                    REQUIRE(!nlist_setup_changes.collection_root_was_deleted);
+                    REQUIRE(nlist_setup_changes.collection_root_was_deleted);
                     REQUIRE_INDICES(nlist_setup_changes.insertions);
-                    REQUIRE_INDICES(nlist_setup_changes.deletions);
+                    REQUIRE_INDICES(nlist_setup_changes.deletions, 0);
                 }
             })
             ->run();
