@@ -314,11 +314,9 @@ void SyncReplication::create_object_with_primary_key(const Table* table, ObjKey 
 }
 
 
-void SyncReplication::erase_class(TableKey table_key, size_t num_tables)
+void SyncReplication::erase_class(TableKey table_key, StringData table_name, size_t num_tables)
 {
-    Replication::erase_class(table_key, num_tables);
-
-    StringData table_name = m_transaction->get_table_name(table_key);
+    Replication::erase_class(table_key, table_name, num_tables);
 
     bool is_class = m_transaction->table_is_public(table_key);
 

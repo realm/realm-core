@@ -114,6 +114,7 @@ InMemoryTestFile::InMemoryTestFile()
     in_memory = true;
     schema_version = 0;
     encryption_key = std::vector<char>();
+    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 }
 
 DBOptions InMemoryTestFile::options() const

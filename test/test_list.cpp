@@ -637,12 +637,14 @@ TEST(List_Nested_InMixed)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::string message;
-    DBRef db = DB::create(make_in_realm_history(), path);
+    DBOptions options;
+    options.logger = test_context.logger;
+    DBRef db = DB::create(make_in_realm_history(), path, options);
     auto tr = db->start_write();
-    auto table = tr->add_table("table");
+    auto table = tr->add_table_with_primary_key("table", type_Int, "id");
     auto col_any = table->add_column(type_Mixed, "something");
 
-    Obj obj = table->create_object();
+    Obj obj = table->create_object_with_primary_key(1);
 
     obj.set_collection(col_any, CollectionType::Dictionary);
     auto set = obj.get_set_ptr<Mixed>(col_any);

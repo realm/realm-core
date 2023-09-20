@@ -74,6 +74,7 @@ public:
     // If you need to obtain additional information for each object in the path,
     // you should use get_fat_path() or traverse_path() instead (see below).
     FullPath get_path() const final;
+    std::string get_id() const;
     Path get_short_path() const noexcept final;
     StablePath get_stable_path() const noexcept final;
     void add_index(Path& path, const Index& ndx) const final;
@@ -308,7 +309,7 @@ public:
     Dictionary get_dictionary(ColKey col_key) const;
     Dictionary get_dictionary(StringData col_name) const;
 
-    void set_collection(ColKey col_key, CollectionType type);
+    Obj& set_collection(ColKey col_key, CollectionType type);
     DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
     DictionaryPtr get_dictionary_ptr(const Path& path) const;
 
