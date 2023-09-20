@@ -42,6 +42,7 @@ struct ErrorCategory {
         http_error = RLM_ERR_CAT_HTTP_ERROR,
         custom_error = RLM_ERR_CAT_CUSTOM_ERROR,
         websocket_error = RLM_ERR_CAT_WEBSOCKET_ERROR,
+        sync_error = RLM_ERR_CAT_SYNC_ERROR,
     };
     constexpr ErrorCategory() = default;
     constexpr bool test(Type cat)
@@ -107,6 +108,24 @@ public:
         NoSubscriptionForWrite = RLM_ERR_NO_SUBSCRIPTION_FOR_WRITE,
         BadVersion = RLM_ERR_BAD_VERSION,
         OperationAborted = RLM_ERR_OPERATION_ABORTED,
+
+        AutoClientResetFailed = RLM_ERR_AUTO_CLIENT_RESET_FAILED,
+        BadSyncPartitionValue = RLM_ERR_BAD_SYNC_PARTITION_VALUE,
+        ConnectionClosed = RLM_ERR_CONNECTION_CLOSED,
+        InvalidSubscriptionQuery = RLM_ERR_INVALID_SUBSCRIPTION_QUERY,
+        SyncClientResetRequired = RLM_ERR_SYNC_CLIENT_RESET_REQUIRED,
+        SyncCompensatingWrite = RLM_ERR_SYNC_COMPENSATING_WRITE,
+        SyncConnectFailed = RLM_ERR_SYNC_CONNECT_FAILED,
+        SyncConnectTimeout = RLM_ERR_SYNC_CONNECT_TIMEOUT,
+        SyncInvalidSchemaChange = RLM_ERR_SYNC_INVALID_SCHEMA_CHANGE,
+        SyncPermissionDenied = RLM_ERR_SYNC_PERMISSION_DENIED,
+        SyncProtocolInvariantFailed = RLM_ERR_SYNC_PROTOCOL_INVARIANT_FAILED,
+        SyncProtocolNegotiationFailed = RLM_ERR_SYNC_PROTOCOL_NEGOTIATION_FAILED,
+        SyncServerPermissionsChanged = RLM_ERR_SYNC_SERVER_PERMISSIONS_CHANGED,
+        SyncUserMismatch = RLM_ERR_SYNC_USER_MISMATCH,
+        TlsHandshakeFailed = RLM_ERR_TLS_HANDSHAKE_FAILED,
+        WrongSyncType = RLM_ERR_WRONG_SYNC_TYPE,
+        SyncWriteNotAllowed = RLM_ERR_SYNC_WRITE_NOT_ALLOWED,
 
         SystemError = RLM_ERR_SYSTEM_ERROR,
 
@@ -186,7 +205,7 @@ public:
         MongoDBError = RLM_ERR_MONGODB_ERROR,
         ArgumentsNotAllowed = RLM_ERR_ARGUMENTS_NOT_ALLOWED,
         FunctionExecutionError = RLM_ERR_FUNCTION_EXECUTION_ERROR,
-        NoMatchingRule = RLM_ERR_NO_MATCHING_RULE,
+        NoMatchingRuleFound = RLM_ERR_NO_MATCHING_RULE_FOUND,
         InternalServerError = RLM_ERR_INTERNAL_SERVER_ERROR,
         AuthProviderNotFound = RLM_ERR_AUTH_PROVIDER_NOT_FOUND,
         AuthProviderAlreadyExists = RLM_ERR_AUTH_PROVIDER_ALREADY_EXISTS,
@@ -227,10 +246,7 @@ public:
         MaintenanceInProgress = RLM_ERR_MAINTENANCE_IN_PROGRESS,
         UserpassTokenInvalid = RLM_ERR_USERPASS_TOKEN_INVALID,
         InvalidServerResponse = RLM_ERR_INVALID_SERVER_RESPONSE,
-
-        WebSocketResolveFailedError = RLM_ERR_WEBSOCKET_RESOLVE_FAILED_ERROR,
-        WebSocketConnectionClosedClientError = RLM_ERR_WEBSOCKET_CONNECTION_CLOSED_CLIENT_ERROR,
-        WebSocketConnectionClosedServerError = RLM_ERR_WEBSOCKET_CONNECTION_CLOSED_SERVER_ERROR,
+        AppServerError = RLM_ERR_APP_SERVER_ERROR,
 
         CallbackFailed = RLM_ERR_CALLBACK,
         UnknownError = RLM_ERR_UNKNOWN,
@@ -241,6 +257,7 @@ public:
     static Error from_string(std::string_view str);
     static std::vector<Error> get_all_codes();
     static std::vector<std::string_view> get_all_names();
+    static std::vector<std::pair<std::string_view, ErrorCodes::Error>> get_error_list();
 };
 
 std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code);

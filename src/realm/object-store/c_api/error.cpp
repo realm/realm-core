@@ -15,6 +15,7 @@ namespace realm::c_api {
 ErrorStorage::ErrorStorage(std::exception_ptr ptr) noexcept
     : m_err(none)
     , m_message_buf()
+    , m_usercode_error(nullptr)
 {
     assign(std::move(ptr));
 }
@@ -22,6 +23,7 @@ ErrorStorage::ErrorStorage(std::exception_ptr ptr) noexcept
 ErrorStorage::ErrorStorage(const ErrorStorage& other)
     : m_err(other.m_err)
     , m_message_buf(other.m_message_buf)
+    , m_usercode_error(other.m_usercode_error)
 {
     if (m_err) {
         m_err->message = m_message_buf.c_str();
@@ -32,6 +34,7 @@ ErrorStorage& ErrorStorage::operator=(const ErrorStorage& other)
 {
     m_err = other.m_err;
     m_message_buf = other.m_message_buf;
+    m_usercode_error = other.m_usercode_error;
     if (m_err) {
         m_err->message = m_message_buf.c_str();
     }
@@ -41,6 +44,7 @@ ErrorStorage& ErrorStorage::operator=(const ErrorStorage& other)
 ErrorStorage::ErrorStorage(ErrorStorage&& other)
     : m_err(std::move(other.m_err))
     , m_message_buf(std::move(other.m_message_buf))
+    , m_usercode_error(std::move(other.m_usercode_error))
 {
     if (m_err) {
         m_err->message = m_message_buf.c_str();
@@ -52,6 +56,7 @@ ErrorStorage& ErrorStorage::operator=(ErrorStorage&& other)
 {
     m_err = std::move(other.m_err);
     m_message_buf = std::move(other.m_message_buf);
+    m_usercode_error = std::move(other.m_usercode_error);
     if (m_err) {
         m_err->message = m_message_buf.c_str();
     }
@@ -224,9 +229,12 @@ RLM_API realm_async_error_t* realm_get_last_error_as_async_error(void)
     return new realm_async_error_t{*ErrorStorage::get_thread_local()};
 }
 
-RLM_API void realm_get_async_error(const realm_async_error_t* async_err, realm_error_t* out_err)
+RLM_API bool realm_get_async_error(const realm_async_error_t* async_err, realm_error_t* out_err)
 {
-    async_err->error_storage.get_as_realm_error_t(out_err);
+    if (!async_err)
+        return false;
+
+    return async_err->error_storage.get_as_realm_error_t(out_err);
 }
 
 } // namespace realm::c_api

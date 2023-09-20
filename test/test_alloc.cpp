@@ -348,10 +348,17 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
 
     { // Verify we can still open the file with the same allocator
         _impl::SimulatedFailure::prime_mmap(nullptr);
-        alloc.attach_file(path, cfg);
+        auto top_ref = alloc.attach_file(path, cfg);
         CHECK(alloc.is_attached());
-        CHECK(alloc.get_baseline() == page_size);
-
+        // file has not (yet) been expanded to match:
+        CHECK(alloc.get_baseline() != page_size);
+        // convert before aligning file size
+        alloc.convert_from_streaming_form(top_ref);
+        // file is expanded:
+        CHECK(alloc.align_filesize_for_mmap(top_ref, cfg));
+        // and consequently needs to be reattached:
+        alloc.detach();
+        alloc.attach_file(path, cfg);
         alloc.init_mapping_management(1);
     }
 

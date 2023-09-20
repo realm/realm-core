@@ -130,7 +130,7 @@ SlabAlloc::Slab::~Slab()
         delete[] addr;
 }
 
-void SlabAlloc::detach() noexcept
+void SlabAlloc::detach(bool keep_file_open) noexcept
 {
     delete[] m_ref_translation_ptr;
     m_ref_translation_ptr.store(nullptr);
@@ -150,7 +150,8 @@ void SlabAlloc::detach() noexcept
             m_data = 0;
             m_mappings.clear();
             m_youngest_live_version = 0;
-            m_file.close();
+            if (!keep_file_open)
+                m_file.close();
             break;
         case attach_Heap:
             m_data = 0;
@@ -697,6 +698,79 @@ std::string SlabAlloc::get_file_path_for_assertions() const
     return m_file.get_path();
 }
 
+bool SlabAlloc::align_filesize_for_mmap(ref_type top_ref, Config& cfg)
+{
+    if (cfg.read_only) {
+        // If the file is opened read-only, we cannot change it. This is not a problem,
+        // because for a read-only file we assume that it will not change while we use it,
+        // hence there will be no need to grow memory mappings.
+        // This assumption obviously will not hold, if the file is shared by multiple
+        // processes or threads with different opening modes.
+        // Currently, there is no way to detect if this assumption is violated.
+        return false;
+    }
+    size_t expected_size = size_t(-1);
+    size_t size = static_cast<size_t>(m_file.get_size());
+
+    // It is not safe to change the size of a file on streaming form, since the footer
+    // must remain available and remain at the very end of the file.
+    REALM_ASSERT(!is_file_on_streaming_form());
+
+    // check if online compaction allows us to shrink the file:
+    if (top_ref) {
+        // Get the expected file size by looking up logical file size stored in top array
+        constexpr size_t max_top_size = (Group::s_file_size_ndx + 1) * 8 + sizeof(Header);
+        size_t top_page_base = top_ref & ~(page_size() - 1);
+        size_t top_offset = top_ref - top_page_base;
+        size_t map_size = std::min(max_top_size + top_offset, size - top_page_base);
+        File::Map<char> map_top(m_file, top_page_base, File::access_ReadOnly, map_size, 0, m_write_observer);
+        realm::util::encryption_read_barrier(map_top, top_offset, max_top_size);
+        auto top_header = map_top.get_addr() + top_offset;
+        auto top_data = NodeHeader::get_data_from_header(top_header);
+        auto w = NodeHeader::get_width_from_header(top_header);
+        auto logical_size = size_t(get_direct(top_data, w, Group::s_file_size_ndx)) >> 1;
+        // make sure we're page aligned, so the code below doesn't first
+        // truncate the file, then expand it again
+        expected_size = round_up_to_page_size(logical_size);
+    }
+
+    // Check if we can shrink the file
+    if (cfg.session_initiator && expected_size < size && !cfg.read_only) {
+        detach(true); // keep m_file open
+        m_file.resize(expected_size);
+        m_file.close();
+        size = expected_size;
+        return true;
+    }
+
+    // We can only safely mmap the file, if its size matches a page boundary. If not,
+    // we must change the size to match before mmaping it.
+    if (size != round_up_to_page_size(size)) {
+        // The file size did not match a page boundary.
+        // We must extend the file to a page boundary (unless already there)
+        // The file must be extended to match in size prior to being mmapped,
+        // as extending it after mmap has undefined behavior.
+        if (cfg.session_initiator || !cfg.is_shared) {
+            // We can only safely extend the file if we're the session initiator, or if
+            // the file isn't shared at all. Extending the file to a page boundary is ONLY
+            // done to ensure well defined behavior for memory mappings. It does not matter,
+            // that the free space management isn't informed
+            size = round_up_to_page_size(size);
+            detach(true); // keep m_file open
+            m_file.prealloc(size);
+            m_file.close();
+            return true;
+        }
+        else {
+            // Getting here, we have a file of a size that will not work, and without being
+            // allowed to extend it. This should not be possible. But allowing a retry is
+            // arguably better than giving up and crashing...
+            throw Retry();
+        }
+    }
+    return false;
+}
+
 ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::WriteObserver* write_observer)
 {
     m_cfg = cfg;
@@ -773,7 +847,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
         note_reader_end(this);
     });
 
-    size_t expected_size = size_t(-1);
     try {
         // we'll read header and (potentially) footer
         File::Map<char> map_header(m_file, File::access_ReadOnly, sizeof(Header), 0, m_write_observer);
@@ -814,21 +887,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
             REALM_ASSERT_EX(footer->m_magic_cookie == footer_magic_cookie, footer->m_magic_cookie,
                             get_file_path_for_assertions());
         }
-
-        if (top_ref) {
-            // Get the expected file size by looking up logical file size stored in top array
-            constexpr size_t max_top_size = (Group::s_file_size_ndx + 1) * 8 + sizeof(Header);
-            size_t top_page_base = top_ref & ~(page_size() - 1);
-            size_t top_offset = top_ref - top_page_base;
-            size_t map_size = std::min(max_top_size + top_offset, size - top_page_base);
-            File::Map<char> map_top(m_file, top_page_base, File::access_ReadOnly, map_size, 0, m_write_observer);
-            realm::util::encryption_read_barrier(map_top, top_offset, max_top_size);
-            auto top_header = map_top.get_addr() + top_offset;
-            auto top_data = NodeHeader::get_data_from_header(top_header);
-            auto w = NodeHeader::get_width_from_header(top_header);
-            auto logical_size = size_t(get_direct(top_data, w, Group::s_file_size_ndx)) >> 1;
-            expected_size = round_up_to_page_size(logical_size);
-        }
     }
     catch (const InvalidDatabase&) {
         throw;
@@ -842,6 +900,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
     catch (...) {
         throw InvalidDatabase("unknown error", path);
     }
+    // m_data not valid at this point!
     m_baseline = 0;
     // make sure that any call to begin_read cause any slab to be placed in free
     // lists correctly
@@ -849,45 +908,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
 
     // Ensure clean up, if we need to back out:
     DetachGuard dg(*this);
-
-    // Check if we can shrink the file
-    if (cfg.session_initiator && expected_size < size) {
-        m_file.resize(expected_size);
-        size = expected_size;
-    }
-    // We can only safely mmap the file, if its size matches a page boundary. If not,
-    // we must change the size to match before mmaping it.
-    if (size != round_up_to_page_size(size)) {
-        // The file size did not match a page boundary.
-        // We must extend the file to a page boundary (unless already there)
-        // The file must be extended to match in size prior to being mmapped,
-        // as extending it after mmap has undefined behavior.
-        if (cfg.read_only) {
-            // If the file is opened read-only, we cannot extend it. This is not a problem,
-            // because for a read-only file we assume that it will not change while we use it.
-            // This assumption obviously will not hold, if the file is shared by multiple
-            // processes or threads with different opening modes.
-            // Currently, there is no way to detect if this assumption is violated.
-            m_baseline = 0;
-        }
-        else {
-            if (cfg.session_initiator || !cfg.is_shared) {
-                // We can only safely extend the file if we're the session initiator, or if
-                // the file isn't shared at all. Extending the file to a page boundary is ONLY
-                // done to ensure well defined behavior for memory mappings. It does not matter,
-                // that the free space management isn't informed
-                size = round_up_to_page_size(size);
-                m_file.prealloc(size);
-                m_baseline = 0;
-            }
-            else {
-                // Getting here, we have a file of a size that will not work, and without being
-                // allowed to extend it. This should not be possible. But allowing a retry is
-                // arguably better than giving up and crashing...
-                throw Retry();
-            }
-        }
-    }
 
     reset_free_space_tracking();
     update_reader_view(size);
@@ -915,12 +935,12 @@ void SlabAlloc::convert_from_streaming_form(ref_type top_ref)
     {
         File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof(Header)); // Throws
         Header& writable_header = *writable_map.get_addr();
-        realm::util::encryption_read_barrier(writable_map, 0);
+        realm::util::encryption_read_barrier_for_write(writable_map, 0);
         writable_header.m_top_ref[1] = top_ref;
         writable_header.m_file_format[1] = writable_header.m_file_format[0];
         realm::util::encryption_write_barrier(writable_map, 0);
         writable_map.sync();
-        realm::util::encryption_read_barrier(writable_map, 0);
+        realm::util::encryption_read_barrier_for_write(writable_map, 0);
         writable_header.m_flags |= flags_SelectBit;
         realm::util::encryption_write_barrier(writable_map, 0);
         writable_map.sync();

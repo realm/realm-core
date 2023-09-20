@@ -1350,7 +1350,7 @@ TEST_CASE("dictionary snapshot null", "[dictionary]") {
     StringData new_key("foo");
 
     auto target_obj = Object::create(ctx, r, *r->schema().find("target"), Any{AnyDict{{"id", Any{int64_t(42)}}}});
-    dict.insert(new_key, target_obj.obj().get_key());
+    dict.insert(new_key, target_obj.get_obj().get_key());
     r->commit_transaction();
     REQUIRE(values.size() == 1);
     REQUIRE(snapshot.size() == 0);
@@ -1362,20 +1362,20 @@ TEST_CASE("dictionary snapshot null", "[dictionary]") {
     r->commit_transaction();
     REQUIRE(values.size() == 0);
     REQUIRE(snapshot.size() == 1);
-    auto obj_link = ObjLink{target_obj.obj().get_table()->get_key(), target_obj.obj().get_key()};
+    auto obj_link = ObjLink{target_obj.get_obj().get_table()->get_key(), target_obj.get_obj().get_key()};
     REQUIRE(snapshot.get_any(0) == Mixed{obj_link});
 
     // a snapshot retains an entry for a link when the underlying object is deleted
     // but the snapshot link is nullified
     r->begin_transaction();
-    target_obj.obj().remove();
+    target_obj.get_obj().remove();
     r->commit_transaction();
     REQUIRE(values.size() == 0);
     REQUIRE(snapshot.size() == 1);
     REQUIRE(snapshot.get_any(0) == Mixed{});
 }
 
-TEST_CASE("dictionary aggregate", "[dictionary]") {
+TEST_CASE("dictionary aggregate", "[dictionary][aggregate]") {
     InMemoryTestFile config;
     config.schema = Schema{
         {"DictionaryObject",
@@ -1401,7 +1401,7 @@ TEST_CASE("dictionary aggregate", "[dictionary]") {
     REQUIRE(*sum == 16);
 }
 
-TEST_CASE("callback with empty keypatharray") {
+TEST_CASE("callback with empty keypatharray", "[dictionary]") {
     InMemoryTestFile config;
     config.schema = Schema{
         {"object", {{"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},

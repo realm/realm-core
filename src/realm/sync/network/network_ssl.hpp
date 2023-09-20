@@ -40,13 +40,13 @@
 // synchronous operations were to be used with an underlying TCP socket in
 // nonblocking mode. Currently, the underlying TCP socket is always in blocking
 // mode when performing synchronous operations, but that may continue to be the
-// case in teh future.
+// case in the future.
 
 
 namespace realm::sync::network::ssl {
 
 enum class Errors {
-    certificate_rejected = 1,
+    tls_handshake_failed = 1,
 };
 
 class ErrorCategory : public std::error_category {
@@ -1146,7 +1146,7 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
     m_bio_error_code = std::error_code(); // Success
     int ret = oper();
     int ssl_error = SSL_get_error(m_ssl, ret);
-    int sys_error = int(ERR_get_error());
+    int sys_error = int(ERR_peek_last_error());
 
     // Guaranteed by the documentation of SSL_get_error()
     REALM_ASSERT((ret > 0) == (ssl_error == SSL_ERROR_NONE));

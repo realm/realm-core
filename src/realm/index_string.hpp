@@ -83,6 +83,11 @@ public:
     ObjKey index_string_find_first(Mixed value, const ClusterColumn& column) const;
     void index_string_find_all(std::vector<ObjKey>& result, Mixed value, const ClusterColumn& column,
                                bool case_insensitive = false) const;
+    void index_string_find_all_prefix(std::set<int64_t>& result, StringData str) const
+    {
+        _index_string_find_all_prefix(result, str, NodeHeader::get_header_from_data(m_data));
+    }
+
     FindRes index_string_find_all_no_copy(Mixed value, const ClusterColumn& column, InternalFindResult& result) const;
     size_t index_string_count(Mixed value, const ClusterColumn& column) const;
 
@@ -103,6 +108,7 @@ private:
     void index_string_all(Mixed value, std::vector<ObjKey>& result, const ClusterColumn& column) const;
 
     void index_string_all_ins(StringData value, std::vector<ObjKey>& result, const ClusterColumn& column) const;
+    void _index_string_find_all_prefix(std::set<int64_t>& result, StringData str, const char* header) const;
 };
 
 // 16 is the biggest element size of any non-string/binary Realm type

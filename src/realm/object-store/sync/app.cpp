@@ -595,9 +595,8 @@ void App::get_profile(const std::shared_ptr<SyncUser>& sync_user,
                         SyncUserIdentity(get<std::string>(doc, "id"), get<std::string>(doc, "provider_type")));
                 }
 
-                sync_user->update_identities(identities);
-                sync_user->update_user_profile(SyncUserProfile(get<BsonDocument>(profile_json, "data")));
-                sync_user->set_state(SyncUser::State::LoggedIn);
+                sync_user->update_user_profile(std::move(identities),
+                                               SyncUserProfile(get<BsonDocument>(profile_json, "data")));
                 self->m_sync_manager->set_current_user(sync_user->identity());
                 self->emit_change_to_subscribers(*self);
             }
@@ -612,10 +611,6 @@ void App::get_profile(const std::shared_ptr<SyncUser>& sync_user,
 void App::attach_auth_options(BsonDocument& body)
 {
     BsonDocument options;
-
-    if (m_config.local_app_version) {
-        options["appVersion"] = *m_config.local_app_version;
-    }
 
     log_debug("App: version info: platform: %1  version: %2 - sdk: %3 - sdk version: %4 - core version: %5",
               m_config.device_info.platform, m_config.device_info.platform_version, m_config.device_info.sdk,
@@ -642,16 +637,13 @@ void App::log_in_with_credentials(
 {
     if (would_log(util::Logger::Level::debug)) {
         auto app_info = util::format("app_id: %1", m_config.app_id);
-        if (m_config.local_app_version) {
-            app_info += util::format(" - app_version: %1", *m_config.local_app_version);
-        }
         log_debug("App: log_in_with_credentials: %1", app_info);
     }
     // if we try logging in with an anonymous user while there
     // is already an anonymous session active, reuse it
     if (credentials.provider() == AuthProvider::ANONYMOUS) {
         for (auto&& user : m_sync_manager->all_users()) {
-            if (user->provider_type() == credentials.provider_as_string() && user->is_logged_in()) {
+            if (user->is_anonymous()) {
                 completion(switch_user(user), util::none);
                 return;
             }
@@ -693,8 +685,7 @@ void App::log_in_with_credentials(
                 else {
                     sync_user = self->m_sync_manager->get_user(
                         get<std::string>(json, "user_id"), get<std::string>(json, "refresh_token"),
-                        get<std::string>(json, "access_token"), credentials.provider_as_string(),
-                        get<std::string>(json, "device_id"));
+                        get<std::string>(json, "access_token"), get<std::string>(json, "device_id"));
                 }
             }
             catch (const AppError& e) {
@@ -765,11 +756,7 @@ std::shared_ptr<SyncUser> App::switch_user(const std::shared_ptr<SyncUser>& user
     if (!user || user->state() != SyncUser::State::LoggedIn) {
         throw AppError(ErrorCodes::ClientUserNotLoggedIn, "User is no longer valid or is logged out");
     }
-
-    auto users = m_sync_manager->all_users();
-    auto it = std::find(users.begin(), users.end(), user);
-
-    if (it == users.end()) {
+    if (!verify_user_present(user)) {
         throw AppError(ErrorCodes::ClientUserNotFound, "User does not exist");
     }
 

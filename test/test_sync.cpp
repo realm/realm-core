@@ -146,10 +146,8 @@ TEST(Sync_BadVirtualPath)
         if (state != ConnectionState::disconnected)
             return;
         REALM_ASSERT(error_info);
-        std::error_code ec = error_info->error_code;
-        bool is_fatal = error_info->is_fatal();
-        CHECK_EQUAL(sync::ProtocolError::illegal_realm_path, ec);
-        CHECK(is_fatal);
+        CHECK_EQUAL(error_info->status, ErrorCodes::BadSyncPartitionValue);
+        CHECK(error_info->is_fatal);
         ++nerrors;
         if (nerrors == 3)
             fixture.stop();
@@ -185,8 +183,8 @@ TEST(Sync_AsyncWaitForUploadCompletion)
 
     auto wait = [&] {
         BowlOfStonesSemaphore bowl;
-        auto handler = [&](std::error_code ec) {
-            if (CHECK_NOT(ec))
+        auto handler = [&](Status status) {
+            if (CHECK(status.is_ok()))
                 bowl.add_stone();
         };
         session.async_wait_for_upload_completion(handler);
@@ -228,8 +226,8 @@ TEST(Sync_AsyncWaitForUploadCompletionNoPendingLocalChanges)
 
     auto pf = util::make_promise_future<bool>();
     session.async_wait_for_upload_completion(
-        [promise = std::move(pf.promise), tr = db->start_read()](std::error_code ec) mutable {
-            REALM_ASSERT(!ec);
+        [promise = std::move(pf.promise), tr = db->start_read()](Status status) mutable {
+            REALM_ASSERT(status.is_ok());
             tr->advance_read();
             promise.emplace_value(tr->get_history()->no_pending_local_changes(tr->get_version()));
         });
@@ -247,8 +245,8 @@ TEST(Sync_AsyncWaitForDownloadCompletion)
 
     auto wait = [&](Session& session) {
         BowlOfStonesSemaphore bowl;
-        auto handler = [&](std::error_code ec) {
-            if (CHECK_NOT(ec))
+        auto handler = [&](Status status) {
+            if (CHECK(status.is_ok()))
                 bowl.add_stone();
         };
         session.async_wait_for_download_completion(handler);
@@ -309,8 +307,8 @@ TEST(Sync_AsyncWaitForSyncCompletion)
 
     auto wait = [&](Session& session) {
         BowlOfStonesSemaphore bowl;
-        auto handler = [&](std::error_code ec) {
-            if (CHECK_NOT(ec))
+        auto handler = [&](Status status) {
+            if (CHECK(status.is_ok()))
                 bowl.add_stone();
         };
         session.async_wait_for_sync_completion(handler);
@@ -355,23 +353,15 @@ TEST(Sync_AsyncWaitCancellation)
     ClientServerFixture fixture(dir, test_context);
 
     BowlOfStonesSemaphore bowl;
-    auto upload_completion_handler = [&](std::error_code ec) {
-        CHECK_EQUAL(util::error::operation_aborted, ec);
-        bowl.add_stone();
-    };
-    auto download_completion_handler = [&](std::error_code ec) {
-        CHECK_EQUAL(util::error::operation_aborted, ec);
-        bowl.add_stone();
-    };
-    auto sync_completion_handler = [&](std::error_code ec) {
-        CHECK_EQUAL(util::error::operation_aborted, ec);
+    auto completion_handler = [&](Status status) {
+        CHECK_EQUAL(status, ErrorCodes::OperationAborted);
         bowl.add_stone();
     };
     {
         Session session = fixture.make_bound_session(db, "/test");
-        session.async_wait_for_upload_completion(upload_completion_handler);
-        session.async_wait_for_download_completion(download_completion_handler);
-        session.async_wait_for_sync_completion(sync_completion_handler);
+        session.async_wait_for_upload_completion(completion_handler);
+        session.async_wait_for_download_completion(completion_handler);
+        session.async_wait_for_sync_completion(completion_handler);
         // Destruction of session cancels wait operations
     }
     fixture.start();
@@ -552,7 +542,7 @@ TEST(Sync_WaitForSessionTerminations)
     // Note: Atomicity would not be needed if
     // Session::async_wait_for_download_completion() was assumed to work.
     std::atomic<bool> called{false};
-    auto handler = [&](std::error_code) {
+    auto handler = [&](Status) {
         called = true;
     };
     session.async_wait_for_download_completion(std::move(handler));
@@ -580,9 +570,7 @@ TEST(Sync_TokenWithoutExpirationAllowed)
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
-            std::error_code ec = error_info->error_code;
-            CHECK(ec == sync::ProtocolError::token_expired || ec == sync::ProtocolError::bad_authentication ||
-                  ec == sync::ProtocolError::permission_denied);
+            CHECK_EQUAL(error_info->status, ErrorCodes::SyncPermissionDenied);
             did_fail = true;
             fixture.stop();
         };
@@ -611,7 +599,7 @@ TEST(Sync_TokenWithNullExpirationAllowed)
         TEST_DIR(dir);
         TEST_CLIENT_DB(db);
         ClientServerFixture fixture(dir, test_context);
-        auto error_handler = [&](std::error_code, bool, const std::string&) {
+        auto error_handler = [&](Status, bool) {
             did_fail = true;
             fixture.stop();
         };
@@ -793,21 +781,24 @@ struct ExpectChangesetError {
         if (!error_info)
             return;
         REALM_ASSERT(error_info);
-        std::error_code ec = error_info->error_code;
-        CHECK_EQUAL(ec, sync::Client::Error::bad_changeset);
-        CHECK(ec.category() == client_error_category());
-        CHECK(!error_info->is_fatal());
-        CHECK_EQUAL(error_info->message,
-                    "Bad changeset (DOWNLOAD): Failed to transform received changeset: Schema mismatch: " +
-                        expected_error);
+        CHECK_EQUAL(error_info->status, ErrorCodes::BadChangeset);
+        CHECK(!error_info->is_fatal);
+        CHECK_EQUAL(error_info->status.reason(),
+                    "Failed to transform received changeset: Schema mismatch: " + expected_error);
         fixture.stop();
     }
 };
 
-void test_schema_mismatch(unit_test::TestContext& test_context, util::FunctionRef<void(WriteTransaction&)> fn_1,
-                          util::FunctionRef<void(WriteTransaction&)> fn_2, const char* expected_error_1,
+void test_schema_mismatch(unit_test::TestContext& test_context, util::FunctionRef<void(WriteTransaction&)>&& fn_1,
+                          util::FunctionRef<void(WriteTransaction&)>&& fn_2, const char* expected_error_1,
                           const char* expected_error_2 = nullptr)
 {
+    auto perform_write_transaction = [](DBRef db, util::FunctionRef<void(WriteTransaction&)>&& function) {
+        WriteTransaction wt(db);
+        function(wt);
+        return wt.commit();
+    };
+
     TEST_CLIENT_DB(db_1);
     TEST_CLIENT_DB(db_2);
 
@@ -828,8 +819,14 @@ void test_schema_mismatch(unit_test::TestContext& test_context, util::FunctionRe
     session_1.bind();
     session_2.bind();
 
-    write_transaction_notifying_session(db_1, session_1, fn_1);
-    write_transaction_notifying_session(db_2, session_2, fn_2);
+    // NOTE: There was a race condition with `write_transaction_notifying_session` where session_2
+    // was completing sync before the write transaction was completed, leading to a
+    // `realm::TableNameInUse` exception. Broke up this function and moved the call to
+    // `nonsync_transact_notify()` to after the write transactions.
+    auto version_1 = perform_write_transaction(db_1, std::move(fn_1));
+    auto version_2 = perform_write_transaction(db_2, std::move(fn_2));
+    session_1.nonsync_transact_notify(version_1);
+    session_2.nonsync_transact_notify(version_2);
 
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_upload_complete_or_client_stopped();
@@ -1473,7 +1470,6 @@ TEST(Sync_Randomized)
     }
 }
 
-
 #ifdef REALM_DEBUG // Failure simulation only works in debug mode
 
 TEST(Sync_ReadFailureSimulation)
@@ -1487,8 +1483,9 @@ TEST(Sync_ReadFailureSimulation)
         {
             ClientServerFixture fixture(server_dir, test_context);
             fixture.set_client_side_error_rate(1, 1); // 100% chance of failure
-            auto error_handler = [&](std::error_code ec, bool is_fatal, const std::string&) {
-                CHECK_EQUAL(_impl::SimulatedFailure::sync_client__read_head, ec);
+            auto error_handler = [&](Status status, bool is_fatal) {
+                CHECK_EQUAL(status, ErrorCodes::RuntimeError);
+                CHECK_EQUAL(status.reason(), "Simulated failure during sync client websocket read");
                 CHECK_NOT(is_fatal);
                 client_side_read_did_fail = true;
                 fixture.stop();
@@ -1506,8 +1503,6 @@ TEST(Sync_ReadFailureSimulation)
 }
 
 #endif // REALM_DEBUG
-
-
 TEST(Sync_FailingReadsOnClientSide)
 {
     TEST_CLIENT_DB(db_1);
@@ -1517,9 +1512,12 @@ TEST(Sync_FailingReadsOnClientSide)
         TEST_DIR(dir);
         ClientServerFixture fixture{dir, test_context};
         fixture.set_client_side_error_rate(5, 100); // 5% chance of failure
-        auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-            if (CHECK_EQUAL(_impl::SimulatedFailure::sync_client__read_head, ec))
+        auto error_handler = [&](Status status, bool is_fatal) {
+            if (CHECK_EQUAL(status.reason(), "Simulated failure during sync client websocket read")) {
+                CHECK_EQUAL(status, ErrorCodes::RuntimeError);
+                CHECK_NOT(is_fatal);
                 fixture.cancel_reconnect_delay();
+            }
         };
         fixture.set_client_side_error_handler(error_handler);
         fixture.start();
@@ -1577,7 +1575,7 @@ TEST(Sync_FailingReadsOnServerSide)
         TEST_DIR(dir);
         ClientServerFixture fixture{dir, test_context};
         fixture.set_server_side_error_rate(5, 100); // 5% chance of failure
-        auto error_handler = [&](std::error_code, bool is_fatal, const std::string&) {
+        auto error_handler = [&](Status, bool is_fatal) {
             CHECK_NOT(is_fatal);
             fixture.cancel_reconnect_delay();
         };
@@ -1656,8 +1654,8 @@ TEST(Sync_ErrorAfterServerRestore_BadClientFileIdent)
     bool did_fail = false;
     {
         ClientServerFixture fixture(server_dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool is_fatal, const std::string&) {
-            CHECK_EQUAL(ProtocolError::bad_server_version, ec);
+        auto error_handler = [&](Status status, bool is_fatal) {
+            CHECK_EQUAL(status, ErrorCodes::SyncClientResetRequired);
             CHECK(is_fatal);
             did_fail = true;
             fixture.stop();
@@ -1866,8 +1864,8 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersion)
     bool did_fail = false;
     {
         ClientServerFixture fixture(server_dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool is_fatal, const std::string&) {
-            CHECK_EQUAL(ProtocolError::bad_server_version, ec);
+        auto error_handler = [&](Status status, bool is_fatal) {
+            CHECK_EQUAL(status, ErrorCodes::SyncClientResetRequired);
             CHECK(is_fatal);
             did_fail = true;
             fixture.stop();
@@ -1944,8 +1942,8 @@ TEST(Sync_ErrorAfterServerRestore_BadClientVersion)
     bool did_fail = false;
     {
         ClientServerFixture fixture(server_dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool is_fatal, const std::string&) {
-            CHECK_EQUAL(ProtocolError::bad_client_version, ec);
+        auto error_handler = [&](Status status, bool is_fatal) {
+            CHECK_EQUAL(status, ErrorCodes::SyncClientResetRequired);
             CHECK(is_fatal);
             did_fail = true;
             fixture.stop();
@@ -2011,8 +2009,8 @@ TEST(Sync_ErrorAfterServerRestore_BadClientFileIdentSalt)
     bool did_fail = false;
     {
         ClientServerFixture fixture(server_dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool is_fatal, const std::string&) {
-            CHECK_EQUAL(ProtocolError::diverging_histories, ec);
+        auto error_handler = [&](Status status, bool is_fatal) {
+            CHECK_EQUAL(status, ErrorCodes::SyncClientResetRequired);
             CHECK(is_fatal);
             did_fail = true;
             fixture.stop();
@@ -2095,8 +2093,8 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersionSalt)
     bool did_fail = false;
     {
         ClientServerFixture fixture(server_dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool is_fatal, const std::string&) {
-            CHECK_EQUAL(ProtocolError::diverging_histories, ec);
+        auto error_handler = [&](Status status, bool is_fatal) {
+            CHECK_EQUAL(status, ErrorCodes::SyncClientResetRequired);
             CHECK(is_fatal);
             did_fail = true;
             fixture.stop();
@@ -2280,8 +2278,8 @@ TEST_IF(Sync_ReadOnlyClient, false)
     TEST_DIR(server_dir);
     MultiClientServerFixture fixture(2, 1, server_dir, test_context);
     bool did_get_permission_denied = false;
-    fixture.set_client_side_error_handler(1, [&](std::error_code ec, bool, const std::string&) {
-        CHECK_EQUAL(ProtocolError::permission_denied, ec);
+    fixture.set_client_side_error_handler(1, [&](Status status, bool) {
+        CHECK_EQUAL(status, ErrorCodes::SyncPermissionDenied);
         did_get_permission_denied = true;
         fixture.get_client(1).shutdown();
     });
@@ -2674,8 +2672,8 @@ TEST(Sync_Permissions)
     TEST_DIR(server_dir);
 
     ClientServerFixture fixture{server_dir, test_context};
-    fixture.set_client_side_error_handler([&](std::error_code, bool, const std::string& message) {
-        CHECK_EQUAL("", message);
+    fixture.set_client_side_error_handler([&](Status status, bool) {
+        CHECK_EQUAL("", status.reason());
         did_see_error_for_valid = true;
     });
     fixture.start();
@@ -2744,8 +2742,8 @@ TEST(Sync_SSL_Certificate_2)
     session_config.verify_servers_ssl_certificate = true;
     session_config.ssl_trust_certificate_path = ca_dir + "dns-chain.crt.pem";
 
-    auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        CHECK_EQUAL(ec, Client::Error::ssl_server_cert_rejected);
+    auto error_handler = [&](Status status, bool) {
+        CHECK_EQUAL(status, ErrorCodes::TlsHandshakeFailed);
         did_fail = true;
         fixture.stop();
     };
@@ -2895,8 +2893,8 @@ TEST(Sync_SSL_Certificate_Verify_Callback_2)
 
     ClientServerFixture fixture{server_dir, test_context, config};
 
-    auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        CHECK_EQUAL(ec, Client::Error::ssl_server_cert_rejected);
+    auto error_handler = [&](Status status, bool) {
+        CHECK_EQUAL(status, ErrorCodes::TlsHandshakeFailed);
         did_fail = true;
         fixture.stop();
     };
@@ -3785,8 +3783,6 @@ TEST(Sync_UploadDownloadProgress_7)
     // down the session that is in the process of being created.
 }
 
-// Commenting out test for now and will be fixed in a later PR
-#if 0
 TEST(Sync_MultipleSyncAgentsNotAllowed)
 {
     // At most one sync agent is allowed to participate in a Realm file access
@@ -3796,85 +3792,31 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
     // particular session participant over the "temporally overlapping access"
     // relation.
 
-    using namespace std::literals::chrono_literals;
-
-    std::mutex thread_mutex;
-    bool create_thread_called = false;
-    bool destroy_thread_called = false;
-    std::string error_message;
-    std::condition_variable error_cv;
-
-    auto&& create_thread = [&thread_mutex, &create_thread_called]() {
-        std::lock_guard<std::mutex> lock(thread_mutex);
-        create_thread_called = true;
-    };
-
-    auto&& destroy_thread = [&thread_mutex, &destroy_thread_called]() {
-        std::lock_guard<std::mutex> lock(thread_mutex);
-        destroy_thread_called = true;
-    };
-
-    auto&& handle_error = [&thread_mutex, &error_cv, &error_message](const std::exception& e) {
-        std::unique_lock<std::mutex> lock(thread_mutex);
-        error_message = e.what();
-        error_cv.notify_all();
-        return true;
-    };
-
-    // Since the event loop thread has been moved into the DefaultSocketProvider, use the
-    // client local BindingCallbackThreadObserver to receive the error message
-    auto observer_ptr = std::make_shared<BindingCallbackThreadObserver>(
-        std::move(create_thread), std::move(destroy_thread), std::move(handle_error));
-
-    CHECK(observer_ptr->has_handle_error());
-    {
-        auto no_handle_error_ptr = std::make_shared<BindingCallbackThreadObserver>(
-            nullopt, nullopt, nullopt);
-        no_handle_error_ptr->did_create_thread(); // should not crash
-        no_handle_error_ptr->will_destroy_thread(); // should not crash
-        CHECK(!no_handle_error_ptr->has_handle_error()); // no handler, returns false
-        CHECK(!no_handle_error_ptr->handle_error(MultipleSyncAgents())); // no handler, returns false
-    }
-
     TEST_CLIENT_DB(db);
     Client::Config config;
     config.logger = test_context.logger;
     auto socket_provider = std::make_shared<websocket::DefaultSocketProvider>(
-        config.logger, "", observer_ptr, websocket::DefaultSocketProvider::AutoStart{false});
+        config.logger, "", nullptr, websocket::DefaultSocketProvider::AutoStart{false});
     config.socket_provider = socket_provider;
     config.reconnect_mode = ReconnectMode::testing;
     Client client{config};
     {
-        Session session_1{client, db, nullptr};
-        Session session_2{client, db, nullptr};
-        session_1.bind("realm://foo/bar", "blablabla");
-        session_2.bind("realm://foo/bar", "blablabla");
-        socket_provider->start();
+        Session::Config config_1;
+        config_1.realm_identifier = "blablabla";
+        Session::Config config_2;
+        config_2.realm_identifier = config_1.realm_identifier;
+        Session session_1{client, db, nullptr, nullptr, std::move(config_1)};
+        Session session_2{client, db, nullptr, nullptr, std::move(config_2)};
+        session_1.bind();
+        session_2.bind();
+        CHECK_THROW(
+            websocket::DefaultSocketProvider::OnlyForTesting::run_event_loop_on_current_thread(socket_provider.get()),
+            MultipleSyncAgents);
+        websocket::DefaultSocketProvider::OnlyForTesting::prep_event_loop_for_restart(socket_provider.get());
+    }
 
-        {
-            std::unique_lock<std::mutex> lock(thread_mutex);
-            // Wait up to 10 seconds for the exception to be thrown by event loop
-            // Skip the wait if the exception has already been processed
-            if (error_message.empty()) {
-                CHECK(error_cv.wait_for(lock, 10s, [&error_message]() {
-                    return !error_message.empty();
-                }));
-            }
-            CHECK_STRING_CONTAINS(error_message, "Multiple sync agents attempted to join the same session");
-        }
-    }
-    socket_provider->stop(true);
-    {
-        std::unique_lock<std::mutex> lock(thread_mutex);
-        CHECK(create_thread_called);
-        CHECK(destroy_thread_called);
-    }
-    // restart the socket_provider event loop thread after the exception so we can clean up and resume
     socket_provider->start();
-    // Now start the client shutdown
-    client.shutdown();
 }
-#endif
 
 TEST(Sync_CancelReconnectDelay)
 {
@@ -3892,7 +3834,7 @@ TEST(Sync_CancelReconnectDelay)
 
         BowlOfStonesSemaphore bowl;
         auto handler = [&](const SessionErrorInfo& info) {
-            if (CHECK_EQUAL(info.error_code, ProtocolError::connection_closed))
+            if (CHECK_EQUAL(info.status, ErrorCodes::ConnectionClosed))
                 bowl.add_stone();
         };
         Session session = fixture.make_session(db, "/test");
@@ -3914,7 +3856,7 @@ TEST(Sync_CancelReconnectDelay)
 
         BowlOfStonesSemaphore bowl;
         auto handler = [&](const SessionErrorInfo& info) {
-            if (CHECK_EQUAL(info.error_code, ProtocolError::connection_closed))
+            if (CHECK_EQUAL(info.status, ErrorCodes::ConnectionClosed))
                 bowl.add_stone();
         };
         Session session = fixture.make_session(db, "/test");
@@ -3937,7 +3879,7 @@ TEST(Sync_CancelReconnectDelay)
         {
             BowlOfStonesSemaphore bowl;
             auto handler = [&](const SessionErrorInfo& info) {
-                if (CHECK_EQUAL(info.error_code, ProtocolError::connection_closed))
+                if (CHECK_EQUAL(info.status, ErrorCodes::ConnectionClosed))
                     bowl.add_stone();
             };
             Session session = fixture.make_session(db, "/test");
@@ -3973,7 +3915,7 @@ TEST(Sync_CancelReconnectDelay)
 
         BowlOfStonesSemaphore bowl;
         auto handler = [&](const SessionErrorInfo& info) {
-            if (CHECK_EQUAL(info.error_code, ProtocolError::illegal_realm_path))
+            if (CHECK_EQUAL(info.status, ErrorCodes::BadSyncPartitionValue))
                 bowl.add_stone();
         };
         Session session = fixture.make_session(db, "/..");
@@ -3996,7 +3938,7 @@ TEST(Sync_CancelReconnectDelay)
 
         BowlOfStonesSemaphore bowl;
         auto handler = [&](const SessionErrorInfo& info) {
-            if (CHECK_EQUAL(info.error_code, ProtocolError::illegal_realm_path))
+            if (CHECK_EQUAL(info.status, ErrorCodes::BadSyncPartitionValue))
                 bowl.add_stone();
         };
         Session session = fixture.make_session(db, "/..");
@@ -4501,8 +4443,9 @@ TEST(Sync_PingTimesOut)
         config.client_pong_timeout = 0; // time out immediately
         ClientServerFixture fixture(dir, test_context, std::move(config));
 
-        auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-            CHECK_EQUAL(Client::Error::pong_timeout, ec);
+        auto error_handler = [&](Status status, bool) {
+            CHECK_EQUAL(status, ErrorCodes::ConnectionClosed);
+            CHECK_EQUAL(status.reason(), "Timed out waiting for PONG response from server");
             did_fail = true;
             fixture.stop();
         };
@@ -4529,9 +4472,11 @@ TEST(Sync_ReconnectAfterPingTimeout)
     ClientServerFixture fixture(dir, test_context, std::move(config));
 
     BowlOfStonesSemaphore bowl;
-    auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        if (CHECK_EQUAL(Client::Error::pong_timeout, ec))
+    auto error_handler = [&](Status status, bool) {
+        if (CHECK_EQUAL(status, ErrorCodes::ConnectionClosed)) {
+            CHECK_EQUAL(status.reason(), "Timed out waiting for PONG response from server");
             bowl.add_stone();
+        }
     };
     fixture.set_client_side_error_handler(std::move(error_handler));
     fixture.start();
@@ -4553,8 +4498,9 @@ TEST(Sync_UrgentPingIsSent)
 
         ClientServerFixture fixture(dir, test_context, std::move(config));
 
-        auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-            CHECK_EQUAL(Client::Error::pong_timeout, ec);
+        auto error_handler = [&](Status status, bool) {
+            CHECK_EQUAL(status, ErrorCodes::ConnectionClosed);
+            CHECK_EQUAL(status.reason(), "Timed out waiting for PONG response from server");
             did_fail = true;
             fixture.stop();
         };
@@ -4582,9 +4528,8 @@ TEST(Sync_ServerDiscardDeadConnections)
     ClientServerFixture fixture(dir, test_context, std::move(config));
 
     BowlOfStonesSemaphore bowl;
-    auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        bool valid_error = (ec == sync::websocket::WebSocketError::websocket_read_error);
-        CHECK(valid_error);
+    auto error_handler = [&](Status status, bool) {
+        CHECK_EQUAL(status, ErrorCodes::ConnectionClosed);
         bowl.add_stone();
     };
     fixture.set_client_side_error_handler(std::move(error_handler));
@@ -5178,11 +5123,10 @@ TEST_IF(Sync_SSL_Certificates, false)
         auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
             if (state == ConnectionState::disconnected) {
                 CHECK(error_info);
-                client_logger->debug(
-                    "State change: disconnected, error_code = %1, is_fatal = %2, detailed_message = %3",
-                    error_info->error_code, error_info->is_fatal(), error_info->message);
+                client_logger->debug("State change: disconnected, error_code = %1, is_fatal = %2", error_info->status,
+                                     error_info->is_fatal);
                 // We expect to get through the SSL handshake but will hit an error due to the wrong token.
-                CHECK_NOT_EQUAL(error_info->error_code, Client::Error::ssl_server_cert_rejected);
+                CHECK_NOT_EQUAL(error_info->status, ErrorCodes::TlsHandshakeFailed);
                 client.shutdown();
             }
         };
@@ -5256,10 +5200,8 @@ TEST(Sync_BadChangeset)
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
-            std::error_code ec = error_info->error_code;
-            bool is_fatal = error_info->is_fatal();
-            CHECK_EQUAL(sync::ProtocolError::bad_changeset, ec);
-            CHECK(is_fatal);
+            CHECK_EQUAL(error_info->status, ErrorCodes::BadChangeset);
+            CHECK(error_info->is_fatal);
             did_fail = true;
             fixture.stop();
         };
@@ -6658,7 +6600,7 @@ TEST(Sync_NonIncreasingServerVersions)
         return ++timestamp;
     });
 
-    auto latest_local_verson = [&] {
+    auto latest_local_version = [&] {
         auto tr = db->start_write();
         tr->add_table_with_primary_key("class_foo", type_String, "_id")->add_column(type_Int, "int_col");
         return tr->commit();
@@ -6668,7 +6610,7 @@ TEST(Sync_NonIncreasingServerVersions)
     auto prep_changeset = [&](auto pk_name, auto int_col_val) {
         Changeset changeset;
         changeset.version = 10;
-        changeset.last_integrated_remote_version = latest_local_verson - 1;
+        changeset.last_integrated_remote_version = latest_local_version - 1;
         changeset.origin_timestamp = ++timestamp;
         changeset.origin_file_ident = 1;
         instr::PrimaryKey pk{changeset.intern_string(pk_name)};
@@ -6708,7 +6650,7 @@ TEST(Sync_NonIncreasingServerVersions)
 
     SyncProgress progress = {};
     progress.download.server_version = server_changesets.back().version;
-    progress.download.last_integrated_client_version = latest_local_verson - 1;
+    progress.download.last_integrated_client_version = latest_local_version - 1;
     progress.latest_server_version.version = server_changesets.back().version;
     progress.latest_server_version.salt = 0x7876543217654321;
 
@@ -6809,7 +6751,7 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
         return ++timestamp;
     });
 
-    auto latest_local_verson = [&] {
+    auto latest_local_version = [&] {
         auto tr = db->start_write();
         // Create schema: single table with array of ints as property.
         tr->add_table_with_primary_key("class_table", type_Int, "_id")->add_column_list(type_Int, "ints");
@@ -6842,7 +6784,7 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
     instr.prior_size = 8;
     changeset.push_back(instr);
     changeset.version = 1;
-    changeset.last_integrated_remote_version = latest_local_verson - 1;
+    changeset.last_integrated_remote_version = latest_local_version - 1;
     changeset.origin_timestamp = timestamp;
     changeset.origin_file_ident = 2;
 
@@ -6855,7 +6797,7 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
 
     SyncProgress progress = {};
     progress.download.server_version = changeset.version;
-    progress.download.last_integrated_client_version = latest_local_verson - 1;
+    progress.download.last_integrated_client_version = latest_local_version - 1;
     progress.latest_server_version.version = changeset.version;
     progress.latest_server_version.salt = 0x7876543217654321;
 
@@ -6867,7 +6809,7 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
                                         DownloadBatchState::SteadyState, logger, transact);
 
     bool is_compressed = false;
-    auto data = history.get_reciprocal_transform(latest_local_verson, is_compressed);
+    auto data = history.get_reciprocal_transform(latest_local_version, is_compressed);
     Changeset reciprocal_changeset;
     ChunkedBinaryInputStream in{data};
     if (is_compressed) {
@@ -6965,6 +6907,67 @@ TEST(Sync_TransformAgainstEmptyReciprocalChangeset)
     group_1.verify();
     group_2.verify();
     CHECK(compare_groups(rt_1, rt_2));
+}
+
+TEST(Sync_ServerVersionsSkippedFromDownloadCursor)
+{
+    TEST_CLIENT_DB(db);
+
+    auto& history = get_history(db);
+    history.set_client_file_ident(SaltedFileIdent{2, 0x1234567812345678}, false);
+    timestamp_type timestamp{1};
+    history.set_local_origin_timestamp_source([&] {
+        return ++timestamp;
+    });
+
+    auto latest_local_version = [&] {
+        auto tr = db->start_write();
+        tr->add_table_with_primary_key("class_foo", type_String, "_id")->add_column(type_Int, "int_col");
+        return tr->commit();
+    }();
+
+    Changeset server_changeset;
+    server_changeset.version = 10;
+    server_changeset.last_integrated_remote_version = latest_local_version - 1;
+    server_changeset.origin_timestamp = ++timestamp;
+    server_changeset.origin_file_ident = 1;
+
+    std::vector<ChangesetEncoder::Buffer> encoded;
+    std::vector<Transformer::RemoteChangeset> server_changesets_encoded;
+    encoded.emplace_back();
+    encode_changeset(server_changeset, encoded.back());
+    server_changesets_encoded.emplace_back(server_changeset.version, server_changeset.last_integrated_remote_version,
+                                           BinaryData(encoded.back().data(), encoded.back().size()),
+                                           server_changeset.origin_timestamp, server_changeset.origin_file_ident);
+
+    SyncProgress progress = {};
+    // The server skips 10 server versions.
+    progress.download.server_version = server_changeset.version + 10;
+    progress.download.last_integrated_client_version = latest_local_version - 1;
+    progress.latest_server_version.version = server_changeset.version + 15;
+    progress.latest_server_version.salt = 0x7876543217654321;
+
+    uint_fast64_t downloadable_bytes = 0;
+    VersionInfo version_info;
+    util::StderrLogger logger;
+    auto transact = db->start_read();
+    history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded, version_info,
+                                        DownloadBatchState::SteadyState, logger, transact);
+
+    version_type current_version;
+    SaltedFileIdent file_ident;
+    SyncProgress expected_progress;
+    history.get_status(current_version, file_ident, expected_progress);
+
+    // Check progress is reported correctly.
+    CHECK_EQUAL(progress.latest_server_version.salt, expected_progress.latest_server_version.salt);
+    CHECK_EQUAL(progress.latest_server_version.version, expected_progress.latest_server_version.version);
+    CHECK_EQUAL(progress.download.last_integrated_client_version,
+                expected_progress.download.last_integrated_client_version);
+    CHECK_EQUAL(progress.download.server_version, expected_progress.download.server_version);
+    CHECK_EQUAL(progress.upload.client_version, expected_progress.upload.client_version);
+    CHECK_EQUAL(progress.upload.last_integrated_server_version,
+                expected_progress.upload.last_integrated_server_version);
 }
 
 } // unnamed namespace
