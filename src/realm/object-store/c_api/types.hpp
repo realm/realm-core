@@ -661,7 +661,7 @@ struct realm_user : realm::c_api::WrapC, std::shared_ptr<realm::SyncUser> {
     bool equals(const WrapC& other) const noexcept final
     {
         if (auto ptr = dynamic_cast<const realm_user*>(&other)) {
-            return *get() == *(ptr->get());
+            return get() == ptr->get();
         }
         return false;
     }

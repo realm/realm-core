@@ -34,6 +34,8 @@
 #include <realm/dictionary.hpp>
 #include <realm/table.hpp>
 
+using namespace realm;
+
 namespace {
 static const char* const c_sync_userMetadata = "UserMetadata";
 static const char* const c_sync_identityMetadata = "UserIdentity";
@@ -41,10 +43,9 @@ static const char* const c_sync_app_metadata = "AppMetadata";
 
 static const char* const c_sync_current_user_identity = "current_user_identity";
 
-/* User keys*/
-static const char* const c_sync_marked_for_removal = "marked_for_removal";
+/* User keys */
 static const char* const c_sync_identity = "identity";
-static const char* const c_sync_local_uuid = "local_uuid";
+static const char* const c_sync_legacy_uuids = "legacy_uuids";
 static const char* const c_sync_refresh_token = "refresh_token";
 static const char* const c_sync_access_token = "access_token";
 static const char* const c_sync_identities = "identities";
@@ -61,7 +62,7 @@ static const char* const c_sync_fileActionMetadata = "FileActionMetadata";
 static const char* const c_sync_original_name = "original_name";
 static const char* const c_sync_new_name = "new_name";
 static const char* const c_sync_action = "action";
-static const char* const c_sync_url = "url";
+static const char* const c_sync_partition = "url";
 
 static const char* const c_sync_app_metadata_id = "id";
 static const char* const c_sync_app_metadata_deployment_model = "deployment_model";
@@ -72,47 +73,148 @@ static const char* const c_sync_app_metadata_ws_hostname = "ws_hostname";
 realm::Schema make_schema()
 {
     using namespace realm;
-    return Schema{{c_sync_identityMetadata,
-                   {{c_sync_user_id, PropertyType::String}, {c_sync_provider_type, PropertyType::String}}},
-                  {c_sync_userMetadata,
-                   {{c_sync_identity, PropertyType::String},
-                    {c_sync_local_uuid, PropertyType::String},
-                    {c_sync_marked_for_removal, PropertyType::Bool},
-                    {c_sync_refresh_token, PropertyType::String | PropertyType::Nullable},
-                    {c_sync_provider_type, PropertyType::String},
-                    {c_sync_access_token, PropertyType::String | PropertyType::Nullable},
-                    {c_sync_identities, PropertyType::Object | PropertyType::Array, c_sync_identityMetadata},
-                    {c_sync_state, PropertyType::Int},
-                    {c_sync_device_id, PropertyType::String},
-                    {c_sync_profile_data, PropertyType::String},
-                    {c_sync_local_realm_paths, PropertyType::Set | PropertyType::String}}},
-                  {c_sync_fileActionMetadata,
-                   {
-                       {c_sync_original_name, PropertyType::String, Property::IsPrimary{true}},
-                       {c_sync_new_name, PropertyType::String | PropertyType::Nullable},
-                       {c_sync_action, PropertyType::Int},
-                       {c_sync_url, PropertyType::String},
-                       {c_sync_identity, PropertyType::String},
-                   }},
-                  {c_sync_current_user_identity, {{c_sync_current_user_identity, PropertyType::String}}},
-                  {c_sync_app_metadata,
-                   {{c_sync_app_metadata_id, PropertyType::Int, Property::IsPrimary{true}},
-                    {c_sync_app_metadata_deployment_model, PropertyType::String},
-                    {c_sync_app_metadata_location, PropertyType::String},
-                    {c_sync_app_metadata_hostname, PropertyType::String},
-                    {c_sync_app_metadata_ws_hostname, PropertyType::String}}}};
+    return Schema{
+        {c_sync_identityMetadata,
+         ObjectSchema::ObjectType::Embedded,
+         {
+             {c_sync_user_id, PropertyType::String},
+             {c_sync_provider_type, PropertyType::String},
+         }},
+        {c_sync_userMetadata,
+         {{c_sync_identity, PropertyType::String},
+          {c_sync_legacy_uuids, PropertyType::String | PropertyType::Array},
+          {c_sync_refresh_token, PropertyType::String | PropertyType::Nullable},
+          {c_sync_access_token, PropertyType::String | PropertyType::Nullable},
+          {c_sync_identities, PropertyType::Object | PropertyType::Array, c_sync_identityMetadata},
+          {c_sync_state, PropertyType::Int},
+          {c_sync_device_id, PropertyType::String},
+          {c_sync_profile_data, PropertyType::String},
+          {c_sync_local_realm_paths, PropertyType::Set | PropertyType::String}}},
+        {c_sync_fileActionMetadata,
+         {
+             {c_sync_original_name, PropertyType::String, Property::IsPrimary{true}},
+             {c_sync_new_name, PropertyType::String | PropertyType::Nullable},
+             {c_sync_action, PropertyType::Int},
+             {c_sync_partition, PropertyType::String},
+             {c_sync_identity, PropertyType::String},
+         }},
+        {c_sync_current_user_identity,
+         {
+             {c_sync_current_user_identity, PropertyType::String},
+         }},
+        {c_sync_app_metadata,
+         {
+             {c_sync_app_metadata_id, PropertyType::Int, Property::IsPrimary{true}},
+             {c_sync_app_metadata_deployment_model, PropertyType::String},
+             {c_sync_app_metadata_location, PropertyType::String},
+             {c_sync_app_metadata_hostname, PropertyType::String},
+             {c_sync_app_metadata_ws_hostname, PropertyType::String},
+         }},
+    };
+}
+
+void migrate_to_v7(std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> realm)
+{
+    // Before schema version 7 there may have been multiple UserMetadata entries
+    // for a single user_id with different provider types, so we need to merge
+    // any duplicates together
+
+    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
+    TableRef old_table = ObjectStore::table_for_object_type(old_realm->read_group(), c_sync_userMetadata);
+    if (table->is_empty())
+        return;
+    REALM_ASSERT(table->size() == old_table->size());
+
+    ColKey id_col = table->get_column_key(c_sync_identity);
+    ColKey old_uuid_col = old_table->get_column_key("local_uuid");
+    ColKey new_uuid_col = table->get_column_key(c_sync_legacy_uuids);
+    ColKey state_col = table->get_column_key(c_sync_state);
+
+    std::unordered_map<std::string, Obj> users;
+    for (size_t i = 0, j = 0; i < table->size(); ++j) {
+        auto obj = table->get_object(i);
+
+        // Move the local uuid from the old column to the list
+        auto old_obj = old_table->get_object(j);
+        obj.get_list<String>(new_uuid_col).add(old_obj.get<String>(old_uuid_col));
+
+        // Check if we've already seen an object with the same id. If not, store
+        // this one and move on
+        std::string user_id = obj.get<String>(id_col);
+        auto& existing = users[obj.get<String>(id_col)];
+        if (!existing.is_valid()) {
+            existing = obj;
+            ++i;
+            continue;
+        }
+
+        // We have a second object for the same id, so we need to merge them.
+        // First we merge the state: if one is logged in and the other isn't,
+        // we'll use the logged-in state and tokens. If both are logged in, we'll
+        // use the more recent login. If one is logged out and the other is
+        // removed we'll use the logged out state. If both are logged out or
+        // both are removed then it doesn't matter which we pick.
+        using State = SyncUser::State;
+        auto state = State(obj.get<int64_t>(state_col));
+        auto existing_state = State(existing.get<int64_t>(state_col));
+        if (state == existing_state) {
+            if (state == State::LoggedIn) {
+                RealmJWT token_1(existing.get<StringData>(c_sync_access_token));
+                RealmJWT token_2(obj.get<StringData>(c_sync_access_token));
+                if (token_1.issued_at < token_2.issued_at) {
+                    existing.set(c_sync_refresh_token, obj.get<StringData>(c_sync_refresh_token));
+                    existing.set(c_sync_access_token, obj.get<StringData>(c_sync_access_token));
+                }
+            }
+        }
+        else if (state == State::LoggedIn || existing_state == State::Removed) {
+            existing.set(c_sync_state, int64_t(state));
+            existing.set(c_sync_refresh_token, obj.get<StringData>(c_sync_refresh_token));
+            existing.set(c_sync_access_token, obj.get<StringData>(c_sync_access_token));
+        }
+
+        // Next we merge the list properties (identities, legacy uuids, realm file paths)
+        {
+            auto dest = existing.get_linklist(c_sync_identities);
+            auto src = obj.get_linklist(c_sync_identities);
+            for (size_t i = 0, size = src.size(); i < size; ++i) {
+                if (dest.find_first(src.get(i)) == npos) {
+                    dest.add(src.get(i));
+                }
+            }
+        }
+        {
+            auto dest = existing.get_list<String>(c_sync_legacy_uuids);
+            auto src = obj.get_list<String>(c_sync_legacy_uuids);
+            for (size_t i = 0, size = src.size(); i < size; ++i) {
+                if (dest.find_first(src.get(i)) == npos) {
+                    dest.add(src.get(i));
+                }
+            }
+        }
+        {
+            auto dest = existing.get_set<String>(c_sync_local_realm_paths);
+            auto src = obj.get_set<String>(c_sync_local_realm_paths);
+            for (size_t i = 0, size = src.size(); i < size; ++i) {
+                dest.insert(src.get(i));
+            }
+        }
+
+
+        // Finally we delete the duplicate object. We don't increment `i` as it's
+        // now the index of the object just after the one we're deleting.
+        obj.remove();
+    }
 }
 
 } // anonymous namespace
-
-namespace realm {
 
 // MARK: - Sync metadata manager
 
 SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
                                          util::Optional<std::vector<char>> encryption_key)
 {
-    constexpr uint64_t SCHEMA_VERSION = 6;
+    constexpr uint64_t SCHEMA_VERSION = 7;
 
     if (!REALM_PLATFORM_APPLE && should_encrypt && !encryption_key)
         throw InvalidArgument("Metadata Realm encryption was specified, but no encryption key was provided.");
@@ -125,6 +227,13 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
     m_metadata_config.scheduler = util::Scheduler::make_dummy();
     if (encryption_key)
         m_metadata_config.encryption_key = std::move(*encryption_key);
+    m_metadata_config.automatically_handle_backlinks_in_migrations = true;
+    m_metadata_config.migration_function = [](std::shared_ptr<Realm> old_realm, std::shared_ptr<Realm> realm,
+                                              Schema&) {
+        if (old_realm->schema_version() < 7) {
+            migrate_to_v7(old_realm, realm);
+        }
+    };
 
     auto realm = open_realm(should_encrypt, encryption_key != none);
 
@@ -135,8 +244,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
         object_schema->persisted_properties[2].column_key, object_schema->persisted_properties[3].column_key,
         object_schema->persisted_properties[4].column_key, object_schema->persisted_properties[5].column_key,
         object_schema->persisted_properties[6].column_key, object_schema->persisted_properties[7].column_key,
-        object_schema->persisted_properties[8].column_key, object_schema->persisted_properties[9].column_key,
-        object_schema->persisted_properties[10].column_key};
+        object_schema->persisted_properties[8].column_key};
 
     object_schema = realm->schema().find(c_sync_fileActionMetadata);
     m_file_action_schema = {
@@ -144,8 +252,6 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
         object_schema->persisted_properties[2].column_key, object_schema->persisted_properties[3].column_key,
         object_schema->persisted_properties[4].column_key,
     };
-
-    object_schema = realm->schema().find(c_sync_current_user_identity);
 
     object_schema = realm->schema().find(c_sync_app_metadata);
     m_app_metadata_schema = {
@@ -168,7 +274,13 @@ SyncUserMetadataResults SyncMetadataManager::get_users(bool marked) const
 {
     auto realm = get_realm();
     TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
-    Query query = table->where().equal(m_user_schema.marked_for_removal_col, marked);
+    Query query;
+    if (marked) {
+        query = table->where().equal(m_user_schema.state_col, int64_t(SyncUser::State::Removed));
+    }
+    else {
+        query = table->where().not_equal(m_user_schema.state_col, int64_t(SyncUser::State::Removed));
+    }
     return SyncUserMetadataResults(Results(realm, std::move(query)), m_user_schema);
 }
 
@@ -213,7 +325,6 @@ void SyncMetadataManager::set_current_user_identity(const std::string& identity)
 }
 
 util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(const std::string& identity,
-                                                                                const std::string& provider_type,
                                                                                 bool make_if_absent) const
 {
     auto realm = get_realm();
@@ -221,79 +332,54 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
 
     // Retrieve or create the row for this object.
     TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
-    Query query = table->where()
-                      .equal(schema.identity_col, StringData(identity))
-                      .equal(schema.provider_type_col, StringData(provider_type));
+    Query query = table->where().equal(schema.identity_col, StringData(identity));
     Results results(realm, std::move(query));
     REALM_ASSERT_DEBUG(results.size() < 2);
-    auto row = results.first();
+    auto obj = results.first();
 
-    if (!row) {
+    if (!obj) {
         if (!make_if_absent)
             return none;
 
         realm->begin_transaction();
         // Check the results again.
-        row = results.first();
-        if (!row) {
-            // Because "making this user" is our last action, set this new user as the current user
-            TableRef currentUserIdentityTable =
-                ObjectStore::table_for_object_type(realm->read_group(), c_sync_current_user_identity);
+        obj = results.first();
+    }
+    if (!obj) {
+        // Because "making this user" is our last action, set this new user as the current user
+        TableRef currentUserIdentityTable =
+            ObjectStore::table_for_object_type(realm->read_group(), c_sync_current_user_identity);
 
-            Obj currentUserIdentityObj;
-            if (currentUserIdentityTable->is_empty())
-                currentUserIdentityObj = currentUserIdentityTable->create_object();
-            else
-                currentUserIdentityObj = *currentUserIdentityTable->begin();
+        Obj currentUserIdentityObj;
+        if (currentUserIdentityTable->is_empty())
+            currentUserIdentityObj = currentUserIdentityTable->create_object();
+        else
+            currentUserIdentityObj = *currentUserIdentityTable->begin();
 
-            auto obj = table->create_object();
+        obj = table->create_object();
 
-            currentUserIdentityObj.set<String>(c_sync_current_user_identity, identity);
+        currentUserIdentityObj.set<String>(c_sync_current_user_identity, identity);
 
-            std::string uuid = util::uuid_string();
-            obj.set(schema.identity_col, identity);
-            obj.set(schema.provider_type_col, provider_type);
-            obj.set(schema.local_uuid_col, uuid);
-            obj.set(schema.marked_for_removal_col, false);
-            obj.set(schema.state_col, (int64_t)SyncUser::State::LoggedIn);
-            realm->commit_transaction();
-            return SyncUserMetadata(schema, std::move(realm), std::move(obj));
-        }
-        else {
-            // Someone beat us to adding this user.
-            if (row->get<bool>(schema.marked_for_removal_col)) {
-                // User is dead. Revive or return none.
-                if (make_if_absent) {
-                    row->set(schema.marked_for_removal_col, false);
-                    realm->commit_transaction();
-                }
-                else {
-                    realm->cancel_transaction();
-                    return none;
-                }
-            }
-            else {
-                // User is alive, nothing else to do.
-                realm->cancel_transaction();
-            }
-            return SyncUserMetadata(schema, std::move(realm), std::move(*row));
-        }
+        obj->set(schema.identity_col, identity);
+        obj->set(schema.state_col, (int64_t)SyncUser::State::LoggedIn);
+        realm->commit_transaction();
+        return SyncUserMetadata(schema, std::move(realm), *obj);
     }
 
     // Got an existing user.
-    if (row->get<bool>(schema.marked_for_removal_col)) {
+    if (obj->get<int64_t>(schema.state_col) == int64_t(SyncUser::State::Removed)) {
         // User is dead. Revive or return none.
-        if (make_if_absent) {
-            realm->begin_transaction();
-            row->set(schema.marked_for_removal_col, false);
-            realm->commit_transaction();
-        }
-        else {
+        if (!make_if_absent) {
             return none;
         }
+
+        if (!realm->is_in_transaction())
+            realm->begin_transaction();
+        obj->set(schema.state_col, (int64_t)SyncUser::State::LoggedIn);
+        realm->commit_transaction();
     }
 
-    return SyncUserMetadata(schema, std::move(realm), std::move(*row));
+    return SyncUserMetadata(schema, std::move(realm), std::move(*obj));
 }
 
 void SyncMetadataManager::make_file_action_metadata(StringData original_name, StringData partition_key_value,
@@ -318,7 +404,7 @@ void SyncMetadataManager::make_file_action_metadata(StringData original_name, St
 
     obj.set(schema.idx_new_name, new_name);
     obj.set(schema.idx_action, static_cast<int64_t>(action));
-    obj.set(schema.idx_url, partition_key_value);
+    obj.set(schema.idx_partition, partition_key_value);
     obj.set(schema.idx_user_identity, local_uuid);
     transaction.commit();
 }
@@ -478,11 +564,16 @@ SyncUser::State SyncUserMetadata::state() const
     return SyncUser::State(m_obj.get<int64_t>(m_schema.state_col));
 }
 
-std::string SyncUserMetadata::local_uuid() const
+std::vector<std::string> SyncUserMetadata::legacy_identities() const
 {
     REALM_ASSERT(m_realm);
     m_realm->refresh();
-    return m_obj.get<String>(m_schema.local_uuid_col);
+    std::vector<std::string> uuids;
+    auto list = m_obj.get_list<String>(m_schema.legacy_uuids_col);
+    for (size_t i = 0, size = list.size(); i < size; ++i) {
+        uuids.push_back(list.get(i));
+    }
+    return uuids;
 }
 
 std::string SyncUserMetadata::refresh_token() const
@@ -520,19 +611,22 @@ std::vector<SyncUserIdentity> SyncUserMetadata::identities() const
 
     std::vector<SyncUserIdentity> identities;
     for (size_t i = 0; i < linklist.size(); i++) {
-        auto obj_key = linklist.get(i);
-        auto obj = linklist.get_target_table()->get_object(obj_key);
+        auto obj = linklist.get_object(i);
         identities.push_back(user_identity_from_obj(obj));
     }
 
     return identities;
 }
 
-std::string SyncUserMetadata::provider_type() const
+SyncUserProfile SyncUserMetadata::profile() const
 {
     REALM_ASSERT(m_realm);
     m_realm->refresh();
-    return m_obj.get<String>(m_schema.provider_type_col);
+    StringData result = m_obj.get<String>(m_schema.profile_dump_col);
+    if (result.size() == 0) {
+        return SyncUserProfile();
+    }
+    return SyncUserProfile(static_cast<bson::BsonDocument>(bson::parse(std::string_view(result))));
 }
 
 void SyncUserMetadata::set_refresh_token(const std::string& refresh_token)
@@ -586,17 +680,9 @@ void SyncUserMetadata::set_identities(std::vector<SyncUserIdentity> identities)
     link_list.clear();
 
     for (auto& ident : identities) {
-        ObjKey obj_key = identities_table->where()
-                             .equal(col_user_id, StringData(ident.id))
-                             .equal(col_provider_type, StringData(ident.provider_type))
-                             .find();
-        if (!obj_key) {
-            auto obj = link_list.get_target_table()->create_object();
-            obj.set<String>(c_sync_user_id, ident.id);
-            obj.set<String>(c_sync_provider_type, ident.provider_type);
-            obj_key = obj.get_key();
-        }
-        link_list.add(obj_key);
+        auto obj = link_list.create_and_insert_linked_object(link_list.size());
+        obj.set<String>(col_user_id, ident.id);
+        obj.set<String>(col_provider_type, ident.provider_type);
     }
 
     m_realm->commit_transaction();
@@ -624,15 +710,14 @@ void SyncUserMetadata::set_device_id(const std::string& device_id)
     m_realm->commit_transaction();
 }
 
-SyncUserProfile SyncUserMetadata::profile() const
+void SyncUserMetadata::set_legacy_identities(const std::vector<std::string>& uuids)
 {
-    REALM_ASSERT(m_realm);
-    m_realm->refresh();
-    StringData result = m_obj.get<String>(m_schema.profile_dump_col);
-    if (result.size() == 0) {
-        return SyncUserProfile();
-    }
-    return SyncUserProfile(static_cast<bson::BsonDocument>(bson::parse(std::string_view(result))));
+    m_realm->begin_transaction();
+    auto list = m_obj.get_list<String>(m_schema.legacy_uuids_col);
+    list.clear();
+    for (auto& uuid : uuids)
+        list.add(uuid);
+    m_realm->commit_transaction();
 }
 
 void SyncUserMetadata::set_user_profile(const SyncUserProfile& profile)
@@ -668,16 +753,6 @@ void SyncUserMetadata::add_realm_file_path(const std::string& path)
     m_realm->begin_transaction();
     Set<StringData> paths = m_obj.get_set<StringData>(m_schema.realm_file_paths_col);
     paths.insert(path);
-    m_realm->commit_transaction();
-}
-
-void SyncUserMetadata::mark_for_removal()
-{
-    if (m_invalid)
-        return;
-
-    m_realm->begin_transaction();
-    m_obj.set(m_schema.marked_for_removal_col, true);
     m_realm->commit_transaction();
 }
 
@@ -728,11 +803,11 @@ SyncFileActionMetadata::Action SyncFileActionMetadata::action() const
     return static_cast<SyncFileActionMetadata::Action>(m_obj.get<Int>(m_schema.idx_action));
 }
 
-std::string SyncFileActionMetadata::url() const
+std::string SyncFileActionMetadata::partition() const
 {
     REALM_ASSERT(m_realm);
     m_realm->refresh();
-    return m_obj.get<String>(m_schema.idx_url);
+    return m_obj.get<String>(m_schema.idx_partition);
 }
 
 void SyncFileActionMetadata::remove()
@@ -751,5 +826,3 @@ void SyncFileActionMetadata::set_action(Action new_action)
     m_obj.set<Int>(m_schema.idx_action, static_cast<Int>(new_action));
     m_realm->commit_transaction();
 }
-
-} // namespace realm

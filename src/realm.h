@@ -3232,12 +3232,8 @@ RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user) RLM_AP
 RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_identity_t* out_identities,
                                            size_t capacity, size_t* out_n);
 
-RLM_API const char* realm_user_get_local_identity(const realm_user_t*) RLM_API_NOEXCEPT;
-
 // returned pointer must be manually released with realm_free()
 RLM_API char* realm_user_get_device_id(const realm_user_t*) RLM_API_NOEXCEPT;
-
-RLM_API realm_auth_provider_e realm_user_get_auth_provider(const realm_user_t*) RLM_API_NOEXCEPT;
 
 /**
  * Log out the user and mark it as logged out.

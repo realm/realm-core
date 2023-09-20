@@ -410,29 +410,32 @@ public:
 
 /******************************* Compare Nodes *******************************/
 
-class CompareNode : public QueryNode {
-public:
-    static constexpr int EQUAL = 0;
-    static constexpr int NOT_EQUAL = 1;
-    static constexpr int GREATER = 2;
-    static constexpr int LESS = 3;
-    static constexpr int GREATER_EQUAL = 4;
-    static constexpr int LESS_EQUAL = 5;
-    static constexpr int BEGINSWITH = 6;
-    static constexpr int ENDSWITH = 7;
-    static constexpr int CONTAINS = 8;
-    static constexpr int LIKE = 9;
-    static constexpr int IN = 10;
-    static constexpr int TEXT = 11;
+enum class CompareType : char {
+    EQUAL,
+    NOT_EQUAL,
+    GREATER,
+    LESS,
+    GREATER_EQUAL,
+    LESS_EQUAL,
+    BEGINSWITH,
+    ENDSWITH,
+    CONTAINS,
+    LIKE,
+    IN,
+    TEXT,
 };
+
+std::string_view string_for_op(CompareType op);
+
+class CompareNode : public QueryNode {};
 
 class EqualityNode : public CompareNode {
 public:
     std::vector<ExpressionNode*> values;
-    int op;
+    CompareType op;
     bool case_sensitive = true;
 
-    EqualityNode(ExpressionNode* left, int t, ExpressionNode* right)
+    EqualityNode(ExpressionNode* left, CompareType t, ExpressionNode* right)
         : op(t)
     {
         values.emplace_back(left);
@@ -444,9 +447,9 @@ public:
 class RelationalNode : public CompareNode {
 public:
     std::vector<ExpressionNode*> values;
-    int op;
+    CompareType op;
 
-    RelationalNode(ExpressionNode* left, int t, ExpressionNode* right)
+    RelationalNode(ExpressionNode* left, CompareType t, ExpressionNode* right)
         : op(t)
     {
         values.emplace_back(left);
@@ -471,10 +474,10 @@ public:
 class StringOpsNode : public CompareNode {
 public:
     std::vector<ExpressionNode*> values;
-    int op;
+    CompareType op;
     bool case_sensitive = true;
 
-    StringOpsNode(ValueNode* left, int t, ValueNode* right)
+    StringOpsNode(ValueNode* left, CompareType t, ValueNode* right)
         : op(t)
     {
         values.emplace_back(left);
@@ -628,9 +631,9 @@ public:
     double get_arg_for_coordinate(const std::string&);
 
     template <class T>
-    Query simple_query(int op, ColKey col_key, T val, bool case_sensitive);
+    Query simple_query(CompareType op, ColKey col_key, T val, bool case_sensitive);
     template <class T>
-    Query simple_query(int op, ColKey col_key, T val);
+    Query simple_query(CompareType op, ColKey col_key, T val);
     std::pair<SubexprPtr, SubexprPtr> cmp(const std::vector<ExpressionNode*>& values);
     SubexprPtr column(LinkChain&, const std::string&);
     SubexprPtr dictionary_column(LinkChain&, const std::string&);
@@ -649,35 +652,39 @@ private:
 };
 
 template <class T>
-Query ParserDriver::simple_query(int op, ColKey col_key, T val, bool case_sensitive)
+Query ParserDriver::simple_query(CompareType op, ColKey col_key, T val, bool case_sensitive)
 {
     switch (op) {
-        case CompareNode::IN:
-        case CompareNode::EQUAL:
+        case CompareType::IN:
+        case CompareType::EQUAL:
             return m_base_table->where().equal(col_key, val, case_sensitive);
-        case CompareNode::NOT_EQUAL:
+        case CompareType::NOT_EQUAL:
             return m_base_table->where().not_equal(col_key, val, case_sensitive);
+        default:
+            break;
     }
     return m_base_table->where();
 }
 
 template <class T>
-Query ParserDriver::simple_query(int op, ColKey col_key, T val)
+Query ParserDriver::simple_query(CompareType op, ColKey col_key, T val)
 {
     switch (op) {
-        case CompareNode::IN:
-        case CompareNode::EQUAL:
+        case CompareType::IN:
+        case CompareType::EQUAL:
             return m_base_table->where().equal(col_key, val);
-        case CompareNode::NOT_EQUAL:
+        case CompareType::NOT_EQUAL:
             return m_base_table->where().not_equal(col_key, val);
-        case CompareNode::GREATER:
+        case CompareType::GREATER:
             return m_base_table->where().greater(col_key, val);
-        case CompareNode::LESS:
+        case CompareType::LESS:
             return m_base_table->where().less(col_key, val);
-        case CompareNode::GREATER_EQUAL:
+        case CompareType::GREATER_EQUAL:
             return m_base_table->where().greater_equal(col_key, val);
-        case CompareNode::LESS_EQUAL:
+        case CompareType::LESS_EQUAL:
             return m_base_table->where().less_equal(col_key, val);
+        default:
+            break;
     }
     return m_base_table->where();
 }

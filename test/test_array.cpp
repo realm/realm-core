@@ -1394,60 +1394,6 @@ TEST(Array_NotEqual)
 }
 
 
-TEST(Array_Copy)
-{
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
-
-    a.add(0);
-    a.add(1);
-    a.add(2);
-    a.add(3);
-    a.add(4);
-
-    Array b(Allocator::get_default());
-    b.init_from_mem(a.clone_deep(Allocator::get_default()));
-
-#ifdef REALM_DEBUG
-    b.verify();
-#endif
-
-    CHECK_EQUAL(5, b.size());
-    CHECK_EQUAL(0, b.get(0));
-    CHECK_EQUAL(1, b.get(1));
-    CHECK_EQUAL(2, b.get(2));
-    CHECK_EQUAL(3, b.get(3));
-    CHECK_EQUAL(4, b.get(4));
-
-    // With sub-arrays
-    Array c(Allocator::get_default());
-    c.create(Array::type_HasRefs);
-    c.add(a.get_ref());
-
-    Array d(Allocator::get_default());
-    d.init_from_mem(c.clone_deep(Allocator::get_default()));
-
-#ifdef REALM_DEBUG
-    d.verify();
-#endif
-
-    CHECK(d.has_refs());
-    CHECK_EQUAL(1, d.size());
-
-    Array e(d.get_alloc());
-    e.init_from_ref(to_ref(d.get(0)));
-    CHECK_EQUAL(5, e.size());
-    CHECK_EQUAL(0, e.get(0));
-    CHECK_EQUAL(1, e.get(1));
-    CHECK_EQUAL(2, e.get(2));
-    CHECK_EQUAL(3, e.get(3));
-    CHECK_EQUAL(4, e.get(4));
-
-    b.destroy();
-    c.destroy_deep();
-    d.destroy_deep();
-}
-
 TEST(Array_Large)
 {
     Array c(Allocator::get_default());
@@ -1461,23 +1407,6 @@ TEST(Array_Large)
     }
     CHECK_EQUAL(c.size(), 0x300001);
     CHECK_EQUAL(c.get(0x300000), 0x300000 - 1);
-    c.destroy();
-}
-
-TEST(Array_set_all_zero)
-{
-    Array c(Allocator::get_default());
-    c.create(Array::type_Normal);
-
-    CHECK_EQUAL(c.size(), 0);
-    // size or width zero is basically no-op
-    c.set_all_to_zero();
-    CHECK_EQUAL(c.size(), 0);
-
-    c.add(0x01);
-    c.set_all_to_zero();
-    CHECK_EQUAL(c.size(), 1);
-    CHECK_EQUAL(c.get(0), 0);
     c.destroy();
 }
 
