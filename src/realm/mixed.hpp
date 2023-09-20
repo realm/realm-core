@@ -263,7 +263,11 @@ public:
     Mixed operator/(const Mixed&) const noexcept;
 
     size_t hash() const;
+    // Used when inserting values into index
     StringData get_index_data(std::array<char, 16>&) const noexcept;
+    // Used when logging values
+    std::string to_string(size_t max_size) const noexcept;
+    // Used when you need a backup buffer for string or binary value
     void use_buffer(std::string& buf) noexcept;
 
     void to_json(std::ostream& out, JSONOutputMode output_mode) const noexcept;
