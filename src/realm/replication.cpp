@@ -189,13 +189,8 @@ inline void Replication::select_obj(ObjKey key)
             }
             else if (m_selected_table->is_embedded()) {
                 auto obj = m_selected_table->get_object(key);
-                FullPath full_path = obj.get_path();
-                auto top_table = m_selected_table->get_parent_group()->get_table(full_path.top_table);
-                auto pk = top_table->get_primary_key(full_path.top_objkey);
-                auto prop_name = top_table->get_column_name(full_path.path_from_top[0].get_col_key());
-                full_path.path_from_top[0] = PathElement(prop_name);
-                logger->log(util::Logger::Level::debug, "Mutating object '%1' with path '%2'[%3]%4", class_name,
-                            top_table->get_class_name(), pk, full_path.path_from_top);
+                logger->log(util::Logger::Level::debug, "Mutating object '%1' with path '%2'", class_name,
+                            obj.get_id());
             }
             else {
                 logger->log(util::Logger::Level::debug, "Mutating anonymous object '%1'[%2]", class_name, key);

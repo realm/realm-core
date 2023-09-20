@@ -74,6 +74,7 @@ public:
     // If you need to obtain additional information for each object in the path,
     // you should use get_fat_path() or traverse_path() instead (see below).
     FullPath get_path() const final;
+    std::string get_id() const;
     Path get_short_path() const noexcept final;
     StablePath get_stable_path() const noexcept final;
     void add_index(Path& path, const Index& ndx) const final;

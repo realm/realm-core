@@ -45,6 +45,8 @@
 #include "realm/util/base64.hpp"
 #include "realm/util/overload.hpp"
 
+#include <ostream>
+
 namespace realm {
 namespace {
 
@@ -1033,6 +1035,27 @@ FullPath Obj::get_path() const
         result.top_table = get_table()->get_key();
     }
     return result;
+}
+
+std::string Obj::get_id() const
+{
+    std::ostringstream ostr;
+    auto path = get_path();
+    auto top_table = m_table->get_parent_group()->get_table(path.top_table);
+    ostr << top_table->get_class_name() << '[';
+    if (top_table->get_primary_key_column()) {
+        ostr << top_table->get_primary_key(path.top_objkey);
+    }
+    else {
+        ostr << path.top_objkey;
+    }
+    ostr << ']';
+    if (!path.path_from_top.empty()) {
+        auto prop_name = top_table->get_column_name(path.path_from_top[0].get_col_key());
+        path.path_from_top[0] = PathElement(prop_name);
+        ostr << path.path_from_top;
+    }
+    return ostr.str();
 }
 
 Path Obj::get_short_path() const noexcept
