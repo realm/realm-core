@@ -63,7 +63,7 @@ Group::Group()
     init_array_parents();
     m_alloc.attach_empty(); // Throws
     m_file_format_version = get_target_file_format_version_for_session(0, Replication::hist_None);
-    ref_type top_ref = 0; // Instantiate a new empty group
+    ref_type top_ref = 0;   // Instantiate a new empty group
     bool create_group_when_missing = true;
     bool writable = create_group_when_missing;
     attach(top_ref, writable, create_group_when_missing); // Throws
@@ -633,7 +633,7 @@ void Group::create_empty_group()
     m_top.create(Array::type_HasRefs); // Throws
     _impl::DeepArrayDestroyGuard dg_top(&m_top);
     {
-        m_table_names.create(); // Throws
+        m_table_names.create();             // Throws
         _impl::DestroyGuard<ArrayStringShort> dg(&m_table_names);
         m_top.add(m_table_names.get_ref()); // Throws
         dg.release();
@@ -641,7 +641,7 @@ void Group::create_empty_group()
     {
         m_tables.create(Array::type_HasRefs); // Throws
         _impl::DestroyGuard<Array> dg(&m_tables);
-        m_top.add(m_tables.get_ref()); // Throws
+        m_top.add(m_tables.get_ref());        // Throws
         dg.release();
     }
     size_t initial_logical_file_size = sizeof(SlabAlloc::Header);
@@ -1030,7 +1030,7 @@ BinaryData Group::write_to_mem() const
         throw Exception(ErrorCodes::OutOfMemory, "Could not allocate memory while dumping to memory");
     MemoryOutputStream out; // Throws
     out.set_buffer(buffer.get(), buffer.get() + max_size);
-    write(out); // Throws
+    write(out);             // Throws
     size_t buffer_size = out.size();
     return BinaryData(buffer.release(), buffer_size);
 }
@@ -1072,9 +1072,9 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         ref_type names_ref = table_writer.write_names(out_2);   // Throws
         ref_type tables_ref = table_writer.write_tables(out_2); // Throws
         SlabAlloc new_alloc;
-        new_alloc.attach_empty(); // Throws
+        new_alloc.attach_empty();                               // Throws
         Array top(new_alloc);
-        top.create(Array::type_HasRefs); // Throws
+        top.create(Array::type_HasRefs);                        // Throws
         _impl::ShallowArrayDestroyGuard dg_top(&top);
         int_fast64_t value_1 = from_ref(names_ref);
         int_fast64_t value_2 = from_ref(tables_ref);
@@ -1089,14 +1089,14 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
             Array free_list(new_alloc);
             Array size_list(new_alloc);
             Array version_list(new_alloc);
-            free_list.create(Array::type_Normal); // Throws
+            free_list.create(Array::type_Normal);    // Throws
             _impl::DeepArrayDestroyGuard dg_1(&free_list);
-            size_list.create(Array::type_Normal); // Throws
+            size_list.create(Array::type_Normal);    // Throws
             _impl::DeepArrayDestroyGuard dg_2(&size_list);
             version_list.create(Array::type_Normal); // Throws
             _impl::DeepArrayDestroyGuard dg_3(&version_list);
-            bool deep = true;              // Deep
-            bool only_if_modified = false; // Always
+            bool deep = true;                        // Deep
+            bool only_if_modified = false;           // Always
             ref_type free_list_ref = free_list.write(out_2, deep, only_if_modified);
             ref_type size_list_ref = size_list.write(out_2, deep, only_if_modified);
             ref_type version_list_ref = version_list.write(out_2, deep, only_if_modified);
@@ -1436,8 +1436,10 @@ void Group::advance_transact(ref_type new_top_ref, util::InputStream* in, bool w
     }
 
     m_top.detach();                                           // Soft detach
+    rand_pause();
     bool create_group_when_missing = false;                   // See Group::attach_shared().
     attach(new_top_ref, writable, create_group_when_missing); // Throws
+    rand_pause();
     refresh_dirty_accessors();                                // Throws
 
     if (schema_changed)

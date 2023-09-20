@@ -383,8 +383,8 @@ struct alignas(8) DB::SharedInfo {
     /// compromize version agreement checking.
     uint16_t shared_info_version = g_shared_info_version; // Offset 6
 
-    uint16_t durability;           // Offset 8
-    uint16_t free_write_slots = 0; // Offset 10
+    uint16_t durability;                                  // Offset 8
+    uint16_t free_write_slots = 0;                        // Offset 10
 
     /// Number of participating shared groups
     uint32_t num_participants = 0; // Offset 12
@@ -396,7 +396,7 @@ struct alignas(8) DB::SharedInfo {
     /// Pid of process initiating the session, but only if that process runs
     /// with encryption enabled, zero otherwise. This was used to prevent
     /// multiprocess encryption until support for that was added.
-    uint64_t session_initiator_pid = 0; // Offset 24
+    uint64_t session_initiator_pid = 0;       // Offset 24
 
     std::atomic<uint64_t> number_of_versions; // Offset 32
 
@@ -418,14 +418,14 @@ struct alignas(8) DB::SharedInfo {
     /// Cleared by the daemon when it decides to exit.
     uint8_t daemon_ready = 0; // Offset 42
 
-    uint8_t filler_1; // Offset 43
+    uint8_t filler_1;         // Offset 43
 
     /// Stores a history schema version (as returned by
     /// Replication::get_history_schema_version()). Must match across all
     /// session participants.
-    uint16_t history_schema_version; // Offset 44
+    uint16_t history_schema_version;                 // Offset 44
 
-    uint16_t filler_2; // Offset 46
+    uint16_t filler_2;                               // Offset 46
 
     InterprocessMutex::SharedPart shared_writemutex; // Offset 48
     InterprocessMutex::SharedPart shared_controlmutex;
@@ -457,8 +457,8 @@ struct alignas(8) DB::SharedInfo {
 DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv)
     : size_of_mutex(sizeof(shared_writemutex))
     , size_of_condvar(sizeof(room_to_write))
-    , shared_writemutex()   // Throws
-    , shared_controlmutex() // Throws
+    , shared_writemutex()                     // Throws
+    , shared_controlmutex()                   // Throws
 {
     durability = static_cast<uint16_t>(dura); // durability level is fixed from creation
     REALM_ASSERT(!util::int_cast_has_overflow<decltype(history_type)>(ht + 0));
@@ -945,7 +945,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
     int target_file_format_version;
     int stored_hist_schema_version = -1; // Signals undetermined
 
-    int retries_left = 10; // number of times to retry before throwing exceptions
+    int retries_left = 10;               // number of times to retry before throwing exceptions
     // in case there is something wrong with the .lock file... the retries allows
     // us to pick a new lockfile initializer in case the first one crashes without
     // completing the initialization
@@ -977,7 +977,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
             // This will in particular set m_init_complete to 0.
             m_file.resize(0);
             m_file.prealloc(sizeof(SharedInfo));
-
+            rand_pause();
             // We can crash anytime during this process. A crash prior to
             // the first resize could allow another thread which could not
             // get the exclusive lock because we hold it, and hence were
@@ -993,7 +993,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
             // as being 1 before the entire SharedInfo header has been written.
             info->init_complete = 1;
         }
-
+        rand_pause();
 // We hold the shared lock from here until we close the file!
 #if REALM_PLATFORM_APPLE
         // macOS has a bug which can cause a hang waiting to obtain a lock, even
@@ -1109,8 +1109,11 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                 path, format("Architecture mismatch: Condition variable size is %1 but should be %2.",
                              info->size_of_condvar, sizeof(info->room_to_write)));
         }
+        rand_pause();
         m_writemutex.set_shared_part(info->shared_writemutex, lockfile_prefix, "write");
+        rand_pause();
         m_controlmutex.set_shared_part(info->shared_controlmutex, lockfile_prefix, "control");
+        rand_pause();
         m_versionlist_mutex.set_shared_part(info->shared_versionlist_mutex, lockfile_prefix, "versions");
 
         // even though fields match wrt alignment and size, there may still be incompatibilities
@@ -1131,6 +1134,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
         // - Waiting for and signalling database changes
         {
             std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
+            rand_pause();
             auto version_manager = std::make_unique<FileVersionManager>(m_file, m_versionlist_mutex);
 
             // proceed to initialize versioning and other metadata information related to
@@ -1156,6 +1160,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
             ref_type top_ref;
             m_marker_observer = std::make_unique<EncryptionMarkerObserver>(*version_manager);
             try {
+                rand_pause();
                 top_ref = alloc.attach_file(path, cfg, m_marker_observer.get()); // Throws
             }
             catch (const SlabAlloc::Retry&) {
@@ -1231,6 +1236,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                 throw UnsupportedFileFormatVersion(current_file_format_version);
             }
 
+            rand_pause();
             if (begin_new_session) {
                 // Determine version (snapshot number) and check history
                 // compatibility
@@ -1305,8 +1311,10 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                     throw FileFormatUpgradeRequired(m_db_path);
                 }
 
+                rand_pause();
                 alloc.convert_from_streaming_form(top_ref);
                 try {
+                    rand_pause();
                     bool file_changed_size = alloc.align_filesize_for_mmap(top_ref, cfg);
                     if (file_changed_size) {
                         // we need to re-establish proper mappings after file size change.
@@ -1342,6 +1350,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                     top.init_from_ref(top_ref);
                     file_size = Group::get_logical_file_size(top);
                 }
+                rand_pause();
                 version_manager->init_versioning(top_ref, file_size, version);
             }
             else { // Not the session initiator
@@ -1394,11 +1403,14 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
                 // We need to setup the allocators version information, as it is needed
                 // to correctly age and later reclaim memory mappings.
                 version_type version = info->latest_version_number;
+                rand_pause();
                 alloc.init_mapping_management(version);
             }
 
+            rand_pause();
             m_new_commit_available.set_shared_part(info->new_commit_available, lockfile_prefix, "new_commit",
                                                    options.temp_dir);
+            rand_pause();
             m_pick_next_writer.set_shared_part(info->pick_next_writer, lockfile_prefix, "pick_writer",
                                                options.temp_dir);
 
@@ -1412,7 +1424,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
             fug_1.release(); // Do not unmap
             fcg.release();   // Do not close
         }
-        ulg.release(); // Do not release shared lock
+        ulg.release();       // Do not release shared lock
         break;
     }
 
@@ -1771,6 +1783,7 @@ void DB::release_all_read_locks() noexcept
 // directly.
 void DB::close(bool allow_open_read_transactions)
 {
+    rand_pause();
     // make helper thread(s) terminate
     m_commit_helper.reset();
 
@@ -1778,6 +1791,7 @@ void DB::close(bool allow_open_read_transactions)
         if (!is_attached())
             return;
         {
+            rand_pause();
             CheckedLockGuard local_lock(m_mutex);
             if (!allow_open_read_transactions && m_transaction_count)
                 throw WrongTransactionState("Closing with open read transactions");
@@ -1798,6 +1812,7 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
         return;
 
     {
+        rand_pause();
         CheckedLockGuard local_lock(m_mutex);
         if (m_write_transaction_open)
             throw WrongTransactionState("Closing with open write transactions");
@@ -1806,18 +1821,27 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
     }
     SharedInfo* info = m_info;
     {
-        if (!lock.owns_lock())
+        if (!lock.owns_lock()) {
+            rand_pause();
             lock.lock();
+        }
 
-        if (m_alloc.is_attached())
+        if (m_alloc.is_attached()) {
+            rand_pause();
             m_alloc.detach();
+        }
 
         if (m_is_sync_agent) {
             REALM_ASSERT(info->sync_agent_present);
             info->sync_agent_present = 0; // Set to false
         }
+        rand_pause();
         release_all_read_locks();
-        --info->num_participants;
+        rand_pause();
+        auto t = info->num_participants - 1;
+        rand_pause();
+        info->num_participants = t;
+        rand_pause();
         bool end_of_session = info->num_participants == 0;
         // std::cerr << "closing" << std::endl;
         if (end_of_session) {
@@ -1836,8 +1860,9 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
     }
     {
         CheckedLockGuard local_lock(m_mutex);
-
+        rand_pause();
         m_new_commit_available.close();
+        rand_pause();
         m_pick_next_writer.close();
 
         if (m_in_memory_info) {
@@ -1846,10 +1871,14 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
         else {
             // On Windows it is important that we unmap before unlocking, else a SetEndOfFile() call from another
             // thread may interleave which is not permitted on Windows. It is permitted on *nix.
+            rand_pause();
             m_file_map.unmap();
+            rand_pause();
             m_version_manager.reset();
+            rand_pause();
             m_file.rw_unlock();
             // info->~SharedInfo(); // DO NOT Call destructor
+            rand_pause();
             m_file.close();
         }
         m_info = nullptr;
@@ -2485,8 +2514,8 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     REALM_ASSERT(oldest_version <= new_version);
 #if REALM_METRICS
     transaction.update_num_objects();
-#endif // REALM_METRICS
-
+#endif                                                                                   // REALM_METRICS
+    rand_pause();
     GroupWriter out(transaction, Durability(info->durability), m_marker_observer.get()); // Throws
     out.set_versions(new_version, top_refs, any_new_unreachables);
     out.prepare_evacuation();
@@ -2502,6 +2531,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         transaction.cow_outliers(out.get_evacuation_progress(), limit, work_limit);
     }
 
+    rand_pause();
     ref_type new_top_ref;
     // Recursively write all changed arrays to end of file
     {
@@ -2509,6 +2539,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
         new_top_ref = out.write_group();                         // Throws
     }
+    rand_pause();
     {
         // protect access to shared variables and m_reader_mapping from here
         CheckedLockGuard lock_guard(m_mutex);

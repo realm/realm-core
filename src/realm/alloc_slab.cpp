@@ -133,7 +133,9 @@ SlabAlloc::Slab::~Slab()
 void SlabAlloc::detach(bool keep_file_open) noexcept
 {
     delete[] m_ref_translation_ptr;
+    rand_pause();
     m_ref_translation_ptr.store(nullptr);
+    rand_pause();
     m_translation_table_size = 0;
     set_read_only(true);
     purge_old_mappings(static_cast<uint64_t>(-1), 0);
@@ -148,7 +150,9 @@ void SlabAlloc::detach(bool keep_file_open) noexcept
         case attach_SharedFile:
         case attach_UnsharedFile:
             m_data = 0;
+            rand_pause();
             m_mappings.clear();
+            rand_pause();
             m_youngest_live_version = 0;
             if (!keep_file_open)
                 m_file.close();
@@ -163,7 +167,9 @@ void SlabAlloc::detach(bool keep_file_open) noexcept
     // Release all allocated memory - this forces us to create new
     // slabs after re-attaching thereby ensuring that the slabs are
     // placed correctly (logically) after the end of the file.
+    rand_pause();
     m_slabs.clear();
+    rand_pause();
     clear_freelists();
 #if REALM_ENABLE_ENCRYPTION
     m_realm_file_info = nullptr;
@@ -558,7 +564,7 @@ void SlabAlloc::do_free(ref_type ref, char* addr)
                 // We can do that just by adding the size
                 if (prev->first + prev->second == ref) {
                     prev->second += size;
-                    return; // Done!
+                    return;                                     // Done!
                 }
                 m_free_read_only.emplace_hint(next, ref, size); // Throws
             }
@@ -798,6 +804,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
     File::CreateMode create = cfg.read_only || cfg.no_create ? File::create_Never : File::create_Auto;
     set_read_only(cfg.read_only);
     try {
+        rand_pause();
         m_file.open(path.c_str(), access, create, 0); // Throws
     }
     catch (const FileAccessError& ex) {
@@ -867,7 +874,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
 
         top_ref = validate_header(header, footer, size, path, cfg.encryption_key != nullptr); // Throws
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
-        m_data = map_header.get_addr(); // <-- needed below
+        m_data = map_header.get_addr();                                                       // <-- needed below
 
         if (cfg.session_initiator && is_file_on_streaming_form(*header)) {
             // Don't compare file format version fields as they are allowed to differ.
@@ -1141,6 +1148,7 @@ void SlabAlloc::reset_free_space_tracking()
         --m_translation_table_size;
         m_slabs.pop_back();
     }
+    rand_pause();
     rebuild_freelists_from_slab();
     m_free_space_state = free_space_Clean;
     m_commit_size = 0;
@@ -1212,6 +1220,8 @@ void SlabAlloc::update_reader_view(size_t file_size)
         return;
     }
 
+    CriticalSection cs(changes);
+
     const auto old_slab_base = align_size_to_section_boundary(old_baseline);
     bool replace_last_mapping = false;
     size_t old_num_mappings = get_section_index(old_slab_base);
@@ -1246,7 +1256,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
                     --old_num_mappings;
                 }
             }
-
+            rand_pause();
             // Create new mappings covering from the end of the last complete
             // section to the end of the new file size.
             const auto new_slab_base = align_size_to_section_boundary(file_size);
@@ -1286,8 +1296,10 @@ void SlabAlloc::update_reader_view(size_t file_size)
             // that there was already something mapped after the last section
             REALM_ASSERT(!cur_entry.xover_mapping.is_attached());
             // save the old mapping/keep it open
+            rand_pause();
             m_old_mappings.push_back({m_youngest_live_version, std::move(cur_entry.primary_mapping)});
             m_mappings.pop_back();
+            rand_pause();
             m_mapping_version++;
         }
 
@@ -1380,6 +1392,7 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
     if (requires_new_translation) {
         // we need a new translation table, but must preserve old, as translations using it
         // may be in progress concurrently
+        rand_pause();
         if (m_translation_table_size)
             m_old_translations.emplace_back(m_youngest_live_version, m_translation_table_size - free_space_size,
                                             m_ref_translation_ptr.load());
@@ -1405,6 +1418,7 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
         // mapping is freed, any new array allocated at the same position will NOT need a cross
         // over mapping, but just use the primary mapping.
     }
+    rand_pause();
     for (size_t k = 0; k < free_space_size; ++k) {
         char* base = m_slabs[k].addr;
         REALM_ASSERT(base);
@@ -1414,6 +1428,7 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
     // This will either be null or the same as new_translation_table, which is about to become owned by
     // m_ref_translation_ptr.
     (void)new_translation_table_owner.release();
+    rand_pause();
 
     m_ref_translation_ptr = new_translation_table;
 }
