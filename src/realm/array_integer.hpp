@@ -118,7 +118,7 @@ public:
 private:
     int64_t get_compressed_value(size_t ndx) const;
     // return true or false whether the compression is actually going to shrink the
-    // memory footprint for this array or no.
+    // memory footprint for this array or not.
     bool try_to_compress_array(std::vector<int64_t>&, std::vector<size_t>&);
 
     // TODO this should be moved inside the Node class and only populated by ArrayInteger

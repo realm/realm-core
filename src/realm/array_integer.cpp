@@ -36,21 +36,20 @@ bool ArrayInteger::try_compress()
     std::vector<size_t> indices;
     if (!m_is_compressed && try_to_compress_array(values, indices)) {
         m_is_compressed = true;
-        size_t i{0};
-        // array of values
-        for (const auto& value : values) {
-            set_direct(m_compressed_array.get_addr(), m_compressed_value_width, i, value);
-            i += 1;
+        auto addr = (uint64_t*)m_compressed_array.get_addr();
+        const auto offset = (int)m_compressed_values_size;
+        auto value_width = (int)m_compressed_value_width;
+        auto index_width = (int)m_compressed_index_width;
+        bf_iterator it_value{addr, 0, value_width, value_width, 0};
+        bf_iterator it_index{addr, offset, index_width, index_width, 0};
+        for (size_t i = 0; i < values.size(); ++i) {
+            *it_value = values[i];
+            ++it_value;
         }
-
-        // array of indices
-        i = 0;
-        const auto offset = m_compressed_values_size;
-        for (const auto& index : indices) {
-            set_direct(m_compressed_array.get_addr(), m_compressed_index_width, offset + i, index);
-            i += 1;
+        for (size_t i = 0; i < indices.size(); ++i) {
+            *it_index = indices[i];
+            ++it_index;
         }
-
         return true;
     }
     return false;
@@ -58,20 +57,19 @@ bool ArrayInteger::try_compress()
 
 bool ArrayInteger::try_to_compress_array(std::vector<int64_t>& values, std::vector<size_t>& indices)
 {
-    std::set<int64_t> s;
     const auto sz = size();
+    values.reserve(sz);
     indices.reserve(sz);
 
     for (size_t i = 0; i < sz; ++i) {
         auto item = get(i);
+        values.push_back(item);
         indices.push_back(item);
-        s.insert(item);
     }
 
-    values.reserve(s.size());
-    for (const auto& v : s) {
-        values.push_back(v);
-    }
+    std::sort(values.begin(), values.end());
+    auto last = std::unique(values.begin(), values.end());
+    values.erase(last, values.end());
 
     for (auto& v : indices) {
         auto pos = std::lower_bound(values.begin(), values.end(), v);
@@ -107,12 +105,17 @@ bool ArrayInteger::decompress()
         // working
         clear();
         const auto sz = m_compressed_indices_size / m_compressed_index_width;
-        const auto offset = m_compressed_values_size;
+
+        auto addr = (uint64_t*)m_compressed_array.get_addr();
+        const auto offset = (int)m_compressed_values_size;
+        auto value_width = (int)m_compressed_value_width;
+        auto index_width = (int)m_compressed_index_width;
+        bf_iterator it_value{addr, 0, value_width, value_width, 0};
+        bf_iterator it_index{addr, offset, index_width, index_width, 0};
+
         for (size_t i = 0; i < sz; ++i) {
-            auto index = get_direct(m_compressed_array.get_addr(), m_compressed_index_width, offset + i);
-            auto value = get_direct(m_compressed_array.get_addr(), m_compressed_value_width, index);
-            // auto index = read_compressed_value(m_compressed_index_width, m_compressed_array, offset + i);
-            // auto value = read_compressed_value(m_compressed_value_width, m_compressed_array, index);
+            auto index = (int)read_bitfield(addr, (int)(offset + (i * index_width)), index_width);
+            auto value = read_bitfield(addr, index * value_width, value_width);
             Array::insert(i, value);
         }
         m_is_compressed = false;
@@ -125,15 +128,17 @@ bool ArrayInteger::decompress()
 int64_t ArrayInteger::get_compressed_value(size_t ndx) const
 {
     const auto sz = m_compressed_indices_size / m_compressed_index_width;
-    const auto offset = m_compressed_values_size;
-    for (size_t i = 0; i < sz; ++i) {
-        // this can be improved, doing binary search.
-        auto index = get_direct(m_compressed_array.get_addr(), m_compressed_index_width, offset + i);
-        if (ndx == i) {
-            return get_direct(m_compressed_array.get_addr(), m_compressed_value_width, index);
-        }
-    }
-    return realm::not_found;
+
+    if (ndx >= sz)
+        return realm::not_found;
+
+    const auto addr = (uint64_t*)m_compressed_array.get_addr();
+    const auto index_width = (int)m_compressed_index_width;
+    const auto value_width = (int)m_compressed_value_width;
+    const auto offset = (int)(m_compressed_values_size + (ndx * index_width));
+    const auto index = (int)read_bitfield(addr, offset, index_width);
+    const auto v = read_bitfield(addr, index * value_width, value_width);
+    return v;
 }
 
 Mixed ArrayIntNull::get_any(size_t ndx) const
