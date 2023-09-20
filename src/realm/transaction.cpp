@@ -118,7 +118,6 @@ Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB:
 {
     bool writable = stage == DB::transact_Writing;
     m_transact_stage = DB::transact_Ready;
-    set_metrics(db->m_metrics);
     set_transact_stage(stage);
     m_alloc.note_reader_start(this);
     attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable,
@@ -928,41 +927,6 @@ void Transaction::initialize_replication()
 
 void Transaction::set_transact_stage(DB::TransactStage stage) noexcept
 {
-#if REALM_METRICS
-    REALM_ASSERT(m_metrics == db->m_metrics);
-    if (m_metrics) { // null if metrics are disabled
-        size_t free_space;
-        size_t used_space;
-        db->get_stats(free_space, used_space);
-        size_t total_size = used_space + free_space;
-
-        size_t num_objects = m_total_rows;
-        size_t num_available_versions = static_cast<size_t>(db->get_number_of_versions());
-        size_t num_decrypted_pages = realm::util::get_num_decrypted_pages();
-
-        if (stage == DB::transact_Reading) {
-            if (m_transact_stage == DB::transact_Writing) {
-                m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions,
-                                                 num_decrypted_pages);
-            }
-            m_metrics->start_read_transaction();
-        }
-        else if (stage == DB::transact_Writing) {
-            if (m_transact_stage == DB::transact_Reading) {
-                m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions,
-                                                num_decrypted_pages);
-            }
-            m_metrics->start_write_transaction();
-        }
-        else if (stage == DB::transact_Ready) {
-            m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions,
-                                            num_decrypted_pages);
-            m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions,
-                                             num_decrypted_pages);
-        }
-    }
-#endif
-
     m_transact_stage = stage;
 }
 
