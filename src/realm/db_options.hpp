@@ -80,14 +80,6 @@ struct DBOptions {
     /// This string should include a trailing slash '/'.
     std::string temp_dir = sys_tmp_dir;
 
-    /// Controls the feature of collecting various metrics to the DB.
-    /// A prerequisite is compiling with REALM_METRICS=ON.
-    bool enable_metrics = false;
-
-    /// The maximum number of entries stored by the metrics (if enabled). If this number
-    /// is exceeded without being consumed, only the most recent entries will be stored.
-    size_t metrics_buffer_size = 10000;
-
     /// is_immutable should be set to true if run from a read-only file system.
     /// this will prevent the DB from making any writes, also disabling the creation
     /// of write transactions.
