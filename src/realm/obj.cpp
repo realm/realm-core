@@ -1946,7 +1946,7 @@ Dictionary Obj::get_dictionary(ColKey col_key) const
     return Dictionary(Obj(*this), col_key);
 }
 
-void Obj::set_collection(ColKey col_key, CollectionType type)
+Obj& Obj::set_collection(ColKey col_key, CollectionType type)
 {
     REALM_ASSERT(col_key.get_type() == col_type_Mixed);
     update_if_needed();
@@ -1964,6 +1964,7 @@ void Obj::set_collection(ColKey col_key, CollectionType type)
         values.init_from_ref(ref);
         values.set_key(m_row_ndx, generate_key(0x10));
     }
+    return *this;
 }
 
 DictionaryPtr Obj::get_dictionary_ptr(ColKey col_key) const

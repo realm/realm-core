@@ -5360,4 +5360,47 @@ TEST(Table_FullTextIndex)
     CHECK_EQUAL(2, res.size());
 }
 
+TEST(Table_LoggingMutations)
+{
+    std::stringstream buffer;
+    SHARED_GROUP_TEST_PATH(path);
+    DBOptions options;
+    options.logger = std::make_shared<StreamLogger>(buffer);
+    options.logger->set_level_threshold(util::Logger::Level::all);
+    auto db = DB::create(make_in_realm_history(), path, options);
+    ColKey col;
+    ColKey col_int;
+
+    {
+        auto wt = db->start_write();
+
+        auto t = wt->add_table_with_primary_key("foo", type_Int, "id");
+        col = t->add_column(type_Mixed, "any");
+        col_int = t->add_column(type_Int, "int");
+        auto dict =
+            t->create_object_with_primary_key(1).set_collection(col, CollectionType::Dictionary).get_dictionary(col);
+        dict.insert("hello", "world");
+        auto list =
+            t->create_object_with_primary_key(2).set_collection(col, CollectionType::List).get_list<Mixed>(col);
+        list.add(47.50);
+        auto set = t->create_object_with_primary_key(3).set_collection(col, CollectionType::Set).get_set<Mixed>(col);
+        set.insert(false);
+        wt->commit();
+    }
+    {
+        // Try to serialize a query with a constraining view
+        auto rt = db->start_read();
+        auto table = rt->get_table("foo");
+        TableView tv = table->find_all_int(col_int, 0);
+        table->where(&tv).equal(col_int, 0).count();
+    }
+
+    auto str = buffer.str();
+    // std::cout << str << std::endl;
+    CHECK(str.find("Query::get_description() failed:") != std::string::npos);
+    CHECK(str.find("Set 'any' to dictionary") != std::string::npos);
+    CHECK(str.find("Set 'any' to list") != std::string::npos);
+    CHECK(str.find("Set 'any' to set") != std::string::npos);
+}
+
 #endif // TEST_TABLE

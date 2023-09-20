@@ -1737,6 +1737,9 @@ std::string Query::validate() const
 
 std::string Query::get_description(util::serializer::SerialisationState& state) const
 {
+    if (m_view) {
+        throw SerializationError("Serialization of a query constrained by a view is not currently supported");
+    }
     std::string description;
     if (auto root = root_node()) {
         description = root->describe_expression(state);
@@ -1765,9 +1768,6 @@ util::bind_ptr<DescriptorOrdering> Query::get_ordering()
 
 std::string Query::get_description() const
 {
-    if (m_view) {
-        throw SerializationError("Serialization of a query constrained by a view is not currently supported");
-    }
     util::serializer::SerialisationState state(m_table->get_parent_group());
     return get_description(state);
 }

@@ -309,7 +309,7 @@ public:
     Dictionary get_dictionary(ColKey col_key) const;
     Dictionary get_dictionary(StringData col_name) const;
 
-    void set_collection(ColKey col_key, CollectionType type);
+    Obj& set_collection(ColKey col_key, CollectionType type);
     DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
     DictionaryPtr get_dictionary_ptr(const Path& path) const;
 
