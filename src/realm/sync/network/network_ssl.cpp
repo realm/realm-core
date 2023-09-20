@@ -371,7 +371,7 @@ void Context::ssl_use_verify_file(const std::string& path, std::error_code& ec)
     ec = std::error_code();
 }
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER)
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER) && !defined(OPENSSL_IS_BORINGSSL)
 class Stream::BioMethod {
 public:
     BIO_METHOD* bio_method;
