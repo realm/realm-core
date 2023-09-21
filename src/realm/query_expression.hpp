@@ -148,7 +148,6 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/list.hpp>
 #include <realm/set.hpp>
 #include <realm/query_value.hpp>
-#include <realm/metrics/query_info.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/serializer.hpp>
 

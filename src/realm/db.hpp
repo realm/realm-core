@@ -24,7 +24,6 @@
 #include <realm/handover_defs.hpp>
 #include <realm/impl/changeset_input_stream.hpp>
 #include <realm/impl/transact_log.hpp>
-#include <realm/metrics/metrics.hpp>
 #include <realm/replication.hpp>
 #include <realm/util/checked_mutex.hpp>
 #include <realm/util/features.h>
@@ -391,10 +390,6 @@ public:
     /// On the importing side, the top-level accessor being created during
     /// import takes ownership of all other accessors (if any) being created as
     /// part of the import.
-    std::shared_ptr<metrics::Metrics> get_metrics()
-    {
-        return m_metrics;
-    }
 
     // Try to grab an exclusive lock of the given realm path's lock file. If the lock
     // can be acquired, the callback will be executed with the lock and then return true.
@@ -507,7 +502,6 @@ private:
     util::InterprocessCondVar m_new_commit_available;
     util::InterprocessCondVar m_pick_next_writer;
     std::function<void(int, int)> m_upgrade_callback;
-    std::shared_ptr<metrics::Metrics> m_metrics;
     std::unique_ptr<AsyncCommitHelper> m_commit_helper;
     std::shared_ptr<util::Logger> m_logger;
     bool m_is_sync_agent = false;
