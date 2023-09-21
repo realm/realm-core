@@ -763,6 +763,7 @@ private:
 
     // Migration support
     void migrate_sets_and_dictionaries();
+    void migrate_string_sets();
 
     /// Disable copying assignment.
     ///

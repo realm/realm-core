@@ -1293,6 +1293,31 @@ void Table::migrate_sets_and_dictionaries()
     }
 }
 
+void Table::migrate_string_sets()
+{
+    std::vector<ColKey> to_migrate;
+    for (auto col : get_column_keys()) {
+        if (col.is_set() && (col.get_type() == col_type_Mixed || col.get_type() == col_type_String)) {
+            to_migrate.push_back(col);
+        }
+    }
+    if (to_migrate.size()) {
+        for (auto obj : *this) {
+            for (auto col : to_migrate) {
+                if (col.get_type() == col_type_Mixed) {
+                    auto set = obj.get_set<Mixed>(col);
+                    set.migrate_strings();
+                }
+                else {
+                    REALM_ASSERT_3(col.get_type(), ==, col_type_String);
+                    auto set = obj.get_set<String>(col);
+                    set.migrate_strings();
+                }
+            }
+        }
+    }
+}
+
 StringData Table::get_name() const noexcept
 {
     const Array& real_top = m_top;

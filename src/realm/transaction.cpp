@@ -557,6 +557,35 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             t->migrate_sets_and_dictionaries();
         }
     }
+    if (current_file_format_version < 24) {
+        // rewrite the string indexes with the comparison order
+        for (auto k : table_keys) {
+            auto t = get_table(k);
+            t->migrate_string_sets(); // rewrite sets to use the new string order
+            t->for_each_public_column([&](ColKey col) {
+                if (col.get_type() != col_type_String) {
+                    return IteratorControl::AdvanceToNext;
+                }
+                switch (t->search_index_type(col)) {
+                    case IndexType::General: {
+                        if (current_file_format_version < 22 && t->get_primary_key_column() == col) {
+                            break; // this index was just added by a previous upgrade step above
+                        }
+                        t->remove_search_index(col);
+                        t->add_search_index(col, IndexType::General);
+                        break;
+                    }
+                    case IndexType::Fulltext:
+                        t->remove_search_index(col);
+                        t->add_search_index(col, IndexType::Fulltext);
+                        break;
+                    case IndexType::None:
+                        break;
+                }
+                return IteratorControl::AdvanceToNext;
+            });
+        }
+    }
     // NOTE: Additional future upgrade steps go here.
 }
 
