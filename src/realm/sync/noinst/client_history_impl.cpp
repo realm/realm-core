@@ -404,8 +404,9 @@ void ClientHistory::integrate_server_changesets(
         }
     }
     catch (const BadChangesetError& e) {
-        throw IntegrationException(ClientError::bad_changeset,
-                                   util::format("Failed to parse received changeset: %1", e.what()));
+        throw IntegrationException(ErrorCodes::BadChangeset,
+                                   util::format("Failed to parse received changeset: %1", e.what()),
+                                   ProtocolError::bad_changeset);
     }
 
     VersionID new_version{0, 0};
@@ -564,12 +565,14 @@ size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset
         return changesets_transformed_count;
     }
     catch (const BadChangesetError& e) {
-        throw IntegrationException(ClientError::bad_changeset,
-                                   util::format("Failed to apply received changeset: %1", e.what()));
+        throw IntegrationException(ErrorCodes::BadChangeset,
+                                   util::format("Failed to apply received changeset: %1", e.what()),
+                                   ProtocolError::bad_changeset);
     }
     catch (const TransformError& e) {
-        throw IntegrationException(ClientError::bad_changeset,
-                                   util::format("Failed to transform received changeset: %1", e.what()));
+        throw IntegrationException(ErrorCodes::BadChangeset,
+                                   util::format("Failed to transform received changeset: %1", e.what()),
+                                   ProtocolError::bad_changeset);
     }
 }
 
@@ -801,29 +804,45 @@ void ClientHistory::update_sync_progress(const SyncProgress& progress, const std
     Array& root = m_arrays->root;
 
     // Progress must never decrease
-    if (progress.latest_server_version.version <
-        version_type(root.get_as_ref_or_tagged(s_progress_latest_server_version_iip).get_as_int())) {
-        throw IntegrationException(ClientError::bad_progress, "latest server version cannot decrease");
+    if (auto current = version_type(root.get_as_ref_or_tagged(s_progress_latest_server_version_iip).get_as_int());
+        progress.latest_server_version.version < current) {
+        throw IntegrationException(ErrorCodes::SyncProtocolInvariantFailed,
+                                   util::format("latest server version cannot decrease (current: %1, new: %2)",
+                                                current, progress.latest_server_version.version),
+                                   ProtocolError::bad_progress);
     }
-    if (progress.download.server_version <
-        version_type(root.get_as_ref_or_tagged(s_progress_download_server_version_iip).get_as_int())) {
-        throw IntegrationException(ClientError::bad_progress, "server version of download cursor cannot decrease");
+    if (auto current = version_type(root.get_as_ref_or_tagged(s_progress_download_server_version_iip).get_as_int());
+        progress.download.server_version < current) {
+        throw IntegrationException(
+            ErrorCodes::SyncProtocolInvariantFailed,
+            util::format("server version of download cursor cannot decrease (current: %1, new: %2)", current,
+                         progress.download.server_version),
+            ProtocolError::bad_progress);
     }
-    if (progress.download.last_integrated_client_version <
-        version_type(root.get_as_ref_or_tagged(s_progress_download_client_version_iip).get_as_int())) {
-        throw IntegrationException(ClientError::bad_progress,
-                                   "last integrated client version of download cursor cannot decrease");
+    if (auto current = version_type(root.get_as_ref_or_tagged(s_progress_download_client_version_iip).get_as_int());
+        progress.download.last_integrated_client_version < current) {
+        throw IntegrationException(
+            ErrorCodes::SyncProtocolInvariantFailed,
+            util::format("last integrated client version of download cursor cannot decrease (current: %1, new: %2)",
+                         current, progress.download.last_integrated_client_version),
+            ProtocolError::bad_progress);
     }
-    if (progress.upload.client_version <
-        version_type(root.get_as_ref_or_tagged(s_progress_upload_client_version_iip).get_as_int())) {
-        throw IntegrationException(ClientError::bad_progress, "client version of upload cursor cannot decrease");
+    if (auto current = version_type(root.get_as_ref_or_tagged(s_progress_upload_client_version_iip).get_as_int());
+        progress.upload.client_version < current) {
+        throw IntegrationException(
+            ErrorCodes::SyncProtocolInvariantFailed,
+            util::format("client version of upload cursor cannot decrease (current: %1, new: %2)", current,
+                         progress.upload.client_version),
+            ProtocolError::bad_progress);
     }
     const auto last_integrated_server_version = progress.upload.last_integrated_server_version;
-    if (last_integrated_server_version > 0 &&
-        last_integrated_server_version <
-            version_type(root.get_as_ref_or_tagged(s_progress_upload_server_version_iip).get_as_int())) {
-        throw IntegrationException(ClientError::bad_progress,
-                                   "last integrated server version of upload cursor cannot decrease");
+    if (auto current = version_type(root.get_as_ref_or_tagged(s_progress_upload_server_version_iip).get_as_int());
+        last_integrated_server_version > 0 && last_integrated_server_version < current) {
+        throw IntegrationException(
+            ErrorCodes::SyncProtocolInvariantFailed,
+            util::format("last integrated server version of upload cursor cannot decrease (current: %1, new: %2)",
+                         current, last_integrated_server_version),
+            ProtocolError::bad_progress);
     }
 
     auto uploaded_bytes = std::uint_fast64_t(root.get_as_ref_or_tagged(s_progress_uploaded_bytes_iip).get_as_int());

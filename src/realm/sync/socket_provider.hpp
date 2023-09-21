@@ -25,12 +25,16 @@
 #include <realm/status.hpp>
 
 #include <realm/sync/config.hpp>
+#include <realm/sync/network/websocket_error.hpp>
 
 #include <realm/util/functional.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/span.hpp>
 
 namespace realm::sync {
+namespace websocket {
+enum class WebSocketError;
+}
 
 struct WebSocketEndpoint;
 struct WebSocketInterface;
@@ -195,9 +199,10 @@ struct WebSocketInterface {
     /// during the write operation.
     /// @param data A util::Span containing the data to be sent to the server.
     /// @param handler The handler function to be called when the data has been sent
-    ///                successfully. If the WebSocket readyState is anything other
-    ///                than OPEN, the handler function should be called with a
-    ///                Status of ErrorCodes::RuntimeError.
+    ///                successfully or the websocket has been closed (with
+    ///                ErrorCodes::OperationAborted). If an error occurs during the
+    ///                write operation, the websocket will be closed and the error
+    ///                will be provided via the websocket_closed_handler() function.
     virtual void async_write_binary(util::Span<const char> data, SyncSocketProvider::FunctionHandler&& handler) = 0;
 };
 
@@ -238,15 +243,16 @@ struct WebSocketObserver {
     ///
     /// @param was_clean Was the TCP connection closed after the WebSocket closing
     ///                  handshake was completed.
-    /// @param status A Status object containing the WebSocket status code and the
-    ///               reason string why the connection was closed.
+    /// @param error_code The error code received or synthesized when the websocket was closed.
+    /// @param message    The message received in the close frame when the websocket was closed.
     ///
     /// @return bool designates whether the WebSocket object has been destroyed
     ///         during the execution of this function. The normal return value is
     ///         True to indicate the WebSocket object is no longer valid. If False
     ///         is returned, the WebSocket object will be destroyed at some point
     ///         in the future.
-    virtual bool websocket_closed_handler(bool was_clean, Status status) = 0;
+    virtual bool websocket_closed_handler(bool was_clean, websocket::WebSocketError error_code,
+                                          std::string_view message) = 0;
 };
 
 } // namespace realm::sync

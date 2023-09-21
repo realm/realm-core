@@ -5633,4 +5633,61 @@ TEST(Query_AsymmetricObjects)
                       ErrorCodes::IllegalOperation);
 }
 
+TEST(Query_NestedLinkCount)
+{
+    Group g;
+    auto table = g.add_table_with_primary_key("class_TestClass", type_Int, "id");
+    table->add_column_list(*table, "children");
+    table->add_column_dictionary(*table, "dictionary");
+    table->add_column_list(*table, "list");
+    table->add_column(*table, "Object");
+
+    Obj o1 = table->create_object_with_primary_key(1);
+    Obj o2 = table->create_object_with_primary_key(2);
+    Obj o3 = table->create_object_with_primary_key(3);
+
+    o2.get_linklist("children").add(o1.get_key());
+    auto dict = o2.get_dictionary("dictionary");
+    dict.insert("key", o3);
+    o3.get_linklist("children").add(o2.get_key());
+
+    o1.set("Object", o1.get_key());
+    o2.set("Object", o2.get_key());
+    o3.set("Object", o2.get_key());
+
+    auto q = table->query("children.list.@size == 0");
+    CHECK_EQUAL(q.count(), 2);
+
+    q = table->query("@links.TestClass.children.dictionary.@size == 0");
+    CHECK_EQUAL(q.count(), 1); // Only o2
+
+    q = table->query("@links.TestClass.children.list.@size == 0");
+    CHECK_EQUAL(q.count(), 2);
+
+    o3.get_dictionary("dictionary").insert("key", o1);
+    auto list = o3.get_linklist("list");
+    list.add(o1.get_key());
+    list.add(o1.get_key());
+    list.add(o1.get_key());
+    list.add(o1.get_key());
+    list.add(o1.get_key());
+
+    q = table->query("@links.TestClass.children.list.@size == 5");
+    CHECK_EQUAL(q.count(), 1);
+
+    dict.insert("key1", o3);
+    dict.insert("key2", o3);
+    dict.insert("key3", o3);
+    dict.insert("key4", o3);
+    q = table->query("@links.TestClass.children.dictionary.@size == 5");
+    CHECK_EQUAL(q.count(), 1); // Only o2
+
+    q = table->query("@links.TestClass.Object.@size > 0");
+    CHECK_EQUAL(q.count(), 2);
+    q = table->query("@links.TestClass.Object.Object.@size > 0");
+    CHECK_EQUAL(q.count(), 2);
+    q = table->query("Object.@links.TestClass.Object.@size > 0");
+    CHECK_EQUAL(q.count(), 3);
+}
+
 #endif // TEST_QUERY

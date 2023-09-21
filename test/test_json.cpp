@@ -24,6 +24,7 @@
 #include <string>
 #include <fstream>
 #include <ostream>
+#include <chrono>
 
 #include <realm.hpp>
 #include <external/json/json.hpp>
@@ -857,6 +858,63 @@ TEST(Json_Schema)
         "{\"name\":\"dog\",\"tableType\":\"Embedded\",\"properties\":[{\"name\":\"name\",\"type\":\"string\"}]}\n"
         "]\n";
     CHECK_EQUAL(expected, json);
+}
+
+
+using namespace std::chrono;
+
+TEST(Json_Timestamp)
+{
+    char buffer1[31];
+    char buffer2[31];
+    Timestamp(-63549305085, 0).to_string(buffer1);
+    CHECK(strcmp(buffer1, "-0044-03-15 15:15:15") == 0);
+    Timestamp(0, 0).to_string(buffer1);
+    CHECK(strcmp(buffer1, "1970-01-01 00:00:00") == 0);
+    Timestamp(-1, 0).to_string(buffer1);
+    CHECK(strcmp(buffer1, "1969-12-31 23:59:59") == 0);
+    Timestamp(-1, -100000000).to_string(buffer1);
+    CHECK(strcmp(buffer1, "1969-12-31 23:59:58.900000000") == 0);
+
+    // Compare our own to_string with standard implementation
+    // for years 1900 to 2050
+    struct tm buf {};
+    buf.tm_year = 1900 - 1900;
+    buf.tm_mday = 1;
+    auto start = mktime(&buf);
+    buf.tm_year = 2050 - 1900;
+    auto end = mktime(&buf);
+    constexpr int64_t seconds_in_a_day = 24 * 60 * 60;
+
+    for (auto d = start; d < end; d += (seconds_in_a_day - 1)) {
+        Timestamp t(d, 0);
+        t.to_string(buffer1);
+        auto seconds = time_t(t.get_seconds());
+#ifdef _MSC_VER
+        gmtime_s(&buf, &seconds);
+#else
+        gmtime_r(&seconds, &buf);
+#endif
+        strftime(buffer2, sizeof(buffer2), "%Y-%m-%d %H:%M:%S", &buf);
+        CHECK(strcmp(buffer1, buffer2) == 0);
+    }
+    /*
+    auto t1 = steady_clock::now();
+    for (auto d = 0; d < 10000; d++) {
+        Timestamp(d * seconds_in_a_day, 0).to_string(buffer1);
+    }
+    auto t2 = steady_clock::now();
+    std::cout << "   time_to_string: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+
+    t1 = steady_clock::now();
+    for (auto d = 0; d < 10000; d++) {
+        auto seconds = time_t(d);
+        gmtime_r(&seconds, &buf);
+        // strftime(buffer2, sizeof(buffer2), "%Y-%m-%d %H:%M:%S", &buf);
+    }
+    t2 = steady_clock::now();
+    std::cout << "   gm_time: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+    */
 }
 
 } // anonymous namespace

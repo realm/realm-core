@@ -1,3 +1,13 @@
+# Evergreen CI config script for the Realm Core codebase
+# Run types:
+# * Pull Requests:
+#   * add the "for_pull_requests" tag to the task to run for pull requests
+# * Nightly Builds:
+#   * Add the `"for_nightly_tests"` tag to the task for the "nightly_tests" alias to work
+#   * Add the `allowed_requesters: [ "ad_hoc", "patch" ]` entry to the nightly task to only run for periodic tests
+# * Commit Builds:
+#   * All other tasks will be included in the set run when a PR is merged to master
+
 # Some tests take up to 4 hours to run, so give a very generous timeout project-wide, but generally try to complete tasks within 30 minutes.
 exec_timeout_secs: 14400
 
@@ -280,14 +290,14 @@ functions:
         # Copy the baas_server log from the remote baas host if it exists
         if [[ ! -f baas_host.yml || ! -f .baas_ssh_key ]]; then
           echo "No remote baas host or remote baas host definitions not found"
-          exit
+          exit 0
         fi
 
         BAAS_HOST_NAME=$(tr -d '"[]{}' < baas_host.yml | cut -d , -f 1 | awk -F : '{print $2}')
         export BAAS_HOST_NAME
 
         ssh_user="$(printf "ubuntu@%s" "$BAAS_HOST_NAME")"
-        ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i .baas_ssh_key"
+        ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i .baas_ssh_key"
 
         # Copy the baas_server.log and mongod.log files from the remote baas host
         REMOTE_PATH=/data/baas-remote/baas-work-dir
@@ -384,14 +394,14 @@ functions:
 
         if [[ ! -f baas_host.yml || ! -f .baas_ssh_key ]]; then
           echo "No remote baas host or remote baas host definitions not found"
-          exit
+          exit 0
         fi
 
         BAAS_HOST_NAME=$(tr -d '"[]{}' < baas_host.yml | cut -d , -f 1 | awk -F : '{print $2}')
         export BAAS_HOST_NAME
 
         ssh_user="$(printf "ubuntu@%s" "$BAAS_HOST_NAME")"
-        ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=No -o ConnectTimeout=10 -i .baas_ssh_key"
+        ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i .baas_ssh_key"
 
         # Kill the remote baas server process, if the definition files exist
         echo "Terminating baas server on remote host..."
@@ -404,12 +414,15 @@ functions:
         set -o errexit
         set -o verbose
 
-        if [[ ! -d realm-core ]]; then
+        TOP_DIR=$(pwd)/realm-core
+        HANG_ANALYZER_PATH=$TOP_DIR/evergreen/hang_analyzer
+        REQUIREMENTS_PATH=$HANG_ANALYZER_PATH/requirements.txt
+
+        if [[ ! -d $TOP_DIR || ! -d $REQUIREMENTS_PATH ]]; then
           echo "No source directory exists. Not running hang analyzer"
           exit 1
         fi
 
-        TOP_DIR=$(pwd)/realm-core
         mkdir realm-core/hang_analyzer_workdir; cd realm-core/hang_analyzer_workdir
         ${python3|python3} -m venv venv
 
@@ -446,7 +459,6 @@ functions:
 
         python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" || exit 1
 
-        REQUIREMENTS_PATH=$TOP_DIR/evergreen/hang_analyzer/requirements.txt
         if [ "Windows_NT" = "$OS" ]; then
           REQUIREMENTS_PATH=$(cygpath -w $REQUIREMENTS_PATH)
         fi
@@ -455,7 +467,6 @@ functions:
 
         echo "Going to run hang analyzer"
 
-        HANG_ANALYZER_PATH=$TOP_DIR/evergreen/hang_analyzer
         if [ "Windows_NT" = "$OS" ]; then
           HANG_ANALYZER_PATH=$(cygpath -w $HANG_ANALYZER_PATH)
         fi
@@ -499,13 +510,11 @@ functions:
         export AWS_ACCESS_KEY_ID="${baas_secrets_aws_access_key}"
         export AWS_SECRET_ACCESS_KEY="${baas_secrets_aws_secret_key}"
         export BAAS_HOST_NAME="$BAAS_HOST_NAME"
-        export REALM_CORE_REVISION="${revision}"
         export GITHUB_KNOWN_HOSTS="github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk="
         EOF
 
         chmod 700 baas_host_vars.sh
         echo "baas remote host created: $BAAS_HOST_NAME"
-        echo "- using Realm Core revision: ${revision}"
 
   - command: shell.exec
     params:
@@ -641,6 +650,28 @@ tasks:
         xcrun swift build
         xcrun swift run ObjectStoreTests
 
+- name: validate-installed-headers
+  exec_timeout_secs: 1800
+  commands:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: /bin/bash
+      script: |-
+        #!/bin/bash
+        set -o errexit
+        set -o pipefail
+        set -o verbose
+
+        if [ -n "${xcode_developer_dir}" ]; then
+            export DEVELOPER_DIR="${xcode_developer_dir}"
+        fi
+
+        ./tools/build-cocoa.sh -bm
+        find core/include/realm -name '*.hpp' -print0 | xargs -0 -P "${max_jobs}" -n 1 clang++ -c -o /dev/null -Icore/include -std=c++17
+
 - name: test-on-exfat
   exec_timeout_secs: 2700
   commands:
@@ -656,6 +687,7 @@ tasks:
 - name: valgrind
   exec_timeout_secs: 14400
   tags: [ "for_nightly_tests" ]
+  allowed_requesters: [ "ad_hoc", "patch" ]
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -775,6 +807,7 @@ tasks:
 
 - name: long-running-core-tests
   tags: [ "for_nightly_tests" ]
+  allowed_requesters: [ "ad_hoc", "patch" ]
   commands:
   - func: "run tests"
     # The long-running tests can take a really long time on Windows, so we give the test up to 4
@@ -854,7 +887,7 @@ tasks:
   commands:
   - func: "launch remote baas"
     vars:
-      baas_branch: 1a0d1c021460d2215b21bc4f7c7f668714ce81c7
+      baas_branch: 3f31617aacfe5d31b9057fc298b735b60acd6424
   - func: "compile"
     vars:
       target_to_build: ObjectStoreTests
@@ -1005,6 +1038,7 @@ tasks:
 
 - name: fuzzer
   tags: [ "for_nightly_tests" ]
+  allowed_requesters: [ "ad_hoc", "patch" ]
   commands:
   - command: shell.exec
     params:
@@ -1286,7 +1320,6 @@ buildvariants:
     enable_fuzzer: On
   tasks:
   - name: fuzzer-tests
-    patchable: true
 
 - name: rhel70
   display_name: "RHEL 7 x86_64"
@@ -1342,6 +1375,7 @@ buildvariants:
   tasks:
   - name: compile_test
   - name: swift-build-and-test
+  - name: validate-installed-headers
 
 - name: macos-encrypted
   display_name: "MacOS 11.0 x86_64 (Encryption enabled)"

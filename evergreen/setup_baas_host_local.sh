@@ -20,6 +20,7 @@ function usage()
     echo -e "\t-b BRANCH\tOptional branch or git spec of baas to checkout/build"
     echo -e "\t-v\t\tEnable verbose script debugging"
     echo -e "\t-h\t\tShow this usage summary and exit"
+    echo "Note: This script must be run from a cloned realm-core/ repository directory."
     # Default to 0 if exit code not provided
     exit "${1:0}"
 }
@@ -88,7 +89,7 @@ if [[ -n "${VERBOSE}" ]]; then
 fi
 
 if [[ -z "${BAAS_HOST_NAME}" ]]; then
-    echo "Baas hostname not found in baas host vars script: ${BAAS_HOST_VARS}"
+    echo "Baas remote hostname (BAAS_HOST_NAME) not provided in baas host vars script"
     usage 1
 fi
 
@@ -104,9 +105,15 @@ if [[ -z "${BAAS_USER}" ]]; then
     usage 1
 fi
 
+if [[ ! -d "${EVERGREEN_PATH}/" ]]; then
+    echo "This script must be run from the realm-core directory for accessing files in '${EVERGREEN_PATH}/'"
+    exit 1 
+fi
+
 if [[ -z "${FILE_DEST_DIR}" ]]; then
     FILE_DEST_DIR="/home/${BAAS_USER}"
 fi
+EVERGREEN_DEST_DIR="${FILE_DEST_DIR}/evergreen"
 
 SSH_USER="$(printf "%s@%s" "${BAAS_USER}" "${BAAS_HOST_NAME}")"
 
@@ -119,7 +126,7 @@ if [[ -f ~/.ssh/id_rsa ]]; then
     ssh-add ~/.ssh/id_rsa
 fi
 ssh-add "${BAAS_HOST_KEY}"
-SSH_OPTIONS=(-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i "${BAAS_HOST_KEY}")
+SSH_OPTIONS=(-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -i "${BAAS_HOST_KEY}")
 
 echo "running ssh with ${SSH_OPTIONS[*]}"
 
@@ -131,7 +138,7 @@ CONNECT_COUNT=2
 # Check for remote connectivity - try to connect twice to verify server is "really" ready
 # The tests failed one time due to this ssh command passing, but the next scp command failed
 while [[ ${CONNECT_COUNT} -gt 0 ]]; do
-    until ssh "${SSH_OPTIONS[@]}" "${SSH_USER}" "echo -n 'hello from '; hostname" ; do
+    until ssh "${SSH_OPTIONS[@]}" -o ConnectTimeout=10 "${SSH_USER}" "echo -n 'hello from '; hostname" ; do
         if [[ ${WAIT_COUNTER} -ge ${RETRY_COUNT} ]] ; then
             secs_spent_waiting=$(($(date -u +'%s') - WAIT_START))
             echo "Timed out after waiting ${secs_spent_waiting} seconds for host ${BAAS_HOST_NAME} to start"
@@ -148,11 +155,10 @@ done
 
 echo "Transferring setup scripts to ${SSH_USER}:${FILE_DEST_DIR}"
 # Copy the baas host vars script to the baas remote host
-scp "${SSH_OPTIONS[@]}" "${BAAS_HOST_VARS}" "${SSH_USER}:${FILE_DEST_DIR}/"
-# Copy the current host and baas scripts from the working copy of realm-core
-# This ensures they have the latest copy, esp when running evergreen patches
-scp "${SSH_OPTIONS[@]}" "${EVERGREEN_PATH}/setup_baas_host.sh" "${SSH_USER}:${FILE_DEST_DIR}/"
-scp "${SSH_OPTIONS[@]}" "${EVERGREEN_PATH}/install_baas.sh" "${SSH_USER}:${FILE_DEST_DIR}/"
+scp "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${BAAS_HOST_VARS}" "${SSH_USER}:${FILE_DEST_DIR}/"
+# Copy the entire evergreen/ directory from the working copy of realm-core to the remote host
+# This ensures the remote host the latest copy, esp when running evergreen patches
+scp -r "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 "${EVERGREEN_PATH}/" "${SSH_USER}:${FILE_DEST_DIR}/"
 
 echo "Starting remote baas with branch/commit: '${BAAS_BRANCH}'"
 SETUP_BAAS_OPTS=()
@@ -166,4 +172,5 @@ fi
 # Run the setup baas host script and provide the location of the baas host vars script
 # Also sets up a forward tunnel for port 9090 through the ssh connection to the baas remote host
 echo "Running setup script (with forward tunnel to 127.0.0.1:9090)"
-ssh "${SSH_OPTIONS[@]}" -L 9090:127.0.0.1:9090 "${SSH_USER}" "${FILE_DEST_DIR}/setup_baas_host.sh" "${SETUP_BAAS_OPTS[@]}" "${FILE_DEST_DIR}/baas_host_vars.sh"
+ssh "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 -L 9090:127.0.0.1:9090 "${SSH_USER}" \
+    "${EVERGREEN_DEST_DIR}/setup_baas_host.sh" "${SETUP_BAAS_OPTS[@]}" "${FILE_DEST_DIR}/baas_host_vars.sh"

@@ -183,7 +183,7 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         if (config.sync_config) {
             auto old_user = m_config.sync_config->user;
             auto new_user = config.sync_config->user;
-            if (old_user && new_user && *old_user != *new_user) {
+            if (old_user != new_user) {
                 throw LogicError(
                     ErrorCodes::MismatchedConfig,
                     util::format("Realm at path '%1' already opened with different sync user.", config.path));
@@ -278,7 +278,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::O
     return realm;
 }
 
-std::shared_ptr<Realm> RealmCoordinator::get_realm(std::shared_ptr<util::Scheduler> scheduler)
+std::shared_ptr<Realm> RealmCoordinator::get_realm(std::shared_ptr<util::Scheduler> scheduler, bool first_time_open)
 {
     std::shared_ptr<Realm> realm;
     util::CheckedUniqueLock lock(m_realm_mutex);
@@ -287,7 +287,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(std::shared_ptr<util::Schedul
     if ((realm = do_get_cached_realm(config))) {
         return realm;
     }
-    do_get_realm(std::move(config), realm, none, lock);
+    do_get_realm(std::move(config), realm, none, lock, first_time_open);
     return realm;
 }
 
@@ -319,19 +319,21 @@ ThreadSafeReference RealmCoordinator::get_unbound_realm()
 }
 
 void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>& realm,
-                                    util::Optional<VersionID> version, util::CheckedUniqueLock& realm_lock)
+                                    util::Optional<VersionID> version, util::CheckedUniqueLock& realm_lock,
+                                    bool first_time_open)
 {
-    const auto db_opened_first_time = open_db();
+    const auto db_created = open_db();
 #ifdef REALM_ENABLE_SYNC
     SyncConfig::SubscriptionInitializerCallback subscription_function = nullptr;
     bool rerun_on_open = false;
     if (config.sync_config && config.sync_config->flx_sync_requested &&
         config.sync_config->subscription_initializer) {
-        subscription_function = std::move(config.sync_config->subscription_initializer);
+        subscription_function = config.sync_config->subscription_initializer;
         rerun_on_open = config.sync_config->rerun_init_subscription_on_open;
     }
 #else
-    static_cast<void>(db_opened_first_time);
+    static_cast<void>(first_time_open);
+    static_cast<void>(db_created);
 #endif
 
     auto schema = std::move(config.schema);
@@ -379,7 +381,15 @@ void RealmCoordinator::do_get_realm(RealmConfig&& config, std::shared_ptr<Realm>
     // rerun_on_open was set
     if (subscription_function) {
         const auto current_subscription = realm->get_latest_subscription_set();
-        if ((current_subscription.version() == 0) || (rerun_on_open && db_opened_first_time)) {
+        const auto subscription_version = current_subscription.version();
+        // in case we are hitting this check while during a normal open, we need to take in
+        // consideration if the db was created during this call. Since this may be the first time
+        // we are actually creating a realm. For async open this does not apply, infact db_created
+        // will always be false.
+        if (!first_time_open)
+            first_time_open = db_created;
+        if (subscription_version == 0 || (first_time_open && rerun_on_open)) {
+            // if the tasks is cancelled, the subscription may or may not be run.
             subscription_function(realm);
         }
     }

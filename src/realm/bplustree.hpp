@@ -546,23 +546,6 @@ public:
         });
     }
 
-
-    void dump_values(std::ostream& o, int level) const
-    {
-        std::string indent(" ", level * 2);
-
-        auto func = [&o, indent](BPlusTreeNode* node, size_t) {
-            LeafNode* leaf = static_cast<LeafNode*>(node);
-            size_t sz = leaf->size();
-            for (size_t i = 0; i < sz; i++) {
-                o << indent << leaf->get(i) << std::endl;
-            }
-            return IteratorControl::AdvanceToNext;
-        };
-
-        m_root->bptree_traverse(func);
-    }
-
 protected:
     LeafNode m_leaf_cache;
 
