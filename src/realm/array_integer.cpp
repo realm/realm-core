@@ -34,7 +34,7 @@ bool ArrayInteger::try_compress()
 {
     std::vector<int64_t> values;
     std::vector<size_t> indices;
-    if (!m_is_compressed && try_to_compress_array(values, indices)) {
+    if (!m_is_compressed && try_compress(values, indices)) {
         m_is_compressed = true;
         auto addr = (uint64_t*)m_compressed_array.get_addr();
         const auto offset = (int)m_compressed_values_size;
@@ -50,12 +50,13 @@ bool ArrayInteger::try_compress()
             *it_index = indices[i];
             ++it_index;
         }
+        clear();
         return true;
     }
     return false;
 }
 
-bool ArrayInteger::try_to_compress_array(std::vector<int64_t>& values, std::vector<size_t>& indices)
+bool ArrayInteger::try_compress(std::vector<int64_t>& values, std::vector<size_t>& indices)
 {
     const auto sz = size();
     values.reserve(sz);
@@ -76,20 +77,22 @@ bool ArrayInteger::try_to_compress_array(std::vector<int64_t>& values, std::vect
         v = std::distance(values.begin(), pos);
     }
 
-    auto max = std::max_element(values.begin(), values.end());
-    auto compressed_value_width = bit_width(*max);
-    auto compressed_index_width = bit_width(indices.size() - 1);
-    auto compressed_values_size = compressed_value_width * values.size();
-    auto compressed_indices_size = compressed_index_width * indices.size();
-    // auto total_compressed_size = compressed_values_size + compressed_indices_size;
-    // comment this check for now in order to force compression (needed for testing)
-    // if(total_compressed_size < bit_width(*max)*size() )
-    {
+    const auto max_value = std::max_element(values.begin(), values.end());
+    const auto max_index = std::max_element(indices.begin(), indices.end());
+    const auto compressed_value_width = bit_width(*max_value);
+    const auto compressed_index_width = bit_width(*max_index);
+    const auto compressed_values_size = compressed_value_width * values.size();
+    const auto compressed_indices_size = compressed_index_width * indices.size();
+    const auto compressed_size = compressed_values_size + compressed_indices_size;
+    const auto uncompressed_size = bit_width(*max_value) * size();
+
+    // compress array only if there is some gain
+    if (compressed_size < uncompressed_size) {
         m_compressed_value_width = compressed_value_width;
         m_compressed_index_width = compressed_index_width;
         m_compressed_values_size = compressed_values_size;
         m_compressed_indices_size = compressed_indices_size;
-        m_compressed_array = m_alloc.alloc(m_compressed_values_size + m_compressed_indices_size);
+        m_compressed_array = m_alloc.alloc(compressed_size);
         return true;
     }
     return false;
@@ -99,27 +102,18 @@ bool ArrayInteger::decompress()
 {
     if (m_is_compressed) {
         // decompress
-
-        // this is needed right now because I am keeping the elements underneath in the array
-        // since I need to verify that all the APIs for finding and in general querying are
-        // working
-        clear();
-        const auto sz = m_compressed_indices_size / m_compressed_index_width;
-
-        auto addr = (uint64_t*)m_compressed_array.get_addr();
+        const auto addr = (uint64_t*)m_compressed_array.get_addr();
         const auto offset = (int)m_compressed_values_size;
-        auto value_width = (int)m_compressed_value_width;
-        auto index_width = (int)m_compressed_index_width;
-        bf_iterator it_value{addr, 0, value_width, value_width, 0};
-        bf_iterator it_index{addr, offset, index_width, index_width, 0};
-
-        for (size_t i = 0; i < sz; ++i) {
-            auto index = (int)read_bitfield(addr, (int)(offset + (i * index_width)), index_width);
-            auto value = read_bitfield(addr, index * value_width, value_width);
+        const auto value_width = (int)m_compressed_value_width;
+        const auto index_width = (int)m_compressed_index_width;
+        bf_iterator index_iterator{addr, offset, index_width, index_width, 0};
+        for (size_t i = 0; i < m_compressed_indices_size; ++i) {
+            const auto index = (int)index_iterator.get_value();
+            const auto value = read_bitfield(addr, index * value_width, value_width);
             Array::insert(i, value);
+            ++index_iterator;
         }
         m_is_compressed = false;
-
         return true;
     }
     return false;

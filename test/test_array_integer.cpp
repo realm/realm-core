@@ -31,39 +31,66 @@
 using namespace realm;
 using namespace realm::test_util;
 
-TEST(Test_ArrayInt_compression)
+TEST(Test_ArrayInt_no_compression_needed)
 {
     ArrayInteger a(Allocator::get_default());
     a.create();
-
     a.add(10);
     a.add(5);
     a.add(5);
     a.add(10);
     a.add(15);
+    CHECK_NOT(a.try_compress()); // compression is not needed in this case.
+    CHECK(a.get(0) == 10);
+    CHECK(a.get(1) == 5);
+    CHECK(a.get(2) == 5);
+    CHECK(a.get(3) == 10);
+    CHECK(a.get(4) == 15);
+    a.destroy();
+}
+
+TEST(Test_ArrayInt_compress_data)
+{
+    ArrayInteger a(Allocator::get_default());
+    a.create();
+    a.add(16388);
+    a.add(409);
+    a.add(16388);
+    a.add(16388);
+    a.add(409);
+    a.add(16388);
+    CHECK(a.size() == 6);
+    // Current: [16388:16, 409:16, 16388:16, 16388:16, 409:16, 16388:16], space needed: 6*16 bits = 96 bits + header
+    // compress the array is a good option.
     CHECK(a.try_compress());
-    CHECK(a.get(0) == 10);
-    CHECK(a.get(1) == 5);
-    CHECK(a.get(2) == 5);
-    CHECK(a.get(3) == 10);
-    CHECK(a.get(4) == 15);
-    a.add(20); // this decompresses all
-    // check if array is ok
-    CHECK(a.get(0) == 10);
-    CHECK(a.get(1) == 5);
-    CHECK(a.get(2) == 5);
-    CHECK(a.get(3) == 10);
-    CHECK(a.get(4) == 15);
-    CHECK(a.get(5) == 20);
-    // compress
+    // Compressed: [409:16, 16388:16][1:1,0:1,1:1,1:1,0:1,1:1], space needed: 2*16 bits + 6 * 1 bit = 38 bits + header
+    CHECK(a.get(0) == 16388);
+    CHECK(a.get(1) == 409);
+    CHECK(a.get(2) == 16388);
+    CHECK(a.get(3) == 16388);
+    CHECK(a.get(4) == 409);
+    CHECK(a.get(5) == 16388);
+    // this automatically decompresses the array.
+    a.add(20);
+    CHECK(a.size() == 7);
+    CHECK(a.get(0) == 16388);
+    CHECK(a.get(1) == 409);
+    CHECK(a.get(2) == 16388);
+    CHECK(a.get(3) == 16388);
+    CHECK(a.get(4) == 409);
+    CHECK(a.get(5) == 16388);
+    CHECK(a.get(6) == 20);
+    // compress again.
     CHECK(a.try_compress());
-    CHECK(a.get(0) == 10);
-    CHECK(a.get(1) == 5);
-    CHECK(a.get(2) == 5);
-    CHECK(a.get(3) == 10);
-    CHECK(a.get(4) == 15);
-    CHECK(a.get(5) == 20);
-    a.destroy_deep();
+    // array should now be in compressed form
+    CHECK(a.get(0) == 16388);
+    CHECK(a.get(1) == 409);
+    CHECK(a.get(2) == 16388);
+    CHECK(a.get(3) == 16388);
+    CHECK(a.get(4) == 409);
+    CHECK(a.get(5) == 16388);
+    CHECK(a.get(6) == 20);
+    a.destroy();
 }
 
 TEST(ArrayIntNull_SetNull)
