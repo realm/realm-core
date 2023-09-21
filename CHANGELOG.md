@@ -14,6 +14,7 @@
   ([PR #6837](https://github.com/realm/realm-core/pull/6837), since v10.0.0)
 * Reading existing logged-in users on app startup from the sync metadata Realm performed three no-op writes per user on the metadata Realm ([PR #6837](https://github.com/realm/realm-core/pull/6837), since v10.0.0).
 * If a user was logged out while an access token refresh was in progress, the refresh completing would mark the user as logged in again and the user would be in an inconsistent state ([PR #6837](https://github.com/realm/realm-core/pull/6837), since v10.0.0).
+* The Swift package failed to link required libraries when building for macCatalyst.
 
 ### Breaking changes
 * SyncUser::provider_type() and realm_user_get_auth_provider() have been removed. Users don't have provider types; identities do. `SyncUser::is_anonymous()` is a more correct version of checking if the provider type is anonymous ([PR #6837](https://github.com/realm/realm-core/pull/6837)).
