@@ -771,7 +771,7 @@ std::string Mixed::to_string(size_t max_size) const noexcept
         return ret;
     }
     else if (is_type(type_Binary)) {
-
+        static constexpr int size_one_hex_out = 3;
         static char hex_chars[] = "0123456789ABCDEF";
         auto out_hex = [&ostr](char c) {
             ostr << hex_chars[c >> 4];
@@ -781,12 +781,15 @@ std::string Mixed::to_string(size_t max_size) const noexcept
 
         auto sz = binary_val.size();
         bool capped = false;
-        if (3 * sz > max_size) {
-            sz = max_size / 3;
-            capped = true;
-        }
+        size_t out_size = 0;
+
         ostr << '"';
         for (size_t n = 0; n < sz; n++) {
+            out_size += size_one_hex_out;
+            if (out_size > max_size) {
+                capped = true;
+                break;
+            }
             out_hex(binary_val[n]);
         }
         if (capped) {

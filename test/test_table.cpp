@@ -5410,7 +5410,7 @@ TEST(Table_LoggingMutations)
     }
 
     auto str = buffer.str();
-    std::cout << str << std::endl;
+    // std::cout << str << std::endl;
     CHECK(str.find("abcdefghijklmno ...") != std::string::npos);
     CHECK(str.find("14 15 16 17 18 19 ...") != std::string::npos);
     CHECK(str.find("2023-09-20 10:53:35") != std::string::npos);
