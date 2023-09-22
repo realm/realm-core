@@ -5377,14 +5377,28 @@ TEST(Table_LoggingMutations)
         auto t = wt->add_table_with_primary_key("foo", type_Int, "id");
         col = t->add_column(type_Mixed, "any");
         col_int = t->add_column(type_Int, "int");
+
         auto dict =
             t->create_object_with_primary_key(1).set_collection(col, CollectionType::Dictionary).get_dictionary(col);
         dict.insert("hello", "world");
+
         auto list =
             t->create_object_with_primary_key(2).set_collection(col, CollectionType::List).get_list<Mixed>(col);
         list.add(47.50);
+
         auto set = t->create_object_with_primary_key(3).set_collection(col, CollectionType::Set).get_set<Mixed>(col);
         set.insert(false);
+
+        std::vector<char> str_data(90);
+        std::iota(str_data.begin(), str_data.end(), ' ');
+        t->create_object_with_primary_key(5).set_any(col, StringData(str_data.data(), str_data.size()));
+
+        std::vector<char> bin_data(50);
+        std::iota(bin_data.begin(), bin_data.end(), 0);
+        t->create_object_with_primary_key(6).set_any(col, BinaryData(bin_data.data(), bin_data.size()));
+
+        t->create_object_with_primary_key(7).set_any(col, Timestamp(1695207215, 0));
+
         wt->commit();
     }
     {
@@ -5397,6 +5411,9 @@ TEST(Table_LoggingMutations)
 
     auto str = buffer.str();
     // std::cout << str << std::endl;
+    CHECK(str.find("abcdefghijklmno ...") != std::string::npos);
+    CHECK(str.find("14 15 16 17 18 19 ...") != std::string::npos);
+    CHECK(str.find("2023-09-20 10:53:35") != std::string::npos);
     CHECK(str.find("Query::get_description() failed:") != std::string::npos);
     CHECK(str.find("Set 'any' to dictionary") != std::string::npos);
     CHECK(str.find("Set 'any' to list") != std::string::npos);

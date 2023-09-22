@@ -232,7 +232,8 @@ void Replication::set(const Table* t, ColKey col_key, ObjKey key, Mixed value, _
                 }
             }
             else {
-                logger->log(util::Logger::Level::trace, "   Set '%1' to %2", t->get_column_name(col_key), value);
+                logger->log(util::Logger::Level::trace, "   Set '%1' to %2", t->get_column_name(col_key),
+                            value.to_string(util::Logger::max_width_of_value));
             }
         }
     }
@@ -297,7 +298,8 @@ void Replication::log_collection_operation(const char* operation, const Collecti
         }
     }
     else {
-        logger->log(util::Logger::Level::trace, "   %1 %2 in %3%4", operation, value, path, position);
+        logger->log(util::Logger::Level::trace, "   %1 %2 in %3%4", operation,
+                    value.to_string(util::Logger::max_width_of_value), path, position);
     }
 }
 void Replication::list_insert(const CollectionBase& list, size_t list_ndx, Mixed value, size_t)

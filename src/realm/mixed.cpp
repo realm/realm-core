@@ -756,6 +756,57 @@ StringData Mixed::get_index_data(std::array<char, 16>& buffer) const noexcept
     return {};
 }
 
+std::string Mixed::to_string(size_t max_size) const noexcept
+{
+    std::ostringstream ostr;
+    if (is_type(type_String)) {
+        std::string ret = "\"";
+        if (string_val.size() <= max_size) {
+            ret += std::string(string_val);
+        }
+        else {
+            ret += std::string(StringData(string_val.data(), max_size)) + " ...";
+        }
+        ret += "\"";
+        return ret;
+    }
+    else if (is_type(type_Binary)) {
+        static constexpr int size_one_hex_out = 3;
+        static char hex_chars[] = "0123456789ABCDEF";
+        auto out_hex = [&ostr](char c) {
+            ostr << hex_chars[c >> 4];
+            ostr << hex_chars[c & 0xF];
+            ostr << ' ';
+        };
+
+        auto sz = binary_val.size();
+        bool capped = false;
+        size_t out_size = 0;
+
+        ostr << '"';
+        for (size_t n = 0; n < sz; n++) {
+            out_size += size_one_hex_out;
+            if (out_size > max_size) {
+                capped = true;
+                break;
+            }
+            out_hex(binary_val[n]);
+        }
+        if (capped) {
+            ostr << "...";
+        }
+        ostr << '"';
+    }
+    else if (is_type(type_Timestamp)) {
+        char buffer[32];
+        return date_val.to_string(buffer);
+    }
+    else {
+        ostr << *this;
+    }
+    return ostr.str();
+}
+
 void Mixed::use_buffer(std::string& buf) noexcept
 {
     if (is_null()) {

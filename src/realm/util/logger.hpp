@@ -79,6 +79,8 @@ public:
     // this is enforced in logging.cpp.
     enum class Level { all = 0, trace = 1, debug = 2, detail = 3, info = 4, warn = 5, error = 6, fatal = 7, off = 8 };
 
+    static constexpr size_t max_width_of_value = 80;
+
     template <class... Params>
     void log(Level, const char* message, Params&&...);
 
