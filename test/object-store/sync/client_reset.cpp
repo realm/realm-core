@@ -16,20 +16,13 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
-
-#include "collection_fixtures.hpp"
-#include "sync/sync_test_utils.hpp"
-#include "util/baas_admin_api.hpp"
-#include "util/event_loop.hpp"
-#include "util/index_helpers.hpp"
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
-
-#include <realm/sync/noinst/client_reset.hpp>
-#include <realm/sync/noinst/client_reset_operation.hpp>
-#include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/network/websocket.hpp>
+#include <collection_fixtures.hpp>
+#include <util/event_loop.hpp>
+#include <util/index_helpers.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
+#include <util/sync/baas_admin_api.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/util/scheduler.hpp>
@@ -40,8 +33,16 @@
 #include <realm/object-store/sync/app_credentials.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+
+#include <realm/sync/noinst/client_reset.hpp>
+#include <realm/sync/noinst/client_reset_operation.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/network/websocket.hpp>
+
 #include <realm/util/flat_map.hpp>
 #include <realm/util/overload.hpp>
+
+#include <catch2/catch_all.hpp>
 
 #include <external/mpark/variant.hpp>
 
@@ -79,8 +80,8 @@ struct StringMaker<ThreadSafeSyncError> {
         if (!value) {
             return "No SyncError";
         }
-        return realm::util::format("SyncError(%1), is_fatal: %2, with message: '%3'", value->get_system_error(),
-                                   value->is_fatal, value->reason());
+        return realm::util::format("SyncError(%1), is_fatal: %2, with message: '%3'", value->status.code_string(),
+                                   value->is_fatal, value->status.reason());
     }
 };
 } // namespace Catch
@@ -109,7 +110,7 @@ TableRef get_table(Realm& realm, StringData object_type)
 namespace cf = realm::collection_fixtures;
 using reset_utils::create_object;
 
-TEST_CASE("sync: large reset with recovery is restartable", "[client reset][baas]") {
+TEST_CASE("sync: large reset with recovery is restartable", "[sync][pbs][client reset][baas]") {
     const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
@@ -132,7 +133,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset][baas
     SyncTestFile realm_config(app->current_user(), partition.value, schema);
     realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        if (err.get_system_error() == util::make_error_code(util::MiscExtErrors::end_of_input)) {
+        if (err.status == ErrorCodes::ConnectionClosed) {
             return;
         }
 
@@ -141,7 +142,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset][baas
             return;
         }
 
-        FAIL(util::format("got error from server: %1: %2", err.get_system_error().value(), err.what()));
+        FAIL(util::format("got error from server: %1", err.status));
     };
 
     auto realm = Realm::get_shared_realm(realm_config);
@@ -204,7 +205,7 @@ TEST_CASE("sync: large reset with recovery is restartable", "[client reset][baas
     REQUIRE(expected_obj_ids == found_object_ids);
 }
 
-TEST_CASE("sync: pending client resets are cleared when downloads are complete", "[client reset][baas]") {
+TEST_CASE("sync: pending client resets are cleared when downloads are complete", "[sync][pbs][client reset][baas]") {
     const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
@@ -227,16 +228,12 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
     SyncTestFile realm_config(app->current_user(), partition.value, schema);
     realm_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
     realm_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        if (err.get_system_error() == sync::websocket::WebSocketError::websocket_read_error) {
-            return;
-        }
-
         if (err.server_requests_action == sync::ProtocolErrorInfo::Action::Warning ||
             err.server_requests_action == sync::ProtocolErrorInfo::Action::Transient) {
             return;
         }
 
-        FAIL(util::format("got error from server: %1: %2", err.get_system_error().value(), err.what()));
+        FAIL(util::format("got error from server: %1", err.status));
     };
 
     auto realm = Realm::get_shared_realm(realm_config);
@@ -261,7 +258,7 @@ TEST_CASE("sync: pending client resets are cleared when downloads are complete",
     wait_for_download(*realm, std::chrono::minutes(10));
 }
 
-TEST_CASE("sync: client reset", "[client reset][baas]") {
+TEST_CASE("sync: client reset", "[sync][pbs][client reset][baas]") {
     if (!util::EventLoop::has_implementation())
         return;
 
@@ -356,7 +353,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
         REQUIRE(!util::File::exists(orig_path));
         REQUIRE(util::File::exists(recovery_path));
         local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-            CAPTURE(err.reason());
+            CAPTURE(err.status);
             CAPTURE(local_config.path);
             FAIL("Error handler should not have been called");
         };
@@ -367,7 +364,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
 #endif
 
     local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        CAPTURE(err.reason());
+        CAPTURE(err.status);
         CAPTURE(local_config.path);
         FAIL("Error handler should not have been called");
     };
@@ -900,8 +897,8 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
                 session = test_app_session.app()->sync_manager()->get_existing_session(temp_config.path);
                 REQUIRE(session);
             }
-            sync::SessionErrorInfo synthetic(sync::make_error_code(sync::ProtocolError::bad_client_file),
-                                             "A fake client reset error", false);
+            sync::SessionErrorInfo synthetic(Status{ErrorCodes::SyncClientResetRequired, "A fake client reset error"},
+                                             sync::IsFatal{true});
             synthetic.server_requests_action = sync::ProtocolErrorInfo::Action::ClientReset;
             SyncSession::OnlyForTesting::handle_error(*session, std::move(synthetic));
 
@@ -1785,7 +1782,7 @@ TEST_CASE("sync: client reset", "[client reset][baas]") {
     } // end: The server can prohibit recovery
 }
 
-TEST_CASE("sync: Client reset during async open", "[client reset][baas]") {
+TEST_CASE("sync: Client reset during async open", "[sync][pbs][client reset][baas]") {
     const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
@@ -1880,7 +1877,7 @@ TEST_CASE("sync: Client reset during async open", "[client reset][baas]") {
 #endif // REALM_ENABLE_AUTH_TESTS
 
 namespace cf = realm::collection_fixtures;
-TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
+TEMPLATE_TEST_CASE("client reset types", "[sync][pbs][client reset]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
                    cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
                    cf::BoxedOptional<cf::Int>, cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>,
                    cf::BoxedOptional<cf::Double>, cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>,
@@ -2412,8 +2409,7 @@ struct Remove {
     util::Optional<int64_t> pk;
 };
 
-struct Clear {
-};
+struct Clear {};
 
 struct RemoveObject {
     RemoveObject(std::string_view name, util::Optional<int64_t> key)
@@ -2520,7 +2516,7 @@ private:
 
 } // namespace test_instructions
 
-TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][links][collections]",
+TEMPLATE_TEST_CASE("client reset collections of links", "[sync][pbs][client reset][links][collections]",
                    cf::ListOfObjects, cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,
                    cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks)
 {
@@ -2948,7 +2944,7 @@ void combine_array_values(std::vector<T>& from, const std::vector<T>& to)
     }
 }
 
-TEST_CASE("client reset with embedded object", "[client reset][local][embedded objects]") {
+TEST_CASE("client reset with embedded object", "[sync][pbs][client reset][embedded objects]") {
     if (!util::EventLoop::has_implementation())
         return;
 

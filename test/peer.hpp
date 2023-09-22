@@ -488,7 +488,7 @@ inline auto ShortCircuitHistory::integrate_remote_changesets(file_ident_type rem
     TransformHistoryImpl transform_hist{*this, remote_file_ident};
     auto apply = [&](const Changeset* c) -> bool {
         sync::InstructionApplier applier{*transact};
-        applier.apply(*c, &logger);
+        applier.apply(*c);
 
         return true;
     };

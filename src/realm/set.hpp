@@ -167,7 +167,7 @@ public:
         return *m_tree;
     }
 
-    UpdateStatus update_if_needed_with_status() const noexcept final
+    UpdateStatus update_if_needed_with_status() const final
     {
         auto status = Base::get_update_status();
         switch (status) {
@@ -194,10 +194,10 @@ public:
     void ensure_created()
     {
         if (Base::should_update() || !(m_tree && m_tree->is_attached())) {
-            bool attached = init_from_parent(true);
-            if (!attached) {
-                throw IllegalOperation("This is an ex-set");
-            }
+            // When allow_create is true, init_from_parent will always succeed
+            // In case of errors, an exception is thrown.
+            constexpr bool allow_create = true;
+            init_from_parent(allow_create); // Throws
             Base::update_content_version();
         }
     }
@@ -246,7 +246,7 @@ private:
         }
         catch (...) {
             m_tree->detach();
-            return false;
+            throw;
         }
         return true;
     }
@@ -348,7 +348,7 @@ public:
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
     const Obj& get_obj() const noexcept final;
-    bool is_attached() const final;
+    bool is_attached() const noexcept final;
     bool has_changed() const noexcept final;
     ColKey get_col_key() const noexcept final;
     CollectionType get_collection_type() const noexcept override
@@ -1315,7 +1315,7 @@ inline const Obj& LnkSet::get_obj() const noexcept
     return m_set.get_obj();
 }
 
-inline bool LnkSet::is_attached() const
+inline bool LnkSet::is_attached() const noexcept
 {
     return m_set.is_attached();
 }

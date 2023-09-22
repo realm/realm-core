@@ -1,3 +1,13 @@
+# Evergreen CI config script for the Realm Core codebase
+# Run types:
+# * Pull Requests:
+#   * add the "for_pull_requests" tag to the task to run for pull requests
+# * Nightly Builds:
+#   * Add the `"for_nightly_tests"` tag to the task for the "nightly_tests" alias to work
+#   * Add the `allowed_requesters: [ "ad_hoc", "patch" ]` entry to the nightly task to only run for periodic tests
+# * Commit Builds:
+#   * All other tasks will be included in the set run when a PR is merged to master
+
 # Some tests take up to 4 hours to run, so give a very generous timeout project-wide, but generally try to complete tasks within 30 minutes.
 exec_timeout_secs: 14400
 
@@ -195,8 +205,13 @@ functions:
               export DEVELOPER_DIR="${xcode_developer_dir}"
           fi
 
+          # NOTE: These two values will be ANDed together for matching tests
+          TEST_FLAGS=
+          if [[ -n "${test_label}" ]]; then
+              TEST_FLAGS="-L ${test_label} "
+          fi
           if [[ -n "${test_filter}" ]]; then
-              TEST_FLAGS="-R ${test_filter}"
+              TEST_FLAGS+="-R ${test_filter} "
           fi
 
           if [[ -n "${verbose_test_output}" ]]; then
@@ -218,19 +233,25 @@ functions:
               [[ -d coverage_data ]] || mkdir coverage_data
               [[ -d coverage_binaries ]] || mkdir coverage_binaries
               export LLVM_PROFILE_FILE="$(pwd)/coverage_data/${task_name}-%p.profraw"
-              EXECUTABLE_PATH=$(find build -name ${test_executable_name} -type f)
-              EXECUTABLE_PATH=$(./evergreen/abspath.sh $EXECUTABLE_PATH)
+              EXECUTABLE_FILE="$(find build -name "${test_executable_name}" -type f)"
+              EXECUTABLE_PATH="$(./evergreen/abspath.sh "$EXECUTABLE_FILE")"
               if [[ -z "$EXECUTABLE_PATH" || ! -f "$EXECUTABLE_PATH" ]]; then
                 echo "Invalid executable path $EXECUTABLE_PATH"
                 exit 1
               fi
-              ln -s $EXECUTABLE_PATH coverage_binaries/${test_executable_name}
+              # The sym link may have been created by a previous task run
+              if [[ ! -f "coverage_binaries/${test_executable_name}" ]]; then
+                ln -s "$EXECUTABLE_PATH" "coverage_binaries/${test_executable_name}"
+              fi
           fi
 
           export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
+          if [[ -n "$UNITTEST_EVERGREEN_TEST_RESULTS" && -f "$UNITTEST_EVERGREEN_TEST_RESULTS" ]]; then
+              rm "$UNITTEST_EVERGREEN_TEST_RESULTS"
+          fi
           export UNITTEST_PROGRESS=1
           if [[ -n "${report_test_progress|}" ]]; then
-              export UNITTEST_PROGRESS=${report_test_progress|}
+              export UNITTEST_PROGRESS="${report_test_progress|}"
           fi
 
           if [[ -n "${run_with_encryption}" ]]; then
@@ -253,7 +274,7 @@ functions:
   - command: attach.results
     params:
       file_location: realm-core/${task_name}_results.json
-  - command: "shell.exec"
+  - command: shell.exec
     params:
       working_dir: realm-core
       shell: bash
@@ -269,14 +290,14 @@ functions:
         # Copy the baas_server log from the remote baas host if it exists
         if [[ ! -f baas_host.yml || ! -f .baas_ssh_key ]]; then
           echo "No remote baas host or remote baas host definitions not found"
-          exit
+          exit 0
         fi
 
         BAAS_HOST_NAME=$(tr -d '"[]{}' < baas_host.yml | cut -d , -f 1 | awk -F : '{print $2}')
         export BAAS_HOST_NAME
 
         ssh_user="$(printf "ubuntu@%s" "$BAAS_HOST_NAME")"
-        ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i .baas_ssh_key"
+        ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i .baas_ssh_key"
 
         # Copy the baas_server.log and mongod.log files from the remote baas host
         REMOTE_PATH=/data/baas-remote/baas-work-dir
@@ -292,7 +313,7 @@ functions:
       aws_key: '${artifacts_aws_access_key}'
       aws_secret: '${artifacts_aws_secret_key}'
       local_file: 'realm-core/baas-work-dir/baas_server.log'
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/baas_server.log'
+      remote_file: 'realm-core-stable/${branch_name}/${task_id}/${execution}/baas_server.log'
       bucket: mciuploads
       permissions: public-read
       content_type: text/text
@@ -303,7 +324,7 @@ functions:
       aws_key: '${artifacts_aws_access_key}'
       aws_secret: '${artifacts_aws_secret_key}'
       local_file: 'realm-core/install_baas_output.log'
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/install_baas_output.log'
+      remote_file: 'realm-core-stable/${branch_name}/${task_id}/${execution}/install_baas_output.log'
       bucket: mciuploads
       permissions: public-read
       content_type: text/text
@@ -314,7 +335,7 @@ functions:
       aws_key: '${artifacts_aws_access_key}'
       aws_secret: '${artifacts_aws_secret_key}'
       local_file: 'realm-core/baas-work-dir/mongodb-dbpath/mongod.log'
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/mongod.log'
+      remote_file: 'realm-core-stable/${branch_name}/${task_id}/${execution}/mongod.log'
       bucket: mciuploads
       permissions: public-read
       content_type: text/text
@@ -373,14 +394,14 @@ functions:
 
         if [[ ! -f baas_host.yml || ! -f .baas_ssh_key ]]; then
           echo "No remote baas host or remote baas host definitions not found"
-          exit
+          exit 0
         fi
 
         BAAS_HOST_NAME=$(tr -d '"[]{}' < baas_host.yml | cut -d , -f 1 | awk -F : '{print $2}')
         export BAAS_HOST_NAME
 
         ssh_user="$(printf "ubuntu@%s" "$BAAS_HOST_NAME")"
-        ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=No -o ConnectTimeout=10 -i .baas_ssh_key"
+        ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i .baas_ssh_key"
 
         # Kill the remote baas server process, if the definition files exist
         echo "Terminating baas server on remote host..."
@@ -393,12 +414,15 @@ functions:
         set -o errexit
         set -o verbose
 
-        if [[ ! -d realm-core ]]; then
+        TOP_DIR=$(pwd)/realm-core
+        HANG_ANALYZER_PATH=$TOP_DIR/evergreen/hang_analyzer
+        REQUIREMENTS_PATH=$HANG_ANALYZER_PATH/requirements.txt
+
+        if [[ ! -d $TOP_DIR || ! -d $REQUIREMENTS_PATH ]]; then
           echo "No source directory exists. Not running hang analyzer"
           exit 1
         fi
 
-        TOP_DIR=$(pwd)/realm-core
         mkdir realm-core/hang_analyzer_workdir; cd realm-core/hang_analyzer_workdir
         ${python3|python3} -m venv venv
 
@@ -435,7 +459,6 @@ functions:
 
         python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" || exit 1
 
-        REQUIREMENTS_PATH=$TOP_DIR/evergreen/hang_analyzer/requirements.txt
         if [ "Windows_NT" = "$OS" ]; then
           REQUIREMENTS_PATH=$(cygpath -w $REQUIREMENTS_PATH)
         fi
@@ -444,7 +467,6 @@ functions:
 
         echo "Going to run hang analyzer"
 
-        HANG_ANALYZER_PATH=$TOP_DIR/evergreen/hang_analyzer
         if [ "Windows_NT" = "$OS" ]; then
           HANG_ANALYZER_PATH=$(cygpath -w $HANG_ANALYZER_PATH)
         fi
@@ -471,6 +493,11 @@ functions:
         set -o errexit
         set -o pipefail
 
+        if [[ -n "${disable_tests_against_baas|}" ]]; then
+          echo "Should not be using remote baas if the tests are not being used"
+          exit 0
+        fi
+
         # Save the remote host ssh key and details to files
         echo "${__project_aws_ssh_key_value}" > .baas_ssh_key
         chmod 600 .baas_ssh_key
@@ -483,13 +510,11 @@ functions:
         export AWS_ACCESS_KEY_ID="${baas_secrets_aws_access_key}"
         export AWS_SECRET_ACCESS_KEY="${baas_secrets_aws_secret_key}"
         export BAAS_HOST_NAME="$BAAS_HOST_NAME"
-        export REALM_CORE_REVISION="${revision}"
         export GITHUB_KNOWN_HOSTS="github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk="
         EOF
 
         chmod 700 baas_host_vars.sh
         echo "baas remote host created: $BAAS_HOST_NAME"
-        echo "- using Realm Core revision: ${revision}"
 
   - command: shell.exec
     params:
@@ -501,6 +526,10 @@ functions:
         set -o pipefail
         set -o verbose
 
+        if [[ -n "${disable_tests_against_baas|}" ]]; then
+          exit 0
+        fi
+
         BAAS_USER=ubuntu
 
         OPT_BAAS_BRANCH=
@@ -509,44 +538,8 @@ functions:
         fi
 
         # Run the setup_baas_host_local.sh script to configure and run baas on the remote host
-        ./evergreen/setup_baas_host_local.sh -v -w ./baas-work-dir -u $BAAS_USER $OPT_BAAS_BRANCH ./baas_host_vars.sh ./.baas_ssh_key 2>&1 | tee install_baas_output.log
-
-  "launch local baas":
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      shell: bash
-      background: true
-      # Do NOT use verbose for this script since it would reveal the values of secrets
-      script: |-
-        set -o errexit
-        set -o pipefail
-
-        export CURL=${curl|curl}
-
-        if [[ -n "${disable_tests_against_baas|}" ]]; then
-          exit 0
-        fi
-
-        if [[ -z "${baas_secrets_aws_access_key|}" || -z "${baas_secrets_aws_secret_key|}" ]]; then
-            echo "Must supply baas secrets AWS key info to start baas server"
-            exit 1
-        fi
-
-        export AWS_ACCESS_KEY_ID="${baas_secrets_aws_access_key}"
-        export AWS_SECRET_ACCESS_KEY="${baas_secrets_aws_secret_key}"
-
-        if [ -n "${xcode_developer_dir}" ]; then
-            export DEVELOPER_DIR="${xcode_developer_dir}"
-        fi
-
-        OPT_BAAS_BRANCH=
-        if [ -n "${baas_branch}" ]; then
-            OPT_BAAS_BRANCH="-b ${baas_branch}"
-        fi
-
-        # Run the install_baas.sh script to run baas locally
-        ./evergreen/install_baas.sh -w ./baas-work-dir $OPT_BAAS_BRANCH 2>&1 | tee install_baas_output.log
+        # Add -v to this command for verbose script logging
+        ./evergreen/setup_baas_host_local.sh -w ./baas-work-dir -u $BAAS_USER $OPT_BAAS_BRANCH ./baas_host_vars.sh ./.baas_ssh_key 2>&1 | tee install_baas_output.log
 
   "wait for baas to start":
   - command: shell.exec
@@ -565,6 +558,33 @@ functions:
         ./evergreen/wait_for_baas.sh -s -w ./baas-work-dir -l ""
 
         echo "Baas is started!"
+
+  "check branch state":
+  - command: shell.exec
+    type: setup
+    params:
+      working_dir: realm-core
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o pipefail
+        set -o verbose
+
+        if [[ -n "${disable_tests_against_baas|}" ]]; then
+          exit 0
+        fi
+
+        # Fail the test if local/evergreen object store tests are defined and this is not a patch build
+        if [[ -f "build/objstore-tests.do-not-commit" ]]; then
+            if [[ -z "${is_patch}" ]]; then
+              echo "ERROR: Found custom object store tests for non-patch build"
+              echo "- Revert test/object-store/objstore-tests.do-not-commit and recommit"
+              exit 1
+            else
+              echo "WARNING: Custom object store tests are configured for this patch build"
+              echo "- Revert test/object-store/objstore-tests.do-not-commit before merging PR"
+            fi
+        fi
 
 timeout:
   - func: "run hang analyzer"
@@ -630,6 +650,28 @@ tasks:
         xcrun swift build
         xcrun swift run ObjectStoreTests
 
+- name: validate-installed-headers
+  exec_timeout_secs: 1800
+  commands:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: /bin/bash
+      script: |-
+        #!/bin/bash
+        set -o errexit
+        set -o pipefail
+        set -o verbose
+
+        if [ -n "${xcode_developer_dir}" ]; then
+            export DEVELOPER_DIR="${xcode_developer_dir}"
+        fi
+
+        ./tools/build-cocoa.sh -bm
+        find core/include/realm -name '*.hpp' -print0 | xargs -0 -P "${max_jobs}" -n 1 clang++ -c -o /dev/null -Icore/include -std=c++17
+
 - name: test-on-exfat
   exec_timeout_secs: 2700
   commands:
@@ -643,7 +685,9 @@ tasks:
       script: ../tools/run-tests-on-exfat.sh
 
 - name: valgrind
-  exec_timeout_secs: 18000
+  exec_timeout_secs: 14400
+  tags: [ "for_nightly_tests" ]
+  allowed_requesters: [ "ad_hoc", "patch" ]
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -762,6 +806,8 @@ tasks:
       display_name: bloaty-results
 
 - name: long-running-core-tests
+  tags: [ "for_nightly_tests" ]
+  allowed_requesters: [ "ad_hoc", "patch" ]
   commands:
   - func: "run tests"
     # The long-running tests can take a really long time on Windows, so we give the test up to 4
@@ -819,40 +865,39 @@ tasks:
       test_filter: SyncTests
       test_executable_name: "realm-sync-tests"
 
-- name: object-store-tests-local-baas
-  tags: [ "test_suite_local_baas", "for_pull_requests" ]
+# These are local object store tests; baas is not started, however some use the sync server
+- name: object-store-tests
+  tags: [ "test_suite_remote_baas", "for_pull_requests" ]
   exec_timeout_secs: 3600
   commands:
   - func: "compile"
     vars:
       target_to_build: ObjectStoreTests
-  - func: "launch local baas"
-    vars:
-      baas_branch: 1a0d1c021460d2215b21bc4f7c7f668714ce81c7
-  - func: "wait for baas to start"
   - func: "run tests"
     vars:
-      test_filter: ObjectStoreTests
+      test_label: objstore-local
       test_executable_name: "realm-object-store-tests"
       verbose_test_output: true
+  - func: "check branch state"
 
-# Default object store tests will use a remote host for baas
-- name: object-store-tests
+# These are baas object store tests that run against baas running on a remote host
+- name: baas-integration-tests
   tags: [ "test_suite_remote_baas", "for_pull_requests" ]
   exec_timeout_secs: 3600
   commands:
   - func: "launch remote baas"
     vars:
-      baas_branch: 1a0d1c021460d2215b21bc4f7c7f668714ce81c7
+      baas_branch: 3f31617aacfe5d31b9057fc298b735b60acd6424
   - func: "compile"
     vars:
       target_to_build: ObjectStoreTests
   - func: "wait for baas to start"
   - func: "run tests"
     vars:
-      test_filter: ObjectStoreTests
+      test_label: objstore-baas
       test_executable_name: "realm-object-store-tests"
       verbose_test_output: true
+  - func: "check branch state"
 
 - name: process_coverage_data
   tags: [ "for_pull_requests" ]
@@ -992,6 +1037,8 @@ tasks:
         exit 1
 
 - name: fuzzer
+  tags: [ "for_nightly_tests" ]
+  allowed_requesters: [ "ad_hoc", "patch" ]
   commands:
   - command: shell.exec
     params:
@@ -1013,36 +1060,6 @@ task_groups:
   tasks:
   - core-tests
 
-- name: core_sync_tests_group
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  teardown_task:
-  - func: "upload test results"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - compile
-  - .test_suite
-
-# Runs object-store-tests against baas running locally
-- name: compile_test_and_package_local_baas
-  max_hosts: 1
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  teardown_task:
-  - func: "upload test results"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - compile
-  - .test_suite
-  - .test_suite_local_baas
-  - package
-
 # Runs object-store-tests against baas running on remote host
 - name: compile_test_and_package
   max_hosts: 1
@@ -1060,22 +1077,6 @@ task_groups:
   - .test_suite_remote_baas
   - package
 
-# Runs object-store-tests against baas running locally
-- name: compile_test_local_baas
-  max_hosts: 1
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  teardown_task:
-  - func: "upload test results"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - compile
-  - .test_suite
-  - .test_suite_local_baas
-
 # Runs object-store-tests against baas running on remote host
 - name: compile_test
   max_hosts: 1
@@ -1091,23 +1092,6 @@ task_groups:
   - compile
   - .test_suite
   - .test_suite_remote_baas
-
-# Runs object-store-tests against baas running locally
-- name: compile_test_coverage_local_baas
-  max_hosts: 1
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  teardown_task:
-  - func: "upload test results"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - compile
-  - .test_suite
-  - .test_suite_local_baas
-  - process_coverage_data
 
 # Runs object-store-tests against baas running on remote host
 - name: compile_test_coverage
@@ -1198,7 +1182,7 @@ buildvariants:
   - name: lint
     distros:
     - ubuntu2204-small
-  - name: core_sync_tests_group
+  - name: compile_test
 
 - name: ubuntu2004-no-session-multiplexing
   display_name: "Ubuntu 20.04 x86_64 (Sync Multiplexing Disabled)"
@@ -1336,8 +1320,6 @@ buildvariants:
     enable_fuzzer: On
   tasks:
   - name: fuzzer-tests
-    cron: "@daily"
-    patchable: true
 
 - name: rhel70
   display_name: "RHEL 7 x86_64"
@@ -1355,7 +1337,7 @@ buildvariants:
   - name: compile_test_and_package
 
 - name: ubuntu-valgrind
-  display_name: "Ubuntu 2204 Valgrind"
+  display_name: "Ubuntu 22.04 x86_64 (Valgrind)"
   run_on: ubuntu2204-large
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
@@ -1393,6 +1375,7 @@ buildvariants:
   tasks:
   - name: compile_test
   - name: swift-build-and-test
+  - name: validate-installed-headers
 
 - name: macos-encrypted
   display_name: "MacOS 11.0 x86_64 (Encryption enabled)"

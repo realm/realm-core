@@ -28,7 +28,6 @@
 #include "realm/array_string.hpp"
 #include "realm/array_mixed.hpp"
 #include "realm/array_fixed_bytes.hpp"
-#include "realm/collection_list.hpp"
 
 #include <iostream>
 
@@ -767,31 +766,6 @@ ClusterTree::ClusterTree(Table* owner, Allocator& alloc, size_t top_position_for
 
 ClusterTree::~ClusterTree() {}
 
-size_t ClusterTree::size_from_ref(ref_type ref, Allocator& alloc)
-{
-    size_t ret = 0;
-    if (ref) {
-        Array arr(alloc);
-        arr.init_from_ref(ref);
-        if (arr.is_inner_bptree_node()) {
-            ret = size_t(arr.get(2)) >> 1;
-        }
-        else {
-            int64_t rot = arr.get(0);
-            if (rot & 1) {
-                ret = size_t(rot) >> 1;
-            }
-            else {
-                ref_type key_ref = to_ref(rot);
-                MemRef mem(key_ref, alloc);
-                auto header = mem.get_addr();
-                ret = Node::get_size_from_header(header);
-            }
-        }
-    }
-    return ret;
-}
-
 std::unique_ptr<ClusterNode> ClusterTree::create_root_from_parent(ArrayParent* parent, size_t ndx_in_parent)
 {
     ref_type ref = parent->get_child_ref(ndx_in_parent);
@@ -1013,8 +987,6 @@ size_t ClusterTree::get_ndx(ObjKey k) const noexcept
 
 void ClusterTree::erase(ObjKey k, CascadeState& state)
 {
-    m_owner->free_local_id_after_hash_collision(k);
-    m_owner->erase_from_search_indexes(k);
     if (!k.is_unresolved()) {
         if (auto table = get_owning_table()) {
             if (Replication* repl = table->get_repl()) {
@@ -1022,6 +994,8 @@ void ClusterTree::erase(ObjKey k, CascadeState& state)
             }
         }
     }
+    m_owner->free_local_id_after_hash_collision(k);
+    m_owner->erase_from_search_indexes(k);
 
     size_t root_size = m_root->erase(k, state);
 
@@ -1140,7 +1114,6 @@ void ClusterTree::remove_all_links(CascadeState& state)
             auto col_type = col_key.get_type();
             if (col_type == col_type_LinkList)
                 col_type = col_type_Link;
-            auto nesting_levels = origin_table->get_nesting_levels(col_key);
             if (col_key.is_collection()) {
                 ArrayInteger values(alloc);
                 cluster->init_leaf(col_key, &values);
@@ -1149,16 +1122,7 @@ void ClusterTree::remove_all_links(CascadeState& state)
                 for (size_t i = 0; i < sz; i++) {
                     if (ref_type ref = values.get_as_ref(i)) {
                         ObjKey origin_key = cluster->get_real_key(i);
-                        if (nesting_levels > 0) {
-                            if (col_type == col_type_Link) {
-                                DummyParent parent(origin_table->m_own_ref, ref);
-                                auto list = CollectionList::create(parent, col_key);
-                                std::vector<ObjKey> keys;
-                                list->get_all_keys(nesting_levels - 1, keys);
-                                cluster->do_remove_backlinks(origin_key, col_key, keys, state);
-                            }
-                        }
-                        else if (col_key.is_list() || col_key.is_set()) {
+                        if (col_key.is_list() || col_key.is_set()) {
                             if (col_type == col_type_Link) {
                                 BPlusTree<ObjKey> links(alloc);
                                 links.init_from_ref(ref);

@@ -78,6 +78,7 @@ blank   [ \t\r]
 "@values"                   return yy::parser::make_KEY_VAL (yytext);
 ("FIRST"|"first")           return yy::parser::make_INDEX_FIRST (yytext);
 ("LAST"|"last")             return yy::parser::make_INDEX_LAST (yytext);
+("SIZE"|"size")             return yy::parser::make_INDEX_SIZE (yytext);
 "[c]"                       return yy::parser::make_CASE    ();
 (true|TRUE)                 return yy::parser::make_TRUE    ();
 (false|FALSE)               return yy::parser::make_FALSE    ();

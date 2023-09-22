@@ -942,7 +942,7 @@ Query& Query::like(ColKey column_key, StringData value, bool case_sensitive)
 
 Query& Query::fulltext(ColKey column_key, StringData value)
 {
-    auto index = m_table->get_search_index(column_key);
+    auto index = m_table->get_string_index(column_key);
     if (!(index && index->is_fulltext_index())) {
         throw IllegalOperation{"Column has no fulltext index"};
     }
@@ -954,7 +954,7 @@ Query& Query::fulltext(ColKey column_key, StringData value)
 
 Query& Query::fulltext(ColKey column_key, StringData value, const LinkMap& link_map)
 {
-    auto index = link_map.get_target_table()->get_search_index(column_key);
+    auto index = link_map.get_target_table()->get_string_index(column_key);
     if (!(index && index->is_fulltext_index())) {
         throw IllegalOperation{"Column has no fulltext index"};
     }
@@ -1398,9 +1398,12 @@ TableView Query::find_all(size_t limit) const
 
     TableView ret(*this, limit);
     if (m_ordering) {
+        // apply_descriptor_ordering will call do_sync
         ret.apply_descriptor_ordering(*m_ordering);
     }
-    ret.do_sync();
+    else {
+        ret.do_sync();
+    }
     return ret;
 }
 
@@ -1734,6 +1737,9 @@ std::string Query::validate() const
 
 std::string Query::get_description(util::serializer::SerialisationState& state) const
 {
+    if (m_view) {
+        throw SerializationError("Serialization of a query constrained by a view is not currently supported");
+    }
     std::string description;
     if (auto root = root_node()) {
         description = root->describe_expression(state);
@@ -1762,9 +1768,6 @@ util::bind_ptr<DescriptorOrdering> Query::get_ordering()
 
 std::string Query::get_description() const
 {
-    if (m_view) {
-        throw SerializationError("Serialization of a query constrained by a view is not currently supported");
-    }
     util::serializer::SerialisationState state(m_table->get_parent_group());
     return get_description(state);
 }
@@ -1775,7 +1778,10 @@ std::string Query::get_description_safe() const noexcept
         util::serializer::SerialisationState state(m_table->get_parent_group());
         return get_description(state);
     }
-    catch (...) {
+    catch (const Exception& e) {
+        if (auto logger = m_table->get_logger()) {
+            logger->log(util::Logger::Level::warn, "Query::get_description() failed: '%1'", e.what());
+        }
     }
     return "Unknown Query";
 }

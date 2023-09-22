@@ -250,6 +250,7 @@ enum FindRes {
 enum IndexMethod {
     index_FindFirst,
     index_FindAll_nocopy,
+    index_FindAll_prefix,
     index_Count,
 };
 

@@ -33,7 +33,17 @@ ConstTableRef ExtendedColumnKey::get_target_table(const Table* table) const
 std::string ExtendedColumnKey::get_description(const Table* table) const
 {
     std::string description = table->get_column_name(m_colkey);
-    if (!m_index.is_null()) {
+    if (has_index()) {
+        description += util::format("[%1]", util::serializer::print_value(m_index));
+    }
+    return description;
+}
+
+std::string ExtendedColumnKey::get_description(ConstTableRef table, util::serializer::SerialisationState& state) const
+{
+    std::string description = state.get_column_name(table, m_colkey);
+    // m_index has the type col_key if it is not set
+    if (has_index()) {
         description += util::format("[%1]", util::serializer::print_value(m_index));
     }
     return description;
@@ -41,17 +51,17 @@ std::string ExtendedColumnKey::get_description(const Table* table) const
 
 bool ExtendedColumnKey::is_collection() const
 {
-    return m_colkey.is_collection() && m_index.is_null();
+    return m_colkey.is_collection() && !has_index();
 }
 
 ObjKey ExtendedColumnKey::get_link_target(const Obj& obj) const
 {
-    if (m_index.is_null()) {
+    if (!has_index()) {
         return obj.get<ObjKey>(m_colkey);
     }
     else if (m_colkey.is_dictionary()) {
         const auto dictionary = obj.get_dictionary(m_colkey);
-        auto val = dictionary.try_get(m_index);
+        auto val = dictionary.try_get(m_index.get_key());
         if (val && val->is_type(type_TypedLink)) {
             return val->get<ObjKey>();
         }
@@ -61,12 +71,12 @@ ObjKey ExtendedColumnKey::get_link_target(const Obj& obj) const
 
 Mixed ExtendedColumnKey::get_value(const Obj& obj) const
 {
-    if (m_index.is_null()) {
+    if (!has_index()) {
         return obj.get_any(m_colkey);
     }
     else if (m_colkey.is_dictionary()) {
         const auto dictionary = obj.get_dictionary(m_colkey);
-        auto val = dictionary.try_get(m_index);
+        auto val = dictionary.try_get(m_index.get_key());
         if (val) {
             return *val;
         }
@@ -222,7 +232,7 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ExtendedColumnKey>> const
         std::vector<const Table*> tables = {&root_table};
         tables.resize(sz);
         for (size_t j = 0; j + 1 < sz; ++j) {
-            ColKey col = columns[j].get_col_key();
+            ColKey col = columns[j];
             if (!tables[j]->valid_column(col)) {
                 throw InvalidArgument(ErrorCodes::InvalidSortDescriptor, "Invalid property");
             }
@@ -301,7 +311,29 @@ BaseDescriptor::Sorter SortDescriptor::sorter(Table const& table, const IndexPai
 
 void SortDescriptor::execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const
 {
-    std::sort(v.begin(), v.end(), std::ref(predicate));
+    size_t limit = size_t(-1);
+    if (next && next->get_type() == DescriptorType::Limit) {
+        limit = static_cast<const LimitDescriptor*>(next)->get_limit();
+    }
+    // Measurements shows that if limit is smaller than size / 16, then
+    // it is quicker to make a sorted insert into a smaller vector
+    if (limit < (v.size() >> 4)) {
+        IndexPairs buffer;
+        buffer.reserve(limit + 1);
+        for (auto& elem : v) {
+            auto it = std::lower_bound(buffer.begin(), buffer.end(), elem, std::ref(predicate));
+            buffer.insert(it, elem);
+            if (buffer.size() > limit) {
+                buffer.pop_back();
+            }
+        }
+        v.m_removed_by_limit += v.size() - limit;
+        v.erase(v.begin() + limit, v.end());
+        std::move(buffer.begin(), buffer.end(), v.begin());
+    }
+    else {
+        std::sort(v.begin(), v.end(), std::ref(predicate));
+    }
 
     // not doing this on the last step is an optimisation
     if (next) {

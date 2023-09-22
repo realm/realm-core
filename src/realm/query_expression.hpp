@@ -718,6 +718,11 @@ public:
         return false;
     }
 
+    virtual bool has_indexes_in_link_map() const
+    {
+        return false;
+    }
+
     virtual std::vector<ObjKey> find_all(Mixed) const
     {
         return {};
@@ -796,7 +801,7 @@ Query create(L left, const Subexpr2<R>& right)
         // TODO: recognize size operator expressions
         // auto size_operator = dynamic_cast<const SizeOperator<Size<StringData>, Subexpr>*>(&right);
 
-        if (column && !column->links_exist()) {
+        if (column && !column->links_exist() && !column->has_path()) {
             ConstTableRef t = column->get_base_table();
             Query q(t);
 
@@ -1498,7 +1503,7 @@ iterator pattern. First solution can't exit, second solution requires internal s
 class LinkMap final {
 public:
     LinkMap() = default;
-    LinkMap(ConstTableRef table, std::vector<ColKey> columns)
+    LinkMap(ConstTableRef table, std::vector<ExtendedColumnKey> columns)
         : m_link_column_keys(std::move(columns))
     {
         set_base_table(table);
@@ -1520,6 +1525,14 @@ public:
     bool has_links() const
     {
         return m_link_column_keys.size() > 0;
+    }
+    bool has_indexes() const
+    {
+        for (auto& k : m_link_column_keys) {
+            if (k.has_index())
+                return true;
+        }
+        return false;
     }
 
     ColKey get_first_column_key() const
@@ -1577,7 +1590,7 @@ public:
         return res;
     }
 
-    std::vector<ObjKey> get_origin_ndxs(ObjKey key, size_t column = 0) const;
+    std::vector<ObjKey> get_origin_objkeys(ObjKey key, size_t column = 0) const;
 
     size_t count_links(size_t row) const
     {
@@ -1626,6 +1639,14 @@ public:
         return !m_link_column_keys.empty();
     }
 
+    ColKey pop_last()
+    {
+        ColKey col = m_link_column_keys.back();
+        m_link_column_keys.pop_back();
+        m_tables.pop_back();
+        return col;
+    }
+
 private:
     bool map_links(size_t column, ObjKey key, LinkMapFunction lm) const;
     void map_links(size_t column, size_t row, LinkMapFunction lm) const;
@@ -1638,7 +1659,7 @@ private:
         });
     }
 
-    mutable std::vector<ColKey> m_link_column_keys;
+    mutable std::vector<ExtendedColumnKey> m_link_column_keys;
     std::vector<ColumnType> m_link_types;
     std::vector<ConstTableRef> m_tables;
     bool m_only_unary_links = true;
@@ -1667,7 +1688,7 @@ Value<T> make_value_for_link(bool only_unary_links, size_t size)
 // This class can be used as untyped base for expressions that handle object properties
 class ObjPropertyBase {
 public:
-    ObjPropertyBase(ColKey column, ConstTableRef table, std::vector<ColKey> links,
+    ObjPropertyBase(ColKey column, ConstTableRef table, std::vector<ExtendedColumnKey> links,
                     util::Optional<ExpressionComparisonType> type)
         : m_link_map(table, std::move(links))
         , m_column_key(column)
@@ -1754,6 +1775,11 @@ public:
         return target_table->search_index_type(m_column_key) == IndexType::General;
     }
 
+    bool has_indexes_in_link_map() const final
+    {
+        return m_link_map.has_indexes();
+    }
+
     std::vector<ObjKey> find_all(Mixed value) const final
     {
         std::vector<ObjKey> ret;
@@ -1769,7 +1795,7 @@ public:
                 result.push_back(k);
         }
         else {
-            StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
+            SearchIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
             REALM_ASSERT(index);
             if (value.is_null()) {
                 index->find_all(result, realm::null{});
@@ -1781,7 +1807,7 @@ public:
         }
 
         for (ObjKey k : result) {
-            auto ndxs = m_link_map.get_origin_ndxs(k);
+            auto ndxs = m_link_map.get_origin_objkeys(k);
             ret.insert(ret.end(), ndxs.begin(), ndxs.end());
         }
 
@@ -1821,9 +1847,9 @@ class SimpleQuerySupport : public ObjPropertyExpr<T> {
 public:
     using ObjPropertyExpr<T>::links_exist;
 
-    SimpleQuerySupport(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+    SimpleQuerySupport(ColKey column, ConstTableRef table, const std::vector<ExtendedColumnKey>& links = {},
                        util::Optional<ExpressionComparisonType> type = util::none)
-        : ObjPropertyExpr<T>(column, table, std::move(links), type)
+        : ObjPropertyExpr<T>(column, table, links, type)
     {
     }
 
@@ -2012,7 +2038,7 @@ public:
     {
         return ObjPropertyExpr::description(state) + util::to_string(m_path);
     }
-    void path(const Path& path)
+    Columns<Mixed>& path(const Path& path)
     {
         for (auto& elem : path) {
             if (elem.is_all()) {
@@ -2020,6 +2046,7 @@ public:
             }
             m_path.emplace_back(elem);
         }
+        return *this;
     }
     bool has_path() const noexcept override
     {
@@ -2066,7 +2093,7 @@ Query string_compare(const Subexpr2<StringData>& left, const Subexpr2<StringData
 template <>
 class Columns<StringData> : public SimpleQuerySupport<StringData> {
 public:
-    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+    Columns(ColKey column, ConstTableRef table, const std::vector<ExtendedColumnKey>& links = {},
             util::Optional<ExpressionComparisonType> type = util::none)
         : SimpleQuerySupport(column, table, links, type)
     {
@@ -2241,10 +2268,14 @@ public:
     LinkCount(const LinkMap& link_map)
         : m_link_map(link_map)
     {
+        if (m_link_map.get_nb_hops() > 1) {
+            m_column_key = m_link_map.pop_last();
+        }
     }
     LinkCount(LinkCount const& other)
         : Subexpr2<Int>(other)
         , m_link_map(other.m_link_map)
+        , m_column_key(other.m_column_key)
     {
     }
 
@@ -2273,19 +2304,13 @@ public:
         m_link_map.collect_dependencies(tables);
     }
 
-    void evaluate(size_t index, ValueBase& destination) override
-    {
-        size_t count = m_link_map.count_links(index);
-        destination = Value<int64_t>(count);
-    }
+    void evaluate(size_t index, ValueBase& destination) override;
 
-    std::string description(util::serializer::SerialisationState& state) const override
-    {
-        return state.describe_columns(m_link_map, ColKey()) + util::serializer::value_separator + "@count";
-    }
+    std::string description(util::serializer::SerialisationState& state) const override;
 
 private:
     LinkMap m_link_map;
+    ColKey m_column_key;
 };
 
 // Gives a count of all backlinks across all columns for the specified row.
@@ -2301,7 +2326,7 @@ public:
         : m_link_map(std::move(link_map))
     {
     }
-    BacklinkCount(ConstTableRef table, std::vector<ColKey> links = {})
+    BacklinkCount(ConstTableRef table, std::vector<ExtendedColumnKey>&& links = {})
         : m_link_map(table, std::move(links))
     {
     }
@@ -2690,7 +2715,7 @@ public:
     {
     }
 
-    Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
+    Columns(ColKey column_key, ConstTableRef table, const std::vector<ExtendedColumnKey>& links = {},
             util::Optional<ExpressionComparisonType> type = util::none)
         : m_link_map(table, links)
         , m_comparison_type(type)
@@ -2826,7 +2851,7 @@ class Average;
 
 class ColumnListBase {
 public:
-    ColumnListBase(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links,
+    ColumnListBase(ColKey column_key, ConstTableRef table, const std::vector<ExtendedColumnKey>& links,
                    util::Optional<ExpressionComparisonType> type = util::none)
         : m_column_key(column_key)
         , m_link_map(table, links)
@@ -2879,7 +2904,7 @@ class ColumnListElementLength;
 template <typename T>
 class ColumnsCollection : public Subexpr2<T>, public ColumnListBase {
 public:
-    ColumnsCollection(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
+    ColumnsCollection(ColKey column_key, ConstTableRef table, const std::vector<ExtendedColumnKey>& links = {},
                       util::Optional<ExpressionComparisonType> type = util::none)
         : ColumnListBase(column_key, table, links, type)
         , m_is_nullable_storage(this->m_column_key.get_attrs().test(col_attr_Nullable))
@@ -3159,6 +3184,13 @@ public:
         }
         return false;
     }
+    Columns<Lst<Mixed>>& path(const Path& path)
+    {
+        if (!indexes(path)) {
+            throw InvalidArgument("Illegal path");
+        }
+        return *this;
+    }
     std::string description(util::serializer::SerialisationState& state) const override
     {
         return ColumnListBase::description(state) + util::to_string(m_path);
@@ -3191,18 +3223,18 @@ class ColumnDictionaryKeys;
 template <>
 class Columns<Dictionary> : public ColumnsCollection<Mixed> {
 public:
-    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+    Columns(ColKey column, ConstTableRef table, const std::vector<ExtendedColumnKey>& links = {},
             util::Optional<ExpressionComparisonType> type = util::none)
-        : ColumnsCollection<Mixed>(column, table, std::move(links), type)
+        : ColumnsCollection<Mixed>(column, table, links, type)
     {
         m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(m_column_key);
         m_path.push_back(PathElement::AllTag());
         m_path_only_unary_keys = false;
     }
 
-    Columns(const Path& path, ConstTableRef table, std::vector<ColKey> links = {},
+    Columns(const Path& path, ConstTableRef table, const std::vector<ExtendedColumnKey>& links = {},
             util::Optional<ExpressionComparisonType> type = util::none)
-        : ColumnsCollection<Mixed>(path[0].get_col_key(), table, std::move(links), type)
+        : ColumnsCollection<Mixed>(path[0].get_col_key(), table, links, type)
     {
         size_t path_size = path.size();
         REALM_ASSERT(path_size > 0);
@@ -3221,7 +3253,7 @@ public:
     }
 
     // Change the node to handle a specific key value only
-    Columns<Dictionary>& key(const Path& path)
+    Columns<Dictionary>& path(const Path& path)
     {
         auto sz = path.size();
         const PathElement* first = &path[0];
@@ -3698,9 +3730,9 @@ public:
     using ObjPropertyExpr<T>::links_exist;
     using ObjPropertyBase::is_nullable;
 
-    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+    Columns(ColKey column, ConstTableRef table, const std::vector<ExtendedColumnKey>& links = {},
             util::Optional<ExpressionComparisonType> type = util::none)
-        : ObjPropertyExpr<T>(column, table, std::move(links), type)
+        : ObjPropertyExpr<T>(column, table, links, type)
     {
     }
 
@@ -4391,7 +4423,7 @@ public:
                     column = m_left.get();
                 }
 
-                if (column->has_search_index() &&
+                if (column->has_search_index() && !column->has_indexes_in_link_map() &&
                     column->get_comparison_type().value_or(ExpressionComparisonType::Any) ==
                         ExpressionComparisonType::Any) {
                     if (const_value.is_null()) {

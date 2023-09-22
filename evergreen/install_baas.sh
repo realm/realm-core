@@ -139,7 +139,7 @@ while getopts "w:b:vh" opt; do
     case "${opt}" in
         w) WORK_PATH="$($REALPATH "${OPTARG}")";;
         b) BAAS_VERSION="${OPTARG}";;
-        v) VERBOSE="-v"; set -o verbose; set -o xtrace;;
+        v) VERBOSE="yes"; set -o verbose; set -o xtrace;;
         h) usage 0;;
         *) usage 1;;
     esac
@@ -444,13 +444,25 @@ echo "Building baas app server"
 [[ -f "${BAAS_PID_FILE}" ]] && rm "${BAAS_PID_FILE}"
 go build -o "${WORK_PATH}/baas_server" cmd/server/main.go
 
+# Based on https://github.com/10gen/baas/pull/10665
+# Add a version to the schema change history store so that the drop optimization does not take place
+# This caused issues with this test failing once app deletions starting being done asynchronously
+echo "Adding fake appid to skip baas server drop optimization"
+"${MONGO_BINARIES_DIR}/bin/${MONGOSH}"  --quiet mongodb://localhost:26000/__realm_sync "${BASE_PATH}/add_fake_appid.js"
+
 # Start the baas server on port *:9090 with the provided config JSON files
 echo "Starting baas app server"
 
 "${WORK_PATH}/baas_server" \
     --configFile=etc/configs/test_config.json --configFile="${BASE_PATH}/config_overrides.json" > "${BAAS_SERVER_LOG}" 2>&1 &
 echo $! > "${BAAS_PID_FILE}"
-"${BASE_PATH}/wait_for_baas.sh" "${VERBOSE}" -w "${WORK_PATH}"
+
+WAIT_BAAS_OPTS=()
+if [[ -n "${VERBOSE}" ]]; then
+    WAIT_BAAS_OPTS=("-v")
+fi
+
+"${BASE_PATH}/wait_for_baas.sh" "${WAIT_BAAS_OPTS[@]}" -w "${WORK_PATH}"
 
 # Create the admin user and set up the allowed roles
 echo "Adding roles to admin user"

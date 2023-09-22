@@ -328,6 +328,23 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
     });
 }
 
+RLM_API bool realm_set_json(realm_object_t* obj, realm_property_key_t col, const char* json_string)
+{
+    return wrap_err([&]() {
+        obj->verify_attached();
+        auto o = obj->get_obj();
+        ColKey col_key(col);
+        if (col_key.get_type() != col_type_Mixed) {
+            auto table = o.get_table();
+            auto& schema = schema_for_table(obj->get_realm(), table->get_key());
+            throw PropertyTypeMismatch{schema.name, table->get_column_name(col_key)};
+        }
+        o.set_json(ColKey(col), json_string);
+        return true;
+    });
+}
+
+
 RLM_API realm_object_t* realm_set_embedded(realm_object_t* obj, realm_property_key_t col)
 {
     return wrap_err([&]() {
@@ -337,11 +354,29 @@ RLM_API realm_object_t* realm_set_embedded(realm_object_t* obj, realm_property_k
     });
 }
 
-RLM_API bool realm_set_collection(realm_object_t* obj, realm_property_key_t col, realm_collection_type_e type)
+RLM_API bool realm_set_list(realm_object_t* obj, realm_property_key_t col)
 {
     return wrap_err([&]() {
         obj->verify_attached();
-        obj->get_obj().set_collection(ColKey(col), *from_capi(type));
+        obj->get_obj().set_collection(ColKey(col), CollectionType::List);
+        return true;
+    });
+}
+
+RLM_API bool realm_set_set(realm_object_t* obj, realm_property_key_t col)
+{
+    return wrap_err([&]() {
+        obj->verify_attached();
+        obj->get_obj().set_collection(ColKey(col), CollectionType::Set);
+        return true;
+    });
+}
+
+RLM_API bool realm_set_dictionary(realm_object_t* obj, realm_property_key_t col)
+{
+    return wrap_err([&]() {
+        obj->verify_attached();
+        obj->get_obj().set_collection(ColKey(col), CollectionType::Dictionary);
         return true;
     });
 }

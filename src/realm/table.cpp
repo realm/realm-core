@@ -391,7 +391,7 @@ Table::Table(Replication* const* repl, Allocator& alloc)
     m_cookie = cookie_created;
 }
 
-ColKey Table::add_column(DataType type, StringData name, bool nullable, std::vector<CollectionType> collection_types,
+ColKey Table::add_column(DataType type, StringData name, bool nullable, std::optional<CollectionType> collection_type,
                          DataType key_type)
 {
     REALM_ASSERT(!is_link_type(ColumnType(type)));
@@ -400,8 +400,8 @@ ColKey Table::add_column(DataType type, StringData name, bool nullable, std::vec
     }
 
     ColumnAttrMask attr;
-    if (!collection_types.empty()) {
-        switch (collection_types.back()) {
+    if (collection_type) {
+        switch (*collection_type) {
             case CollectionType::List:
                 attr.set(col_attr_List);
                 break;
@@ -418,18 +418,10 @@ ColKey Table::add_column(DataType type, StringData name, bool nullable, std::vec
     ColKey col_key = generate_col_key(ColumnType(type), attr);
 
     Table* invalid_link = nullptr;
-    col_key = do_insert_column(col_key, type, name, invalid_link, key_type); // Throws
-    if (collection_types.size() > 1) {
-        if (type == type_Mixed) {
-            throw IllegalOperation("Collections of Mixed cannot be statically nested");
-        }
-        collection_types.pop_back();
-        m_spec.set_nested_column_types(m_leaf_ndx2spec_ndx[col_key.get_index().val], collection_types);
-    }
-    return col_key;
+    return do_insert_column(col_key, type, name, invalid_link, key_type); // Throws
 }
 
-ColKey Table::add_column(Table& target, StringData name, std::vector<CollectionType> collection_types,
+ColKey Table::add_column(Table& target, StringData name, std::optional<CollectionType> collection_type,
                          DataType key_type)
 {
     // Both origin and target must be group-level tables, and in the same group.
@@ -450,8 +442,8 @@ ColKey Table::add_column(Table& target, StringData name, std::vector<CollectionT
 
     DataType data_type = type_Link;
     ColumnAttrMask attr;
-    if (!collection_types.empty()) {
-        switch (collection_types.back()) {
+    if (collection_type) {
+        switch (*collection_type) {
             case CollectionType::List:
                 attr.set(col_attr_List);
                 data_type = type_LinkList;
@@ -470,12 +462,7 @@ ColKey Table::add_column(Table& target, StringData name, std::vector<CollectionT
     }
     ColKey col_key = generate_col_key(ColumnType(data_type), attr);
 
-    auto retval = do_insert_column(col_key, data_type, name, &target, key_type); // Throws
-    if (collection_types.size() > 1) {
-        collection_types.pop_back();
-        m_spec.set_nested_column_types(m_leaf_ndx2spec_ndx[col_key.get_index().val], collection_types);
-    }
-    return retval;
+    return do_insert_column(col_key, data_type, name, &target, key_type); // Throws
 }
 
 void Table::remove_recursive(CascadeState& cascade_state)
@@ -517,11 +504,8 @@ void Table::nullify_links(CascadeState& cascade_state)
     }
 }
 
-CollectionType Table::get_collection_type(ColKey col_key, size_t level) const
+CollectionType Table::get_collection_type(ColKey col_key) const
 {
-    if (level < get_nesting_levels(col_key)) {
-        return get_nested_column_type(col_key, level);
-    }
     if (col_key.is_list()) {
         return CollectionType::List;
     }
@@ -691,71 +675,70 @@ ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, T
     return col_key;
 }
 
+template <typename Type>
+void do_bulk_insert_index(Table* table, SearchIndex* index, ColKey col_key, Allocator& alloc)
+{
+    using LeafType = typename ColumnTypeTraits<Type>::cluster_leaf_type;
+    LeafType leaf(alloc);
+
+    auto f = [&col_key, &index, &leaf](const Cluster* cluster) {
+        cluster->init_leaf(col_key, &leaf);
+        index->insert_bulk(cluster->get_key_array(), cluster->get_offset(), cluster->node_size(), leaf);
+        return IteratorControl::AdvanceToNext;
+    };
+
+    table->traverse_clusters(f);
+}
 
 void Table::populate_search_index(ColKey col_key)
 {
     auto col_ndx = col_key.get_index().val;
-    StringIndex* index = m_index_accessors[col_ndx].get();
+    SearchIndex* index = m_index_accessors[col_ndx].get();
+    DataType type = get_column_type(col_key);
 
-    // Insert ref to index
-    for (auto o : *this) {
-        ObjKey key = o.get_key();
-        DataType type = get_column_type(col_key);
-
-        if (type == type_Int) {
-            if (is_nullable(col_key)) {
-                Optional<int64_t> value = o.get<Optional<int64_t>>(col_key);
-                index->insert(key, value); // Throws
-            }
-            else {
-                int64_t value = o.get<int64_t>(col_key);
-                index->insert(key, value); // Throws
-            }
-        }
-        else if (type == type_Bool) {
-            if (is_nullable(col_key)) {
-                Optional<bool> value = o.get<Optional<bool>>(col_key);
-                index->insert(key, value); // Throws
-            }
-            else {
-                bool value = o.get<bool>(col_key);
-                index->insert(key, value); // Throws
-            }
-        }
-        else if (type == type_String) {
-            StringData value = o.get<StringData>(col_key);
-            index->insert(key, value); // Throws
-        }
-        else if (type == type_Timestamp) {
-            Timestamp value = o.get<Timestamp>(col_key);
-            index->insert(key, value); // Throws
-        }
-        else if (type == type_ObjectId) {
-            if (is_nullable(col_key)) {
-                Optional<ObjectId> value = o.get<Optional<ObjectId>>(col_key);
-                index->insert(key, value); // Throws
-            }
-            else {
-                ObjectId value = o.get<ObjectId>(col_key);
-                index->insert(key, value); // Throws
-            }
-        }
-        else if (type == type_UUID) {
-            if (is_nullable(col_key)) {
-                Optional<UUID> value = o.get<Optional<UUID>>(col_key);
-                index->insert(key, value); // Throws
-            }
-            else {
-                UUID value = o.get<UUID>(col_key);
-                index->insert(key, value); // Throws
-            }
-        }
-        else if (type == type_Mixed) {
-            index->insert(key, o.get<Mixed>(col_key));
+    if (type == type_Int) {
+        if (is_nullable(col_key)) {
+            do_bulk_insert_index<Optional<int64_t>>(this, index, col_key, get_alloc());
         }
         else {
-            REALM_ASSERT_RELEASE(false && "Data type does not support search index");
+            do_bulk_insert_index<int64_t>(this, index, col_key, get_alloc());
         }
+    }
+    else if (type == type_Bool) {
+        if (is_nullable(col_key)) {
+            do_bulk_insert_index<Optional<bool>>(this, index, col_key, get_alloc());
+        }
+        else {
+            do_bulk_insert_index<bool>(this, index, col_key, get_alloc());
+        }
+    }
+    else if (type == type_String) {
+        do_bulk_insert_index<StringData>(this, index, col_key, get_alloc());
+    }
+    else if (type == type_Timestamp) {
+        do_bulk_insert_index<Timestamp>(this, index, col_key, get_alloc());
+    }
+    else if (type == type_ObjectId) {
+        if (is_nullable(col_key)) {
+            do_bulk_insert_index<Optional<ObjectId>>(this, index, col_key, get_alloc());
+        }
+        else {
+            do_bulk_insert_index<ObjectId>(this, index, col_key, get_alloc());
+        }
+    }
+    else if (type == type_UUID) {
+        if (is_nullable(col_key)) {
+            do_bulk_insert_index<Optional<UUID>>(this, index, col_key, get_alloc());
+        }
+        else {
+            do_bulk_insert_index<UUID>(this, index, col_key, get_alloc());
+        }
+    }
+    else if (type == type_Mixed) {
+        do_bulk_insert_index<Mixed>(this, index, col_key, get_alloc());
+    }
+    else {
+        REALM_ASSERT_RELEASE(false && "Data type does not support search index");
     }
 }
 
@@ -887,10 +870,10 @@ void Table::do_add_search_index(ColKey col_key, IndexType type)
     // Create the index
     m_index_accessors[column_ndx] =
         std::make_unique<StringIndex>(ClusterColumn(&m_clusters, col_key, type), get_alloc()); // Throws
-    StringIndex* index = m_index_accessors[column_ndx].get();
-
+    SearchIndex* index = m_index_accessors[column_ndx].get();
     // Insert ref to index
     index->set_parent(&m_index_refs, column_ndx);
+
     m_index_refs.set(column_ndx, index->get_ref()); // Throws
 
     populate_search_index(col_key);
@@ -1262,8 +1245,10 @@ Table::~Table() noexcept
 
 IndexType Table::search_index_type(ColKey col_key) const noexcept
 {
-    if (auto index = m_index_accessors[col_key.get_index().val].get()) {
-        return index->is_fulltext_index() ? IndexType::Fulltext : IndexType::General;
+    if (m_index_accessors[col_key.get_index().val].get()) {
+        auto attr = m_spec.get_column_attr(m_leaf_ndx2spec_ndx[col_key.get_index().val]);
+        bool fulltext = attr.test(col_attr_FullText_Indexed);
+        return fulltext ? IndexType::Fulltext : IndexType::General;
     }
     return IndexType::None;
 }
@@ -1648,6 +1633,19 @@ std::optional<Mixed> Table::max(ColKey col_key, ObjKey* return_ndx) const
     return AggregateHelper<Table>::max(*this, *this, col_key, return_ndx);
 }
 
+
+SearchIndex* Table::get_search_index(ColKey col) const noexcept
+{
+    check_column(col);
+    return m_index_accessors[col.get_index().val].get();
+}
+
+StringIndex* Table::get_string_index(ColKey col) const noexcept
+{
+    check_column(col);
+    return dynamic_cast<StringIndex*>(m_index_accessors[col.get_index().val].get());
+}
+
 template <class T>
 ObjKey Table::find_first(ColKey col_key, T value) const
 {
@@ -1658,7 +1656,7 @@ ObjKey Table::find_first(ColKey col_key, T value) const
     }
     // You cannot call GetIndexData on ObjKey
     if constexpr (!std::is_same_v<T, ObjKey>) {
-        if (StringIndex* index = get_search_index(col_key)) {
+        if (SearchIndex* index = get_search_index(col_key)) {
             return index->find_first(value);
         }
         if (col_key == m_primary_key_col) {
@@ -1964,14 +1962,12 @@ void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::s
         }
         if (col_key.is_list()) {
             out << ",\"isArray\":true";
-            out << ",\"isNested\":" << (get_nesting_levels(col_key) > 0 ? "true" : "false");
         }
         else if (col_key.is_set()) {
             out << ",\"isSet\":true";
         }
         else if (col_key.is_dictionary()) {
             out << ",\"isMap\":true";
-            out << ",\"isNested\":" << (get_nesting_levels(col_key) > 0 ? "true" : "false");
             auto key_type = get_dictionary_key_type(col_key);
             out << ",\"keyType\":\"" << get_data_type_name(key_type) << "\"";
         }

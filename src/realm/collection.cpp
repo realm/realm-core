@@ -108,6 +108,28 @@ void check_for_last_unresolved(BPlusTree<ObjKey>* tree)
     }
 }
 
+size_t get_collection_size_from_ref(ref_type ref, Allocator& alloc)
+{
+    size_t ret = 0;
+    if (ref) {
+        Array arr(alloc);
+        arr.init_from_ref(ref);
+        if (arr.is_inner_bptree_node()) {
+            // This is a BPlusTree
+            ret = size_t(arr.back()) >> 1;
+        }
+        else if (arr.has_refs()) {
+            // This is a dictionary
+            auto key_ref = arr.get_as_ref(0);
+            ret = get_collection_size_from_ref(key_ref, alloc);
+        }
+        else {
+            ret = arr.size();
+        }
+    }
+    return ret;
+}
+
 } // namespace _impl
 
 Collection::~Collection() {}
@@ -158,7 +180,7 @@ void Collection::get_any(QueryCtrlBlock& ctrl, Mixed val, size_t index)
         auto ref = val.get_ref();
         if (!ref)
             return;
-        ArrayMixed list(ctrl.alloc);
+        BPlusTree<Mixed> list(ctrl.alloc);
         list.init_from_ref(ref);
         if (size_t sz = list.size()) {
             size_t start = 0;

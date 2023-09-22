@@ -4,6 +4,7 @@
 #include <realm/db.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/sync/network/websocket_error.hpp>
 #include <realm/util/functional.hpp>
 
 namespace realm::sync {
@@ -65,66 +66,6 @@ struct ClientReset {
     util::UniqueFunction<VersionID()> notify_before_client_reset;
     util::UniqueFunction<void(VersionID before_version, bool did_recover)> notify_after_client_reset;
 };
-
-/// \brief Protocol errors discovered by the client.
-///
-/// These errors will terminate the network connection (disconnect all sessions
-/// associated with the affected connection), and the error will be reported to
-/// the application via the connection state change listeners of the affected
-/// sessions.
-enum class ClientError {
-    // clang-format off
-    connection_closed           = RLM_SYNC_ERR_CLIENT_CONNECTION_CLOSED          , ///< Connection closed (no error)
-    unknown_message             = RLM_SYNC_ERR_CLIENT_UNKNOWN_MESSAGE            , ///< Unknown type of input message
-    bad_syntax                  = RLM_SYNC_ERR_CLIENT_BAD_SYNTAX                 , ///< Bad syntax in input message head
-    limits_exceeded             = RLM_SYNC_ERR_CLIENT_LIMITS_EXCEEDED            , ///< Limits exceeded in input message
-    bad_session_ident           = RLM_SYNC_ERR_CLIENT_BAD_SESSION_IDENT          , ///< Bad session identifier in input message
-    bad_message_order           = RLM_SYNC_ERR_CLIENT_BAD_MESSAGE_ORDER          , ///< Bad input message order
-    bad_client_file_ident       = RLM_SYNC_ERR_CLIENT_BAD_CLIENT_FILE_IDENT      , ///< Bad client file identifier (IDENT)
-    bad_progress                = RLM_SYNC_ERR_CLIENT_BAD_PROGRESS               , ///< Bad progress information (DOWNLOAD)
-    bad_changeset_header_syntax = RLM_SYNC_ERR_CLIENT_BAD_CHANGESET_HEADER_SYNTAX, ///< Bad syntax in changeset header (DOWNLOAD)
-    bad_changeset_size          = RLM_SYNC_ERR_CLIENT_BAD_CHANGESET_SIZE         , ///< Bad changeset size in changeset header (DOWNLOAD)
-    bad_origin_file_ident       = RLM_SYNC_ERR_CLIENT_BAD_ORIGIN_FILE_IDENT      , ///< Bad origin file identifier in changeset header (DOWNLOAD)
-    bad_server_version          = RLM_SYNC_ERR_CLIENT_BAD_SERVER_VERSION         , ///< Bad server version in changeset header (DOWNLOAD)
-    bad_changeset               = RLM_SYNC_ERR_CLIENT_BAD_CHANGESET              , ///< Bad changeset (DOWNLOAD)
-    bad_request_ident           = RLM_SYNC_ERR_CLIENT_BAD_REQUEST_IDENT          , ///< Bad request identifier (MARK)
-    bad_error_code              = RLM_SYNC_ERR_CLIENT_BAD_ERROR_CODE             , ///< Bad error code (ERROR),
-    bad_compression             = RLM_SYNC_ERR_CLIENT_BAD_COMPRESSION            , ///< Bad compression (DOWNLOAD)
-    bad_client_version          = RLM_SYNC_ERR_CLIENT_BAD_CLIENT_VERSION         , ///< Bad last integrated client version in changeset header (DOWNLOAD)
-    ssl_server_cert_rejected    = RLM_SYNC_ERR_CLIENT_SSL_SERVER_CERT_REJECTED   , ///< SSL server certificate rejected
-    pong_timeout                = RLM_SYNC_ERR_CLIENT_PONG_TIMEOUT               , ///< Timeout on reception of PONG respone message
-    bad_client_file_ident_salt  = RLM_SYNC_ERR_CLIENT_BAD_CLIENT_FILE_IDENT_SALT , ///< Bad client file identifier salt (IDENT)
-    bad_file_ident              = RLM_SYNC_ERR_CLIENT_BAD_FILE_IDENT             , ///< Bad file identifier (ALLOC)
-    connect_timeout             = RLM_SYNC_ERR_CLIENT_CONNECT_TIMEOUT            , ///< Sync connection was not fully established in time
-    bad_timestamp               = RLM_SYNC_ERR_CLIENT_BAD_TIMESTAMP              , ///< Bad timestamp (PONG)
-    bad_protocol_from_server    = RLM_SYNC_ERR_CLIENT_BAD_PROTOCOL_FROM_SERVER   , ///< Bad or missing protocol version information from server
-    client_too_old_for_server   = RLM_SYNC_ERR_CLIENT_CLIENT_TOO_OLD_FOR_SERVER  , ///< Protocol version negotiation failed: Client is too old for server
-    client_too_new_for_server   = RLM_SYNC_ERR_CLIENT_CLIENT_TOO_NEW_FOR_SERVER  , ///< Protocol version negotiation failed: Client is too new for server
-    protocol_mismatch           = RLM_SYNC_ERR_CLIENT_PROTOCOL_MISMATCH          , ///< Protocol version negotiation failed: No version supported by both client and server
-    bad_state_message           = RLM_SYNC_ERR_CLIENT_BAD_STATE_MESSAGE          , ///< Bad values in state message (STATE)
-    missing_protocol_feature    = RLM_SYNC_ERR_CLIENT_MISSING_PROTOCOL_FEATURE   , ///< Requested feature missing in negotiated protocol version
-    http_tunnel_failed          = RLM_SYNC_ERR_CLIENT_HTTP_TUNNEL_FAILED         , ///< Failed to establish HTTP tunnel with configured proxy
-    auto_client_reset_failure   = RLM_SYNC_ERR_CLIENT_AUTO_CLIENT_RESET_FAILURE  , ///< A fatal error was encountered which prevents completion of a client reset
-    // clang-format on
-};
-
-const std::error_category& client_error_category() noexcept;
-
-std::error_code make_error_code(ClientError) noexcept;
-
-ProtocolError client_error_to_protocol_error(ClientError);
-} // namespace realm::sync
-
-namespace std {
-
-template <>
-struct is_error_code_enum<realm::sync::ClientError> {
-    static const bool value = true;
-};
-
-} // namespace std
-
-namespace realm::sync {
 
 static constexpr milliseconds_type default_connect_timeout = 120000;        // 2 minutes
 static constexpr milliseconds_type default_connection_linger_time = 30000;  // 30 seconds
@@ -305,22 +246,25 @@ struct ClientConfig {
 ///
 /// \sa set_connection_state_change_listener().
 struct SessionErrorInfo : public ProtocolErrorInfo {
-    SessionErrorInfo(const ProtocolErrorInfo& info, const std::error_code& ec)
+    SessionErrorInfo(const ProtocolErrorInfo& info)
         : ProtocolErrorInfo(info)
-        , error_code(ec)
+        , status(protocol_error_to_status(static_cast<ProtocolError>(info.raw_error_code), message))
     {
     }
-    SessionErrorInfo(const std::error_code& ec, bool try_again)
-        : ProtocolErrorInfo(ec.value(), ec.message(), try_again)
-        , error_code(ec)
+
+    SessionErrorInfo(const ProtocolErrorInfo& info, Status status)
+        : ProtocolErrorInfo(info)
+        , status(std::move(status))
     {
     }
-    SessionErrorInfo(const std::error_code& ec, const std::string& msg, bool try_again)
-        : ProtocolErrorInfo(ec.value(), msg, try_again)
-        , error_code(ec)
+
+    SessionErrorInfo(Status status, IsFatal is_fatal)
+        : ProtocolErrorInfo(0, {}, is_fatal)
+        , status(std::move(status))
     {
     }
-    std::error_code error_code;
+
+    Status status;
 };
 
 enum class ConnectionState { disconnected, connecting, connected };
@@ -337,6 +281,14 @@ inline std::ostream& operator<<(std::ostream& os, ConnectionState state)
     }
     REALM_TERMINATE("Invalid ConnectionState value");
 }
+
+// The reason a synchronization session is used for.
+enum class SessionReason {
+    // Regular synchronization
+    Sync = 0,
+    // Download a fresh realm
+    ClientReset,
+};
 
 } // namespace realm::sync
 

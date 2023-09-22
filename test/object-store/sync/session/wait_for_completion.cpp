@@ -16,17 +16,19 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
-#include "sync/session/session_util.hpp"
-#include "util/event_loop.hpp"
-#include "util/test_utils.hpp"
+#include <util/event_loop.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
+#include <util/sync/session_util.hpp>
 
 #include <realm/util/scope_exit.hpp>
+
+#include <catch2/catch_all.hpp>
 
 using namespace realm;
 using namespace realm::util;
 
-TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
+TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync][pbs][session][completion]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -91,23 +93,21 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
     }
 
     SECTION("aborts properly when queued and the session errors out") {
-        using ProtocolError = realm::sync::ProtocolError;
         auto user = sync_manager->get_user("user-async-wait-download-4", ENCODE_FAKE_JWT("not_a_real_token"),
                                            ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url, dummy_device_id);
         std::atomic<int> error_count(0);
         std::shared_ptr<SyncSession> session = sync_session(user, "/async-wait-download-4", [&](auto, auto) {
             ++error_count;
         });
-        std::error_code code =
-            std::error_code{static_cast<int>(ProtocolError::bad_syntax), realm::sync::protocol_error_category()};
+        Status err_status(ErrorCodes::SyncProtocolInvariantFailed, "Not a real error message");
         // Register the download-completion notification
         session->wait_for_download_completion([&](Status status) {
-            REQUIRE(status.get_std_error_code() == code);
+            REQUIRE(status == err_status);
             handler_called = true;
         });
         REQUIRE(handler_called == false);
         // Now trigger an error
-        sync::SessionErrorInfo err{code, "Not a real error message", false};
+        sync::SessionErrorInfo err{err_status, sync::IsFatal{false}};
         err.server_requests_action = sync::ProtocolErrorInfo::Action::ProtocolViolation;
         SyncSession::OnlyForTesting::handle_error(*session, std::move(err));
         EventLoop::main().run_until([&] {
@@ -117,7 +117,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
     }
 }
 
-TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
+TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync][pbs][session][completion]") {
     if (!EventLoop::has_implementation())
         return;
 

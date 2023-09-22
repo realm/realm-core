@@ -3678,8 +3678,8 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
         if (i == 0) {
             list.add(items_keys[0]);
             list.add(items_keys[1]);
-            list.add(items_keys[2]);
             list.add(items_keys[3]);
+            list.add(items_keys[2]);
         }
         else if (i == 1) {
             for (size_t j = 0; j < 10; ++j) {
@@ -3698,6 +3698,10 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
         items->add_search_index(item_name_col);
         t->add_search_index(id_col);
     }
+
+    verify_query(test_context, t, "items[FIRST].name == 'milk'", 2);
+    verify_query(test_context, t, "items[LAST].name == 'cereal'", 1);
+    verify_query(test_context, t, "items[1].name == 'oranges'", 1);
 
     // any is implied over list properties
     verify_query(test_context, t, "items.price == 5.5", 2);
@@ -5162,6 +5166,9 @@ TEST(Parser_NestedDictionaryList)
     list2->add(3);
     list2->add(4);
 
+    auto q = persons->column<Dictionary>(col).path({"tickets", 0}) == 0;
+    CHECK_EQUAL(q.count(), 1);
+
     verify_query(test_context, persons, "properties.tickets[0] == 0", 1);
     verify_query(test_context, persons, "properties.tickets[last] == 4", 2);
 }
@@ -5188,6 +5195,9 @@ TEST(Parser_NestedListDictionary)
     dict2->insert("two", 2);
     dict2->insert("bar", 5);
     dict2->insert("four", 4);
+
+    auto q = persons->column<Lst<Mixed>>(col).path({0, "one"}) == 1;
+    CHECK_EQUAL(q.count(), 1);
 
     verify_query(test_context, persons, "properties[0].one == 1", 1);
     verify_query(test_context, persons, "properties[*].one == 1", 1);
@@ -5275,6 +5285,9 @@ TEST(Parser_NestedMixedDictionaryList)
         snake->insert("legs", 0);
         snake->insert("age", 20);
     }
+
+    auto q = persons->column<Mixed>(col).path({"instruments", 0, "strings"}) == 6;
+    CHECK_EQUAL(q.count(), 1);
 
     verify_query(test_context, persons, "properties.instruments[0].strings == 6", 1);
     verify_query(test_context, persons, "properties.instruments[*].strings == 6", 2);
@@ -5735,6 +5748,72 @@ TEST(Parser_SetLinks)
     verify_query(test_context, origin, "link.set.val == 5", 2);
 }
 
+TEST(Parser_CollectionLinks)
+{
+    Group g;
+    auto persons = g.add_table_with_primary_key("person", type_String, "name");
+    auto col_dict = persons->add_column_dictionary(*persons, "relations");
+    auto col_list = persons->add_column_list(*persons, "children");
+    auto col_int = persons->add_column_list(type_Int, "scores");
+    persons->add_column(*persons, "spouse");
+
+    Obj adam = persons->create_object_with_primary_key("adam");
+    Obj bernie = persons->create_object_with_primary_key("bernie");
+    Obj charlie = persons->create_object_with_primary_key("charlie");
+
+    Obj david = persons->create_object_with_primary_key("david");
+    Obj elisabeth = persons->create_object_with_primary_key("elisabeth");
+    Obj felix = persons->create_object_with_primary_key("felix");
+
+    Obj gary = persons->create_object_with_primary_key("gary");
+    Obj hutch = persons->create_object_with_primary_key("hutch");
+
+    auto dict = adam.get_dictionary(col_dict);
+    dict.insert("partner", bernie);
+    dict.insert("colleague", charlie);
+
+    dict = bernie.get_dictionary(col_dict);
+    dict.insert("partner", charlie);
+    dict.insert("colleague", charlie);
+    auto scores = bernie.get_list<Int>(col_int);
+    scores.add(1);
+    scores.add(2);
+    scores.add(3);
+
+    dict = charlie.get_dictionary(col_dict);
+    dict.insert("partner", adam);
+    dict.insert("colleague", bernie);
+    dict.insert("uncle", gary);
+    scores = charlie.get_list<Int>(col_int);
+    scores.add(3);
+    scores.add(4);
+    scores.add(5);
+
+    auto list = adam.get_linklist(col_list);
+    list.add(david);
+
+    list = david.get_linklist(col_list);
+    list.add(gary);
+    list.add(hutch);
+
+    list = bernie.get_linklist(col_list);
+    list.add(gary);
+    list.add(david);
+
+    verify_query(test_context, persons, "relations.partner.name == 'bernie'", 1);
+    verify_query(test_context, persons, "relations[SIZE] == 3", 1);
+    verify_query(test_context, persons, "relations.partner.relations.partner.name == 'bernie'", 1);
+    verify_query(test_context, persons, "relations.colleague.name == 'charlie'", 2);
+    verify_query(test_context, persons, "relations.colleague.scores[FIRST] == 1", 1);
+    verify_query(test_context, persons, "relations.colleague.scores[LAST] > 2", 3);
+
+    verify_query(test_context, persons, "children[FIRST].name == 'david'", 1);
+    verify_query(test_context, persons, "children[*].name == 'david'", 2);
+    verify_query(test_context, persons, "children[SIZE] == 2", 2);
+    verify_query(test_context, persons, "children[FIRST].children[LAST].name == 'hutch'", 1);
+    CHECK_THROW_ANY(verify_query(test_context, persons, "spouse[5].name == 'elisabeth'", 0));
+}
+
 namespace {
 
 void worker(test_util::unit_test::TestContext& test_context, TransactionRef frozen)
@@ -6054,11 +6133,21 @@ TEST(Parser_Geospatial)
         GeoPolygon{{{GeoPoint{0, 0}, GeoPoint{1, 0}, GeoPoint{1, 1}, GeoPoint{0, 1}, GeoPoint{0, 0}}}}};
     Geospatial invalid;
     Geospatial point{GeoPoint{0, 0}};
-    std::vector<Mixed> args = {Mixed{&box},          Mixed{&circle}, Mixed{&polygon}, Mixed{&invalid},
-                               Mixed{realm::null()}, Mixed{1.2},     Mixed{1000},     Mixed{"string value"}};
+    std::string str_of_box = box.to_string();
+    std::string str_of_circle = circle.to_string();
+    std::string str_of_polygon = polygon.to_string();
+    std::string str_of_point = point.to_string();
+    std::vector<Mixed> args = {Mixed{&box},          Mixed{&circle},        Mixed{&polygon},
+                               Mixed{&invalid},      Mixed{realm::null()},  Mixed{1.2},
+                               Mixed{1000},          Mixed{"string value"}, Mixed{str_of_box},
+                               Mixed{str_of_circle}, Mixed{str_of_polygon}, Mixed{str_of_point}};
+
     verify_query_sub(test_context, table, "location GEOWITHIN $0", args, 1);
     verify_query_sub(test_context, table, "location GEOWITHIN $1", args, 4);
     verify_query_sub(test_context, table, "location GEOWITHIN $2", args, 1);
+    verify_query_sub(test_context, table, "location GEOWITHIN $8", args, 1);
+    verify_query_sub(test_context, table, "location GEOWITHIN $9", args, 4);
+    verify_query_sub(test_context, table, "location GEOWITHIN $10", args, 1);
 
     GeoCircle c = circle.get<GeoCircle>();
     std::vector<Mixed> coord_args = {Mixed{c.center.longitude}, Mixed{c.center.latitude}, Mixed{c.radius_radians}};
@@ -6116,8 +6205,18 @@ TEST(Parser_Geospatial)
                                          "But the provided type is 'int'") != std::string::npos));
     CHECK_THROW_EX(
         verify_query_sub(test_context, table, "location GEOWITHIN $7", args, 1), query_parser::InvalidQueryError,
-        CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
-                                         "But the provided type is 'string'") != std::string::npos));
+        CHECK(std::string(e.what()).find(
+                  "Invalid syntax in serialized geospatial object at argument 7: 'Invalid predicate: 'string value': "
+                  "syntax error, unexpected identifier, expecting geobox or geopolygon or geocircle or argument'") !=
+              std::string::npos));
+
+    CHECK_THROW_EX(verify_query_sub(test_context, table, "location GEOWITHIN $11", args, 1),
+                   query_parser::InvalidQueryError,
+                   CHECK(std::string(e.what()).find(
+                             "Invalid syntax in serialized geospatial object at argument 11: 'Invalid predicate: "
+                             "'GeoPoint([0, 0])': syntax error, unexpected identifier, expecting geobox or "
+                             "geopolygon or geocircle or argument'") != std::string::npos));
+
     CHECK_THROW_EX(verify_query_sub(test_context, table, "location GEOWITHIN $3", args, 0),
                    query_parser::InvalidQueryError,
                    CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a valid "
@@ -6196,6 +6295,31 @@ TEST(Parser_RecursiveLogial)
     q = table->query(query, args, {});
     q_count = q.count();
     CHECK_EQUAL(q_count, 1);
+}
+
+TEST(Parser_issue6831)
+{
+    Group g;
+    auto plant = g.add_table_with_primary_key("Plant", type_ObjectId, "id");
+    plant->add_column(type_String, "Family");
+    auto inventory = g.add_table_with_primary_key("Inventory", type_String, "id");
+    inventory->add_column_dictionary(*plant, "Plants");
+
+    auto potato = plant->create_object_with_primary_key(ObjectId::gen());
+    potato.set("Family", "Solanaceae");
+    auto petunia = plant->create_object_with_primary_key(ObjectId::gen());
+    petunia.set("Family", "Solanaceae");
+    auto rose = plant->create_object_with_primary_key(ObjectId::gen());
+    rose.set("Family", "Rosaceae");
+    auto obj = inventory->create_object_with_primary_key("Inv");
+    auto dict = obj.get_dictionary("Plants");
+    dict.insert("Potato", potato);
+    dict.insert("Petunia", petunia);
+    dict.insert("Rose", rose);
+    auto q = inventory->query("Plants.@keys == 'Petunia'");
+    CHECK_EQUAL(q.count(), 1);
+    q = inventory->query("Plants.Rose.Family == 'Rosaceae'");
+    CHECK_EQUAL(q.count(), 1);
 }
 
 #endif // TEST_PARSER

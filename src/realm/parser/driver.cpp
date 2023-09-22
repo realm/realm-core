@@ -794,29 +794,65 @@ Query GeoWithinNode::visit(ParserDriver* drv)
         auto geo_value = dynamic_cast<const ConstantGeospatialValue*>(right.get());
         return link_column->geo_within(geo_value->get_mixed().get<Geospatial>());
     }
-    else {
-        size_t arg_no = size_t(strtol(argument.substr(1).c_str(), nullptr, 10));
-        auto right_type = drv->m_args.is_argument_null(arg_no) ? DataType(-1) : drv->m_args.type_for_argument(arg_no);
-        if (right_type != type_Geospatial) {
-            throw InvalidQueryError(util::format("The right hand side of 'geoWithin' must be a geospatial constant "
-                                                 "value. But the provided type is '%1'",
-                                                 get_data_type_name(right_type)));
-        }
-        Geospatial geo = drv->m_args.geospatial_for_argument(arg_no);
 
-        if (geo.get_type() == Geospatial::Type::Invalid) {
-            throw InvalidQueryError(
-                util::format("The right hand side of 'geoWithin' must be a valid Geospatial value, got '%1'", geo));
+    REALM_ASSERT_3(argument.size(), >, 1);
+    REALM_ASSERT_3(argument[0], ==, '$');
+    size_t arg_no = size_t(strtol(argument.substr(1).c_str(), nullptr, 10));
+    auto right_type = drv->m_args.is_argument_null(arg_no) ? DataType(-1) : drv->m_args.type_for_argument(arg_no);
+
+    Geospatial geo_from_argument;
+    if (right_type == type_Geospatial) {
+        geo_from_argument = drv->m_args.geospatial_for_argument(arg_no);
+    }
+    else if (right_type == type_String) {
+        // This is a "hack" to allow users to pass in geospatial objects
+        // serialized as a string instead of as a native type. This is because
+        // the CAPI doesn't have support for marshalling polygons (of variable length)
+        // yet and that project was deprioritized to geospatial phase 2. This should be
+        // removed once SDKs are all using the binding generator.
+        std::string str_val = drv->m_args.string_for_argument(arg_no);
+        const std::string simulated_prefix = "simulated GEOWITHIN ";
+        str_val = simulated_prefix + str_val;
+        ParserDriver sub_driver;
+        try {
+            sub_driver.parse(str_val);
         }
-        Status geo_status = geo.is_valid();
-        if (!geo_status.is_ok()) {
-            throw InvalidQueryError(
-                util::format("The Geospatial query argument region is invalid: '%1'", geo_status.reason()));
+        catch (const std::exception& ex) {
+            std::string doctored_err = ex.what();
+            size_t prefix_location = doctored_err.find(simulated_prefix);
+            if (prefix_location != std::string::npos) {
+                doctored_err.erase(prefix_location, simulated_prefix.size());
+            }
+            throw InvalidQueryError(util::format(
+                "Invalid syntax in serialized geospatial object at argument %1: '%2'", arg_no, doctored_err));
         }
-        return link_column->geo_within(geo);
+        GeoWithinNode* node = dynamic_cast<GeoWithinNode*>(sub_driver.result);
+        REALM_ASSERT(node);
+        if (node->geo) {
+            if (node->geo->m_geo.get_type() != Geospatial::Type::Invalid) {
+                geo_from_argument = node->geo->m_geo;
+            }
+            else {
+                geo_from_argument = GeoPolygon{node->geo->m_points};
+            }
+        }
+    }
+    else {
+        throw InvalidQueryError(util::format("The right hand side of 'geoWithin' must be a geospatial constant "
+                                             "value. But the provided type is '%1'",
+                                             get_data_type_name(right_type)));
     }
 
-    REALM_UNREACHABLE();
+    if (geo_from_argument.get_type() == Geospatial::Type::Invalid) {
+        throw InvalidQueryError(util::format(
+            "The right hand side of 'geoWithin' must be a valid Geospatial value, got '%1'", geo_from_argument));
+    }
+    Status geo_status = geo_from_argument.is_valid();
+    if (!geo_status.is_ok()) {
+        throw InvalidQueryError(
+            util::format("The Geospatial query argument region is invalid: '%1'", geo_status.reason()));
+    }
+    return link_column->geo_within(geo_from_argument);
 }
 #endif
 
@@ -844,6 +880,9 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
     }
     m_link_chain = path->visit(drv, comp_type);
     if (!path->at_end()) {
+        if (!path->current_path_elem->is_key()) {
+            throw InvalidQueryError(util::format("[%1] not expected", *path->current_path_elem));
+        }
         identifier = path->current_path_elem->get_key();
     }
     std::unique_ptr<Subexpr> subexpr{drv->column(m_link_chain, path)};
@@ -873,12 +912,12 @@ std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
                     subexpr = std::make_unique<ColumnDictionaryKeys>(*dict);
                 }
                 else {
-                    dict->key(indexes);
+                    dict->path(indexes);
                 }
             }
             else if (first_index.is_all()) {
                 ok = true;
-                dict->key(indexes);
+                dict->path(indexes);
             }
         }
         else if (auto coll = dynamic_cast<Columns<Lst<Mixed>>*>(subexpr.get())) {
@@ -1537,13 +1576,17 @@ LinkChain PathNode::visit(ParserDriver* drv, util::Optional<ExpressionComparison
                 continue; // this element has been removed, this happens in subqueries
             }
 
-            if (!link_chain.link(path_elem)) {
+            // Check if it is a link
+            if (link_chain.link(path_elem)) {
+                continue;
+            }
+            // The next identifier being a property on the linked to object takes precedence
+            if (link_chain.get_current_table()->get_column_key(path_elem)) {
                 break;
             }
         }
-        else {
-            throw InvalidQueryError("Index not supported here");
-        }
+        if (!link_chain.index(*current_path_elem))
+            break;
     }
     return link_chain;
 }
@@ -1715,7 +1758,14 @@ auto ParserDriver::cmp(const std::vector<ExpressionNode*>& values) -> std::pair<
 auto ParserDriver::column(LinkChain& link_chain, PathNode* path) -> SubexprPtr
 {
     if (path->at_end()) {
-        return link_chain.create_subexpr<Link>(link_chain.m_link_cols.back());
+        // This is a link property. However Columns<Link> does not handle @keys and indexes
+        auto extended_col_key = link_chain.m_link_cols.back();
+        if (!extended_col_key.has_index()) {
+            return link_chain.create_subexpr<Link>(ColKey(extended_col_key));
+        }
+        link_chain.pop_back();
+        --path->current_path_elem;
+        --path->current_path_elem;
     }
     auto identifier = m_mapping.translate(link_chain, path->next_identifier());
     if (auto col = link_chain.column(identifier)) {
@@ -1846,15 +1896,15 @@ std::unique_ptr<Subexpr> LinkChain::column(const std::string& col)
     }
 
     auto col_type{col_key.get_type()};
+    if (col_key.is_dictionary()) {
+        return create_subexpr<Dictionary>(col_key);
+    }
     if (Table::is_link_type(col_type)) {
         add(col_key);
         return create_subexpr<Link>(col_key);
     }
 
-    if (col_key.is_dictionary()) {
-        return create_subexpr<Dictionary>(col_key);
-    }
-    else if (col_key.is_set()) {
+    if (col_key.is_set()) {
         switch (col_type) {
             case col_type_Int:
                 return create_subexpr<Set<Int>>(col_key);

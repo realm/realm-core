@@ -22,7 +22,7 @@
 #include <realm/collection.hpp>
 
 #include <realm/obj.hpp>
-#include <realm/bplustree.hpp>
+#include <realm/column_mixed.hpp>
 #include <realm/obj_list.hpp>
 #include <realm/array_basic.hpp>
 #include <realm/array_integer.hpp>
@@ -34,7 +34,6 @@
 #include <realm/array_ref.hpp>
 #include <realm/array_fixed_bytes.hpp>
 #include <realm/array_decimal128.hpp>
-#include <realm/array_mixed.hpp>
 #include <realm/array_typed_link.hpp>
 #include <realm/replication.hpp>
 
@@ -184,7 +183,7 @@ public:
         return *m_tree;
     }
 
-    UpdateStatus update_if_needed_with_status() const noexcept final
+    UpdateStatus update_if_needed_with_status() const final
     {
         auto status = Base::get_update_status();
         switch (status) {
@@ -211,8 +210,10 @@ public:
     void ensure_created()
     {
         if (Base::should_update() || !(m_tree && m_tree->is_attached())) {
-            bool attached = init_from_parent(true);
-            REALM_ASSERT(attached);
+            // When allow_create is true, init_from_parent will always succeed
+            // In case of errors, an exception is thrown.
+            constexpr bool allow_create = true;
+            init_from_parent(allow_create); // Throws
             Base::update_content_version();
         }
     }
@@ -350,14 +351,10 @@ public:
     DictionaryPtr get_dictionary(const PathElement& path_elem) const override;
     SetMixedPtr get_set(const PathElement& path_elem) const override;
     ListMixedPtr get_list(const PathElement& path_elem) const override;
+
     int64_t get_key(size_t ndx)
     {
         return m_tree->get_key(ndx);
-    }
-    size_t find_key(int64_t key)
-    {
-        update();
-        return m_tree->find_key(key);
     }
 
     // Overriding members of CollectionBase:
@@ -452,36 +449,15 @@ public:
         return *m_tree;
     }
 
-    UpdateStatus update_if_needed_with_status() const noexcept final
-    {
-        auto status = Base::get_update_status();
-        switch (status) {
-            case UpdateStatus::Detached: {
-                m_tree.reset();
-                return UpdateStatus::Detached;
-            }
-            case UpdateStatus::NoChange:
-                if (m_tree && m_tree->is_attached()) {
-                    return UpdateStatus::NoChange;
-                }
-                // The tree has not been initialized yet for this accessor, so
-                // perform lazy initialization by treating it as an update.
-                [[fallthrough]];
-            case UpdateStatus::Updated: {
-                bool attached = init_from_parent(false);
-                Base::update_content_version();
-                return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
-            }
-        }
-        REALM_UNREACHABLE();
-    }
+    UpdateStatus update_if_needed_with_status() const final;
 
     void ensure_created()
     {
         if (Base::should_update() || !(m_tree && m_tree->is_attached())) {
-            if (!init_from_parent(true)) {
-                throw IllegalOperation("This is an ex-list");
-            }
+            // When allow_create is true, init_from_parent will always succeed
+            // In case of errors, an exception is thrown.
+            constexpr bool allow_create = true;
+            init_from_parent(allow_create); // Throws
             Base::update_content_version();
         }
     }
@@ -509,7 +485,9 @@ public:
         return Base::get_stable_path();
     }
 
-    void add_index(Path& path, Index ndx) const final;
+    void add_index(Path& path, const Index& ndx) const final;
+    size_t find_index(const Index& ndx) const final;
+
     bool nullify(ObjLink);
     bool replace_link(ObjLink old_link, ObjLink replace_link);
     void remove_backlinks(CascadeState& state) const;
@@ -523,69 +501,12 @@ public:
         return get_obj();
     }
     ref_type get_collection_ref(Index, CollectionType) const override;
+    bool check_collection_ref(Index, CollectionType) const noexcept override;
     void set_collection_ref(Index, ref_type ref, CollectionType) override;
 
     void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
 private:
-    class BPlusTreeMixed : public BPlusTree<Mixed> {
-    public:
-        BPlusTreeMixed(Allocator& alloc)
-            : BPlusTree<Mixed>(alloc)
-        {
-        }
-
-        void ensure_keys()
-        {
-            auto func = [&](BPlusTreeNode* node, size_t) {
-                return static_cast<LeafNode*>(node)->ensure_keys() ? IteratorControl::Stop
-                                                                   : IteratorControl::AdvanceToNext;
-            };
-
-            m_root->bptree_traverse(func);
-        }
-        size_t find_key(int64_t key) const noexcept
-        {
-            size_t ret = realm::npos;
-            auto func = [&](BPlusTreeNode* node, size_t offset) {
-                LeafNode* leaf = static_cast<LeafNode*>(node);
-                auto pos = leaf->find_key(key);
-                if (pos != realm::not_found) {
-                    ret = pos + offset;
-                    return IteratorControl::Stop;
-                }
-                else {
-                    return IteratorControl::AdvanceToNext;
-                }
-            };
-
-            m_root->bptree_traverse(func);
-            return ret;
-        }
-
-        void set_key(size_t ndx, int64_t key) const noexcept
-        {
-            auto func = [key](BPlusTreeNode* node, size_t ndx) {
-                LeafNode* leaf = static_cast<LeafNode*>(node);
-                leaf->set_key(ndx, key);
-            };
-
-            m_root->bptree_access(ndx, func);
-        }
-
-        int64_t get_key(size_t ndx) const noexcept
-        {
-            int64_t ret = 0;
-            auto func = [&ret](BPlusTreeNode* node, size_t ndx) {
-                LeafNode* leaf = static_cast<LeafNode*>(node);
-                ret = leaf->get_key(ndx);
-            };
-
-            m_root->bptree_access(ndx, func);
-            return ret;
-        }
-    };
-
     // `do_` methods here perform the action after preconditions have been
     // checked (bounds check, writability, etc.).
     void do_set(size_t ndx, Mixed value);
@@ -614,7 +535,6 @@ private:
         }
     }
 
-private:
     static Mixed unresolved_to_null(Mixed value) noexcept
     {
         if (value.is_type(type_TypedLink) && value.is_unresolved_link())
@@ -709,6 +629,13 @@ public:
         // FIXME: Should this add to the end of the unresolved list?
         insert(size(), value);
     }
+    void add(const Obj& obj)
+    {
+        if (get_target_table()->get_key() != obj.get_table_key()) {
+            throw InvalidArgument("LnkLst::add: Wrong object type");
+        }
+        add(obj.get_key());
+    }
 
     // Overriding members of CollectionBase:
     using CollectionBase::get_owner_key;
@@ -724,6 +651,10 @@ public:
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
     const Obj& get_obj() const noexcept final;
+    bool is_attached() const noexcept final
+    {
+        return m_list.is_attached();
+    }
     bool has_changed() const noexcept final;
     ColKey get_col_key() const noexcept final;
     CollectionType get_collection_type() const noexcept override

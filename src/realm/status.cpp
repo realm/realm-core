@@ -22,14 +22,14 @@
 
 namespace realm {
 
-Status::ErrorInfo::ErrorInfo(ErrorCodes::Error code, std::string_view reason)
+Status::ErrorInfo::ErrorInfo(ErrorCodes::Error code, std::string&& reason)
     : m_refs(0)
     , m_code(code)
-    , m_reason(reason)
+    , m_reason(std::move(reason))
 {
 }
 
-util::bind_ptr<Status::ErrorInfo> Status::ErrorInfo::create(ErrorCodes::Error code, std::string_view reason)
+util::bind_ptr<Status::ErrorInfo> Status::ErrorInfo::create(ErrorCodes::Error code, std::string&& reason)
 {
     // OK status should be created by calling Status::OK() - which is a special case that doesn't allocate
     // anything.

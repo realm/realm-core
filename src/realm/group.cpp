@@ -852,7 +852,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     size_t prior_num_tables = m_tables.size();
     Replication* repl = *get_repl();
     if (repl)
-        repl->erase_class(key, prior_num_tables); // Throws
+        repl->erase_class(key, table->get_name(), prior_num_tables); // Throws
 
     int64_t ref_64 = m_tables.get(table_ndx);
     REALM_ASSERT(!int_cast_has_overflow<ref_type>(ref_64));
@@ -1113,6 +1113,8 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
                 top.add(RefOrTagged::make_tagged(history_info.version));
                 top.add(RefOrTagged::make_tagged(history_info.sync_file_id));
                 top_size = s_group_max_size;
+                // ^ this is too large, since the evacuation point entry is not there:
+                // (but the code below is self correcting)
             }
         }
         top_ref = out_2.get_ref_of_next_array();

@@ -83,19 +83,52 @@ RLM_API bool realm_list_insert(realm_list_t* list, size_t index, realm_value_t v
     });
 }
 
-RLM_API bool realm_list_insert_collection(realm_list_t* list, size_t index, realm_collection_type_e type)
+RLM_API realm_list_t* realm_list_insert_list(realm_list_t* list, size_t index)
 {
     return wrap_err([&]() {
-        list->insert_collection(index, *from_capi(type));
-        return true;
+        list->insert_collection(index, CollectionType::List);
+        return new realm_list_t{list->get_list(index)};
     });
 }
 
-RLM_API bool realm_list_set_collection(realm_list_t* list, size_t index, realm_collection_type_e type)
+RLM_API realm_set_t* realm_list_insert_set(realm_list_t* list, size_t index)
 {
     return wrap_err([&]() {
-        list->set_collection(index, *from_capi(type));
-        return true;
+        list->insert_collection(index, CollectionType::Set);
+        return new realm_set_t{list->get_set(index)};
+    });
+}
+
+RLM_API realm_dictionary_t* realm_list_insert_dictionary(realm_list_t* list, size_t index)
+{
+    return wrap_err([&]() {
+        list->insert_collection(index, CollectionType::Dictionary);
+        return new realm_dictionary_t{list->get_dictionary(index)};
+    });
+}
+
+RLM_API realm_list_t* realm_list_set_list(realm_list_t* list, size_t index)
+{
+    return wrap_err([&]() {
+        list->set_collection(index, CollectionType::List);
+        return new realm_list_t{list->get_list(index)};
+    });
+}
+
+RLM_API realm_set_t* realm_list_set_set(realm_list_t* list, size_t index)
+{
+    return wrap_err([&]() {
+        list->set_collection(index, CollectionType::Set);
+        return new realm_set_t{list->get_set(index)};
+    });
+}
+
+RLM_API realm_dictionary_t* realm_list_set_dictionary(realm_list_t* list, size_t index)
+{
+    return wrap_err([&]() {
+        list->set_collection(index, CollectionType::Dictionary);
+        return new realm_dictionary_t{list->get_dictionary(index)};
+        ;
     });
 }
 

@@ -82,13 +82,13 @@ public:
     template <class... Params>
     void log(Level, const char* message, Params&&...);
 
-    virtual Level get_level_threshold() const noexcept
+    Level get_level_threshold() const noexcept
     {
         // Don't need strict ordering, mainly that the gets/sets are atomic
         return m_level_threshold.load(std::memory_order_relaxed);
     }
 
-    virtual void set_level_threshold(Level level) noexcept
+    void set_level_threshold(Level level) noexcept
     {
         // Don't need strict ordering, mainly that the gets/sets are atomic
         m_level_threshold.store(level, std::memory_order_relaxed);
@@ -106,11 +106,9 @@ public:
     static std::shared_ptr<util::Logger>& get_default_logger() noexcept;
     static void set_default_level_threshold(Level level) noexcept;
     static Level get_default_level_threshold() noexcept;
+    static const std::string_view level_to_string(Level level) noexcept;
 
 protected:
-    // Used by subclasses that link to a base logger
-    std::shared_ptr<Logger> m_base_logger_ptr;
-
     // Shared level threshold for subclasses that link to a base logger
     // See PrefixLogger and ThreadSafeLogger
     std::atomic<Level>& m_level_threshold;
@@ -127,9 +125,8 @@ protected:
     {
     }
 
-    explicit Logger(const std::shared_ptr<Logger>& base_logger) noexcept
-        : m_base_logger_ptr{base_logger}
-        , m_level_threshold{m_base_logger_ptr->m_level_threshold}
+    explicit Logger(const Logger& base_logger) noexcept
+        : m_level_threshold{base_logger.m_level_threshold}
     {
     }
 
@@ -228,6 +225,7 @@ protected:
 
 private:
     Mutex m_mutex;
+    std::shared_ptr<Logger> m_base_logger_ptr;
 };
 
 
@@ -246,6 +244,7 @@ protected:
 private:
     const std::string m_prefix;
     // The next logger in the chain for chained PrefixLoggers or the base_logger
+    std::shared_ptr<Logger> m_owned_logger;
     Logger& m_chained_logger;
 };
 
@@ -269,29 +268,6 @@ public:
 
 protected:
     std::shared_ptr<Logger> m_chained_logger;
-};
-
-
-/// A logger that essentially performs a noop when logging functions are called
-/// The log level threshold for this logger is always Logger::Level::off and
-/// cannot be changed.
-class NullLogger : public Logger {
-public:
-    NullLogger()
-        : Logger{Level::off}
-    {
-    }
-
-    Level get_level_threshold() const noexcept override
-    {
-        return Level::off;
-    }
-
-    void set_level_threshold(Level) noexcept override {}
-
-protected:
-    // Since we don't want to log anything, do_log() does nothing
-    void do_log(Level, const std::string&) override {}
 };
 
 
@@ -367,36 +343,7 @@ void Logger::do_log(Level level, const char* message, Params&&... params)
 template <class C, class T>
 std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, Logger::Level level)
 {
-    switch (level) {
-        case Logger::Level::all:
-            out << "all";
-            return out;
-        case Logger::Level::trace:
-            out << "trace";
-            return out;
-        case Logger::Level::debug:
-            out << "debug";
-            return out;
-        case Logger::Level::detail:
-            out << "detail";
-            return out;
-        case Logger::Level::info:
-            out << "info";
-            return out;
-        case Logger::Level::warn:
-            out << "warn";
-            return out;
-        case Logger::Level::error:
-            out << "error";
-            return out;
-        case Logger::Level::fatal:
-            out << "fatal";
-            return out;
-        case Logger::Level::off:
-            out << "off";
-            return out;
-    }
-    REALM_ASSERT(false);
+    out << Logger::level_to_string(level);
     return out;
 }
 
@@ -487,14 +434,15 @@ inline AppendToFileLogger::AppendToFileLogger(util::File file)
 }
 
 inline ThreadSafeLogger::ThreadSafeLogger(const std::shared_ptr<Logger>& base_logger) noexcept
-    : Logger(base_logger)
+    : Logger(*base_logger)
+    , m_base_logger_ptr(base_logger)
 {
 }
 
 // Construct a PrefixLogger from another PrefixLogger object for chaining the prefixes on log output
 inline PrefixLogger::PrefixLogger(std::string prefix, PrefixLogger& prefix_logger) noexcept
     // Save an alias of the base_logger shared_ptr from the passed in PrefixLogger
-    : Logger(prefix_logger.m_base_logger_ptr)
+    : Logger(prefix_logger)
     , m_prefix{std::move(prefix)}
     , m_chained_logger{prefix_logger} // do_log() writes to the chained logger
 {
@@ -505,9 +453,10 @@ inline PrefixLogger::PrefixLogger(std::string prefix, PrefixLogger& prefix_logge
 // created, will point back to this logger shared_ptr for referencing the level_threshold when
 // logging output.
 inline PrefixLogger::PrefixLogger(std::string prefix, const std::shared_ptr<Logger>& base_logger) noexcept
-    : Logger(base_logger) // Save an alias of the passed in base_logger shared_ptr
+    : Logger(*base_logger) // Save an alias of the passed in base_logger shared_ptr
     , m_prefix{std::move(prefix)}
-    , m_chained_logger{*base_logger} // do_log() writes to the chained logger
+    , m_owned_logger{base_logger}
+    , m_chained_logger{*m_owned_logger} // do_log() writes to the chained logger
 {
 }
 
@@ -527,6 +476,11 @@ inline LocalThresholdLogger::LocalThresholdLogger(const std::shared_ptr<Logger>&
     REALM_ASSERT(m_chained_logger);
 }
 
+// Intended to be used to get a somewhat smaller number derived from 'this' pointer
+inline unsigned gen_log_id(void* p)
+{
+    return (size_t(p) >> 4) & 0xffff;
+}
 } // namespace realm::util
 
 #endif // REALM_UTIL_LOGGER_HPP

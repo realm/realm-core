@@ -42,7 +42,7 @@
 using namespace realm;
 using util::any_cast;
 
-TEST_CASE("list") {
+TEST_CASE("list", "[list]") {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -1304,6 +1304,7 @@ TEST_CASE("nested List") {
     top_list.insert_collection(1, CollectionType::List);
     top_list.insert(2, "Godbye");
     top_list.insert_collection(3, CollectionType::List);
+    top_list.insert_collection(4, CollectionType::List);
     auto l0 = obj.get_list_ptr<Mixed>(Path{"any", 1});
     auto l1 = obj.get_list_ptr<Mixed>(Path{"any", 3});
 
@@ -1383,10 +1384,45 @@ TEST_CASE("nested List") {
             REQUIRE_INDICES(change.insertions, 0);
             REQUIRE(!change.collection_was_cleared);
         }
+        SECTION("remove item from collection") {
+            auto token = require_change();
+            write([&] {
+                lst0.add(Mixed(8));
+            });
+            REQUIRE_INDICES(change.insertions, 0);
+            write([&] {
+                lst0.remove(0);
+            });
+            REQUIRE_INDICES(change.deletions, 0);
+        }
+        SECTION("erase from containing list") {
+            auto token = require_change();
+            write([&] {
+                lst0.add(Mixed(8));
+            });
+            REQUIRE_INDICES(change.insertions, 0);
+            write([&] {
+                top_list.set(1, 42);
+            });
+            REQUIRE_INDICES(change.deletions, 0);
+            REQUIRE(change.collection_root_was_deleted);
+        }
+        SECTION("remove containing object") {
+            auto token = require_change();
+            write([&] {
+                lst0.add(Mixed(8));
+            });
+            REQUIRE_INDICES(change.insertions, 0);
+            write([&] {
+                obj.remove();
+            });
+            REQUIRE_INDICES(change.deletions, 0);
+            REQUIRE(change.collection_root_was_deleted);
+        }
     }
 }
 
-TEST_CASE("embedded List") {
+TEST_CASE("embedded List", "[list]") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
@@ -1824,7 +1860,7 @@ TEST_CASE("embedded List") {
 }
 
 
-TEST_CASE("list of embedded objects") {
+TEST_CASE("list of embedded objects", "[list]") {
     Schema schema{
         {"parent",
          {
@@ -1944,7 +1980,7 @@ TEST_CASE("list of embedded objects") {
 
 #if REALM_ENABLE_SYNC
 
-TEST_CASE("list with unresolved links") {
+TEST_CASE("list with unresolved links", "[list]") {
     TestSyncManager init_sync_manager({}, {false});
     auto& server = init_sync_manager.sync_server();
 

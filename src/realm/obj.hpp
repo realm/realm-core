@@ -69,14 +69,19 @@ public:
     Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
 
     // Overriding members of CollectionParent:
-    UpdateStatus update_if_needed_with_status() const noexcept final;
+    UpdateStatus update_if_needed_with_status() const final;
     // Get the path in a minimal format without including object accessors.
     // If you need to obtain additional information for each object in the path,
     // you should use get_fat_path() or traverse_path() instead (see below).
     FullPath get_path() const final;
+    std::string get_id() const;
     Path get_short_path() const noexcept final;
     StablePath get_stable_path() const noexcept final;
-    void add_index(Path& path, Index ndx) const final;
+    void add_index(Path& path, const Index& ndx) const final;
+    size_t find_index(const Index&) const final
+    {
+        return realm::npos;
+    }
 
     bool update_if_needed() const final;
     TableRef get_table() const noexcept final
@@ -88,7 +93,10 @@ public:
         return *this;
     }
     ref_type get_collection_ref(Index, CollectionType) const final;
+    bool check_collection_ref(Index, CollectionType) const noexcept final;
     void set_collection_ref(Index, ref_type, CollectionType) final;
+    StableIndex build_index(ColKey) const;
+    bool check_index(StableIndex) const;
 
     // Operator overloads
     bool operator==(const Obj& other) const;
@@ -301,7 +309,7 @@ public:
     Dictionary get_dictionary(ColKey col_key) const;
     Dictionary get_dictionary(StringData col_name) const;
 
-    void set_collection(ColKey col_key, CollectionType type);
+    Obj& set_collection(ColKey col_key, CollectionType type);
     DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
     DictionaryPtr get_dictionary_ptr(const Path& path) const;
 
@@ -310,9 +318,6 @@ public:
     CollectionPtr get_collection_ptr(const Path& path) const;
     CollectionPtr get_collection_by_stable_path(const StablePath& path) const;
     LinkCollectionPtr get_linkcollection_ptr(ColKey col_key) const;
-
-    // Get a collection to hold other collections
-    CollectionListPtr get_collection_list(ColKey col_key) const;
 
     void assign_pk_and_backlinks(const Obj& other);
 
@@ -334,6 +339,7 @@ private:
     template <class>
     friend class Lst;
     friend class LnkLst;
+    friend class LinkCount;
     friend class Dictionary;
     friend class LinkMap;
     template <class>
@@ -402,8 +408,8 @@ private:
         return _get_linked_object(get_column_key(link_col_name), link);
     }
 
-    void set_int(ColKey col_key, int64_t value);
-    void set_ref(ColKey col_key, ref_type value, CollectionType type);
+    void set_int(ColKey::Idx col_ndx, int64_t value);
+    void set_ref(ColKey::Idx col_ndx, ref_type value, CollectionType type);
     void add_backlink(ColKey backlink_col, ObjKey origin_key);
     bool remove_one_backlink(ColKey backlink_col, ObjKey origin_key);
     void nullify_link(ColKey origin_col, ObjLink target_key) &&;

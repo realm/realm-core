@@ -16,7 +16,13 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
+#include <collection_fixtures.hpp>
+#include <util/event_loop.hpp>
+#include <util/test_utils.hpp>
+#include <util/test_file.hpp>
+#include <util/sync/baas_admin_api.hpp>
+#include <util/sync/sync_test_utils.hpp>
+
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/sync/app.hpp>
@@ -30,24 +36,21 @@
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
+
 #include <realm/sync/network/default_socket.hpp>
-
-#include "collection_fixtures.hpp"
-#include "sync_test_utils.hpp"
-#include "util/baas_admin_api.hpp"
-#include "util/event_loop.hpp"
-#include "util/test_utils.hpp"
-#include "util/test_file.hpp"
-
-#include <external/json/json.hpp>
-#include <external/mpark/variant.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/server/access_token.hpp>
+
 #include <realm/util/base64.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/overload.hpp>
 #include <realm/util/platform_info.hpp>
 #include <realm/util/uri.hpp>
-#include <realm/sync/network/websocket.hpp>
+
+#include <catch2/catch_all.hpp>
+
+#include <external/json/json.hpp>
+#include <external/mpark/variant.hpp>
 
 #include <chrono>
 #include <condition_variable>
@@ -64,6 +67,7 @@ using util::any_cast;
 using util::Optional;
 
 using namespace std::string_view_literals;
+using namespace std::literals::string_literals;
 
 namespace {
 std::shared_ptr<SyncUser> log_in(std::shared_ptr<App> app, AppCredentials credentials = AppCredentials::anonymous())
@@ -151,9 +155,194 @@ static std::string create_jwt(const std::string& appId)
     return jwtPayload + "." + signature;
 }
 
+// MARK: - Verify AppError with all error codes
+TEST_CASE("app: verify app error codes", "[sync][app][local]") {
+    auto error_codes = ErrorCodes::get_error_list();
+    std::vector<std::pair<int, std::string>> http_status_codes = {
+        {0, ""},
+        {100, "http error code considered fatal: some http error. Informational: 100"},
+        {200, ""},
+        {300, "http error code considered fatal: some http error. Redirection: 300"},
+        {400, "http error code considered fatal: some http error. Client Error: 400"},
+        {500, "http error code considered fatal: some http error. Server Error: 500"},
+        {600, "http error code considered fatal: some http error. Unknown HTTP Error: 600"}};
+
+    auto make_http_error = [](std::optional<std::string_view> error_code, int http_status = 500,
+                              std::optional<std::string_view> error = "some error",
+                              std::optional<std::string_view> link = "http://dummy-link/") -> app::Response {
+        nlohmann::json body;
+        if (error_code) {
+            body["error_code"] = *error_code;
+        }
+        if (error) {
+            body["error"] = *error;
+        }
+        if (link) {
+            body["link"] = *link;
+        }
+
+        return {
+            http_status,
+            0,
+            {{"Content-Type", "application/json"}},
+            body.empty() ? "{}" : body.dump(),
+        };
+    };
+
+    // Success response
+    app::Response response = {200, 0, {}, ""};
+    auto app_error = AppUtils::check_for_errors(response);
+    REQUIRE(!app_error);
+
+    // Empty error code
+    response = make_http_error("");
+    app_error = AppUtils::check_for_errors(response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::AppUnknownError);
+    REQUIRE(app_error->code_string() == "AppUnknownError");
+    REQUIRE(app_error->server_error.empty());
+    REQUIRE(app_error->reason() == "some error");
+    REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
+    REQUIRE(*app_error->additional_status_code == 500);
+
+    // Missing error code
+    response = make_http_error(std::nullopt);
+    app_error = AppUtils::check_for_errors(response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::AppUnknownError);
+    REQUIRE(app_error->code_string() == "AppUnknownError");
+    REQUIRE(app_error->server_error.empty());
+    REQUIRE(app_error->reason() == "some error");
+    REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
+    REQUIRE(*app_error->additional_status_code == 500);
+
+    // Missing error code and error message with success http status
+    response = make_http_error(std::nullopt, 200, std::nullopt);
+    app_error = AppUtils::check_for_errors(response);
+    REQUIRE(!app_error);
+
+    for (auto [name, error] : error_codes) {
+        // All error codes should not cause an exception
+        if (error != ErrorCodes::HTTPError && error != ErrorCodes::OK) {
+            response = make_http_error(name);
+            app_error = AppUtils::check_for_errors(response);
+            REQUIRE(app_error);
+            if (ErrorCodes::error_categories(error).test(ErrorCategory::app_error)) {
+                REQUIRE(app_error->code() == error);
+                REQUIRE(app_error->code_string() == name);
+            }
+            else {
+                REQUIRE(app_error->code() == ErrorCodes::AppServerError);
+                REQUIRE(app_error->code_string() == "AppServerError");
+            }
+            REQUIRE(app_error->server_error == name);
+            REQUIRE(app_error->reason() == "some error");
+            REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
+            REQUIRE(app_error->additional_status_code);
+            REQUIRE(*app_error->additional_status_code == 500);
+        }
+    }
+
+    response = make_http_error("AppErrorMissing", 404);
+    app_error = AppUtils::check_for_errors(response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::AppServerError);
+    REQUIRE(app_error->code_string() == "AppServerError");
+    REQUIRE(app_error->server_error == "AppErrorMissing");
+    REQUIRE(app_error->reason() == "some error");
+    REQUIRE(app_error->link_to_server_logs == "http://dummy-link/");
+    REQUIRE(app_error->additional_status_code);
+    REQUIRE(*app_error->additional_status_code == 404);
+
+    // HTTPError with different status values
+    for (auto [status, message] : http_status_codes) {
+        response = {
+            status,
+            0,
+            {},
+            "some http error",
+        };
+        app_error = AppUtils::check_for_errors(response);
+        if (message.empty()) {
+            REQUIRE(!app_error);
+            continue;
+        }
+        REQUIRE(app_error);
+        REQUIRE(app_error->code() == ErrorCodes::HTTPError);
+        REQUIRE(app_error->code_string() == "HTTPError");
+        REQUIRE(app_error->server_error.empty());
+        REQUIRE(app_error->reason() == message);
+        REQUIRE(app_error->link_to_server_logs.empty());
+        REQUIRE(app_error->additional_status_code);
+        REQUIRE(*app_error->additional_status_code == status);
+    }
+
+    // Missing error code and error message with fatal http status
+    response = {
+        501,
+        0,
+        {},
+        "",
+    };
+    app_error = AppUtils::check_for_errors(response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::HTTPError);
+    REQUIRE(app_error->code_string() == "HTTPError");
+    REQUIRE(app_error->server_error.empty());
+    REQUIRE(app_error->reason() == "http error code considered fatal. Server Error: 501");
+    REQUIRE(app_error->link_to_server_logs.empty());
+    REQUIRE(app_error->additional_status_code);
+    REQUIRE(*app_error->additional_status_code == 501);
+
+    // Valid client error code, with body, but no json
+    app::Response client_response = {
+        501,
+        0,
+        {},
+        "Some error occurred",
+        ErrorCodes::BadBsonParse, // client_error_code
+    };
+    app_error = AppUtils::check_for_errors(client_response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::BadBsonParse);
+    REQUIRE(app_error->code_string() == "BadBsonParse");
+    REQUIRE(app_error->server_error.empty());
+    REQUIRE(app_error->reason() == "Some error occurred");
+    REQUIRE(app_error->link_to_server_logs.empty());
+    REQUIRE(app_error->additional_status_code);
+    REQUIRE(*app_error->additional_status_code == 501);
+
+    // Same response with client error code, but no body
+    client_response.body = "";
+    app_error = AppUtils::check_for_errors(client_response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->reason() == "client error code value considered fatal");
+
+    // Valid custom status code, with body, but no json
+    app::Response custom_response = {501,
+                                     4999, // custom_status_code
+                                     {},
+                                     "Some custom error occurred"};
+    app_error = AppUtils::check_for_errors(custom_response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->code() == ErrorCodes::CustomError);
+    REQUIRE(app_error->code_string() == "CustomError");
+    REQUIRE(app_error->server_error.empty());
+    REQUIRE(app_error->reason() == "Some custom error occurred");
+    REQUIRE(app_error->link_to_server_logs.empty());
+    REQUIRE(app_error->additional_status_code);
+    REQUIRE(*app_error->additional_status_code == 4999);
+
+    // Same response with custom status code, but no body
+    custom_response.body = "";
+    app_error = AppUtils::check_for_errors(custom_response);
+    REQUIRE(app_error);
+    REQUIRE(app_error->reason() == "non-zero custom status code considered fatal");
+}
+
 // MARK: - Login with Credentials Tests
 
-TEST_CASE("app: login_with_credentials integration", "[sync][app][baas]") {
+TEST_CASE("app: login_with_credentials integration", "[sync][app][user][baas]") {
     SECTION("login") {
         TestAppSession session;
         auto app = session.app();
@@ -190,7 +379,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app][baas]") {
 
 // MARK: - UsernamePasswordProviderClient Tests
 
-TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][baas]") {
+TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][user][baas]") {
     const std::string base_url = get_base_url();
     AutoVerifiedEmailCredentials creds;
     auto email = creds.email;
@@ -368,7 +557,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app][baas]"
 
 // MARK: - UserAPIKeyProviderClient Tests
 
-TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app][baas]") {
+TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app][api key][baas]") {
     TestAppSession session;
     auto app = session.app();
     auto client = app->provider_client<App::UserAPIKeyProviderClient>();
@@ -630,7 +819,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app][baas]") {
 
 // MARK: - Auth Providers Function Tests
 
-TEST_CASE("app: auth providers function integration", "[sync][app][baas]") {
+TEST_CASE("app: auth providers function integration", "[sync][app][user][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -644,7 +833,7 @@ TEST_CASE("app: auth providers function integration", "[sync][app][baas]") {
 
 // MARK: - Link User Tests
 
-TEST_CASE("app: link_user integration", "[sync][app][baas]") {
+TEST_CASE("app: link_user integration", "[sync][app][user][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -677,7 +866,7 @@ TEST_CASE("app: link_user integration", "[sync][app][baas]") {
 
 // MARK: - Delete User Tests
 
-TEST_CASE("app: delete anonymous user integration", "[sync][app][baas]") {
+TEST_CASE("app: delete anonymous user integration", "[sync][app][user][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -719,7 +908,7 @@ TEST_CASE("app: delete anonymous user integration", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: delete user with credentials integration", "[sync][app][baas]") {
+TEST_CASE("app: delete user with credentials integration", "[sync][app][user][baas]") {
     TestAppSession session;
     auto app = session.app();
     app->remove_user(app->current_user(), [](auto) {});
@@ -760,7 +949,7 @@ TEST_CASE("app: delete user with credentials integration", "[sync][app][baas]") 
 
 // MARK: - Call Function Tests
 
-TEST_CASE("app: call function", "[sync][app][baas]") {
+TEST_CASE("app: call function", "[sync][app][function][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -776,7 +965,7 @@ TEST_CASE("app: call function", "[sync][app][baas]") {
 
 // MARK: - Remote Mongo Client Tests
 
-TEST_CASE("app: remote mongo client", "[sync][app][baas]") {
+TEST_CASE("app: remote mongo client", "[sync][app][mongo][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -1444,7 +1633,7 @@ TEST_CASE("app: remote mongo client", "[sync][app][baas]") {
 
 // MARK: - Push Notifications Tests
 
-TEST_CASE("app: push notifications", "[sync][app][baas]") {
+TEST_CASE("app: push notifications", "[sync][app][notifications][baas]") {
     TestAppSession session;
     auto app = session.app();
     std::shared_ptr<SyncUser> sync_user = app->current_user();
@@ -1558,7 +1747,7 @@ TEST_CASE("app: token refresh", "[sync][app][token][baas]") {
 
 // MARK: - Sync Tests
 
-TEST_CASE("app: mixed lists with object links", "[sync][app][baas]") {
+TEST_CASE("app: mixed lists with object links", "[sync][pbs][app][links][baas]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
@@ -1634,7 +1823,7 @@ TEST_CASE("app: mixed lists with object links", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: roundtrip values", "[sync][app][baas]") {
+TEST_CASE("app: roundtrip values", "[sync][pbs][app][baas]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
@@ -1683,7 +1872,7 @@ TEST_CASE("app: roundtrip values", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: upgrade from local to synced realm", "[sync][app][baas]") {
+TEST_CASE("app: upgrade from local to synced realm", "[sync][pbs][app][upgrade][baas]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
@@ -1785,7 +1974,7 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app][baas]") {
     // r1->read_group().to_json(std::cout);
 }
 
-TEST_CASE("app: set new embedded object", "[sync][app][baas]") {
+TEST_CASE("app: set new embedded object", "[sync][pbs][app][baas]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
@@ -1923,7 +2112,7 @@ TEST_CASE("app: set new embedded object", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: make distributable client file", "[sync][app][baas]") {
+TEST_CASE("app: make distributable client file", "[sync][pbs][app][baas]") {
     TestAppSession session;
     auto app = session.app();
 
@@ -1997,7 +2186,7 @@ TEST_CASE("app: make distributable client file", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: sync integration", "[sync][app][baas]") {
+TEST_CASE("app: sync integration", "[sync][pbs][app][baas]") {
     auto logger = std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
     const auto schema = default_app_config("").schema;
@@ -2472,7 +2661,7 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
         SyncTestFile r_config(user1, partition, schema);
         // Override the default
         r_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-            if (error.get_system_error() == sync::make_error_code(realm::sync::ProtocolError::bad_authentication)) {
+            if (error.status == ErrorCodes::AuthError) {
                 util::format(std::cerr, "Websocket redirect test: User logged out\n");
                 std::unique_lock lk(logout_mutex);
                 logged_out = true;
@@ -2480,7 +2669,7 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
                 return;
             }
             util::format(std::cerr, "An unexpected sync error was caught by the default SyncTestFile handler: '%1'\n",
-                         error.what());
+                         error.status);
             abort();
         };
 
@@ -2769,9 +2958,9 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
             std::atomic<bool> sync_error_handler_called{false};
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 sync_error_handler_called.store(true);
-                REQUIRE(error.get_system_error() ==
-                        sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                REQUIRE(error.reason() == "Unable to refresh the user access token.");
+                REQUIRE(error.status.code() == ErrorCodes::AuthError);
+                REQUIRE_THAT(std::string{error.status.reason()},
+                             Catch::Matchers::StartsWith("Unable to refresh the user access token"));
             };
             auto r = Realm::get_shared_realm(config);
             timed_wait_for([&] {
@@ -2865,21 +3054,19 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
             user->update_access_token(encode_fake_jwt("fake_access_token"));
             REQUIRE(!app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
 
-            std::atomic<bool> sync_error_handler_called{false};
-            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                std::lock_guard<std::mutex> lock(mtx);
-                sync_error_handler_called.store(true);
-                REQUIRE(error.get_system_error() ==
-                        sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                REQUIRE(error.reason() == "Unable to refresh the user access token.");
-            };
+            auto [sync_error_promise, sync_error] = util::make_promise_future<SyncError>();
+            config.sync_config->error_handler =
+                [promise = util::CopyablePromiseHolder(std::move(sync_error_promise))](std::shared_ptr<SyncSession>,
+                                                                                       SyncError error) mutable {
+                    promise.get_promise().emplace_value(std::move(error));
+                };
 
             auto transport = static_cast<SynchronousTestTransport*>(session.transport());
             transport->block(); // don't let the token refresh happen until we're ready for it
             auto r = Realm::get_shared_realm(config);
             auto session = user->session_for_on_disk_path(config.path);
             REQUIRE(user->is_logged_in());
-            REQUIRE(!sync_error_handler_called.load());
+            REQUIRE(!sync_error.is_ready());
             {
                 std::atomic<bool> called{false};
                 session->wait_for_upload_completion([&](Status stat) {
@@ -2894,9 +3081,11 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
                 std::lock_guard<std::mutex> lock(mtx);
                 REQUIRE(called);
             }
-            timed_wait_for([&] {
-                return sync_error_handler_called.load();
-            });
+
+            auto sync_error_res = wait_for_future(std::move(sync_error)).get();
+            REQUIRE(sync_error_res.status == ErrorCodes::AuthError);
+            REQUIRE_THAT(std::string{sync_error_res.status.reason()},
+                         Catch::Matchers::StartsWith("Unable to refresh the user access token"));
 
             // the failed refresh logs out the user
             std::lock_guard<std::mutex> lock(mtx);
@@ -3059,9 +3248,9 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
                            CreatePolicy::ForceCreate);
             r->commit_transaction();
         }
-        r->sync_session()->wait_for_upload_completion([&](Status ec) {
+        r->sync_session()->wait_for_upload_completion([&](Status status) {
             std::lock_guard lk(mutex);
-            REQUIRE(!ec.get_std_error_code());
+            REQUIRE(status.is_ok());
             done = true;
         });
         r->sync_session()->resume();
@@ -3100,9 +3289,10 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
         r->commit_transaction();
 
         auto error = wait_for_future(std::move(pf.future), std::chrono::minutes(5)).get();
-        REQUIRE(error.get_system_error() == make_error_code(sync::ProtocolError::limits_exceeded));
-        REQUIRE(error.reason() == "Sync websocket closed because the server received a message that was too large: "
-                                  "read limited at 16777217 bytes");
+        REQUIRE(error.status == ErrorCodes::LimitExceeded);
+        REQUIRE(error.status.reason() ==
+                "Sync websocket closed because the server received a message that was too large: "
+                "read limited at 16777217 bytes");
         REQUIRE(error.is_client_reset_requested());
         REQUIRE(error.server_requests_action == sync::ProtocolErrorInfo::Action::ClientReset);
     }
@@ -3182,8 +3372,9 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
             config.sync_config->partition_value = "not a bson serialized string";
             std::atomic<bool> error_did_occur = false;
             config.sync_config->error_handler = [&error_did_occur](std::shared_ptr<SyncSession>, SyncError error) {
-                CHECK(error.reason().find("Illegal Realm path (BIND): serialized partition 'not a bson serialized "
-                                          "string' is invalid") != std::string::npos);
+                CHECK(error.status.reason().find(
+                          "Illegal Realm path (BIND): serialized partition 'not a bson serialized "
+                          "string' is invalid") != std::string::npos);
                 error_did_occur.store(true);
             };
             auto r = Realm::get_shared_realm(config);
@@ -3221,7 +3412,7 @@ TEST_CASE("app: sync integration", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: custom user data integration tests", "[sync][app][baas]") {
+TEST_CASE("app: custom user data integration tests", "[sync][app][user][function][baas]") {
     TestAppSession session;
     auto app = session.app();
     auto user = app->current_user();
@@ -3246,7 +3437,7 @@ TEST_CASE("app: custom user data integration tests", "[sync][app][baas]") {
     }
 }
 
-TEST_CASE("app: jwt login and metadata tests", "[sync][app][baas]") {
+TEST_CASE("app: jwt login and metadata tests", "[sync][app][user][metadata][function][baas]") {
     TestAppSession session;
     auto app = session.app();
     auto jwt = create_jwt(session.app()->config().app_id);
@@ -3277,7 +3468,7 @@ TEST_CASE("app: jwt login and metadata tests", "[sync][app][baas]") {
 }
 
 namespace cf = realm::collection_fixtures;
-TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][baas][collections]", cf::ListOfObjects,
+TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][pbs][app][collections][baas]", cf::ListOfObjects,
                    cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks, cf::DictionaryOfObjects,
                    cf::DictionaryOfMixedLinks)
 {
@@ -3444,8 +3635,8 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][baas][c
     }
 }
 
-TEMPLATE_TEST_CASE("app: partition types", "[sync][app][baas][partition]", cf::Int, cf::String, cf::OID, cf::UUID,
-                   cf::BoxedOptional<cf::Int>, cf::UnboxedOptional<cf::String>, cf::BoxedOptional<cf::OID>,
+TEMPLATE_TEST_CASE("app: partition types", "[sync][pbs][app][partition][baas]", cf::Int, cf::String, cf::OID,
+                   cf::UUID, cf::BoxedOptional<cf::Int>, cf::UnboxedOptional<cf::String>, cf::BoxedOptional<cf::OID>,
                    cf::BoxedOptional<cf::UUID>)
 {
     std::string base_url = get_base_url();
@@ -3531,9 +3722,70 @@ TEMPLATE_TEST_CASE("app: partition types", "[sync][app][baas][partition]", cf::I
     }
 }
 
+TEST_CASE("app: full-text compatible with sync", "[sync][app][baas]") {
+    std::string base_url = get_base_url();
+    const std::string valid_pk_name = "_id";
+    REQUIRE(!base_url.empty());
+
+    Schema schema{
+        {"TopLevel",
+         {
+             {valid_pk_name, PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"full_text", Property::IsFulltextIndexed{true}},
+         }},
+    };
+
+    auto server_app_config = minimal_app_config(base_url, "full_text", schema);
+    auto app_session = create_app(server_app_config);
+    const auto partition = random_string(100);
+    TestAppSession test_session(app_session, nullptr);
+    SyncTestFile config(test_session.app(), partition, schema);
+    SharedRealm realm;
+    SECTION("sync open") {
+        INFO("realm opened without async open");
+        realm = Realm::get_shared_realm(config);
+    }
+    SECTION("async open") {
+        INFO("realm opened with async open");
+        auto async_open_task = Realm::get_synchronized_realm(config);
+
+        auto [realm_promise, realm_future] = util::make_promise_future<ThreadSafeReference>();
+        async_open_task->start(
+            [promise = std::move(realm_promise)](ThreadSafeReference ref, std::exception_ptr ouch) mutable {
+                if (ouch) {
+                    try {
+                        std::rethrow_exception(ouch);
+                    }
+                    catch (...) {
+                        promise.set_error(exception_to_status());
+                    }
+                }
+                else {
+                    promise.emplace_value(std::move(ref));
+                }
+            });
+
+        realm = Realm::get_shared_realm(std::move(realm_future.get()));
+    }
+
+    CppContext c(realm);
+    auto obj_id_1 = ObjectId::gen();
+    auto obj_id_2 = ObjectId::gen();
+    realm->begin_transaction();
+    Object::create(c, realm, "TopLevel", std::any(AnyDict{{"_id", obj_id_1}, {"full_text", "Hello, world!"s}}));
+    Object::create(c, realm, "TopLevel", std::any(AnyDict{{"_id", obj_id_2}, {"full_text", "Hello, everyone!"s}}));
+    realm->commit_transaction();
+
+    auto table = realm->read_group().get_table("class_TopLevel");
+    REQUIRE(table->search_index_type(table->get_column_key("full_text")) == IndexType::Fulltext);
+    Results world_results(realm, Query(table).fulltext(table->get_column_key("full_text"), "world"));
+    REQUIRE(world_results.size() == 1);
+    REQUIRE(world_results.get<Obj>(0).get_primary_key() == Mixed{obj_id_1});
+}
+
 #endif // REALM_ENABLE_AUTH_TESTS
 
-TEST_CASE("app: custom error handling", "[sync][app][baas][custom_errors]") {
+TEST_CASE("app: custom error handling", "[sync][app][custom errors]") {
     class CustomErrorTransport : public GenericNetworkTransport {
     public:
         CustomErrorTransport(int code, const std::string& message)
@@ -3658,7 +3910,6 @@ private:
         CHECK(nlohmann::json::parse(request.body)["options"] ==
               nlohmann::json({{"device",
                                {{"appId", "app_id"},
-                                {"appVersion", "A Local App Version"},
                                 {"platform", util::get_library_platform()},
                                 {"platformVersion", "Object Store Test Platform Version"},
                                 {"sdk", "SDK Name"},
@@ -3827,7 +4078,7 @@ const std::string UnitTestTransport::user_id = "Ailuropoda melanoleuca";
 const std::string UnitTestTransport::identity_0_id = "Ursus arctos isabellinus";
 const std::string UnitTestTransport::identity_1_id = "Ursus arctos horribilis";
 
-TEST_CASE("subscribable unit tests", "[sync][app][local]") {
+TEST_CASE("subscribable unit tests", "[sync][app]") {
     struct Foo : public Subscribable<Foo> {
         void event()
         {
@@ -3896,7 +4147,7 @@ TEST_CASE("subscribable unit tests", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][local]") {
+TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][user]") {
     auto config = get_config();
 
     SECTION("login_anonymous good") {
@@ -3984,7 +4235,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app][local]") {
+TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app][user][api key]") {
     TestSyncManager sync_manager(get_config(), {});
     auto app = sync_manager.app();
     auto client = app->provider_client<App::UserAPIKeyProviderClient>();
@@ -4031,7 +4282,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app][local]") {
 }
 
 
-TEST_CASE("app: user_semantics", "[app][local]") {
+TEST_CASE("app: user_semantics", "[sync][app][user]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4176,7 +4427,7 @@ private:
     Response* m_response;
 };
 
-TEST_CASE("app: response error handling", "[sync][app][local]") {
+TEST_CASE("app: response error handling", "[sync][app]") {
     std::string response_body = nlohmann::json({{"access_token", good_access_token},
                                                 {"refresh_token", good_access_token},
                                                 {"user_id", "Brown Bear"},
@@ -4259,7 +4510,7 @@ TEST_CASE("app: response error handling", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: switch user", "[sync][app][local]") {
+TEST_CASE("app: switch user", "[sync][app][user]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4315,7 +4566,7 @@ TEST_CASE("app: switch user", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: remove anonymous user", "[sync][app][local]") {
+TEST_CASE("app: remove anonymous user", "[sync][app][user]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4357,7 +4608,7 @@ TEST_CASE("app: remove anonymous user", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: remove user with credentials", "[sync][app][local]") {
+TEST_CASE("app: remove user with credentials", "[sync][app][user]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4390,7 +4641,7 @@ TEST_CASE("app: remove user with credentials", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: link_user", "[sync][app][local]") {
+TEST_CASE("app: link_user", "[sync][app][user]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -4429,7 +4680,7 @@ TEST_CASE("app: link_user", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: auth providers", "[sync][app][local]") {
+TEST_CASE("app: auth providers", "[sync][app][user]") {
     SECTION("auth providers facebook") {
         auto credentials = AppCredentials::facebook("a_token");
         CHECK(credentials.provider() == AuthProvider::FACEBOOK);
@@ -4509,7 +4760,7 @@ TEST_CASE("app: auth providers", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: refresh access token unit tests", "[sync][app][local]") {
+TEST_CASE("app: refresh access token unit tests", "[sync][app][user][token]") {
     auto setup_user = [](std::shared_ptr<App> app) {
         if (app->sync_manager()->get_current_user()) {
             return;
@@ -4730,7 +4981,7 @@ private:
 
 } // namespace
 
-TEST_CASE("app: app destroyed during token refresh", "[sync][app][local]") {
+TEST_CASE("app: app destroyed during token refresh", "[sync][app][user][token]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, profile_1, profile_2, refresh_1, refresh_2, refresh_3 };
     struct TestStateBundle {
@@ -4846,19 +5097,24 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][local]") {
         SyncTestFile config(app->current_user(), bson::Bson("foo"));
         // Ignore websocket errors, since sometimes a websocket connection gets started during the test
         config.sync_config->error_handler = [](std::shared_ptr<SyncSession> session, SyncError error) mutable {
-            // Ignore websocket errors, since there's not really an app out there...
-            if (error.reason().find("Bad WebSocket") != std::string::npos ||
-                error.reason().find("Connection Failed") != std::string::npos ||
-                error.reason().find("user has been removed") != std::string::npos) {
+            // Ignore these errors, since there's not really an app out there...
+            // Primarily make sure we don't crash unexpectedly
+            std::vector<const char*> expected_errors = {"Bad WebSocket", "Connection Failed", "user has been removed",
+                                                        "Connection refused"};
+            auto expected =
+                std::find_if(expected_errors.begin(), expected_errors.end(), [error](const char* err_msg) {
+                    return error.status.reason().find(err_msg) != std::string::npos;
+                });
+            if (expected != expected_errors.end()) {
                 util::format(std::cerr,
                              "An expected possible WebSocket error was caught during test: 'app destroyed during "
                              "token refresh': '%1' for '%2'",
-                             error.what(), session->path());
+                             error.status, session->path());
             }
             else {
                 std::string err_msg(util::format("An unexpected sync error was caught during test: 'app destroyed "
                                                  "during token refresh': '%1' for '%2'",
-                                                 error.what(), session->path()));
+                                                 error.status, session->path()));
                 std::cerr << err_msg << std::endl;
                 throw std::runtime_error(err_msg);
             }
@@ -4880,7 +5136,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app][local]") {
     mock_transport_worker.mark_complete();
 }
 
-TEST_CASE("app: metadata is persisted between sessions", "[sync][app][local]") {
+TEST_CASE("app: metadata is persisted between sessions", "[sync][app][metadata]") {
     static const auto test_hostname = "proto://host:1234";
     static const auto test_ws_hostname = "wsproto://host:1234";
 
@@ -4934,7 +5190,7 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: make_streaming_request", "[sync][app][local]") {
+TEST_CASE("app: make_streaming_request", "[sync][app][streaming]") {
     UnitTestTransport::access_token = good_access_token;
 
     constexpr uint64_t timeout_ms = 60000;
@@ -5008,7 +5264,7 @@ TEST_CASE("app: make_streaming_request", "[sync][app][local]") {
     }
 }
 
-TEST_CASE("app: sync_user_profile unit tests", "[sync][app][local]") {
+TEST_CASE("app: sync_user_profile unit tests", "[sync][app][user]") {
     SECTION("with empty map") {
         auto profile = SyncUserProfile(bson::BsonDocument());
         CHECK(profile.name() == util::none);
@@ -5046,7 +5302,7 @@ TEST_CASE("app: sync_user_profile unit tests", "[sync][app][local]") {
 }
 
 #if 0
-TEST_CASE("app: app cannot get deallocated during log in", "[sync][app][local]") {
+TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, app_deallocated, profile };
     struct TestStateBundle {
@@ -5138,7 +5394,7 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app][local]")
 }
 #endif
 
-TEST_CASE("app: user logs out while profile is fetched", "[sync][app][local]") {
+TEST_CASE("app: user logs out while profile is fetched", "[sync][app][user]") {
     AsyncMockNetworkTransport mock_transport_worker;
     enum class TestState { unknown, location, login, profile };
     struct TestStateBundle {
@@ -5235,7 +5491,7 @@ TEST_CASE("app: user logs out while profile is fetched", "[sync][app][local]") {
     mock_transport_worker.mark_complete();
 }
 
-TEST_CASE("app: shared instances", "[sync][app][local]") {
+TEST_CASE("app: shared instances", "[sync][app]") {
     App::Config base_config;
     set_app_config_defaults(base_config, instance_of<UnitTestTransport>);
 

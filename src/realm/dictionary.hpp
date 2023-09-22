@@ -22,7 +22,7 @@
 #include <realm/collection.hpp>
 #include <realm/obj.hpp>
 #include <realm/mixed.hpp>
-#include <realm/array_mixed.hpp>
+#include <realm/column_mixed.hpp>
 
 namespace realm {
 
@@ -69,6 +69,10 @@ public:
 
     std::pair<Mixed, Mixed> get_pair(size_t ndx) const;
     Mixed get_key(size_t ndx) const;
+    PathElement get_path_element(size_t ndx) const override
+    {
+        return {get_key(ndx).get_string()};
+    }
 
     // Overriding members of CollectionBase:
     CollectionBasePtr clone_collection() const final;
@@ -117,7 +121,7 @@ public:
     // throws std::out_of_range if key is not found
     Mixed get(Mixed key) const;
     // Noexcept version
-    util::Optional<Mixed> try_get(Mixed key) const noexcept;
+    util::Optional<Mixed> try_get(Mixed key) const;
     // adds entry if key is not found
     const Mixed operator[](Mixed key);
 
@@ -198,19 +202,23 @@ public:
         return Base::get_stable_path();
     }
 
-    void add_index(Path& path, Index ndx) const final;
+    void add_index(Path& path, const Index& ndx) const final;
+    size_t find_index(const Index&) const final;
+
     TableRef get_table() const noexcept override
     {
         return get_obj().get_table();
     }
-    UpdateStatus update_if_needed_with_status() const noexcept override;
+    UpdateStatus update_if_needed_with_status() const override;
     bool update_if_needed() const override;
     const Obj& get_object() const noexcept override
     {
         return get_obj();
     }
     ref_type get_collection_ref(Index, CollectionType) const override;
+    bool check_collection_ref(Index, CollectionType) const noexcept override;
     void set_collection_ref(Index, ref_type ref, CollectionType) override;
+    StableIndex build_index(Mixed key) const;
 
     void to_json(std::ostream&, size_t, JSONOutputMode, util::FunctionRef<void(const Mixed&)>) const override;
 
@@ -222,7 +230,7 @@ private:
 
     mutable std::unique_ptr<Array> m_dictionary_top;
     mutable std::unique_ptr<BPlusTreeBase> m_keys;
-    mutable std::unique_ptr<BPlusTree<Mixed>> m_values;
+    mutable std::unique_ptr<BPlusTreeMixed> m_values;
     DataType m_key_type = type_String;
 
     Dictionary(Allocator& alloc, ColKey col_key, ref_type ref);

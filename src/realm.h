@@ -67,6 +67,7 @@ typedef bool (*realm_on_object_store_error_callback_t)(realm_userdata_t userdata
 
 /* Accessor types */
 typedef struct realm_object realm_object_t;
+
 typedef struct realm_list realm_list_t;
 typedef struct realm_set realm_set_t;
 typedef struct realm_dictionary realm_dictionary_t;
@@ -446,9 +447,10 @@ RLM_API bool realm_get_last_error(realm_error_t* err);
  *
  * @param err A pointer to a `realm_error_t` struct that will be populated with
  *            information about the error. May not be NULL.
+ * @return A bool indicating whether or not an error is available to be returned
  * @see realm_get_last_error()
  */
-RLM_API void realm_get_async_error(const realm_async_error_t* err, realm_error_t* out_err);
+RLM_API bool realm_get_async_error(const realm_async_error_t* err, realm_error_t* out_err);
 
 /**
  * Convert the last error to `realm_async_error_t`, which can safely be passed
@@ -1631,6 +1633,14 @@ RLM_API bool realm_get_values(const realm_object_t*, size_t num_values, const re
 RLM_API bool realm_set_value(realm_object_t*, realm_property_key_t, realm_value_t new_value, bool is_default);
 
 /**
+ * Assign a JSON formatted string to a Mixed property. Underlying structures will be created as needed
+ *
+ * @param json_string The new value for the property.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_set_json(realm_object_t*, realm_property_key_t, const char* json_string);
+
+/**
  * Create an embedded object in a given property.
  *
  * @return A non-NULL pointer if the object was created successfully.
@@ -1641,7 +1651,9 @@ RLM_API realm_object_t* realm_set_embedded(realm_object_t*, realm_property_key_t
  * Create a collection in a given Mixed property.
  *
  */
-RLM_API bool realm_set_collection(realm_object_t*, realm_property_key_t, realm_collection_type_e);
+RLM_API bool realm_set_list(realm_object_t*, realm_property_key_t);
+RLM_API bool realm_set_set(realm_object_t*, realm_property_key_t);
+RLM_API bool realm_set_dictionary(realm_object_t*, realm_property_key_t);
 
 /** Return the object linked by the given property
  *
@@ -1785,24 +1797,28 @@ RLM_API bool realm_list_set(realm_list_t*, size_t index, realm_value_t value);
 RLM_API bool realm_list_insert(realm_list_t*, size_t index, realm_value_t value);
 
 /**
- * Insert a collection inside a list (only available for mixed properities)
+ * Insert a collection inside a list (only available for mixed types)
  *
- * @param list valid ptr to a list where a nested collection needs to be added
+ * @param list valid ptr to a list of mixed
  * @param index position in the list where to add the collection
- * @return RLM_API
+ * @return pointer to a valid collection that has been just inserted at the index passed as argument
  */
-RLM_API bool realm_list_insert_collection(realm_list_t* list, size_t index, realm_collection_type_e);
+RLM_API realm_list_t* realm_list_insert_list(realm_list_t* list, size_t index);
+RLM_API realm_set_t* realm_list_insert_set(realm_list_t* list, size_t index);
+RLM_API realm_dictionary_t* realm_list_insert_dictionary(realm_list_t* list, size_t index);
 
 /**
- * Set a collection inside a list (only available for mixed properities).
+ * Set a collection inside a list (only available for mixed types).
  * If the list already contains a collection of the requested type, the
  * operation is idempotent.
  *
  * @param list valid ptr to a list where a nested collection needs to be set
  * @param index position in the list where to set the collection
- * @return RLM_API
+ * @return a valid ptr representing the collection just set
  */
-RLM_API bool realm_list_set_collection(realm_list_t* list, size_t index, realm_collection_type_e);
+RLM_API realm_list_t* realm_list_set_list(realm_list_t* list, size_t index);
+RLM_API realm_set_t* realm_list_set_set(realm_list_t* list, size_t index);
+RLM_API realm_dictionary_t* realm_list_set_dictionary(realm_list_t* list, size_t index);
 
 /**
  * Returns a nested list if such collection exists, NULL otherwise.
@@ -1936,10 +1952,12 @@ RLM_API size_t realm_object_changes_get_modified_properties(const realm_object_c
  * @param out_num_modifications The number of modifications. May be NULL.
  * @param out_num_moves The number of moved elements. May be NULL.
  * @param out_collection_was_cleared a flag to signal if the collection has been cleared. May be NULL
+ * @param out_collection_was_deleted a flag to signal if the collection has been deleted. May be NULL
  */
 RLM_API void realm_collection_changes_get_num_changes(const realm_collection_changes_t*, size_t* out_num_deletions,
                                                       size_t* out_num_insertions, size_t* out_num_modifications,
-                                                      size_t* out_num_moves, bool* out_collection_was_cleared);
+                                                      size_t* out_num_moves, bool* out_collection_was_cleared,
+                                                      bool* out_collection_was_deleted);
 
 /**
  * Get the number of various types of changes in a collection notification,
@@ -2020,9 +2038,11 @@ RLM_API void realm_collection_changes_get_ranges(
  * @param out_deletions_size number of deletions
  * @param out_insertion_size number of insertions
  * @param out_modification_size number of modifications
+ * @param out_was_deleted a flag to signal if the dictionary has been deleted.
  */
 RLM_API void realm_dictionary_get_changes(const realm_dictionary_changes_t* changes, size_t* out_deletions_size,
-                                          size_t* out_insertion_size, size_t* out_modification_size);
+                                          size_t* out_insertion_size, size_t* out_modification_size,
+                                          bool* out_was_deleted);
 
 /**
  * Returns the list of keys changed for the dictionary passed as argument.
@@ -2309,9 +2329,16 @@ RLM_API bool realm_dictionary_insert(realm_dictionary_t*, realm_value_t key, rea
 RLM_API realm_object_t* realm_dictionary_insert_embedded(realm_dictionary_t*, realm_value_t key);
 
 /**
- * Insert a nested collection
+ * Insert a collection inside a dictionary (only available for mixed types)
+ *
+ * @param dictionary valid ptr to a dictionary of mixed
+ * @param key the mixed representing a key for a dictionary (only string)
+ * @return pointer to a valid collection that has been just inserted at the key passed as argument
  */
-RLM_API bool realm_dictionary_insert_collection(realm_dictionary_t*, realm_value_t key, realm_collection_type_e);
+RLM_API realm_list_t* realm_dictionary_insert_list(realm_dictionary_t* dictionary, realm_value_t key);
+RLM_API realm_set_t* realm_dictionary_insert_set(realm_dictionary_t*, realm_value_t);
+RLM_API realm_dictionary_t* realm_dictionary_insert_dictionary(realm_dictionary_t*, realm_value_t);
+
 
 /**
  * Fetch a list from a dictionary.
@@ -2628,6 +2655,24 @@ RLM_API realm_results_t* realm_results_limit(realm_results_t* results, size_t ma
 RLM_API bool realm_results_get(realm_results_t*, size_t index, realm_value_t* out_value);
 
 /**
+ * Returns an instance of realm_list at the index passed as argument.
+ * @return A valid ptr to a list instance or nullptr in case of errors
+ */
+RLM_API realm_list_t* realm_results_get_list(realm_results_t*, size_t index);
+
+/**
+ * Returns an instance of realm_set_t for the index passed as argument.
+ * @return A valid ptr to a set instance or nullptr in case of errors
+ */
+RLM_API realm_set_t* realm_results_get_set(realm_results_t*, size_t index);
+
+/**
+ * Returns an instance of realm_dictionary for the index passed as argument.
+ * @return A valid ptr to a dictionary instance or nullptr in case of errors
+ */
+RLM_API realm_dictionary_t* realm_results_get_dictionary(realm_results_t*, size_t index);
+
+/**
  * Find the index for the value passed as parameter inside realm results pointer passed a input parameter.
  *  @param value the value to find inside the realm results
  *  @param out_index the index where the object has been found, or realm::not_found
@@ -2930,8 +2975,6 @@ RLM_API realm_app_config_t* realm_app_config_new(const char* app_id,
                                                  const realm_http_transport_t* http_transport) RLM_API_NOEXCEPT;
 
 RLM_API void realm_app_config_set_base_url(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_local_app_name(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_local_app_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t*, uint64_t ms) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_platform_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_sdk_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
@@ -3414,26 +3457,6 @@ typedef enum realm_sync_progress_direction {
     RLM_SYNC_PROGRESS_DIRECTION_DOWNLOAD,
 } realm_sync_progress_direction_e;
 
-/**
- * Possible error categories realm_sync_error_code_t can fall in.
- */
-typedef enum realm_sync_error_category {
-    RLM_SYNC_ERROR_CATEGORY_CLIENT,
-    RLM_SYNC_ERROR_CATEGORY_CONNECTION,
-    RLM_SYNC_ERROR_CATEGORY_SESSION,
-    RLM_SYNC_ERROR_CATEGORY_WEBSOCKET,
-
-    /**
-     * System error - POSIX errno, Win32 HRESULT, etc.
-     */
-    RLM_SYNC_ERROR_CATEGORY_SYSTEM,
-
-    /**
-     * Unknown source of error.
-     */
-    RLM_SYNC_ERROR_CATEGORY_UNKNOWN,
-} realm_sync_error_category_e;
-
 typedef enum realm_sync_error_action {
     RLM_SYNC_ERROR_ACTION_NO_ACTION,
     RLM_SYNC_ERROR_ACTION_PROTOCOL_VIOLATION,
@@ -3449,17 +3472,6 @@ typedef enum realm_sync_error_action {
 
 typedef struct realm_sync_session realm_sync_session_t;
 typedef struct realm_async_open_task realm_async_open_task_t;
-
-// This type should never be returned from a function.
-// It's only meant as an asynchronous callback argument.
-// Pointers to this struct and its pointer members are only valid inside the scope
-// of the callback they were passed to.
-typedef struct realm_sync_error_code {
-    realm_sync_error_category_e category;
-    int value;
-    const char* message;
-    const char* category_name;
-} realm_sync_error_code_t;
 
 typedef struct realm_sync_error_user_info {
     const char* key;
@@ -3477,8 +3489,7 @@ typedef struct realm_sync_error_compensating_write_info {
 // Pointers to this struct and its pointer members are only valid inside the scope
 // of the callback they were passed to.
 typedef struct realm_sync_error {
-    realm_sync_error_code_t error_code;
-    const char* detailed_message;
+    realm_error_t status;
     const char* c_original_file_path_key;
     const char* c_recovery_file_path_key;
     bool is_fatal;
@@ -3502,7 +3513,7 @@ typedef struct realm_sync_error {
  *
  * @param error Null, if the operation completed successfully.
  */
-typedef void (*realm_sync_wait_for_completion_func_t)(realm_userdata_t userdata, realm_sync_error_code_t* error);
+typedef void (*realm_sync_wait_for_completion_func_t)(realm_userdata_t userdata, realm_error_t* error);
 typedef void (*realm_sync_connection_state_changed_func_t)(realm_userdata_t userdata,
                                                            realm_sync_connection_state_e old_state,
                                                            realm_sync_connection_state_e new_state);
@@ -3944,13 +3955,13 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
 /**
  * Wrapper for SyncSession::OnlyForTesting::handle_error. This routine should be used only for testing.
  * @param session ptr to a valid sync session
- * @param error_code error code to simulate
- * @param category category of the error to simulate
- * @param error_message string representing the error
+ * @param error_code realm_errno_e representing the error to simulate
+ * @param error_str error message to be included with Status
  * @param is_fatal boolean to signal if the error is fatal or not
  */
-RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session, int error_code,
-                                                         int category, const char* error_message, bool is_fatal);
+RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session,
+                                                         realm_errno_e error_code, const char* error_str,
+                                                         bool is_fatal);
 
 /**
  * In case of exception thrown in user code callbacks, this api will allow the sdk to store the user code exception
@@ -4186,8 +4197,8 @@ RLM_API realm_sync_socket_t* realm_sync_socket_new(
     realm_sync_socket_websocket_async_write_func_t websocket_write_func,
     realm_sync_socket_websocket_free_func_t websocket_free_func);
 
-RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback_t* realm_callback,
-                                                 realm_web_socket_errno_e status, const char* reason);
+RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback_t* realm_callback, realm_errno_e status,
+                                                 const char* reason);
 
 RLM_API void realm_sync_socket_websocket_connected(realm_websocket_observer_t* realm_websocket_observer,
                                                    const char* protocol);

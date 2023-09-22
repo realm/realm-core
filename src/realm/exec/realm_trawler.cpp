@@ -249,9 +249,9 @@ public:
         return str;
     }
 
-    size_t mem_usage(realm::Allocator& alloc) const
+    uint64_t mem_usage(realm::Allocator& alloc) const
     {
-        size_t mem = 0;
+        uint64_t mem = 0;
         _mem_usage(alloc, mem);
         return mem;
     }
@@ -260,7 +260,7 @@ private:
     char* m_data;
     bool m_has_refs = false;
 
-    void _mem_usage(realm::Allocator& alloc, size_t& mem) const
+    void _mem_usage(realm::Allocator& alloc, uint64_t& mem) const
     {
         if (m_has_refs) {
             for (size_t i = 0; i < m_size; ++i) {
@@ -337,11 +337,11 @@ public:
             }
             else {
                 if (uint64_t key_ref = m_clusters.get_ref(0)) {
-                    auto header = alloc.translate(key_ref);
+                    auto header = alloc.translate(realm::to_ref(key_ref));
                     ret = realm::NodeHeader::get_size_from_header(header);
                 }
                 else {
-                    ret = m_clusters.get_val(0);
+                    ret = (size_t)m_clusters.get_val(0);
                 }
             }
         }
@@ -538,7 +538,7 @@ private:
     realm::SlabAlloc m_alloc;
 };
 
-std::string human_readable(uint64_t val)
+static std::string human_readable(uint64_t val)
 {
     std::ostringstream out;
     out.precision(3);
@@ -557,7 +557,7 @@ std::string human_readable(uint64_t val)
     return out.str();
 }
 
-uint64_t get_size(const std::vector<Entry>& list)
+static uint64_t get_size(const std::vector<Entry>& list)
 {
     uint64_t sz = 0;
     std::for_each(list.begin(), list.end(), [&](const Entry& e) {
@@ -630,7 +630,7 @@ void Table::print_columns(const Group& group) const
             if (col_key.is_set())
                 type_str += "{}";
             if (col_key.is_dictionary()) {
-                auto key_type = realm::DataType(m_column_types.get_val(i) >> 16);
+                auto key_type = realm::DataType(int(m_column_types.get_val(i)) >> 16);
                 type_str = std::string("{") + get_data_type_name(key_type) + ", " + type_str + "}";
             }
         }
@@ -663,7 +663,7 @@ void Group::print_schema() const
 void Node::init(realm::Allocator& alloc, uint64_t ref)
 {
     m_ref = ref;
-    m_header = alloc.translate(ref);
+    m_header = alloc.translate(realm::to_ref(ref));
 
     if (memcmp(m_header, &signature, 4)) {
     }
@@ -676,7 +676,7 @@ void Node::init(realm::Allocator& alloc, uint64_t ref)
 
 std::vector<unsigned> path;
 
-std::string print_path()
+static std::string print_path()
 {
     std::string ret = "[" + std::to_string(path[0]);
     for (auto it = path.begin() + 1; it != path.end(); ++it) {
@@ -686,7 +686,7 @@ std::string print_path()
     return ret + "]";
 }
 
-std::vector<Entry> get_nodes(realm::Allocator& alloc, uint64_t ref)
+static std::vector<Entry> get_nodes(realm::Allocator& alloc, uint64_t ref)
 {
     std::vector<Entry> nodes;
     if (ref != 0) {
@@ -896,8 +896,8 @@ void RealmFile::free_list_info() const
     std::map<uint64_t, unsigned> pinned_sizes;
     std::cout << "Free space:" << std::endl;
     auto free_list = m_group->get_free_list();
-    size_t pinned_free_list_size = 0;
-    size_t total_free_list_size = 0;
+    uint64_t pinned_free_list_size = 0;
+    uint64_t total_free_list_size = 0;
     auto it = free_list.begin();
     auto end = free_list.end();
     while (it != end) {
@@ -1012,7 +1012,7 @@ public:
         return true;
     }
 
-    bool select_collection(realm::ColKey col_key, realm::ObjKey key, const StablePath&)
+    bool select_collection(realm::ColKey col_key, realm::ObjKey key, const realm::StablePath&)
     {
         std::cout << "Select collection: " << m_table->get_column_name(col_key) << " on " << key << std::endl;
         return true;
@@ -1060,7 +1060,7 @@ void RealmFile::changes() const
     }
 }
 
-unsigned int hex_char_to_bin(char c)
+static unsigned int hex_char_to_bin(char c)
 {
     if (c >= '0' && c <= '9')
         return c - '0';
@@ -1071,7 +1071,7 @@ unsigned int hex_char_to_bin(char c)
     throw std::invalid_argument("Illegal key (not a hex digit)");
 }
 
-unsigned int hex_to_bin(char first, char second)
+static unsigned int hex_to_bin(char first, char second)
 {
     return (hex_char_to_bin(first) << 4) | hex_char_to_bin(second);
 }
