@@ -22,7 +22,7 @@
 * SyncUser::provider_type() and realm_user_get_auth_provider() have been removed. Users don't have provider types; identities do. `SyncUser::is_anonymous()` is a more correct version of checking if the provider type is anonymous ([PR #6837](https://github.com/realm/realm-core/pull/6837)).
 * SyncUser no longer has a `local_identity()`. `identity()` has been guaranteed to be unique per App ever since v10 ([PR #6837](https://github.com/realm/realm-core/pull/6837)).
 * SyncUser no longer overrides operator==. Pointer equality should be used to compare sync users ([PR #6837](https://github.com/realm/realm-core/pull/6837)).
-* Platform Networking CAPI has been updated to provide 3 different functions (instead of 1) for executing callback handlers depending on purpose ([PR #6994](https://github.com/realm/realm-core/pull/6994)).
+* Platform Networking CAPI has been updated to provide separate functions (instead of 1) for executing callback handlers depending on purpose ([PR #6994](https://github.com/realm/realm-core/pull/6994)).
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
