@@ -154,7 +154,7 @@ std::optional<GeoPoint> Geospatial::point_from_obj(const Obj& obj, ColKey type_c
     }
 
     if (!type_is_valid(obj.get<StringData>(type_col))) {
-        throw IllegalOperation("The only Geospatial type currently supported is 'point'");
+        return {}; // the only geospatial type currently supported is 'Point'
     }
 
     Lst<double> coords = obj.get_list<double>(coords_col);
@@ -211,7 +211,9 @@ void Geospatial::assign_to(Obj& link) const
         return;
     }
     if (type != Type::Point) {
-        throw IllegalOperation("The only Geospatial type currently supported for storage is 'point'");
+        throw IllegalOperation(util::format("Attempting to store a '%1' in  class '%2' but the only Geospatial type "
+                                            "currently supported for storage is 'Point'",
+                                            get_type_string(), link.get_table()->get_class_name()));
     }
     auto&& point = get<GeoPoint>();
     link.set(type_col, get_type_string());
