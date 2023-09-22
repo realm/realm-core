@@ -4090,7 +4090,8 @@ RLM_API realm_sync_socket_t* realm_sync_socket_new(
     realm_sync_socket_websocket_free_func_t websocket_free_func);
 
 /**
- * This function is to be called by the CAPI Implementer when the timer expires or an error occurs.
+ * To be called to execute the callback handler provided to the create_timer_func when the timer is
+ * complete or an error occurs while processing the timer.
  * @param timer_handler the timer callback handler that was provided when the timer was created.
  * @param status the error code for the error that occurred or RLM_ERR_NONE if the timer expired normally.
  * @param reason a string describing details about the error that occurred or empty string if no error.
@@ -4100,8 +4101,8 @@ RLM_API void realm_sync_socket_timer_complete(realm_sync_socket_callback_t* time
                                               const char* reason);
 
 /**
- * This function is to be called by the CAPI implementer when the timer is canceled by the Sync Client, either
- * directly or as a result of the CAPITimer object being destroyed.
+ * To be called to execute the callback handler provided to the create_timer_func when the timer has been
+ * canceled.
  * @param timer_handler the timer callback handler that was provided when the timer was created.
  * NOTE: This function must be called by the event loop execution thread.
  */

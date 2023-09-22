@@ -61,9 +61,14 @@ private:
 static void realm_sync_socket_op_complete(realm_sync_socket_callback* realm_callback, realm_errno_e status,
                                           const char* reason)
 {
-    auto complete_status =
-        status == realm_errno_e::RLM_ERR_NONE ? Status::OK() : Status{static_cast<ErrorCodes::Error>(status), reason};
-    (*(realm_callback->get()))(complete_status);
+    if (*realm_callback) {
+        auto complete_status = status == realm_errno_e::RLM_ERR_NONE
+                                   ? Status::OK()
+                                   : Status{static_cast<ErrorCodes::Error>(status), reason};
+        (*(realm_callback->get()))(complete_status);
+        // Keep the container, but release the handler
+        realm_callback->reset();
+    }
 }
 
 RLM_API void realm_sync_socket_timer_complete(realm_sync_socket_callback* timer_handler, realm_errno_e status,
