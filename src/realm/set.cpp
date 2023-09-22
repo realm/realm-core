@@ -226,6 +226,32 @@ void Set<Mixed>::migrate()
     }
 }
 
+template <class T>
+void Set<T>::do_resort(size_t start, size_t end)
+{
+    if (end > size()) {
+        end = size();
+    }
+    if (start >= end) {
+        return;
+    }
+    std::vector<size_t> indices;
+    indices.resize(end - start);
+    std::iota(indices.begin(), indices.end(), 0);
+    std::sort(indices.begin(), indices.end(), [&](auto a, auto b) {
+        return get(a + start) < get(b + start);
+    });
+    for (size_t i = 0; i < indices.size(); ++i) {
+        if (indices[i] != i) {
+            m_tree->swap(i + start, start + indices[i]);
+            auto it = std::find(indices.begin() + i, indices.end(), i);
+            REALM_ASSERT(it != indices.end());
+            *it = indices[i];
+            indices[i] = i;
+        }
+    }
+}
+
 template <>
 void Set<Mixed>::migrate_strings()
 {
