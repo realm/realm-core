@@ -662,8 +662,8 @@ LocalVersionIDs perform_client_reset_diff(DB& db_local, DB& db_remote, sync::Sal
         // the way to the final state, but since separate commits are necessary, this is
         // unavoidable.
         wt_local = db_local.start_write();
-        RecoverLocalChangesetsHandler handler{*wt_local, *frozen_pre_local_state, logger};
-        handler.process_changesets(local_changes, std::move(pending_subscriptions)); // throws on error
+        process_recovered_changesets(*wt_local, *frozen_pre_local_state, logger, local_changes,
+                                     std::move(pending_subscriptions));
         // The new file ident is set as part of the final commit. This is to ensure that if
         // there are any exceptions during recovery, or the process is killed for some
         // reason, the client reset cycle detection will catch this and we will not attempt
@@ -678,8 +678,7 @@ LocalVersionIDs perform_client_reset_diff(DB& db_local, DB& db_remote, sync::Sal
         // In PBS recovery, the strategy is to apply all local changes to the remote realm first,
         // and then transfer the modified state all at once to the local Realm. This creates a
         // nice side effect for notifications because only the minimal state change is made.
-        RecoverLocalChangesetsHandler handler{*wt_remote, *frozen_pre_local_state, logger};
-        handler.process_changesets(local_changes, {}); // throws on error
+        process_recovered_changesets(*wt_remote, *frozen_pre_local_state, logger, local_changes, {});
         ChangesetEncoder& encoder = repl_remote.get_instruction_encoder();
         const sync::ChangesetEncoder::Buffer& buffer = encoder.buffer();
         recovered_changeset = {buffer.data(), buffer.size()};
