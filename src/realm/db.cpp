@@ -57,7 +57,6 @@
 
 
 using namespace realm;
-using namespace realm::metrics;
 using namespace realm::util;
 using Durability = DBOptions::Durability;
 
@@ -1443,11 +1442,6 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
         close();
         throw;
     }
-#if REALM_METRICS
-    if (options.enable_metrics) {
-        m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
-    }
-#endif // REALM_METRICS
     m_alloc.set_read_only(true);
 }
 
@@ -1534,11 +1528,6 @@ void DB::open(Replication& repl, const DBOptions options)
 
     m_file_format_version = target_file_format_version;
 
-#if REALM_METRICS
-    if (options.enable_metrics) {
-        m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
-    }
-#endif // REALM_METRICS
     m_info = info;
     m_alloc.set_read_only(true);
 }
@@ -2483,9 +2472,6 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     auto live_versions = top_refs.size();
     // Do the actual commit
     REALM_ASSERT(oldest_version <= new_version);
-#if REALM_METRICS
-    transaction.update_num_objects();
-#endif // REALM_METRICS
 
     GroupWriter out(transaction, Durability(info->durability), m_marker_observer.get()); // Throws
     out.set_versions(new_version, top_refs, any_new_unreachables);

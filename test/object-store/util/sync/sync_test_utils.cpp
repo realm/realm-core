@@ -52,12 +52,11 @@ std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error)
     return os;
 }
 
-bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity,
-                           const std::string& provider_type)
+bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity)
 {
     for (size_t i = 0; i < results.size(); i++) {
         auto this_result = results.get(i);
-        if (this_result.identity() == identity && this_result.provider_type() == provider_type) {
+        if (this_result.identity() == identity) {
             return true;
         }
     }
@@ -122,7 +121,7 @@ auto do_hash = [](const std::string& name) -> std::string {
 };
 
 ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::string& app_id,
-                                       const std::string& identity, const std::string& local_identity,
+                                       const std::string& identity, const std::vector<std::string>& legacy_identities,
                                        const std::string& partition)
 {
     // This is copied from SyncManager.cpp string_from_partition() in order to prevent
@@ -158,6 +157,10 @@ ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::
     const auto preferred_name = manager_path / identity / clean_name;
     current_preferred_path = preferred_name.string() + ".realm";
     fallback_hashed_path = (manager_path / do_hash(preferred_name.string())).string() + ".realm";
+
+    if (legacy_identities.size() < 1)
+        return;
+    auto& local_identity = legacy_identities[0];
     legacy_sync_directories_to_make.push_back((manager_path / local_identity).string());
     std::string encoded_partition = util::make_percent_encoded_string(partition);
     legacy_local_id_path = (manager_path / local_identity / encoded_partition).concat(".realm").string();
