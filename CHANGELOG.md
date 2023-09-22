@@ -1,10 +1,9 @@
-# NEXT RELEASE
+# 13.21.0 Release notes
 
 ### Enhancements
 * Allow non-embedded links in asymmetric objects. ([PR #6981](https://github.com/realm/realm-core/pull/6981))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Logging into a single user using multiple auth providers created a separate SyncUser per auth provider. This mostly worked, but had some quirks:
   - Sync sessions would not necessarily be associated with the specific SyncUser used to create them. As a result, querying a user for its sessions could give incorrect results, and logging one user out could close the wrong sessions.
   - Existing local synchronized Realm files created using version of Realm from August - November 2020 would sometimes not be opened correctly and would instead be redownloaded.
@@ -18,7 +17,7 @@
 * The Swift package failed to link required libraries when building for macCatalyst.
 
 ### Breaking changes
-* SyncUser::provider_type() and realm_user_get_auth_provider() have been removed. Users don't have provider types; identities do. `SyncUser::is_anonymous()` is a more correct version of checking if the provider type is anonymous ([PR #6837](https://github.com/realm/realm-core/pull/6837)).
+* `SyncUser::provider_type()` and `realm_user_get_auth_provider()` have been removed. Users don't have provider types; identities do. `SyncUser::is_anonymous()` is a more correct version of checking if the provider type is anonymous ([PR #6837](https://github.com/realm/realm-core/pull/6837)).
 * SyncUser no longer has a `local_identity()`. `identity()` has been guaranteed to be unique per App ever since v10 ([PR #6837](https://github.com/realm/realm-core/pull/6837)).
 * SyncUser no longer overrides operator==. Pointer equality should be used to compare sync users ([PR #6837](https://github.com/realm/realm-core/pull/6837)).
 
