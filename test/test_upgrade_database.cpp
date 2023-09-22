@@ -657,9 +657,16 @@ TEST_IF(Upgrade_Database_23, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE
     const size_t cnt = 10 * REALM_MAX_BPNODE_SIZE;
     // string order changed in sets, and string indexes
     // The strings will be sorted according to the old ordering using signed chars
+    std::string base(StringIndex::s_max_offset, 'a');
+    // include long prefix strings > s_max_offset with non-ascii suffixes to test string ordering in the index
+    std::vector<std::string> string_storage = {base + "aaaaa", base + "aaaaA", base + "aaaaʄ", base + "aaaaÆ",
+                                               base + "aaaaæ"};
     std::vector<Mixed> set_values = {
         1,         2.,     "John",  "Ringo", BinaryData("Paul"), BinaryData("George"), "Æ", "æ", "ÿ",
         "Beatles", "john", "ringo", {}};
+    for (auto& str : string_storage) {
+        set_values.push_back(StringData(str));
+    }
     std::sort(set_values.begin(), set_values.end()); // using default Mixed::operator<
 
 #if TEST_READ_UPGRADE_MODE
