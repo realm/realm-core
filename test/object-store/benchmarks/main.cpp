@@ -45,7 +45,7 @@ int main(int argc, char** argv)
     SetCurrentDirectoryA(path);
 #else
     char executable[PATH_MAX];
-    realpath(argv[0], executable);
+    (void)realpath(argv[0], executable);
     const char* directory = dirname(executable);
     chdir(directory);
 #endif
