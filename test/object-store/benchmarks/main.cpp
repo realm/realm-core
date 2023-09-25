@@ -16,8 +16,11 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#define CATCH_CONFIG_ENABLE_BENCHMARKING
+#if TEST_SCHEDULER_UV
+#include <realm/object-store/util/uv/scheduler.hpp>
+#endif
 
+#define CATCH_CONFIG_ENABLE_BENCHMARKING
 #include <catch2/catch_all.hpp>
 
 #include <limits.h>
@@ -28,10 +31,6 @@
 #else
 #include <libgen.h>
 #include <unistd.h>
-#endif
-
-#if TEST_SCHEDULER_UV
-#include <realm/object-store/util/uv/scheduler.hpp>
 #endif
 
 int main(int argc, char** argv)
@@ -56,7 +55,7 @@ int main(int argc, char** argv)
         return std::make_shared<realm::util::UvMainLoopScheduler>();
     });
 #endif
-    
+
     int result = Catch::Session().run(argc, argv);
     return result < 0xff ? result : 0xff;
 }
