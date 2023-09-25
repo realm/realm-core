@@ -46,8 +46,7 @@
 
 namespace realm {
 
-bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity,
-                           const std::string& auth_server);
+bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity);
 bool results_contains_original_name(SyncFileActionMetadataResults& results, const std::string& original_name);
 
 void timed_wait_for(util::FunctionRef<bool()> condition,
@@ -119,7 +118,7 @@ util::Future<T> wait_for_future(util::Future<T>&& input, std::chrono::millisecon
 
 struct ExpectedRealmPaths {
     ExpectedRealmPaths(const std::string& base_path, const std::string& app_id, const std::string& user_identity,
-                       const std::string& local_identity, const std::string& partition);
+                       const std::vector<std::string>& legacy_identities, const std::string& partition);
     std::string current_preferred_path;
     std::string fallback_hashed_path;
     std::string legacy_local_id_path;

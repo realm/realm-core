@@ -642,11 +642,6 @@ RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_
     });
 }
 
-RLM_API const char* realm_user_get_local_identity(const realm_user_t* user) noexcept
-{
-    return (*user)->local_identity().c_str();
-}
-
 RLM_API char* realm_user_get_device_id(const realm_user_t* user) noexcept
 {
     if ((*user)->has_device_id()) {
@@ -654,11 +649,6 @@ RLM_API char* realm_user_get_device_id(const realm_user_t* user) noexcept
     }
 
     return nullptr;
-}
-
-RLM_API realm_auth_provider_e realm_user_get_auth_provider(const realm_user_t* user) noexcept
-{
-    return realm_auth_provider_e(enum_from_provider_type((*user)->provider_type()));
 }
 
 RLM_API bool realm_user_log_out(realm_user_t* user)

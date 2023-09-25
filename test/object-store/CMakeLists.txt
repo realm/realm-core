@@ -1,7 +1,4 @@
 set(HEADERS
-    ../util/crypt_key.hpp
-    ../util/spawned_process.hpp
-    ../util/test_path.hpp
     util/event_loop.hpp
     util/index_helpers.hpp
     util/test_file.hpp
@@ -32,9 +29,6 @@ set(SOURCES
     c_api/c_api.cpp
     c_api/c_api.c
 
-    ../util/crypt_key.cpp
-    ../util/spawned_process.cpp
-    ../util/test_path.cpp
     util/event_loop.cpp
     util/test_file.cpp
     util/test_utils.cpp
@@ -45,7 +39,8 @@ if (REALM_ENABLE_GEOSPATIAL)
 endif()
 
 file(GLOB RESOURCES RELATIVE ${CMAKE_CURRENT_BINARY_DIR}
-     "*.realm")
+    ../*.pem
+     *.realm)
 
 if(REALM_ENABLE_AUTH_TESTS)
     list(APPEND SOURCES util/sync/baas_admin_api.cpp)
@@ -53,13 +48,15 @@ endif()
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
+        util/sync/baas_admin_api.hpp
         util/sync/flx_sync_harness.hpp
         util/sync/session_util.hpp
         util/sync/sync_test_utils.hpp
-        util/sync/baas_admin_api.hpp
+        util/unit_test_transport.hpp
     )
     list(APPEND SOURCES
         bson.cpp
+        sync/app.cpp
         sync/client_reset.cpp
         sync/file.cpp
         sync/flx_migration.cpp
@@ -73,8 +70,8 @@ if(REALM_ENABLE_SYNC)
         sync/session/wait_for_completion.cpp
         sync/sync_manager.cpp
         sync/user.cpp
-        sync/app.cpp
         util/sync/sync_test_utils.cpp
+        util/unit_test_transport.cpp
     )
     if(APPLE)
         list(APPEND SOURCES audit.cpp)
@@ -90,7 +87,7 @@ if(MSVC)
     target_compile_options(ObjectStoreTests PRIVATE /bigobj)
 endif()
 
-target_link_libraries(ObjectStoreTests Catch2::Catch2 ObjectStore RealmFFIStatic)
+target_link_libraries(ObjectStoreTests Catch2::Catch2 ObjectStore TestUtil RealmFFIStatic)
 enable_stdfilesystem(ObjectStoreTests)
 create_coverage_target(generate-coverage ObjectStoreTests)
 
@@ -192,10 +189,7 @@ if(NOT APPLE AND NOT EMSCRIPTEN AND NOT WINDOWS_STORE)
     endif()
 
     target_link_libraries(ObjectStoreTests ${libuv_target})
-    # FIXME: ObjectStore itself shouldn't care about this, but we need to refactor scheduler.cpp to make it happen
-    target_compile_definitions(ObjectStore PUBLIC REALM_HAVE_UV=1)
-    get_property(libuv_include_dir TARGET ${libuv_target} PROPERTY INCLUDE_DIRECTORIES)
-    target_include_directories(ObjectStore PRIVATE ${libuv_include_dir})
+    target_compile_definitions(ObjectStoreTests PRIVATE TEST_SCHEDULER_UV=1)
 
     if (MSVC)
         get_target_property(comp_opts ${libuv_target} COMPILE_OPTIONS)

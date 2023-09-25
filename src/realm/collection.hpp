@@ -19,7 +19,7 @@ struct CollectionIterator;
 /// Collections are bound to particular properties of an object. In a
 /// collection's public interface, the implementation must take care to keep the
 /// object consistent with the persisted state, mindful of the fact that the
-/// state may have changed as a consquence of modifications from other instances
+/// state may have changed as a consequence of modifications from other instances
 /// referencing the same persisted state.
 class CollectionBase {
 public:

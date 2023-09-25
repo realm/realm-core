@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "13.20.0"
+let versionStr = "13.20.1"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -403,7 +403,6 @@ let package = Package(
                 "realm/CMakeLists.txt",
                 "realm/exec",
                 "realm/geospatial.cpp",
-                "realm/metrics",
                 "realm/object-store/CMakeLists.txt",
                 "realm/object-store/c_api",
                 "realm/object-store/impl/epoll",
@@ -426,8 +425,8 @@ let package = Package(
             linkerSettings: [
                 .linkedLibrary("compression"),
                 .linkedLibrary("z"),
-                .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-                .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+                .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS, .macCatalyst])),
+                .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS, .macCatalyst])),
             ]),
         .target(
             name: "RealmQueryParser",
@@ -451,7 +450,6 @@ let package = Package(
                 "external",
                 "realm/CMakeLists.txt",
                 "realm/exec",
-                "realm/metrics",
                 "realm/object-store",
                 "realm/parser",
                 "realm/sync/CMakeLists.txt",
