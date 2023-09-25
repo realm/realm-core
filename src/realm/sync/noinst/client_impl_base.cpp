@@ -2521,7 +2521,7 @@ Status Session::receive_query_error_message(int error_code, std::string_view mes
     // because in that case, the associated Realm and SessionWrapper must
     // not be accessed any longer.
     if (m_state == Active) {
-        on_flx_sync_error(query_version, std::string_view(message.data(), message.size())); // throws
+        on_flx_sync_error(query_version, message); // throws
     }
     return Status::OK();
 }
