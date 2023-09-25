@@ -3607,7 +3607,7 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
         std::lock_guard<std::mutex> lk(errors_mutex);
         for (const auto& compensating_write : data.error_info->compensating_writes) {
             error_to_download_version.emplace_back(compensating_write.primary_key.get_object_id(),
-                                                   data.error_info->compensating_write_server_version);
+                                                   *data.error_info->compensating_write_server_version);
         }
 
         return SyncClientHookAction::NoAction;
