@@ -247,12 +247,19 @@ if(UNIX)
         add_compile_definitions("_LARGEFILE_SOURCE" "_LARGEFILE64_SOURCE")
     endif()
     cmake_reset_check_state()
-    set(CMAKE_REQUIRED_DEFINITIONS "-D_POSIX_C_SOURCE=200112L")
+    set(CMAKE_REQUIRED_DEFINITIONS "-D_POSIX_C_SOURCE=200809L")
     check_symbol_exists(posix_fallocate "fcntl.h" REALM_HAVE_POSIX_FALLOCATE)
     if(REALM_HAVE_POSIX_FALLOCATE)
-        add_compile_definitions("_POSIX_C_SOURCE=200112L")
+        add_compile_definitions("_POSIX_C_SOURCE=200809L")
     endif()
     cmake_pop_check_state()
+endif()
+
+# Threads library is pthread-compatible
+# Check for these explicitly because older versions of musl define only one or the other
+if(CMAKE_USE_PTHREADS_INIT)
+    check_symbol_exists(pthread_getname_np "pthread.h" REALM_HAVE_PTHREAD_GETNAME)
+    check_symbol_exists(pthread_setname_np "pthread.h" REALM_HAVE_PTHREAD_SETNAME)
 endif()
 
 # Options (passed to CMake)

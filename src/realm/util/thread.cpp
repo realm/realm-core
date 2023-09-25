@@ -79,7 +79,15 @@ void Thread::join()
 
 void Thread::set_name(const std::string& name)
 {
-#if defined _GNU_SOURCE && !REALM_ANDROID && !REALM_PLATFORM_APPLE && !defined(__EMSCRIPTEN__)
+#elif REALM_PLATFORM_APPLE
+    int r = pthread_setname_np(name.data());
+    if (REALM_UNLIKELY(r != 0))
+        throw std::system_error(r, std::system_category(), "pthread_setname_np() failed");
+#elif REALM_HAVE_PTHREAD_SETNAME || (!defined(REALM_HAVE_PTHREAD_SETNAME) && defined(_GNU_SOURCE))
+// Look for the HAVE_ macro defined by CMake. If building outside CMake and the macro wasn't explicitly defined, fall
+// back to assuming this is available on Unix-y systems.
+#if REALM_LINUX
+    // Thread names on Linux can only be 16 characters long, including the null terminator
     const size_t max = 16;
     size_t n = name.size();
     if (n > max - 1)
@@ -87,30 +95,29 @@ void Thread::set_name(const std::string& name)
     char name_2[max];
     std::copy(name.data(), name.data() + n, name_2);
     name_2[n] = '\0';
+#else
+    auto& name_2 = name;
+#endif
     pthread_t id = pthread_self();
     int r = pthread_setname_np(id, name_2);
     if (REALM_UNLIKELY(r != 0))
         throw std::system_error(r, std::system_category(), "pthread_setname_np() failed");
-#elif REALM_PLATFORM_APPLE
-    int r = pthread_setname_np(name.data());
-    if (REALM_UNLIKELY(r != 0))
-        throw std::system_error(r, std::system_category(), "pthread_setname_np() failed");
 #elif defined(_WIN32)
-    // SetThreadDescription was only introduced in Windows 10 1607, so we need to dynamically load it.
-    HRESULT(WINAPI * SETTHREADDESCRIPTION)(HANDLE hThread, PCWSTR threadDescription) = nullptr;
 #if !defined(NTDDI_WIN10_RS1) || NTDDI_VERSION < NTDDI_WIN10_RS1
-    auto proc_address = GetProcAddress(GetModuleHandle(L"Kernel32.dll"), "SetThreadDescription");
+    // SetThreadDescription was only introduced in Windows 10 1607, so we need to dynamically load it.
+    static const auto proc_address = GetProcAddress(GetModuleHandle(L"Kernel32.dll"), "SetThreadDescription");
     if (!proc_address) {
         return;
     }
-    SETTHREADDESCRIPTION = reinterpret_cast<decltype(SETTHREADDESCRIPTION)>(proc_address);
-#else
-    SETTHREADDESCRIPTION = &SetThreadDescription;
+
+    HRESULT(WINAPI * SetThreadDescription)(HANDLE hThread, PCWSTR threadDescription) = nullptr;
+    SetThreadDescription = reinterpret_cast<decltype(SetThreadDescription)>(proc_address);
 #endif
     std::wstring name_wide;
-    name_wide.resize(MultiByteToWideChar(CP_UTF8, 0, name.c_str(), name.length(), nullptr, 0));
-    MultiByteToWideChar(CP_UTF8, 0, name.c_str(), name.length(), name_wide.data(), name_wide.size());
-    HRESULT result = SETTHREADDESCRIPTION(GetCurrentThread(), name_wide.data());
+    name_wide.resize(MultiByteToWideChar(CP_UTF8, 0, name.c_str(), static_cast<int>(name.length()), nullptr, 0));
+    MultiByteToWideChar(CP_UTF8, 0, name.c_str(), static_cast<int>(name.length()), name_wide.data(),
+                        static_cast<int>(name_wide.size()));
+    HRESULT result = SetThreadDescription(GetCurrentThread(), name_wide.data());
     if (REALM_UNLIKELY(!SUCCEEDED(result))) {
         throw std::system_error(result, std::system_category(), "SetThreadDescription failed");
     }
@@ -122,7 +129,10 @@ void Thread::set_name(const std::string& name)
 
 bool Thread::get_name(std::string& name) noexcept
 {
-#if (defined _GNU_SOURCE && !REALM_ANDROID && !defined(__EMSCRIPTEN__)) || REALM_PLATFORM_APPLE
+// Look for the HAVE_ macro defined by CMake. If building outside CMake and the macro wasn't explicitly defined, fall
+// back to assuming this is available on Unix-y systems.
+#if REALM_HAVE_PTHREAD_GETNAME ||                                                                                    \
+    (!defined(REALM_HAVE_PTHREAD_GETNAME) && (defined(_GNU_SOURCE) || REALM_PLATFORM_APPLE))
     const size_t max = 64;
     char name_2[max];
     pthread_t id = pthread_self();
@@ -134,26 +144,26 @@ bool Thread::get_name(std::string& name) noexcept
     name.assign(name_2, strlen(name_2)); // Throws
     return true;
 #elif defined(_WIN32)
-    // GetThreadDescription was only introduced in Windows 10 1607, so we need to dynamically load it.
-    HRESULT(WINAPI * GETTHREADDESCRIPTION)(HANDLE hThread, PWSTR * threadDescription) = nullptr;
 #if !defined(NTDDI_WIN10_RS1) || NTDDI_VERSION < NTDDI_WIN10_RS1
-    auto proc_address = GetProcAddress(GetModuleHandle(L"Kernel32.dll"), "GetThreadDescription");
+    // GetThreadDescription was only introduced in Windows 10 1607, so we need to dynamically load it.
+    static const auto proc_address = GetProcAddress(GetModuleHandle(L"Kernel32.dll"), "GetThreadDescription");
     if (!proc_address) {
         return false;
     }
-    GETTHREADDESCRIPTION = reinterpret_cast<decltype(GETTHREADDESCRIPTION)>(proc_address);
-#else
-    GETTHREADDESCRIPTION = &GetThreadDescription;
+    HRESULT(WINAPI * GetThreadDescription)(HANDLE hThread, PWSTR * threadDescription) = nullptr;
+    GetThreadDescription = reinterpret_cast<decltype(GetThreadDescription)>(proc_address);
 #endif
     PWSTR name_wide;
-    if (SUCCEEDED(GETTHREADDESCRIPTION(GetCurrentThread(), &name_wide))) {
-        size_t length_wide = wcslen(name_wide);
-        name.resize(WideCharToMultiByte(CP_UTF8, 0, name_wide, length_wide, nullptr, 0, nullptr, nullptr));
-        WideCharToMultiByte(CP_UTF8, 0, name_wide, length_wide, name.data(), name.size(), nullptr, nullptr);
-        LocalFree(name_wide);
-        return true;
+    if (!SUCCEEDED(GetThreadDescription(GetCurrentThread(), &name_wide))) {
+        return false;
     }
-    return false;
+
+    int length_wide = static_cast<int>(wcslen(name_wide));
+    name.resize(WideCharToMultiByte(CP_UTF8, 0, name_wide, length_wide, nullptr, 0, nullptr, nullptr));
+    WideCharToMultiByte(CP_UTF8, 0, name_wide, length_wide, name.data(), static_cast<int>(name.size()), nullptr,
+                        nullptr);
+    LocalFree(name_wide);
+    return true;
 #else
     static_cast<void>(name);
     return false;
@@ -283,7 +293,7 @@ int RobustMutex::try_low_level_lock()
 
 bool RobustMutex::is_valid() noexcept
 {
-#ifdef _WIN32    
+#ifdef _WIN32
     REALM_ASSERT_RELEASE(false);
 #else
     // FIXME: This check tries to lock the mutex, and only unlocks it if the
