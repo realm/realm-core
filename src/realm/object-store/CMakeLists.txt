@@ -164,6 +164,7 @@ check_symbol_exists(epoll_create sys/epoll.h REALM_HAVE_EPOLL)
 
 if(APPLE)
     target_sources(ObjectStore PRIVATE impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
+    target_link_options(ObjectStore INTERFACE "SHELL:-framework Security")
 elseif(REALM_HAVE_EPOLL)
     target_compile_definitions(ObjectStore PUBLIC REALM_HAVE_EPOLL=1)
     target_sources(ObjectStore PRIVATE impl/epoll/external_commit_helper.cpp)
@@ -175,8 +176,8 @@ else()
     target_sources(ObjectStore PRIVATE impl/generic/external_commit_helper.cpp)
 endif()
 
-if(REALM_ENABLE_SYNC AND REALM_ENABLE_SYNC_MULTIPLEXING)
-    target_compile_definitions(ObjectStore PUBLIC REALM_ENABLE_SYNC_MULTIPLEXING=1)
+if(REALM_ENABLE_SYNC AND NOT REALM_SYNC_MULTIPLEXING)
+    target_compile_definitions(ObjectStore PUBLIC REALM_DISABLE_SYNC_MULTIPLEXING=1)
 endif()
 
 if(REALM_ENABLE_SYNC OR REALM_ENABLE_SERVER)

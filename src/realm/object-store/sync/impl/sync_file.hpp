@@ -69,15 +69,16 @@ public:
     static bool try_file_exists(const std::string& path) noexcept;
 
     util::Optional<std::string> get_existing_realm_file_path(const std::string& user_identity,
-                                                             const std::string& local_user_identity,
+                                                             const std::vector<std::string>& legacy_user_identities,
                                                              const std::string& realm_file_name,
                                                              const std::string& partition) const;
     /// Return the path for a given Realm, creating the user directory if it does not already exist.
-    std::string realm_file_path(const std::string& user_identity, const std::string& local_user_identity,
+    std::string realm_file_path(const std::string& user_identity,
+                                const std::vector<std::string>& legacy_user_identities,
                                 const std::string& realm_file_name, const std::string& partition) const;
 
     /// Remove the Realm at a given path for a given user. Returns `true` if the remove operation fully succeeds.
-    bool remove_realm(const std::string& user_identity, const std::string& local_identity,
+    bool remove_realm(const std::string& user_identity, const std::vector<std::string>& legacy_user_identities,
                       const std::string& realm_file_name, const std::string& partition) const;
 
     /// Remove the Realm whose primary Realm file is located at `absolute_path`. Returns `true` if the remove

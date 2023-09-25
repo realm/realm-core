@@ -325,7 +325,7 @@ void MigrationStore::create_subscriptions(const SubscriptionStore& subs_store, c
     auto sub_count = mut_sub.size();
 
     auto tr = m_db->start_read();
-    // List of tables covered by latest subscription set.
+    // List of tables covered by the latest subscription set.
     auto tables = subs_store.get_tables_for_latest(*tr);
 
     // List of tables in the realm.

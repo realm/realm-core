@@ -1,16 +1,40 @@
-#include <sync/flx_sync_harness.hpp>
-#include <sync/sync_test_utils.hpp>
-#include <util/baas_admin_api.hpp>
+////////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2023 Realm Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+////////////////////////////////////////////////////////////////////////////
+
 #include <util/crypt_key.hpp>
+#include <util/sync/baas_admin_api.hpp>
+#include <util/sync/flx_sync_harness.hpp>
+#include <util/sync/sync_test_utils.hpp>
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/thread_safe_reference.hpp>
+#include <realm/object-store/sync/async_open_task.hpp>
+#include <realm/object-store/util/scheduler.hpp>
+
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
+
 #include <realm/util/future.hpp>
 
 #include <catch2/catch_all.hpp>
+
 #include <chrono>
 
 #if REALM_ENABLE_SYNC
@@ -89,7 +113,7 @@ static std::vector<ObjectId> fill_test_data(SyncTestFile& config, std::optional<
 }
 
 
-TEST_CASE("Test server migration and rollback", "[flx][migration]") {
+TEST_CASE("Test server migration and rollback", "[sync][flx][flx migration][baas]") {
     std::shared_ptr<util::Logger> logger_ptr =
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
@@ -210,12 +234,12 @@ TEST_CASE("Test server migration and rollback", "[flx][migration]") {
         flx_config.sync_config->error_handler =
             [&logger_ptr, error_promise = std::move(promise)](std::shared_ptr<SyncSession>, SyncError err) mutable {
                 // This situation should return the switch_to_pbs error
-                logger_ptr->error("Server rolled back - connect as FLX received error: %1", err.reason());
+                logger_ptr->error("Server rolled back - connect as FLX received error: %1", err.status);
                 error_promise.get_promise().emplace_value(std::move(err));
             };
         auto flx_realm = Realm::get_shared_realm(flx_config);
         auto err = wait_for_future(std::move(err_future), std::chrono::seconds(30)).get();
-        REQUIRE(err.get_system_error() == make_error_code(sync::ProtocolError::switch_to_pbs));
+        REQUIRE(err.status == ErrorCodes::WrongSyncType);
         REQUIRE(err.server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
     }
 
@@ -239,7 +263,7 @@ TEST_CASE("Test server migration and rollback", "[flx][migration]") {
     }
 }
 
-TEST_CASE("Test client migration and rollback", "[flx][migration]") {
+TEST_CASE("Test client migration and rollback", "[sync][flx][flx migration][baas]") {
     std::shared_ptr<util::Logger> logger_ptr =
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
@@ -296,7 +320,7 @@ TEST_CASE("Test client migration and rollback", "[flx][migration]") {
     }
 }
 
-TEST_CASE("Test client migration and rollback with recovery", "[flx][migration]") {
+TEST_CASE("Test client migration and rollback with recovery", "[sync][flx][flx migration][baas]") {
     std::shared_ptr<util::Logger> logger_ptr =
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
@@ -447,7 +471,8 @@ TEST_CASE("Test client migration and rollback with recovery", "[flx][migration]"
     }
 }
 
-TEST_CASE("An interrupted migration or rollback can recover on the next session", "[flx][migration]") {
+TEST_CASE("An interrupted migration or rollback can recover on the next session",
+          "[sync][flx][flx migration][baas]") {
     std::shared_ptr<util::Logger> logger_ptr =
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
@@ -559,7 +584,7 @@ TEST_CASE("An interrupted migration or rollback can recover on the next session"
     }
 }
 
-TEST_CASE("Update to native FLX after migration", "[flx][migration]") {
+TEST_CASE("Update to native FLX after migration", "[sync][flx][flx migration][baas]") {
     std::shared_ptr<util::Logger> logger_ptr =
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
@@ -669,17 +694,17 @@ TEST_CASE("Update to native FLX after migration", "[flx][migration]") {
         flx_config.sync_config->error_handler =
             [&logger_ptr, error_promise = std::move(promise)](std::shared_ptr<SyncSession>, SyncError err) mutable {
                 // This situation should return the switch_to_pbs error
-                logger_ptr->error("Server rolled back - connect as FLX received error: %1", err.reason());
+                logger_ptr->error("Server rolled back - connect as FLX received error: %1", err.status);
                 error_promise.get_promise().emplace_value(std::move(err));
             };
         auto flx_realm = Realm::get_shared_realm(flx_config);
         auto err = wait_for_future(std::move(err_future), std::chrono::seconds(30)).get();
-        REQUIRE(err.get_system_error() == make_error_code(sync::ProtocolError::switch_to_pbs));
+        REQUIRE(err.status == ErrorCodes::WrongSyncType);
         REQUIRE(err.server_requests_action == sync::ProtocolErrorInfo::Action::ApplicationBug);
     }
 }
 
-TEST_CASE("New table is synced after migration", "[flx][migration]") {
+TEST_CASE("New table is synced after migration", "[sync][flx][flx migration][baas]") {
     std::shared_ptr<util::Logger> logger_ptr =
         std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
@@ -774,6 +799,118 @@ TEST_CASE("New table is synced after migration", "[flx][migration]") {
         auto active_subs = sub_store->get_active();
         REQUIRE(active_subs.size() == 2);
         REQUIRE(active_subs.find("flx_migrated_Object2"));
+    }
+}
+
+// There is a sequence of events where we tried to open a frozen Realm with new
+// object types in the schema and this fails schema validation causing client reset
+// to fail.
+//   - Add a new class to the schema, but use async open to initiate
+//     sync without any schema
+//   - Have the server send a client reset.
+//   - The client tries to populate the notify_before callback with a frozen Realm using
+//     the schema with the new class, but the class is not stored on disk yet.
+// This hits the update_schema() check that makes sure that the frozen Realm's schema is
+// a subset of the one found on disk. Since it is not, a schema exception is thrown
+// which is eventually forwarded to the sync error handler and client reset fails.
+TEST_CASE("Async open + client reset", "[sync][flx][flx migration][baas]") {
+    std::shared_ptr<util::Logger> logger_ptr =
+        std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
+
+    const std::string base_url = get_base_url();
+    const std::string partition = "async-open-migration-test";
+    ObjectSchema shared_object("Object", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                          {"string_field", PropertyType::String | PropertyType::Nullable},
+                                          {"realm_id", PropertyType::String | PropertyType::Nullable}});
+    const Schema mig_schema{shared_object};
+    size_t num_before_reset_notifications = 0;
+    size_t num_after_reset_notifications = 0;
+    auto server_app_config = minimal_app_config(base_url, "async_open_during_migration", mig_schema);
+    std::optional<SyncTestFile> config; // destruct this after the sessions are torn down
+    TestAppSession session(create_app(server_app_config));
+    config.emplace(session.app(), partition, server_app_config.schema);
+    config->sync_config->client_resync_mode = ClientResyncMode::Recover;
+    config->sync_config->notify_before_client_reset = [&](SharedRealm before) {
+        logger_ptr->debug("notify_before_client_reset");
+        REQUIRE(before);
+        REQUIRE(before->is_frozen());
+        auto table = before->read_group().get_table("class_Object");
+        CHECK(table);
+        ++num_before_reset_notifications;
+    };
+    config->sync_config->notify_after_client_reset = [&](SharedRealm before, ThreadSafeReference after_ref,
+                                                         bool did_recover) {
+        logger_ptr->debug("notify_after_client_reset");
+        CHECK(did_recover);
+        REQUIRE(before);
+        auto table_before = before->read_group().get_table("class_Object");
+        CHECK(table_before);
+        SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
+        REQUIRE(after);
+        auto table_after = after->read_group().get_table("class_Object");
+        REQUIRE(table_after);
+        ++num_after_reset_notifications;
+    };
+
+    ObjectSchema locally_added("LocallyAdded", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                                {"string_field", PropertyType::String | PropertyType::Nullable},
+                                                {"realm_id", PropertyType::String | PropertyType::Nullable}});
+
+    SECTION("no initial state") {
+        // Migrate to FLX
+        trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
+        shared_object.persisted_properties.push_back({"oid_field", PropertyType::ObjectId | PropertyType::Nullable});
+        config->schema = {shared_object, locally_added};
+
+        async_open_realm(*config, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
+            REQUIRE(ref);
+            REQUIRE_FALSE(error);
+
+            auto realm = Realm::get_shared_realm(std::move(ref));
+
+            auto table = realm->read_group().get_table("class_Object");
+            REQUIRE(table->size() == 0);
+            REQUIRE(num_before_reset_notifications == 1);
+            REQUIRE(num_after_reset_notifications == 1);
+
+            auto locally_added_table = realm->read_group().get_table("class_LocallyAdded");
+            REQUIRE(locally_added_table);
+            REQUIRE(locally_added_table->size() == 0);
+        });
+    }
+
+    SECTION("initial state") {
+        {
+            config->schema = {shared_object};
+            auto realm = Realm::get_shared_realm(*config);
+            realm->begin_transaction();
+            auto table = realm->read_group().get_table("class_Object");
+            table->create_object_with_primary_key(ObjectId::gen());
+            realm->commit_transaction();
+            wait_for_upload(*realm);
+        }
+        trigger_server_migration(session.app_session(), MigrateToFLX, logger_ptr);
+        {
+            shared_object.persisted_properties.push_back(
+                {"oid_field", PropertyType::ObjectId | PropertyType::Nullable});
+            config->schema = {shared_object, locally_added};
+
+            async_open_realm(*config, [&](ThreadSafeReference&& ref, std::exception_ptr error) {
+                REQUIRE(ref);
+                REQUIRE_FALSE(error);
+
+                auto realm = Realm::get_shared_realm(std::move(ref));
+
+                auto table = realm->read_group().get_table("class_Object");
+                REQUIRE(table->size() == 1);
+                REQUIRE(num_before_reset_notifications == 1);
+                REQUIRE(num_after_reset_notifications == 1);
+
+                auto locally_added_table = realm->read_group().get_table("class_LocallyAdded");
+                REQUIRE(locally_added_table);
+                REQUIRE(locally_added_table->size() == 0);
+            });
+        }
     }
 }
 

@@ -10,7 +10,6 @@ set(SOURCES
     object.cpp
     results.cpp
 
-    ../../util/crypt_key.cpp
     ../util/event_loop.cpp
     ../util/test_file.cpp
     ../util/test_utils.cpp
@@ -19,11 +18,11 @@ set(SOURCES
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
-        ../sync/sync_test_utils.hpp
-        ../sync/session/session_util.hpp
+        ../util/sync/sync_test_utils.hpp
+        ../util/sync/session_util.hpp
     )
     list(APPEND SOURCES
-        ../sync/sync_test_utils.cpp
+        ../util/sync/sync_test_utils.cpp
         client_reset.cpp
     )
 endif()
@@ -39,7 +38,7 @@ if(REALM_ENABLE_SYNC)
     enable_stdfilesystem(object-store-benchmarks)
 endif()
 
-target_link_libraries(object-store-benchmarks ObjectStore Catch2::Catch2)
+target_link_libraries(object-store-benchmarks ObjectStore TestUtil Catch2::Catch2)
 set_target_properties(object-store-benchmarks PROPERTIES
       EXCLUDE_FROM_ALL 1
       EXCLUDE_FROM_DEFAULT_BUILD 1)

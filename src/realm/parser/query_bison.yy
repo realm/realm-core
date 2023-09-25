@@ -34,6 +34,8 @@
     class DescriptorNode;
     class PropertyNode;
     class SubqueryNode;
+
+    enum class CompareType: char;
     struct PathElem {
         std::string id;
         Mixed index;
@@ -101,7 +103,7 @@ using namespace realm::query_parser;
   NOT     "!"
   GEOBOX        "geobox"
   GEOPOLYGON    "geopolygon"
-  GEOSPHERE     "geosphere"
+  GEOCIRCLE     "geocircle"
 ;
 
 %token <std::string> ID "identifier"
@@ -136,7 +138,8 @@ using namespace realm::query_parser;
 %token <std::string> TYPE "@type"
 %token <std::string> KEY_VAL "key or value"
 %type  <bool> direction
-%type  <int> equality relational stringop aggr_op
+%type  <CompareType> equality relational stringop
+%type  <int> aggr_op
 %type  <double> coordinate
 %type  <ConstantNode*> constant primary_key
 %type  <GeospatialNode*> geospatial geoloop geoloop_content geopoly_content
@@ -173,6 +176,7 @@ using namespace realm::query_parser;
 %printer { yyo << $$.id; } <PathElem>;
 %printer { yyo << $$; } <*>;
 %printer { yyo << "<>"; } <>;
+%printer { yyo << string_for_op($$); } <CompareType>;
 
 %%
 %start final;
@@ -193,7 +197,7 @@ query
     | NOT query                 { $$ = drv.m_parse_nodes.create<NotNode>($2); }
     | '(' query ')'             { $$ = $2; }
     | boolexpr                  { $$ =$1; }
-
+ 
 compare
     : expr equality expr        { $$ = drv.m_parse_nodes.create<EqualityNode>($1, $2, $3); }
     | expr equality CASE expr   {
@@ -203,7 +207,7 @@ compare
                                 }
     | expr relational expr      { $$ = drv.m_parse_nodes.create<RelationalNode>($1, $2, $3); }
     | value stringop value      { $$ = drv.m_parse_nodes.create<StringOpsNode>($1, $2, $3); }
-    | value TEXT value          { $$ = drv.m_parse_nodes.create<StringOpsNode>($1, CompareNode::TEXT, $3); }
+    | value TEXT value          { $$ = drv.m_parse_nodes.create<StringOpsNode>($1, CompareType::TEXT, $3); }
     | value stringop CASE value {
                                     auto tmp = drv.m_parse_nodes.create<StringOpsNode>($1, $2, $4);
                                     tmp->case_sensitive = false;
@@ -251,6 +255,7 @@ subquery
 coordinate
     : FLOAT         { $$ = strtod($1.c_str(), nullptr); }
     | NATURAL0      { $$ = double(strtoll($1.c_str(), nullptr, 0)); }
+    | ARG           { $$ = drv.get_arg_for_coordinate($1); }
 
 geopoint
     : '[' coordinate ',' coordinate ']' { $$ = GeoPoint{$2, $4}; }
@@ -268,7 +273,7 @@ geopoly_content
 
 geospatial
     : GEOBOX '(' geopoint ',' geopoint ')'  { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Box{}, *$3, *$5); }
-    | GEOSPHERE '(' geopoint ',' coordinate ')' { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Sphere{}, *$3, $5); }
+    | GEOCIRCLE '(' geopoint ',' coordinate ')' { $$ = drv.m_parse_nodes.create<GeospatialNode>(GeospatialNode::Circle{}, *$3, $5); }
     | GEOPOLYGON '(' geopoly_content ')'    { $$ = $3; }
 
 post_query
@@ -352,21 +357,21 @@ aggr_op
     | '.' AVG                   { $$ = int(AggrNode::AVG);}
 
 equality
-    : EQUAL                     { $$ = CompareNode::EQUAL; }
-    | NOT_EQUAL                 { $$ = CompareNode::NOT_EQUAL; }
-    | IN                        { $$ = CompareNode::IN; }
+    : EQUAL                     { $$ = CompareType::EQUAL; }
+    | NOT_EQUAL                 { $$ = CompareType::NOT_EQUAL; }
+    | IN                        { $$ = CompareType::IN; }
 
 relational
-    : LESS                      { $$ = CompareNode::LESS; }
-    | LESS_EQUAL                { $$ = CompareNode::LESS_EQUAL; }
-    | GREATER                   { $$ = CompareNode::GREATER; }
-    | GREATER_EQUAL             { $$ = CompareNode::GREATER_EQUAL; }
+    : LESS                      { $$ = CompareType::LESS; }
+    | LESS_EQUAL                { $$ = CompareType::LESS_EQUAL; }
+    | GREATER                   { $$ = CompareType::GREATER; }
+    | GREATER_EQUAL             { $$ = CompareType::GREATER_EQUAL; }
 
 stringop
-    : BEGINSWITH                { $$ = CompareNode::BEGINSWITH; }
-    | ENDSWITH                  { $$ = CompareNode::ENDSWITH; }
-    | CONTAINS                  { $$ = CompareNode::CONTAINS; }
-    | LIKE                      { $$ = CompareNode::LIKE; }
+    : BEGINSWITH                { $$ = CompareType::BEGINSWITH; }
+    | ENDSWITH                  { $$ = CompareType::ENDSWITH; }
+    | CONTAINS                  { $$ = CompareType::CONTAINS; }
+    | LIKE                      { $$ = CompareType::LIKE; }
 
 path
     : path_elem                 { $$ = drv.m_parse_nodes.create<PathNode>($1); }

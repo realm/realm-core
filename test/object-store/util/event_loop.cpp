@@ -26,7 +26,7 @@
 #include <stdexcept>
 #include <vector>
 
-#if REALM_USE_UV
+#if TEST_SCHEDULER_UV
 #include <uv.h>
 #elif REALM_PLATFORM_APPLE
 #include <realm/util/cf_ptr.hpp>
@@ -81,10 +81,13 @@ struct EventLoop::Impl {
     // Schedule execution of the given function on the event loop.
     void perform(util::UniqueFunction<void()>);
 
+    // Run the event loop until all currently pending work has been run.
+    void run_pending();
+
     ~Impl();
 
 private:
-#if REALM_USE_UV
+#if TEST_SCHEDULER_UV
     Impl(uv_loop_t* loop);
 
     std::vector<util::UniqueFunction<void()>> m_pending_work;
@@ -124,7 +127,12 @@ void EventLoop::perform(util::UniqueFunction<void()> function)
     return m_impl->perform(std::move(function));
 }
 
-#if REALM_USE_UV
+void EventLoop::run_pending()
+{
+    return m_impl->run_pending();
+}
+
+#if TEST_SCHEDULER_UV
 
 bool EventLoop::has_implementation()
 {
@@ -204,6 +212,11 @@ void EventLoop::Impl::perform(util::UniqueFunction<void()> f)
     uv_async_send(&m_perform_work);
 }
 
+void EventLoop::Impl::run_pending()
+{
+    uv_run(m_loop, UV_RUN_NOWAIT);
+}
+
 #elif REALM_PLATFORM_APPLE
 
 bool EventLoop::has_implementation()
@@ -254,6 +267,12 @@ void EventLoop::Impl::perform(util::UniqueFunction<void()> func)
     CFRunLoopWakeUp(m_loop.get());
 }
 
+void EventLoop::Impl::run_pending()
+{
+    while (CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true) == kCFRunLoopRunHandledSource)
+        ;
+}
+
 #else
 
 bool EventLoop::has_implementation()
@@ -270,6 +289,10 @@ void EventLoop::Impl::run_until(util::FunctionRef<bool()>)
     printf("WARNING: there is no event loop implementation and nothing is happening.\n");
 }
 void EventLoop::Impl::perform(util::UniqueFunction<void()>)
+{
+    printf("WARNING: there is no event loop implementation and nothing is happening.\n");
+}
+void EventLoop::Impl::run_pending()
 {
     printf("WARNING: there is no event loop implementation and nothing is happening.\n");
 }

@@ -126,9 +126,11 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops, string* err) {
             continue;
         }
         pair<int, int> other = edges[key];
-          s2_logger()->error("Duplicate edge: loop %1, edge %2 and loop %3, edge %4", i, j, other.first, other.second);
         if (err) {
-            *err = realm::util::format("Duplicate edge: loop %1, edge %2 and loop %3, edge %4", i, j, other.first, other.second);
+            *err = realm::util::format("Duplicate edge: ring %1, edge %2 and ring %3, edge %4", i, j, other.first, other.second);
+        }
+        else {
+            s2_logger()->error("Duplicate edge: ring %1, edge %2 and ring %3, edge %4", i, j, other.first, other.second);
         }
         return false;
       }
@@ -139,16 +141,16 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops, string* err) {
   // two loops cross.
   for (size_t i = 0; i < loops.size(); ++i) {
     if (!loops[i]->IsNormalized()) {
-        s2_logger()->error("Loop %1 encloses more than half the sphere", i);
-        if (err) *err = realm::util::format("Loop %1 encloses more than half the sphere", i);
+        s2_logger()->error("Ring %1 encloses more than half the sphere", i);
+        if (err) *err = realm::util::format("Ring %1 encloses more than half the sphere", i);
       return false;
     }
     for (size_t j = i + 1; j < loops.size(); ++j) {
       // This test not only checks for edge crossings, it also detects
       // cases where the two boundaries cross at a shared vertex.
       if (loops[i]->ContainsOrCrosses(loops[j]) < 0) {
-          s2_logger()->error("Loop %1 crosses loop %2", i, j);
-          if (err) *err = realm::util::format("Loop %1 crosses loop %2", i, j);
+          s2_logger()->error("Ring %1 crosses ring %2", i, j);
+          if (err) *err = realm::util::format("Ring %1 crosses ring %2", i, j);
         return false;
       }
     }
@@ -1051,7 +1053,7 @@ bool S2Polygon::IsNormalized(string* err) const {
     }
     if (count > 1) {
       if (err) {
-          *err = realm::util::format("Loop %1 shares more than one vertex with its parent loop %2", i, GetParent(i));
+          *err = realm::util::format("Ring %1 shares more than one vertex with its parent ring %2", i, GetParent(i));
       }
       return false;
     }

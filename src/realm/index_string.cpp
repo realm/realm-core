@@ -44,6 +44,30 @@ void get_child(Array& parent, size_t child_ref_ndx, Array& child) noexcept
     child.set_parent(&parent, child_ref_ndx);
 }
 
+// This method reconstructs the string inserted in the search index based on a string
+// that matches so far and the last key (only works if complete strings are stored in the index)
+static StringData reconstruct_string(size_t offset, StringIndex::key_type key, StringData new_string)
+{
+    if (key == 0)
+        return StringData();
+
+    size_t rest_len = 4;
+    char* k = reinterpret_cast<char*>(&key);
+    if (k[0] == 'X')
+        rest_len = 3;
+    else if (k[1] == 'X')
+        rest_len = 2;
+    else if (k[2] == 'X')
+        rest_len = 1;
+    else if (k[3] == 'X')
+        rest_len = 0;
+
+    REALM_ASSERT(offset + rest_len <= new_string.size());
+
+    return StringData(new_string.data(), offset + rest_len);
+}
+
+
 } // anonymous namespace
 
 DataType ClusterColumn::get_data_type() const
@@ -229,12 +253,8 @@ int64_t IndexArray::index_string(Mixed value, InternalFindResult& result_ref, co
         if (ref & 1) {
             int64_t key_value = int64_t(ref >> 1);
 
-            if (column.is_fulltext()) {
-                result_ref.payload = key_value;
-                return first ? key_value : (get_count ? 1 : FindRes_single);
-            }
-
-            Mixed a = column.get_value(ObjKey(key_value));
+            Mixed a = column.is_fulltext() ? reconstruct_string(stringoffset, key, index_data)
+                                           : column.get_value(ObjKey(key_value));
             if (a == value) {
                 result_ref.payload = key_value;
                 return first ? key_value : get_count ? 1 : FindRes_single;
@@ -600,6 +620,112 @@ void IndexArray::index_string_all(Mixed value, std::vector<ObjKey>& result, cons
 
         // Update 4 byte index key
         key = StringIndex::create_key(index_data, stringoffset);
+    }
+}
+
+static void get_all_keys_below(std::set<int64_t>& result, ref_type ref, Allocator& alloc)
+{
+    const char* sub_header = alloc.translate(ref_type(ref));
+    const bool sub_isindex = NodeHeader::get_context_flag_from_header(sub_header);
+
+    if (sub_isindex) {
+        Array tree(alloc);
+        tree.init_from_ref(ref);
+        auto sz = tree.size();
+        for (size_t n = 1; n < sz; n++) {
+            auto rot = tree.get_as_ref_or_tagged(n);
+            // Literal row index (tagged)
+            if (rot.is_tagged()) {
+                result.insert(rot.get_as_int());
+            }
+            else {
+                get_all_keys_below(result, rot.get_as_ref(), alloc);
+            }
+        }
+    }
+    else {
+        IntegerColumn tree(alloc, ref);
+        tree.for_all([&result](int64_t i) {
+            result.insert(i);
+        });
+    }
+}
+
+void IndexArray::_index_string_find_all_prefix(std::set<int64_t>& result, StringData str, const char* header) const
+{
+    size_t stringoffset = 0;
+
+    for (;;) {
+        const char* data = NodeHeader::get_data_from_header(header);
+        uint_least8_t width = get_width_from_header(header);
+
+        // Create 4 byte lower and upper key
+        key_type lower = 0;
+        size_t i = 0;
+        size_t n = str.size() - stringoffset;
+        bool is_at_string_end = (n <= 4);
+        if (!is_at_string_end) {
+            n = 4;
+        }
+        while (i < n) {
+            lower <<= 8;
+            lower += str[stringoffset + i++];
+        }
+        size_t shift = (4 - i) * 8;
+        key_type upper = lower + 1;
+        lower <<= shift;
+        upper <<= shift;
+        upper--;
+
+        // Get index array
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+
+        // Find the position matching the key
+        const char* offsets_header = m_alloc.translate(offsets_ref);
+        const char* offsets_data = get_data_from_header(offsets_header);
+        size_t offsets_size = get_size_from_header(offsets_header);
+        size_t pos = ::lower_bound<32>(offsets_data, offsets_size, lower); // keys are always 32 bits wide
+        // If key is outside range, we know there can be no match
+        if (pos == offsets_size)
+            return;
+
+        size_t pos_refs = pos + 1; // first entry in refs points to offsets
+
+        if (NodeHeader::get_is_inner_bptree_node_from_header(header)) {
+            bool done = false;
+            while (!done) {
+                // Recursively call with child node
+                const char* header = m_alloc.translate(to_ref(get_direct(data, width, pos_refs++)));
+                _index_string_find_all_prefix(result, str, header);
+
+                // Check if current node is past end of key range or last node
+                auto key = get_direct<32>(offsets_data, pos++);
+                done = key > upper || pos == offsets_size;
+            }
+            return;
+        }
+
+        size_t end = ::upper_bound<32>(offsets_data, offsets_size, upper); // keys are always 32 bits wide
+        if (is_at_string_end) {
+            // now get all entries from start to end
+            for (size_t ndx = pos_refs; ndx <= end; ndx++) {
+                uint64_t ref = get_direct(data, width, ndx);
+                // Literal row index (tagged)
+                if (ref & 1) {
+                    result.emplace(int64_t(ref >> 1));
+                }
+                else {
+                    get_all_keys_below(result, to_ref(ref), m_alloc);
+                }
+            }
+            return;
+        }
+
+        // When we are not at end of string then we are comparing against the whole key
+        // and we can have at most one match
+        REALM_ASSERT(end == pos + 1);
+        header = m_alloc.translate(to_ref(get_direct(data, width, pos_refs)));
+        stringoffset += 4;
     }
 }
 
@@ -970,29 +1096,6 @@ void StringIndex::node_insert(size_t ndx, size_t ref)
     m_array->insert(ndx + 1, ref);
 }
 
-// This method reconstructs the string inserted in the search index based on a string
-// that matches so far and the last key (only works if complete strings are stored in the index)
-static StringData reconstruct_string(size_t offset, StringIndex::key_type key, StringData new_string)
-{
-    if (key == 0)
-        return StringData();
-
-    size_t rest_len = 4;
-    char* k = reinterpret_cast<char*>(&key);
-    if (k[0] == 'X')
-        rest_len = 3;
-    else if (k[1] == 'X')
-        rest_len = 2;
-    else if (k[2] == 'X')
-        rest_len = 1;
-    else if (k[3] == 'X')
-        rest_len = 0;
-
-    REALM_ASSERT(offset + rest_len <= new_string.size());
-
-    return StringData(new_string.data(), offset + rest_len);
-}
-
 bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, StringData index_data, const Mixed& value,
                               bool noextend)
 {
@@ -1196,6 +1299,64 @@ void StringIndex::erase(ObjKey key)
     }
 }
 
+namespace {
+template <typename T>
+void intersect(std::vector<ObjKey>& result, T& keys)
+{
+    if (result.empty()) {
+        result.reserve(keys.size());
+        for (auto k : keys) {
+            result.emplace_back(k);
+        }
+    }
+    else {
+        auto it = result.begin();
+        auto keep = it;
+        auto m = keys.begin();
+
+        // only keep intersection
+        while (it != result.end() && m != keys.end()) {
+            int64_t int_val = *m;
+            if (it->value < int_val) {
+                it++; // don't keep if match is not in new set
+            }
+            else if (it->value > int_val) {
+                ++m; // ignore new matches
+            }
+            else {
+                // Found both places - make sure it is kept
+                if (keep < it)
+                    *keep = *it;
+                ++keep;
+                ++it;
+                ++m;
+            }
+        }
+        if (keep != result.end()) {
+            result.erase(keep, result.end());
+        }
+    }
+}
+
+struct FindResWrapper {
+    InternalFindResult& res;
+    IntegerColumn& indexes;
+    size_t n = 0;
+    size_t size()
+    {
+        return res.end_ndx - res.start_ndx;
+    }
+    auto begin()
+    {
+        return indexes.cbegin();
+    }
+    auto end()
+    {
+        return indexes.cend();
+    }
+};
+} // namespace
+
 void StringIndex::find_all_fulltext(std::vector<ObjKey>& result, StringData value) const
 {
     InternalFindResult res;
@@ -1203,110 +1364,109 @@ void StringIndex::find_all_fulltext(std::vector<ObjKey>& result, StringData valu
 
     auto tokenizer = Tokenizer::get_instance();
     tokenizer->reset({value.data(), value.size()});
-    auto token_info = tokenizer->get_token_info();
-    if (token_info.empty()) {
-        throw InvalidArgument("Missing search token");
-    }
-    struct Token {
-        std::string_view token;
-        bool exclude;
-    };
-    std::list<Token> tokens;
-    auto exclude_start = tokens.begin();
-    // Order the tokens so that we handle words to match first
-    for (auto& info : token_info) {
-        auto start = std::get<0>(info.second.ranges[0]);
-        if (info.second.ranges.size() > 1) {
-            throw InvalidArgument("Search token should only appear once");
+    auto [includes, excludes] = tokenizer->get_search_tokens();
+    if (includes.empty()) {
+        if (excludes.empty()) {
+            throw InvalidArgument("Missing search token");
         }
-        bool exclude = start == 0 ? false : value[start - 1] == '-';
-        auto it = tokens.insert(exclude_start, {info.first, exclude});
-        if (exclude) {
-            exclude_start = it;
-        }
-    }
-    if (exclude_start == tokens.begin()) {
         result = m_target_column.get_all_keys();
     }
-    for (auto& token : tokens) {
-        FindRes res1 = find_all_no_copy(StringData{token.token}, res);
-        if (res1 == FindRes_not_found) {
-            if (!token.exclude) {
-                result.clear();
-            }
-            return;
-        }
-        else if (res1 == FindRes_column) {
-            IntegerColumn indexes(m_array->get_alloc(), ref_type(res.payload));
-
-            if (result.empty()) {
-                for (size_t i = res.start_ndx; i < res.end_ndx; ++i) {
-                    result.emplace_back(indexes.get(i));
-                }
+    else {
+        for (auto& token : includes) {
+            if (token.back() == '*') {
+                std::set<int64_t> keys;
+                m_array->index_string_find_all_prefix(keys, StringData(token.data(), token.size() - 1));
+                intersect(result, keys);
             }
             else {
-                auto r = result.begin();
-                size_t m = res.start_ndx;
-
-                // only keep intersection
-                while (r != result.end() && m < res.end_ndx) {
-                    auto key_val = indexes.get(m);
-                    if (r->value < key_val) {
-                        if (token.exclude) {
-                            ++r;
+                switch (find_all_no_copy(StringData{token}, res)) {
+                    case FindRes_not_found:
+                        result.clear();
+                        break;
+                    case FindRes_column: {
+                        IntegerColumn indexes(m_array->get_alloc(), ref_type(res.payload));
+                        FindResWrapper wrapper{res, indexes};
+                        intersect(result, wrapper);
+                        break;
+                    }
+                    case FindRes_single:
+                        // merge in single res
+                        if (result.empty()) {
+                            result.emplace_back(res.payload);
                         }
                         else {
-                            r = result.erase(r); // remove if match is not in new set
+                            ObjKey key(res.payload);
+                            auto pos = std::lower_bound(result.begin(), result.end(), key);
+                            if (pos != result.end() && key == *pos) {
+                                result.clear();
+                                result.push_back(key);
+                            }
+                            else {
+                                result.clear();
+                            }
                         }
-                    }
-                    else if (r->value > key_val) {
-                        ++m; // ignore new matches
-                    }
-                    else {
-                        if (token.exclude) {
-                            r = result.erase(r); // remove if match is found in new set
-                        }
-                        else {
-                            ++r;
-                        }
-                        ++m;
-                    }
-                }
-                if (!token.exclude && r != result.end()) {
-                    result.erase(r, result.end());
+                        break;
                 }
             }
-
             if (result.empty())
                 return;
         }
-        else if (res1 == FindRes_single) {
-            // merge in single res
-            if (result.empty()) {
-                result.emplace_back(res.payload);
+    }
+
+    for (auto& token : excludes) {
+        if (token.back() == '*') {
+            throw IllegalOperation("Exclude by prefix is not implemented");
+        }
+        if (result.empty())
+            return;
+
+        switch (find_all_no_copy(StringData{token}, res)) {
+            case FindRes_not_found:
+                // Nothing to exclude
+                break;
+            case FindRes_column: {
+                IntegerColumn indexes(m_array->get_alloc(), ref_type(res.payload));
+
+                auto it = result.begin();
+                auto keep = it;
+                size_t m = res.start_ndx;
+                auto idx_val = indexes.get(m);
+
+                while (it != result.end()) {
+                    if (it->value < idx_val) {
+                        // Not found in excludes
+                        if (keep < it)
+                            *keep = *it;
+                        ++keep;
+                        ++it;
+                    }
+                    else {
+                        if (it->value == idx_val) {
+                            // found in excludes - don't keep
+                            ++it;
+                        }
+                        ++m;
+                        idx_val = m < res.end_ndx ? indexes.get(m) : std::numeric_limits<int64_t>::max();
+                    }
+                }
+                if (keep != result.end()) {
+                    result.erase(keep, result.end());
+                }
+                break;
             }
-            else {
+            case FindRes_single: {
+                // exclude single res
                 ObjKey key(res.payload);
                 auto pos = std::lower_bound(result.begin(), result.end(), key);
                 if (pos != result.end() && key == *pos) {
-                    if (token.exclude) {
-                        result.erase(pos);
-                    }
-                    else {
-                        result.clear();
-                        result.push_back(key);
-                    }
+                    result.erase(pos);
                 }
-                else {
-                    if (!token.exclude) {
-                        result.clear();
-                        return;
-                    }
-                }
+                break;
             }
         }
     }
 }
+
 
 void StringIndex::clear()
 {
@@ -1720,6 +1880,20 @@ void StringIndex::verify_entries(const ClusterColumn& column) const
     }
 }
 
+namespace {
+
+void out_hex(std::ostream& out, uint64_t val)
+{
+    if (val) {
+        out_hex(out, val >> 8);
+        if (char c = val & 0xFF) {
+            out << c;
+        }
+    }
+}
+
+} // namespace
+
 void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int level)
 {
     int indent = level * 2;
@@ -1728,6 +1902,8 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
 
     size_t node_size = node.size();
     REALM_ASSERT(node_size >= 1);
+
+    out << std::hex;
 
     bool node_is_leaf = !node.is_inner_bptree_node();
     if (node_is_leaf) {
@@ -1750,7 +1926,7 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
         for (size_t i = 0; i != subnode.size(); ++i) {
             if (i != 0)
                 out << ", ";
-            out << subnode.get(i);
+            out_hex(out, subnode.get(i));
         }
     }
     out << ")\n";

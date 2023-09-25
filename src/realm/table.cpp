@@ -31,7 +31,6 @@
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/index_string.hpp>
 #include <realm/query_conditions_tpl.hpp>
-#include <realm/query_engine.hpp>
 #include <realm/replication.hpp>
 #include <realm/table_view.hpp>
 #include <realm/util/features.h>
@@ -416,10 +415,6 @@ ColKey Table::add_column(Table& target, StringData name)
     Group* target_group = target.get_parent_group();
     REALM_ASSERT_RELEASE(origin_group && target_group);
     REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Only links to embedded objects are allowed.
-    if (is_asymmetric() && !target.is_embedded()) {
-        throw IllegalOperation("Object property not supported in asymmetric table");
-    }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
         throw IllegalOperation("Ephemeral objects not supported");
@@ -565,9 +560,11 @@ void Table::remove_recursive(CascadeState& cascade_state)
         cascade_state.send_notifications();
 
         for (auto& l : cascade_state.m_to_be_nullified) {
-            group->get_table(l.origin_table)
-                ->get_object(l.origin_key)
-                .nullify_link(l.origin_col_key, l.old_target_link);
+            Obj obj = group->get_table(l.origin_table)->try_get_object(l.origin_key);
+            REALM_ASSERT_DEBUG(obj);
+            if (obj) {
+                std::move(obj).nullify_link(l.origin_col_key, l.old_target_link);
+            }
         }
         cascade_state.m_to_be_nullified.clear();
 
@@ -964,6 +961,9 @@ void Table::add_search_index(ColKey col_key, IndexType type)
     // Check spec
     auto spec_ndx = leaf_ndx2spec_ndx(col_key.get_index());
     auto attr = m_spec.get_column_attr(spec_ndx);
+
+    if (col_key == m_primary_key_col && type == IndexType::Fulltext)
+        throw InvalidColumnKey("primary key cannot have a full text index");
 
     switch (type) {
         case IndexType::None:
@@ -3600,6 +3600,14 @@ void Table::set_primary_key_column(ColKey col_key)
 
 void Table::do_set_primary_key_column(ColKey col_key)
 {
+    if (col_key) {
+        auto spec_ndx = leaf_ndx2spec_ndx(col_key.get_index());
+        auto attr = m_spec.get_column_attr(spec_ndx);
+        if (attr.test(col_attr_FullText_Indexed)) {
+            throw InvalidColumnKey("primary key cannot have a full text index");
+        }
+    }
+
     if (m_primary_key_col) {
         // If the search index has not been set explicitly on current pk col, we remove it again
         auto spec_ndx = leaf_ndx2spec_ndx(m_primary_key_col.get_index());

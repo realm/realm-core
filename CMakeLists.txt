@@ -265,8 +265,7 @@ if(NOT EMSCRIPTEN)
 endif()
 option(REALM_ENABLE_MEMDEBUG "Add additional memory checks" OFF)
 option(REALM_VALGRIND "Tell the test suite we are running with valgrind" OFF)
-option(REALM_METRICS "Enable various metric tracking" ON)
-option(REALM_ENABLE_SYNC_MULTIPLEXING "Enables sync session multi-plexing by default")
+option(REALM_SYNC_MULTIPLEXING "Enables/disables sync session multiplexing by default" ON)
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 option(REALM_ENABLE_GEOSPATIAL "Enable geospatial types and queries." ON)
 
@@ -308,8 +307,8 @@ endif()
 # Just use -lz and let Xcode figure it out
 # Emscripten does provide Zlib, but it doesn't work with find_package and is handled specially
 if(NOT APPLE AND NOT EMSCRIPTEN AND NOT TARGET ZLIB::ZLIB)
-    if(WIN32)
-        realm_acquire_dependency(zlib ${DEP_WIN32_ZLIB_VERSION} ZLIB_CMAKE_INCLUDE_FILE)
+    if(WIN32 OR (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND REALM_LINUX_TOOLCHAIN))
+        realm_acquire_dependency(zlib ${DEP_ZLIB_VERSION} ZLIB_CMAKE_INCLUDE_FILE)
         include(${ZLIB_CMAKE_INCLUDE_FILE})
     elseif(ANDROID)
         # On Android FindZLIB chooses the static libz over the dynamic one, but this leads to issues

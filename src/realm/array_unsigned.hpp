@@ -110,17 +110,6 @@ private:
     uint64_t _get(size_t ndx, uint8_t width) const;
 };
 
-class ClusterKeyArray : public ArrayUnsigned {
-public:
-    using ArrayUnsigned::ArrayUnsigned;
-
-    uint64_t get(size_t ndx) const
-    {
-        return (m_data != nullptr) ? ArrayUnsigned::get(ndx) : uint64_t(ndx);
-    }
-};
-
-
 } // namespace realm
 
 #endif /* REALM_ARRAY_UNSIGNED_HPP */

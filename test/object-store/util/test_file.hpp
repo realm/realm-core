@@ -109,11 +109,13 @@ void on_change_but_no_notify(realm::Realm& realm);
 #if REALM_ENABLE_SYNC
 
 using StartImmediately = realm::util::TaggedBool<class StartImmediatelyTag>;
+using EnableSSL = realm::util::TaggedBool<class EnableSSLTag>;
 
 class SyncServer : private realm::sync::Clock {
 public:
     struct Config {
-        bool start_immediately = true;
+        StartImmediately start_immediately = true;
+        EnableSSL ssl = false;
         std::string local_dir;
     };
 
@@ -219,6 +221,7 @@ public:
         realm::util::Logger::Level log_level = realm::util::Logger::Level::TEST_LOGGING_LEVEL;
         bool override_sync_route = true;
         std::shared_ptr<realm::app::GenericNetworkTransport> transport;
+        bool start_sync_client = true;
     };
 
     TestSyncManager(realm::SyncManager::MetadataMode mode);

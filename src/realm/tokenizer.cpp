@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <realm/tokenizer.hpp>
+#include <realm/exceptions.hpp>
 
 namespace realm {
 
@@ -39,6 +40,74 @@ std::set<std::string> Tokenizer::get_all_tokens()
         tokens.emplace(get_token());
     }
     return tokens;
+}
+std::pair<std::set<std::string>, std::set<std::string>> Tokenizer::get_search_tokens()
+{
+    std::vector<std::string_view> incl;
+    std::vector<std::string_view> excl;
+
+    const char* begin = nullptr;
+    const char* end = nullptr;
+    auto add_token = [&] {
+        if (begin) {
+            if (*begin == '-') {
+                begin++;
+                excl.emplace_back(begin, end - begin);
+            }
+            else {
+                incl.emplace_back(begin, end - begin);
+            }
+            begin = nullptr;
+        }
+    };
+    for (; m_cur_pos != m_end_pos; m_cur_pos++) {
+        if (isspace(*m_cur_pos)) {
+            add_token();
+        }
+        else {
+            if (begin) {
+                end++;
+            }
+            else {
+                begin = m_cur_pos;
+                end = m_cur_pos + 1;
+            }
+        }
+    }
+    add_token();
+
+    std::set<std::string> includes;
+    std::set<std::string> excludes;
+
+    for (auto& tok : incl) {
+        reset(tok);
+        next();
+        if (tok.back() == '*') {
+            std::string str(get_token());
+            str += '*';
+            includes.insert(str);
+        }
+        else {
+            includes.emplace(get_token());
+        }
+        if (next()) {
+            throw InvalidArgument("Non alphanumeric characters not allowed inside search word");
+        }
+    }
+    for (auto& tok : excl) {
+        reset(tok);
+        next();
+        std::string t(get_token());
+        if (includes.count(t)) {
+            throw InvalidArgument("You can't include and exclude the same token");
+        }
+        excludes.emplace(t);
+        if (next()) {
+            throw InvalidArgument("Non alphanumeric characters not allowed inside search word");
+        }
+    }
+
+    return {includes, excludes};
 }
 
 TokenInfoMap Tokenizer::get_token_info()

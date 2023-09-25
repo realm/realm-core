@@ -7,7 +7,7 @@
 #ifndef UTIL_MATH_MATHUTIL_H__
 #define UTIL_MATH_MATHUTIL_H__
 
-#include <math.h>
+#include <cmath>
 #include <algorithm>
 using std::min;
 using std::max;
@@ -19,6 +19,8 @@ using std::vector;
 
 #include "s2/base/basictypes.h"
 #include "s2/base/logging.h"
+
+#include <realm/util/features.h>
 
 // Returns the sign of x:
 //   -1 if x < 0,
@@ -105,11 +107,13 @@ template<typename T> struct MathLimits {
 #endif  //UTIL_MATH_MATHLIMITS_H
 // ========================================================================= //
 
+#if defined(__clang__)
 // Disable error about fabs causing truncation of value because
 // it takes a double instead of a long double (Clang 3.5)
 // See SERVER-15183
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wabsolute-value"
+#endif
 
 class MathUtil {
  public:
@@ -317,33 +321,6 @@ class MathUtil {
                            vector<bool>* shards_to_read);
 
   // --------------------------------------------------------------------
-  // Round, IntRound
-  //   These functions round a floating-point number to an integer.  They
-  //   work for positive or negative numbers.
-  //
-  //   Values that are halfway between two integers may be rounded up or
-  //   down, for example IntRound(0.5) == 0 and IntRound(1.5) == 2.  This
-  //   allows these functions to be implemented efficiently on Intel
-  //   processors (see the template specializations at the bottom of this
-  //   file).  You should not use these functions if you care about which
-  //   way such half-integers are rounded.
-  //
-  //   Example usage:
-  //     double y, z;
-  //     int x = IntRound(y + 3.7);
-  //     int64 b = Round<int64>(0.3 * z);
-  //
-  //   Note that the floating-point template parameter is typically inferred
-  //   from the argument type, i.e. there is no need to specify it explicitly.
-  // --------------------------------------------------------------------
-  template <class IntOut, class FloatIn>
-  static IntOut Round(FloatIn x);
-
-  // Example usage: IntRound(3.6) (no need for IntRound<double>(3.6)).
-  template <class FloatIn>
-  static int IntRound(FloatIn x) { return Round<int>(x); }
-
-  // --------------------------------------------------------------------
   // FastIntRound, FastInt64Round
   //   Fast routines for converting floating-point numbers to integers.
   //
@@ -356,11 +333,10 @@ class MathUtil {
   //   floating-point pipeline (unless programs are compiled specifically
   //   for the Pentium 4, which has a new instruction to avoid this).
   //
-  //   Numbers that are halfway between two integers may be rounded up or
-  //   down.  This is because the conversion is done using the default
+  //   Numbers that are halfway between two integers follow the default
   //   rounding mode, which rounds towards the closest even number in case
   //   of ties.  So for example, FastIntRound(0.5) == 0, but
-  //   FastIntRound(1.5) == 2.  These functions should only be used with
+  //   FastIntRound(1.5) == 2. These functions should only be used with
   //   applications that don't care about which way such half-integers are
   //   rounded.
   //
@@ -368,10 +344,8 @@ class MathUtil {
   //   functions (for "int" and "int64" only), but it's safer to call them
   //   directly.
   //
-  //   This functions are equivalent to lrint() and llrint() as defined in
-  //   the ISO C99 standard.  Unfortunately this standard does not seem to
-  //   widely adopted yet and these functions are not available by default.
-  //   --------------------------------------------------------------------
+  //   This functions are equivalent to rint() and llrint().
+  // --------------------------------------------------------------------
 
   static int32 FastIntRound(double x) {
     // This function is not templatized because gcc doesn't seem to be able
@@ -379,7 +353,7 @@ class MathUtil {
     // is no advantage to passing an argument type of "float" on Intel
     // architectures anyway.
 
-#if defined __GNUC__ && (defined __i386__ || defined __SSE2__)
+#if defined __GNUC__ && (defined __i386__ || defined __SSE2__) && !(REALM_WATCHOS && !REALM_APPLE_DEVICE)
 #if defined __SSE2__
     // SSE2.
     int32 result;
@@ -399,12 +373,12 @@ class MathUtil {
     return result;
 #endif  // if defined __x86_64__ || ...
 #else
-    return Round<int32, double>(x);
+    return static_cast<int32>(std::rint(x));
 #endif  // if defined __GNUC__ && ...
   }
 
   static int64 FastInt64Round(double x) {
-#if defined __GNUC__ && (defined __i386__ || defined __x86_64__)
+#if defined __GNUC__ && (defined __i386__ || defined __x86_64__) && !(REALM_WATCHOS && !REALM_APPLE_DEVICE)
 #if defined __x86_64__
     // SSE2.
     int64 result;
@@ -425,7 +399,7 @@ class MathUtil {
     return result;
 #endif  // if defined __i386__
 #else
-    return Round<int64, double>(x);
+    return static_cast<int64>(std::llrint(x));
 #endif  // if defined __GNUC__ && ...
   }
 
@@ -686,35 +660,6 @@ class MathUtil {
   }
 };
 
-// ========================================================================= //
-
-#if (defined __i386__ || defined __x86_64__) && defined __GNUC__
-
-// We define template specializations of Round() to get the more efficient
-// Intel versions when possible.  Note that gcc does not currently support
-// partial specialization of templatized functions.
-template<>
-inline int32 MathUtil::Round<int32, double>(double x) {
-  return FastIntRound(x);
-}
-
-template<>
-inline int32 MathUtil::Round<int32, float>(float x) {
-  return FastIntRound(x);
-}
-
-template<>
-inline int64 MathUtil::Round<int64, double>(double x) {
-  return FastInt64Round(x);
-}
-
-template<>
-inline int64 MathUtil::Round<int64, float>(float x) {
-  return FastInt64Round(x);
-}
-
-#endif
-
 template<typename T>
 bool MathUtil::WithinFraction(const T x, const T y, const T fraction) {
   // not just "0 <= fraction" to fool the compiler for unsigned types
@@ -752,6 +697,8 @@ bool MathUtil::WithinFractionOrMargin(const T x, const T y,
   }
 }
 
+#if defined(__clang__)
 #pragma clang diagnostic pop
+#endif
 
 #endif  // UTIL_MATH_MATHUTIL_H__

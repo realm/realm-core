@@ -213,7 +213,11 @@ bid128_to_string (char *str, BID_UINT128 x
 	__L1_Split_MiDi_6_Lead (HI_18Dig, ptr);
 	__L1_Split_MiDi_6 (LO_18Dig, ptr);
       }
-      len = ptr - MiDi;
+
+      // Realm edit: silence warning about lengths by casting
+      // this should not be a problem under the assumption that
+      // we are working with strings with reasonable lengths
+      len = (int)(ptr - MiDi);
       c_ptr_start = &(str[k]);
       c_ptr = c_ptr_start;
 
@@ -222,7 +226,10 @@ bid128_to_string (char *str, BID_UINT128 x
       for (k_lcv = 1; k_lcv < len; k_lcv++) {
 	__L0_MiDi2Str (MiDi[k_lcv], c_ptr);
       }
-      k = k + (c_ptr - c_ptr_start);
+
+      // Realm edit: explicit cast to silence warning
+      // assumes working with strings of reasonable length
+      k = k + (unsigned int)(c_ptr - c_ptr_start);
     }
 
     // print E and sign of exponent

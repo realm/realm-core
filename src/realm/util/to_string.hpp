@@ -19,6 +19,7 @@
 #ifndef REALM_UTIL_TO_STRING_HPP
 #define REALM_UTIL_TO_STRING_HPP
 
+#include <cstdint>
 #include <iosfwd>
 #include <ostream>
 #include <string>

@@ -133,7 +133,7 @@ Mixed Dictionary::get_any(size_t ndx) const
 {
     // Note: `size()` calls `update_if_needed()`.
     CollectionBase::validate_index("get_any()", ndx, size());
-    return m_values->get(ndx);
+    return do_get(ndx);
 }
 
 std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx) const
@@ -703,8 +703,10 @@ void Dictionary::nullify(Mixed key)
 
 void Dictionary::remove_backlinks(CascadeState& state) const
 {
-    for (auto&& elem : *this) {
-        clear_backlink(elem.second, state);
+    if (size() > 0) {
+        m_values->for_all([&](Mixed val) {
+            clear_backlink(val, state);
+        });
     }
 }
 
@@ -831,12 +833,8 @@ Mixed Dictionary::do_get(size_t ndx) const
     Mixed val = m_values->get(ndx);
 
     // Filter out potential unresolved links
-    if (val.is_type(type_TypedLink)) {
-        auto link = val.get<ObjLink>();
-        auto key = link.get_obj_key();
-        if (key.is_unresolved()) {
-            return {};
-        }
+    if (val.is_type(type_TypedLink) && val.get<ObjKey>().is_unresolved()) {
+        return {};
     }
     return val;
 }
