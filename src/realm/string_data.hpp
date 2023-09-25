@@ -264,10 +264,11 @@ inline bool operator<(const StringData& a, const StringData& b) noexcept
         // equal to empty strings.
         return true;
     }
-    using uchar_p = const unsigned char*;
-    return std::lexicographical_compare(
-        reinterpret_cast<uchar_p>(a.m_data), reinterpret_cast<uchar_p>(a.m_data + a.m_size),
-        reinterpret_cast<uchar_p>(b.m_data), reinterpret_cast<uchar_p>(b.m_data + b.m_size));
+    // memcmp does comparison using unsigned characters which gives the correct ordering for utf8
+    int cmp =  memcmp(a.m_data, b.m_data, std::min(a.size(), b.size()));
+    if (cmp == 0 && a.size() < b.size())
+        return true;
+    return cmp < 0;
 }
 
 inline bool operator>(const StringData& a, const StringData& b) noexcept
