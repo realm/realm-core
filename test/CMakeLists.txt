@@ -54,7 +54,6 @@ set(CORE_TEST_SOURCES
     test_link_query_view.cpp
     test_links.cpp
     test_list.cpp
-    test_metrics.cpp
     test_mixed_null_assertions.cpp
     test_object_id.cpp
     test_optional.cpp

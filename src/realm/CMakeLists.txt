@@ -254,11 +254,6 @@ set(REALM_INSTALL_HEADERS
     util/to_string.hpp
     util/type_traits.hpp
     util/uri.hpp
-
-    metrics/metrics.hpp
-    metrics/metric_timer.hpp
-    metrics/query_info.hpp
-    metrics/transaction_info.hpp
 ) # REALM_INSTALL_HEADERS
 
 set(REALM_NOINST_HEADERS
@@ -283,12 +278,6 @@ set(REALM_NOINST_HEADERS
     util/timestamp_logger.hpp
     util/value_reset_guard.hpp
 ) # REALM_NOINST_HEADERS
-
-list(APPEND REALM_SOURCES
-    metrics/metrics.cpp
-    metrics/metric_timer.cpp
-    metrics/query_info.cpp
-    metrics/transaction_info.cpp)
 
 if(NOT MSVC)
     list(APPEND REALM_SOURCES util/interprocess_mutex.cpp)

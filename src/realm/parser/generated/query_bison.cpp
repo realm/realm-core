@@ -198,6 +198,12 @@ namespace yy {
         value.YY_MOVE_OR_COPY< AggrNode* > (YY_MOVE (that.value));
         break;
 
+      case symbol_kind::SYM_equality: // equality
+      case symbol_kind::SYM_relational: // relational
+      case symbol_kind::SYM_stringop: // stringop
+        value.YY_MOVE_OR_COPY< CompareType > (YY_MOVE (that.value));
+        break;
+
       case symbol_kind::SYM_constant: // constant
       case symbol_kind::SYM_primary_key: // primary_key
         value.YY_MOVE_OR_COPY< ConstantNode* > (YY_MOVE (that.value));
@@ -271,9 +277,6 @@ namespace yy {
 
       case symbol_kind::SYM_comp_type: // comp_type
       case symbol_kind::SYM_aggr_op: // aggr_op
-      case symbol_kind::SYM_equality: // equality
-      case symbol_kind::SYM_relational: // relational
-      case symbol_kind::SYM_stringop: // stringop
         value.YY_MOVE_OR_COPY< int > (YY_MOVE (that.value));
         break;
 
@@ -338,6 +341,12 @@ namespace yy {
     {
       case symbol_kind::SYM_aggregate: // aggregate
         value.move< AggrNode* > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_equality: // equality
+      case symbol_kind::SYM_relational: // relational
+      case symbol_kind::SYM_stringop: // stringop
+        value.move< CompareType > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_constant: // constant
@@ -413,9 +422,6 @@ namespace yy {
 
       case symbol_kind::SYM_comp_type: // comp_type
       case symbol_kind::SYM_aggr_op: // aggr_op
-      case symbol_kind::SYM_equality: // equality
-      case symbol_kind::SYM_relational: // relational
-      case symbol_kind::SYM_stringop: // stringop
         value.move< int > (YY_MOVE (that.value));
         break;
 
@@ -480,6 +486,12 @@ namespace yy {
     {
       case symbol_kind::SYM_aggregate: // aggregate
         value.copy< AggrNode* > (that.value);
+        break;
+
+      case symbol_kind::SYM_equality: // equality
+      case symbol_kind::SYM_relational: // relational
+      case symbol_kind::SYM_stringop: // stringop
+        value.copy< CompareType > (that.value);
         break;
 
       case symbol_kind::SYM_constant: // constant
@@ -555,9 +567,6 @@ namespace yy {
 
       case symbol_kind::SYM_comp_type: // comp_type
       case symbol_kind::SYM_aggr_op: // aggr_op
-      case symbol_kind::SYM_equality: // equality
-      case symbol_kind::SYM_relational: // relational
-      case symbol_kind::SYM_stringop: // stringop
         value.copy< int > (that.value);
         break;
 
@@ -620,6 +629,12 @@ namespace yy {
     {
       case symbol_kind::SYM_aggregate: // aggregate
         value.move< AggrNode* > (that.value);
+        break;
+
+      case symbol_kind::SYM_equality: // equality
+      case symbol_kind::SYM_relational: // relational
+      case symbol_kind::SYM_stringop: // stringop
+        value.move< CompareType > (that.value);
         break;
 
       case symbol_kind::SYM_constant: // constant
@@ -695,9 +710,6 @@ namespace yy {
 
       case symbol_kind::SYM_comp_type: // comp_type
       case symbol_kind::SYM_aggr_op: // aggr_op
-      case symbol_kind::SYM_equality: // equality
-      case symbol_kind::SYM_relational: // relational
-      case symbol_kind::SYM_stringop: // stringop
         value.move< int > (that.value);
         break;
 
@@ -1207,15 +1219,15 @@ namespace yy {
         break;
 
       case symbol_kind::SYM_equality: // equality
-                 { yyo << yysym.value.template as < int > (); }
+                 { yyo << string_for_op(yysym.value.template as < CompareType > ()); }
         break;
 
       case symbol_kind::SYM_relational: // relational
-                 { yyo << yysym.value.template as < int > (); }
+                 { yyo << string_for_op(yysym.value.template as < CompareType > ()); }
         break;
 
       case symbol_kind::SYM_stringop: // stringop
-                 { yyo << yysym.value.template as < int > (); }
+                 { yyo << string_for_op(yysym.value.template as < CompareType > ()); }
         break;
 
       case symbol_kind::SYM_path: // path
@@ -1454,6 +1466,12 @@ namespace yy {
         yylhs.value.emplace< AggrNode* > ();
         break;
 
+      case symbol_kind::SYM_equality: // equality
+      case symbol_kind::SYM_relational: // relational
+      case symbol_kind::SYM_stringop: // stringop
+        yylhs.value.emplace< CompareType > ();
+        break;
+
       case symbol_kind::SYM_constant: // constant
       case symbol_kind::SYM_primary_key: // primary_key
         yylhs.value.emplace< ConstantNode* > ();
@@ -1527,9 +1545,6 @@ namespace yy {
 
       case symbol_kind::SYM_comp_type: // comp_type
       case symbol_kind::SYM_aggr_op: // aggr_op
-      case symbol_kind::SYM_equality: // equality
-      case symbol_kind::SYM_relational: // relational
-      case symbol_kind::SYM_stringop: // stringop
         yylhs.value.emplace< int > ();
         break;
 
@@ -1620,32 +1635,32 @@ namespace yy {
     break;
 
   case 9: // compare: expr equality expr
-                                { yylhs.value.as < QueryNode* > () = drv.m_parse_nodes.create<EqualityNode>(yystack_[2].value.as < ExpressionNode* > (), yystack_[1].value.as < int > (), yystack_[0].value.as < ExpressionNode* > ()); }
+                                { yylhs.value.as < QueryNode* > () = drv.m_parse_nodes.create<EqualityNode>(yystack_[2].value.as < ExpressionNode* > (), yystack_[1].value.as < CompareType > (), yystack_[0].value.as < ExpressionNode* > ()); }
     break;
 
   case 10: // compare: expr equality "[c]" expr
                                 {
-                                    auto tmp = drv.m_parse_nodes.create<EqualityNode>(yystack_[3].value.as < ExpressionNode* > (), yystack_[2].value.as < int > (), yystack_[0].value.as < ExpressionNode* > ());
+                                    auto tmp = drv.m_parse_nodes.create<EqualityNode>(yystack_[3].value.as < ExpressionNode* > (), yystack_[2].value.as < CompareType > (), yystack_[0].value.as < ExpressionNode* > ());
                                     tmp->case_sensitive = false;
                                     yylhs.value.as < QueryNode* > () = tmp;
                                 }
     break;
 
   case 11: // compare: expr relational expr
-                                { yylhs.value.as < QueryNode* > () = drv.m_parse_nodes.create<RelationalNode>(yystack_[2].value.as < ExpressionNode* > (), yystack_[1].value.as < int > (), yystack_[0].value.as < ExpressionNode* > ()); }
+                                { yylhs.value.as < QueryNode* > () = drv.m_parse_nodes.create<RelationalNode>(yystack_[2].value.as < ExpressionNode* > (), yystack_[1].value.as < CompareType > (), yystack_[0].value.as < ExpressionNode* > ()); }
     break;
 
   case 12: // compare: value stringop value
-                                { yylhs.value.as < QueryNode* > () = drv.m_parse_nodes.create<StringOpsNode>(yystack_[2].value.as < ValueNode* > (), yystack_[1].value.as < int > (), yystack_[0].value.as < ValueNode* > ()); }
+                                { yylhs.value.as < QueryNode* > () = drv.m_parse_nodes.create<StringOpsNode>(yystack_[2].value.as < ValueNode* > (), yystack_[1].value.as < CompareType > (), yystack_[0].value.as < ValueNode* > ()); }
     break;
 
   case 13: // compare: value "fulltext" value
-                                { yylhs.value.as < QueryNode* > () = drv.m_parse_nodes.create<StringOpsNode>(yystack_[2].value.as < ValueNode* > (), CompareNode::TEXT, yystack_[0].value.as < ValueNode* > ()); }
+                                { yylhs.value.as < QueryNode* > () = drv.m_parse_nodes.create<StringOpsNode>(yystack_[2].value.as < ValueNode* > (), CompareType::TEXT, yystack_[0].value.as < ValueNode* > ()); }
     break;
 
   case 14: // compare: value stringop "[c]" value
                                 {
-                                    auto tmp = drv.m_parse_nodes.create<StringOpsNode>(yystack_[3].value.as < ValueNode* > (), yystack_[2].value.as < int > (), yystack_[0].value.as < ValueNode* > ());
+                                    auto tmp = drv.m_parse_nodes.create<StringOpsNode>(yystack_[3].value.as < ValueNode* > (), yystack_[2].value.as < CompareType > (), yystack_[0].value.as < ValueNode* > ());
                                     tmp->case_sensitive = false;
                                     yylhs.value.as < QueryNode* > () = tmp;
                                 }
@@ -2002,47 +2017,47 @@ namespace yy {
     break;
 
   case 100: // equality: "=="
-                                { yylhs.value.as < int > () = CompareNode::EQUAL; }
+                                { yylhs.value.as < CompareType > () = CompareType::EQUAL; }
     break;
 
   case 101: // equality: "!="
-                                { yylhs.value.as < int > () = CompareNode::NOT_EQUAL; }
+                                { yylhs.value.as < CompareType > () = CompareType::NOT_EQUAL; }
     break;
 
   case 102: // equality: "in"
-                                { yylhs.value.as < int > () = CompareNode::IN; }
+                                { yylhs.value.as < CompareType > () = CompareType::IN; }
     break;
 
   case 103: // relational: "<"
-                                { yylhs.value.as < int > () = CompareNode::LESS; }
+                                { yylhs.value.as < CompareType > () = CompareType::LESS; }
     break;
 
   case 104: // relational: "<="
-                                { yylhs.value.as < int > () = CompareNode::LESS_EQUAL; }
+                                { yylhs.value.as < CompareType > () = CompareType::LESS_EQUAL; }
     break;
 
   case 105: // relational: ">"
-                                { yylhs.value.as < int > () = CompareNode::GREATER; }
+                                { yylhs.value.as < CompareType > () = CompareType::GREATER; }
     break;
 
   case 106: // relational: ">="
-                                { yylhs.value.as < int > () = CompareNode::GREATER_EQUAL; }
+                                { yylhs.value.as < CompareType > () = CompareType::GREATER_EQUAL; }
     break;
 
   case 107: // stringop: "beginswith"
-                                { yylhs.value.as < int > () = CompareNode::BEGINSWITH; }
+                                { yylhs.value.as < CompareType > () = CompareType::BEGINSWITH; }
     break;
 
   case 108: // stringop: "endswith"
-                                { yylhs.value.as < int > () = CompareNode::ENDSWITH; }
+                                { yylhs.value.as < CompareType > () = CompareType::ENDSWITH; }
     break;
 
   case 109: // stringop: "contains"
-                                { yylhs.value.as < int > () = CompareNode::CONTAINS; }
+                                { yylhs.value.as < CompareType > () = CompareType::CONTAINS; }
     break;
 
   case 110: // stringop: "like"
-                                { yylhs.value.as < int > () = CompareNode::LIKE; }
+                                { yylhs.value.as < CompareType > () = CompareType::LIKE; }
     break;
 
   case 111: // path: id
@@ -2814,20 +2829,20 @@ namespace yy {
   const short
   parser::yyrline_[] =
   {
-       0,   178,   178,   181,   182,   183,   184,   185,   186,   189,
-     190,   195,   196,   197,   198,   203,   204,   205,   208,   209,
-     210,   211,   212,   213,   216,   217,   218,   219,   220,   223,
-     224,   227,   231,   237,   240,   243,   244,   245,   248,   249,
-     252,   253,   255,   258,   259,   262,   263,   264,   267,   268,
-     269,   270,   272,   275,   276,   278,   281,   282,   284,   287,
-     288,   290,   291,   294,   295,   296,   299,   300,   301,   302,
-     303,   304,   305,   306,   307,   308,   309,   310,   311,   312,
-     318,   319,   322,   323,   324,   325,   326,   329,   330,   333,
-     334,   335,   338,   339,   340,   341,   344,   345,   346,   347,
-     350,   351,   352,   355,   356,   357,   358,   361,   362,   363,
-     364,   367,   368,   369,   370,   371,   372,   373,   374,   377,
-     378,   379,   380,   381,   382,   383,   384,   385,   386,   387,
-     388,   389,   390,   391,   392,   393,   394,   395
+       0,   182,   182,   185,   186,   187,   188,   189,   190,   193,
+     194,   199,   200,   201,   202,   207,   208,   209,   212,   213,
+     214,   215,   216,   217,   220,   221,   222,   223,   224,   227,
+     228,   231,   235,   241,   244,   247,   248,   249,   252,   253,
+     256,   257,   259,   262,   263,   266,   267,   268,   271,   272,
+     273,   274,   276,   279,   280,   282,   285,   286,   288,   291,
+     292,   294,   295,   298,   299,   300,   303,   304,   305,   306,
+     307,   308,   309,   310,   311,   312,   313,   314,   315,   316,
+     322,   323,   326,   327,   328,   329,   330,   333,   334,   337,
+     338,   339,   342,   343,   344,   345,   348,   349,   350,   351,
+     354,   355,   356,   359,   360,   361,   362,   365,   366,   367,
+     368,   371,   372,   373,   374,   375,   376,   377,   378,   381,
+     382,   383,   384,   385,   386,   387,   388,   389,   390,   391,
+     392,   393,   394,   395,   396,   397,   398,   399
   };
 
   void

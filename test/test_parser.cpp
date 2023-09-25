@@ -70,7 +70,6 @@
 #include <set>
 
 using namespace realm;
-using namespace realm::metrics;
 using namespace realm::test_util;
 using namespace realm::util;
 

@@ -74,9 +74,6 @@ class TableFriend;
 namespace util {
 class Logger;
 }
-namespace metrics {
-class QueryInfo;
-}
 namespace query_parser {
 class Arguments;
 class KeyPathMapping;
@@ -877,7 +874,6 @@ private:
 
     friend class _impl::TableFriend;
     friend class Query;
-    friend class metrics::QueryInfo;
     template <class>
     friend class SimpleQuerySupport;
     friend class TableView;
