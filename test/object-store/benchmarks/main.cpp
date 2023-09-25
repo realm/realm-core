@@ -30,6 +30,10 @@
 #include <unistd.h>
 #endif
 
+#if TEST_SCHEDULER_UV
+#include <realm/object-store/util/uv/scheduler.hpp>
+#endif
+
 int main(int argc, char** argv)
 {
 #ifdef _MSC_VER
@@ -47,6 +51,12 @@ int main(int argc, char** argv)
     chdir(directory);
 #endif
 
+#if TEST_SCHEDULER_UV
+    realm::util::Scheduler::set_default_factory([]() {
+        return std::make_shared<realm::util::UvMainLoopScheduler>();
+    });
+#endif
+    
     int result = Catch::Session().run(argc, argv);
     return result < 0xff ? result : 0xff;
 }
