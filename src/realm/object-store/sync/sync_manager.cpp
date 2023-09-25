@@ -46,17 +46,7 @@ SyncManager::SyncManager() = default;
 void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sync_route,
                             const SyncClientConfig& config)
 {
-    struct UserCreationData {
-        std::string identity;
-        std::string refresh_token;
-        std::string access_token;
-        std::string provider_type;
-        std::vector<SyncUserIdentity> identities;
-        SyncUser::State state;
-        std::string device_id;
-    };
-
-    std::vector<UserCreationData> users_to_add;
+    std::vector<std::shared_ptr<SyncUser>> users_to_add;
     {
         // Locking the mutex here ensures that it is released before locking m_user_mutex
         util::CheckedLockGuard lock(m_mutex);
@@ -114,11 +104,8 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
                 auto user_data = users.get(i);
                 auto refresh_token = user_data.refresh_token();
                 auto access_token = user_data.access_token();
-                auto device_id = user_data.device_id();
                 if (!refresh_token.empty() && !access_token.empty()) {
-                    users_to_add.push_back(UserCreationData{user_data.identity(), std::move(refresh_token),
-                                                            std::move(access_token), user_data.provider_type(),
-                                                            user_data.identities(), user_data.state(), device_id});
+                    users_to_add.push_back(std::make_shared<SyncUser>(user_data, this));
                 }
             }
 
@@ -145,15 +132,7 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
     }
     {
         util::CheckedLockGuard lock(m_user_mutex);
-        for (auto& user_data : users_to_add) {
-            auto& identity = user_data.identity;
-            auto& provider_type = user_data.provider_type;
-            auto user =
-                std::make_shared<SyncUser>(user_data.refresh_token, identity, provider_type, user_data.access_token,
-                                           user_data.state, user_data.device_id, this);
-            user->update_identities(user_data.identities);
-            m_users.emplace_back(std::move(user));
-        }
+        m_users.insert(m_users.end(), users_to_add.begin(), users_to_add.end());
     }
 }
 
@@ -354,20 +333,16 @@ bool SyncManager::perform_metadata_update(util::FunctionRef<void(SyncMetadataMan
     return true;
 }
 
-std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, std::string refresh_token,
-                                                std::string access_token, const std::string provider_type,
-                                                std::string device_id)
+std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, const std::string& refresh_token,
+                                                const std::string& access_token, const std::string& device_id)
 {
     util::CheckedLockGuard lock(m_user_mutex);
-    auto it = std::find_if(m_users.begin(), m_users.end(), [user_id, provider_type](const auto& user) {
-        return user->identity() == user_id && user->provider_type() == provider_type &&
-               user->state() != SyncUser::State::Removed;
+    auto it = std::find_if(m_users.begin(), m_users.end(), [&](const auto& user) {
+        return user->identity() == user_id && user->state() != SyncUser::State::Removed;
     });
     if (it == m_users.end()) {
         // No existing user.
-        auto new_user =
-            std::make_shared<SyncUser>(std::move(refresh_token), user_id, provider_type, std::move(access_token),
-                                       SyncUser::State::LoggedIn, device_id, this);
+        auto new_user = std::make_shared<SyncUser>(refresh_token, user_id, access_token, device_id, this);
         m_users.emplace(m_users.begin(), new_user);
         {
             util::CheckedLockGuard lock(m_file_system_mutex);
@@ -380,7 +355,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, std:
     else { // LoggedOut => LoggedIn
         auto user = *it;
         REALM_ASSERT(user->state() != SyncUser::State::Removed);
-        user->update_state_and_tokens(SyncUser::State::LoggedIn, std::move(access_token), std::move(refresh_token));
+        user->log_in(access_token, refresh_token);
         return user;
     }
 }
@@ -423,39 +398,36 @@ std::shared_ptr<SyncUser> SyncManager::get_current_user() const
     return cur_user_ident ? get_user_for_identity(*cur_user_ident) : nullptr;
 }
 
-void SyncManager::log_out_user(const std::string& user_id)
+void SyncManager::log_out_user(const SyncUser& user)
 {
     util::CheckedLockGuard lock(m_user_mutex);
 
     // Move this user to the end of the vector
-    if (m_users.size() > 1) {
-        auto it = std::find_if(m_users.begin(), m_users.end(), [user_id](const auto& user) {
-            return user->identity() == user_id;
-        });
+    auto user_pos = std::partition(m_users.begin(), m_users.end(), [&](auto& u) {
+        return u.get() != &user;
+    });
 
-        if (it != m_users.end())
-            std::rotate(it, it + 1, m_users.end());
-    }
+    auto active_user = std::find_if(m_users.begin(), user_pos, [](auto& u) {
+        return u->state() == SyncUser::State::LoggedIn;
+    });
 
     util::CheckedLockGuard fs_lock(m_file_system_mutex);
-    bool was_active = (m_current_user && m_current_user->identity() == user_id) ||
-                      (m_metadata_manager && m_metadata_manager->get_current_user_identity() == user_id);
+    bool was_active = m_current_user.get() == &user ||
+                      (m_metadata_manager && m_metadata_manager->get_current_user_identity() == user.identity());
     if (!was_active)
         return;
 
     // Set the current active user to the next logged in user, or null if none
-    for (auto& user : m_users) {
-        if (user->state() == SyncUser::State::LoggedIn) {
-            if (m_metadata_manager)
-                m_metadata_manager->set_current_user_identity(user->identity());
-            m_current_user = user;
-            return;
-        }
+    if (active_user != user_pos) {
+        m_current_user = *active_user;
+        if (m_metadata_manager)
+            m_metadata_manager->set_current_user_identity((*active_user)->identity());
     }
-
-    if (m_metadata_manager)
-        m_metadata_manager->set_current_user_identity("");
-    m_current_user = nullptr;
+    else {
+        m_current_user = nullptr;
+        if (m_metadata_manager)
+            m_metadata_manager->set_current_user_identity("");
+    }
 }
 
 void SyncManager::set_current_user(const std::string& user_id)
@@ -471,27 +443,14 @@ void SyncManager::set_current_user(const std::string& user_id)
 void SyncManager::remove_user(const std::string& user_id)
 {
     util::CheckedLockGuard lock(m_user_mutex);
-    auto user = get_user_for_identity(user_id);
-    if (!user)
-        return;
-    user->set_state(SyncUser::State::Removed);
-
-    util::CheckedLockGuard fs_lock(m_file_system_mutex);
-    if (!m_metadata_manager)
-        return;
-
-    for (size_t i = 0; i < m_metadata_manager->all_unmarked_users().size(); i++) {
-        auto metadata = m_metadata_manager->all_unmarked_users().get(i);
-        if (user->identity() == metadata.identity()) {
-            metadata.mark_for_removal();
-        }
-    }
+    if (auto user = get_user_for_identity(user_id))
+        user->invalidate();
 }
 
 void SyncManager::delete_user(const std::string& user_id)
 {
     util::CheckedLockGuard lock(m_user_mutex);
-    // Avoid itterating over m_users twice by not calling `get_user_for_identity`.
+    // Avoid iterating over m_users twice by not calling `get_user_for_identity`.
     auto it = std::find_if(m_users.begin(), m_users.end(), [&user_id](auto& user) {
         return user->identity() == user_id;
     });
@@ -611,12 +570,12 @@ std::string SyncManager::path_for_realm(const SyncConfig& config, util::Optional
             }
             return string_from_partition(config.partition_value);
         }();
-        path = m_file_manager->realm_file_path(user->identity(), user->local_identity(), file_name,
+        path = m_file_manager->realm_file_path(user->identity(), user->legacy_identities(), file_name,
                                                config.partition_value);
     }
     // Report the use of a Realm for this user, so the metadata can track it for clean up.
     perform_metadata_update([&](const auto& manager) {
-        auto metadata = manager.get_or_make_user_metadata(user->identity(), user->provider_type());
+        auto metadata = manager.get_or_make_user_metadata(user->identity());
         metadata->add_realm_file_path(path);
     });
     return path;

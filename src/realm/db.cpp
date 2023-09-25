@@ -57,7 +57,6 @@
 
 
 using namespace realm;
-using namespace realm::metrics;
 using namespace realm::util;
 using Durability = DBOptions::Durability;
 
@@ -1443,11 +1442,6 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
         close();
         throw;
     }
-#if REALM_METRICS
-    if (options.enable_metrics) {
-        m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
-    }
-#endif // REALM_METRICS
     m_alloc.set_read_only(true);
 }
 
@@ -1476,8 +1470,9 @@ void DB::open(Replication& repl, const std::string& file, const DBOptions& optio
 class DBLogger : public Logger {
 public:
     DBLogger(const std::shared_ptr<Logger>& base_logger, unsigned hash) noexcept
-        : Logger(base_logger)
+        : Logger(*base_logger)
         , m_hash(hash)
+        , m_base_logger_ptr(base_logger)
     {
     }
 
@@ -1486,18 +1481,19 @@ protected:
     {
         std::ostringstream ostr;
         auto id = std::this_thread::get_id();
-        ostr << "DB: " << m_hash << " Thread " << id << ": ";
-        Logger::do_log(*m_base_logger_ptr, level, ostr.str() + message);
+        ostr << "DB: " << m_hash << " Thread " << id << ": " << message;
+        Logger::do_log(*m_base_logger_ptr, level, ostr.str());
     }
 
 private:
     unsigned m_hash;
+    std::shared_ptr<Logger> m_base_logger_ptr;
 };
 
 void DB::set_logger(const std::shared_ptr<util::Logger>& logger) noexcept
 {
     if (logger)
-        m_logger = std::make_shared<DBLogger>(logger, m_log_id);
+        m_logger = std::make_unique<DBLogger>(logger, m_log_id);
 }
 
 void DB::open(Replication& repl, const DBOptions options)
@@ -1511,7 +1507,7 @@ void DB::open(Replication& repl, const DBOptions options)
     set_logger(options.logger);
     m_replication->set_logger(m_logger.get());
     if (m_logger)
-        m_logger->log(util::Logger::Level::detail, "Open memory-only realm");
+        m_logger->detail("Open memory-only realm");
 
     auto hist_type = repl.get_history_type();
     m_in_memory_info =
@@ -1534,11 +1530,6 @@ void DB::open(Replication& repl, const DBOptions options)
 
     m_file_format_version = target_file_format_version;
 
-#if REALM_METRICS
-    if (options.enable_metrics) {
-        m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
-    }
-#endif // REALM_METRICS
     m_info = info;
     m_alloc.set_read_only(true);
 }
@@ -2483,9 +2474,6 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     auto live_versions = top_refs.size();
     // Do the actual commit
     REALM_ASSERT(oldest_version <= new_version);
-#if REALM_METRICS
-    transaction.update_num_objects();
-#endif // REALM_METRICS
 
     GroupWriter out(transaction, Durability(info->durability), m_marker_observer.get()); // Throws
     out.set_versions(new_version, top_refs, any_new_unreachables);

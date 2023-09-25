@@ -122,7 +122,6 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
         [&](const Instruction::AddTable::TopLevelTable& spec) {
             auto table_type = (spec.is_asymmetric ? Table::Type::TopLevelAsymmetric : Table::Type::TopLevel);
             if (spec.pk_type == Instruction::Payload::Type::GlobalKey) {
-                log("sync::create_table(group, \"%1\", %2);", table_name, table_type);
                 m_transaction.get_or_add_table(table_name, table_type);
             }
             else {
@@ -134,8 +133,6 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
                 StringData pk_field = get_string(spec.pk_field);
                 bool nullable = spec.pk_nullable;
 
-                log("group.get_or_add_table_with_primary_key(group, \"%1\", %2, \"%3\", %4, %5);", table_name,
-                    pk_type, pk_field, nullable, table_type);
                 if (!m_transaction.get_or_add_table_with_primary_key(table_name, pk_type, pk_field, nullable,
                                                                      table_type)) {
                     bad_transaction_log("AddTable: The existing table '%1' has different properties", table_name);
@@ -149,7 +146,6 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
                 }
             }
             else {
-                log("group.add_embedded_table(\"%1\");", table_name);
                 m_transaction.add_table(table_name, Table::Type::Embedded);
             }
         },
@@ -169,7 +165,6 @@ void InstructionApplier::operator()(const Instruction::EraseTable& instr)
         bad_transaction_log("table does not exist");
     }
 
-    log("sync::erase_table(m_group, \"%1\")", table_name);
     m_transaction.remove_table(table_name);
 }
 
@@ -188,8 +183,6 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                 if (!table->is_nullable(pk_col)) {
                     bad_transaction_log("CreateObject(NULL) on a table with a non-nullable primary key");
                 }
-                log("sync::create_object_with_primary_key(group, get_table(\"%1\"), realm::util::none);",
-                    table->get_name());
                 m_last_object = table->create_object_with_primary_key(util::none);
             },
             [&](int64_t pk) {
@@ -200,7 +193,6 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                     bad_transaction_log("CreateObject(Int) on a table with primary key type %1",
                                         table->get_column_type(pk_col));
                 }
-                log("sync::create_object_with_primary_key(group, get_table(\"%1\"), %2);", table->get_name(), pk);
                 m_last_object = table->create_object_with_primary_key(pk);
             },
             [&](InternString pk) {
@@ -212,8 +204,6 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                                         table->get_column_type(pk_col));
                 }
                 StringData str = get_string(pk);
-                log("sync::create_object_with_primary_key(group, get_table(\"%1\"), \"%2\");", table->get_name(),
-                    str);
                 m_last_object = table->create_object_with_primary_key(str);
             },
             [&](const ObjectId& id) {
@@ -224,7 +214,6 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                     bad_transaction_log("CreateObject(ObjectId) on a table with primary key type %1",
                                         table->get_column_type(pk_col));
                 }
-                log("sync::create_object_with_primary_key(group, get_table(\"%1\"), %2);", table->get_name(), id);
                 m_last_object = table->create_object_with_primary_key(id);
             },
             [&](const UUID& id) {
@@ -235,15 +224,12 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                     bad_transaction_log("CreateObject(UUID) on a table with primary key type %1",
                                         table->get_column_type(pk_col));
                 }
-                log("sync::create_object_with_primary_key(group, get_table(\"%1\"), %2);", table->get_name(), id);
                 m_last_object = table->create_object_with_primary_key(id);
             },
             [&](GlobalKey key) {
                 if (pk_col) {
                     bad_transaction_log("CreateObject(GlobalKey) on table with a primary key");
                 }
-                log("sync::create_object_with_primary_key(group, get_table(\"%1\"), GlobalKey{%2, %3});",
-                    table->get_name(), key.hi(), key.lo());
                 m_last_object = table->create_object(key);
             },
         },

@@ -85,7 +85,6 @@ TConditionValue:    Type of values in condition column. That is, int64_t, float,
 #include <realm/array_bool.hpp>
 #include <realm/array_backlink.hpp>
 #include <realm/column_type_traits.hpp>
-#include <realm/metrics/query_info.hpp>
 #include <realm/query_conditions.hpp>
 #include <realm/table.hpp>
 #include <realm/column_integer.hpp>

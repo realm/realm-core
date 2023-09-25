@@ -1184,8 +1184,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         TestSyncManager tsm(tsm_config);
 
         SyncTestFile config(tsm.app(), "realm");
-        config.sync_config->user->update_refresh_token(std::string(invalid_token));
-        config.sync_config->user->update_access_token(std::move(invalid_token));
+        config.sync_config->user->log_in(invalid_token, invalid_token);
 
         bool got_error = false;
         config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {

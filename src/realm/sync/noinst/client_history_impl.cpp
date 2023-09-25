@@ -552,7 +552,7 @@ size_t ClientHistory::transform_and_apply_server_changesets(util::Span<Changeset
             InstructionApplier applier{*transact};
             {
                 TempShortCircuitReplication tscr{m_replication};
-                applier.apply(*transformed_changeset, &logger); // Throws
+                applier.apply(*transformed_changeset); // Throws
             }
             downloaded_bytes += transformed_changeset->original_changeset_size;
 

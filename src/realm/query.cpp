@@ -31,7 +31,6 @@
 #include <algorithm>
 
 using namespace realm;
-using namespace realm::metrics;
 
 Query::Query()
 {
@@ -1105,33 +1104,21 @@ void Query::aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start,
 
 std::optional<Mixed> Query::sum(ColKey col_key) const
 {
-#if REALM_METRICS
-    auto metric_timer = QueryInfo::track(this, QueryInfo::type_Sum);
-#endif
     return AggregateHelper<Query>::sum(*m_table, *this, col_key);
 }
 
 std::optional<Mixed> Query::avg(ColKey col_key, size_t* value_count) const
 {
-#if REALM_METRICS
-    auto metric_timer = QueryInfo::track(this, QueryInfo::type_Average);
-#endif
     return AggregateHelper<Query>::avg(*m_table, *this, col_key, value_count);
 }
 
 std::optional<Mixed> Query::min(ColKey col_key, ObjKey* return_ndx) const
 {
-#if REALM_METRICS
-    auto metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
-#endif
     return AggregateHelper<Query>::min(*m_table, *this, col_key, return_ndx);
 }
 
 std::optional<Mixed> Query::max(ColKey col_key, ObjKey* return_ndx) const
 {
-#if REALM_METRICS
-    auto metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
-#endif
     return AggregateHelper<Query>::max(*m_table, *this, col_key, return_ndx);
 }
 
@@ -1206,10 +1193,6 @@ ObjKey Query::find() const
 
     if (!m_table)
         return ret;
-
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Find);
-#endif
 
     auto logger = m_table->get_logger();
     bool do_log = false;
@@ -1392,10 +1375,6 @@ void Query::do_find_all(QueryStateBase& st) const
 
 TableView Query::find_all(size_t limit) const
 {
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
-#endif
-
     TableView ret(*this, limit);
     if (m_ordering) {
         // apply_descriptor_ordering will call do_sync
@@ -1515,9 +1494,6 @@ size_t Query::do_count(size_t limit) const
 
 size_t Query::count() const
 {
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
-#endif
     if (!m_table)
         return 0;
     return do_count();
@@ -1525,9 +1501,6 @@ size_t Query::count() const
 
 TableView Query::find_all(const DescriptorOrdering& descriptor) const
 {
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
-#endif
     if (descriptor.is_empty()) {
         return find_all();
     }
@@ -1558,9 +1531,6 @@ TableView Query::find_all(const DescriptorOrdering& descriptor) const
 
 size_t Query::count(const DescriptorOrdering& descriptor) const
 {
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
-#endif
     if (!m_table)
         return 0;
     realm::util::Optional<size_t> min_limit = descriptor.get_min_limit();
@@ -1737,6 +1707,9 @@ std::string Query::validate() const
 
 std::string Query::get_description(util::serializer::SerialisationState& state) const
 {
+    if (m_view) {
+        throw SerializationError("Serialization of a query constrained by a view is not currently supported");
+    }
     std::string description;
     if (auto root = root_node()) {
         description = root->describe_expression(state);
@@ -1765,9 +1738,6 @@ util::bind_ptr<DescriptorOrdering> Query::get_ordering()
 
 std::string Query::get_description() const
 {
-    if (m_view) {
-        throw SerializationError("Serialization of a query constrained by a view is not currently supported");
-    }
     util::serializer::SerialisationState state(m_table->get_parent_group());
     return get_description(state);
 }
@@ -1778,7 +1748,10 @@ std::string Query::get_description_safe() const noexcept
         util::serializer::SerialisationState state(m_table->get_parent_group());
         return get_description(state);
     }
-    catch (...) {
+    catch (const Exception& e) {
+        if (auto logger = m_table->get_logger()) {
+            logger->log(util::Logger::Level::warn, "Query::get_description() failed: '%1'", e.what());
+        }
     }
     return "Unknown Query";
 }

@@ -76,7 +76,6 @@ Group::Group(const std::string& file_path, const char* encryption_key)
     , m_top(m_alloc)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
-    , m_total_rows(0)
 {
     init_array_parents();
 
@@ -99,7 +98,6 @@ Group::Group(BinaryData buffer, bool take_ownership)
     , m_top(m_alloc)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
-    , m_total_rows(0)
 {
     REALM_ASSERT(buffer.data());
 
@@ -118,7 +116,6 @@ Group::Group(SlabAlloc* alloc) noexcept
     m_top(m_alloc)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
-    , m_total_rows(0)
 {
     init_array_parents();
 }
@@ -561,9 +558,6 @@ void Group::attach(ref_type top_ref, bool writable, bool create_group_when_missi
     while (m_table_accessors.size() < sz) {
         m_table_accessors.emplace_back();
     }
-#if REALM_METRICS
-    update_num_objects();
-#endif // REALM_METRICS
 }
 
 
@@ -577,23 +571,6 @@ void Group::detach() noexcept
     m_top.detach();
 
     m_attached = false;
-}
-
-void Group::update_num_objects()
-{
-#if REALM_METRICS
-    if (m_metrics) {
-        // This is quite invasive and completely defeats the lazy loading mechanism
-        // where table accessors are only instantiated on demand, because they are all created here.
-
-        m_total_rows = 0;
-        auto keys = get_table_keys();
-        for (auto key : keys) {
-            ConstTableRef t = get_table(key);
-            m_total_rows += t->size();
-        }
-    }
-#endif // REALM_METRICS
 }
 
 void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, VersionID version)
@@ -852,7 +829,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     size_t prior_num_tables = m_tables.size();
     Replication* repl = *get_repl();
     if (repl)
-        repl->erase_class(key, prior_num_tables); // Throws
+        repl->erase_class(key, table->get_name(), prior_num_tables); // Throws
 
     int64_t ref_64 = m_tables.get(table_ndx);
     REALM_ASSERT(!int_cast_has_overflow<ref_type>(ref_64));

@@ -5861,9 +5861,12 @@ NONCONCURRENT_TEST_TYPES(Sync_PrimaryKeyTypes, Int, String, ObjectId, UUID, util
 TEST(Sync_Mixed)
 {
     // Test replication and synchronization of Mixed values and lists.
-
-    TEST_CLIENT_DB(db_1);
-    TEST_CLIENT_DB(db_2);
+    DBOptions options;
+    options.logger = test_context.logger;
+    SHARED_GROUP_TEST_PATH(db_1_path);
+    SHARED_GROUP_TEST_PATH(db_2_path);
+    auto db_1 = DB::create(make_client_replication(), db_1_path, options);
+    auto db_2 = DB::create(make_client_replication(), db_2_path, options);
 
     TEST_DIR(dir);
     fixtures::ClientServerFixture fixture{dir, test_context};
@@ -6723,10 +6726,12 @@ TEST(Sync_BundledRealmFile)
 
 TEST(Sync_UpgradeToClientHistory)
 {
-    SHARED_GROUP_TEST_PATH(db1_path);
-    SHARED_GROUP_TEST_PATH(db2_path);
-    auto db_1 = DB::create(make_in_realm_history(), db1_path);
-    auto db_2 = DB::create(make_in_realm_history(), db2_path);
+    DBOptions options;
+    options.logger = test_context.logger;
+    SHARED_GROUP_TEST_PATH(db_1_path);
+    SHARED_GROUP_TEST_PATH(db_2_path);
+    auto db_1 = DB::create(make_in_realm_history(), db_1_path, options);
+    auto db_2 = DB::create(make_in_realm_history(), db_2_path, options);
     {
         auto tr = db_1->start_write();
 
@@ -6762,16 +6767,23 @@ TEST(Sync_UpgradeToClientHistory)
 
         auto list = baa.get_list<Int>(col_list);
         list.add(1);
+        list.add(0);
         list.add(2);
         list.add(3);
+        list.set(1, 5);
+        list.remove(1);
         auto set = baa.get_set<Int>(col_set);
         set.insert(4);
+        set.insert(2);
         set.insert(5);
         set.insert(6);
+        set.erase(2);
         auto dict = baa.get_dictionary(col_dict);
+        dict.insert("key6", 6);
         dict.insert("key7", 7);
         dict.insert("key8", 8);
         dict.insert("key9", 9);
+        dict.erase("key6");
 
         for (int i = 0; i < 100; i++) {
             foobaas->create_object_with_primary_key(ObjectId::gen()).set(col_time, Timestamp(::time(nullptr), i));

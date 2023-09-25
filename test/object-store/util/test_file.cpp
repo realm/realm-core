@@ -114,6 +114,7 @@ InMemoryTestFile::InMemoryTestFile()
     in_memory = true;
     schema_version = 0;
     encryption_key = std::vector<char>();
+    util::Logger::set_default_level_threshold(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 }
 
 DBOptions InMemoryTestFile::options() const
@@ -131,8 +132,7 @@ static const std::string fake_device_id = "123400000000000000000000";
 
 static std::shared_ptr<SyncUser> get_fake_user(app::App& app, const std::string& user_name)
 {
-    return app.sync_manager()->get_user(user_name, fake_refresh_token, fake_access_token, app.base_url(),
-                                        fake_device_id);
+    return app.sync_manager()->get_user(user_name, fake_refresh_token, fake_access_token, fake_device_id);
 }
 
 SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std::string user_name)
@@ -195,13 +195,7 @@ SyncServer::SyncServer(const SyncServer::Config& config)
     , m_server(m_local_root_dir, util::none, ([&] {
                    using namespace std::literals::chrono_literals;
 
-#if TEST_ENABLE_LOGGING
-                   auto logger = new util::StderrLogger(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
-                   m_logger.reset(logger);
-#else
-                   // Logging is disabled, use a NullLogger to prevent printing anything
-                   m_logger.reset(new util::NullLogger());
-#endif
+                   m_logger = std::make_shared<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
 
                    sync::Server::Config c;
                    c.logger = m_logger;

@@ -307,7 +307,7 @@ int main(int argc, const char** argv)
                                  });
                                  auto transaction = local_db->start_write();
                                  realm::sync::InstructionApplier applier(*transaction);
-                                 applier.apply(changeset, logger.get());
+                                 applier.apply(changeset);
                                  auto generated_version = transaction->commit();
                                  logger->debug("integrated local changesets as version %1", generated_version);
                                  history.set_local_origin_timestamp_source(realm::sync::generate_changeset_timestamp);

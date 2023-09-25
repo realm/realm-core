@@ -72,6 +72,8 @@
     class DescriptorNode;
     class PropertyNode;
     class SubqueryNode;
+
+    enum class CompareType: char;
   }
   using namespace realm::query_parser;
 
@@ -436,71 +438,73 @@ namespace yy {
       // aggregate
       char dummy1[sizeof (AggrNode*)];
 
+      // equality
+      // relational
+      // stringop
+      char dummy2[sizeof (CompareType)];
+
       // constant
       // primary_key
-      char dummy2[sizeof (ConstantNode*)];
+      char dummy3[sizeof (ConstantNode*)];
 
       // distinct
       // distinct_param
       // sort
       // sort_param
       // limit
-      char dummy3[sizeof (DescriptorNode*)];
+      char dummy4[sizeof (DescriptorNode*)];
 
       // post_query
-      char dummy4[sizeof (DescriptorOrderingNode*)];
+      char dummy5[sizeof (DescriptorOrderingNode*)];
 
       // expr
-      char dummy5[sizeof (ExpressionNode*)];
+      char dummy6[sizeof (ExpressionNode*)];
 
       // geoloop_content
       // geoloop
       // geopoly_content
       // geospatial
-      char dummy6[sizeof (GeospatialNode*)];
+      char dummy7[sizeof (GeospatialNode*)];
 
       // list
       // list_content
-      char dummy7[sizeof (ListNode*)];
+      char dummy8[sizeof (ListNode*)];
 
       // path
-      char dummy8[sizeof (PathNode*)];
+      char dummy9[sizeof (PathNode*)];
 
       // post_op
-      char dummy9[sizeof (PostOpNode*)];
+      char dummy10[sizeof (PostOpNode*)];
 
       // prop
       // simple_prop
-      char dummy10[sizeof (PropertyNode*)];
+      char dummy11[sizeof (PropertyNode*)];
 
       // query
       // compare
-      char dummy11[sizeof (QueryNode*)];
+      char dummy12[sizeof (QueryNode*)];
 
       // subquery
-      char dummy12[sizeof (SubqueryNode*)];
+      char dummy13[sizeof (SubqueryNode*)];
 
       // boolexpr
-      char dummy13[sizeof (TrueOrFalseNode*)];
+      char dummy14[sizeof (TrueOrFalseNode*)];
 
       // value
-      char dummy14[sizeof (ValueNode*)];
+      char dummy15[sizeof (ValueNode*)];
 
       // direction
-      char dummy15[sizeof (bool)];
+      char dummy16[sizeof (bool)];
 
       // coordinate
-      char dummy16[sizeof (double)];
+      char dummy17[sizeof (double)];
 
       // comp_type
       // aggr_op
-      // equality
-      // relational
-      // stringop
-      char dummy17[sizeof (int)];
+      char dummy18[sizeof (int)];
 
       // geopoint
-      char dummy18[sizeof (std::optional<GeoPoint>)];
+      char dummy19[sizeof (std::optional<GeoPoint>)];
 
       // "identifier"
       // "string"
@@ -539,7 +543,7 @@ namespace yy {
       // "key or value"
       // "@links"
       // id
-      char dummy19[sizeof (std::string)];
+      char dummy20[sizeof (std::string)];
     };
 
     /// The size of the largest semantic type.
@@ -817,6 +821,12 @@ namespace yy {
         value.move< AggrNode* > (std::move (that.value));
         break;
 
+      case symbol_kind::SYM_equality: // equality
+      case symbol_kind::SYM_relational: // relational
+      case symbol_kind::SYM_stringop: // stringop
+        value.move< CompareType > (std::move (that.value));
+        break;
+
       case symbol_kind::SYM_constant: // constant
       case symbol_kind::SYM_primary_key: // primary_key
         value.move< ConstantNode* > (std::move (that.value));
@@ -890,9 +900,6 @@ namespace yy {
 
       case symbol_kind::SYM_comp_type: // comp_type
       case symbol_kind::SYM_aggr_op: // aggr_op
-      case symbol_kind::SYM_equality: // equality
-      case symbol_kind::SYM_relational: // relational
-      case symbol_kind::SYM_stringop: // stringop
         value.move< int > (std::move (that.value));
         break;
 
@@ -968,6 +975,18 @@ namespace yy {
       {}
 #else
       basic_symbol (typename Base::kind_type t, const AggrNode*& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, CompareType&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const CompareType& v)
         : Base (t)
         , value (v)
       {}
@@ -1214,18 +1233,6 @@ namespace yy {
                     { }
         break;
 
-      case symbol_kind::SYM_equality: // equality
-                    { }
-        break;
-
-      case symbol_kind::SYM_relational: // relational
-                    { }
-        break;
-
-      case symbol_kind::SYM_stringop: // stringop
-                    { }
-        break;
-
        default:
           break;
         }
@@ -1235,6 +1242,12 @@ switch (yykind)
     {
       case symbol_kind::SYM_aggregate: // aggregate
         value.template destroy< AggrNode* > ();
+        break;
+
+      case symbol_kind::SYM_equality: // equality
+      case symbol_kind::SYM_relational: // relational
+      case symbol_kind::SYM_stringop: // stringop
+        value.template destroy< CompareType > ();
         break;
 
       case symbol_kind::SYM_constant: // constant
@@ -1310,9 +1323,6 @@ switch (yykind)
 
       case symbol_kind::SYM_comp_type: // comp_type
       case symbol_kind::SYM_aggr_op: // aggr_op
-      case symbol_kind::SYM_equality: // equality
-      case symbol_kind::SYM_relational: // relational
-      case symbol_kind::SYM_stringop: // stringop
         value.template destroy< int > ();
         break;
 
@@ -2909,6 +2919,12 @@ switch (yykind)
         value.copy< AggrNode* > (YY_MOVE (that.value));
         break;
 
+      case symbol_kind::SYM_equality: // equality
+      case symbol_kind::SYM_relational: // relational
+      case symbol_kind::SYM_stringop: // stringop
+        value.copy< CompareType > (YY_MOVE (that.value));
+        break;
+
       case symbol_kind::SYM_constant: // constant
       case symbol_kind::SYM_primary_key: // primary_key
         value.copy< ConstantNode* > (YY_MOVE (that.value));
@@ -2982,9 +2998,6 @@ switch (yykind)
 
       case symbol_kind::SYM_comp_type: // comp_type
       case symbol_kind::SYM_aggr_op: // aggr_op
-      case symbol_kind::SYM_equality: // equality
-      case symbol_kind::SYM_relational: // relational
-      case symbol_kind::SYM_stringop: // stringop
         value.copy< int > (YY_MOVE (that.value));
         break;
 
@@ -3067,6 +3080,12 @@ switch (yykind)
         value.move< AggrNode* > (YY_MOVE (s.value));
         break;
 
+      case symbol_kind::SYM_equality: // equality
+      case symbol_kind::SYM_relational: // relational
+      case symbol_kind::SYM_stringop: // stringop
+        value.move< CompareType > (YY_MOVE (s.value));
+        break;
+
       case symbol_kind::SYM_constant: // constant
       case symbol_kind::SYM_primary_key: // primary_key
         value.move< ConstantNode* > (YY_MOVE (s.value));
@@ -3140,9 +3159,6 @@ switch (yykind)
 
       case symbol_kind::SYM_comp_type: // comp_type
       case symbol_kind::SYM_aggr_op: // aggr_op
-      case symbol_kind::SYM_equality: // equality
-      case symbol_kind::SYM_relational: // relational
-      case symbol_kind::SYM_stringop: // stringop
         value.move< int > (YY_MOVE (s.value));
         break;
 

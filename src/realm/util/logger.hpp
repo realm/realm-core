@@ -79,16 +79,18 @@ public:
     // this is enforced in logging.cpp.
     enum class Level { all = 0, trace = 1, debug = 2, detail = 3, info = 4, warn = 5, error = 6, fatal = 7, off = 8 };
 
+    static constexpr size_t max_width_of_value = 80;
+
     template <class... Params>
     void log(Level, const char* message, Params&&...);
 
-    virtual Level get_level_threshold() const noexcept
+    Level get_level_threshold() const noexcept
     {
         // Don't need strict ordering, mainly that the gets/sets are atomic
         return m_level_threshold.load(std::memory_order_relaxed);
     }
 
-    virtual void set_level_threshold(Level level) noexcept
+    void set_level_threshold(Level level) noexcept
     {
         // Don't need strict ordering, mainly that the gets/sets are atomic
         m_level_threshold.store(level, std::memory_order_relaxed);
@@ -109,9 +111,6 @@ public:
     static const std::string_view level_to_string(Level level) noexcept;
 
 protected:
-    // Used by subclasses that link to a base logger
-    std::shared_ptr<Logger> m_base_logger_ptr;
-
     // Shared level threshold for subclasses that link to a base logger
     // See PrefixLogger and ThreadSafeLogger
     std::atomic<Level>& m_level_threshold;
@@ -128,9 +127,8 @@ protected:
     {
     }
 
-    explicit Logger(const std::shared_ptr<Logger>& base_logger) noexcept
-        : m_base_logger_ptr{base_logger}
-        , m_level_threshold{m_base_logger_ptr->m_level_threshold}
+    explicit Logger(const Logger& base_logger) noexcept
+        : m_level_threshold{base_logger.m_level_threshold}
     {
     }
 
@@ -229,6 +227,7 @@ protected:
 
 private:
     Mutex m_mutex;
+    std::shared_ptr<Logger> m_base_logger_ptr;
 };
 
 
@@ -247,6 +246,7 @@ protected:
 private:
     const std::string m_prefix;
     // The next logger in the chain for chained PrefixLoggers or the base_logger
+    std::shared_ptr<Logger> m_owned_logger;
     Logger& m_chained_logger;
 };
 
@@ -270,29 +270,6 @@ public:
 
 protected:
     std::shared_ptr<Logger> m_chained_logger;
-};
-
-
-/// A logger that essentially performs a noop when logging functions are called
-/// The log level threshold for this logger is always Logger::Level::off and
-/// cannot be changed.
-class NullLogger : public Logger {
-public:
-    NullLogger()
-        : Logger{Level::off}
-    {
-    }
-
-    Level get_level_threshold() const noexcept override
-    {
-        return Level::off;
-    }
-
-    void set_level_threshold(Level) noexcept override {}
-
-protected:
-    // Since we don't want to log anything, do_log() does nothing
-    void do_log(Level, const std::string&) override {}
 };
 
 
@@ -459,14 +436,15 @@ inline AppendToFileLogger::AppendToFileLogger(util::File file)
 }
 
 inline ThreadSafeLogger::ThreadSafeLogger(const std::shared_ptr<Logger>& base_logger) noexcept
-    : Logger(base_logger)
+    : Logger(*base_logger)
+    , m_base_logger_ptr(base_logger)
 {
 }
 
 // Construct a PrefixLogger from another PrefixLogger object for chaining the prefixes on log output
 inline PrefixLogger::PrefixLogger(std::string prefix, PrefixLogger& prefix_logger) noexcept
     // Save an alias of the base_logger shared_ptr from the passed in PrefixLogger
-    : Logger(prefix_logger.m_base_logger_ptr)
+    : Logger(prefix_logger)
     , m_prefix{std::move(prefix)}
     , m_chained_logger{prefix_logger} // do_log() writes to the chained logger
 {
@@ -477,9 +455,10 @@ inline PrefixLogger::PrefixLogger(std::string prefix, PrefixLogger& prefix_logge
 // created, will point back to this logger shared_ptr for referencing the level_threshold when
 // logging output.
 inline PrefixLogger::PrefixLogger(std::string prefix, const std::shared_ptr<Logger>& base_logger) noexcept
-    : Logger(base_logger) // Save an alias of the passed in base_logger shared_ptr
+    : Logger(*base_logger) // Save an alias of the passed in base_logger shared_ptr
     , m_prefix{std::move(prefix)}
-    , m_chained_logger{*base_logger} // do_log() writes to the chained logger
+    , m_owned_logger{base_logger}
+    , m_chained_logger{*m_owned_logger} // do_log() writes to the chained logger
 {
 }
 
