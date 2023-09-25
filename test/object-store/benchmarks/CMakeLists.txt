@@ -39,9 +39,6 @@ if(REALM_ENABLE_SYNC)
 endif()
 
 target_link_libraries(object-store-benchmarks ObjectStore TestUtil Catch2::Catch2)
-set_target_properties(object-store-benchmarks PROPERTIES
-      EXCLUDE_FROM_ALL 1
-      EXCLUDE_FROM_DEFAULT_BUILD 1)
 
 add_dependencies(benchmarks object-store-benchmarks)
 
@@ -50,4 +47,5 @@ add_dependencies(benchmarks object-store-benchmarks)
 if(NOT APPLE AND NOT WINDOWS_STORE)
     target_include_directories(object-store-benchmarks PRIVATE ${libuv_include_dir})
     target_link_libraries(object-store-benchmarks ${libuv_target})
+    target_compile_definitions(ObjectStoreTests PRIVATE TEST_SCHEDULER_UV=1)
 endif()
