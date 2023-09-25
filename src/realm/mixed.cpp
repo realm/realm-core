@@ -351,21 +351,6 @@ int Mixed::compare(const Mixed& b) const noexcept
     // Observe! Changing this function breaks the file format for Set<Mixed> and the StringIndex
 }
 
-int Mixed::compare_signed(const Mixed& b) const noexcept
-{
-    if (is_type(type_String) && b.is_type(type_String)) {
-        auto a_val = get_string();
-        auto b_val = b.get_string();
-        if (a_val == b_val)
-            return 0;
-        if (std::lexicographical_compare(a_val.data(), a_val.data() + a_val.size(), b_val.data(),
-                                         b_val.data() + b_val.size()))
-            return -1;
-        return 1;
-    }
-    return compare(b);
-}
-
 template <>
 int64_t Mixed::export_to_type() const noexcept
 {
