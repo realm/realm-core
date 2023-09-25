@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Update tests to use global logger. ([PR #6917](https://github.com/realm/realm-core/pull/6917))
 
 ----------------------------------------------
 
@@ -83,7 +83,6 @@
 ### Internals
 * Add a CI job to validate that the headers in the installation package all build ([PR #6954](https://github.com/realm/realm-core/pull/6954)).
 * Fix build of most internal tools, also build them by default. ([PR #6475](https://github.com/realm/realm-core/pull/6475))
-* Update tests to use global logger. ([PR #6917](https://github.com/realm/realm-core/pull/6917))
 
 ----------------------------------------------
 
