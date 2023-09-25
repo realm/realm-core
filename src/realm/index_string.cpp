@@ -1753,34 +1753,33 @@ void StringIndex::node_add_key(ref_type ref)
     m_array->add(ref);
 }
 
-// Must return true if value of object(key) is less than needle.
-bool SortedListComparator::operator()(int64_t key_value, Mixed needle) // used in lower_bound
+// Must return true if value of object(key) is less than 'b'.
+bool SortedListComparator::operator()(int64_t key_value, Mixed b) // used in lower_bound
 {
     Mixed a = m_column.get_value(ObjKey(key_value));
-    if (a.is_null() && !needle.is_null())
+    if (a.is_null() && !b.is_null())
         return true;
-    else if (needle.is_null() && !a.is_null())
+    else if (b.is_null() && !a.is_null())
         return false;
-    else if (a.is_null() && needle.is_null())
+    else if (a.is_null() && b.is_null())
         return false;
-
-    if (a == needle)
-        return false;
-
-    // We need to be consistent with using the same compare method as how these strings
-    // were they were put into this ordered column in the first place.
-    return a < needle;
+    int cmp = a.compare(b);
+    return cmp == 0 ? false : cmp < 0;
 }
 
 
-// Must return true if value of needle is less than value of object(key).
-bool SortedListComparator::operator()(Mixed needle, int64_t key_value) // used in upper_bound
+// Must return true if value of 'a' is less than value of object(key).
+bool SortedListComparator::operator()(Mixed a, int64_t key_value) // used in upper_bound
 {
-    Mixed a = m_column.get_value(ObjKey(key_value));
-    if (needle == a) {
+    Mixed b = m_column.get_value(ObjKey(key_value));
+    if (a.is_null() && !b.is_null())
+        return true;
+    else if (b.is_null() && !a.is_null())
         return false;
-    }
-    return !(*this)(key_value, needle);
+    else if (a.is_null() && b.is_null())
+        return false;
+    int cmp = a.compare(b);
+    return cmp == 0 ? false : cmp < 0;
 }
 
 // LCOV_EXCL_START ignore debug functions
