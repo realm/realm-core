@@ -27,6 +27,7 @@ public:
     /// Cancels the timer and destroys the timer instance.
     ~CAPITimer()
     {
+        // Make sure the timer is stopped, if not already
         m_timer_cancel(m_userdata, m_timer);
         m_timer_free(m_userdata, m_timer);
         realm_release(m_handler);
@@ -61,12 +62,12 @@ private:
 static void realm_sync_socket_op_complete(realm_sync_socket_callback* realm_callback, realm_errno_e status,
                                           const char* reason)
 {
-    if (*realm_callback) {
+    if (realm_callback->get() != nullptr) {
         auto complete_status = status == realm_errno_e::RLM_ERR_NONE
                                    ? Status::OK()
                                    : Status{static_cast<ErrorCodes::Error>(status), reason};
         (*(realm_callback->get()))(complete_status);
-        // Keep the container, but release the handler
+        // Keep the container, but release the handler so it can't be called twice.
         realm_callback->reset();
     }
 }
