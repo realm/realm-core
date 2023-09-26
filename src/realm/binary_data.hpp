@@ -182,7 +182,7 @@ inline bool operator<(const BinaryData& a, const BinaryData& b) noexcept
         return !a.is_null() < !b.is_null();
 
     // memcmp does comparison using unsigned characters which gives the correct ordering for utf8
-    int cmp =  memcmp(a.m_data, b.m_data, std::min(a.size(), b.size()));
+    int cmp = memcmp(a.m_data, b.m_data, std::min(a.size(), b.size()));
     if (cmp == 0 && a.size() < b.size())
         return true;
     return cmp < 0;
