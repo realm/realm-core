@@ -266,8 +266,8 @@ public:
     {
     }
 
-    bool operator()(int64_t key_value, Mixed needle);
-    bool operator()(Mixed needle, int64_t key_value);
+    bool operator()(int64_t key_value, const Mixed& b);
+    bool operator()(const Mixed& a, int64_t key_value);
 
 private:
     const ClusterColumn m_column;

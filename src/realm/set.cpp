@@ -253,30 +253,27 @@ void Set<T>::do_resort(size_t start, size_t end)
 }
 
 template <>
-void Set<Mixed>::migrate_strings()
+void Set<Mixed>::migration_resort()
 {
-    // sort order of strings changed
-    const size_t set_size = size();
-    size_t first_binary = set_size;
-    size_t first_string = set_size;
-    for (size_t n = 0; n < set_size; n++) {
-        auto val = m_tree->get(n);
-        if (val.is_type(type_String) && first_string == set_size) {
-            first_string = n;
-            continue;
-        }
-        if (val.is_type(type_Binary)) {
-            first_binary = n;
-            break;
-        }
-    }
-    do_resort(first_string, first_binary);
+    // sort order of strings and binaries changed
+    auto first_string = std::lower_bound(begin(), end(), StringData(""));
+    auto last_binary = std::partition_point(first_string, end(), [](const Mixed& item) {
+        return item.is_type(type_String, type_Binary);
+    });
+    do_resort(first_string.index(), last_binary.index());
 }
 
 template <>
-void Set<StringData>::migrate_strings()
+void Set<StringData>::migration_resort()
 {
     // sort order of strings changed
+    do_resort(0, size());
+}
+
+template <>
+void Set<BinaryData>::migration_resort()
+{
+    // sort order of binaries changed
     do_resort(0, size());
 }
 

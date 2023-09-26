@@ -259,11 +259,12 @@ constexpr inline bool operator!=(const StringData& a, const StringData& b) noexc
 inline bool operator<(const StringData& a, const StringData& b) noexcept
 {
     // Observe! Changing these values breaks the file format for Set<Mixed>
-    if (a.is_null() && !b.is_null()) {
+    if (a.is_null() || b.is_null()) {
         // Null strings are smaller than all other strings, and not
         // equal to empty strings.
-        return true;
+        return !a.is_null() < !b.is_null();
     }
+
     // memcmp does comparison using unsigned characters which gives the correct ordering for utf8
     int cmp =  memcmp(a.m_data, b.m_data, std::min(a.size(), b.size()));
     if (cmp == 0 && a.size() < b.size())

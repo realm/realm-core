@@ -568,21 +568,22 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         // rewrite the string indexes with the comparison order
         for (auto k : table_keys) {
             auto t = get_table(k);
-            t->migrate_string_sets(); // rewrite sets to use the new string order
-            if constexpr (std::is_signed<char>()) {
-                t->for_each_public_column([&](ColKey col) {
-                    if (col.get_type() == col_type_String || col.get_type() == col_type_Mixed) {
-                        if (t->search_index_type(col) == IndexType::General) {
-                            if (current_file_format_version < 22 && t->get_primary_key_column() == col) {
-                                break; // this index was just added by a previous upgrade step above
-                            }
-                            t->remove_search_index(col);
-                            t->add_search_index(col, IndexType::General);
-                        }
+            t->migrate_set_orderings(); // rewrite sets to use the new string/binary order
+            // Strings in the index were stored in an incorrect order on platforms where
+            // char is signed; fix that here by rewriting them. This was due to using
+            // std::lexicographical_sort on char* arguments.
+            t->for_each_public_column([&](ColKey col) {
+                if (col.get_type() == col_type_String || col.get_type() == col_type_Mixed) {
+                    // FullText indexes are omitted because they store single words, and the
+                    // index/sort bug being fixed here only applies to items in the index that
+                    // are longer than 200 characters (see StringIndex::s_max_offset).
+                    if (t->search_index_type(col) == IndexType::General) {
+                        t->remove_search_index(col);
+                        t->add_search_index(col, IndexType::General);
                     }
-                    return IteratorControl::AdvanceToNext;
-                });
-            }
+                }
+                return IteratorControl::AdvanceToNext;
+            });
         }
     }
     // NOTE: Additional future upgrade steps go here.

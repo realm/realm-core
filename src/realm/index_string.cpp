@@ -1754,7 +1754,7 @@ void StringIndex::node_add_key(ref_type ref)
 }
 
 // Must return true if value of object(key) is less than 'b'.
-bool SortedListComparator::operator()(int64_t key_value, Mixed b) // used in lower_bound
+bool SortedListComparator::operator()(int64_t key_value, const Mixed& b) // used in lower_bound
 {
     Mixed a = m_column.get_value(ObjKey(key_value));
     if (a.is_null() && !b.is_null())
@@ -1769,7 +1769,7 @@ bool SortedListComparator::operator()(int64_t key_value, Mixed b) // used in low
 
 
 // Must return true if value of 'a' is less than value of object(key).
-bool SortedListComparator::operator()(Mixed a, int64_t key_value) // used in upper_bound
+bool SortedListComparator::operator()(const Mixed& a, int64_t key_value) // used in upper_bound
 {
     Mixed b = m_column.get_value(ObjKey(key_value));
     if (a.is_null() && !b.is_null())

@@ -203,7 +203,7 @@ public:
     }
 
     void migrate();
-    void migrate_strings();
+    void migration_resort();
 
 private:
     // Friend because it needs access to `m_tree` in the implementation of
@@ -475,9 +475,11 @@ void Set<Mixed>::do_clear();
 template <>
 void Set<Mixed>::migrate();
 template <>
-void Set<Mixed>::migrate_strings();
+void Set<Mixed>::migration_resort();
 template <>
-void Set<StringData>::migrate_strings();
+void Set<StringData>::migration_resort();
+template <>
+void Set<BinaryData>::migration_resort();
 
 /// Compare set elements.
 ///

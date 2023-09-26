@@ -980,6 +980,7 @@ struct CollectionIterator {
     using pointer = const value_type*;
     using reference = const value_type&;
 
+    CollectionIterator() noexcept = default;
     CollectionIterator(const L* l, size_t ndx) noexcept
         : m_list(l)
         , m_ndx(ndx)
@@ -1070,7 +1071,7 @@ struct CollectionIterator {
 
 private:
     mutable value_type m_val;
-    const L* m_list;
+    const L* m_list = nullptr;
     size_t m_ndx = size_t(-1);
 };
 

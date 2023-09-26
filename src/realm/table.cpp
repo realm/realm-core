@@ -1278,11 +1278,12 @@ void Table::migrate_sets_and_dictionaries()
     }
 }
 
-void Table::migrate_string_sets()
+void Table::migrate_set_orderings()
 {
     std::vector<ColKey> to_migrate;
     for (auto col : get_column_keys()) {
-        if (col.is_set() && (col.get_type() == col_type_Mixed || col.get_type() == col_type_String)) {
+        if (col.is_set() && (col.get_type() == col_type_Mixed || col.get_type() == col_type_String ||
+                             col.get_type() == col_type_Binary)) {
             to_migrate.push_back(col);
         }
     }
@@ -1291,12 +1292,16 @@ void Table::migrate_string_sets()
             for (auto col : to_migrate) {
                 if (col.get_type() == col_type_Mixed) {
                     auto set = obj.get_set<Mixed>(col);
-                    set.migrate_strings();
+                    set.migration_resort();
+                }
+                else if (col.get_type() == col_type_Binary) {
+                    auto set = obj.get_set<BinaryData>(col);
+                    set.migration_resort();
                 }
                 else {
                     REALM_ASSERT_3(col.get_type(), ==, col_type_String);
                     auto set = obj.get_set<String>(col);
-                    set.migrate_strings();
+                    set.migration_resort();
                 }
             }
         }
