@@ -1871,7 +1871,7 @@ void Session::send_bind_message()
             bind_json_data["migratedPartition"] = *migrated_partition;
         }
         bind_json_data["sessionReason"] = static_cast<uint64_t>(get_session_reason());
-        bind_json_data["schema_version"] = get_schema_version();
+        bind_json_data["schemaVersion"] = get_schema_version();
         if (logger.would_log(util::Logger::Level::debug)) {
             std::string json_data_dump;
             if (!bind_json_data.empty()) {
