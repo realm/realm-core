@@ -5,10 +5,11 @@
 * None.
 
 ### Fixed
-* Receiving a write_not_allowed error from the server would have led to a crash. ([#6978](https://github.com/realm/realm-core/issues/6978))
+* Fixed issue with double delete when using the CAPI for timers in platform networking ([#6993](https://github.com/realm/realm-core/issues/6993), since v13.3.0).
+* Receiving a write_not_allowed error from the server would have led to a crash. ([#6978](https://github.com/realm/realm-core/issues/6978), since v13.2.0)
 
 ### Breaking changes
-* None.
+* Platform Networking CAPI has been updated to provide separate functions (instead of 1) for executing callback handlers depending on purpose ([PR #6994](https://github.com/realm/realm-core/pull/6994)).
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
