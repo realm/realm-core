@@ -80,6 +80,7 @@ public:
     void delete_app(const std::string& app_id) const;
     void trigger_client_reset(const std::string& app_id, int64_t file_ident) const;
     void migrate_to_flx(const std::string& app_id, const std::string& service_id, bool migrate_to_flx) const;
+    void update_schema(const std::string& app_id, Schema schema) const;
 
     struct Service {
         std::string id;

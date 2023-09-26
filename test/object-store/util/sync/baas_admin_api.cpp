@@ -343,10 +343,10 @@ AdminAPIEndpoint AdminAPIEndpoint::operator[](StringData name) const
 app::Response AdminAPIEndpoint::do_request(app::Request request) const
 {
     if (request.url.find('?') == std::string::npos) {
-        request.url = util::format("%1?bypass_service_change=DestructiveSyncProtocolVersionIncrease", request.url);
+        request.url = util::format("%1?bypass_service_change=SyncSchemaVersionIncrease", request.url);
     }
     else {
-        request.url = util::format("%1&bypass_service_change=DestructiveSyncProtocolVersionIncrease", request.url);
+        request.url = util::format("%1&bypass_service_change=SyncSchemaVersionIncrease", request.url);
     }
     request.headers["Content-Type"] = "application/json;charset=utf-8";
     request.headers["Accept"] = "application/json";
@@ -582,6 +582,49 @@ void AdminAPISession::migrate_to_flx(const std::string& app_id, const std::strin
 {
     auto endpoint = apps()[app_id]["sync"]["migration"];
     endpoint.put_json(nlohmann::json{{"serviceId", service_id}, {"action", migrate_to_flx ? "start" : "rollback"}});
+}
+
+void AdminAPISession::update_schema(const std::string& app_id, Schema schema) const
+{
+    auto drafts = apps()[app_id]["drafts"];
+    auto draft_create_resp = drafts.post_json({});
+    std::string draft_id = draft_create_resp["_id"];
+
+    auto schemas = apps()[app_id]["schemas"];
+    auto resp = schemas.get_json();
+
+    std::unordered_map<std::string, std::string> table_name_to_id;
+    for (const auto& schema : resp) {
+        table_name_to_id[schema["metadata"]["collection"]] = schema["_id"];
+    }
+
+    // New tables
+
+    // Existing tables
+
+    // Removed tables
+
+    schemas[table_name_to_id["TopLevel2"]].del();
+    // schemas[table_name_to_id["TopLevel"]].put_json(schema[0]);
+    std::cerr << resp << std::endl;
+
+
+    // auto schemas = apps()[app_id]["schemas"];
+    // for (const auto& obj_schema : schema) {
+    //     auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema);
+    //     schemas.post_json(schema_to_create);
+    // }
+
+    // for (const auto& [id, obj_schema] : object_schema_to_create) {
+    //     auto schema_to_create = rule_builder.object_schema_to_baas_schema(*obj_schema, nullptr);
+    //     schema_to_create["_id"] = id;
+    //     schemas[id].put_json(schema_to_create);
+    // }
+
+    drafts[draft_id]["deployment"].post_json({});
+
+    resp = schemas.get_json();
+    std::cerr << resp << std::endl;
 }
 
 static nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
