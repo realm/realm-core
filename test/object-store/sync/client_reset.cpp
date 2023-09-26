@@ -4170,13 +4170,6 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                             {
                                 {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                 {"any_mixed", PropertyType::Mixed | PropertyType::Nullable},
-                                {"embedded_obj", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"},
-                            }},
-                           {"EmbeddedObject",
-                            ObjectSchema::ObjectType::Embedded,
-                            {
-                                {"name", PropertyType::String | PropertyType::Nullable},
-                                {"int_value", PropertyType::Int},
                             }}};
 
     SECTION("add nested collection locally") {
@@ -4200,7 +4193,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
         });
         if (test_mode == ClientResyncMode::DiscardLocal) {
             REQUIRE_THROWS_WITH(test_reset->run(), "Client reset cannot recover when classes have been removed: "
-                                                   "{EmbeddedObject, TopLevel}");
+                                                   "{TopLevel}");
         }
         else {
             test_reset
@@ -4341,11 +4334,6 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
             })
             ->run();
     }
-    // // The tests above are testing a very simple condition, in which we basically have a nested collection added
-    // // remotely and we verify that we have copied all the data, furthermore that locally we can handle the
-    // // collections stored inside the Mixed. The following tests are a little bit more complicated, we try to change
-    // // the mixed type remotely and locally and trigger some conflicts, that for nested collections are a little bit
-    // // more difficult to handle, because of the nature of nesting collections itself.
     SECTION("add nested collection both locally and remotely List vs Set") {
         ObjectId pk_val = ObjectId::gen();
         SyncTestFile config2(init_sync_manager.app(), "default");
@@ -5228,7 +5216,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
             })
             ->run();
     }
-    SECTION("Verify copy logic for collections in mixed that contain nested collections and scalar types.") {
+    SECTION("Verify copy and notification logic for List with scalar mixed types and nested collections") {
         Results results;
         Object object;
         List list_listener, nlist_setup_listener, nlist_local_listener;
@@ -5324,12 +5312,15 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     REQUIRE(nlist_remote.get_any(0).get_string() == "Remote");
                     REQUIRE(nlist_setup.get_any(0).get_string() == "Setup");
                     REQUIRE(list_listener.is_valid());
-                    REQUIRE_INDICES(list_changes.deletions, 0, 3);  // removed local nlist and "Local"
-                    REQUIRE_INDICES(list_changes.insertions, 0, 3); // inserted remote nlist "Remote"
-                    REQUIRE(nlist_local_changes.collection_root_was_deleted);
+                    REQUIRE_INDICES(list_changes.deletions);  // old nested collection deleted
+                    REQUIRE_INDICES(list_changes.insertions); // new nested collection inserted
+                    REQUIRE_INDICES(list_changes.modifications, 0,
+                                    3); // replace Local with Remote at position 0 and 3
+                    REQUIRE(!nlist_local_changes.collection_root_was_deleted); // original local collection deleted
                     REQUIRE(!nlist_setup_changes.collection_root_was_deleted);
-                    REQUIRE_INDICES(nlist_setup_changes.insertions);
+                    REQUIRE_INDICES(nlist_setup_changes.insertions); // there are no new insertions or deletions
                     REQUIRE_INDICES(nlist_setup_changes.deletions);
+                    REQUIRE_INDICES(nlist_setup_changes.modifications);
                 }
                 else {
                     List list{local_realm, obj, col};
@@ -5352,18 +5343,20 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     REQUIRE(nlist_setup.get_any(0).get_string() == "Setup");
                     // notifications
                     REQUIRE(list_listener.is_valid());
-                    // I think there is still something odd with the logic....
-                    REQUIRE_INDICES(list_changes.deletions, 1, 2, 3); // nothing deleted
                     // src is [ [Local],[Remote],[Setup], Local, Setup, Remote ]
                     // dst is [ [Local], [Setup], Setup, Local]
-                    REQUIRE_INDICES(list_changes.insertions, 1, 2, 3, 4,
-                                    5); // inserted remote nlist and "Remote" (should be 1 and 5)
+                    // no deletions
+                    REQUIRE_INDICES(list_changes.deletions);
+                    // inserted "Setup" and "Remote" at the end
+                    REQUIRE_INDICES(list_changes.insertions, 4, 5);
+                    // changed [Setup] ==> [Remote] and Setup ==> [Setup]
+                    REQUIRE_INDICES(list_changes.modifications, 1, 2);
                     REQUIRE(!nlist_local_changes.collection_root_was_deleted);
                     REQUIRE_INDICES(nlist_local_changes.insertions);
                     REQUIRE_INDICES(nlist_local_changes.deletions);
-                    REQUIRE(nlist_setup_changes.collection_root_was_deleted);
+                    REQUIRE(!nlist_setup_changes.collection_root_was_deleted);
                     REQUIRE_INDICES(nlist_setup_changes.insertions);
-                    REQUIRE_INDICES(nlist_setup_changes.deletions, 0);
+                    REQUIRE_INDICES(nlist_setup_changes.deletions);
                 }
             })
             ->run();

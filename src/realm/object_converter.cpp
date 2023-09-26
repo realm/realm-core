@@ -27,7 +27,7 @@
 namespace realm::converters {
 
 // Takes two lists, src and dst, and makes dst equal src. src is unchanged.
-void InterRealmValueConverter::copy_list(const LstBase& src, LstBase& dst, bool* update_out)
+void InterRealmValueConverter::copy_list(const LstBase& src, LstBase& dst, bool* update_out) const
 {
     // The two arrays are compared by finding the longest common prefix and
     // suffix.  The middle section differs between them and is made equal by
@@ -106,7 +106,7 @@ void InterRealmValueConverter::copy_list(const LstBase& src, LstBase& dst, bool*
     }
 }
 
-void InterRealmValueConverter::copy_set(const SetBase& src, SetBase& dst, bool* update_out)
+void InterRealmValueConverter::copy_set(const SetBase& src, SetBase& dst, bool* update_out) const
 {
     std::vector<size_t> sorted_src, sorted_dst, to_insert, to_delete;
     constexpr bool ascending = true;
@@ -173,7 +173,7 @@ void InterRealmValueConverter::copy_set(const SetBase& src, SetBase& dst, bool* 
     }
 }
 
-void InterRealmValueConverter::copy_dictionary(const Dictionary& src, Dictionary& dst, bool* update_out)
+void InterRealmValueConverter::copy_dictionary(const Dictionary& src, Dictionary& dst, bool* update_out) const
 {
     std::vector<size_t> to_insert, to_delete;
 
@@ -298,256 +298,307 @@ void InterRealmValueConverter::copy_value(const Obj& src_obj, Obj& dst_obj, bool
     }
 }
 
-void InterRealmValueConverter::handle_list_in_mixed(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list)
+//
+// Handle collections in mixed. A collection can have N nested levels (expect for Sets). And these levels can be
+// nested in arbitrary way (eg a List within a Dictionary or viceversa). In order to try to merge server changes with
+// client changes, the algorithm needs to go throw each single element in the collection, check its type and perform
+// the most appropriate action in order to miminize the number of notificiations triggered.
+//
+void InterRealmValueConverter::handle_list_in_mixed(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list) const
 {
-    auto handle_collection_copy = [&, this](CollectionType type, size_t ndx) {
-        if (type == CollectionType::List) {
-            auto n_src_list = src_list.get_list(ndx);
-            auto n_dst_list = dst_list.get_list(ndx);
-            handle_list_in_mixed(*n_src_list, *n_dst_list);
-        }
-        else if (type == CollectionType::Set) {
-            auto n_src_set = src_list.get_set(ndx);
-            auto n_dst_set = dst_list.get_set(ndx);
-            copy_set(*n_src_set, *n_dst_set, nullptr);
-        }
-        else if (type == CollectionType::Dictionary) {
-            auto n_src_dict = src_list.get_dictionary(ndx);
-            auto n_dst_dict = dst_list.get_dictionary(ndx);
-            handle_dictionary_in_mixed(*n_src_dict, *n_dst_dict);
-        }
-    };
+    int sz = (int)std::min(src_list.size(), dst_list.size());
+    int left = 0;
+    int right = (int)sz - 1;
 
-    auto collection_type_for_mixed_type = [](auto mixed_type) -> CollectionType {
-        if (mixed_type == type_List)
-            return CollectionType::List;
-        if (mixed_type == type_Set)
-            return CollectionType::Set;
-        if (mixed_type == type_Dictionary)
-            return CollectionType::Dictionary;
-        REALM_UNREACHABLE();
-    };
-
-    auto compare_collections = [&](size_t ndx, auto type) {
-        if (type == CollectionType::List) {
-            auto n_src_list = src_list.get_list(ndx);
-            auto n_dst_list = dst_list.get_list(ndx);
-            auto n = n_src_list->size();
-            auto m = n_dst_list->size();
-            if (n != m)
-                return false;
-            for (size_t i = 0; i < n; ++i) {
-                auto src_mixed = n_src_list->get_any(i);
-                auto dst_mixed = n_dst_list->get_any(i);
-                if (src_mixed != dst_mixed)
-                    return false;
-            }
-        }
-        else if (type == CollectionType::Dictionary) {
-            auto n_src_dictionary = src_list.get_dictionary(ndx);
-            auto n_dst_dictionary = dst_list.get_dictionary(ndx);
-            auto n = n_src_dictionary->size();
-            auto m = n_dst_dictionary->size();
-            if (n != m)
-                return false;
-            for (size_t i = 0; i < n; ++i) {
-                auto [src_key, src_mixed] = n_src_dictionary->get_pair(i);
-                auto [dst_key, dst_mixed] = n_dst_dictionary->get_pair(i);
-                if (src_key != dst_key)
-                    return false;
-                if (src_mixed != dst_mixed)
-                    return false;
-            }
-        }
-        return true;
-    };
-
-    auto sz = std::min(src_list.size(), dst_list.size());
-    for (size_t i = 0; i < sz; ++i) {
-        auto src_any = src_list.get_any(i);
-        auto dst_any = dst_list.get_any(i);
-
-        if (src_any.is_type(dst_any.get_type())) {
-            // same type but data mismatched
-            if (src_any.is_type(type_List, type_Dictionary)) {
-                auto coll_type = collection_type_for_mixed_type(src_any.get_type());
-                if (!compare_collections(i, coll_type)) {
-                    dst_list.remove(i);
-                    dst_list.insert_collection(i, coll_type);
-                    handle_collection_copy(coll_type, i);
-                }
-            }
-            else if (src_any.is_type(type_Set)) {
-                auto coll_type = collection_type_for_mixed_type(src_any.get_type());
-                handle_collection_copy(coll_type, i);
-            }
-            else if (dst_any != src_any) {
-                dst_list.remove(i);
-                dst_list.insert_any(i, src_any);
-            }
-        }
-        else {
-            // type mismatch
-            if (src_any.is_type(type_List, type_Dictionary, type_Set)) {
-                auto coll_type = collection_type_for_mixed_type(src_any.get_type());
-                dst_list.insert_collection(i, coll_type);
-                handle_collection_copy(coll_type, i);
-            }
-            else if (src_any != dst_any) {
-                dst_list.insert_any(i, src_any);
-            }
-            // sz of dst has changed.
-            sz = std::min(src_list.size(), dst_list.size());
-        }
+    // find fist not matching element from beginning
+    while (left < sz) {
+        auto src_any = src_list.get_any(left);
+        auto dst_any = dst_list.get_any(left);
+        if (src_any != dst_any)
+            break;
+        if (is_collection(src_any) && !check_matching_list(src_list, dst_list, left, to_collection_type(src_any)))
+            break;
+        left += 1;
     }
 
-    // append what's left in src into dst
+    // find first not matching element from end
+    while (right >= 0) {
+        auto src_any = src_list.get_any(right);
+        auto dst_any = dst_list.get_any(right);
+        if (src_any != dst_any)
+            break;
+        if (is_collection(src_any) && !check_matching_list(src_list, dst_list, right, to_collection_type(src_any)))
+            break;
+        right -= 1;
+    }
+
+    // Replace all different elements in [left, right]
+    while (left <= right) {
+        auto src_any = src_list.get_any(left);
+        auto dst_any = dst_list.get_any(left);
+
+        if (is_collection(src_any)) {
+            auto coll_type = to_collection_type(src_any);
+
+            if (!dst_any.is_type(src_any.get_type())) {
+                // Mixed vs Collection
+                dst_list.set_collection(left, coll_type);
+                copy_list_in_mixed(src_list, dst_list, left, coll_type);
+            }
+            else if (!check_matching_list(src_list, dst_list, left, coll_type)) {
+                // Collection vs Collection
+                dst_list.set_any(left, src_any);
+                copy_list_in_mixed(src_list, dst_list, left, coll_type);
+            }
+        }
+        else if (dst_any != src_any) {
+            // Mixed vs Mixed
+            dst_list.set_any(left, src_any);
+        }
+        left += 1;
+    }
+
+    // remove dst elements not present in src
+    if (dst_list.size() > src_list.size()) {
+        auto dst_size = dst_list.size();
+        auto src_size = src_list.size();
+        while (dst_size > src_size)
+            dst_list.remove(--dst_size);
+    }
+
+    // append remainig src into dst
     for (size_t i = dst_list.size(); i < src_list.size(); ++i) {
         auto src_any = src_list.get(i);
-        if (src_any.is_type(type_List, type_Set, type_Dictionary)) {
-            auto coll_type = collection_type_for_mixed_type(src_any.get_type());
+        if (is_collection(src_any)) {
+            auto coll_type = to_collection_type(src_any);
             dst_list.insert_collection(i, coll_type);
-            handle_collection_copy(coll_type, i);
+            copy_list_in_mixed(src_list, dst_list, i, coll_type);
         }
         else {
             dst_list.insert_any(i, src_any);
         }
     }
+}
 
-    // remove all the elements that are not in src
-    if (dst_list.size() > src_list.size()) {
-        auto m = dst_list.size();
-        auto n = src_list.size();
-        while (m > n)
-            dst_list.remove(--m);
+void InterRealmValueConverter::handle_dictionary_in_mixed(Dictionary& src_dictionary,
+                                                          Dictionary& dst_dictionary) const
+{
+    int sz = (int)std::min(src_dictionary.size(), dst_dictionary.size());
+    int left = 0;
+    int right = (int)sz - 1;
+
+    // find fist not matching element from beginning
+    while (left < sz) {
+        const auto [key_src, src_any] = src_dictionary.get_pair(left);
+        const auto [key_dst, dst_any] = dst_dictionary.get_pair(left);
+        if (src_any != dst_any || key_src != key_dst)
+            break;
+        if (is_collection(src_any) && !check_matching_dictionary(src_dictionary, dst_dictionary, key_src.get_string(),
+                                                                 to_collection_type(src_any)))
+            break;
+        left += 1;
+    }
+
+    // find first not matching element from end
+    while (right >= 0) {
+        const auto [key_src, src_any] = src_dictionary.get_pair(right);
+        const auto [key_dst, dst_any] = dst_dictionary.get_pair(right);
+        if (src_any != dst_any || key_src != key_dst)
+            break;
+        if (is_collection(src_any) && !check_matching_dictionary(src_dictionary, dst_dictionary, key_src.get_string(),
+                                                                 to_collection_type(src_any)))
+            break;
+        right -= 1;
+    }
+
+    // Replace all different elements in [left, right]
+    while (left <= right) {
+        const auto [key_src, src_any] = src_dictionary.get_pair(left);
+        const auto [key_dst, dst_any] = dst_dictionary.get_pair(left);
+
+        // handle possible key mismatches
+        if (key_src != key_dst) {
+            dst_dictionary.erase(key_dst);
+            dst_dictionary.insert(key_src, src_any);
+        }
+
+        if (is_collection(src_any)) {
+            auto coll_type = to_collection_type(src_any);
+            const auto key = key_src.get_string();
+
+            if (!dst_any.is_type(src_any.get_type())) {
+                // Mixed vs Collection
+                const auto key = key_src.get_string();
+                dst_dictionary.set_collection(key, coll_type);
+                copy_dictionary_in_mixed(src_dictionary, dst_dictionary, key, coll_type);
+            }
+            else if (!check_matching_dictionary(src_dictionary, dst_dictionary, key, coll_type)) {
+                // Collection vs Collection
+                dst_dictionary.insert(key_src, src_any);
+                copy_dictionary_in_mixed(src_dictionary, dst_dictionary, key, coll_type);
+            }
+        }
+        else if (dst_any != src_any) {
+            // Mixed vs Mixed
+            dst_dictionary.insert(key_src, src_any);
+        }
+        left += 1;
+    }
+
+    // remove dst elements not present in src
+    if (dst_dictionary.size() > src_dictionary.size()) {
+        auto dst_size = dst_dictionary.size();
+        auto src_size = src_dictionary.size();
+        while (dst_size > src_size) {
+            const auto [dst_key, dst_any] = dst_dictionary.get_pair(--dst_size);
+            dst_dictionary.erase(dst_key);
+        }
+    }
+
+    // append remainig src into dst
+    for (size_t i = dst_dictionary.size(); i < src_dictionary.size(); ++i) {
+        const auto [src_key, src_any] = src_dictionary.get_pair(i);
+        if (is_collection(src_any)) {
+            const auto coll_type = to_collection_type(src_any);
+            const auto key = src_key.get_string();
+            dst_dictionary.insert_collection(key, coll_type);
+            copy_dictionary_in_mixed(src_dictionary, dst_dictionary, key, coll_type);
+        }
+        else {
+            dst_dictionary.insert(src_key, src_any);
+        }
     }
 }
 
-void InterRealmValueConverter::handle_dictionary_in_mixed(const Dictionary& src_dictionary,
-                                                          Dictionary& dst_dictionary)
+bool InterRealmValueConverter::check_matching_list(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list, size_t ndx,
+                                                   CollectionType type) const
 {
-    auto handle_collection_copy = [&, this](CollectionType type, StringData key) {
-        if (type == CollectionType::List) {
-            auto n_src_list = src_dictionary.get_list(key);
-            auto n_dst_list = dst_dictionary.get_list(key);
-            handle_list_in_mixed(*n_src_list, *n_dst_list);
-        }
-        else if (type == CollectionType::Set) {
-            auto n_src_set = src_dictionary.get_set(key);
-            auto n_dst_set = dst_dictionary.get_set(key);
-            copy_set(*n_src_set, *n_dst_set, nullptr);
-        }
-        else if (type == CollectionType::Dictionary) {
-            auto n_src_dictionary = src_dictionary.get_dictionary(key);
-            auto n_dst_dictionary = dst_dictionary.get_dictionary(key);
-            handle_dictionary_in_mixed(*n_src_dictionary, *n_dst_dictionary);
-        }
-    };
 
-    auto compare_collections = [&](StringData key, auto type) {
-        if (type == CollectionType::List) {
-            auto n_src_list = src_dictionary.get_list(key);
-            auto n_dst_list = dst_dictionary.get_list(key);
-            auto n = n_src_list->size();
-            auto m = n_dst_list->size();
-            if (n != m)
+    if (type == CollectionType::List) {
+        auto nested_src_list = src_list.get_list(ndx);
+        auto nested_dst_list = dst_list.get_list(ndx);
+        auto size_src = nested_src_list->size();
+        auto size_dst = nested_dst_list->size();
+        if (size_src != size_dst)
+            return false;
+        for (size_t i = 0; i < size_src; ++i) {
+            auto src_mixed = nested_src_list->get_any(i);
+            auto dst_mixed = nested_dst_list->get_any(i);
+            if (src_mixed != dst_mixed)
                 return false;
-            for (size_t i = 0; i < n; ++i) {
-                auto src_mixed = n_src_list->get_any(i);
-                auto dst_mixed = n_dst_list->get_any(i);
-                if (src_mixed != dst_mixed)
-                    return false;
-            }
         }
-        else if (type == CollectionType::Dictionary) {
-            auto n_src_dictionary = src_dictionary.get_dictionary(key);
-            auto n_dst_dictionary = dst_dictionary.get_dictionary(key);
-            auto n = n_src_dictionary->size();
-            auto m = n_dst_dictionary->size();
-            if (n != m)
+    }
+    else if (type == CollectionType::Dictionary) {
+        auto nested_src_dictionary = src_list.get_dictionary(ndx);
+        auto nested_dst_dictionary = dst_list.get_dictionary(ndx);
+        auto size_src = nested_src_dictionary->size();
+        auto size_dst = nested_dst_dictionary->size();
+        if (size_src != size_dst)
+            return false;
+        for (size_t i = 0; i < size_src; ++i) {
+            auto [src_key, src_mixed] = nested_src_dictionary->get_pair(i);
+            auto [dst_key, dst_mixed] = nested_dst_dictionary->get_pair(i);
+            if (src_key != dst_key)
                 return false;
-            for (size_t i = 0; i < n; ++i) {
-                auto [src_key, src_mixed] = n_src_dictionary->get_pair(i);
-                auto [dst_key, dst_mixed] = n_dst_dictionary->get_pair(i);
-                if (src_key != dst_key)
-                    return false;
-                if (src_mixed != dst_mixed)
-                    return false;
-            }
-        }
-        return true;
-    };
-
-    auto collection_type_for_mixed_type = [](auto mixed_type) -> CollectionType {
-        if (mixed_type == type_List)
-            return CollectionType::List;
-        if (mixed_type == type_Set)
-            return CollectionType::Set;
-        if (mixed_type == type_Dictionary)
-            return CollectionType::Dictionary;
-        REALM_UNREACHABLE();
-    };
-
-    auto sz = std::min(src_dictionary.size(), dst_dictionary.size());
-    for (size_t i = 0; i < sz; ++i) {
-        auto [key_src, src_any] = src_dictionary.get_pair(i);
-        auto [key_dst, dst_any] = dst_dictionary.get_pair(i);
-        if (src_any.is_type(dst_any.get_type()) && key_src == key_dst) {
-            if (src_any.is_type(type_List, type_Dictionary)) {
-                auto coll_type = collection_type_for_mixed_type(src_any.get_type());
-                if (!compare_collections(key_src.get_string(), coll_type)) {
-                    dst_dictionary.erase(key_dst.get_string());
-                    dst_dictionary.insert_collection(key_src.get_string(), coll_type);
-                    handle_collection_copy(coll_type, key_src.get_string());
-                }
-            }
-            else if (src_any.is_type(type_Set)) {
-                auto coll_type = collection_type_for_mixed_type(src_any.get_type());
-                handle_collection_copy(coll_type, key_src.get_string());
-            }
-            else if (dst_any != src_any) {
-                dst_dictionary.erase(key_dst.get_string());
-                dst_dictionary.insert(key_src.get_string(), src_any);
-            }
-        }
-        else {
-            if (src_any.is_type(type_List, type_Dictionary, type_Set)) {
-                auto coll_type = collection_type_for_mixed_type(src_any.get_type());
-                dst_dictionary.insert_collection(key_src.get_string(), coll_type);
-                handle_collection_copy(coll_type, key_src.get_string());
-            }
-            else if (src_any != dst_any) {
-                dst_dictionary.insert(key_src.get_string(), src_any);
-            }
-            // sz of dst has changed.
-            sz = std::min(src_dictionary.size(), dst_dictionary.size());
+            if (src_mixed != dst_mixed)
+                return false;
         }
     }
+    return true;
+}
 
-    // append src elements to dst
-    for (size_t i = dst_dictionary.size(); i < src_dictionary.size(); ++i) {
-        auto [src_key, src_any] = src_dictionary.get_pair(i);
-
-        if (src_any.is_type(type_List, type_Set, type_Dictionary)) {
-            auto coll_type = collection_type_for_mixed_type(src_any.get_type());
-            dst_dictionary.insert_collection(src_key.get_string(), coll_type);
-            handle_collection_copy(coll_type, src_key.get_string());
-        }
-        else {
-            dst_dictionary.insert(src_key.get_string(), src_any);
-        }
-    }
-
-    // remove what's left in dst that is not present in src
-    if (dst_dictionary.size() > src_dictionary.size()) {
-        auto m = dst_dictionary.size();
-        auto n = src_dictionary.size();
-        while (m > n) {
-            auto [key, value] = dst_dictionary.get_pair(m - 1);
-            dst_dictionary.erase(key);
-            m -= 1;
+bool InterRealmValueConverter::check_matching_dictionary(const Dictionary& src_dictionary,
+                                                         const Dictionary& dst_dictionary, StringData key,
+                                                         CollectionType type) const
+{
+    if (type == CollectionType::List) {
+        auto n_src_list = src_dictionary.get_list(key);
+        auto n_dst_list = dst_dictionary.get_list(key);
+        auto size_src = n_src_list->size();
+        auto size_dst = n_dst_list->size();
+        if (size_src != size_dst)
+            return false;
+        for (size_t i = 0; i < size_src; ++i) {
+            auto src_mixed = n_src_list->get_any(i);
+            auto dst_mixed = n_dst_list->get_any(i);
+            if (src_mixed != dst_mixed)
+                return false;
         }
     }
+    else if (type == CollectionType::Dictionary) {
+        auto n_src_dictionary = src_dictionary.get_dictionary(key);
+        auto n_dst_dictionary = dst_dictionary.get_dictionary(key);
+        auto size_src = n_src_dictionary->size();
+        auto size_dst = n_dst_dictionary->size();
+        if (size_src != size_dst)
+            return false;
+        for (size_t i = 0; i < size_src; ++i) {
+            auto [src_key, src_mixed] = n_src_dictionary->get_pair(i);
+            auto [dst_key, dst_mixed] = n_dst_dictionary->get_pair(i);
+            if (src_key != dst_key)
+                return false;
+            if (src_mixed != dst_mixed)
+                return false;
+        }
+    }
+    return true;
+}
+
+void InterRealmValueConverter::copy_list_in_mixed(const Lst<Mixed>& src_list, Lst<Mixed>& dst_list, size_t ndx,
+                                                  CollectionType type) const
+{
+    if (type == CollectionType::List) {
+        auto n_src_list = src_list.get_list(ndx);
+        auto n_dst_list = dst_list.get_list(ndx);
+        handle_list_in_mixed(*n_src_list, *n_dst_list);
+    }
+    else if (type == CollectionType::Set) {
+        auto n_src_set = src_list.get_set(ndx);
+        auto n_dst_set = dst_list.get_set(ndx);
+        copy_set(*n_src_set, *n_dst_set, nullptr);
+    }
+    else if (type == CollectionType::Dictionary) {
+        auto n_src_dict = src_list.get_dictionary(ndx);
+        auto n_dst_dict = dst_list.get_dictionary(ndx);
+        handle_dictionary_in_mixed(*n_src_dict, *n_dst_dict);
+    }
+}
+
+void InterRealmValueConverter::copy_dictionary_in_mixed(const Dictionary& src_dictionary, Dictionary& dst_dictionary,
+                                                        StringData key, CollectionType type) const
+{
+    if (type == CollectionType::List) {
+        auto n_src_list = src_dictionary.get_list(key);
+        auto n_dst_list = dst_dictionary.get_list(key);
+        handle_list_in_mixed(*n_src_list, *n_dst_list);
+    }
+    else if (type == CollectionType::Set) {
+        auto n_src_set = src_dictionary.get_set(key);
+        auto n_dst_set = dst_dictionary.get_set(key);
+        copy_set(*n_src_set, *n_dst_set, nullptr);
+    }
+    else if (type == CollectionType::Dictionary) {
+        auto n_src_dictionary = src_dictionary.get_dictionary(key);
+        auto n_dst_dictionary = dst_dictionary.get_dictionary(key);
+        handle_dictionary_in_mixed(*n_src_dictionary, *n_dst_dictionary);
+    }
+}
+
+bool InterRealmValueConverter::is_collection(Mixed mixed) const
+{
+    return mixed.is_type(type_List, type_Set, type_Dictionary);
+}
+
+CollectionType InterRealmValueConverter::to_collection_type(Mixed mixed) const
+{
+    const auto mixed_type = mixed.get_type();
+    if (mixed_type == type_List)
+        return CollectionType::List;
+    if (mixed_type == type_Set)
+        return CollectionType::Set;
+    if (mixed_type == type_Dictionary)
+        return CollectionType::Dictionary;
+    REALM_UNREACHABLE();
 }
 
 // If an embedded object is encountered, add it to a list of embedded objects to process.
@@ -600,7 +651,7 @@ InterRealmValueConverter::InterRealmValueConverter(ConstTableRef src_table, ColK
     }
 }
 
-void InterRealmValueConverter::track_new_embedded(const Obj& src, const Obj& dst)
+void InterRealmValueConverter::track_new_embedded(const Obj& src, const Obj& dst) const
 {
     m_embedded_converter->track(src, dst);
 }
@@ -608,7 +659,7 @@ void InterRealmValueConverter::track_new_embedded(const Obj& src, const Obj& dst
 // convert `src` to the destination Realm and compare that value with `dst`
 // If `converted_src_out` is provided, it will be set to the converted src value
 int InterRealmValueConverter::cmp_src_to_dst(Mixed src, Mixed dst, ConversionResult* converted_src_out,
-                                             bool* did_update_out)
+                                             bool* did_update_out) const
 {
     int cmp = 0;
     Mixed converted_src;
@@ -724,5 +775,7 @@ void InterRealmObjectConverter::copy(const Obj& src, Obj& dst, bool* update_out)
         column.copy_value(src, dst, update_out);
     }
 }
+
+//
 
 } // namespace realm::converters
