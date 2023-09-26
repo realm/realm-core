@@ -79,7 +79,7 @@ void Thread::join()
 
 void Thread::set_name(const std::string& name)
 {
-#elif REALM_PLATFORM_APPLE
+#if REALM_PLATFORM_APPLE
     int r = pthread_setname_np(name.data());
     if (REALM_UNLIKELY(r != 0))
         throw std::system_error(r, std::system_category(), "pthread_setname_np() failed");

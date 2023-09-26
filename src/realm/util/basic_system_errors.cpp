@@ -16,8 +16,10 @@
  *
  **************************************************************************/
 
+#ifndef _POSIX_C_SOURCE
 // opt into the POSIX version of strerror_r
 #define _POSIX_C_SOURCE 200112L
+#endif
 
 #include <cstdlib>
 #include <cstring>
