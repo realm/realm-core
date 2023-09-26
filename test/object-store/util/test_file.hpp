@@ -204,6 +204,9 @@ public:
         return m_transport.get();
     }
 
+    std::vector<realm::bson::BsonDocument> get_documents(realm::SyncUser& user, const std::string& object_type,
+                                                         size_t expected_count) const;
+
 private:
     std::shared_ptr<realm::app::App> m_app;
     std::unique_ptr<realm::AppSession> m_app_session;

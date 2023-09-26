@@ -1021,7 +1021,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
 
         // Open the realm again. This should not crash.
         auto&& [err_future, err_handler] = make_error_handler();
-        config_local.sync_config->error_handler = err_handler;
+        config_local.sync_config->error_handler = std::move(err_handler);
 
         auto realm_post_reset = Realm::get_shared_realm(config_local);
         sync_error = wait_for_future(std::move(err_future)).get();
@@ -2433,19 +2433,12 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][protocol][
     std::mutex sync_error_mutex;
     util::Optional<SyncError> sync_error;
     config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) mutable {
-        std::lock_guard<std::mutex> lk(sync_error_mutex);
+        std::lock_guard lk(sync_error_mutex);
         sync_error = std::move(error);
     };
     auto realm = Realm::get_shared_realm(config);
-    auto latest_subs = realm->get_latest_subscription_set().make_mutable_copy();
-    auto table = realm->read_group().get_table("class_TopLevel");
-    Query new_query_a(table);
-    new_query_a.equal(table->get_column_key("_id"), ObjectId::gen());
-    latest_subs.insert_or_assign(std::move(new_query_a));
-    latest_subs.commit();
-
     timed_wait_for([&] {
-        std::lock_guard<std::mutex> lk(sync_error_mutex);
+        std::lock_guard lk(sync_error_mutex);
         return static_cast<bool>(sync_error);
     });
 
@@ -2810,7 +2803,37 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][boot
     }
 }
 
+// Check that a document with the given id is present and has the expected fields
+static void check_document(const std::vector<bson::BsonDocument>& documents, ObjectId id,
+                           std::initializer_list<std::pair<const char*, bson::Bson>> fields)
+{
+    auto it = std::find_if(documents.begin(), documents.end(), [&](auto&& doc) {
+        auto it = doc.entries().find("_id");
+        REQUIRE(it != doc.entries().end());
+        return it->second == id;
+    });
+    REQUIRE(it != documents.end());
+    auto& doc = it->entries();
+    for (auto& [name, expected_value] : fields) {
+        auto it = doc.find(name);
+        REQUIRE(it != doc.end());
+
+        // bson documents are ordered  but Realm dictionaries aren't, so the
+        // document might validly be in a different order than we expected and
+        // we need to do a comparison that doesn't check order.
+        if (expected_value.type() == bson::Bson::Type::Document) {
+            REQUIRE(static_cast<const bson::BsonDocument&>(it->second).entries() ==
+                    static_cast<const bson::BsonDocument&>(expected_value).entries());
+        }
+        else {
+            REQUIRE(it->second == expected_value);
+        }
+    }
+}
+
 TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
+    using namespace ::realm::bson;
+
     static auto server_schema = [] {
         FLXSyncTestHarness::ServerSchema server_schema;
         server_schema.queryable_fields = {"queryable_str_field"};
@@ -2820,17 +2843,37 @@ TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
              {
                  {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                  {"location", PropertyType::String | PropertyType::Nullable},
-                 {"embedded_obj", PropertyType::Object | PropertyType::Nullable, "Embedded"},
+                 {"embedded obj", PropertyType::Object | PropertyType::Nullable, "Embedded"},
+                 {"embedded list", PropertyType::Object | PropertyType::Array, "Embedded"},
+                 {"embedded dictionary", PropertyType::Object | PropertyType::Nullable | PropertyType::Dictionary,
+                  "Embedded"},
+                 {"link obj", PropertyType::Object | PropertyType::Nullable, "TopLevel"},
+                 {"link list", PropertyType::Object | PropertyType::Array, "TopLevel"},
+                 {"link dictionary", PropertyType::Object | PropertyType::Nullable | PropertyType::Dictionary,
+                  "TopLevel"},
              }},
-            {"Embedded",
-             ObjectSchema::ObjectType::Embedded,
+            {"Embedded", ObjectSchema::ObjectType::Embedded, {{"value", PropertyType::String}}},
+            {"TopLevel",
              {
-                 {"value", PropertyType::String | PropertyType::Nullable},
+                 {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                 {"value", PropertyType::Int},
              }},
         };
         return server_schema;
     }();
     static auto harness = std::make_unique<FLXSyncTestHarness>("asymmetric_sync", server_schema);
+
+    // We reuse a single app for each section, so tests will see the documents
+    // created by previous tests and we need to add those documents to the count
+    // we're waiting for
+    static std::unordered_map<std::string, size_t> previous_count;
+    auto get_documents = [&](const char* name, size_t expected_count) {
+        auto& count = previous_count[name];
+        auto documents =
+            harness->session().get_documents(*harness->app()->current_user(), name, count + expected_count);
+        count = documents.size();
+        return documents;
+    };
 
     SECTION("basic object construction") {
         auto foo_obj_id = ObjectId::gen();
@@ -2841,7 +2884,10 @@ TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
             Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
             Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", bar_obj_id}, {"location", "bar"s}}));
             realm->commit_transaction();
-            wait_for_upload(*realm);
+
+            auto documents = get_documents("Asymmetric", 2);
+            check_document(documents, foo_obj_id, {{"location", "foo"}});
+            check_document(documents, bar_obj_id, {{"location", "bar"}});
         });
 
         harness->do_with_new_realm([&](SharedRealm realm) {
@@ -2849,9 +2895,8 @@ TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
 
             auto table = realm->read_group().get_table("class_Asymmetric");
             REQUIRE(table->size() == 0);
-            auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
             // Cannot query asymmetric tables.
-            CHECK_THROWS_AS(new_query.insert_or_assign(Query(table)), LogicError);
+            CHECK_THROWS_AS(Query(table), LogicError);
         });
     }
 
@@ -2866,25 +2911,24 @@ TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
                 "Attempting to create an object of type 'Asymmetric' with an existing primary key value 'not "
                 "implemented'");
             realm->commit_transaction();
-            wait_for_upload(*realm);
-        });
 
-        harness->do_with_new_realm([&](SharedRealm realm) {
-            wait_for_download(*realm);
-
-            auto table = realm->read_group().get_table("class_Asymmetric");
-            REQUIRE(table->size() == 0);
+            auto documents = get_documents("Asymmetric", 1);
+            check_document(documents, foo_obj_id, {{"location", "foo"}});
         });
     }
 
     SECTION("create multiple objects - separate commits") {
         harness->do_with_new_realm([&](SharedRealm realm) {
             CppContext c(realm);
+            std::vector<ObjectId> obj_ids;
             for (int i = 0; i < 100; ++i) {
                 realm->begin_transaction();
-                auto obj_id = ObjectId::gen();
+                obj_ids.push_back(ObjectId::gen());
                 Object::create(c, realm, "Asymmetric",
-                               std::any(AnyDict{{"_id", obj_id}, {"location", util::format("foo_%1", i)}}));
+                               std::any(AnyDict{
+                                   {"_id", obj_ids.back()},
+                                   {"location", util::format("foo_%1", i)},
+                               }));
                 realm->commit_transaction();
             }
 
@@ -2893,6 +2937,11 @@ TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
 
             auto table = realm->read_group().get_table("class_Asymmetric");
             REQUIRE(table->size() == 0);
+
+            auto documents = get_documents("Asymmetric", 100);
+            for (int i = 0; i < 100; ++i) {
+                check_document(documents, obj_ids[i], {{"location", util::format("foo_%1", i)}});
+            }
         });
     }
 
@@ -2900,10 +2949,14 @@ TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
         harness->do_with_new_realm([&](SharedRealm realm) {
             CppContext c(realm);
             realm->begin_transaction();
+            std::vector<ObjectId> obj_ids;
             for (int i = 0; i < 100; ++i) {
-                auto obj_id = ObjectId::gen();
+                obj_ids.push_back(ObjectId::gen());
                 Object::create(c, realm, "Asymmetric",
-                               std::any(AnyDict{{"_id", obj_id}, {"location", util::format("foo_%1", i)}}));
+                               std::any(AnyDict{
+                                   {"_id", obj_ids.back()},
+                                   {"location", util::format("bar_%1", i)},
+                               }));
             }
             realm->commit_transaction();
 
@@ -2912,6 +2965,11 @@ TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
 
             auto table = realm->read_group().get_table("class_Asymmetric");
             REQUIRE(table->size() == 0);
+
+            auto documents = get_documents("Asymmetric", 100);
+            for (int i = 0; i < 100; ++i) {
+                check_document(documents, obj_ids[i], {{"location", util::format("bar_%1", i)}});
+            }
         });
     }
 
@@ -2948,12 +3006,19 @@ TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
 
     SECTION("basic embedded object construction") {
         harness->do_with_new_realm([&](SharedRealm realm) {
+            auto obj_id = ObjectId::gen();
             realm->begin_transaction();
             CppContext c(realm);
             Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", ObjectId::gen()}, {"embedded_obj", AnyDict{{"value", "foo"s}}}}));
+                           std::any(AnyDict{
+                               {"_id", obj_id},
+                               {"embedded obj", AnyDict{{"value", "foo"s}}},
+                           }));
             realm->commit_transaction();
             wait_for_upload(*realm);
+
+            auto documents = get_documents("Asymmetric", 1);
+            check_document(documents, obj_id, {{"embedded obj", BsonDocument{{"value", "foo"}}}});
         });
 
         harness->do_with_new_realm([&](SharedRealm realm) {
@@ -2968,19 +3033,29 @@ TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
         harness->do_with_new_realm([&](SharedRealm realm) {
             CppContext c(realm);
             auto foo_obj_id = ObjectId::gen();
+
             realm->begin_transaction();
             Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", foo_obj_id}, {"embedded_obj", AnyDict{{"value", "foo"s}}}}));
+                           std::any(AnyDict{
+                               {"_id", foo_obj_id},
+                               {"embedded obj", AnyDict{{"value", "foo"s}}},
+                           }));
             realm->commit_transaction();
-            // Update embedded field to `null`.
+
+            // Update embedded field to `null`. The server discards this write
+            // as asymmetric sync can only create new objects.
             realm->begin_transaction();
             Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", foo_obj_id}, {"embedded_obj", std::any()}}));
+                           std::any(AnyDict{
+                               {"_id", foo_obj_id},
+                               {"embedded obj", std::any()},
+                           }));
             realm->commit_transaction();
-            // Update embedded field again to a new value.
+
+            // create a second object so that we can know when the translator
+            // has processed everything
             realm->begin_transaction();
-            Object::create(c, realm, "Asymmetric",
-                           std::any(AnyDict{{"_id", foo_obj_id}, {"embedded_obj", AnyDict{{"value", "bar"s}}}}));
+            Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", ObjectId::gen()}, {}}));
             realm->commit_transaction();
 
             wait_for_upload(*realm);
@@ -2988,6 +3063,41 @@ TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
 
             auto table = realm->read_group().get_table("class_Asymmetric");
             REQUIRE(table->size() == 0);
+
+            auto documents = get_documents("Asymmetric", 2);
+            check_document(documents, foo_obj_id, {{"embedded obj", BsonDocument{{"value", "foo"}}}});
+        });
+    }
+
+    SECTION("embedded collections") {
+        harness->do_with_new_realm([&](SharedRealm realm) {
+            CppContext c(realm);
+            auto obj_id = ObjectId::gen();
+
+            realm->begin_transaction();
+            Object::create(c, realm, "Asymmetric",
+                           std::any(AnyDict{
+                               {"_id", obj_id},
+                               {"embedded list", AnyVector{AnyDict{{"value", "foo"s}}, AnyDict{{"value", "bar"s}}}},
+                               {"embedded dictionary",
+                                AnyDict{
+                                    {"key1", AnyDict{{"value", "foo"s}}},
+                                    {"key2", AnyDict{{"value", "bar"s}}},
+                                }},
+                           }));
+            realm->commit_transaction();
+
+            auto documents = get_documents("Asymmetric", 1);
+            check_document(
+                documents, obj_id,
+                {
+                    {"embedded list", BsonArray{BsonDocument{{"value", "foo"}}, BsonDocument{{"value", "bar"}}}},
+                    {"embedded dictionary",
+                     BsonDocument{
+                         {"key1", BsonDocument{{"value", "foo"}}},
+                         {"key2", BsonDocument{{"value", "bar"}}},
+                     }},
+                });
         });
     }
 
@@ -3002,10 +3112,59 @@ TEST_CASE("flx: data ingest", "[sync][flx][data ingest][baas]") {
              }},
         };
 
-        SyncTestFile config(harness->app(), bson::Bson{}, schema);
+        SyncTestFile config(harness->app(), Bson{}, schema);
         REQUIRE_EXCEPTION(
             Realm::get_shared_realm(config), SchemaValidationFailed,
             Catch::Matchers::ContainsSubstring("Asymmetric table 'Asymmetric2' not allowed in partition based sync"));
+    }
+
+    SECTION("links to top-level objects") {
+        harness->do_with_new_realm([&](SharedRealm realm) {
+            subscribe_to_all_and_bootstrap(*realm);
+
+            ObjectId obj_id = ObjectId::gen();
+            std::array<ObjectId, 5> target_obj_ids;
+            for (auto& id : target_obj_ids) {
+                id = ObjectId::gen();
+            }
+
+            realm->begin_transaction();
+            CppContext c(realm);
+            Object::create(c, realm, "Asymmetric",
+                           std::any(AnyDict{
+                               {"_id", obj_id},
+                               {"link obj", AnyDict{{"_id", target_obj_ids[0]}, {"value", INT64_C(10)}}},
+                               {"link list",
+                                AnyVector{
+                                    AnyDict{{"_id", target_obj_ids[1]}, {"value", INT64_C(11)}},
+                                    AnyDict{{"_id", target_obj_ids[2]}, {"value", INT64_C(12)}},
+                                }},
+                               {"link dictionary",
+                                AnyDict{
+                                    {"key1", AnyDict{{"_id", target_obj_ids[3]}, {"value", INT64_C(13)}}},
+                                    {"key2", AnyDict{{"_id", target_obj_ids[4]}, {"value", INT64_C(14)}}},
+                                }},
+                           }));
+            realm->commit_transaction();
+            wait_for_upload(*realm);
+
+            auto docs1 = get_documents("Asymmetric", 1);
+            check_document(docs1, obj_id,
+                           {{"link obj", target_obj_ids[0]},
+                            {"link list", BsonArray{{target_obj_ids[1], target_obj_ids[2]}}},
+                            {
+                                "link dictionary",
+                                BsonDocument{
+                                    {"key1", target_obj_ids[3]},
+                                    {"key2", target_obj_ids[4]},
+                                },
+                            }});
+
+            auto docs2 = get_documents("TopLevel", 5);
+            for (int64_t i = 0; i < 5; ++i) {
+                check_document(docs2, target_obj_ids[i], {{"value", 10 + i}});
+            }
+        });
     }
 
     // Add any new test sections above this point
@@ -3039,18 +3198,15 @@ TEST_CASE("flx: data ingest - dev mode", "[sync][flx][data ingest][baas]") {
 
     harness.do_with_new_realm(
         [&](SharedRealm realm) {
-            auto table = realm->read_group().get_table("class_TopLevel");
-            auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
-            new_query.insert_or_assign(Query(table));
-            std::move(new_query).commit();
-
             CppContext c(realm);
             realm->begin_transaction();
             Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", foo_obj_id}, {"location", "foo"s}}));
             Object::create(c, realm, "Asymmetric", std::any(AnyDict{{"_id", bar_obj_id}, {"location", "bar"s}}));
             realm->commit_transaction();
 
-            wait_for_upload(*realm);
+            auto docs = harness.session().get_documents(*realm->config().sync_config->user, "Asymmetric", 2);
+            check_document(docs, foo_obj_id, {{"location", "foo"}});
+            check_document(docs, bar_obj_id, {{"location", "bar"}});
         },
         schema);
 }

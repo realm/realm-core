@@ -115,17 +115,7 @@ public:
     {
         SyncTestFile config(m_test_session.app()->current_user(), schema(), SyncConfig::FLXSyncEnabled{});
         auto realm = Realm::get_shared_realm(config);
-        auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
-        for (const auto& table : realm->schema()) {
-            if (table.table_type != ObjectSchema::ObjectType::TopLevel) {
-                continue;
-            }
-            Query query_for_table(realm->read_group().get_table(table.table_key));
-            mut_subs.insert_or_assign(query_for_table);
-        }
-        auto subs = std::move(mut_subs).commit();
-        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
-        wait_for_download(*realm);
+        subscribe_to_all_and_bootstrap(*realm);
 
         realm->begin_transaction();
         func(realm);
