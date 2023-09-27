@@ -49,8 +49,8 @@ public:
         return ServerSchema{std::move(schema), {"queryable_str_field", "queryable_int_field"}};
     }
 
-    static AppSession make_app_from_server_schema(const std::string& test_name,
-                                                  const FLXSyncTestHarness::ServerSchema& server_schema)
+    static AppCreateConfig make_config_from_server_schema(const std::string& test_name,
+                                                          const FLXSyncTestHarness::ServerSchema& server_schema)
     {
         auto server_app_config = minimal_app_config(get_base_url(), test_name, server_schema.schema);
         server_app_config.dev_mode_enabled = server_schema.dev_mode_enabled;
@@ -60,7 +60,13 @@ public:
         server_app_config.flx_sync_config = std::move(flx_config);
         server_app_config.service_roles = server_schema.service_roles;
 
-        return create_app(server_app_config);
+        return server_app_config;
+    }
+
+    static AppSession make_app_from_server_schema(const std::string& test_name,
+                                                  const FLXSyncTestHarness::ServerSchema& server_schema)
+    {
+        return create_app(make_config_from_server_schema(test_name, server_schema));
     }
 
     struct Config {

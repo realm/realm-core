@@ -65,6 +65,8 @@ private:
     std::string m_access_token;
 };
 
+struct AppCreateConfig;
+
 class AdminAPISession {
 public:
     static AdminAPISession login(const std::string& base_url, const std::string& username,
@@ -80,7 +82,7 @@ public:
     void delete_app(const std::string& app_id) const;
     void trigger_client_reset(const std::string& app_id, int64_t file_ident) const;
     void migrate_to_flx(const std::string& app_id, const std::string& service_id, bool migrate_to_flx) const;
-    void update_schema(const std::string& app_id, Schema schema) const;
+    void create_schema(const std::string& app_id, const AppCreateConfig& config) const;
 
     struct Service {
         std::string id;

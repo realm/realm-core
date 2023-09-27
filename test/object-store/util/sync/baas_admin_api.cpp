@@ -584,46 +584,73 @@ void AdminAPISession::migrate_to_flx(const std::string& app_id, const std::strin
     endpoint.put_json(nlohmann::json{{"serviceId", service_id}, {"action", migrate_to_flx ? "start" : "rollback"}});
 }
 
-void AdminAPISession::update_schema(const std::string& app_id, Schema schema) const
+void AdminAPISession::create_schema(const std::string& app_id, const AppCreateConfig& config) const
 {
+    static const std::string mongo_service_name = "BackingDB";
+
     auto drafts = apps()[app_id]["drafts"];
     auto draft_create_resp = drafts.post_json({});
     std::string draft_id = draft_create_resp["_id"];
 
     auto schemas = apps()[app_id]["schemas"];
-    auto resp = schemas.get_json();
+    auto current_schema = schemas.get_json();
+    auto target_schema = config.schema;
+    std::cerr << current_schema << std::endl;
 
-    std::unordered_map<std::string, std::string> table_name_to_id;
-    for (const auto& schema : resp) {
-        table_name_to_id[schema["metadata"]["collection"]] = schema["_id"];
+    std::unordered_map<std::string, std::string> current_schema_tables;
+    for (const auto& schema : current_schema) {
+        current_schema_tables[schema["metadata"]["collection"]] = schema["_id"];
     }
 
-    // New tables
+    // Add new tables
 
-    // Existing tables
+    auto pk_and_queryable_only = [&](const Property& prop) {
+        if (config.flx_sync_config) {
+            const auto& queryable_fields = config.flx_sync_config->queryable_fields;
 
-    // Removed tables
+            if (std::find(queryable_fields.begin(), queryable_fields.end(), prop.name) != queryable_fields.end()) {
+                return true;
+            }
+        }
+        return prop.name == "_id" || prop.name == config.partition_key.name;
+    };
 
-    schemas[table_name_to_id["TopLevel2"]].del();
-    // schemas[table_name_to_id["TopLevel"]].put_json(schema[0]);
-    std::cerr << resp << std::endl;
+    // Create the schemas in two passes: first populate just the primary key and
+    // partition key, then add the rest of the properties. This ensures that the
+    // targest of links exist before adding the links.
+    std::vector<std::pair<std::string, const ObjectSchema*>> object_schema_to_create;
+    BaasRuleBuilder rule_builder(target_schema, config.partition_key, mongo_service_name, config.mongo_dbname,
+                                 static_cast<bool>(config.flx_sync_config));
+    for (const auto& obj_schema : target_schema) {
+        auto it = current_schema_tables.find(obj_schema.name);
+        if (it != current_schema_tables.end()) {
+            // object_schema_to_create.push_back({it->second, &obj_schema});
+            //  schemas[it->second].del();
+            continue;
+        }
 
+        auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema, pk_and_queryable_only);
+        auto schema_create_resp = schemas.post_json(schema_to_create);
+        object_schema_to_create.push_back({schema_create_resp["_id"], &obj_schema});
+    }
 
-    // auto schemas = apps()[app_id]["schemas"];
-    // for (const auto& obj_schema : schema) {
-    //     auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema);
-    //     schemas.post_json(schema_to_create);
-    // }
+    // Update existing tables (including the ones just created)
+    for (const auto& [id, obj_schema] : object_schema_to_create) {
+        auto schema_to_create = rule_builder.object_schema_to_baas_schema(*obj_schema, nullptr);
+        schema_to_create["_id"] = id;
+        schemas[id].put_json(schema_to_create);
+    }
 
-    // for (const auto& [id, obj_schema] : object_schema_to_create) {
-    //     auto schema_to_create = rule_builder.object_schema_to_baas_schema(*obj_schema, nullptr);
-    //     schema_to_create["_id"] = id;
-    //     schemas[id].put_json(schema_to_create);
-    // }
+    // Delete removed tables
+    for (const auto& table : current_schema_tables) {
+        if (target_schema.find(table.first) == target_schema.end()) {
+            schemas[table.second].del();
+        }
+    }
 
     drafts[draft_id]["deployment"].post_json({});
 
-    resp = schemas.get_json();
+    auto resp = schemas.get_json();
     std::cerr << resp << std::endl;
 }
 
@@ -1074,31 +1101,6 @@ AppSession create_app(const AppCreateConfig& config)
 
     auto create_mongo_service_resp = services.post_json(std::move(mongo_service_def));
     std::string mongo_service_id = create_mongo_service_resp["_id"];
-    auto schemas = app["schemas"];
-
-    auto pk_and_queryable_only = [&](const Property& prop) {
-        if (config.flx_sync_config) {
-            const auto& queryable_fields = config.flx_sync_config->queryable_fields;
-
-            if (std::find(queryable_fields.begin(), queryable_fields.end(), prop.name) != queryable_fields.end()) {
-                return true;
-            }
-        }
-        return prop.name == "_id" || prop.name == config.partition_key.name;
-    };
-
-    // Create the schemas in two passes: first populate just the primary key and
-    // partition key, then add the rest of the properties. This ensures that the
-    // targest of links exist before adding the links.
-    std::vector<std::pair<std::string, const ObjectSchema*>> object_schema_to_create;
-    BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname,
-                                 static_cast<bool>(config.flx_sync_config));
-    for (const auto& obj_schema : config.schema) {
-        auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema, pk_and_queryable_only);
-        auto schema_create_resp = schemas.post_json(schema_to_create);
-        object_schema_to_create.push_back({schema_create_resp["_id"], &obj_schema});
-    }
-
     auto default_rule = services[mongo_service_id]["default_rule"];
     auto service_roles = nlohmann::json::array();
     if (config.service_roles.empty()) {
@@ -1136,11 +1138,7 @@ AppSession create_app(const AppCreateConfig& config)
 
     default_rule.post_json({{"roles", service_roles}});
 
-    for (const auto& [id, obj_schema] : object_schema_to_create) {
-        auto schema_to_create = rule_builder.object_schema_to_baas_schema(*obj_schema, nullptr);
-        schema_to_create["_id"] = id;
-        schemas[id].put_json(schema_to_create);
-    }
+    session.create_schema(app_id, config);
 
     // For PBS, enable sync after schema is created.
     if (!config.flx_sync_config) {

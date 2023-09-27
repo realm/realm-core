@@ -76,7 +76,7 @@ TEST_CASE("flx: new schema version", "[sync][flx][baas]") {
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
 
     const AppSession& app_session = harness.session().app_session();
-    //set_schema_versioning_feature_flag(app_session.server_app_id, harness.app()->current_user());
+    set_schema_versioning_feature_flag(app_session.server_app_id, harness.app()->current_user());
 
     {
         config.schema_version = 0;
@@ -125,9 +125,18 @@ TEST_CASE("flx: new schema version", "[sync][flx][baas]") {
                        {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
                        {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
                        {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}}};
-    
-    set_schema_versioning_feature_flag(app_session.server_app_id, harness.app()->current_user());
-    app_session.admin_api.update_schema(app_session.server_app_id, schema_v1);
+
+    // set_schema_versioning_feature_flag(app_session.server_app_id, harness.app()->current_user());
+    app_session.admin_api.create_schema(
+        app_session.server_app_id,
+        FLXSyncTestHarness::make_config_from_server_schema(
+            "flx_schema_versions", {schema_v1, {"queryable_str_field", "queryable_int_field"}}));
+
+    const auto wait_start = std::chrono::steady_clock::now();
+    using namespace std::chrono_literals;
+    util::EventLoop::main().run_until([&]() -> bool {
+        return std::chrono::steady_clock::now() - wait_start >= 5s;
+    });
 
     {
         // Bump the schema version
