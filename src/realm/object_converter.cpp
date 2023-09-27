@@ -23,7 +23,6 @@
 #include <realm/set.hpp>
 
 #include <realm/util/flat_map.hpp>
-#include <iostream>
 namespace realm::converters {
 
 // Takes two lists, src and dst, and makes dst equal src. src is unchanged.
@@ -383,89 +382,63 @@ void InterRealmValueConverter::handle_list_in_mixed(const Lst<Mixed>& src_list, 
 void InterRealmValueConverter::handle_dictionary_in_mixed(Dictionary& src_dictionary,
                                                           Dictionary& dst_dictionary) const
 {
-    int sz = (int)std::min(src_dictionary.size(), dst_dictionary.size());
-    int left = 0;
-    int right = (int)sz - 1;
+    std::vector<size_t> to_insert, to_delete;
+    size_t src_ndx = 0, dst_ndx = 0;
+    while (src_ndx < src_dictionary.size() && dst_ndx < dst_dictionary.size()) {
+        const auto [key_src, src_any] = src_dictionary.get_pair(src_ndx);
+        const auto [key_dst, dst_any] = dst_dictionary.get_pair(dst_ndx);
 
-    // find fist not matching element from beginning
-    while (left < sz) {
-        const auto [key_src, src_any] = src_dictionary.get_pair(left);
-        const auto [key_dst, dst_any] = dst_dictionary.get_pair(left);
-        if (src_any != dst_any || key_src != key_dst)
-            break;
-        if (is_collection(src_any) && !check_matching_dictionary(src_dictionary, dst_dictionary, key_src.get_string(),
-                                                                 to_collection_type(src_any)))
-            break;
-        left += 1;
-    }
-
-    // find first not matching element from end
-    while (right >= 0) {
-        const auto [key_src, src_any] = src_dictionary.get_pair(right);
-        const auto [key_dst, dst_any] = dst_dictionary.get_pair(right);
-        if (src_any != dst_any || key_src != key_dst)
-            break;
-        if (is_collection(src_any) && !check_matching_dictionary(src_dictionary, dst_dictionary, key_src.get_string(),
-                                                                 to_collection_type(src_any)))
-            break;
-        right -= 1;
-    }
-
-    // Replace all different elements in [left, right]
-    while (left <= right) {
-        const auto [key_src, src_any] = src_dictionary.get_pair(left);
-        const auto [key_dst, dst_any] = dst_dictionary.get_pair(left);
-
-        // handle possible key mismatches
-        if (key_src != key_dst) {
-            dst_dictionary.erase(key_dst);
-            dst_dictionary.insert(key_src, src_any);
-        }
-
-        if (is_collection(src_any)) {
-            auto coll_type = to_collection_type(src_any);
-            const auto key = key_src.get_string();
-
-            if (!dst_any.is_type(src_any.get_type())) {
-                // Mixed vs Collection
-                const auto key = key_src.get_string();
-                dst_dictionary.set_collection(key, coll_type);
-                copy_dictionary_in_mixed(src_dictionary, dst_dictionary, key, coll_type);
+        auto cmp = key_src.compare(key_dst);
+        if (cmp == 0) {
+            if (src_any != dst_any) {
+                to_insert.push_back(src_ndx);
             }
-            else if (!check_matching_dictionary(src_dictionary, dst_dictionary, key, coll_type)) {
-                // Collection vs Collection
-                dst_dictionary.insert(key_src, src_any);
-                copy_dictionary_in_mixed(src_dictionary, dst_dictionary, key, coll_type);
+            else if (is_collection(src_any) &&
+                     !check_matching_dictionary(src_dictionary, dst_dictionary, key_src.get_string(),
+                                                to_collection_type(src_any))) {
+                to_insert.push_back(src_ndx);
             }
+            src_ndx += 1;
+            dst_ndx += 1;
         }
-        else if (dst_any != src_any) {
-            // Mixed vs Mixed
-            dst_dictionary.insert(key_src, src_any);
-        }
-        left += 1;
-    }
-
-    // remove dst elements not present in src
-    if (dst_dictionary.size() > src_dictionary.size()) {
-        auto dst_size = dst_dictionary.size();
-        auto src_size = src_dictionary.size();
-        while (dst_size > src_size) {
-            const auto [dst_key, dst_any] = dst_dictionary.get_pair(--dst_size);
-            dst_dictionary.erase(dst_key);
-        }
-    }
-
-    // append remainig src into dst
-    for (size_t i = dst_dictionary.size(); i < src_dictionary.size(); ++i) {
-        const auto [src_key, src_any] = src_dictionary.get_pair(i);
-        if (is_collection(src_any)) {
-            const auto coll_type = to_collection_type(src_any);
-            const auto key = src_key.get_string();
-            dst_dictionary.insert_collection(key, coll_type);
-            copy_dictionary_in_mixed(src_dictionary, dst_dictionary, key, coll_type);
+        else if (cmp < 0) {
+            to_insert.push_back(src_ndx);
+            src_ndx += 1;
         }
         else {
-            dst_dictionary.insert(src_key, src_any);
+            to_delete.push_back(dst_ndx);
+            dst_ndx += 1;
+        }
+    }
+
+    // append src to dst
+    while (src_ndx < src_dictionary.size()) {
+        to_insert.push_back(src_ndx);
+        src_ndx += 1;
+    }
+
+    // delete everything that did not match passed src.size()
+    while (dst_ndx < dst_dictionary.size()) {
+        to_delete.push_back(dst_ndx);
+        dst_ndx += 1;
+    }
+
+    // delete all the non matching keys
+    while (!to_delete.empty()) {
+        dst_dictionary.erase(dst_dictionary.begin() + to_delete.back());
+        to_delete.pop_back();
+    }
+
+    // insert into dst
+    for (const auto pos : to_insert) {
+        const auto [key, any] = src_dictionary.get_pair(pos);
+        if (is_collection(any)) {
+            auto coll_type = to_collection_type(any);
+            dst_dictionary.insert_collection(key.get_string(), coll_type);
+            copy_dictionary_in_mixed(src_dictionary, dst_dictionary, key.get_string(), coll_type);
+        }
+        else {
+            dst_dictionary.insert(key, any);
         }
     }
 }

@@ -2031,11 +2031,15 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
             if (collection->get_collection_type() == CollectionType::List) {
                 auto list_of_mixed = dynamic_cast<Lst<Mixed>*>(collection.get());
                 size_t ndx = list_of_mixed->find_index(index);
+                if (ndx == realm::not_found)
+                    return {Mixed{}, PathElement{}};
                 return {list_of_mixed->get(ndx), PathElement(ndx)};
             }
             else {
                 auto dict = dynamic_cast<Dictionary*>(collection.get());
                 size_t ndx = dict->find_index(index);
+                if (ndx == realm::not_found)
+                    return {Mixed{}, PathElement{}};
                 return {dict->get_any(ndx), PathElement(dict->get_key(ndx).get_string())};
             }
         };

@@ -959,9 +959,16 @@ Mixed Dictionary::do_get(size_t ndx) const
 void Dictionary::do_erase(size_t ndx, Mixed key)
 {
     auto old_value = m_values->get(ndx);
-
     CascadeState cascade_state(CascadeState::Mode::Strong);
     bool recurse = clear_backlink(old_value, cascade_state);
+
+    if (old_value.is_type(type_List)) {
+        get_list(key.get_string())->remove_backlinks(cascade_state);
+    }
+    else if (old_value.is_type(type_Dictionary)) {
+        get_dictionary(key.get_string())->remove_backlinks(cascade_state);
+    }
+
     if (recurse)
         _impl::TableFriend::remove_recursive(*get_table_unchecked(), cascade_state); // Throws
 
@@ -971,7 +978,6 @@ void Dictionary::do_erase(size_t ndx, Mixed key)
 
     m_keys->erase(ndx);
     m_values->erase(ndx);
-
     bump_content_version();
 }
 

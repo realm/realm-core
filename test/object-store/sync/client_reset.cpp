@@ -5216,7 +5216,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
             })
             ->run();
     }
-    SECTION("Verify copy and notification logic for List with scalar mixed types and nested collections") {
+    SECTION("Verify copy and notification logic for List<List> and scalar types") {
         Results results;
         Object object;
         List list_listener, nlist_setup_listener, nlist_local_listener;
@@ -5357,6 +5357,443 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     REQUIRE(!nlist_setup_changes.collection_root_was_deleted);
                     REQUIRE_INDICES(nlist_setup_changes.insertions);
                     REQUIRE_INDICES(nlist_setup_changes.deletions);
+                }
+            })
+            ->run();
+    }
+    SECTION("Verify copy and notification logic for Dictionary<List> and scalar types") {
+        Results results;
+        Object object;
+        object_store::Dictionary dictionary_listener;
+        List nlist_setup_listener, nlist_local_listener;
+        CollectionChangeSet dictionary_changes, nlist_setup_changes, nlist_local_changes;
+        NotificationToken dictionary_token, nlist_setup_token, nlist_local_token;
+
+        ObjectId pk_val = ObjectId::gen();
+        SyncTestFile config2(init_sync_manager.app(), "default");
+        config2.schema = config.schema;
+        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        test_reset
+            ->setup([&](SharedRealm realm) {
+                auto table = get_table(*realm, "TopLevel");
+                auto obj = table->create_object_with_primary_key(pk_val);
+                auto col = table->get_column_key("any_mixed");
+                obj.set_collection(col, CollectionType::Dictionary);
+                object_store::Dictionary dictionary{realm, obj, col};
+                dictionary.insert_collection("[Setup]", CollectionType::List);
+                dictionary.insert("Setup", Mixed{"Setup"});
+                auto nlist = dictionary.get_list("[Setup]");
+                nlist.add(Mixed{"Setup"});
+            })
+            ->make_local_changes([&](SharedRealm local_realm) {
+                advance_and_notify(*local_realm);
+                TableRef table = get_table(*local_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any_mixed");
+                object_store::Dictionary dictionary{local_realm, obj, col};
+                REQUIRE(dictionary.size() == 2);
+                dictionary.insert_collection("[Local]", CollectionType::List);
+                dictionary.insert("Local", Mixed{"Local"});
+                auto nlist = dictionary.get_list("[Local]");
+                nlist.add(Mixed{"Local"});
+            })
+            ->on_post_local_changes([&](SharedRealm realm) {
+                TableRef table = get_table(*realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any_mixed");
+                dictionary_listener = object_store::Dictionary{realm, obj, col};
+                REQUIRE(dictionary_listener.size() == 4);
+                dictionary_token = dictionary_listener.add_notification_callback([&](CollectionChangeSet changes) {
+                    dictionary_changes = std::move(changes);
+                });
+                auto nlist_setup = dictionary_listener.get_list("[Setup]");
+                REQUIRE(nlist_setup.size() == 1);
+                REQUIRE(nlist_setup.get_any(0) == Mixed{"Setup"});
+                nlist_setup_listener = nlist_setup;
+                nlist_setup_token = nlist_setup_listener.add_notification_callback([&](CollectionChangeSet changes) {
+                    nlist_setup_changes = std::move(changes);
+                });
+                auto nlist_local = dictionary_listener.get_list("[Local]");
+                REQUIRE(nlist_local.size() == 1);
+                REQUIRE(nlist_local.get_any(0) == Mixed{"Local"});
+                nlist_local_listener = nlist_local;
+                nlist_local_token = nlist_local_listener.add_notification_callback([&](CollectionChangeSet changes) {
+                    nlist_local_changes = std::move(changes);
+                });
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                advance_and_notify(*remote_realm);
+                TableRef table = get_table(*remote_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any_mixed");
+                object_store::Dictionary dictionary{remote_realm, obj, col};
+                REQUIRE(dictionary.size() == 2);
+                dictionary.insert_collection("[Remote]", CollectionType::List);
+                dictionary.insert("Remote", Mixed{"Remote"});
+                auto nlist = dictionary.get_list("[Remote]");
+                nlist.add(Mixed{"Remote"});
+            })
+            ->on_post_reset([&](SharedRealm local_realm) {
+                advance_and_notify(*local_realm);
+                TableRef table = get_table(*local_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any_mixed");
+
+                if (test_mode == ClientResyncMode::DiscardLocal) {
+                    // db must be equal to remote
+                    object_store::Dictionary dictionary{local_realm, obj, col};
+                    REQUIRE(dictionary.size() == 4);
+                    auto nlist_remote = dictionary.get_list("[Remote]");
+                    auto nlist_setup = dictionary.get_list("[Setup]");
+                    auto mixed_setup = dictionary.get_any("Setup");
+                    auto mixed_remote = dictionary.get_any("Remote");
+                    REQUIRE(nlist_remote.size() == 1);
+                    REQUIRE(nlist_setup.size() == 1);
+                    REQUIRE(mixed_setup.get_string() == "Setup");
+                    REQUIRE(mixed_remote.get_string() == "Remote");
+                    REQUIRE(nlist_remote.get_any(0).get_string() == "Remote");
+                    REQUIRE(nlist_setup.get_any(0).get_string() == "Setup");
+                    REQUIRE(dictionary_listener.is_valid());
+                    REQUIRE_INDICES(dictionary_changes.deletions, 0, 2);  // remove [Local], Local
+                    REQUIRE_INDICES(dictionary_changes.insertions, 0, 2); // insert [Remote], Remote
+                    REQUIRE_INDICES(
+                        dictionary_changes.modifications); // replace Local with Remote at position 0 and 3
+                    REQUIRE(nlist_local_changes.collection_root_was_deleted); // local list is deleted
+                    REQUIRE(!nlist_setup_changes.collection_root_was_deleted);
+                    REQUIRE_INDICES(nlist_setup_changes.insertions); // there are no new insertions or deletions
+                    REQUIRE_INDICES(nlist_setup_changes.deletions);
+                    REQUIRE_INDICES(nlist_setup_changes.modifications);
+                }
+                else {
+                    object_store::Dictionary dictionary{local_realm, obj, col};
+                    REQUIRE(dictionary.size() == 6);
+                    auto nlist_local = dictionary.get_list("[Local]");
+                    auto nlist_remote = dictionary.get_list("[Remote]");
+                    auto nlist_setup = dictionary.get_list("[Setup]");
+                    auto mixed_local = dictionary.get_any("Local");
+                    auto mixed_setup = dictionary.get_any("Setup");
+                    auto mixed_remote = dictionary.get_any("Remote");
+                    // local, remote changes are kept
+                    REQUIRE(nlist_remote.size() == 1);
+                    REQUIRE(nlist_setup.size() == 1);
+                    REQUIRE(nlist_local.size() == 1);
+                    REQUIRE(mixed_setup.get_string() == "Setup");
+                    REQUIRE(mixed_remote.get_string() == "Remote");
+                    REQUIRE(mixed_local.get_string() == "Local");
+                    REQUIRE(nlist_remote.get_any(0).get_string() == "Remote");
+                    REQUIRE(nlist_local.get_any(0).get_string() == "Local");
+                    REQUIRE(nlist_setup.get_any(0).get_string() == "Setup");
+                    // notifications
+                    REQUIRE(dictionary_listener.is_valid());
+                    // src is [ [Local],[Remote],[Setup], Local, Setup, Remote ]
+                    // dst is [ [Local], [Setup], Setup, Local]
+                    // no deletions
+                    REQUIRE_INDICES(dictionary_changes.deletions);
+                    // inserted "[Remote]" and "Remote"
+                    REQUIRE_INDICES(dictionary_changes.insertions, 1, 4);
+                    REQUIRE_INDICES(dictionary_changes.modifications);
+                    REQUIRE(!nlist_local_changes.collection_root_was_deleted);
+                    REQUIRE_INDICES(nlist_local_changes.insertions);
+                    REQUIRE_INDICES(nlist_local_changes.deletions);
+                    REQUIRE(!nlist_setup_changes.collection_root_was_deleted);
+                    REQUIRE_INDICES(nlist_setup_changes.insertions);
+                    REQUIRE_INDICES(nlist_setup_changes.deletions);
+                }
+            })
+            ->run();
+    }
+    SECTION("Verify copy and notification logic for List<Dictionary> and scalar types") {
+        Results results;
+        Object object;
+        List list_listener;
+        object_store::Dictionary ndictionary_setup_listener, ndictionary_local_listener;
+        CollectionChangeSet list_changes, ndictionary_setup_changes, ndictionary_local_changes;
+        NotificationToken list_token, ndictionary_setup_token, ndictionary_local_token;
+
+        ObjectId pk_val = ObjectId::gen();
+        SyncTestFile config2(init_sync_manager.app(), "default");
+        config2.schema = config.schema;
+        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        test_reset
+            ->setup([&](SharedRealm realm) {
+                auto table = get_table(*realm, "TopLevel");
+                auto obj = table->create_object_with_primary_key(pk_val);
+                auto col = table->get_column_key("any_mixed");
+                obj.set_collection(col, CollectionType::List);
+                List list{realm, obj, col};
+                list.insert_collection(0, CollectionType::Dictionary);
+                list.add(Mixed{"Setup"});
+                auto ndictionary = list.get_dictionary(0);
+                ndictionary.insert("Key", Mixed{"Setup"});
+            })
+            ->make_local_changes([&](SharedRealm local_realm) {
+                advance_and_notify(*local_realm);
+                TableRef table = get_table(*local_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any_mixed");
+                List list{local_realm, obj, col};
+                REQUIRE(list.size() == 2);
+                list.insert_collection(0, CollectionType::Dictionary);
+                list.add(Mixed{"Local"});
+                auto ndictionary = list.get_dictionary(0);
+                ndictionary.insert("Key", Mixed{"Local"});
+            })
+            ->on_post_local_changes([&](SharedRealm realm) {
+                TableRef table = get_table(*realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any_mixed");
+                list_listener = List{realm, obj, col};
+                REQUIRE(list_listener.size() == 4);
+                list_token = list_listener.add_notification_callback([&](CollectionChangeSet changes) {
+                    list_changes = std::move(changes);
+                });
+                auto ndictionary_setup = list_listener.get_dictionary(1);
+                REQUIRE(ndictionary_setup.size() == 1);
+                REQUIRE(ndictionary_setup.get_any("Key") == Mixed{"Setup"});
+                ndictionary_setup_listener = ndictionary_setup;
+                ndictionary_setup_token =
+                    ndictionary_setup_listener.add_notification_callback([&](CollectionChangeSet changes) {
+                        ndictionary_setup_changes = std::move(changes);
+                    });
+                auto ndictionary_local = list_listener.get_dictionary(0);
+                REQUIRE(ndictionary_local.size() == 1);
+                REQUIRE(ndictionary_local.get_any("Key") == Mixed{"Local"});
+                ndictionary_local_listener = ndictionary_local;
+                ndictionary_local_token =
+                    ndictionary_local_listener.add_notification_callback([&](CollectionChangeSet changes) {
+                        ndictionary_local_changes = std::move(changes);
+                    });
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                advance_and_notify(*remote_realm);
+                TableRef table = get_table(*remote_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any_mixed");
+                List list{remote_realm, obj, col};
+                REQUIRE(list.size() == 2);
+                list.insert_collection(0, CollectionType::Dictionary);
+                list.add(Mixed{"Remote"});
+                auto ndictionary = list.get_dictionary(0);
+                ndictionary.insert("Key", Mixed{"Remote"});
+            })
+            ->on_post_reset([&](SharedRealm local_realm) {
+                advance_and_notify(*local_realm);
+                TableRef table = get_table(*local_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any_mixed");
+
+                if (test_mode == ClientResyncMode::DiscardLocal) {
+                    // db must be equal to remote
+                    List list{local_realm, obj, col};
+                    REQUIRE(list.size() == 4);
+                    auto ndictionary_remote = list.get_dictionary(0);
+                    auto ndictionary_setup = list.get_dictionary(1);
+                    auto mixed_setup = list.get_any(2);
+                    auto mixed_remote = list.get_any(3);
+                    REQUIRE(ndictionary_remote.size() == 1);
+                    REQUIRE(ndictionary_setup.size() == 1);
+                    REQUIRE(mixed_setup.get_string() == "Setup");
+                    REQUIRE(mixed_remote.get_string() == "Remote");
+                    REQUIRE(ndictionary_remote.get_any("Key").get_string() == "Remote");
+                    REQUIRE(ndictionary_setup.get_any("Key").get_string() == "Setup");
+                    REQUIRE(list_listener.is_valid());
+                    REQUIRE_INDICES(list_changes.deletions);  // old nested collection deleted
+                    REQUIRE_INDICES(list_changes.insertions); // new nested collection inserted
+                    REQUIRE_INDICES(list_changes.modifications, 0,
+                                    3); // replace Local with Remote at position 0 and 3
+                    REQUIRE(
+                        !ndictionary_local_changes.collection_root_was_deleted); // original local collection deleted
+                    REQUIRE(!ndictionary_setup_changes.collection_root_was_deleted);
+                    REQUIRE_INDICES(ndictionary_setup_changes.insertions); // there are no new insertions or deletions
+                    REQUIRE_INDICES(ndictionary_setup_changes.deletions);
+                    REQUIRE_INDICES(ndictionary_setup_changes.modifications);
+                }
+                else {
+                    List list{local_realm, obj, col};
+                    REQUIRE(list.size() == 6);
+                    auto ndictionary_local = list.get_dictionary(0);
+                    auto ndictionary_remote = list.get_dictionary(1);
+                    auto ndictionary_setup = list.get_dictionary(2);
+                    auto mixed_local = list.get_any(3);
+                    auto mixed_setup = list.get_any(4);
+                    auto mixed_remote = list.get_any(5);
+                    // local, remote changes are kept
+                    REQUIRE(ndictionary_remote.size() == 1);
+                    REQUIRE(ndictionary_setup.size() == 1);
+                    REQUIRE(ndictionary_local.size() == 1);
+                    REQUIRE(mixed_setup.get_string() == "Setup");
+                    REQUIRE(mixed_remote.get_string() == "Remote");
+                    REQUIRE(mixed_local.get_string() == "Local");
+                    REQUIRE(ndictionary_remote.get_any("Key").get_string() == "Remote");
+                    REQUIRE(ndictionary_local.get_any("Key").get_string() == "Local");
+                    REQUIRE(ndictionary_setup.get_any("Key").get_string() == "Setup");
+                    // notifications
+                    REQUIRE(list_listener.is_valid());
+                    // src is [ [Local],[Remote],[Setup], Local, Setup, Remote ]
+                    // dst is [ [Local], [Setup], Setup, Local]
+                    // no deletions
+                    REQUIRE_INDICES(list_changes.deletions);
+                    // inserted "Setup" and "Remote" at the end
+                    REQUIRE_INDICES(list_changes.insertions, 4, 5);
+                    // changed [Setup] ==> [Remote] and Setup ==> [Setup]
+                    REQUIRE_INDICES(list_changes.modifications, 1, 2);
+                    REQUIRE(!ndictionary_local_changes.collection_root_was_deleted);
+                    REQUIRE_INDICES(ndictionary_local_changes.insertions);
+                    REQUIRE_INDICES(ndictionary_local_changes.deletions);
+                    REQUIRE(!ndictionary_setup_changes.collection_root_was_deleted);
+                    REQUIRE_INDICES(ndictionary_setup_changes.insertions);
+                    REQUIRE_INDICES(ndictionary_setup_changes.deletions);
+                }
+            })
+            ->run();
+    }
+    SECTION("Verify copy and notification logic for Dictionary<Dictionary> and scalar types") {
+        Results results;
+        Object object;
+        object_store::Dictionary dictionary_listener, ndictionary_setup_listener, ndictionary_local_listener;
+        CollectionChangeSet dictionary_changes, ndictionary_setup_changes, ndictionary_local_changes;
+        NotificationToken dictionary_token, ndictionary_setup_token, ndictionary_local_token;
+
+        ObjectId pk_val = ObjectId::gen();
+        SyncTestFile config2(init_sync_manager.app(), "default");
+        config2.schema = config.schema;
+        auto test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        test_reset
+            ->setup([&](SharedRealm realm) {
+                auto table = get_table(*realm, "TopLevel");
+                auto obj = table->create_object_with_primary_key(pk_val);
+                auto col = table->get_column_key("any_mixed");
+                obj.set_collection(col, CollectionType::Dictionary);
+                object_store::Dictionary dictionary{realm, obj, col};
+                dictionary.insert_collection("<Setup>", CollectionType::Dictionary);
+                dictionary.insert("Key-Setup", Mixed{"Setup"});
+                auto ndictionary = dictionary.get_dictionary("<Setup>");
+                ndictionary.insert("Key", Mixed{"Setup"});
+            })
+            ->make_local_changes([&](SharedRealm local_realm) {
+                advance_and_notify(*local_realm);
+                TableRef table = get_table(*local_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any_mixed");
+                object_store::Dictionary dictionary{local_realm, obj, col};
+                dictionary.insert_collection("<Local>", CollectionType::Dictionary);
+                dictionary.insert("Key-Local", Mixed{"Local"});
+                auto ndictionary = dictionary.get_dictionary("<Local>");
+                ndictionary.insert("Key", Mixed{"Local"});
+            })
+            ->on_post_local_changes([&](SharedRealm realm) {
+                TableRef table = get_table(*realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any_mixed");
+                dictionary_listener = object_store::Dictionary{realm, obj, col};
+                REQUIRE(dictionary_listener.size() == 4);
+                dictionary_token = dictionary_listener.add_notification_callback([&](CollectionChangeSet changes) {
+                    dictionary_changes = std::move(changes);
+                });
+                auto ndictionary_setup = dictionary_listener.get_dictionary("<Setup>");
+                REQUIRE(ndictionary_setup.size() == 1);
+                REQUIRE(ndictionary_setup.get_any("Key") == Mixed{"Setup"});
+                ndictionary_setup_listener = ndictionary_setup;
+                ndictionary_setup_token =
+                    ndictionary_setup_listener.add_notification_callback([&](CollectionChangeSet changes) {
+                        ndictionary_setup_changes = std::move(changes);
+                    });
+                auto ndictionary_local = dictionary_listener.get_dictionary("<Local>");
+                REQUIRE(ndictionary_local.size() == 1);
+                REQUIRE(ndictionary_local.get_any("Key") == Mixed{"Local"});
+                ndictionary_local_listener = ndictionary_local;
+                ndictionary_local_token =
+                    ndictionary_local_listener.add_notification_callback([&](CollectionChangeSet changes) {
+                        ndictionary_local_changes = std::move(changes);
+                    });
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                advance_and_notify(*remote_realm);
+                TableRef table = get_table(*remote_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any_mixed");
+                object_store::Dictionary dictionary{remote_realm, obj, col};
+                REQUIRE(dictionary.size() == 2);
+                dictionary.insert_collection("<Remote>", CollectionType::Dictionary);
+                dictionary.insert("Key-Remote", Mixed{"Remote"});
+                auto ndictionary = dictionary.get_dictionary("<Remote>");
+                ndictionary.insert("Key", Mixed{"Remote"});
+            })
+            ->on_post_reset([&](SharedRealm local_realm) {
+                advance_and_notify(*local_realm);
+                TableRef table = get_table(*local_realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                auto obj = table->get_object(0);
+                auto col = table->get_column_key("any_mixed");
+
+                if (test_mode == ClientResyncMode::DiscardLocal) {
+                    // db must be equal to remote
+                    object_store::Dictionary dictionary{local_realm, obj, col};
+                    REQUIRE(dictionary.size() == 4);
+                    auto ndictionary_remote = dictionary.get_dictionary("<Remote>");
+                    auto ndictionary_setup = dictionary.get_dictionary("<Setup>");
+                    auto mixed_setup = dictionary.get_any("Key-Setup");
+                    auto mixed_remote = dictionary.get_any("Key-Remote");
+                    REQUIRE(ndictionary_remote.size() == 1);
+                    REQUIRE(ndictionary_setup.size() == 1);
+                    REQUIRE(mixed_setup.get_string() == "Setup");
+                    REQUIRE(mixed_remote.get_string() == "Remote");
+                    REQUIRE(ndictionary_remote.get_any("Key").get_string() == "Remote");
+                    REQUIRE(ndictionary_setup.get_any("Key").get_string() == "Setup");
+                    REQUIRE(dictionary_listener.is_valid());
+                    REQUIRE_INDICES(dictionary_changes.deletions, 0, 2);
+                    REQUIRE_INDICES(dictionary_changes.insertions, 0, 2);
+                    REQUIRE_INDICES(dictionary_changes.modifications);
+                    REQUIRE(ndictionary_local_changes.collection_root_was_deleted);
+                    REQUIRE(!ndictionary_setup_changes.collection_root_was_deleted);
+                    REQUIRE_INDICES(ndictionary_setup_changes.insertions);
+                    REQUIRE_INDICES(ndictionary_setup_changes.deletions);
+                    REQUIRE_INDICES(ndictionary_setup_changes.modifications);
+                }
+                else {
+                    object_store::Dictionary dictionary{local_realm, obj, col};
+                    REQUIRE(dictionary.size() == 6);
+                    auto ndictionary_local = dictionary.get_dictionary("<Local>");
+                    auto ndictionary_remote = dictionary.get_dictionary("<Remote>");
+                    auto ndictionary_setup = dictionary.get_dictionary("<Setup>");
+                    auto mixed_local = dictionary.get_any("Key-Local");
+                    auto mixed_setup = dictionary.get_any("Key-Setup");
+                    auto mixed_remote = dictionary.get_any("Key-Remote");
+                    // local, remote changes are kept
+                    REQUIRE(ndictionary_remote.size() == 1);
+                    REQUIRE(ndictionary_setup.size() == 1);
+                    REQUIRE(ndictionary_local.size() == 1);
+                    REQUIRE(mixed_setup.get_string() == "Setup");
+                    REQUIRE(mixed_remote.get_string() == "Remote");
+                    REQUIRE(mixed_local.get_string() == "Local");
+                    REQUIRE(ndictionary_remote.get_any("Key").get_string() == "Remote");
+                    REQUIRE(ndictionary_local.get_any("Key").get_string() == "Local");
+                    REQUIRE(ndictionary_setup.get_any("Key").get_string() == "Setup");
+                    // notifications
+                    REQUIRE(dictionary_listener.is_valid());
+                    // src is [ [Local],[Remote],[Setup], Local, Setup, Remote ]
+                    // dst is [ [Local], [Setup], Setup, Local]
+                    // no deletions
+                    REQUIRE_INDICES(dictionary_changes.deletions);
+                    REQUIRE_INDICES(dictionary_changes.insertions, 1, 4);
+                    REQUIRE_INDICES(dictionary_changes.modifications);
+                    REQUIRE(!ndictionary_local_changes.collection_root_was_deleted);
+                    REQUIRE_INDICES(ndictionary_local_changes.insertions);
+                    REQUIRE_INDICES(ndictionary_local_changes.deletions);
+                    REQUIRE(!ndictionary_setup_changes.collection_root_was_deleted);
+                    REQUIRE_INDICES(ndictionary_setup_changes.insertions);
+                    REQUIRE_INDICES(ndictionary_setup_changes.deletions);
                 }
             })
             ->run();
