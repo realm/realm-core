@@ -611,7 +611,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         // Remove the folder preventing the completion of a client reset.
         util::try_remove_dir_recursive(fresh_path);
 
-        auto config_copy = config_local;
+        RealmConfig config_copy = config_local;
         config_copy.sync_config = std::make_shared<SyncConfig>(*config_copy.sync_config);
         config_copy.sync_config->error_handler = nullptr;
         auto&& [reset_future, reset_handler] = make_client_reset_handler();
@@ -837,7 +837,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
             test_reset->make_local_changes(std::move(make_local_changes_that_will_fail))
                 ->on_post_reset(std::move(verify_post_reset_state))
                 ->run();
-            auto config_copy = config_local;
+            RealmConfig config_copy = config_local;
             auto&& [error_future2, err_handler2] = make_error_handler();
             config_copy.sync_config->error_handler = err_handler2;
             auto realm_post_reset = Realm::get_shared_realm(config_copy);
@@ -855,7 +855,7 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
                 ->on_post_reset(std::move(verify_post_reset_state))
                 ->run();
 
-            auto config_copy = config_local;
+            RealmConfig config_copy = config_local;
             auto&& [client_reset_future, reset_handler] = make_client_reset_handler();
             config_copy.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError err) {
                 REALM_ASSERT_EX(!err.is_fatal, err.status);
@@ -1020,15 +1020,12 @@ TEST_CASE("flx: client reset", "[sync][flx][client reset][baas]") {
         REQUIRE(sync_error.status == ErrorCodes::AutoClientResetFailed);
 
         // Open the realm again. This should not crash.
-        {
-            auto config_copy = config_local;
-            auto&& [err_future, err_handler] = make_error_handler();
-            config_local.sync_config->error_handler = err_handler;
+        auto&& [err_future, err_handler] = make_error_handler();
+        config_local.sync_config->error_handler = err_handler;
 
-            auto realm_post_reset = Realm::get_shared_realm(config_copy);
-            auto sync_error = wait_for_future(std::move(err_future)).get();
-            REQUIRE(sync_error.status == ErrorCodes::AutoClientResetFailed);
-        }
+        auto realm_post_reset = Realm::get_shared_realm(config_local);
+        sync_error = wait_for_future(std::move(err_future)).get();
+        REQUIRE(sync_error.status == ErrorCodes::AutoClientResetFailed);
     }
 
     enum class ResetMode { NoReset, InitiateClientReset };

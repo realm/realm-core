@@ -73,6 +73,9 @@ struct TestFile : realm::Realm::Config {
     TestFile();
     ~TestFile();
 
+    TestFile(const TestFile&) = delete;
+    TestFile& operator=(const TestFile&) = delete;
+
     // The file should outlive the object, ie. should not be deleted in destructor
     void persist()
     {
