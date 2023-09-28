@@ -121,6 +121,8 @@ private:
 
     bool m_is_compressed{false};
     MemRef m_compressed_array;
+
+    // TODO replace these with actual calls to node header.
     size_t m_compressed_value_width{0};
     size_t m_compressed_index_width{0};
     size_t m_compressed_values_size{0};

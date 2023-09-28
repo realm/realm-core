@@ -144,6 +144,11 @@ public:
     /// just the reference to the underlying memory. All elements will be
     /// initialized to the specified value.
     static MemRef create_array(Type, bool context_flag, size_t size, int_fast64_t value, Allocator&);
+    /// Construct a compressed integer array. Return the ref to the underlying memory.
+    /// All the elements will be initialized to the specif value, the calle will then need
+    /// to fill the arrat with the specific elements.
+    static MemRef create_flex_array(Type, bool context_flag, size_t value_size, int_fast64_t value, size_t index_size,
+                                    int_fast64_t index, Allocator&);
 
     Type get_type() const noexcept;
 
@@ -474,7 +479,7 @@ protected:
     /// It is an error to specify a non-zero value unless the width
     /// type is wtype_Bits. It is also an error to specify a non-zero
     /// size if the width type is wtype_Ignore.
-    static MemRef create(Type, bool context_flag, WidthType, size_t size, int_fast64_t value, Allocator&);
+    static MemRef create(Type, bool, WidthType, size_t, int_fast64_t, Allocator&, size_t = 0, int_fast64_t = 0);
 
     // Overriding method in ArrayParent
     void update_child_ref(size_t, ref_type) override;
@@ -640,7 +645,6 @@ inline void Array::create(Type type, bool context_flag, size_t length, int_fast6
     MemRef mem = create_array(type, context_flag, length, value, m_alloc); // Throws
     init_from_mem(mem);
 }
-
 
 inline Array::Type Array::get_type() const noexcept
 {
@@ -947,6 +951,13 @@ inline MemRef Array::create_array(Type type, bool context_flag, size_t size, int
 {
     return create(type, context_flag, wtype_Bits, size, value, alloc); // Throws
 }
+
+inline MemRef Array::create_flex_array(Type type, bool context_flag, size_t value_size, int_fast64_t value,
+                                       size_t index_size, int_fast64_t index, Allocator& alloc)
+{
+    return create(type, context_flag, wtype_Flex, value_size, value, alloc, index_size, index); // Throws
+}
+
 
 inline size_t Array::get_max_byte_size(size_t num_elems) noexcept
 {

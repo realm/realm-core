@@ -92,7 +92,12 @@ bool ArrayInteger::try_compress(std::vector<int64_t>& values, std::vector<size_t
         m_compressed_index_width = compressed_index_width;
         m_compressed_values_size = compressed_values_size;
         m_compressed_indices_size = compressed_indices_size;
-        m_compressed_array = m_alloc.alloc(compressed_size);
+
+        m_compressed_array = Array::create_flex_array(Type::type_Normal, false, values.size(), *max_value,
+                                                      indices.size(), *max_index, m_alloc);
+
+        // TODO release previous array memory
+        // m_alloc.free_()
         return true;
     }
     return false;
@@ -101,7 +106,6 @@ bool ArrayInteger::try_compress(std::vector<int64_t>& values, std::vector<size_t
 bool ArrayInteger::decompress()
 {
     if (m_is_compressed) {
-        // decompress
         const auto addr = (uint64_t*)m_compressed_array.get_addr();
         const auto offset = (int)m_compressed_values_size;
         const auto value_width = (int)m_compressed_value_width;
@@ -114,6 +118,7 @@ bool ArrayInteger::decompress()
             ++index_iterator;
         }
         m_is_compressed = false;
+        m_alloc.free_(m_compressed_array);
         return true;
     }
     return false;
