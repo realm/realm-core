@@ -5,8 +5,8 @@
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed issue with double delete when using the CAPI for timers in platform networking ([#6993](https://github.com/realm/realm-core/issues/6993), since v13.3.0).
+* Receiving a write_not_allowed error from the server would have led to a crash. ([#6978](https://github.com/realm/realm-core/issues/6978), since v13.2.0)
 
 ### Breaking changes
 * Platform Networking CAPI has been updated to provide separate functions (instead of 1) for executing callback handlers depending on purpose ([PR #6994](https://github.com/realm/realm-core/pull/6994)).
