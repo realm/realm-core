@@ -1470,9 +1470,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
                        std::any(AnyDict{{"_id", invalid_obj}, {"queryable_str_field", "bizz"s}}));
         realm->commit_transaction();
 
-        wait_for_upload(*realm);
-        wait_for_download(*realm);
-
         validate_sync_error(
             std::move(error_future).get(), invalid_obj, "TopLevel",
             util::format("write to \"%1\" in table \"TopLevel\" not allowed", invalid_obj.to_string()));
@@ -1504,8 +1501,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
         embedded_obj.set_property_value(c, "str_field", std::any{"baz"s});
         realm->commit_transaction();
 
-        wait_for_upload(*realm);
-        wait_for_download(*realm);
         validate_sync_error(
             std::move(error_future).get(), invalid_obj, "TopLevel",
             util::format("write to \"%1\" in table \"TopLevel\" not allowed", invalid_obj.to_string()));
@@ -1551,9 +1546,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
                        }));
         realm->commit_transaction();
 
-        wait_for_upload(*realm);
-        wait_for_download(*realm);
-
         validate_sync_error(std::move(error_future).get(), invalid_obj, "TopLevel",
                             "object is outside of the current query view");
 
@@ -1585,9 +1577,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             realm->read_group().get_table("class_Int PK")->create_object_with_primary_key(123456);
             realm->commit_transaction();
 
-            wait_for_upload(*realm);
-            wait_for_download(*realm);
-
             validate_sync_error(std::move(error_future).get(), 123456, "Int PK",
                                 "write to \"123456\" in table \"Int PK\" not allowed");
         }
@@ -1599,9 +1588,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             realm->begin_transaction();
             realm->read_group().get_table("class_String PK")->create_object_with_primary_key("short");
             realm->commit_transaction();
-
-            wait_for_upload(*realm);
-            wait_for_download(*realm);
 
             validate_sync_error(std::move(error_future).get(), "short", "String PK",
                                 "write to \"short\" in table \"String PK\" not allowed");
@@ -1616,9 +1602,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             realm->read_group().get_table("class_String PK")->create_object_with_primary_key(pk);
             realm->commit_transaction();
 
-            wait_for_upload(*realm);
-            wait_for_download(*realm);
-
             validate_sync_error(std::move(error_future).get(), pk, "String PK",
                                 util::format("write to \"%1\" in table \"String PK\" not allowed", pk));
         }
@@ -1631,9 +1614,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             UUID pk("01234567-9abc-4def-9012-3456789abcde");
             realm->read_group().get_table("class_UUID PK")->create_object_with_primary_key(pk);
             realm->commit_transaction();
-
-            wait_for_upload(*realm);
-            wait_for_download(*realm);
 
             validate_sync_error(std::move(error_future).get(), pk, "UUID PK",
                                 util::format("write to \"UUID(%1)\" in table \"UUID PK\" not allowed", pk));
