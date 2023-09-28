@@ -304,6 +304,7 @@ public:
                             info.compensating_writes.push_back(std::move(cwei));
                         }
 
+                        // Not provided when 'write_not_allowed' (230) error is received from the server.
                         if (auto server_version = json.find("compensatingWriteServerVersion");
                             server_version != json.end()) {
                             info.compensating_write_server_version =
