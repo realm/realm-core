@@ -716,6 +716,7 @@ classes:
       remove_object: '(key: ObjKey)'
       get_link_target: '(column: ColKey) -> TableRef'
       clear: ()
+      get_primary_key_column: '() -> ColKey'
 
   Obj:
     properties:
