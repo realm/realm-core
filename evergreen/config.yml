@@ -959,9 +959,11 @@ tasks:
             --service-flag-name="${coveralls_flag_name}" \
             --commit-sha="${github_commit}" \
             --vcs-branch="${branch_name}" \
+            --ignore='build/_deps/**' \
+            --ignore='build/external/**' \
             --ignore='external/**' \
             --ignore='src/external/**' \
-            --ignore='test/**' \
+            --ignore='test/large_tests/**' \
             --parallel \
             --output-path=coveralls_${task_name}.json
 
