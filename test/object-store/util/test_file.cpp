@@ -131,8 +131,7 @@ static const std::string fake_device_id = "123400000000000000000000";
 
 static std::shared_ptr<SyncUser> get_fake_user(app::App& app, const std::string& user_name)
 {
-    return app.sync_manager()->get_user(user_name, fake_refresh_token, fake_access_token, app.base_url(),
-                                        fake_device_id);
+    return app.sync_manager()->get_user(user_name, fake_refresh_token, fake_access_token, fake_device_id);
 }
 
 SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std::string user_name)

@@ -41,13 +41,12 @@
 using namespace realm;
 using namespace realm::util;
 
-static const std::string dummy_auth_url = "https://realm.example.org";
 static const std::string dummy_device_id = "123400000000000000000000";
 
 static std::shared_ptr<SyncUser> get_user(const std::shared_ptr<app::App>& app)
 {
     return app->sync_manager()->get_user("user_id", ENCODE_FAKE_JWT("fake_refresh_token"),
-                                         ENCODE_FAKE_JWT("fake_access_token"), dummy_auth_url, dummy_device_id);
+                                         ENCODE_FAKE_JWT("fake_access_token"), dummy_device_id);
 }
 
 TEST_CASE("SyncSession: management by SyncUser", "[sync][session]") {
@@ -462,7 +461,6 @@ TEST_CASE("sync: error handling", "[sync][session]") {
 }
 
 TEST_CASE("sync: stop policy behavior", "[sync][session]") {
-    const std::string dummy_auth_url = "https://realm.example.org";
     if (!EventLoop::has_implementation())
         return;
 

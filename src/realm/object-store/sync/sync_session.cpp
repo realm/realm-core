@@ -740,7 +740,7 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
         return;
     }
 
-    // Dont't bother invoking m_config.error_handler if the sync is inactive.
+    // Don't bother invoking m_config.error_handler if the sync is inactive.
     // It does not make sense to call the handler when the session is closed.
     if (m_state == State::Inactive || m_state == State::Paused) {
         return;
