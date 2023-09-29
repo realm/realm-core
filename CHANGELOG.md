@@ -2,7 +2,7 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Added separate enum for callback handler result values in the platform networking C API. ([PR #7015](https://github.com/realm/realm-core/pull/7015))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
