@@ -6093,7 +6093,8 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
         auto test_data = static_cast<TestData*>(userdata);
         REQUIRE(test_data);
         auto cb = [callback_copy = callback](Status s) {
-            realm_sync_socket_post_complete(callback_copy, static_cast<realm_errno_e>(s.code()), s.reason().c_str());
+            realm_sync_socket_post_complete(callback_copy, static_cast<realm_sync_socket_callback_result_e>(s.code()),
+                                            s.reason().c_str());
         };
         test_data->socket_provider->post(std::move(cb));
     };
