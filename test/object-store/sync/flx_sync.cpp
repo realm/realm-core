@@ -1470,9 +1470,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
                        std::any(AnyDict{{"_id", invalid_obj}, {"queryable_str_field", "bizz"s}}));
         realm->commit_transaction();
 
-        wait_for_upload(*realm);
-        wait_for_download(*realm);
-
         validate_sync_error(
             std::move(error_future).get(), invalid_obj, "TopLevel",
             util::format("write to \"%1\" in table \"TopLevel\" not allowed", invalid_obj.to_string()));
@@ -1504,8 +1501,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
         embedded_obj.set_property_value(c, "str_field", std::any{"baz"s});
         realm->commit_transaction();
 
-        wait_for_upload(*realm);
-        wait_for_download(*realm);
         validate_sync_error(
             std::move(error_future).get(), invalid_obj, "TopLevel",
             util::format("write to \"%1\" in table \"TopLevel\" not allowed", invalid_obj.to_string()));
@@ -1551,9 +1546,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
                        }));
         realm->commit_transaction();
 
-        wait_for_upload(*realm);
-        wait_for_download(*realm);
-
         validate_sync_error(std::move(error_future).get(), invalid_obj, "TopLevel",
                             "object is outside of the current query view");
 
@@ -1585,9 +1577,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             realm->read_group().get_table("class_Int PK")->create_object_with_primary_key(123456);
             realm->commit_transaction();
 
-            wait_for_upload(*realm);
-            wait_for_download(*realm);
-
             validate_sync_error(std::move(error_future).get(), 123456, "Int PK",
                                 "write to \"123456\" in table \"Int PK\" not allowed");
         }
@@ -1599,9 +1588,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             realm->begin_transaction();
             realm->read_group().get_table("class_String PK")->create_object_with_primary_key("short");
             realm->commit_transaction();
-
-            wait_for_upload(*realm);
-            wait_for_download(*realm);
 
             validate_sync_error(std::move(error_future).get(), "short", "String PK",
                                 "write to \"short\" in table \"String PK\" not allowed");
@@ -1616,9 +1602,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             realm->read_group().get_table("class_String PK")->create_object_with_primary_key(pk);
             realm->commit_transaction();
 
-            wait_for_upload(*realm);
-            wait_for_download(*realm);
-
             validate_sync_error(std::move(error_future).get(), pk, "String PK",
                                 util::format("write to \"%1\" in table \"String PK\" not allowed", pk));
         }
@@ -1631,9 +1614,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             UUID pk("01234567-9abc-4def-9012-3456789abcde");
             realm->read_group().get_table("class_UUID PK")->create_object_with_primary_key(pk);
             realm->commit_transaction();
-
-            wait_for_upload(*realm);
-            wait_for_download(*realm);
 
             validate_sync_error(std::move(error_future).get(), pk, "UUID PK",
                                 util::format("write to \"UUID(%1)\" in table \"UUID PK\" not allowed", pk));
@@ -3078,6 +3058,78 @@ TEST_CASE("flx: data ingest - dev mode", "[sync][flx][data ingest][baas]") {
         schema);
 }
 
+TEST_CASE("flx: data ingest - write not allowed", "[sync][flx][data ingest][baas]") {
+    AppCreateConfig::ServiceRole role;
+    role.name = "asymmetric_write_perms";
+
+    AppCreateConfig::ServiceRoleDocumentFilters doc_filters;
+    doc_filters.read = true;
+    doc_filters.write = false;
+    role.document_filters = doc_filters;
+
+    role.insert_filter = true;
+    role.delete_filter = true;
+    role.read = true;
+    role.write = true;
+
+    Schema schema({
+        {"Asymmetric",
+         ObjectSchema::ObjectType::TopLevelAsymmetric,
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"location", PropertyType::String | PropertyType::Nullable},
+             {"embedded_obj", PropertyType::Object | PropertyType::Nullable, "Embedded"},
+         }},
+        {"Embedded",
+         ObjectSchema::ObjectType::Embedded,
+         {
+             {"value", PropertyType::String | PropertyType::Nullable},
+         }},
+    });
+    FLXSyncTestHarness::ServerSchema server_schema{schema, {}, {role}};
+    FLXSyncTestHarness harness("asymmetric_sync", server_schema);
+
+    auto error_received_pf = util::make_promise_future<void>();
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    config.sync_config->on_sync_client_event_hook =
+        [promise = util::CopyablePromiseHolder(std::move(error_received_pf.promise))](
+            std::weak_ptr<SyncSession> weak_session, const SyncClientHookData& data) mutable {
+            if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
+                return SyncClientHookAction::NoAction;
+            }
+            auto session = weak_session.lock();
+            REQUIRE(session);
+
+            auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
+
+            if (error_code == sync::ProtocolError::initial_sync_not_completed) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            REQUIRE(error_code == sync::ProtocolError::write_not_allowed);
+            REQUIRE_FALSE(data.error_info->compensating_write_server_version.has_value());
+            REQUIRE_FALSE(data.error_info->compensating_writes.empty());
+            promise.get_promise().emplace_value();
+
+            return SyncClientHookAction::EarlyReturn;
+        };
+
+    auto realm = Realm::get_shared_realm(config);
+
+    // Create an asymmetric object and upload it to the server.
+    {
+        realm->begin_transaction();
+        CppContext c(realm);
+        Object::create(c, realm, "Asymmetric",
+                       std::any(AnyDict{{"_id", ObjectId::gen()}, {"embedded_obj", AnyDict{{"value", "foo"s}}}}));
+        realm->commit_transaction();
+        wait_for_upload(*realm);
+    }
+
+    error_received_pf.future.get();
+    realm->close();
+}
+
 TEST_CASE("flx: send client error", "[sync][flx][baas]") {
     FLXSyncTestHarness harness("flx_client_error");
 
@@ -3607,7 +3659,7 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
         std::lock_guard<std::mutex> lk(errors_mutex);
         for (const auto& compensating_write : data.error_info->compensating_writes) {
             error_to_download_version.emplace_back(compensating_write.primary_key.get_object_id(),
-                                                   data.error_info->compensating_write_server_version);
+                                                   *data.error_info->compensating_write_server_version);
         }
 
         return SyncClientHookAction::NoAction;
