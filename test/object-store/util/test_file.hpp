@@ -106,6 +106,14 @@ void on_change_but_no_notify(realm::Realm& realm);
 #endif // TEST_ENABLE_LOGGING
 #endif // TEST_LOGGING_LEVEL
 
+#define TEST_LOGGING_LEVEL_STORAGE off
+#define TEST_LOGGING_LEVEL_SERVER off
+/*
+#define TEST_LOGGING_LEVEL_SYNC off
+#define TEST_LOGGING_LEVEL_RESET trace
+#define TEST_LOGGING_LEVEL_APP off
+*/
+
 #if REALM_ENABLE_SYNC
 
 using StartImmediately = realm::util::TaggedBool<class StartImmediatelyTag>;
@@ -213,12 +221,11 @@ private:
 class TestSyncManager {
 public:
     struct Config {
-        Config() {}
+        Config();
         realm::app::App::Config app_config;
         std::string base_path;
         realm::SyncManager::MetadataMode metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
         bool should_teardown_test_directory = true;
-        realm::util::Logger::Level log_level = realm::util::Logger::Level::TEST_LOGGING_LEVEL;
         bool override_sync_route = true;
         std::shared_ptr<realm::app::GenericNetworkTransport> transport;
         bool start_sync_client = true;

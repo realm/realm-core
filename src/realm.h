@@ -578,6 +578,7 @@ typedef void (*realm_log_func_t)(realm_userdata_t userdata, realm_log_level_e le
 RLM_API void realm_set_log_callback(realm_log_func_t, realm_log_level_e, realm_userdata_t userdata,
                                     realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 RLM_API void realm_set_log_level(realm_log_level_e) RLM_API_NOEXCEPT;
+RLM_API void realm_set_log_level_category(const char*, realm_log_level_e) RLM_API_NOEXCEPT;
 
 /**
  * Get a thread-safe reference representing the same underlying object as some

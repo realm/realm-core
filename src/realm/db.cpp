@@ -1467,22 +1467,23 @@ void DB::open(Replication& repl, const std::string& file, const DBOptions& optio
     bool no_create = false;
     open(file, no_create, options); // Throws
 }
+
 class DBLogger : public Logger {
 public:
     DBLogger(const std::shared_ptr<Logger>& base_logger, unsigned hash) noexcept
-        : Logger(*base_logger)
+        : Logger(LogCategory::storage, *base_logger)
         , m_hash(hash)
         , m_base_logger_ptr(base_logger)
     {
     }
 
 protected:
-    void do_log(Level level, const std::string& message) final
+    void do_log(const LogCategory& category, Level level, const std::string& message) final
     {
         std::ostringstream ostr;
         auto id = std::this_thread::get_id();
         ostr << "DB: " << m_hash << " Thread " << id << ": " << message;
-        Logger::do_log(*m_base_logger_ptr, level, ostr.str());
+        Logger::do_log(*m_base_logger_ptr, category, level, ostr.str());
     }
 
 private:
@@ -2308,7 +2309,7 @@ bool DB::do_try_begin_write()
 void DB::do_begin_write()
 {
     if (m_logger) {
-        m_logger->log(util::Logger::Level::trace, "acquire writemutex");
+        m_logger->log(util::LogCategory::transaction, util::Logger::Level::trace, "acquire writemutex");
     }
 
     SharedInfo* info = m_info;
@@ -2370,7 +2371,7 @@ void DB::do_begin_write()
     info->next_served = my_ticket;
     finish_begin_write();
     if (m_logger) {
-        m_logger->log(util::Logger::Level::trace, "writemutex acquired");
+        m_logger->log(util::LogCategory::transaction, util::Logger::Level::trace, "writemutex acquired");
     }
 }
 
@@ -2400,7 +2401,7 @@ void DB::do_end_write() noexcept
     m_pick_next_writer.notify_all();
     m_writemutex.unlock();
     if (m_logger) {
-        m_logger->log(util::Logger::Level::trace, "writemutex released");
+        m_logger->log(util::LogCategory::transaction, util::Logger::Level::trace, "writemutex released");
     }
 }
 
@@ -2481,7 +2482,8 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     auto t1 = std::chrono::steady_clock::now();
     auto commit_size = m_alloc.get_commit_size();
     if (m_logger) {
-        m_logger->log(util::Logger::Level::debug, "Initiate commit version: %1", new_version);
+        m_logger->log(util::LogCategory::transaction, util::Logger::Level::debug, "Initiate commit version: %1",
+                      new_version);
     }
     if (auto limit = out.get_evacuation_limit()) {
         // Get a work limit based on the size of the transaction we're about to commit
@@ -2544,8 +2546,9 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     auto t2 = std::chrono::steady_clock::now();
     if (m_logger) {
         std::string to_disk_str = commit_to_disk ? util::format(" ref %1", new_top_ref) : " (no commit to disk)";
-        m_logger->log(util::Logger::Level::debug, "Commit of size %1 done in %2 us%3", commit_size,
-                      std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count(), to_disk_str);
+        m_logger->log(util::LogCategory::transaction, util::Logger::Level::debug, "Commit of size %1 done in %2 us%3",
+                      commit_size, std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count(),
+                      to_disk_str);
     }
 }
 
@@ -2697,7 +2700,8 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
         tr->m_async_stage = Transaction::AsyncState::Requesting;
         tr->m_request_time_point = std::chrono::steady_clock::now();
         if (tr->db->m_logger) {
-            tr->db->m_logger->log(util::Logger::Level::trace, "Tr %1: Async request write lock", tr->m_log_id);
+            tr->db->m_logger->log(util::LogCategory::transaction, util::Logger::Level::trace,
+                                  "Tr %1: Async request write lock", tr->m_log_id);
         }
     }
     std::weak_ptr<Transaction> weak_tr = tr;
@@ -2712,7 +2716,8 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
             if (tr->db->m_logger) {
                 auto t2 = std::chrono::steady_clock::now();
                 tr->db->m_logger->log(
-                    util::Logger::Level::trace, "Tr %1, Got write lock in %2 us", tr->m_log_id,
+                    util::LogCategory::transaction, util::Logger::Level::trace, "Tr %1, Got write lock in %2 us",
+                    tr->m_log_id,
                     std::chrono::duration_cast<std::chrono::microseconds>(t2 - tr->m_request_time_point).count());
             }
             if (tr->m_waiting_for_write_lock) {

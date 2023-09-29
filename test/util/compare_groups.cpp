@@ -20,15 +20,16 @@ namespace {
 class TableCompareLogger : public util::Logger {
 public:
     TableCompareLogger(StringData table_name, util::Logger& base_logger) noexcept
-        : util::Logger(base_logger.get_level_threshold())
+        : util::Logger()
         , m_table_name{table_name}
         , m_base_logger{base_logger}
     {
+        set_level_threshold(base_logger.get_level_threshold());
     }
-    void do_log(Level level, const std::string& message) override final
+    void do_log(const util::LogCategory& category, Level level, const std::string& message) override final
     {
         ensure_prefix();                                          // Throws
-        Logger::do_log(m_base_logger, level, m_prefix + message); // Throws
+        Logger::do_log(m_base_logger, category, level, m_prefix + message); // Throws
     }
 
 private:
@@ -49,15 +50,16 @@ private:
 class ObjectCompareLogger : public util::Logger {
 public:
     ObjectCompareLogger(sync::PrimaryKey oid, util::Logger& base_logger) noexcept
-        : util::Logger(base_logger.get_level_threshold())
+        : util::Logger()
         , m_oid{oid}
         , m_base_logger{base_logger}
     {
+        set_level_threshold(base_logger.get_level_threshold());
     }
-    void do_log(Level level, const std::string& message) override final
+    void do_log(const util::LogCategory& category, Level level, const std::string& message) override final
     {
         ensure_prefix();                                          // Throws
-        Logger::do_log(m_base_logger, level, m_prefix + message); // Throws
+        Logger::do_log(m_base_logger, category, level, m_prefix + message); // Throws
     }
 
 private:

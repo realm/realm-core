@@ -1241,18 +1241,25 @@ TEST_CASE("C API", "[c_api]") {
 
     SECTION("logging") {
         LogUserData userdata;
-        auto log_level_old = util::Logger::get_default_level_threshold();
+        auto log_level_old = util::LogCategory::realm.get_default_level_threshold();
         realm_set_log_callback(realm_log_func, RLM_LOG_LEVEL_DEBUG, &userdata, nullptr);
-        auto config = make_config(test_file.path.c_str(), false);
+        realm_set_log_level_category("Realm.Storage.Object", RLM_LOG_LEVEL_OFF);
+        auto config = make_config(test_file.path.c_str(), true);
         realm_t* realm = realm_open(config.get());
         realm_begin_write(realm);
+        realm_class_info_t class_foo;
+        realm_find_class(realm, "Foo", nullptr, &class_foo);
+        realm_property_info_t info;
+        realm_find_property(realm, class_foo.key, "int", nullptr, &info);
+        auto obj1 = cptr_checked(realm_object_create(realm, class_foo.key));
+        realm_set_value(obj1.get(), info.key, rlm_int_val(123), false);
         realm_commit(realm);
-        REQUIRE(userdata.log.size() == 3);
+        REQUIRE(userdata.log.size() == 5);
         realm_set_log_level(RLM_LOG_LEVEL_INFO);
         // Commit begin/end should not be logged at INFO level
         realm_begin_write(realm);
         realm_commit(realm);
-        REQUIRE(userdata.log.size() == 3);
+        REQUIRE(userdata.log.size() == 5);
         realm_release(realm);
         userdata.log.clear();
         realm_set_log_level(RLM_LOG_LEVEL_ERROR);
@@ -1263,7 +1270,7 @@ TEST_CASE("C API", "[c_api]") {
         // Remove this logger again
         realm_set_log_callback(nullptr, RLM_LOG_LEVEL_DEBUG, nullptr, nullptr);
         // Restore old log level
-        util::Logger::set_default_level_threshold(log_level_old);
+        util::LogCategory::realm.set_default_level_threshold(log_level_old);
     }
 
     realm_t* realm;

@@ -166,8 +166,8 @@ Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB:
     attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable,
                   VersionID{rli.m_version, rli.m_reader_idx});
     if (db->m_logger) {
-        db->m_logger->log(util::Logger::Level::trace, "Start %1 %2: %3 ref %4", log_stage[stage], m_log_id,
-                          rli.m_version, m_read_lock.m_top_ref);
+        db->m_logger->log(util::LogCategory::transaction, util::Logger::Level::trace, "Start %1 %2: %3 ref %4",
+                          log_stage[stage], m_log_id, rli.m_version, m_read_lock.m_top_ref);
     }
 }
 
@@ -323,8 +323,8 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
     }
     catch (std::exception& e) {
         if (db->m_logger) {
-            db->m_logger->log(util::Logger::Level::error, "Tr %1: Commit failed with exception: \"%2\"", m_log_id,
-                              e.what());
+            db->m_logger->log(util::LogCategory::transaction, util::Logger::Level::error,
+                              "Tr %1: Commit failed with exception: \"%2\"", m_log_id, e.what());
         }
         // In case of failure, further use of the transaction for reading is unsafe
         set_transact_stage(DB::transact_Ready);
@@ -650,8 +650,8 @@ void Transaction::complete_async_commit()
     try {
         read_lock = db->grab_read_lock(DB::ReadLockInfo::Live, VersionID());
         if (db->m_logger) {
-            db->m_logger->log(util::Logger::Level::trace, "Tr %1: Committing ref %2 to disk", m_log_id,
-                              read_lock.m_top_ref);
+            db->m_logger->log(util::LogCategory::transaction, util::Logger::Level::trace,
+                              "Tr %1: Committing ref %2 to disk", m_log_id, read_lock.m_top_ref);
         }
         GroupCommitter out(*this);
         out.commit(read_lock.m_top_ref); // Throws
@@ -666,8 +666,8 @@ void Transaction::complete_async_commit()
     catch (const std::exception& e) {
         m_commit_exception = std::current_exception();
         if (db->m_logger) {
-            db->m_logger->log(util::Logger::Level::error, "Tr %1: Committing to disk failed with exception: \"%2\"",
-                              m_log_id, e.what());
+            db->m_logger->log(util::LogCategory::transaction, util::Logger::Level::error,
+                              "Tr %1: Committing to disk failed with exception: \"%2\"", m_log_id, e.what());
         }
         m_async_commit_has_failed = true;
         db->release_read_lock(read_lock);
@@ -786,7 +786,7 @@ void Transaction::acquire_write_lock()
 void Transaction::do_end_read() noexcept
 {
     if (db->m_logger)
-        db->m_logger->log(util::Logger::Level::trace, "End transaction %1", m_log_id);
+        db->m_logger->log(util::LogCategory::transaction, util::Logger::Level::trace, "End transaction %1", m_log_id);
 
     prepare_for_close();
     detach();
