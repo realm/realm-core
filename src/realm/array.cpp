@@ -1078,9 +1078,6 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     REALM_ASSERT(value == 0 || width_type == wtype_Bits || width_type == wtype_Flex);
     REALM_ASSERT(size_value == 0 || width_type != wtype_Ignore);
 
-    // REALM_ASSERT_7(value, ==, 0, ||, width_type, ==, wtype_Bits, ||, width_type, ==, wtype_Flex);
-    // REALM_ASSERT_7(size_value, ==, 0, ||, width_type, !=, wtype_Ignore, ||, width_type, ==, wtype_Flex);
-
     bool is_inner_bptree_node = false, has_refs = false;
     switch (type) {
         case type_Normal:
@@ -1110,10 +1107,6 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
         size |= (size_value << 8);
         size |= (width_flex_arrays << 16);
         init_header(header, is_inner_bptree_node, has_refs, context_flag, width_type, 0, size, byte_size);
-        // auto test_value_size = get_size_A_from_header(header);
-        // auto test_index_size = get_size_B_from_header(header);
-        // auto test_value_width = get_width_A_from_header(header);
-        // auto test_index_width = get_width_B_from_header(header);
         return mem;
     }
 

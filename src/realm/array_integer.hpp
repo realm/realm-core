@@ -34,20 +34,6 @@ public:
     explicit ArrayInteger(Allocator&) noexcept;
     ~ArrayInteger() noexcept override {}
 
-    // this should not be here.
-    void destroy_deep() noexcept
-    {
-        if (m_is_compressed) {
-            Array::destroy(m_compressed_array, m_alloc);
-            m_compressed_values_size = 0;
-            m_compressed_indices_size = 0;
-            m_compressed_value_width = 0;
-            m_compressed_index_width = 0;
-            m_is_compressed = false;
-        }
-        Array::destroy_deep();
-    }
-
     static value_type default_value(bool)
     {
         return 0;
@@ -121,12 +107,6 @@ private:
 
     bool m_is_compressed{false};
     MemRef m_compressed_array;
-
-    // TODO replace these with actual calls to node header.
-    size_t m_compressed_value_width{0};
-    size_t m_compressed_index_width{0};
-    size_t m_compressed_values_size{0};
-    size_t m_compressed_indices_size{0};
 };
 
 class ArrayIntNull : public Array, public ArrayPayload {
