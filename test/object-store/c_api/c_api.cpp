@@ -5326,11 +5326,11 @@ static void realm_app_user2(void* p, realm_user_t* user, const realm_app_error_t
 TEST_CASE("C API app: link_user integration w/c_api transport", "[sync][app][c_api][baas]") {
     struct TestTransportUserData {
         TestTransportUserData()
-            : logger(std::make_unique<util::StderrLogger>(realm::util::Logger::Level::TEST_LOGGING_LEVEL))
+            : logger(util::Logger::get_default_logger())
             , transport(std::make_unique<SynchronousTestTransport>())
         {
         }
-        std::unique_ptr<util::Logger> logger;
+        std::shared_ptr<util::Logger> logger;
         std::unique_ptr<realm::app::GenericNetworkTransport> transport;
     };
 
@@ -6081,8 +6081,7 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
         int free_count = 0;
     };
 
-    auto logger = std::make_shared<util::StderrLogger>();
-    DefaultSocketProvider default_socket_provider(logger, "SocketProvider");
+    DefaultSocketProvider default_socket_provider(util::Logger::get_default_logger(), "SocketProvider");
 
     auto free_fn = [](realm_userdata_t user_ptr) {
         auto test_data = static_cast<TestData*>(user_ptr);
