@@ -34,28 +34,50 @@ bool ArrayInteger::try_compress()
 {
     std::vector<int64_t> values;
     std::vector<size_t> indices;
-    if (!m_is_compressed && try_compress(values, indices)) {
-        m_is_compressed = true;
+    if (!is_in_compressed_format() && try_compress(values, indices)) {
+        size_t value_width, index_width, value_size, index_size;
+        if (get_compressed_header_info(value_width, index_width, value_size, index_size)) {
+            const auto data = (uint64_t*)get_data_from_header(m_compressed_array.get_addr());
+            const auto offset = value_size * value_width;
+            bf_iterator it_value{data, 0, value_width, value_width, 0};
+            bf_iterator it_index{data, offset, index_width, index_width, 0};
+            for (size_t i = 0; i < values.size(); ++i) {
+                *it_value = values[i];
+                ++it_value;
+            }
+            for (size_t i = 0; i < indices.size(); ++i) {
+                *it_index = indices[i];
+                ++it_index;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ArrayInteger::is_in_compressed_format() const
+{
+    const auto header = m_compressed_array.get_addr();
+    if (header) {
+        return get_wtype_from_header(header) >= wtype_extend;
+    }
+    return false;
+}
+
+bool ArrayInteger::get_compressed_header_info(size_t& value_width, size_t& index_width, size_t& value_size,
+                                              size_t& index_size) const
+{
+    if (is_in_compressed_format()) {
         const auto addr = m_compressed_array.get_addr();
-        const auto data = (uint64_t*)get_data_from_header(addr);
-        const auto compressed_value_size = get_size_A_from_header(addr);
-        const auto value_width = get_width_A_from_header(addr);
-        const auto index_width = get_width_B_from_header(addr);
-        const auto offset = compressed_value_size * value_width;
-        bf_iterator it_value{data, 0, value_width, value_width, 0};
-        bf_iterator it_index{data, (int)offset, index_width, index_width, 0};
-        for (size_t i = 0; i < values.size(); ++i) {
-            *it_value = values[i];
-            ++it_value;
-        }
-        for (size_t i = 0; i < indices.size(); ++i) {
-            *it_index = indices[i];
-            ++it_index;
-        }
+        value_size = get_size_A_from_header(addr);
+        index_size = get_size_B_from_header(addr);
+        value_width = get_width_A_from_header(addr);
+        index_width = get_width_B_from_header(addr);
         return true;
     }
     return false;
 }
+
 
 bool ArrayInteger::try_compress(std::vector<int64_t>& values, std::vector<size_t>& indices)
 {
@@ -89,9 +111,8 @@ bool ArrayInteger::try_compress(std::vector<int64_t>& values, std::vector<size_t
     if (compressed_size < uncompressed_size) {
         m_compressed_array = Array::create_flex_array(Type::type_Normal, false, values.size(), *max_value,
                                                       indices.size(), *max_index, m_alloc);
-
         // release memory allocated for the array.
-        m_alloc.free_(get_mem());
+        Array::destroy();
         return true;
     }
     return false;
@@ -99,25 +120,21 @@ bool ArrayInteger::try_compress(std::vector<int64_t>& values, std::vector<size_t
 
 bool ArrayInteger::decompress()
 {
-    if (m_is_compressed) {
+    size_t value_width, index_width, value_size, index_size;
+    if (get_compressed_header_info(value_width, index_width, value_size, index_size)) {
         create(); // recreate the array
-        const auto addr = m_compressed_array.get_addr();
-        const auto data = (uint64_t*)get_data_from_header(addr);
-        const auto compressed_value_size = get_size_A_from_header(addr);
-        const auto compressed_index_size = get_size_B_from_header(addr);
-        const auto value_width = get_width_A_from_header(addr);
-        const auto index_width = get_width_B_from_header(addr);
-        const auto offset = compressed_value_size * value_width;
-        bf_iterator index_iterator{data, (int)offset, index_width, index_width, 0};
-        for (size_t i = 0; i < compressed_index_size; ++i) {
+        const auto data = (uint64_t*)get_data_from_header(m_compressed_array.get_addr());
+        const auto offset = value_size * value_width;
+        bf_iterator index_iterator{data, offset, index_width, index_width, 0};
+        for (size_t i = 0; i < index_size; ++i) {
             const auto index = (int)index_iterator.get_value();
             const auto value = read_bitfield(data, index * value_width, value_width);
             Array::insert(i, value);
             ++index_iterator;
         }
-        m_is_compressed = false;
-        // free the compress array
+        // free compressed array
         m_alloc.free_(m_compressed_array);
+        m_compressed_array.set_addr(nullptr);
         return true;
     }
     return false;
@@ -125,22 +142,18 @@ bool ArrayInteger::decompress()
 
 int64_t ArrayInteger::get_compressed_value(size_t ndx) const
 {
-    const auto addr = m_compressed_array.get_addr();
-    const auto compressed_index_size = get_size_B_from_header(addr);
+    size_t value_width, index_width, value_size, index_size;
+    if (get_compressed_header_info(value_width, index_width, value_size, index_size)) {
 
-    if (ndx >= compressed_index_size)
-        return realm::not_found;
+        if (ndx >= index_size)
+            return realm::not_found;
 
-
-    const auto data = (uint64_t*)get_data_from_header(addr);
-    const auto compressed_value_size = get_size_A_from_header(addr);
-    const auto value_width = get_width_A_from_header(addr);
-    const auto index_width = get_width_B_from_header(addr);
-
-    const auto offset = (compressed_value_size * value_width) + (ndx * index_width);
-    const auto index = (int)read_bitfield(data, (int)offset, index_width);
-    const auto v = read_bitfield(data, index * value_width, value_width);
-    return v;
+        const auto data = (uint64_t*)get_data_from_header(m_compressed_array.get_addr());
+        const auto offset = (value_size * value_width) + (ndx * index_width);
+        const auto index = read_bitfield(data, offset, index_width);
+        return read_bitfield(data, index * value_width, value_width);
+    }
+    return realm::not_found;
 }
 
 Mixed ArrayIntNull::get_any(size_t ndx) const

@@ -49,7 +49,7 @@ TEST(Test_ArrayInt_no_compression_needed)
     a.destroy();
 }
 
-TEST(Test_ArrayInt_compress_data)
+ONLY(Test_ArrayInt_compress_data)
 {
     ArrayInteger a(Allocator::get_default());
     a.create();

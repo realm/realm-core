@@ -34,6 +34,17 @@ public:
     explicit ArrayInteger(Allocator&) noexcept;
     ~ArrayInteger() noexcept override {}
 
+    void destroy() noexcept
+    {
+        if (!is_in_compressed_format()) {
+            Array::destroy();
+        }
+        else {
+            m_alloc.free_(m_compressed_array);
+            m_compressed_array.set_addr(nullptr);
+        }
+    }
+
     static value_type default_value(bool)
     {
         return 0;
@@ -64,32 +75,32 @@ public:
     // implement parent interface in order to deal with compressed arrays
     inline int64_t get(size_t ndx) const noexcept
     {
-        if (m_is_compressed) {
+        if (is_in_compressed_format()) {
             return get_compressed_value(ndx);
         }
         return Array::get(ndx);
     }
     inline void set(size_t ndx, int64_t value)
     {
-        if (m_is_compressed)
+        if (is_in_compressed_format())
             decompress();
         Array::set(ndx, value);
     }
     inline void insert(size_t ndx, int_fast64_t value)
     {
-        if (m_is_compressed)
+        if (is_in_compressed_format())
             decompress();
         Array::insert(ndx, value);
     }
     inline void add(int_fast64_t value)
     {
-        if (m_is_compressed)
+        if (is_in_compressed_format())
             decompress();
         Array::add(value);
     }
     inline void move(Array& dst, size_t ndx)
     {
-        if (m_is_compressed)
+        if (is_in_compressed_format())
             decompress();
         Array::move(dst, ndx);
     }
@@ -104,8 +115,10 @@ public:
 private:
     int64_t get_compressed_value(size_t ndx) const;
     bool try_compress(std::vector<int64_t>&, std::vector<size_t>&);
+    bool is_in_compressed_format() const;
+    bool get_compressed_header_info(size_t& value_width, size_t& index_width, size_t& value_size,
+                                    size_t& index_size) const;
 
-    bool m_is_compressed{false};
     MemRef m_compressed_array;
 };
 

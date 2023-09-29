@@ -200,12 +200,12 @@ class bf_ref;
 class bf_iterator {
     uint64_t* data_area;
     uint64_t* first_word_ptr;
-    int field_position;
+    size_t field_position;
     uint8_t field_size;
     uint8_t step_size; // may be different than field_size if used for arrays of pairs
 
 public:
-    bf_iterator(uint64_t* data_area, int initial_offset, int field_size, int step_size, int index)
+    bf_iterator(uint64_t* data_area, size_t initial_offset, size_t field_size, size_t step_size, size_t index)
         : data_area(data_area)
         , field_size(field_size)
         , step_size(step_size)
@@ -306,13 +306,13 @@ inline bf_ref bf_iterator::operator*()
 }
 
 
-inline uint64_t read_bitfield(uint64_t* data_area, int field_position, int width)
+inline uint64_t read_bitfield(uint64_t* data_area, size_t field_position, size_t width)
 {
     bf_iterator it(data_area, field_position, width, 0, 0);
     return *it;
 }
 
-inline void write_bitfield(uint64_t* data_area, int field_position, int width, uint64_t value)
+inline void write_bitfield(uint64_t* data_area, size_t field_position, size_t width, uint64_t value)
 {
     bf_iterator it(data_area, field_position, width, 0, 0);
     *it = value;
