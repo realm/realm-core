@@ -963,6 +963,7 @@ tasks:
             --ignore='build/external/**' \
             --ignore='external/**' \
             --ignore='src/external/**' \
+            --ignore='src/realm/parser/generated/**' \
             --ignore='test/large_tests/**' \
             --parallel \
             --output-path=coveralls_${task_name}.json
