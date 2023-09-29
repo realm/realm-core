@@ -1501,15 +1501,17 @@ void Session::gather_pending_compensating_writes(util::Span<Changeset> changeset
     REALM_ASSERT_DEBUG(
         std::is_sorted(m_pending_compensating_write_errors.begin(), m_pending_compensating_write_errors.end(),
                        [](const ProtocolErrorInfo& lhs, const ProtocolErrorInfo& rhs) {
-                           return lhs.compensating_write_server_version < rhs.compensating_write_server_version;
+                           REALM_ASSERT_DEBUG(lhs.compensating_write_server_version.has_value());
+                           REALM_ASSERT_DEBUG(rhs.compensating_write_server_version.has_value());
+                           return *lhs.compensating_write_server_version < *rhs.compensating_write_server_version;
                        }));
 #endif
 
     while (!m_pending_compensating_write_errors.empty() &&
-           m_pending_compensating_write_errors.front().compensating_write_server_version <=
+           *m_pending_compensating_write_errors.front().compensating_write_server_version <=
                changesets.back().version) {
         auto& cur_error = m_pending_compensating_write_errors.front();
-        REALM_ASSERT_3(cur_error.compensating_write_server_version, >=, changesets.front().version);
+        REALM_ASSERT_3(*cur_error.compensating_write_server_version, >=, changesets.front().version);
         out->push_back(std::move(cur_error));
         m_pending_compensating_write_errors.pop_front();
     }
@@ -1552,7 +1554,7 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
     for (const auto& pending_error : pending_compensating_write_errors) {
         logger.info("Reporting compensating write for client version %1 in server version %2: %3",
                     pending_error.compensating_write_rejected_client_version,
-                    pending_error.compensating_write_server_version, pending_error.message);
+                    *pending_error.compensating_write_server_version, pending_error.message);
         try {
             on_connection_state_changed(
                 m_conn.get_state(),
@@ -2561,6 +2563,7 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
         // If the client is not active, the compensating writes will not be processed now, but will be
         // sent again the next time the client connects
         if (m_state == Active) {
+            REALM_ASSERT(info.compensating_write_server_version.has_value());
             m_pending_compensating_write_errors.push_back(info);
         }
         return Status::OK();
