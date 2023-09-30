@@ -1,3 +1,7 @@
+<p align="right">
+<a href='https://coveralls.io/github/realm/realm-core'><img src='https://coveralls.io/repos/github/realm/realm-core/badge.svg' alt='Coverage Status' /></a>
+</p>
+
 ![Realm](doc/logo.png)
 
 Realm is a mobile database that runs directly inside phones, tablets or wearables - check out [realm.io](https://realm.io).
