@@ -866,7 +866,7 @@ TEST(Sync_MutableSubscriptionSetOperations)
         out.insert_or_assign("b sub", query_b);
         CHECK_EQUAL(out.size(), 2);
         std::tie(it, inserted) = out.insert_or_assign("a sub", query_a);
-        CHECK(!inserted);
+        CHECK_NOT(inserted);
         CHECK_EQUAL(it->id, named_id);
         CHECK_EQUAL(out.size(), 2);
     }
@@ -891,7 +891,7 @@ TEST(Sync_MutableSubscriptionSetOperations)
         // Iterator points to last query inserted due do "swap and pop" idiom.
         CHECK_EQUAL(it->query_string, query_c.get_description());
         CHECK_EQUAL(out.size(), 2);
-        CHECK(!out.erase("a sub"));
+        CHECK_NOT(out.erase("a sub"));
         CHECK_EQUAL(out.size(), 2);
         CHECK(out.erase(query_b));
         CHECK_EQUAL(out.size(), 1);
@@ -905,6 +905,9 @@ TEST(Sync_MutableSubscriptionSetOperations)
         out.insert_or_assign("a sub", query_a);
         out.insert_or_assign("b sub", query_b);
         out.insert_or_assign("c sub", query_c);
+        // Nothing to erase.
+        CHECK_NOT(out.erase_by_class_name("foo"));
+        // Erase all queries for the class type of the first query.
         CHECK(out.erase_by_class_name(out.begin()->object_class_name));
         // No queries left.
         CHECK_EQUAL(out.size(), 0);
@@ -915,6 +918,8 @@ TEST(Sync_MutableSubscriptionSetOperations)
         auto out = store->get_latest().make_mutable_copy();
         out.insert_or_assign("a sub", query_a);
         out.insert_or_assign("b sub", query_b);
+        // Nothing to erase.
+        CHECK_NOT(out.erase_by_id(ObjectId::gen()));
         // Erase first query.
         CHECK(out.erase_by_id(out.begin()->id));
         CHECK_EQUAL(out.size(), 1);
