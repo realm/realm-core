@@ -58,51 +58,6 @@ public:
     };
 };
 
-
-class NodeHeaderPacked : public NodeHeaderBasic {
-public:
-    // the packed format supports smaller arrays with elements of sizes that
-    // are not restricted to powers of 2. Layout:
-    // header[0-1]  capacity
-    // header[2]    flags
-    // header[3]    kind (must be 0x01)
-    // header[4]    reserved
-    // header[5]    element size in bits
-    // header[6-7]  number of elements
-    constexpr static int id = 0x01;
-    static bool is_valid(uint64_t* header)
-    {
-        return get_kind(header) == id;
-    }
-    static size_t get_num_elements(uint64_t* header)
-    {
-        return ((uint16_t*)header)[3];
-    };
-    static void set_num_elements(uint64_t* header, uint16_t num_elements)
-    {
-        ((uint16_t*)header)[3] = num_elements;
-    };
-    static size_t get_capacity(uint64_t* header)
-    {
-        ((uint16_t*)header)[0];
-    }
-    static void set_capacity(uint64_t* header, uint16_t capacity)
-    {
-        ((uint16_t*)header)[0] = capacity;
-    }
-    static size_t get_bits_per_element(uint64_t* header)
-    {
-        auto retval = ((uint8_t*)header)[5];
-        REALM_ASSERT(retval <= 64);
-    }
-    static void set_bits_per_element(uint64_t* header, uint8_t bits_per_element)
-    {
-        REALM_ASSERT(bits_per_element <= 64);
-        ((uint8_t*)header)[5] = bits_per_element;
-    };
-};
-
-
 class NodeHeader : public NodeHeaderBasic {
 public:
     constexpr static int id = 0x41;
@@ -133,52 +88,8 @@ public:
         wtype_Bits = 0,     // width indicates how many bits every element occupies
         wtype_Multiply = 1, // width indicates how many bytes every element occupies
         wtype_Ignore = 2,   // each element is 1 byte
-        // The following encodings were added to provide better compression of integral values.
-        // These encodings use the width field (bits 0-2) of byte 4 to specify layouts.
-        // byte 5 of the header holds one or two element sizes. These new element size encodings
-        // are given below.
-        // byte 6 and 7 holds one or two array sizes (element counts).
-        //
-        // the header stores enough data to a) compute the total size of a block,
-        // and b) determine which part of a block may hold refs, which may need to be
-        // scanned/updated for example during write to disk.
-        //
-        wtype_Packed = 3, // Array with better packed elements.
-                          // Use for denser packaging of existing arrays up to 65535 elements
-                          // bits 0-3 of byte 5 holds element size.
-                          // byte 6 and 7 holds number of elements.
-                          //
-        wtype_AofP = 4,   // Array of pairs. Each pair has elements of two different sizes.
-                          // Use for better spatial locality if you often access both members of a pair
-                          // bits 0-3 of byte 5 holds size of first element in each pair
-                          // bits 4-7 of byte 5 holds size of snd element in each pair
-                          // byte 6 and 7 holds number of pairs
-                          // if HasRefs is set, it applies to snd element.
-                          //
-        wtype_PofA = 5,   // Pair of arrays. Each array may hold elements of different sizes.
-                          // Arrays are the same length. Use wtype_Flex if you need different lengths
-                          // Use for better spatial locality if you often access only one of the arrays,
-                          // but want to represent stuff from two arrays in one memory block to
-                          // save allocation and ref-translation overhead
-                          // bits 0-3 of byte 5 holds size of elements in first array
-                          // bits 4-7 of byte 5 holds size of elements in second array
-                          // byte 6 and 7 holds number of elements in both arrays
-                          // if HasRefs is set, it applies to snd array
-                          //
-        wtype_Flex = 6,   // Pair of arrays possibly of different length and different element sizes.
-                          // Use for situations where array lengths may differ, for example
-                          // if one array is used to index the other, or if one array is used
-                          // for metadata which cannot hold refs. Note the number of elements
-                          // is limited to 255.
-                          // bits 0-3 of byte 5 holds size of elements in first array
-                          // bits 4-7 of byte 5 holds size of elements in second array
-                          // byte 6 holds number of elements in first array
-                          // byte 7 holds number of elements in second array
-                          // if HasRefs is set, it applies to snd array
-        // possibly more....
     };
-    static const int wtype_extend = 3; // value held in wtype field for wtypes after wtype_Wide
-    static const int header_size = 8;  // Number of bytes used by header
+    static const int header_size = 8; // Number of bytes used by header
 
     // The encryption layer relies on headers always fitting within a single page.
     static_assert(header_size == 8, "Header must always fit in entirely on a page");
@@ -250,34 +161,6 @@ public:
         h[4] = uchar((int(h[4]) & ~0x20) | int(value) << 5);
     }
 
-    // Element width encoding:
-    //
-    // For wtype lower than wtype_extend, the element width is given by
-    // bits 0-2 in byte 4 of the header and only powers of two is supported:
-    //   0,1,2,4,8,16,32,64.
-    // For new wtypes we support 16 different element sizes and in some
-    // cases two of them -- for arrays of pairs or pairs of arrays.
-    // Element sizes of zero is not supported in the new format - pick an old format for that.
-    // This is the extended encoding of the element widths (all widths in bits)
-    //
-    // Encoding:    Sizes:
-    // 0            -> 1
-    // 1            -> 2
-    // 2            -> 3
-    // 3            -> 4
-    // 4            -> 5
-    // 5            -> 6
-    // 6            -> 8 (+2)
-    // 7            -> 10 (+2)
-    // 8            -> 12 (+2)
-    // 9            -> 16 (+4)
-    // 10           -> 20 (+4)
-    // 11           -> 24 (+4)
-    // 12           -> 32 (+8)
-    // 13           -> 40 (+8)
-    // 14           -> 52 (+12)
-    // 15           -> 64 (+12)
-
     // Helpers for NodeHeader::WidthType:
     // handles all header formats
     static WidthType get_wtype_from_header(const char* header) noexcept
@@ -285,11 +168,7 @@ public:
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
         int h4 = h[4];
-        if ((h4 & 0x18) == 0x18) {
-            return WidthType(wtype_extend + (h4 & 0x7));
-        }
-        else
-            return WidthType((h4 & 0x18) >> 3);
+        return WidthType((h4 & 0x18) >> 3);
     }
 
     static void set_wtype_in_header(WidthType value, char* header) noexcept
@@ -297,46 +176,8 @@ public:
         typedef unsigned char uchar;
         uchar* h = reinterpret_cast<uchar*>(header);
         auto h4 = h[4];
-        if (value < wtype_extend) {
-            h4 = (h4 & ~0x18) | int(value) << 3;
-        }
-        else {
-            h4 = (h4 & ~0x1F) | (int(wtype_extend) << 3) | int(value - wtype_extend);
-        }
+        h4 = (h4 & ~0x18) | int(value) << 3;
         h[4] = h4;
-    }
-
-    // Helpers for the new width encoding (for wtype >= wtype_extend)
-    static constexpr int width_enc_to_bits_table[16] = {1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32, 40, 52, 64};
-    // from any number of bits to the encoding capable of holding them (0 should not be used)
-    static constexpr int bits_to_width_enc[65] = {
-        -1, 0,  1,  2,  // 0-3 bits
-        3,  4,  5,  6,  // 4-7
-        6,  7,  7,  8,  // 8-11
-        8,  9,  9,  9,  // 12-15
-        9,  10, 10, 10, // 16-19
-        10, 11, 11, 11, // 20-23
-        11, 12, 12, 12, // 24-27
-        12, 12, 12, 12, // 28-31
-        12, 13, 13, 13, // 32-35
-        13, 13, 13, 13, // 36-39
-        13, 14, 14, 14, // 40-43
-        14, 14, 14, 14, // 44-47
-        14, 14, 14, 14, // 48-51
-        14, 15, 15, 15, // 52-25
-        15, 15, 15, 15, // 56-59
-        15, 15, 15, 15, // 60-63
-        15              // 64
-    };
-
-    static int width_encoding_to_num_bits(int encoding)
-    {
-        return width_enc_to_bits_table[encoding];
-    }
-
-    static int num_bits_to_width_encoding(int num_bits)
-    {
-        return bits_to_width_enc[num_bits];
     }
 
     static int unsigned_to_num_bits(uint64_t value)
@@ -357,10 +198,8 @@ public:
     // Handling width and sizes:
     static uint_least8_t get_width_from_header(const char* header) noexcept
     {
-        auto wtype = get_wtype_from_header(header);
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
-        REALM_ASSERT_RELEASE(wtype < wtype_extend);
         return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
     }
 
@@ -396,53 +235,6 @@ public:
         h[7] = uchar(value & 0x000000FF);
     }
 
-    // Helper functions for layouts above wtype_extend:
-    // Element width:
-    static int get_width_A_from_header(const char* header) noexcept
-    {
-        auto wtype = get_wtype_from_header(header);
-        typedef unsigned char uchar;
-        const uchar* h = reinterpret_cast<const uchar*>(header);
-        REALM_ASSERT_RELEASE(wtype >= wtype_extend);
-        return width_encoding_to_num_bits(h[5] & 0xF);
-    }
-
-    // should not be used for wtype_Packed which has only one element size
-    static int get_width_B_from_header(const char* header) noexcept
-    {
-        auto wtype = get_wtype_from_header(header);
-        typedef unsigned char uchar;
-        const uchar* h = reinterpret_cast<const uchar*>(header);
-        REALM_ASSERT_RELEASE(wtype >= wtype_extend);
-        return width_encoding_to_num_bits((h[5] >> 4) & 0xF);
-    }
-
-
-    // Helper functions for array sizes for layouts above wtype_extend:
-    // should only be used for wtype_Flex
-    static size_t get_size_A_from_header(const char* header) noexcept
-    {
-        typedef unsigned char uchar;
-        const uchar* h = reinterpret_cast<const uchar*>(header);
-        return size_t(h[6]);
-    }
-
-    // should only be used for wtype_Flex
-    static size_t get_size_B_from_header(const char* header) noexcept
-    {
-        typedef unsigned char uchar;
-        const uchar* h = reinterpret_cast<const uchar*>(header);
-        return size_t(h[7]);
-    }
-
-    // shold be used for wtype_Packed, wtype_AofP, wtype_PofA
-    static size_t get_size_AB_from_header(const char* header) noexcept
-    {
-        typedef unsigned char uchar;
-        const uchar* h = reinterpret_cast<const uchar*>(header);
-        return size_t(h[7] | (size_t(h[6]) << 8));
-    }
-
 
     // Helpers shared for all formats:
     static size_t get_capacity_from_header(const char* header) noexcept
@@ -469,67 +261,30 @@ public:
         WidthType wtype = get_wtype_from_header(header);
         size_t width;
         size_t size;
-        switch (wtype) {
-            case wtype_Bits:
-            case wtype_Multiply:
-            case wtype_Ignore: {
-                width = get_width_from_header(header);
-                size = get_size_from_header(header);
-                return calc_byte_size(wtype, size, width);
-            }
-            case wtype_Packed: {
-                width = get_width_A_from_header(header);
-                size = get_size_AB_from_header(header);
-                return calc_byte_size(wtype, size, width);
-            }
-            case wtype_AofP:
-            case wtype_PofA: {
-                width = get_width_A_from_header(header) + get_width_B_from_header(header);
-                size = get_size_AB_from_header(header);
-                return calc_byte_size(wtype, size, width);
-            }
-            case wtype_Flex: {
-                auto widthA = get_width_A_from_header(header);
-                auto widthB = get_width_B_from_header(header);
-                auto sizeA = get_size_A_from_header(header);
-                auto sizeB = get_size_B_from_header(header);
-                return calc_byte_size_extended(wtype, sizeA, sizeB, widthA, widthB);
-            }
-            default:
-                REALM_ASSERT(false);
-        }
+        width = get_width_from_header(header);
+        size = get_size_from_header(header);
+        return calc_byte_size(wtype, size, width);
     }
 
 
     static size_t calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept
     {
-        REALM_ASSERT(wtype != wtype_Flex);
-        return calc_byte_size_extended(wtype, size, 0, width, 0);
-    }
-
-    static size_t calc_byte_size_extended(WidthType wtype, size_t sizeA, size_t sizeB, uint8_t widthA,
-                                          uint8_t widthB) noexcept
-    {
         size_t num_bytes = 0;
         switch (wtype) {
-            case wtype_Packed:
-            case wtype_AofP:
-            case wtype_PofA:
-            case wtype_Flex:
             case wtype_Bits: {
                 // Current assumption is that size is at most 2^24 and that width is at most 64.
                 // In that case the following will never overflow. (Assuming that size_t is at least 32 bits)
-                REALM_ASSERT_3(sizeA, <, 0x1000000);
-                size_t num_bits = sizeA * widthA + sizeB * widthB;
+                REALM_ASSERT_3(size, <, 0x1000000);
+                size_t num_bits = size * width;
                 num_bytes = (num_bits + 7) >> 3;
                 break;
             }
             case wtype_Multiply: {
-                num_bytes = sizeA * widthA;
+                num_bytes = size * width;
                 break;
             }
             case wtype_Ignore:
-                num_bytes = sizeA;
+                num_bytes = size;
                 break;
             default: {
                 REALM_ASSERT(false);
@@ -546,21 +301,262 @@ public:
     }
 };
 
+// Access to different header formats is done through specializations of a set
+// of access functions. This allows for defining ONLY the abilities which makes
+// sense for each different header encoding. For example: headers for a single
+// array support a 'set_element_size()', while headers for arrays of pairs or
+// pairs of arrays instead support 'set_elementA_size()' and 'set_elementB_size()'.
+//
+// This approach also allows for zero overhead selection between the different
+// header encodings.
 enum class Kind { Packed = 1, AofP = 2, PofA = 3, Flex = 4, Unpacked = 0x41 };
-
+// Packed: tightly packed array (any alement size <= 64)
+// Unpacked: less tightly packed array (element size must be power of two)
+// encodings with more flexibility but lower number of elements:
+// AofP: Array of pairs (2 element sizes, 1 element count)
+// PofA: Pair of arrays (2 elememt sizes, 1 element count)
+// Encodings with even more flexibility with even lower number of elements
+// Flex: Pair of arrays with different element count
+// Setting element size for encodings with a single element size:
 template <Kind>
-void set_element_size(uint64_t* header, size_t bits_per_element);
+void inline set_element_size(uint64_t* header, size_t bits_per_element);
 template <>
-void set_element_size<Kind::Packed>(uint64_t* header, size_t bits_per_element)
+void inline set_element_size<Kind::Packed>(uint64_t* header, size_t bits_per_element)
 {
     REALM_ASSERT(bits_per_element <= 64);
     ((uint16_t*)header)[2] = bits_per_element;
 }
 template <>
-void set_element_size<Kind::Unpacked>(uint64_t* header, size_t bits_per_element)
+void inline set_element_size<Kind::Unpacked>(uint64_t* header, size_t bits_per_element)
 {
     REALM_ASSERT(bits_per_element <= 64);
+    // TODO: Only powers of two allowed
     NodeHeader::set_width_in_header(bits_per_element, (char*)header);
+}
+
+
+// Getting element size for encodings with a single element size:
+template <Kind>
+inline size_t get_element_size(uint64_t* header);
+template <>
+inline size_t get_element_size<Kind::Packed>(uint64_t* header)
+{
+    auto bits_per_element = ((uint16_t*)header)[2];
+    REALM_ASSERT(bits_per_element <= 64);
+    return bits_per_element;
+}
+template <>
+inline size_t get_element_size<Kind::Unpacked>(uint64_t* header)
+{
+    auto bits_per_element = NodeHeader::get_width_from_header((char*)header);
+    REALM_ASSERT(bits_per_element <= 64);
+    return bits_per_element;
+}
+
+// Setting element sizes for encodings with two element sizes (called A and B)
+template <Kind>
+inline void set_elementA_size(uint64_t* header, size_t bits_per_element);
+template <>
+inline void set_elementA_size<Kind::AofP>(uint64_t* header, size_t bits_per_element)
+{
+    REALM_ASSERT(bits_per_element <= 64);
+    ((uint8_t*)header)[4] = bits_per_element;
+}
+template <>
+inline void set_elementA_size<Kind::PofA>(uint64_t* header, size_t bits_per_element)
+{
+    REALM_ASSERT(bits_per_element <= 64);
+    ((uint8_t*)header)[4] = bits_per_element;
+}
+template <>
+inline void set_elementA_size<Kind::Flex>(uint64_t* header, size_t bits_per_element)
+{
+    // we're a bit low on bits for the Flex encoding, so we need to squeeze stuff
+    REALM_ASSERT(bits_per_element <= 64);
+    REALM_ASSERT(bits_per_element > 0);
+    uint32_t word = ((uint32_t*)header)[1];
+    word &= ~(0b111111 << 20);
+    word |= (bits_per_element - 1) << 20;
+    ((uint32_t*)header)[1] = word;
+}
+
+
+// Setting element sizes for encodings with two element sizes (called A and B)
+template <Kind>
+inline void set_elementB_size(uint64_t* header, size_t bits_per_element);
+
+template <>
+inline void set_elementB_size<Kind::AofP>(uint64_t* header, size_t bits_per_element)
+{
+    REALM_ASSERT(bits_per_element <= 64);
+    ((uint8_t*)header)[5] = bits_per_element;
+}
+template <>
+inline void set_elementB_size<Kind::PofA>(uint64_t* header, size_t bits_per_element)
+{
+    REALM_ASSERT(bits_per_element <= 64);
+    ((uint8_t*)header)[5] = bits_per_element;
+}
+template <>
+inline void set_elementB_size<Kind::Flex>(uint64_t* header, size_t bits_per_element)
+{
+    // we're a bit low on bits for the Flex encoding, so we need to squeeze stuff
+    REALM_ASSERT(bits_per_element <= 64);
+    REALM_ASSERT(bits_per_element > 0);
+    uint32_t word = ((uint32_t*)header)[1];
+    word &= ~(0b111111 << 26);
+    word |= (bits_per_element - 1) << 26;
+    ((uint32_t*)header)[1] = word;
+}
+
+
+// Getting element sizes for encodings with two element sizes (called A and B)
+template <Kind>
+inline size_t Get_elementA_size(uint64_t* header);
+template <>
+inline size_t Get_elementA_size<Kind::AofP>(uint64_t* header)
+{
+    auto bits_per_element = ((uint8_t*)header)[4];
+    REALM_ASSERT(bits_per_element <= 64);
+    return bits_per_element;
+}
+template <>
+inline size_t Get_elementA_size<Kind::PofA>(uint64_t* header)
+{
+    auto bits_per_element = ((uint8_t*)header)[4];
+    REALM_ASSERT(bits_per_element <= 64);
+    return bits_per_element;
+}
+template <>
+inline size_t Get_elementA_size<Kind::Flex>(uint64_t* header)
+{
+    uint32_t word = ((uint32_t*)header)[1];
+    auto bits_per_element = (word >> 20) & 0b111111;
+    bits_per_element++;
+    REALM_ASSERT(bits_per_element <= 64);
+    REALM_ASSERT(bits_per_element > 0);
+    return bits_per_element;
+}
+
+// Getting element sizes for encodings with two element sizes (called A and B)
+template <Kind>
+inline size_t Get_elementB_size(uint64_t* header);
+template <>
+inline size_t Get_elementB_size<Kind::AofP>(uint64_t* header)
+{
+    auto bits_per_element = ((uint8_t*)header)[5];
+    REALM_ASSERT(bits_per_element <= 64);
+    return bits_per_element;
+}
+template <>
+inline size_t Get_elementB_size<Kind::PofA>(uint64_t* header)
+{
+    auto bits_per_element = ((uint8_t*)header)[5];
+    REALM_ASSERT(bits_per_element <= 64);
+    return bits_per_element;
+}
+template <>
+inline size_t Get_elementB_size<Kind::Flex>(uint64_t* header)
+{
+    uint32_t word = ((uint32_t*)header)[1];
+    auto bits_per_element = (word >> 26) & 0b111111;
+    bits_per_element++;
+    REALM_ASSERT(bits_per_element <= 64);
+    REALM_ASSERT(bits_per_element > 0);
+    return bits_per_element;
+}
+
+// Setting the number of elements in the array(s). All encodings except Flex have one number of elements.
+template <Kind>
+inline void set_num_elements(uint64_t* header, size_t num_elements);
+template <>
+inline void set_num_elements<Kind::Packed>(uint64_t* header, size_t num_elements)
+{
+    REALM_ASSERT(num_elements < 0x10000);
+    ((uint16_t*)header)[3] = num_elements;
+}
+template <>
+inline void set_num_elements<Kind::Unpacked>(uint64_t* header, size_t num_elements)
+{
+    NodeHeader::set_size_in_header(num_elements, (char*)header);
+}
+template <>
+inline void set_num_elements<Kind::AofP>(uint64_t* header, size_t num_elements)
+{
+    REALM_ASSERT(num_elements < 0x10000);
+    ((uint16_t*)header)[3] = num_elements;
+}
+template <>
+inline void set_num_elements<Kind::PofA>(uint64_t* header, size_t num_elements)
+{
+    REALM_ASSERT(num_elements < 0x10000);
+    ((uint16_t*)header)[3] = num_elements;
+}
+
+// For the encodings with two size specifications - currently only the Flex encoding
+template <Kind>
+inline void set_arrayA_num_elements(uint64_t* header, size_t num_elements);
+template <>
+inline void set_arrayA_num_elements<Kind::Flex>(uint64_t* header, size_t num_elements)
+{
+    REALM_ASSERT(num_elements < 0b10000000000); // 10 bits
+    uint32_t word = ((uint32_t*)header)[1];
+    word &= ~(0b1111111111);
+    word |= num_elements;
+}
+template <Kind>
+inline void set_arrayB_num_elements(uint64_t* header, size_t num_elements);
+template <>
+inline void set_arrayB_num_elements<Kind::Flex>(uint64_t* header, size_t num_elements)
+{
+    REALM_ASSERT(num_elements < 0b10000000000); // 10 bits
+    uint32_t word = ((uint32_t*)header)[1];
+    word &= ~(0b1111111111 << 10);
+    word |= num_elements << 10;
+}
+
+// Setting the number of elements in the array(s). All encodings except Flex have one number of elements.
+template <Kind>
+inline size_t get_num_elements(uint64_t* header);
+template <>
+inline size_t get_num_elements<Kind::Packed>(uint64_t* header)
+{
+    return ((uint16_t*)header)[3];
+}
+template <>
+inline size_t get_num_elements<Kind::AofP>(uint64_t* header)
+{
+    return ((uint16_t*)header)[3];
+}
+template <>
+inline size_t get_num_elements<Kind::PofA>(uint64_t* header)
+{
+    return ((uint16_t*)header)[3];
+}
+template <>
+inline size_t get_num_elements<Kind::Unpacked>(uint64_t* header)
+{
+    return NodeHeader::get_size_from_header((const char*)header);
+}
+
+template <Kind>
+inline size_t get_arrayA_num_elements(uint64_t* header);
+template <>
+inline size_t get_arrayA_num_elements<Kind::Flex>(uint64_t* header)
+{
+    uint32_t word = ((uint32_t*)header)[1];
+    auto num_elements = word & 0b1111111111;
+    return num_elements;
+}
+
+template <Kind>
+inline size_t get_arrayB_num_elements(uint64_t* header);
+template <>
+inline size_t get_arrayB_num_elements<Kind::Flex>(uint64_t* header)
+{
+    uint32_t word = ((uint32_t*)header)[1];
+    auto num_elements = (word >> 10) & 0b1111111111;
+    return num_elements;
 }
 
 
