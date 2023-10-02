@@ -63,7 +63,11 @@ ONLY(Test_ArrayInt_compress_data)
     // Current: [16388:16, 409:16, 16388:16, 16388:16, 409:16, 16388:16], space needed: 6*16 bits = 96 bits + header
     // compress the array is a good option.
     CHECK(a.try_compress());
+    CHECK_NOT(a.try_compress());
+    CHECK(a.decompress());
+    CHECK(a.try_compress());
     // Compressed: [409:16, 16388:16][1:1,0:1,1:1,1:1,0:1,1:1], space needed: 2*16 bits + 6 * 1 bit = 38 bits + header
+    CHECK(a.size() == 6);
     CHECK(a.get(0) == 16388);
     CHECK(a.get(1) == 409);
     CHECK(a.get(2) == 16388);
