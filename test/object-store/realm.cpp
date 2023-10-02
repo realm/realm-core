@@ -3561,7 +3561,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
     size_t schema_changed_called = 0;
     Schema changed_fixed_schema;
     TestFile config;
-    auto dynamic_config = config;
+    RealmConfig dynamic_config = config;
 
     config.schema = Schema{{"object1",
                             {

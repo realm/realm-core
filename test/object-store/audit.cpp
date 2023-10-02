@@ -167,51 +167,28 @@ void sort_events(std::vector<AuditEvent>& events)
 static std::vector<AuditEvent> get_audit_events_from_baas(TestAppSession& session, SyncUser& user,
                                                           size_t expected_count)
 {
-    auto& app_session = session.app_session();
-    app::MongoClient remote_client = user.mongo_client("BackingDB");
-    app::MongoDatabase db = remote_client.db(app_session.config.mongo_dbname);
-    app::MongoCollection collection = db["AuditEvent"];
-    std::vector<AuditEvent> events;
     static const std::set<std::string> nonmetadata_fields = {"activity", "event", "data", "realm_id"};
 
-    timed_wait_for(
-        [&] {
-            uint64_t count = 0;
-            collection.count({}, [&](uint64_t c, util::Optional<app::AppError> error) {
-                REQUIRE(!error);
-                count = c;
-            });
-            if (count < expected_count) {
-                millisleep(500); // slow down the number of retries
-                return false;
-            }
-            return true;
-        },
-        std::chrono::minutes(5));
-
-    collection.find({}, {},
-                    [&](util::Optional<std::vector<bson::Bson>>&& result, util::Optional<app::AppError> error) {
-                        REQUIRE(!error);
-                        REQUIRE(result->size() >= expected_count);
-                        events.reserve(result->size());
-                        for (auto bson : *result) {
-                            auto doc = static_cast<const bson::BsonDocument&>(bson).entries();
-                            AuditEvent event;
-                            event.activity = static_cast<std::string>(doc["activity"]);
-                            event.timestamp = static_cast<Timestamp>(doc["timestamp"]);
-                            if (auto it = doc.find("event"); it != doc.end() && it->second != bson::Bson()) {
-                                event.event = static_cast<std::string>(it->second);
-                            }
-                            if (auto it = doc.find("data"); it != doc.end() && it->second != bson::Bson()) {
-                                event.data = json::parse(static_cast<std::string>(it->second));
-                            }
-                            for (auto& [key, value] : doc) {
-                                if (value.type() == bson::Bson::Type::String && !nonmetadata_fields.count(key))
-                                    event.metadata.insert({key, static_cast<std::string>(value)});
-                            }
-                            events.push_back(event);
-                        }
-                    });
+    auto documents = session.get_documents(user, "AuditEvent", expected_count);
+    std::vector<AuditEvent> events;
+    events.reserve(documents.size());
+    for (auto document : documents) {
+        auto doc = document.entries();
+        AuditEvent event;
+        event.activity = static_cast<std::string>(doc["activity"]);
+        event.timestamp = static_cast<Timestamp>(doc["timestamp"]);
+        if (auto it = doc.find("event"); it != doc.end() && it->second != bson::Bson()) {
+            event.event = static_cast<std::string>(it->second);
+        }
+        if (auto it = doc.find("data"); it != doc.end() && it->second != bson::Bson()) {
+            event.data = json::parse(static_cast<std::string>(it->second));
+        }
+        for (auto& [key, value] : doc) {
+            if (value.type() == bson::Bson::Type::String && !nonmetadata_fields.count(key))
+                event.metadata.insert({key, static_cast<std::string>(value)});
+        }
+        events.push_back(event);
+    }
     sort_events(events);
     return events;
 }

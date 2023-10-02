@@ -32,6 +32,9 @@
 #include <realm/util/file.hpp>
 
 #if REALM_ENABLE_SYNC
+#include <realm/object-store/sync/mongo_client.hpp>
+#include <realm/object-store/sync/mongo_database.hpp>
+#include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
@@ -374,6 +377,47 @@ TestAppSession::~TestAppSession()
     }
 }
 
+std::vector<bson::BsonDocument> TestAppSession::get_documents(SyncUser& user, const std::string& object_type,
+                                                              size_t expected_count) const
+{
+    app::MongoClient remote_client = user.mongo_client("BackingDB");
+    app::MongoDatabase db = remote_client.db(m_app_session->config.mongo_dbname);
+    app::MongoCollection collection = db[object_type];
+    int sleep_time = 10;
+    timed_wait_for(
+        [&] {
+            uint64_t count = 0;
+            collection.count({}, [&](uint64_t c, util::Optional<app::AppError> error) {
+                REQUIRE(!error);
+                count = c;
+            });
+            if (count < expected_count) {
+                // querying the server too frequently makes it take longer to process the sync changesets we're
+                // waiting for
+                millisleep(sleep_time);
+                if (sleep_time < 500) {
+                    sleep_time *= 2;
+                }
+                return false;
+            }
+            return true;
+        },
+        std::chrono::minutes(5));
+
+    std::vector<bson::BsonDocument> documents;
+    collection.find({}, {},
+                    [&](util::Optional<std::vector<bson::Bson>>&& result, util::Optional<app::AppError> error) {
+                        REQUIRE(result);
+                        REQUIRE(!error);
+                        REQUIRE(result->size() == expected_count);
+                        documents.reserve(result->size());
+                        for (auto&& bson : *result) {
+                            REQUIRE(bson.type() == bson::Bson::Type::Document);
+                            documents.push_back(std::move(static_cast<bson::BsonDocument&>(bson)));
+                        }
+                    });
+    return documents;
+}
 #endif // REALM_ENABLE_AUTH_TESTS
 
 // MARK: - TestSyncManager
