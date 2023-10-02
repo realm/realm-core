@@ -2805,7 +2805,7 @@ class TestTableView : public TableView {
 public:
     using TableView::TableView;
 
-    KeyColumn& get_keys()
+    KeyValues& get_keys()
     {
         return this->m_key_values;
     }
@@ -2867,6 +2867,27 @@ TEST(TableView_SortFollowedByLimit)
     for (int i = 0; i < limit; i++) {
         CHECK_EQUAL(tv.get_object(i).get<Int>(col), i);
     }
+}
+
+TEST(TableView_Filter)
+{
+    Table table;
+    auto col = table.add_column(type_Int, "first");
+    std::vector<int> values(10000);
+    std::iota(values.begin(), values.end(), 0);
+    std::shuffle(values.begin(), values.end(), std::mt19937(unit_test_random_seed));
+
+    for (auto i : values) {
+        table.create_object().set(col, i);
+    }
+
+    auto tv = table.where().find_all();
+
+    Obj obj;
+    tv.filter(FilterDescriptor([&](const Obj& obj) {
+        return obj.get<Int>(col) < 100;
+    }));
+    CHECK_EQUAL(tv.size(), 100);
 }
 
 #endif // TEST_TABLE_VIEW

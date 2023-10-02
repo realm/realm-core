@@ -2171,8 +2171,6 @@ void Table::ensure_graveyard()
 
 void Table::batch_erase_rows(const KeyColumn& keys)
 {
-    Group* g = get_parent_group();
-
     size_t num_objs = keys.size();
     std::vector<ObjKey> vec;
     vec.reserve(num_objs);
@@ -2182,12 +2180,20 @@ void Table::batch_erase_rows(const KeyColumn& keys)
             vec.push_back(key);
         }
     }
+
     sort(vec.begin(), vec.end());
     vec.erase(unique(vec.begin(), vec.end()), vec.end());
 
+    batch_erase_objects(vec);
+}
+
+void Table::batch_erase_objects(std::vector<ObjKey>& keys)
+{
+    Group* g = get_parent_group();
+
     if (has_any_embedded_objects() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::Strong, g);
-        std::for_each(vec.begin(), vec.end(), [this, &state](ObjKey k) {
+        std::for_each(keys.begin(), keys.end(), [this, &state](ObjKey k) {
             state.m_to_be_deleted.emplace_back(m_key, k);
         });
         nullify_links(state);
@@ -2195,15 +2201,15 @@ void Table::batch_erase_rows(const KeyColumn& keys)
     }
     else {
         CascadeState state(CascadeState::Mode::None, g);
-        for (auto k : vec) {
+        for (auto k : keys) {
             if (g) {
                 m_clusters.nullify_links(k, state);
             }
             m_clusters.erase(k, state);
         }
     }
+    keys.clear();
 }
-
 
 void Table::clear()
 {
