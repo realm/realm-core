@@ -136,7 +136,7 @@ bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& 
 
 
 ClientImpl::ClientImpl(ClientConfig config)
-    : logger_ptr{config.logger ? std::move(config.logger) : std::make_shared<util::StderrLogger>()}
+    : logger_ptr{config.logger ? std::move(config.logger) : util::Logger::get_default_logger()}
     , logger{*logger_ptr}
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}
@@ -2523,7 +2523,7 @@ Status Session::receive_query_error_message(int error_code, std::string_view mes
     // because in that case, the associated Realm and SessionWrapper must
     // not be accessed any longer.
     if (m_state == Active) {
-        on_flx_sync_error(query_version, std::string_view(message.data(), message.size())); // throws
+        on_flx_sync_error(query_version, message); // throws
     }
     return Status::OK();
 }
