@@ -3,7 +3,7 @@
 ### Enhancements
 * Flexible sync API improvements:
   - Erase Subscriptions by class type for C API. 
-  - `MutableSubscriptionSet::erase()` now runs in constant time.
+  - `MutableSubscriptionSet::erase(iterator)` now runs in constant time.
   - Introduce `MutableSubscriptionSet::erase_by_id()`.
   - Introduce `MutableSubscriptionSet::erase_by_class_name()`.
   ([PR #7008](https://github.com/realm/realm-core/pull/7008))
