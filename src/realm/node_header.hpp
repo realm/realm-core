@@ -24,15 +24,93 @@
 
 namespace realm {
 
+// The header holds metadata for all allocations. It is 8 bytes.
+// byte 3 indicates the type of the allocation.
+//
+// Up to and including Core v 13, byte 3 would always hold a value of 0x41 'A'
+// when stored in the file. This value now indicates that the chunk of memory
+// must be interpreted according to the methods in NodeHeader.
+//
+// If byte 3 has a value different from 0x41, it describes not just
+// its low level encoding, but the exact C++ type used to access it.
+// This allows us to create an accessor of the correct type to
+// access any chunk of memory.
+
 const size_t max_array_size = 0x00ffffffL;            // Maximum number of elements in an array
 const size_t max_array_payload_aligned = 0x07ffffc0L; // Maximum number of bytes that the payload of an array can be
 // Even though the encoding supports arrays with size up to max_array_payload_aligned,
 // the maximum allocation size is smaller as it must fit within a memory section
 // (a contiguous virtual address range). This limitation is enforced in SlabAlloc::do_alloc().
 
-// Newer array headers
-class NodeHeader {
+// Basic support for interpreting node headers:
+class NodeHeaderBasic {
 public:
+    // we assume a little endian machine. At this point all relevant machines
+    // are little endian, and making this assumption makes access to these
+    // fields a bit faster.
+    static uint8_t get_kind(uint64_t* header)
+    {
+        return ((uint8_t*)header)[3];
+    };
+    static void set_kind(uint64_t* header, uint8_t kind)
+    {
+        ((uint8_t*)header)[3] = kind;
+    };
+};
+
+
+class NodeHeaderPacked : public NodeHeaderBasic {
+public:
+    // the packed format supports smaller arrays with elements of sizes that
+    // are not restricted to powers of 2. Layout:
+    // header[0-1]  capacity
+    // header[2]    flags
+    // header[3]    kind (must be 0x01)
+    // header[4]    reserved
+    // header[5]    element size in bits
+    // header[6-7]  number of elements
+    constexpr static int id = 0x01;
+    static bool is_valid(uint64_t* header)
+    {
+        return get_kind(header) == id;
+    }
+    static size_t get_num_elements(uint64_t* header)
+    {
+        return ((uint16_t*)header)[3];
+    };
+    static void set_num_elements(uint64_t* header, uint16_t num_elements)
+    {
+        ((uint16_t*)header)[3] = num_elements;
+    };
+    static size_t get_capacity(uint64_t* header)
+    {
+        ((uint16_t*)header)[0];
+    }
+    static void set_capacity(uint64_t* header, uint16_t capacity)
+    {
+        ((uint16_t*)header)[0] = capacity;
+    }
+    static size_t get_bits_per_element(uint64_t* header)
+    {
+        auto retval = ((uint8_t*)header)[5];
+        REALM_ASSERT(retval <= 64);
+    }
+    static void set_bits_per_element(uint64_t* header, uint8_t bits_per_element)
+    {
+        REALM_ASSERT(bits_per_element <= 64);
+        ((uint8_t*)header)[5] = bits_per_element;
+    };
+};
+
+
+class NodeHeader : public NodeHeaderBasic {
+public:
+    constexpr static int id = 0x41;
+    bool is_valid(uint64_t* header)
+    {
+        return get_kind(header) == id;
+    }
+
     enum Type {
         type_Normal,
 
@@ -467,6 +545,25 @@ public:
         return num_bytes;
     }
 };
+
+enum class Kind { Packed = 1, AofP = 2, PofA = 3, Flex = 4, Unpacked = 0x41 };
+
+template <Kind>
+void set_element_size(uint64_t* header, size_t bits_per_element);
+template <>
+void set_element_size<Kind::Packed>(uint64_t* header, size_t bits_per_element)
+{
+    REALM_ASSERT(bits_per_element <= 64);
+    ((uint16_t*)header)[2] = bits_per_element;
+}
+template <>
+void set_element_size<Kind::Unpacked>(uint64_t* header, size_t bits_per_element)
+{
+    REALM_ASSERT(bits_per_element <= 64);
+    NodeHeader::set_width_in_header(bits_per_element, (char*)header);
+}
+
+
 } // namespace realm
 
 #endif /* REALM_NODE_HEADER_HPP */
