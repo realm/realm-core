@@ -415,10 +415,6 @@ ColKey Table::add_column(Table& target, StringData name)
     Group* target_group = target.get_parent_group();
     REALM_ASSERT_RELEASE(origin_group && target_group);
     REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Only links to embedded objects are allowed.
-    if (is_asymmetric() && !target.is_embedded()) {
-        throw IllegalOperation("Object property not supported in asymmetric table");
-    }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
         throw IllegalOperation("Ephemeral objects not supported");

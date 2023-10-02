@@ -22,6 +22,10 @@
 #include <realm/util/features.h>
 #include <realm/util/to_string.hpp>
 
+#if TEST_SCHEDULER_UV
+#include <realm/object-store/util/uv/scheduler.hpp>
+#endif
+
 #include <catch2/catch_all.hpp>
 #include <catch2/reporters/catch_reporter_cumulative_base.hpp>
 #include <catch2/catch_test_case_info.hpp>
@@ -71,6 +75,12 @@ int main(int argc, const char** argv)
             realm::test_util::enable_always_encrypt();
         }
     }
+
+#if TEST_SCHEDULER_UV
+    realm::util::Scheduler::set_default_factory([]() {
+        return std::make_shared<realm::util::UvMainLoopScheduler>();
+    });
+#endif
 
     Catch::Session session;
     session.useConfigData(config);

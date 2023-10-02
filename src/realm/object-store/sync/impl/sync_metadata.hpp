@@ -52,16 +52,14 @@ public:
 class SyncUserMetadata {
 public:
     struct Schema {
-        // The ROS identity of the user. This, plus the auth server URL, uniquely identifies a user.
+        // The server-supplied user_id for the user. Unique per App.
         ColKey identity_col;
-        // A locally issued UUID for the user. This is used to generate the on-disk user directory.
-        ColKey local_uuid_col;
-        // Whether or not this user has been marked for removal.
-        ColKey marked_for_removal_col;
+        // Locally generated UUIDs for the user. These are tracked to be able
+        // to open pre-existing Realm files, but are no longer generated or
+        // used for anything else.
+        ColKey legacy_uuids_col;
         // The cached refresh token for this user.
         ColKey refresh_token_col;
-        // The URL of the authentication server this user resides upon.
-        ColKey provider_type_col;
         // The cached access token for this user.
         ColKey access_token_col;
         // The identities for this user.
@@ -79,8 +77,9 @@ public:
     // Cannot be set after creation.
     std::string identity() const;
 
-    // Cannot be set after creation.
-    std::string local_uuid() const;
+    std::vector<std::string> legacy_identities() const;
+    // for testing purposes only
+    void set_legacy_identities(const std::vector<std::string>&);
 
     std::vector<realm::SyncUserIdentity> identities() const;
     void set_identities(std::vector<SyncUserIdentity>);
@@ -106,13 +105,6 @@ public:
     void set_state(SyncUser::State);
 
     SyncUser::State state() const;
-
-    // Cannot be set after creation.
-    std::string provider_type() const;
-
-    // Mark the user as "ready for removal". Since Realm files cannot be safely deleted after being opened, the actual
-    // deletion of a user must be deferred until the next time the host application is launched.
-    void mark_for_removal();
 
     void remove();
 
@@ -141,8 +133,8 @@ public:
         ColKey idx_new_name;
         // An enum describing the action to take.
         ColKey idx_action;
-        // The full remote URL of the Realm on the ROS.
-        ColKey idx_url;
+        // The partition key of the Realm.
+        ColKey idx_partition;
         // The local UUID of the user to whom the file action applies (despite the internal column name).
         ColKey idx_user_identity;
     };
@@ -167,7 +159,7 @@ public:
     std::string user_local_uuid() const;
 
     Action action() const;
-    std::string url() const;
+    std::string partition() const;
     void remove();
     void set_action(Action new_action);
 
@@ -229,7 +221,6 @@ public:
     // Retrieve or create user metadata.
     // Note: if `make_is_absent` is true and the user has been marked for deletion, it will be unmarked.
     util::Optional<SyncUserMetadata> get_or_make_user_metadata(const std::string& identity,
-                                                               const std::string& provider_type,
                                                                bool make_if_absent = true) const;
 
     // Retrieve file action metadata.
