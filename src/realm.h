@@ -3692,6 +3692,12 @@ RLM_API bool realm_sync_subscription_set_erase_by_query(realm_flx_sync_mutable_s
 RLM_API bool realm_sync_subscription_set_erase_by_results(realm_flx_sync_mutable_subscription_set_t*,
                                                           realm_results_t*, bool* erased);
 /**
+ *  Remove all subscriptions for a given class type. If operation completes successfully set the bool out param.
+ *  @return true if no error occurred, false otherwise (use realm_get_last_error for fetching the error).
+ */
+RLM_API bool realm_sync_subscription_set_erase_by_class_name(realm_flx_sync_mutable_subscription_set_t*, const char*,
+                                                             bool* erased);
+/**
  *  Commit the subscription_set passed as parameter (in order that all the changes made will take effect)
  *  @return pointer to a valid immutable subscription if commit was successful
  */
