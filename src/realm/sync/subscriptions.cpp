@@ -33,6 +33,8 @@
 #include <initializer_list>
 #include <stdexcept>
 
+#include <algorithm>
+
 namespace realm::sync {
 namespace {
 // Schema version history:
@@ -273,11 +275,24 @@ void MutableSubscriptionSet::check_is_mutable() const
     }
 }
 
+// This uses the 'swap and pop' idiom to run in constant time.
+// The iterator returned is:
+//  1. end(), if the last subscription is removed
+//  2. same iterator it is passed (but pointing to the last subscription in set), otherwise
 MutableSubscriptionSet::iterator MutableSubscriptionSet::erase(const_iterator it)
 {
     check_is_mutable();
     REALM_ASSERT(it != end());
-    return m_subs.erase(it);
+    if (it == std::prev(m_subs.end())) {
+        m_subs.pop_back();
+        return end();
+    }
+    auto back = std::prev(m_subs.end());
+    // const_iterator to iterator in constant time (See https://stackoverflow.com/a/10669041)
+    auto iterator = m_subs.erase(it, it);
+    std::swap(*iterator, *back);
+    m_subs.pop_back();
+    return iterator;
 }
 
 bool MutableSubscriptionSet::erase(StringData name)
@@ -286,7 +301,8 @@ bool MutableSubscriptionSet::erase(StringData name)
     auto ptr = find(name);
     if (!ptr)
         return false;
-    m_subs.erase(m_subs.begin() + (ptr - &m_subs.front()));
+    auto it = m_subs.begin() + (ptr - &m_subs.front());
+    erase(it);
     return true;
 }
 
@@ -296,7 +312,31 @@ bool MutableSubscriptionSet::erase(const Query& query)
     auto ptr = find(query);
     if (!ptr)
         return false;
-    m_subs.erase(m_subs.begin() + (ptr - &m_subs.front()));
+    auto it = m_subs.begin() + (ptr - &m_subs.front());
+    erase(it);
+    return true;
+}
+
+bool MutableSubscriptionSet::erase_by_class_name(StringData object_class_name)
+{
+    // TODO: Use std::erase_if when switching to C++20.
+    auto it = std::remove_if(m_subs.begin(), m_subs.end(), [&object_class_name](const Subscription& sub) {
+        return sub.object_class_name == object_class_name;
+    });
+    auto erased = end() - it;
+    m_subs.erase(it, end());
+    return erased > 0;
+}
+
+bool MutableSubscriptionSet::erase_by_id(ObjectId id)
+{
+    auto it = std::find_if(m_subs.begin(), m_subs.end(), [&id](const Subscription& sub) -> bool {
+        return sub.id == id;
+    });
+    if (it == end()) {
+        return false;
+    }
+    erase(it);
     return true;
 }
 
