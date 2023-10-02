@@ -73,37 +73,13 @@ public:
     bool decompress();
 
     // implement parent interface in order to deal with compressed arrays
-    inline int64_t get(size_t ndx) const noexcept
-    {
-        if (is_in_compressed_format()) {
-            return get_compressed_value(ndx);
-        }
-        return Array::get(ndx);
-    }
-    inline void set(size_t ndx, int64_t value)
-    {
-        if (is_in_compressed_format())
-            decompress();
-        Array::set(ndx, value);
-    }
-    inline void insert(size_t ndx, int_fast64_t value)
-    {
-        if (is_in_compressed_format())
-            decompress();
-        Array::insert(ndx, value);
-    }
-    inline void add(int_fast64_t value)
-    {
-        if (is_in_compressed_format())
-            decompress();
-        Array::add(value);
-    }
-    inline void move(Array& dst, size_t ndx)
-    {
-        if (is_in_compressed_format())
-            decompress();
-        Array::move(dst, ndx);
-    }
+    int64_t get(size_t ndx) const noexcept;
+    void set(size_t ndx, int64_t value);
+    void insert(size_t ndx, int_fast64_t value);
+    void add(int_fast64_t value);
+    void move(Array& dst, size_t ndx);
+    size_t size() const noexcept;
+    bool is_empty() const noexcept;
 
     bool is_null(size_t) const
     {

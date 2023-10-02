@@ -30,6 +30,56 @@ Mixed ArrayInteger::get_any(size_t ndx) const
     return Mixed(get(ndx));
 }
 
+int64_t ArrayInteger::get(size_t ndx) const noexcept
+{
+    if (is_in_compressed_format()) {
+        return get_compressed_value(ndx);
+    }
+    return Array::get(ndx);
+}
+
+void ArrayInteger::set(size_t ndx, int64_t value)
+{
+    if (is_in_compressed_format())
+        decompress();
+    Array::set(ndx, value);
+}
+
+void ArrayInteger::insert(size_t ndx, int_fast64_t value)
+{
+    if (is_in_compressed_format())
+        decompress();
+    Array::insert(ndx, value);
+}
+
+void ArrayInteger::add(int_fast64_t value)
+{
+    if (is_in_compressed_format())
+        decompress();
+    Array::add(value);
+}
+
+void ArrayInteger::move(Array& dst, size_t ndx)
+{
+    if (is_in_compressed_format())
+        decompress();
+    Array::move(dst, ndx);
+}
+
+size_t ArrayInteger::size() const noexcept
+{
+    size_t value_width, index_width, value_size, index_size;
+    if (get_compressed_header_info(value_width, index_width, value_size, index_size)) {
+        return index_size;
+    }
+    return Array::size();
+}
+
+bool ArrayInteger::is_empty() const noexcept
+{
+    return size() == 0;
+}
+
 bool ArrayInteger::try_compress()
 {
     std::vector<int64_t> values;
