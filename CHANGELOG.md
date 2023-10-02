@@ -1,8 +1,12 @@
 # NEXT RELEASE
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Flexible sync API improvements:
+  - Erase Subscriptions by class type for C API. 
+  - `MutableSubscriptionSet::erase()` now runs in constant time.
+  - Introduce `MutableSubscriptionSet::erase_by_id()`.
+  - Introduce `MutableSubscriptionSet::erase_by_class_name()`.
+  ([PR #7008](https://github.com/realm/realm-core/pull/7008))
 
 ### Fixed
 * Fixed issue with double delete when using the CAPI for timers in platform networking ([#6993](https://github.com/realm/realm-core/issues/6993), since v13.3.0).
