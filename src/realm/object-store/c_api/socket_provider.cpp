@@ -15,8 +15,7 @@ public:
               realm_sync_socket_create_timer_func_t create_timer_func,
               realm_sync_socket_timer_canceled_func_t cancel_timer_func,
               realm_sync_socket_timer_free_func_t free_timer_func)
-        : m_handler(handler)
-        , m_userdata(userdata)
+        : m_userdata(userdata)
         , m_timer_create(create_timer_func)
         , m_timer_cancel(cancel_timer_func)
         , m_timer_free(free_timer_func)
@@ -30,7 +29,6 @@ public:
         // Make sure the timer is stopped, if not already
         m_timer_cancel(m_userdata, m_timer);
         m_timer_free(m_userdata, m_timer);
-        realm_release(m_handler);
     }
 
     // Cancel the timer immediately - the CAPI implementation will need to call the
@@ -46,10 +44,6 @@ private:
     // A pointer to the CAPI implementation's timer instance. This is provided by the
     // CAPI implementation when the create_timer_func function is called.
     realm_sync_socket_timer_t m_timer = nullptr;
-
-    // A wrapped reference to the callback function to be called when the timer completes,
-    // is canceled or an error occurs. This is provided by the Sync Client
-    realm_sync_socket_callback_t* m_handler = nullptr;
 
     // These values were originally provided to the socket_provider instance by the CAPI
     // implementation when it was created
@@ -70,6 +64,7 @@ static void realm_sync_socket_op_complete(realm_sync_socket_callback* realm_call
         // Keep the container, but release the handler so it can't be called twice.
         realm_callback->reset();
     }
+    realm_release(realm_callback);
 }
 
 RLM_API void realm_sync_socket_timer_complete(realm_sync_socket_callback* timer_handler,
@@ -284,14 +279,12 @@ RLM_API void realm_sync_socket_post_complete(realm_sync_socket_callback* post_ha
                                              realm_sync_socket_callback_result_e result, const char* reason)
 {
     realm_sync_socket_op_complete(post_handler, result, reason);
-    realm_release(post_handler);
 }
 
 RLM_API void realm_sync_socket_write_complete(realm_sync_socket_callback_t* write_handler,
                                               realm_sync_socket_callback_result_e result, const char* reason)
 {
     realm_sync_socket_op_complete(write_handler, result, reason);
-    realm_release(write_handler);
 }
 
 RLM_API void realm_sync_socket_websocket_connected(realm_websocket_observer_t* realm_websocket_observer,
