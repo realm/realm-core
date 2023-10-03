@@ -234,7 +234,6 @@ public:
         h[2] = uchar(value >> 3 & 0x000000FF);
     }
 
-    // This one needs to be correct for all layouts, both old and new:
     static size_t get_byte_size_from_header(const char* header) noexcept
     {
         WidthType wtype = get_wtype_from_header(header);
@@ -599,6 +598,13 @@ inline size_t get_byte_size<Encoding::Flex>(uint64_t* header)
     return NodeHeader::header_size +
            align8(get_arrayA_num_elements<Encoding::Flex>(header) * get_elementA_size<Encoding::PofA>(header) +
                   get_arrayB_num_elements<Encoding::Flex>(header) * get_elementB_size<Encoding::PofA>(header));
+}
+
+template<Encoding>
+inline size_t calc_size(size_t num_elements, size_t element_size);
+template<>
+inline size_t calc_size<Encoding::Packed>(size_t num_elements, size_t elemement_size) {
+    return NodeHeader::header_size + align8(num_elements * elemement_size);
 }
 
 } // namespace realm
