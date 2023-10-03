@@ -1540,8 +1540,7 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
         progress, &downloadable_bytes, received_changesets, version_info, download_batch_state, logger, transact,
         [&](const TransactionRef&, util::Span<Changeset> changesets) {
             gather_pending_compensating_writes(changesets, &pending_compensating_write_errors);
-        },
-        get_transact_reporter()); // Throws
+        }); // Throws
     if (received_changesets.size() == 1) {
         logger.debug("1 remote changeset integrated, producing client version %1",
                      version_info.sync_version.version); // Throws
@@ -2274,8 +2273,6 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
                                               std::move(on_flx_subscription_complete))) {
             return false;
         }
-        realm::VersionID client_reset_old_version = client_reset_operation->get_client_reset_old_version();
-        realm::VersionID client_reset_new_version = client_reset_operation->get_client_reset_new_version();
 
         // The fresh Realm has been used to reset the state
         logger.debug("Client reset is completed, path=%1", get_realm_path()); // Throws
@@ -2300,8 +2297,6 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
         // For both, we want to allow uploads again without needing external changes to download first.
         m_allow_upload = true;
         REALM_ASSERT_EX(m_last_version_selected_for_upload == 0, m_last_version_selected_for_upload);
-
-        get_transact_reporter()->report_sync_transact(client_reset_old_version, client_reset_new_version);
 
         if (has_pending_client_reset) {
             handle_pending_client_reset_acknowledgement();

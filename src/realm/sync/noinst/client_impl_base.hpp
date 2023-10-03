@@ -836,9 +836,6 @@ public:
     /// of the normal sync process. This can happen during client reset.
     void on_flx_sync_version_complete(int64_t version);
 
-    /// \brief Callback for when a new subscription set has been created for FLX sync.
-    void on_new_flx_subscription_set(int64_t new_version);
-
     /// If this session is currently suspended, resume it immediately.
     ///
     /// It is an error to call this function before activation of the session,
@@ -885,8 +882,6 @@ public:
     util::Future<std::string> send_test_command(std::string body);
 
 private:
-    using SyncTransactReporter = ClientHistory::SyncTransactReporter;
-
     struct PendingTestCommand {
         request_ident_type id;
         std::string body;
@@ -906,7 +901,6 @@ private:
 
     const std::string& get_realm_path() const noexcept;
     DBRef get_db() const noexcept;
-    SyncTransactReporter* get_transact_reporter() noexcept;
 
     /// The implementation need only ensure that the returned reference stays valid
     /// until the next invocation of access_realm() on one of the session
