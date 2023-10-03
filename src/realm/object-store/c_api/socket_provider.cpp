@@ -7,6 +7,8 @@
 namespace realm::c_api {
 namespace {
 
+// THis class represents the timer resource that is returned to the sync client from the
+// CAPI implementation details for canceling and deleting the timer resources.
 struct CAPITimer : sync::SyncSocketProvider::Timer {
 public:
     CAPITimer(realm_userdata_t userdata, int64_t delay_ms, realm_sync_socket_callback_t* handler,
@@ -14,6 +16,7 @@ public:
               realm_sync_socket_timer_canceled_func_t cancel_timer_func,
               realm_sync_socket_timer_free_func_t free_timer_func)
         : m_handler(handler)
+        , m_userdata(userdata)
         , m_timer_create(create_timer_func)
         , m_timer_cancel(cancel_timer_func)
         , m_timer_free(free_timer_func)
@@ -24,27 +27,65 @@ public:
     /// Cancels the timer and destroys the timer instance.
     ~CAPITimer()
     {
+        // Make sure the timer is stopped, if not already
         m_timer_cancel(m_userdata, m_timer);
         m_timer_free(m_userdata, m_timer);
         realm_release(m_handler);
     }
 
-    /// Cancel the timer immediately.
+    // Cancel the timer immediately - the CAPI implementation will need to call the
+    // realm_sync_socket_timer_canceled function to notify the sync client that the
+    // timer has been canceled and must be called in the same execution thread as
+    // the timer complete.
     void cancel() override
     {
         m_timer_cancel(m_userdata, m_timer);
     }
 
 private:
+    // A pointer to the CAPI implementation's timer instance. This is provided by the
+    // CAPI implementation when the create_timer_func function is called.
     realm_sync_socket_timer_t m_timer = nullptr;
 
-    realm_userdata_t m_userdata = nullptr;
+    // A wrapped reference to the callback function to be called when the timer completes,
+    // is canceled or an error occurs. This is provided by the Sync Client
     realm_sync_socket_callback_t* m_handler = nullptr;
+
+    // These values were originally provided to the socket_provider instance by the CAPI
+    // implementation when it was created
+    realm_userdata_t m_userdata = nullptr;
     realm_sync_socket_create_timer_func_t m_timer_create = nullptr;
     realm_sync_socket_timer_canceled_func_t m_timer_cancel = nullptr;
     realm_sync_socket_timer_free_func_t m_timer_free = nullptr;
 };
 
+static void realm_sync_socket_op_complete(realm_sync_socket_callback* realm_callback, realm_errno_e status,
+                                          const char* reason)
+{
+    if (realm_callback->get() != nullptr) {
+        auto complete_status = status == realm_errno_e::RLM_ERR_NONE
+                                   ? Status::OK()
+                                   : Status{static_cast<ErrorCodes::Error>(status), reason};
+        (*(realm_callback->get()))(complete_status);
+        // Keep the container, but release the handler so it can't be called twice.
+        realm_callback->reset();
+    }
+}
+
+RLM_API void realm_sync_socket_timer_complete(realm_sync_socket_callback* timer_handler, realm_errno_e status,
+                                              const char* reason)
+{
+    realm_sync_socket_op_complete(timer_handler, status, reason);
+}
+
+RLM_API void realm_sync_socket_timer_canceled(realm_sync_socket_callback* timer_handler)
+{
+    realm_sync_socket_op_complete(timer_handler, RLM_ERR_OPERATION_ABORTED, "Timer canceled");
+}
+
+// This class represents a websocket instance provided by the CAPI implememtation for sending
+// and receiving data and connection state from the websocket. This class is used directly by
+// the sync client.
 struct CAPIWebSocket : sync::WebSocketInterface {
 public:
     CAPIWebSocket(realm_userdata_t userdata, realm_sync_socket_connect_func_t websocket_connect_func,
@@ -89,15 +130,24 @@ public:
     }
 
 private:
+    // A pointer to the CAPI implementation's websocket instance. This is provided by
+    // the m_websocket_connect() function when this websocket instance is created.
     realm_sync_socket_websocket_t m_socket = nullptr;
-    realm_websocket_observer_t* m_observer = nullptr;
-    realm_userdata_t m_userdata = nullptr;
 
+    // A wrapped reference to the websocket observer in the sync client that receives the
+    // websocket status callbacks. This is provided by the Sync Client.
+    realm_websocket_observer_t* m_observer = nullptr;
+
+    // These values were originally provided to the socket_provider instance by the CAPI
+    // implementation when it was created.
+    realm_userdata_t m_userdata = nullptr;
     realm_sync_socket_connect_func_t m_websocket_connect = nullptr;
     realm_sync_socket_websocket_async_write_func_t m_websocket_async_write = nullptr;
     realm_sync_socket_websocket_free_func_t m_websocket_free = nullptr;
 };
 
+// Represents the websocket observer in the sync client that receives websocket status
+// callbacks and passes them along to the WebSocketObserver object.
 struct CAPIWebSocketObserver : sync::WebSocketObserver {
 public:
     CAPIWebSocketObserver(std::unique_ptr<sync::WebSocketObserver> observer)
@@ -131,9 +181,13 @@ private:
     std::unique_ptr<sync::WebSocketObserver> m_observer;
 };
 
+// This is the primary resource for providing event loop, timer and websocket
+// resources and synchronization for the Sync Client. The CAPI implementation
+// needs to implement the "funct_t" functions provided to this class for connecting
+// the implementation to the operations called by the Sync Client.
 struct CAPISyncSocketProvider : sync::SyncSocketProvider {
     realm_userdata_t m_userdata = nullptr;
-    realm_free_userdata_func_t m_free = nullptr;
+    realm_free_userdata_func_t m_userdata_free = nullptr;
     realm_sync_socket_post_func_t m_post = nullptr;
     realm_sync_socket_create_timer_func_t m_timer_create = nullptr;
     realm_sync_socket_timer_canceled_func_t m_timer_cancel = nullptr;
@@ -145,7 +199,7 @@ struct CAPISyncSocketProvider : sync::SyncSocketProvider {
     CAPISyncSocketProvider() = default;
     CAPISyncSocketProvider(CAPISyncSocketProvider&& other)
         : m_userdata(std::exchange(other.m_userdata, nullptr))
-        , m_free(std::exchange(other.m_free, nullptr))
+        , m_userdata_free(std::exchange(other.m_userdata_free, nullptr))
         , m_post(std::exchange(other.m_post, nullptr))
         , m_timer_create(std::exchange(other.m_timer_create, nullptr))
         , m_timer_cancel(std::exchange(other.m_timer_cancel, nullptr))
@@ -154,7 +208,10 @@ struct CAPISyncSocketProvider : sync::SyncSocketProvider {
         , m_websocket_async_write(std::exchange(other.m_websocket_async_write, nullptr))
         , m_websocket_free(std::exchange(other.m_websocket_free, nullptr))
     {
-        REALM_ASSERT(m_free);
+        // userdata_free can be null if userdata is not used
+        if (m_userdata != nullptr) {
+            REALM_ASSERT(m_userdata_free);
+        }
         REALM_ASSERT(m_post);
         REALM_ASSERT(m_timer_create);
         REALM_ASSERT(m_timer_cancel);
@@ -166,9 +223,14 @@ struct CAPISyncSocketProvider : sync::SyncSocketProvider {
 
     ~CAPISyncSocketProvider()
     {
-        m_free(m_userdata);
+        if (m_userdata_free) {
+            m_userdata_free(m_userdata);
+        }
     }
 
+    // Create a websocket object that will be returned to the Sync Client, which is expected to
+    // begin connecting to the endpoint as soon as the object is created. The state and any data
+    // received is passed to the socket observer via the helper functions defined below this class.
     std::unique_ptr<sync::WebSocketInterface> connect(std::unique_ptr<sync::WebSocketObserver> observer,
                                                       sync::WebSocketEndpoint&& endpoint) final
     {
@@ -206,7 +268,7 @@ RLM_API realm_sync_socket_t* realm_sync_socket_new(
     return wrap_err([&]() {
         auto capi_socket_provider = std::make_shared<CAPISyncSocketProvider>();
         capi_socket_provider->m_userdata = userdata;
-        capi_socket_provider->m_free = userdata_free;
+        capi_socket_provider->m_userdata_free = userdata_free;
         capi_socket_provider->m_post = post_func;
         capi_socket_provider->m_timer_create = create_timer_func;
         capi_socket_provider->m_timer_cancel = cancel_timer_func;
@@ -218,13 +280,18 @@ RLM_API realm_sync_socket_t* realm_sync_socket_new(
     });
 }
 
-RLM_API void realm_sync_socket_callback_complete(realm_sync_socket_callback* realm_callback, realm_errno_e code,
-                                                 const char* reason)
+RLM_API void realm_sync_socket_post_complete(realm_sync_socket_callback* post_handler, realm_errno_e status,
+                                             const char* reason)
 {
-    auto complete_status =
-        code == realm_errno_e::RLM_ERR_NONE ? Status::OK() : Status{static_cast<ErrorCodes::Error>(code), reason};
-    (*(realm_callback->get()))(complete_status);
-    realm_release(realm_callback);
+    realm_sync_socket_op_complete(post_handler, status, reason);
+    realm_release(post_handler);
+}
+
+RLM_API void realm_sync_socket_write_complete(realm_sync_socket_callback_t* write_handler, realm_errno_e status,
+                                              const char* reason)
+{
+    realm_sync_socket_op_complete(write_handler, status, reason);
+    realm_release(write_handler);
 }
 
 RLM_API void realm_sync_socket_websocket_connected(realm_websocket_observer_t* realm_websocket_observer,
@@ -245,10 +312,10 @@ RLM_API void realm_sync_socket_websocket_message(realm_websocket_observer_t* rea
 }
 
 RLM_API void realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
-                                                realm_web_socket_errno_e code, const char* reason)
+                                                realm_web_socket_errno_e status, const char* reason)
 {
     realm_websocket_observer->get()->websocket_closed_handler(
-        was_clean, static_cast<sync::websocket::WebSocketError>(code), reason);
+        was_clean, static_cast<sync::websocket::WebSocketError>(status), reason);
 }
 
 RLM_API void realm_sync_client_config_set_sync_socket(realm_sync_client_config_t* config,

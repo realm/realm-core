@@ -177,10 +177,9 @@ void ResultsNotifier::run()
         return;
     }
 
-    m_query->sync_view_if_needed();
-    m_run_tv = m_query->find_all();
+    m_run_tv = TableView(*m_query, size_t(-1));
+    // Syncing will be done here
     m_run_tv.apply_descriptor_ordering(m_descriptor_ordering);
-    m_run_tv.sync_if_needed();
     m_last_seen_version = std::move(new_versions);
 
     calculate_changes();

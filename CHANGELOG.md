@@ -1,10 +1,60 @@
 # NEXT RELEASE
 
 ### Enhancements
-* Allow non-embedded links in asymmetric objects. ([PR #6981](https://github.com/realm/realm-core/pull/6981))
+* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* Allow collections of non-embedded links in asymmetric objects. ([PR #7003](https://github.com/realm/realm-core/pull/7003))
+* Flexible sync API improvements:
+  - Erase Subscriptions by class type for C API. 
+  - `MutableSubscriptionSet::erase(iterator)` now runs in constant time.
+  - Introduce `MutableSubscriptionSet::erase_by_id()`.
+  - Introduce `MutableSubscriptionSet::erase_by_class_name()`.
+  ([PR #7008](https://github.com/realm/realm-core/pull/7008))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Update tests to use global logger. ([PR #6917](https://github.com/realm/realm-core/pull/6917))
+
+----------------------------------------------
+
+# 13.22.0 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Fixed issue with double delete when using the CAPI for timers in platform networking ([#6993](https://github.com/realm/realm-core/issues/6993), since v13.3.0).
+* Receiving a write_not_allowed error from the server would have led to a crash. ([#6978](https://github.com/realm/realm-core/issues/6978), since v13.2.0)
+
+### Breaking changes
+* Platform Networking CAPI has been updated to provide separate functions (instead of 1) for executing callback handlers depending on purpose ([PR #6994](https://github.com/realm/realm-core/pull/6994)).
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.21.0 Release notes
+
+### Enhancements
+* Allow non-embedded links in asymmetric objects. ([PR #6981](https://github.com/realm/realm-core/pull/6981))
+
+### Fixed
 * Logging into a single user using multiple auth providers created a separate SyncUser per auth provider. This mostly worked, but had some quirks:
   - Sync sessions would not necessarily be associated with the specific SyncUser used to create them. As a result, querying a user for its sessions could give incorrect results, and logging one user out could close the wrong sessions.
   - Existing local synchronized Realm files created using version of Realm from August - November 2020 would sometimes not be opened correctly and would instead be redownloaded.
