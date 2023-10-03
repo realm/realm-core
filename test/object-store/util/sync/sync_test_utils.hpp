@@ -141,6 +141,8 @@ TestSyncManager::Config get_config(Transport&& transport)
     return config;
 }
 
+void subscribe_to_all_and_bootstrap(Realm& realm);
+
 #if REALM_ENABLE_AUTH_TESTS
 
 #ifdef REALM_MONGODB_ENDPOINT
