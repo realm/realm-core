@@ -42,30 +42,9 @@ const size_t max_array_payload_aligned = 0x07ffffc0L; // Maximum number of bytes
 // the maximum allocation size is smaller as it must fit within a memory section
 // (a contiguous virtual address range). This limitation is enforced in SlabAlloc::do_alloc().
 
-// Basic support for interpreting node headers:
-class NodeHeaderBasic {
-public:
-    // we assume a little endian machine. At this point all relevant machines
-    // are little endian, and making this assumption makes access to these
-    // fields a bit faster.
-    static uint8_t get_kind(uint64_t* header)
-    {
-        return ((uint8_t*)header)[3];
-    };
-    static void set_kind(uint64_t* header, uint8_t kind)
-    {
-        ((uint8_t*)header)[3] = kind;
-    };
-};
 
-class NodeHeader : public NodeHeaderBasic {
+class NodeHeader {
 public:
-    constexpr static int id = 0x41;
-    bool is_valid(uint64_t* header)
-    {
-        return get_kind(header) == id;
-    }
-
     enum Type {
         type_Normal,
 
@@ -299,6 +278,22 @@ public:
 
         return num_bytes;
     }
+
+    // The 'kind' field provides runtime type information.
+    // it allows us to select the proper class for handling the block.
+    // For example, this could be the Array class.
+    // A class may use one or multiple different encodings, depending
+    // on the data it stores.
+    // A value of 0x41 ('A') represents the "old" (core 13 or earlier)
+    // set of classes, which could all be represented by the Array class.
+    static uint8_t get_kind(uint64_t* header)
+    {
+        return ((uint8_t*)header)[3];
+    };
+    static void set_kind(uint64_t* header, uint8_t kind)
+    {
+        ((uint8_t*)header)[3] = kind;
+    };
 };
 
 // Access to different header formats is done through specializations of a set
@@ -309,25 +304,27 @@ public:
 //
 // This approach also allows for zero overhead selection between the different
 // header encodings.
-enum class Kind { Packed = 1, AofP = 2, PofA = 3, Flex = 4, Unpacked = 0x41 };
-// Packed: tightly packed array (any alement size <= 64)
-// Unpacked: less tightly packed array (element size must be power of two)
+enum class Encoding { Packed, AofP, PofA, Flex, Unpacked };
+// * Packed: tightly packed array (any element size <= 64)
+// * Unpacked: less tightly packed array (element size must be power of two)
 // encodings with more flexibility but lower number of elements:
-// AofP: Array of pairs (2 element sizes, 1 element count)
-// PofA: Pair of arrays (2 elememt sizes, 1 element count)
+// * AofP: Array of pairs (2 element sizes, 1 element count)
+// * PofA: Pair of arrays (2 elememt sizes, 1 element count)
+//   Choose between them according to spatial locality
 // Encodings with even more flexibility with even lower number of elements
-// Flex: Pair of arrays with different element count
+// * Flex: Pair of arrays (like PofA) but allowing different element count
+//
 // Setting element size for encodings with a single element size:
-template <Kind>
+template <Encoding>
 void inline set_element_size(uint64_t* header, size_t bits_per_element);
 template <>
-void inline set_element_size<Kind::Packed>(uint64_t* header, size_t bits_per_element)
+void inline set_element_size<Encoding::Packed>(uint64_t* header, size_t bits_per_element)
 {
     REALM_ASSERT(bits_per_element <= 64);
     ((uint16_t*)header)[2] = bits_per_element;
 }
 template <>
-void inline set_element_size<Kind::Unpacked>(uint64_t* header, size_t bits_per_element)
+void inline set_element_size<Encoding::Unpacked>(uint64_t* header, size_t bits_per_element)
 {
     REALM_ASSERT(bits_per_element <= 64);
     // TODO: Only powers of two allowed
@@ -336,17 +333,17 @@ void inline set_element_size<Kind::Unpacked>(uint64_t* header, size_t bits_per_e
 
 
 // Getting element size for encodings with a single element size:
-template <Kind>
+template <Encoding>
 inline size_t get_element_size(uint64_t* header);
 template <>
-inline size_t get_element_size<Kind::Packed>(uint64_t* header)
+inline size_t get_element_size<Encoding::Packed>(uint64_t* header)
 {
     auto bits_per_element = ((uint16_t*)header)[2];
     REALM_ASSERT(bits_per_element <= 64);
     return bits_per_element;
 }
 template <>
-inline size_t get_element_size<Kind::Unpacked>(uint64_t* header)
+inline size_t get_element_size<Encoding::Unpacked>(uint64_t* header)
 {
     auto bits_per_element = NodeHeader::get_width_from_header((char*)header);
     REALM_ASSERT(bits_per_element <= 64);
@@ -354,22 +351,22 @@ inline size_t get_element_size<Kind::Unpacked>(uint64_t* header)
 }
 
 // Setting element sizes for encodings with two element sizes (called A and B)
-template <Kind>
+template <Encoding>
 inline void set_elementA_size(uint64_t* header, size_t bits_per_element);
 template <>
-inline void set_elementA_size<Kind::AofP>(uint64_t* header, size_t bits_per_element)
+inline void set_elementA_size<Encoding::AofP>(uint64_t* header, size_t bits_per_element)
 {
     REALM_ASSERT(bits_per_element <= 64);
     ((uint8_t*)header)[4] = bits_per_element;
 }
 template <>
-inline void set_elementA_size<Kind::PofA>(uint64_t* header, size_t bits_per_element)
+inline void set_elementA_size<Encoding::PofA>(uint64_t* header, size_t bits_per_element)
 {
     REALM_ASSERT(bits_per_element <= 64);
     ((uint8_t*)header)[4] = bits_per_element;
 }
 template <>
-inline void set_elementA_size<Kind::Flex>(uint64_t* header, size_t bits_per_element)
+inline void set_elementA_size<Encoding::Flex>(uint64_t* header, size_t bits_per_element)
 {
     // we're a bit low on bits for the Flex encoding, so we need to squeeze stuff
     REALM_ASSERT(bits_per_element <= 64);
@@ -382,23 +379,23 @@ inline void set_elementA_size<Kind::Flex>(uint64_t* header, size_t bits_per_elem
 
 
 // Setting element sizes for encodings with two element sizes (called A and B)
-template <Kind>
+template <Encoding>
 inline void set_elementB_size(uint64_t* header, size_t bits_per_element);
 
 template <>
-inline void set_elementB_size<Kind::AofP>(uint64_t* header, size_t bits_per_element)
+inline void set_elementB_size<Encoding::AofP>(uint64_t* header, size_t bits_per_element)
 {
     REALM_ASSERT(bits_per_element <= 64);
     ((uint8_t*)header)[5] = bits_per_element;
 }
 template <>
-inline void set_elementB_size<Kind::PofA>(uint64_t* header, size_t bits_per_element)
+inline void set_elementB_size<Encoding::PofA>(uint64_t* header, size_t bits_per_element)
 {
     REALM_ASSERT(bits_per_element <= 64);
     ((uint8_t*)header)[5] = bits_per_element;
 }
 template <>
-inline void set_elementB_size<Kind::Flex>(uint64_t* header, size_t bits_per_element)
+inline void set_elementB_size<Encoding::Flex>(uint64_t* header, size_t bits_per_element)
 {
     // we're a bit low on bits for the Flex encoding, so we need to squeeze stuff
     REALM_ASSERT(bits_per_element <= 64);
@@ -411,24 +408,24 @@ inline void set_elementB_size<Kind::Flex>(uint64_t* header, size_t bits_per_elem
 
 
 // Getting element sizes for encodings with two element sizes (called A and B)
-template <Kind>
-inline size_t Get_elementA_size(uint64_t* header);
+template <Encoding>
+inline size_t get_elementA_size(uint64_t* header);
 template <>
-inline size_t Get_elementA_size<Kind::AofP>(uint64_t* header)
+inline size_t get_elementA_size<Encoding::AofP>(uint64_t* header)
 {
     auto bits_per_element = ((uint8_t*)header)[4];
     REALM_ASSERT(bits_per_element <= 64);
     return bits_per_element;
 }
 template <>
-inline size_t Get_elementA_size<Kind::PofA>(uint64_t* header)
+inline size_t get_elementA_size<Encoding::PofA>(uint64_t* header)
 {
     auto bits_per_element = ((uint8_t*)header)[4];
     REALM_ASSERT(bits_per_element <= 64);
     return bits_per_element;
 }
 template <>
-inline size_t Get_elementA_size<Kind::Flex>(uint64_t* header)
+inline size_t get_elementA_size<Encoding::Flex>(uint64_t* header)
 {
     uint32_t word = ((uint32_t*)header)[1];
     auto bits_per_element = (word >> 20) & 0b111111;
@@ -439,24 +436,24 @@ inline size_t Get_elementA_size<Kind::Flex>(uint64_t* header)
 }
 
 // Getting element sizes for encodings with two element sizes (called A and B)
-template <Kind>
-inline size_t Get_elementB_size(uint64_t* header);
+template <Encoding>
+inline size_t get_elementB_size(uint64_t* header);
 template <>
-inline size_t Get_elementB_size<Kind::AofP>(uint64_t* header)
+inline size_t get_elementB_size<Encoding::AofP>(uint64_t* header)
 {
     auto bits_per_element = ((uint8_t*)header)[5];
     REALM_ASSERT(bits_per_element <= 64);
     return bits_per_element;
 }
 template <>
-inline size_t Get_elementB_size<Kind::PofA>(uint64_t* header)
+inline size_t get_elementB_size<Encoding::PofA>(uint64_t* header)
 {
     auto bits_per_element = ((uint8_t*)header)[5];
     REALM_ASSERT(bits_per_element <= 64);
     return bits_per_element;
 }
 template <>
-inline size_t Get_elementB_size<Kind::Flex>(uint64_t* header)
+inline size_t get_elementB_size<Encoding::Flex>(uint64_t* header)
 {
     uint32_t word = ((uint32_t*)header)[1];
     auto bits_per_element = (word >> 26) & 0b111111;
@@ -467,47 +464,47 @@ inline size_t Get_elementB_size<Kind::Flex>(uint64_t* header)
 }
 
 // Setting the number of elements in the array(s). All encodings except Flex have one number of elements.
-template <Kind>
+template <Encoding>
 inline void set_num_elements(uint64_t* header, size_t num_elements);
 template <>
-inline void set_num_elements<Kind::Packed>(uint64_t* header, size_t num_elements)
+inline void set_num_elements<Encoding::Packed>(uint64_t* header, size_t num_elements)
 {
     REALM_ASSERT(num_elements < 0x10000);
     ((uint16_t*)header)[3] = num_elements;
 }
 template <>
-inline void set_num_elements<Kind::Unpacked>(uint64_t* header, size_t num_elements)
+inline void set_num_elements<Encoding::Unpacked>(uint64_t* header, size_t num_elements)
 {
     NodeHeader::set_size_in_header(num_elements, (char*)header);
 }
 template <>
-inline void set_num_elements<Kind::AofP>(uint64_t* header, size_t num_elements)
+inline void set_num_elements<Encoding::AofP>(uint64_t* header, size_t num_elements)
 {
     REALM_ASSERT(num_elements < 0x10000);
     ((uint16_t*)header)[3] = num_elements;
 }
 template <>
-inline void set_num_elements<Kind::PofA>(uint64_t* header, size_t num_elements)
+inline void set_num_elements<Encoding::PofA>(uint64_t* header, size_t num_elements)
 {
     REALM_ASSERT(num_elements < 0x10000);
     ((uint16_t*)header)[3] = num_elements;
 }
 
 // For the encodings with two size specifications - currently only the Flex encoding
-template <Kind>
+template <Encoding>
 inline void set_arrayA_num_elements(uint64_t* header, size_t num_elements);
 template <>
-inline void set_arrayA_num_elements<Kind::Flex>(uint64_t* header, size_t num_elements)
+inline void set_arrayA_num_elements<Encoding::Flex>(uint64_t* header, size_t num_elements)
 {
     REALM_ASSERT(num_elements < 0b10000000000); // 10 bits
     uint32_t word = ((uint32_t*)header)[1];
     word &= ~(0b1111111111);
     word |= num_elements;
 }
-template <Kind>
+template <Encoding>
 inline void set_arrayB_num_elements(uint64_t* header, size_t num_elements);
 template <>
-inline void set_arrayB_num_elements<Kind::Flex>(uint64_t* header, size_t num_elements)
+inline void set_arrayB_num_elements<Encoding::Flex>(uint64_t* header, size_t num_elements)
 {
     REALM_ASSERT(num_elements < 0b10000000000); // 10 bits
     uint32_t word = ((uint32_t*)header)[1];
@@ -516,49 +513,93 @@ inline void set_arrayB_num_elements<Kind::Flex>(uint64_t* header, size_t num_ele
 }
 
 // Setting the number of elements in the array(s). All encodings except Flex have one number of elements.
-template <Kind>
+template <Encoding>
 inline size_t get_num_elements(uint64_t* header);
 template <>
-inline size_t get_num_elements<Kind::Packed>(uint64_t* header)
+inline size_t get_num_elements<Encoding::Packed>(uint64_t* header)
 {
     return ((uint16_t*)header)[3];
 }
 template <>
-inline size_t get_num_elements<Kind::AofP>(uint64_t* header)
+inline size_t get_num_elements<Encoding::AofP>(uint64_t* header)
 {
     return ((uint16_t*)header)[3];
 }
 template <>
-inline size_t get_num_elements<Kind::PofA>(uint64_t* header)
+inline size_t get_num_elements<Encoding::PofA>(uint64_t* header)
 {
     return ((uint16_t*)header)[3];
 }
 template <>
-inline size_t get_num_elements<Kind::Unpacked>(uint64_t* header)
+inline size_t get_num_elements<Encoding::Unpacked>(uint64_t* header)
 {
     return NodeHeader::get_size_from_header((const char*)header);
 }
 
-template <Kind>
+template <Encoding>
 inline size_t get_arrayA_num_elements(uint64_t* header);
 template <>
-inline size_t get_arrayA_num_elements<Kind::Flex>(uint64_t* header)
+inline size_t get_arrayA_num_elements<Encoding::Flex>(uint64_t* header)
 {
     uint32_t word = ((uint32_t*)header)[1];
     auto num_elements = word & 0b1111111111;
     return num_elements;
 }
 
-template <Kind>
+template <Encoding>
 inline size_t get_arrayB_num_elements(uint64_t* header);
 template <>
-inline size_t get_arrayB_num_elements<Kind::Flex>(uint64_t* header)
+inline size_t get_arrayB_num_elements<Encoding::Flex>(uint64_t* header)
 {
     uint32_t word = ((uint32_t*)header)[1];
     auto num_elements = (word >> 10) & 0b1111111111;
     return num_elements;
 }
 
+
+// helper converting a number of bits into bytes and aligning to 8 byte boundary
+inline size_t align8(size_t n)
+{
+    n = (n + 7) >> 3;
+    return (n + 7) & ~size_t(7);
+}
+
+// Get the size in bytes (aligned to 8) of a block
+template <Encoding>
+inline size_t get_byte_size(uint64_t* header);
+template <>
+inline size_t get_byte_size<Encoding::Unpacked>(uint64_t* header)
+{
+    return NodeHeader::get_byte_size_from_header((const char*)header);
+}
+
+template <>
+inline size_t get_byte_size<Encoding::Packed>(uint64_t* header)
+{
+    return NodeHeader::header_size +
+           align8(get_num_elements<Encoding::Packed>(header) * get_element_size<Encoding::Packed>(header));
+}
+template <>
+inline size_t get_byte_size<Encoding::AofP>(uint64_t* header)
+{
+    return NodeHeader::header_size +
+           align8(get_num_elements<Encoding::AofP>(header) *
+                  (get_elementA_size<Encoding::AofP>(header) + get_elementB_size<Encoding::AofP>(header)));
+}
+template <>
+inline size_t get_byte_size<Encoding::PofA>(uint64_t* header)
+{
+    return NodeHeader::header_size +
+           align8(get_num_elements<Encoding::PofA>(header) *
+                  (get_elementA_size<Encoding::PofA>(header) + get_elementB_size<Encoding::PofA>(header)));
+}
+template <>
+inline size_t get_byte_size<Encoding::Flex>(uint64_t* header)
+{
+    return NodeHeader::header_size +
+           align8(get_arrayA_num_elements<Encoding::Flex>(header) * get_elementA_size<Encoding::PofA>(header) +
+                  get_arrayB_num_elements<Encoding::Flex>(header) * get_elementB_size<Encoding::PofA>(header));
+}
 
 } // namespace realm
 
