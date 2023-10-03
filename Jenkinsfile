@@ -149,6 +149,7 @@ jobWrapper {
 
         stage('Publish to S3') {
             rlmNode('docker') {
+                // Publish to current S3 bucket
                 deleteDir()
                 dir('temp') {
                     withAWS(credentials: 'tightdb-s3-ci', region: 'us-east-1') {
@@ -159,6 +160,22 @@ jobWrapper {
                                 def files = findFiles(glob: '**')
                                 for (file in files) {
                                     s3Upload file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}", bucket: 'static.realm.io'
+                                }
+                            }
+                        }
+                    }
+                }
+                // Also publish to new S3 bucket.
+                deleteDir()
+                dir('temp') {
+                    withAWS(useNode: true) { // the `docker` nodes have an instance profile attached with the right permissions
+                        for (publishingStash in publishingStashes) {
+                            dir(publishingStash) {
+                                unstash name: publishingStash
+                                def path = publishingStash.replaceAll('___', '/')
+                                def files = findFiles(glob: '**')
+                                for (file in files) {
+                                    s3Upload file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}", bucket: 'staging.static.realm.io'
                                 }
                             }
                         }
