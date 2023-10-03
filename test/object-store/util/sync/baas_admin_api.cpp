@@ -138,7 +138,13 @@ nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop, con
                 m_current_path.push_back("[]");
             }
 
-            type_output = object_schema_to_jsonschema(*target_obj, include_prop);
+            // embedded objects are normally not allowed to be queryable,
+            // except if it is a GeoJSON type, and in that case the server
+            // needs to know if it conforms to the expected schema shape.
+            IncludePropCond always = [](const Property&) -> bool {
+                return true;
+            };
+            type_output = object_schema_to_jsonschema(*target_obj, always);
             type_output.emplace("bsonType", "object");
         }
         else {

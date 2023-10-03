@@ -1730,7 +1730,7 @@ TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
                  {"coordinates", PropertyType::Double | PropertyType::Array},
              }},
         };
-        FLXSyncTestHarness::ServerSchema server_schema{schema, {"queryable_str_field"}};
+        FLXSyncTestHarness::ServerSchema server_schema{schema, {"queryable_str_field", "location"}};
         harness.emplace("flx_geospatial", server_schema);
     }
 
@@ -1742,33 +1742,38 @@ TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
         return new_query.commit();
     };
 
-    // TODO: when this test starts failing because the server implements the new
-    // syntax, then we should implement an actual geospatial FLX query test here
-    /*
-    auto check_failed_status = [](auto status) {
-        CHECK(!status.is_ok());
-        if (status.get_status().reason().find("Client provided query with bad syntax:") == std::string::npos ||
-            status.get_status().reason().find("\"restaurant\": syntax error") == std::string::npos) {
-            FAIL(status.get_status().reason());
-        }
-    };
-
-    SECTION("Server doesn't support GEOWITHIN yet") {
+    SECTION("Server supports a basic geowithin FLX query") {
         harness->do_with_new_realm([&](SharedRealm realm) {
+            const realm::AppSession& app_session = harness->session().app_session();
+            auto sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
+
+            AdminAPISession::ServiceConfig config =
+                app_session.admin_api.get_config(app_session.server_app_id, sync_service);
             auto subs = create_subscription(realm, "class_restaurant", "location", [](Query q, ColKey c) {
                 GeoBox area{GeoPoint{0.2, 0.2}, GeoPoint{0.7, 0.7}};
-                return q.get_table()->column<Link>(c).geo_within(area);
+                Query query = q.get_table()->column<Link>(c).geo_within(area);
+                std::string ser = query.get_description();
+                return query;
             });
             auto sub_res = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
-            check_failed_status(sub_res);
-            CHECK(realm->get_active_subscription_set().version() == 0);
+            CHECK(sub_res.is_ok());
+            CHECK(realm->get_active_subscription_set().version() == 1);
             CHECK(realm->get_latest_subscription_set().version() == 1);
         });
     }
-     */
 
-    SECTION("non-geospatial FLX query syncs data which can be queried locally") {
-        harness->do_with_new_realm([&](SharedRealm realm) {
+    SECTION("geospatial query consistency: local/server/FLX") {
+        harness->do_with_new_user([&](std::shared_ptr<SyncUser> user) {
+            SyncTestFile config(user, harness->schema(), SyncConfig::FLXSyncEnabled{});
+            auto error_pf = util::make_promise_future<SyncError>();
+            config.sync_config->error_handler =
+                [promise = std::make_shared<util::Promise<SyncError>>(std::move(error_pf.promise))](
+                    std::shared_ptr<SyncSession>, SyncError error) {
+                    promise->emplace_value(std::move(error));
+                };
+
+            auto realm = Realm::get_shared_realm(config);
+
             auto subs = create_subscription(realm, "class_restaurant", "queryable_str_field", [](Query q, ColKey c) {
                 return q.equal(c, "synced");
             });
@@ -1831,8 +1836,6 @@ TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
             CHECK(realm->get_active_subscription_set().version() == 1);
             CHECK(realm->get_latest_subscription_set().version() == 1);
 
-            realm->begin_transaction();
-
             CppContext c(realm);
             int64_t pk = 0;
             auto add_point = [&](GeoPoint p) {
@@ -1854,11 +1857,20 @@ TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
                 GeoPoint{82.55243, 84.54981}, // another northern point, but on the other side of the pole
                 GeoPoint{2129, 89},           // invalid
             };
+            constexpr size_t invalids_to_be_compensated = 2; // 4, 8
+            realm->begin_transaction();
             for (auto& point : points) {
                 add_point(point);
             }
             realm->commit_transaction();
-            wait_for_upload(*realm);
+            const auto& error = error_pf.future.get();
+            REQUIRE(!error.is_fatal);
+            REQUIRE(error.status == ErrorCodes::SyncCompensatingWrite);
+            REQUIRE(error.compensating_writes_info.size() == invalids_to_be_compensated);
+            REQUIRE_THAT(error.compensating_writes_info[0].reason,
+                         Catch::Matchers::ContainsSubstring("in table \"restaurant\" will corrupt geojson data"));
+            REQUIRE_THAT(error.compensating_writes_info[1].reason,
+                         Catch::Matchers::ContainsSubstring("in table \"restaurant\" will corrupt geojson data"));
 
             {
                 auto table = realm->read_group().get_table("class_restaurant");
@@ -1877,22 +1889,43 @@ TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
                     Query query = table->column<Link>(location_col).geo_within(Geospatial(bounds));
                     return query.find_all().size();
                 };
+                auto run_query_as_flx = [&](Geospatial bounds) -> size_t {
+                    size_t num_objects = 0;
+                    harness->do_with_new_realm([&](SharedRealm realm) {
+                        auto subs =
+                            create_subscription(realm, "class_restaurant", "location", [&](Query q, ColKey c) {
+                                return q.get_table()->column<Link>(c).geo_within(Geospatial(bounds));
+                            });
+                        auto sub_res =
+                            subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
+                        CHECK(sub_res.is_ok());
+                        CHECK(realm->get_active_subscription_set().version() == 1);
+                        realm->refresh();
+                        num_objects = realm->get_class("restaurant").num_objects();
+                    });
+                    return num_objects;
+                };
 
-                reset_utils::wait_for_num_objects_in_atlas(
-                    harness->app()->current_user(), harness->session().app_session(), "restaurant", points.size());
+                reset_utils::wait_for_num_objects_in_atlas(harness->app()->current_user(),
+                                                           harness->session().app_session(), "restaurant",
+                                                           points.size() - invalids_to_be_compensated);
 
                 {
                     GeoPolygon bounds{
                         {{GeoPoint{-80, 40.7128}, GeoPoint{20, 60}, GeoPoint{20, 20}, GeoPoint{-80, 40.7128}}}};
                     size_t local_matches = run_query_locally(bounds);
                     size_t server_results = run_query_on_server(make_polygon_filter(bounds));
+                    size_t flx_results = run_query_as_flx(bounds);
+                    CHECK(flx_results == local_matches);
                     CHECK(server_results == local_matches);
                 }
                 {
                     GeoCircle circle{.5, GeoPoint{0, 90}};
                     size_t local_matches = run_query_locally(circle);
                     size_t server_results = run_query_on_server(make_circle_filter(circle));
+                    size_t flx_results = run_query_as_flx(circle);
                     CHECK(server_results == local_matches);
+                    CHECK(flx_results == local_matches);
                 }
                 { // a ring with 3 points without a matching begin/end is an error
                     GeoPolygon open_bounds{{{GeoPoint{-80, 40.7128}, GeoPoint{20, 60}, GeoPoint{20, 20}}}};
@@ -1934,8 +1967,10 @@ TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
                         size_t local_matches = run_query_locally(geo);
                         size_t server_matches =
                             run_query_on_server(make_polygon_filter(geo.get<GeoBox>().to_polygon()));
+                        size_t flx_matches = run_query_as_flx(geo);
                         CHECK(local_matches == expected_results);
                         CHECK(server_matches == expected_results);
+                        CHECK(flx_matches == expected_results);
                     }
                     std::vector<Geospatial> invalid_boxes = {
                         GeoBox{GeoPoint{11.97575, 55.71601}, GeoPoint{11.97575, 55.71601}}, // same point twice
@@ -1961,8 +1996,10 @@ TEST_CASE("flx: geospatial", "[sync][flx][geospatial][baas]") {
                     size_t local_matches = run_query_locally(north_pole_box);
                     size_t server_matches =
                         run_query_on_server(make_polygon_filter(north_pole_box.get<GeoPolygon>()));
+                    size_t flx_matches = run_query_as_flx(north_pole_box);
                     CHECK(local_matches == num_matching_points);
                     CHECK(server_matches == num_matching_points);
+                    CHECK(flx_matches == num_matching_points);
                 }
             }
         });
