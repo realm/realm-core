@@ -298,16 +298,16 @@ RLM_API void realm_sync_socket_websocket_error(realm_websocket_observer_t* realm
     realm_websocket_observer->get()->websocket_error_handler();
 }
 
-RLM_API void realm_sync_socket_websocket_message(realm_websocket_observer_t* realm_websocket_observer,
+RLM_API bool realm_sync_socket_websocket_message(realm_websocket_observer_t* realm_websocket_observer,
                                                  const char* data, size_t data_size)
 {
-    realm_websocket_observer->get()->websocket_binary_message_received(util::Span{data, data_size});
+    return realm_websocket_observer->get()->websocket_binary_message_received(util::Span{data, data_size});
 }
 
-RLM_API void realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
+RLM_API bool realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
                                                 realm_web_socket_errno_e code, const char* reason)
 {
-    realm_websocket_observer->get()->websocket_closed_handler(
+    return realm_websocket_observer->get()->websocket_closed_handler(
         was_clean, static_cast<sync::websocket::WebSocketError>(code), reason);
 }
 
