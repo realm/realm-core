@@ -624,8 +624,7 @@ void AdminAPISession::create_schema(const std::string& app_id, const AppCreateCo
     for (const auto& obj_schema : target_schema) {
         auto it = current_schema_tables.find(obj_schema.name);
         if (it != current_schema_tables.end()) {
-            // object_schema_to_create.push_back({it->second, &obj_schema});
-            //  schemas[it->second].del();
+            object_schema_to_create.push_back({it->second, &obj_schema});
             continue;
         }
 
