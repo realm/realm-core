@@ -249,6 +249,9 @@ public:
     bool erase(StringData name);
     bool erase(const Query& query);
 
+    bool erase_by_class_name(StringData object_class_name);
+    bool erase_by_id(ObjectId id);
+
     // Updates the state of the transaction and optionally updates its error information.
     //
     // You may only set an error_str when the State is State::Error.

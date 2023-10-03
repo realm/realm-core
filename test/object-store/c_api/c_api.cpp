@@ -5991,6 +5991,27 @@ TEST_CASE("app: flx-sync basic tests", "[sync][flx][c_api][baas]") {
             realm_release(sub_c_1);
         }
 
+        {
+            auto sub = realm_sync_get_latest_subscription_set(&c_wrap_realm);
+            auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
+            std::size_t index = -1;
+            bool inserted = false;
+            CHECK(realm_sync_subscription_set_insert_or_assign_query(mut_sub, c_wrap_query_bar, nullptr, &index,
+                                                                     &inserted));
+            CHECK(inserted);
+            CHECK(realm_sync_subscription_set_insert_or_assign_query(mut_sub, c_wrap_query_foo, nullptr, &index,
+                                                                     &inserted));
+            CHECK(inserted);
+            bool erased = false;
+            CHECK(realm_sync_subscription_set_erase_by_class_name(mut_sub, "Obj", &erased));
+            CHECK(erased);
+            // Nothing to remove when trying again.
+            CHECK(realm_sync_subscription_set_erase_by_class_name(mut_sub, "Obj", &erased));
+            CHECK_FALSE(erased);
+            realm_release(sub);
+            realm_release(mut_sub);
+        }
+
         realm_release(c_wrap_query_foo);
         realm_release(c_wrap_query_bar);
     });

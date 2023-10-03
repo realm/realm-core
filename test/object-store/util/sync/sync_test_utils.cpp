@@ -173,6 +173,23 @@ ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::
 
 #if REALM_ENABLE_SYNC
 
+void subscribe_to_all_and_bootstrap(Realm& realm)
+{
+    auto mut_subs = realm.get_latest_subscription_set().make_mutable_copy();
+    auto& group = realm.read_group();
+    for (auto key : group.get_table_keys()) {
+        if (group.table_is_public(key)) {
+            auto table = group.get_table(key);
+            if (table->get_table_type() == Table::Type::TopLevel) {
+                mut_subs.insert_or_assign(table->where());
+            }
+        }
+    }
+    auto subs = std::move(mut_subs).commit();
+    subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    wait_for_download(realm);
+}
+
 #if REALM_ENABLE_AUTH_TESTS
 
 #ifdef REALM_MONGODB_ENDPOINT
