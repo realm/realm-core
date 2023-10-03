@@ -357,7 +357,8 @@ void LimitDescriptor::execute(const Table&, KeyValues& key_values, const BaseDes
 
 std::string FilterDescriptor::get_description(ConstTableRef) const
 {
-    return "FILTER(custom_function)";
+    throw SerializationError("Serialization of FilterDescriptor is not supported");
+    return "";
 }
 
 std::unique_ptr<BaseDescriptor> FilterDescriptor::clone() const

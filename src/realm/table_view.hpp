@@ -150,7 +150,6 @@ namespace realm {
 class KeyValues : public std::vector<ObjKey> {
 public:
     KeyValues() = default;
-    KeyValues(const KeyValues&) = delete;
     void create()
     {
         m_attached = true;

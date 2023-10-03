@@ -170,12 +170,18 @@ public:
     BaseDescriptor() = default;
     virtual ~BaseDescriptor() = default;
     virtual bool is_valid() const noexcept = 0;
-    virtual bool need_indexpair() const noexcept = 0;
+    virtual bool need_indexpair() const noexcept
+    {
+        return false;
+    }
     virtual std::string get_description(ConstTableRef attached_table) const = 0;
     virtual std::unique_ptr<BaseDescriptor> clone() const = 0;
     virtual DescriptorType get_type() const = 0;
-    virtual void collect_dependencies(const Table* table, std::vector<TableKey>& table_keys) const = 0;
-    virtual Sorter sorter(Table const& table, const IndexPairs& indexes) const = 0;
+    virtual void collect_dependencies(const Table*, std::vector<TableKey>&) const {}
+    virtual Sorter sorter(Table const&, const IndexPairs&) const
+    {
+        return {};
+    }
     // Do what you have to do
     virtual void execute(IndexPairs&, const Sorter&, const BaseDescriptor*) const {}
     virtual void execute(const Table&, KeyValues&, const BaseDescriptor*) const {}
@@ -308,24 +314,11 @@ public:
         return m_limit;
     }
 
-    bool need_indexpair() const noexcept override
-    {
-        return false;
-    }
-
     DescriptorType get_type() const override
     {
         return DescriptorType::Limit;
     }
 
-    Sorter sorter(Table const&, const IndexPairs&) const override
-    {
-        return Sorter();
-    }
-
-    void collect_dependencies(const Table*, std::vector<TableKey>&) const override
-    {
-    }
     void execute(const Table&, KeyValues&, const BaseDescriptor*) const override;
 
 private:
@@ -338,8 +331,6 @@ public:
         : m_predicate(std::move(fn))
     {
     }
-    FilterDescriptor(FilterDescriptor&&) = default;
-    FilterDescriptor(const FilterDescriptor&) = default;
     FilterDescriptor() = default;
     ~FilterDescriptor() = default;
 
@@ -350,22 +341,11 @@ public:
     std::string get_description(ConstTableRef attached_table) const override;
     std::unique_ptr<BaseDescriptor> clone() const override;
 
-    bool need_indexpair() const noexcept override
-    {
-        return false;
-    }
-
     DescriptorType get_type() const override
     {
         return DescriptorType::Filter;
     }
 
-    Sorter sorter(Table const&, const IndexPairs&) const override
-    {
-        return Sorter();
-    }
-
-    void collect_dependencies(const Table*, std::vector<TableKey>&) const override {}
     void execute(const Table&, KeyValues&, const BaseDescriptor*) const override;
 
 private:

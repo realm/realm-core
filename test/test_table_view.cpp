@@ -2881,11 +2881,12 @@ TEST(TableView_Filter)
         table.create_object().set(col, i);
     }
 
-    auto tv = table.where().find_all();
-
-    tv.filter(FilterDescriptor([&](const Obj& obj) {
+    TableView tv(table.where(), size_t(-1));
+    DescriptorOrdering ordering;
+    ordering.append_filter(FilterDescriptor([&](const Obj& obj) {
         return obj.get<Int>(col) < 100;
     }));
+    tv.apply_descriptor_ordering(ordering);
     CHECK_EQUAL(tv.size(), 100);
 }
 
