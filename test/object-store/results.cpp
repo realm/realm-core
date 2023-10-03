@@ -3085,6 +3085,36 @@ TEST_CASE("notifications: results", "[notifications][results]") {
         }
     }
 
+    SECTION("filter notifications") {
+        results = results.filter_by_method(FilterDescriptor([&](const Obj& obj) {
+            return obj.get<Int>(col_value) > 5;
+        }));
+
+        int notification_calls = 0;
+        CollectionChangeSet change;
+        auto token = results.add_notification_callback([&](CollectionChangeSet c) {
+            change = c;
+            ++notification_calls;
+        });
+
+        advance_and_notify(*r);
+
+        SECTION("modifications that leave a non-matching row non-matching do not send notifications") {
+            write([&] {
+                table->get_object(object_keys[2]).set(col_value, 5);
+            });
+            REQUIRE(notification_calls == 1);
+        }
+
+        SECTION("modifying a matching row and leaving it matching marks that row as modified") {
+            write([&] {
+                table->get_object(object_keys[3]).set(col_value, 9);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.modifications, 0);
+        }
+    }
+
     SECTION("schema changes") {
         CollectionChangeSet change;
         auto token = results.add_notification_callback([&](CollectionChangeSet c) {

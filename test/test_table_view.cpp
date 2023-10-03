@@ -2883,7 +2883,6 @@ TEST(TableView_Filter)
 
     auto tv = table.where().find_all();
 
-    Obj obj;
     tv.filter(FilterDescriptor([&](const Obj& obj) {
         return obj.get<Int>(col) < 100;
     }));

@@ -970,6 +970,16 @@ Results Results::distinct(std::vector<std::string> const& keypaths) const
     return distinct({std::move(column_keys)});
 }
 
+Results Results::filter_by_method(FilterDescriptor&& predicate) const
+{
+    DescriptorOrdering new_order = m_descriptor_ordering;
+    new_order.append_filter(std::move(predicate));
+    util::CheckedUniqueLock lock(m_mutex);
+    if (m_mode == Mode::Collection)
+        return Results(m_realm, m_collection, std::move(new_order));
+    return Results(m_realm, do_get_query(), std::move(new_order));
+}
+
 SectionedResults Results::sectioned_results(SectionedResults::SectionKeyFunc&& section_key_func) REQUIRES(m_mutex)
 {
     return SectionedResults(*this, std::move(section_key_func));
