@@ -927,7 +927,7 @@ AppCreateConfig default_app_config(const std::string& base_url)
                            db_name,
                            std::move(default_schema),
                            std::move(partition_key),
-                           true,       // dev_mode_enabled
+                           false,      // dev_mode_enabled
                            util::none, // Default to no FLX sync config
                            std::move(funcs),
                            std::move(user_pass_config),
@@ -956,7 +956,7 @@ AppCreateConfig minimal_app_config(const std::string& base_url, const std::strin
         util::format("test_data_%1_%2", name, id.to_string()),
         schema,
         std::move(partition_key),
-        true,                        // dev_mode_enabled
+        false,                       // dev_mode_enabled
         util::none,                  // no FLX sync config
         {},                          // no functions
         std::move(user_pass_config), // enable basic user/pass auth
@@ -1101,6 +1101,31 @@ AppSession create_app(const AppCreateConfig& config)
 
     auto create_mongo_service_resp = services.post_json(std::move(mongo_service_def));
     std::string mongo_service_id = create_mongo_service_resp["_id"];
+    auto schemas = app["schemas"];
+
+    auto pk_and_queryable_only = [&](const Property& prop) {
+        if (config.flx_sync_config) {
+            const auto& queryable_fields = config.flx_sync_config->queryable_fields;
+
+            if (std::find(queryable_fields.begin(), queryable_fields.end(), prop.name) != queryable_fields.end()) {
+                return true;
+            }
+        }
+        return prop.name == "_id" || prop.name == config.partition_key.name;
+    };
+
+    // Create the schemas in two passes: first populate just the primary key and
+    // partition key, then add the rest of the properties. This ensures that the
+    // targest of links exist before adding the links.
+    std::vector<std::pair<std::string, const ObjectSchema*>> object_schema_to_create;
+    BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname,
+                                 static_cast<bool>(config.flx_sync_config));
+    for (const auto& obj_schema : config.schema) {
+        auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema, pk_and_queryable_only);
+        auto schema_create_resp = schemas.post_json(schema_to_create);
+        object_schema_to_create.push_back({schema_create_resp["_id"], &obj_schema});
+    }
+
     auto default_rule = services[mongo_service_id]["default_rule"];
     auto service_roles = nlohmann::json::array();
     if (config.service_roles.empty()) {
@@ -1138,7 +1163,13 @@ AppSession create_app(const AppCreateConfig& config)
 
     default_rule.post_json({{"roles", service_roles}});
 
-    session.create_schema(app_id, config);
+    for (const auto& [id, obj_schema] : object_schema_to_create) {
+        auto schema_to_create = rule_builder.object_schema_to_baas_schema(*obj_schema, nullptr);
+        schema_to_create["_id"] = id;
+        schemas[id].put_json(schema_to_create);
+    }
+
+    // session.create_schema(app_id, config);
 
     // For PBS, enable sync after schema is created.
     if (!config.flx_sync_config) {

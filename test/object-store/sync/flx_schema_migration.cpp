@@ -19,6 +19,7 @@
 #if REALM_ENABLE_SYNC
 #if REALM_ENABLE_AUTH_TESTS
 
+#include <util/crypt_key.hpp>
 #include <util/sync/baas_admin_api.hpp>
 #include <util/sync/flx_sync_harness.hpp>
 #include <util/sync/sync_test_utils.hpp>
@@ -28,6 +29,8 @@
 #include <realm/object-store/sync/mongo_client.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
+
+#include <realm/sync/noinst/client_history_impl.hpp>
 
 #include <realm/util/future.hpp>
 
@@ -42,9 +45,9 @@ namespace realm::app {
 namespace {
 
 // TODO: to be removed once the feature flag is removed.
-void set_schema_versioning_feature_flag(const std::string& app_id, std::shared_ptr<SyncUser> user)
+void set_schema_versioning_feature_flag(const std::string& app_id, SyncUser& user)
 {
-    auto remote_client = user->mongo_client("BackingDB");
+    auto remote_client = user.mongo_client("BackingDB");
     auto db = remote_client.db("app");
     auto settings = db["settings"];
 
@@ -55,6 +58,24 @@ void set_schema_versioning_feature_flag(const std::string& app_id, std::shared_p
                             REQUIRE_FALSE(error);
                             CHECK(result.modified_count == 1);
                         });
+}
+
+std::pair<ThreadSafeReference, std::exception_ptr> async_open_realm(const Realm::Config& config)
+{
+    std::mutex mutex;
+    ThreadSafeReference realm_ref;
+    std::exception_ptr error;
+    auto task = Realm::get_synchronized_realm(config);
+    task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
+        std::lock_guard lock(mutex);
+        realm_ref = std::move(ref);
+        error = e;
+    });
+    util::EventLoop::main().run_until([&] {
+        std::lock_guard lock(mutex);
+        return realm_ref || error;
+    });
+    return std::pair(std::move(realm_ref), error);
 }
 
 } // namespace
@@ -76,7 +97,7 @@ TEST_CASE("flx: new schema version", "[sync][flx][baas]") {
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
 
     const AppSession& app_session = harness.session().app_session();
-    set_schema_versioning_feature_flag(app_session.server_app_id, harness.app()->current_user());
+    set_schema_versioning_feature_flag(app_session.server_app_id, *harness.app()->current_user());
 
     {
         config.schema_version = 0;
@@ -120,17 +141,23 @@ TEST_CASE("flx: new schema version", "[sync][flx][baas]") {
                                         {"non_queryable_field", "non queryable 2"s}}));
     });
 
-    Schema schema_v1{{"TopLevel",
-                      {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                       {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
-                       {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
-                       {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}}};
+    Schema schema_v1{
+        {"TopLevel",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+          {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+          {"non_queryable_field", PropertyType::String}}},
+        {"TopLevel2",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+          {"queryable_int_field", PropertyType::Int | PropertyType::Nullable}}},
+    };
 
-    // set_schema_versioning_feature_flag(app_session.server_app_id, harness.app()->current_user());
-    app_session.admin_api.create_schema(
-        app_session.server_app_id,
-        FLXSyncTestHarness::make_config_from_server_schema(
-            "flx_schema_versions", {schema_v1, {"queryable_str_field", "queryable_int_field"}}));
+    // set_schema_versioning_feature_flag(app_session.server_app_id, *harness.app()->current_user());
+    auto create_config = app_session.config;
+    create_config.schema = schema_v1;
+    create_config.flx_sync_config->queryable_fields = {"", ""};
+    app_session.admin_api.create_schema(app_session.server_app_id, create_config);
 
     const auto wait_start = std::chrono::steady_clock::now();
     using namespace std::chrono_literals;
@@ -151,24 +178,6 @@ TEST_CASE("flx: new schema version", "[sync][flx][baas]") {
             subs.commit();
         };
 
-        std::mutex mutex;
-
-        auto async_open_realm = [&](const Realm::Config& config) {
-            ThreadSafeReference realm_ref;
-            std::exception_ptr error;
-            auto task = Realm::get_synchronized_realm(config);
-            task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
-                std::lock_guard lock(mutex);
-                realm_ref = std::move(ref);
-                error = e;
-            });
-            util::EventLoop::main().run_until([&] {
-                std::lock_guard lock(mutex);
-                return realm_ref || error;
-            });
-            return std::pair(std::move(realm_ref), error);
-        };
-
         auto [ref, error] = async_open_realm(config);
         REQUIRE(ref);
         REQUIRE_FALSE(error);
@@ -178,7 +187,7 @@ TEST_CASE("flx: new schema version", "[sync][flx][baas]") {
         // REQUIRE(!table->get_column_key("queryable_str_field"));
         REQUIRE(table);
         auto table2 = realm->read_group().get_table("class_TopLevel2");
-        REQUIRE(!table2);
+        // REQUIRE(!table2);
 
         realm->begin_transaction();
         CppContext c(realm);
@@ -195,6 +204,654 @@ TEST_CASE("flx: new schema version", "[sync][flx][baas]") {
         Results results(realm, table);
         CHECK(results.size() == 4);
     }
+}
+
+TEST_CASE("flx: sync open fails if schema migration is required", "[sync][flx][flx schema migration][baas]") {
+    std::vector<ObjectSchema> schema_v0{
+        {"TopLevel",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+          {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+          {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}},
+        {"TopLevel2",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+          {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+          {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}},
+    };
+
+    FLXSyncTestHarness harness("flx_schema_versions", {schema_v0, {"queryable_str_field", "queryable_int_field"}});
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+    const AppSession& app_session = harness.session().app_session();
+    set_schema_versioning_feature_flag(app_session.server_app_id, *harness.app()->current_user());
+
+    // First open the realm at schema version 0.
+    {
+        config.schema_version = 0;
+        auto realm = Realm::get_shared_realm(config);
+        wait_for_download(*realm);
+        wait_for_upload(*realm);
+    }
+
+    // Bump the schema version.
+
+    SECTION("Breaking change detected by client") {
+        config.schema_version = 1;
+        auto schema_v1 = schema_v0;
+        // Make field 'non_queryable_field' of table 'TopLevel' required.
+        schema_v1[0].persisted_properties.back() = {"non_queryable_field", PropertyType::String};
+        config.schema = schema_v1;
+
+        auto create_config = app_session.config;
+        create_config.schema = *config.schema;
+        app_session.admin_api.create_schema(app_session.server_app_id, create_config);
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+
+        REQUIRE_THROWS_AS(Realm::get_shared_realm(config), InvalidAdditiveSchemaChangeException);
+    }
+
+    SECTION("Breaking change detected by server") {
+        config.schema_version = 1;
+        auto schema_v1 = schema_v0;
+        // Remove table 'TopLevel2'.
+        schema_v1.pop_back();
+        config.schema = schema_v1;
+
+        auto create_config = app_session.config;
+        create_config.schema = *config.schema;
+        app_session.admin_api.create_schema(app_session.server_app_id, create_config);
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+
+        auto realm = Realm::get_shared_realm(config);
+        wait_for_download(*realm);
+        wait_for_upload(*realm);
+    }
+}
+
+TEST_CASE("flx: migrating schema to unknown version fails", "[sync][flx][flx schema migration][baas]") {
+    std::vector<ObjectSchema> schema_v0{
+        {"TopLevel",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+          {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+          {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}},
+        {"TopLevel2",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+          {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+          {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}},
+    };
+
+    FLXSyncTestHarness harness("flx_schema_versions", {schema_v0, {"queryable_str_field", "queryable_int_field"}});
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+    const AppSession& app_session = harness.session().app_session();
+    set_schema_versioning_feature_flag(app_session.server_app_id, *harness.app()->current_user());
+
+    // First open the realm at schema version 0.
+    {
+        config.schema_version = 0;
+        auto realm = Realm::get_shared_realm(config);
+        wait_for_download(*realm);
+        wait_for_upload(*realm);
+    }
+
+    auto schema_v1 = schema_v0;
+    // Make field 'non_queryable_field' of table 'TopLevel' required.
+    schema_v1[0].persisted_properties.back() = {"non_queryable_field", PropertyType::String};
+
+    {
+        auto create_config = app_session.config;
+        create_config.schema = schema_v1;
+        app_session.admin_api.create_schema(app_session.server_app_id, create_config);
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+    }
+
+    // Bump the schema to a version the server does not know about.
+    config.schema_version = 42;
+    config.schema = schema_v1;
+    auto error_received_pf = util::make_promise_future<void>();
+    config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError err) {};
+    config.sync_config->on_sync_client_event_hook =
+        [promise = util::CopyablePromiseHolder(std::move(error_received_pf.promise))](
+            std::weak_ptr<SyncSession> weak_session, const SyncClientHookData& data) mutable {
+            if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
+                return SyncClientHookAction::NoAction;
+            }
+            auto session = weak_session.lock();
+            REQUIRE(session);
+
+            auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
+            if (error_code == sync::ProtocolError::initial_sync_not_completed) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            REQUIRE(error_code == sync::ProtocolError::bad_schema_version);
+            promise.get_promise().emplace_value();
+            return SyncClientHookAction::NoAction;
+        };
+
+    auto [ref, error] = async_open_realm(config);
+    REQUIRE_FALSE(ref);
+    REQUIRE(error);
+
+    error_received_pf.future.get();
+}
+
+TEST_CASE("flx: fresh realm does not require schema migration", "[sync][flx][flx schema migration][baas]") {
+    std::vector<ObjectSchema> schema_v0{
+        {"TopLevel",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+          {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+          {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}},
+        {"TopLevel2",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+          {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+          {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}},
+    };
+
+    FLXSyncTestHarness harness("flx_schema_versions", {schema_v0, {"queryable_str_field", "queryable_int_field"}});
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+    const AppSession& app_session = harness.session().app_session();
+    set_schema_versioning_feature_flag(app_session.server_app_id, *harness.app()->current_user());
+
+    auto schema_v1 = schema_v0;
+    // Make field 'non_queryable_field' of table 'TopLevel' required.
+    schema_v1[0].persisted_properties.back() = {"non_queryable_field", PropertyType::String};
+
+    {
+        auto create_config = app_session.config;
+        create_config.schema = schema_v1;
+        app_session.admin_api.create_schema(app_session.server_app_id, create_config);
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+    }
+
+    config.schema_version = 1;
+    config.schema = schema_v1;
+    config.sync_config->on_sync_client_event_hook = [](std::weak_ptr<SyncSession> weak_session,
+                                                       const SyncClientHookData& data) mutable {
+        if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
+            return SyncClientHookAction::NoAction;
+        }
+        auto session = weak_session.lock();
+        REQUIRE(session);
+
+        auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
+        REQUIRE(error_code == sync::ProtocolError::initial_sync_not_completed);
+        return SyncClientHookAction::NoAction;
+    };
+
+    auto [ref, error] = async_open_realm(config);
+    REQUIRE(ref);
+    REQUIRE_FALSE(error);
+}
+
+TEST_CASE("flx: connect with new schema version then downgrade", "[sync][flx][schema migration][baas]") {
+    FLXSyncTestHarness harness("flx_schema_versions");
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+    const AppSession& app_session = harness.session().app_session();
+    set_schema_versioning_feature_flag(app_session.server_app_id, *harness.app()->current_user());
+
+    config.schema_version = 1;
+
+    {
+        SyncTestFile config2(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+        auto realm = Realm::get_shared_realm(config2);
+        wait_for_download(*realm);
+        wait_for_upload(*realm);
+        realm->sync_session()->shutdown_and_wait();
+
+        {
+            realm->begin_transaction();
+            ObjectStore::set_schema_version(realm->read_group(), 1);
+            realm->commit_transaction();
+        }
+
+        // Check schema version in new realm is 1.
+        DBOptions options;
+        options.encryption_key = test_util::crypt_key();
+        auto db = DB::create(sync::make_client_replication(), config2.path, options);
+        ObjectStore::set_schema_version(*db->start_write(), 1);
+        auto schema_version = ObjectStore::get_schema_version(*db->start_read());
+        REQUIRE(schema_version == 1);
+    }
+
+    // SECTION("No schema versions") {
+
+    // }
+
+    // SECTION("Schema versions") {
+
+    // }
+
+    auto error_received_pf = util::make_promise_future<void>();
+    config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError err) {};
+    config.sync_config->on_sync_client_event_hook =
+        [promise = util::CopyablePromiseHolder(std::move(error_received_pf.promise))](
+            std::weak_ptr<SyncSession> weak_session, const SyncClientHookData& data) mutable {
+            if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
+                return SyncClientHookAction::NoAction;
+            }
+            auto session = weak_session.lock();
+            REQUIRE(session);
+
+            auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
+            if (error_code == sync::ProtocolError::initial_sync_not_completed) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            REQUIRE(error_code == sync::ProtocolError::bad_schema_version);
+            promise.get_promise().emplace_value();
+            return SyncClientHookAction::NoAction;
+        };
+
+    auto [ref, error] = async_open_realm(config);
+    REQUIRE_FALSE(ref);
+    REQUIRE(error);
+
+    error_received_pf.future.get();
+
+    config.schema_version = 0;
+    config.sync_config->on_sync_client_event_hook = nullptr;
+    std::tie(ref, error) = async_open_realm(config);
+    REQUIRE(ref);
+    REQUIRE_FALSE(error);
+}
+
+TEST_CASE("flx: migrate schema then rollback (with recovery)", "[sync][flx][schema migration][baas]") {
+    std::vector<ObjectSchema> schema_v0{
+        {"TopLevel",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+          {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+          {"non_queryable_field", PropertyType::String | PropertyType::Nullable},
+          {"non_queryable_field2", PropertyType::String}}},
+        {"TopLevel2",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+          {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+          {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}},
+    };
+
+    FLXSyncTestHarness harness("flx_schema_versions", {schema_v0, {"queryable_str_field", "queryable_int_field"}});
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+    const AppSession& app_session = harness.session().app_session();
+    set_schema_versioning_feature_flag(app_session.server_app_id, *harness.app()->current_user());
+
+    {
+        config.schema_version = 0;
+        auto realm = Realm::get_shared_realm(config);
+
+        wait_for_download(*realm);
+        wait_for_upload(*realm);
+
+        auto table = realm->read_group().get_table("class_TopLevel");
+        auto queryable_str_field = table->get_column_key("queryable_str_field");
+        auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        new_subs.insert_or_assign(Query(table).not_equal(queryable_str_field, ""));
+        auto subs = new_subs.commit();
+        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+
+        realm->sync_session()->pause();
+
+        realm->begin_transaction();
+        CppContext c(realm);
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", ObjectId::gen()},
+                                        {"queryable_str_field", "biz"s},
+                                        {"queryable_int_field", static_cast<int64_t>(15)},
+                                        {"non_queryable_field", "non queryable 3"s},
+                                        {"non_queryable_field2", "non queryable 33"s}}));
+        realm->commit_transaction();
+        realm->close();
+    }
+
+    harness.load_initial_data([&](SharedRealm realm) {
+        CppContext c(realm);
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", ObjectId::gen()},
+                                        {"queryable_str_field", "foo"s},
+                                        {"queryable_int_field", static_cast<int64_t>(5)},
+                                        {"non_queryable_field", "non queryable 1"s},
+                                        {"non_queryable_field2", "non queryable 11"s}}));
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", ObjectId::gen()},
+                                        {"queryable_str_field", "bar"s},
+                                        {"queryable_int_field", static_cast<int64_t>(10)},
+                                        {"non_queryable_field", "non queryable 2"s},
+                                        {"non_queryable_field2", "non queryable 22"s}}));
+    });
+
+    Schema schema_v1{
+        {"TopLevel",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+          {"queryable_int_field", PropertyType::Int},
+          {"non_queryable_field2", PropertyType::String | PropertyType::Nullable}}},
+    };
+
+    auto create_config = app_session.config;
+    create_config.schema = schema_v1;
+    app_session.admin_api.create_schema(app_session.server_app_id, create_config);
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+
+    {
+        // Upgrade the schema version
+        config.schema_version = 1;
+        config.schema = schema_v1;
+        config.sync_config->subscription_initializer = [](std::shared_ptr<Realm> realm) mutable {
+            REQUIRE(realm);
+            auto table = realm->read_group().get_table("class_TopLevel");
+            Query query(table);
+            auto subs = realm->get_latest_subscription_set().make_mutable_copy();
+            subs.insert_or_assign(query);
+            subs.commit();
+        };
+
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+
+        auto realm = Realm::get_shared_realm(std::move(ref));
+        auto table = realm->read_group().get_table("class_TopLevel");
+        REQUIRE(table);
+        REQUIRE(!table->get_column_key("non_queryable_field"));
+        auto table2 = realm->read_group().get_table("class_TopLevel2");
+        REQUIRE(!table2);
+
+        realm->begin_transaction();
+        CppContext c(realm);
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", ObjectId::gen()},
+                                        {"queryable_int_field", static_cast<int64_t>(15)},
+                                        {"non_queryable_field", "non queryable 4"s},
+                                        {"non_queryable_field2", "non queryable 44"s}}));
+        realm->commit_transaction();
+
+        wait_for_upload(*realm);
+        wait_for_download(*realm);
+
+        wait_for_advance(*realm);
+        Results results(realm, table);
+        CHECK(results.size() == 4);
+
+        realm->sync_session()->pause();
+
+        // Changeset to recover when downgrading.
+        realm->begin_transaction();
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", ObjectId::gen()},
+                                        {"queryable_str_field", "flx"s},
+                                        {"queryable_int_field", static_cast<int64_t>(15)},
+                                        {"non_queryable_field", "non queryable 3"s},
+                                        {"non_queryable_field2", "non queryable 33"s}}));
+        realm->commit_transaction();
+        realm->close();
+    }
+
+    // Downgrade the schema.
+    {
+        config.schema_version = 0;
+        config.schema = schema_v0;
+        config.sync_config->subscription_initializer = [](std::shared_ptr<Realm> realm) mutable {
+            REQUIRE(realm);
+            auto table = realm->read_group().get_table("class_TopLevel");
+            Query query(table);
+            auto subs = realm->get_latest_subscription_set().make_mutable_copy();
+            subs.insert_or_assign(query);
+            subs.commit();
+        };
+
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+    }
+}
+
+TEST_CASE("flx: two migrations", "[sync][flx][schema migration][baas]") {
+    std::vector<ObjectSchema> schema_v0{
+        {"TopLevel",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+          {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+          {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}},
+        {"TopLevel2",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+          {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+          {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}},
+    };
+
+    FLXSyncTestHarness harness("flx_schema_versions", {schema_v0, {"queryable_str_field", "queryable_int_field"}});
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+    const AppSession& app_session = harness.session().app_session();
+    set_schema_versioning_feature_flag(app_session.server_app_id, *harness.app()->current_user());
+
+    {
+        config.schema_version = 0;
+        auto realm = Realm::get_shared_realm(config);
+        wait_for_download(*realm);
+        wait_for_upload(*realm);
+    }
+
+    auto schema_v1 = schema_v0;
+    // Make field 'non_queryable_field' of table 'TopLevel' required.
+    schema_v1[0].persisted_properties.back() = {"non_queryable_field", PropertyType::String};
+    {
+        auto create_config = app_session.config;
+        create_config.schema = schema_v1;
+        app_session.admin_api.create_schema(app_session.server_app_id, create_config);
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+    }
+
+    auto schema_v2 = schema_v1;
+    // Remove table 'TopLevel2'.
+    schema_v2.pop_back();
+    {
+        auto create_config = app_session.config;
+        create_config.schema = schema_v2;
+        app_session.admin_api.create_schema(app_session.server_app_id, create_config);
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+    }
+
+    // {
+    //     config.schema_version = 0;
+    //     auto realm = Realm::get_shared_realm(config);
+    //     wait_for_download(*realm);
+    //     wait_for_upload(*realm);
+    // }
+
+    {
+        config.schema_version = 1;
+        config.schema = schema_v1;
+
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+    }
+
+    {
+        config.schema_version = 2;
+        config.schema = schema_v2;
+
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+    }
+
+    DBOptions options;
+    options.encryption_key = test_util::crypt_key();
+    auto db = DB::create(sync::make_client_replication(), config.path, options);
+    auto schema_version = ObjectStore::get_schema_version(*db->start_read());
+    REQUIRE(schema_version == 2);
+}
+
+TEST_CASE("flx: pause and resume schema migration", "[sync][flx][schema migration][baas]") {
+    std::vector<ObjectSchema> schema_v0{
+        {"TopLevel",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+          {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+          {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}},
+        {"TopLevel2",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+          {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+          {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}},
+    };
+
+    FLXSyncTestHarness harness("flx_schema_versions", {schema_v0, {"queryable_str_field", "queryable_int_field"}});
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+    const AppSession& app_session = harness.session().app_session();
+    set_schema_versioning_feature_flag(app_session.server_app_id, *harness.app()->current_user());
+
+    auto schema_v1 = schema_v0;
+    // Make field 'non_queryable_field' of table 'TopLevel' required.
+    schema_v1[0].persisted_properties.back() = {"non_queryable_field", PropertyType::String};
+    {
+        auto create_config = app_session.config;
+        create_config.schema = schema_v1;
+        app_session.admin_api.create_schema(app_session.server_app_id, create_config);
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+    }
+
+    {
+        config.schema_version = 0;
+        auto realm = Realm::get_shared_realm(config);
+        wait_for_download(*realm);
+    }
+
+    config.schema_version = 1;
+    config.schema = schema_v1;
+    auto bad_schema_version_count = 0;
+    config.sync_config->on_sync_client_event_hook =
+        [&bad_schema_version_count](std::weak_ptr<SyncSession> weak_session, const SyncClientHookData& data) mutable {
+            if (data.event != SyncClientHookEvent::ErrorMessageReceived) {
+                return SyncClientHookAction::NoAction;
+            }
+            auto session = weak_session.lock();
+            REQUIRE(session);
+
+            auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
+            if (error_code == sync::ProtocolError::initial_sync_not_completed) {
+                return SyncClientHookAction::NoAction;
+            }
+
+            REQUIRE(error_code == sync::ProtocolError::bad_schema_version);
+            // Pause and resume the session the first time the a schema migration is required.
+            if (++bad_schema_version_count == 1) {
+                session->pause();
+                session->resume();
+            }
+            return SyncClientHookAction::NoAction;
+        };
+
+    auto [ref, error] = async_open_realm(config);
+    REQUIRE(ref);
+    REQUIRE_FALSE(error);
+    REQUIRE(bad_schema_version_count == 2);
+}
+
+TEST_CASE("flx: client reset during schema migration", "[sync][flx][schema migration][baas]") {
+    std::vector<ObjectSchema> schema_v0{
+        {"TopLevel",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+          {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+          {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}},
+        {"TopLevel2",
+         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+          {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+          {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}},
+    };
+
+    FLXSyncTestHarness harness("flx_schema_versions", {schema_v0, {"queryable_str_field", "queryable_int_field"}});
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+
+    const AppSession& app_session = harness.session().app_session();
+    set_schema_versioning_feature_flag(app_session.server_app_id, *harness.app()->current_user());
+
+    {
+        config.schema_version = 0;
+        auto realm = Realm::get_shared_realm(config);
+        subscribe_to_all_and_bootstrap(*realm);
+        realm->sync_session()->pause();
+
+        realm->begin_transaction();
+        CppContext c(realm);
+        Object::create(c, realm, "TopLevel",
+                       std::any(AnyDict{{"_id", ObjectId::gen()},
+                                        {"queryable_str_field", "foo"s},
+                                        {"queryable_int_field", static_cast<int64_t>(15)},
+                                        {"non_queryable_field", "non queryable 1"s}}));
+        realm->commit_transaction();
+        realm->close();
+    }
+
+    auto schema_v1 = schema_v0;
+    // Make field 'non_queryable_field' of table 'TopLevel' required.
+    schema_v1[0].persisted_properties.back() = {"non_queryable_field", PropertyType::String};
+    {
+        auto create_config = app_session.config;
+        create_config.schema = schema_v1;
+        app_session.admin_api.create_schema(app_session.server_app_id, create_config);
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+    }
+
+    // {
+    //     config.schema_version = 0;
+    //     auto realm = Realm::get_shared_realm(config);
+    //     wait_for_download(*realm);
+    //     wait_for_upload(*realm);
+    // }
+
+    config.schema_version = 1;
+    config.schema = schema_v1;
+    config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+    config.sync_config->on_sync_client_event_hook = [&harness, schema_version_changed_count =
+                                                                   0](std::weak_ptr<SyncSession> weak_session,
+                                                                      const SyncClientHookData& data) mutable {
+        if (data.event != SyncClientHookEvent::ErrorMessageReceived &&
+            data.event != SyncClientHookEvent::DownloadMessageReceived) {
+            return SyncClientHookAction::NoAction;
+        }
+        auto session = weak_session.lock();
+        REQUIRE(session);
+
+        if (data.event == SyncClientHookEvent::DownloadMessageReceived) {
+            if (schema_version_changed_count == 1) {
+                return SyncClientHookAction::EarlyReturn;
+            }
+            return SyncClientHookAction::NoAction;
+        }
+
+        auto error_code = sync::ProtocolError(data.error_info->raw_error_code);
+        if (error_code == sync::ProtocolError::initial_sync_not_completed) {
+            return SyncClientHookAction::NoAction;
+        }
+
+        if (error_code == sync::ProtocolError::schema_version_changed) {
+            ++schema_version_changed_count;
+            if (schema_version_changed_count == 1) {
+                reset_utils::trigger_client_reset(harness.session().app_session());
+            }
+        }
+
+        return SyncClientHookAction::NoAction;
+    };
+
+    auto [ref, error] = async_open_realm(config);
+    REQUIRE(ref);
+    REQUIRE_FALSE(error);
 }
 
 } // namespace realm::app
