@@ -174,14 +174,6 @@ public:
         }
         return realm::not_found;
     }
-    void move_from(KeyValues& other)
-    {
-        *this = std::move(other);
-    }
-    void copy_from(const KeyValues& other)
-    {
-        *this = other;
-    }
 
 private:
     bool m_attached = false;
@@ -500,8 +492,8 @@ inline TableView::TableView(const TableView& tv)
     , m_query(tv.m_query)
     , m_limit(tv.m_limit)
     , m_last_seen_versions(tv.m_last_seen_versions)
+    , m_key_values(tv.m_key_values)
 {
-    m_key_values.copy_from(tv.m_key_values);
 }
 
 inline TableView::TableView(TableView&& tv) noexcept
@@ -515,15 +507,15 @@ inline TableView::TableView(TableView&& tv) noexcept
     // if we are created from a table view which is outdated, take care to use the outdated
     // version number so that we can later trigger a sync if needed.
     , m_last_seen_versions(std::move(tv.m_last_seen_versions))
+    , m_key_values(std::move(tv.m_key_values))
 {
-    m_key_values.move_from(tv.m_key_values);
 }
 
 inline TableView& TableView::operator=(TableView&& tv) noexcept
 {
     m_table = std::move(tv.m_table);
 
-    m_key_values.move_from(tv.m_key_values);
+    m_key_values = std::move(tv.m_key_values);
     m_query = std::move(tv.m_query);
     m_last_seen_versions = tv.m_last_seen_versions;
     m_limit = tv.m_limit;
@@ -540,7 +532,7 @@ inline TableView& TableView::operator=(const TableView& tv)
     if (this == &tv)
         return *this;
 
-    m_key_values.copy_from(tv.m_key_values);
+    m_key_values = tv.m_key_values;
 
     m_query = tv.m_query;
     m_last_seen_versions = tv.m_last_seen_versions;

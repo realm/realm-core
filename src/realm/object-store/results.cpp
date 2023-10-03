@@ -970,10 +970,10 @@ Results Results::distinct(std::vector<std::string> const& keypaths) const
     return distinct({std::move(column_keys)});
 }
 
-Results Results::filter_by_method(FilterDescriptor&& predicate) const
+Results Results::filter_by_method(std::function<bool(const Obj&)>&& predicate) const
 {
     DescriptorOrdering new_order = m_descriptor_ordering;
-    new_order.append_filter(std::move(predicate));
+    new_order.append_filter(FilterDescriptor(std::move(predicate)));
     util::CheckedUniqueLock lock(m_mutex);
     if (m_mode == Mode::Collection)
         return Results(m_realm, m_collection, std::move(new_order));

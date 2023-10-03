@@ -52,11 +52,11 @@ TableView::TableView(TableView& src, Transaction* tr, PayloadPolicy policy_mode)
 
     // don't use methods which throw after this point...or m_table_view_key_values will leak
     if (policy_mode == PayloadPolicy::Copy && src.m_key_values.is_attached()) {
-        m_key_values.copy_from(src.m_key_values);
+        m_key_values = src.m_key_values;
     }
     else if (policy_mode == PayloadPolicy::Move && src.m_key_values.is_attached())
         // Requires that 'src' is a writable object
-        m_key_values.move_from(src.m_key_values);
+        m_key_values = std::move(src.m_key_values);
     else {
         m_key_values.create();
     }

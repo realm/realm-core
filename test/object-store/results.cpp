@@ -3086,9 +3086,9 @@ TEST_CASE("notifications: results", "[notifications][results]") {
     }
 
     SECTION("filter notifications") {
-        results = results.filter_by_method(FilterDescriptor([&](const Obj& obj) {
+        results = results.filter_by_method([&](const Obj& obj) {
             return obj.get<Int>(col_value) > 5;
-        }));
+        });
 
         int notification_calls = 0;
         CollectionChangeSet change;

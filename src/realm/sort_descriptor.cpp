@@ -378,7 +378,7 @@ void FilterDescriptor::execute(const Table& table, KeyValues& key_values, const 
             filtered.add(key);
         }
     }
-    key_values.move_from(filtered);
+    key_values = std::move(filtered);
 }
 
 // This function must conform to 'is less' predicate - that is:

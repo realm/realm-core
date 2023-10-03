@@ -157,7 +157,9 @@ public:
     Results distinct(std::vector<std::string> const& keypaths) const REQUIRES(!m_mutex);
 
     // Create a new Results by filtering using a user supplied function.
-    Results filter_by_method(FilterDescriptor&& predicate) const REQUIRES(!m_mutex);
+    // The user supplied function can be called from any thread, so it has
+    // to be a pure function or at least thread safe.
+    Results filter_by_method(std::function<bool(const Obj&)>&& predicate) const REQUIRES(!m_mutex);
 
     // Create a new Results with only the first `max_count` entries
     Results limit(size_t max_count) const REQUIRES(!m_mutex);
