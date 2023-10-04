@@ -24,6 +24,7 @@
 #include "realm/uuid.hpp"
 #include "realm/util/base64.hpp"
 #include "realm/util/overload.hpp"
+#include "realm/object-store/class.hpp"
 
 #define YY_NO_UNISTD_H 1
 #define YY_NO_INPUT 1
@@ -71,21 +72,6 @@ const char* expression_cmp_type_to_str(util::Optional<ExpressionComparisonType> 
     }
     return "";
 }
-
-
-static std::map<int, std::string> opstr = {
-    {CompareNode::EQUAL, "="},
-    {CompareNode::NOT_EQUAL, "!="},
-    {CompareNode::GREATER, ">"},
-    {CompareNode::LESS, "<"},
-    {CompareNode::GREATER_EQUAL, ">="},
-    {CompareNode::LESS_EQUAL, "<="},
-    {CompareNode::BEGINSWITH, "beginswith"},
-    {CompareNode::ENDSWITH, "endswith"},
-    {CompareNode::CONTAINS, "contains"},
-    {CompareNode::LIKE, "like"},
-    {CompareNode::IN, "in"},
-};
 
 std::string print_pretty_objlink(const ObjLink& link, const Group* g)
 {
@@ -311,6 +297,37 @@ namespace realm {
 
 namespace query_parser {
 
+std::string_view string_for_op(CompareType op)
+{
+    switch (op) {
+        case CompareType::EQUAL:
+            return "=";
+        case CompareType::NOT_EQUAL:
+            return "!=";
+        case CompareType::GREATER:
+            return ">";
+        case CompareType::LESS:
+            return "<";
+        case CompareType::GREATER_EQUAL:
+            return ">=";
+        case CompareType::LESS_EQUAL:
+            return "<=";
+        case CompareType::BEGINSWITH:
+            return "beginswith";
+        case CompareType::ENDSWITH:
+            return "endswith";
+        case CompareType::CONTAINS:
+            return "contains";
+        case CompareType::LIKE:
+            return "like";
+        case CompareType::IN:
+            return "in";
+        case CompareType::TEXT:
+            return "text";
+    }
+    return ""; // appease MSVC warnings
+}
+
 NoArguments ParserDriver::s_default_args;
 query_parser::KeyPathMapping ParserDriver::s_default_mapping;
 
@@ -348,7 +365,7 @@ Query AndNode::visit(ParserDriver* drv)
     return q;
 }
 
-static void verify_only_string_types(DataType type, const std::string& op_string)
+static void verify_only_string_types(DataType type, std::string_view op_string)
 {
     if (type != type_String && type != type_Binary && type != type_Mixed) {
         throw InvalidQueryError(util::format(
@@ -502,7 +519,7 @@ Query EqualityNode::visit(ParserDriver* drv)
         }
     }
 
-    if (op == CompareNode::IN) {
+    if (op == CompareType::IN) {
         Subexpr* r = right.get();
         if (!r->has_multiple_values()) {
             throw InvalidQueryArgError("The keypath following 'IN' must contain a list. Found '" +
@@ -523,11 +540,11 @@ Query EqualityNode::visit(ParserDriver* drv)
                 for (auto val : *link_values) {
                     values.emplace_back(val.is_null() ? ObjKey() : val.get<ObjKey>());
                 }
-                if (op == CompareNode::EQUAL) {
+                if (op == CompareType::EQUAL) {
                     return drv->m_base_table->where().links_to(link_column->link_map().get_first_column_key(),
                                                                values);
                 }
-                else if (op == CompareNode::NOT_EQUAL) {
+                else if (op == CompareType::NOT_EQUAL) {
                     return drv->m_base_table->where().not_links_to(link_column->link_map().get_first_column_key(),
                                                                    values);
                 }
@@ -541,11 +558,13 @@ Query EqualityNode::visit(ParserDriver* drv)
             auto col_key = prop->column_key();
             if (val.is_null()) {
                 switch (op) {
-                    case CompareNode::EQUAL:
-                    case CompareNode::IN:
+                    case CompareType::EQUAL:
+                    case CompareType::IN:
                         return drv->m_base_table->where().equal(col_key, realm::null());
-                    case CompareNode::NOT_EQUAL:
+                    case CompareType::NOT_EQUAL:
                         return drv->m_base_table->where().not_equal(col_key, realm::null());
+                    default:
+                        break;
                 }
             }
             switch (left->get_type()) {
@@ -578,22 +597,26 @@ Query EqualityNode::visit(ParserDriver* drv)
     }
     if (case_sensitive) {
         switch (op) {
-            case CompareNode::EQUAL:
-            case CompareNode::IN:
+            case CompareType::EQUAL:
+            case CompareType::IN:
                 return Query(std::unique_ptr<Expression>(new Compare<Equal>(std::move(left), std::move(right))));
-            case CompareNode::NOT_EQUAL:
+            case CompareType::NOT_EQUAL:
                 return Query(std::unique_ptr<Expression>(new Compare<NotEqual>(std::move(left), std::move(right))));
+            default:
+                break;
         }
     }
     else {
-        verify_only_string_types(right_type, opstr[op] + "[c]");
+        verify_only_string_types(right_type, util::format("%1%2", string_for_op(op), "[c]"));
         switch (op) {
-            case CompareNode::EQUAL:
-            case CompareNode::IN:
+            case CompareType::EQUAL:
+            case CompareType::IN:
                 return Query(std::unique_ptr<Expression>(new Compare<EqualIns>(std::move(left), std::move(right))));
-            case CompareNode::NOT_EQUAL:
+            case CompareType::NOT_EQUAL:
                 return Query(
                     std::unique_ptr<Expression>(new Compare<NotEqualIns>(std::move(left), std::move(right))));
+            default:
+                break;
         }
     }
     return {};
@@ -615,8 +638,8 @@ Query BetweenNode::visit(ParserDriver* drv)
 
     auto& min(limits->elements.at(0));
     auto& max(limits->elements.at(1));
-    RelationalNode cmp1(prop, CompareNode::GREATER_EQUAL, min);
-    RelationalNode cmp2(prop, CompareNode::LESS_EQUAL, max);
+    RelationalNode cmp1(prop, CompareType::GREATER_EQUAL, min);
+    RelationalNode cmp2(prop, CompareType::LESS_EQUAL, max);
 
     Query q(drv->m_base_table);
     q.and_query(cmp1.visit(drv));
@@ -638,7 +661,7 @@ Query RelationalNode::visit(ParserDriver* drv)
     if (left_type == type_Link || left_type == type_TypeOfValue) {
         throw InvalidQueryError(util::format(
             "Unsupported operator %1 in query. Only equal (==) and not equal (!=) are supported for this type.",
-            opstr[op]));
+            string_for_op(op)));
     }
 
     if (!(left_type_is_null || right_type_is_null) && (!left_type.is_valid() || !right_type.is_valid() ||
@@ -685,14 +708,16 @@ Query RelationalNode::visit(ParserDriver* drv)
         }
     }
     switch (op) {
-        case CompareNode::GREATER:
+        case CompareType::GREATER:
             return Query(std::unique_ptr<Expression>(new Compare<Greater>(std::move(left), std::move(right))));
-        case CompareNode::LESS:
+        case CompareType::LESS:
             return Query(std::unique_ptr<Expression>(new Compare<Less>(std::move(left), std::move(right))));
-        case CompareNode::GREATER_EQUAL:
+        case CompareType::GREATER_EQUAL:
             return Query(std::unique_ptr<Expression>(new Compare<GreaterEqual>(std::move(left), std::move(right))));
-        case CompareNode::LESS_EQUAL:
+        case CompareType::LESS_EQUAL:
             return Query(std::unique_ptr<Expression>(new Compare<LessEqual>(std::move(left), std::move(right))));
+        default:
+            break;
     }
     return {};
 }
@@ -705,7 +730,7 @@ Query StringOpsNode::visit(ParserDriver* drv)
     auto right_type = right->get_type();
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
 
-    verify_only_string_types(right_type, opstr[op]);
+    verify_only_string_types(right_type, string_for_op(op));
 
     if (prop && !prop->links_exist() && right->has_single_value() &&
         (left_type == right_type || left_type == type_Mixed)) {
@@ -714,64 +739,98 @@ Query StringOpsNode::visit(ParserDriver* drv)
             StringData val = right->get_mixed().get_string();
 
             switch (op) {
-                case CompareNode::BEGINSWITH:
+                case CompareType::BEGINSWITH:
                     return drv->m_base_table->where().begins_with(col_key, val, case_sensitive);
-                case CompareNode::ENDSWITH:
+                case CompareType::ENDSWITH:
                     return drv->m_base_table->where().ends_with(col_key, val, case_sensitive);
-                case CompareNode::CONTAINS:
+                case CompareType::CONTAINS:
                     return drv->m_base_table->where().contains(col_key, val, case_sensitive);
-                case CompareNode::LIKE:
+                case CompareType::LIKE:
                     return drv->m_base_table->where().like(col_key, val, case_sensitive);
-                case CompareNode::TEXT:
+                case CompareType::TEXT:
                     return drv->m_base_table->where().fulltext(col_key, val);
+                case CompareType::IN:
+                case CompareType::EQUAL:
+                case CompareType::NOT_EQUAL:
+                case CompareType::GREATER:
+                case CompareType::LESS:
+                case CompareType::GREATER_EQUAL:
+                case CompareType::LESS_EQUAL:
+                    break;
             }
         }
         else if (right_type == type_Binary) {
             BinaryData val = right->get_mixed().get_binary();
 
             switch (op) {
-                case CompareNode::BEGINSWITH:
+                case CompareType::BEGINSWITH:
                     return drv->m_base_table->where().begins_with(col_key, val, case_sensitive);
-                case CompareNode::ENDSWITH:
+                case CompareType::ENDSWITH:
                     return drv->m_base_table->where().ends_with(col_key, val, case_sensitive);
-                case CompareNode::CONTAINS:
+                case CompareType::CONTAINS:
                     return drv->m_base_table->where().contains(col_key, val, case_sensitive);
-                case CompareNode::LIKE:
+                case CompareType::LIKE:
                     return drv->m_base_table->where().like(col_key, val, case_sensitive);
+                case CompareType::TEXT:
+                case CompareType::IN:
+                case CompareType::EQUAL:
+                case CompareType::NOT_EQUAL:
+                case CompareType::GREATER:
+                case CompareType::LESS:
+                case CompareType::GREATER_EQUAL:
+                case CompareType::LESS_EQUAL:
+                    break;
             }
         }
     }
 
     if (case_sensitive) {
         switch (op) {
-            case CompareNode::BEGINSWITH:
+            case CompareType::BEGINSWITH:
                 return Query(std::unique_ptr<Expression>(new Compare<BeginsWith>(std::move(right), std::move(left))));
-            case CompareNode::ENDSWITH:
+            case CompareType::ENDSWITH:
                 return Query(std::unique_ptr<Expression>(new Compare<EndsWith>(std::move(right), std::move(left))));
-            case CompareNode::CONTAINS:
+            case CompareType::CONTAINS:
                 return Query(std::unique_ptr<Expression>(new Compare<Contains>(std::move(right), std::move(left))));
-            case CompareNode::LIKE:
+            case CompareType::LIKE:
                 return Query(std::unique_ptr<Expression>(new Compare<Like>(std::move(right), std::move(left))));
-            case CompareNode::TEXT: {
+            case CompareType::TEXT: {
                 StringData val = right->get_mixed().get_string();
                 auto string_prop = dynamic_cast<Columns<StringData>*>(left.get());
                 return string_prop->fulltext(val);
             }
+            case CompareType::IN:
+            case CompareType::EQUAL:
+            case CompareType::NOT_EQUAL:
+            case CompareType::GREATER:
+            case CompareType::LESS:
+            case CompareType::GREATER_EQUAL:
+            case CompareType::LESS_EQUAL:
+                break;
         }
     }
     else {
         switch (op) {
-            case CompareNode::BEGINSWITH:
+            case CompareType::BEGINSWITH:
                 return Query(
                     std::unique_ptr<Expression>(new Compare<BeginsWithIns>(std::move(right), std::move(left))));
-            case CompareNode::ENDSWITH:
+            case CompareType::ENDSWITH:
                 return Query(
                     std::unique_ptr<Expression>(new Compare<EndsWithIns>(std::move(right), std::move(left))));
-            case CompareNode::CONTAINS:
+            case CompareType::CONTAINS:
                 return Query(
                     std::unique_ptr<Expression>(new Compare<ContainsIns>(std::move(right), std::move(left))));
-            case CompareNode::LIKE:
+            case CompareType::LIKE:
                 return Query(std::unique_ptr<Expression>(new Compare<LikeIns>(std::move(right), std::move(left))));
+            case CompareType::IN:
+            case CompareType::EQUAL:
+            case CompareType::NOT_EQUAL:
+            case CompareType::GREATER:
+            case CompareType::LESS:
+            case CompareType::GREATER_EQUAL:
+            case CompareType::LESS_EQUAL:
+            case CompareType::TEXT:
+                break;
         }
     }
     return {};
@@ -794,29 +853,65 @@ Query GeoWithinNode::visit(ParserDriver* drv)
         auto geo_value = dynamic_cast<const ConstantGeospatialValue*>(right.get());
         return link_column->geo_within(geo_value->get_mixed().get<Geospatial>());
     }
-    else {
-        size_t arg_no = size_t(strtol(argument.substr(1).c_str(), nullptr, 10));
-        auto right_type = drv->m_args.is_argument_null(arg_no) ? DataType(-1) : drv->m_args.type_for_argument(arg_no);
-        if (right_type != type_Geospatial) {
-            throw InvalidQueryError(util::format("The right hand side of 'geoWithin' must be a geospatial constant "
-                                                 "value. But the provided type is '%1'",
-                                                 get_data_type_name(right_type)));
-        }
-        Geospatial geo = drv->m_args.geospatial_for_argument(arg_no);
 
-        if (geo.get_type() == Geospatial::Type::Invalid) {
-            throw InvalidQueryError(
-                util::format("The right hand side of 'geoWithin' must be a valid Geospatial value, got '%1'", geo));
+    REALM_ASSERT_3(argument.size(), >, 1);
+    REALM_ASSERT_3(argument[0], ==, '$');
+    size_t arg_no = size_t(strtol(argument.substr(1).c_str(), nullptr, 10));
+    auto right_type = drv->m_args.is_argument_null(arg_no) ? DataType(-1) : drv->m_args.type_for_argument(arg_no);
+
+    Geospatial geo_from_argument;
+    if (right_type == type_Geospatial) {
+        geo_from_argument = drv->m_args.geospatial_for_argument(arg_no);
+    }
+    else if (right_type == type_String) {
+        // This is a "hack" to allow users to pass in geospatial objects
+        // serialized as a string instead of as a native type. This is because
+        // the CAPI doesn't have support for marshalling polygons (of variable length)
+        // yet and that project was deprioritized to geospatial phase 2. This should be
+        // removed once SDKs are all using the binding generator.
+        std::string str_val = drv->m_args.string_for_argument(arg_no);
+        const std::string simulated_prefix = "simulated GEOWITHIN ";
+        str_val = simulated_prefix + str_val;
+        ParserDriver sub_driver;
+        try {
+            sub_driver.parse(str_val);
         }
-        Status geo_status = geo.is_valid();
-        if (!geo_status.is_ok()) {
-            throw InvalidQueryError(
-                util::format("The Geospatial query argument region is invalid: '%1'", geo_status.reason()));
+        catch (const std::exception& ex) {
+            std::string doctored_err = ex.what();
+            size_t prefix_location = doctored_err.find(simulated_prefix);
+            if (prefix_location != std::string::npos) {
+                doctored_err.erase(prefix_location, simulated_prefix.size());
+            }
+            throw InvalidQueryError(util::format(
+                "Invalid syntax in serialized geospatial object at argument %1: '%2'", arg_no, doctored_err));
         }
-        return link_column->geo_within(geo);
+        GeoWithinNode* node = dynamic_cast<GeoWithinNode*>(sub_driver.result);
+        REALM_ASSERT(node);
+        if (node->geo) {
+            if (node->geo->m_geo.get_type() != Geospatial::Type::Invalid) {
+                geo_from_argument = node->geo->m_geo;
+            }
+            else {
+                geo_from_argument = GeoPolygon{node->geo->m_points};
+            }
+        }
+    }
+    else {
+        throw InvalidQueryError(util::format("The right hand side of 'geoWithin' must be a geospatial constant "
+                                             "value. But the provided type is '%1'",
+                                             get_data_type_name(right_type)));
     }
 
-    REALM_UNREACHABLE();
+    if (geo_from_argument.get_type() == Geospatial::Type::Invalid) {
+        throw InvalidQueryError(util::format(
+            "The right hand side of 'geoWithin' must be a valid Geospatial value, got '%1'", geo_from_argument));
+    }
+    Status geo_status = geo_from_argument.is_valid();
+    if (!geo_status.is_ok()) {
+        throw InvalidQueryError(
+            util::format("The Geospatial query argument region is invalid: '%1'", geo_status.reason()));
+    }
+    return link_column->geo_within(geo_from_argument);
 }
 #endif
 

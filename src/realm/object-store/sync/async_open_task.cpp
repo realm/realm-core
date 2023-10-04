@@ -122,18 +122,17 @@ void AsyncOpenTask::attach_to_subscription_initializer(AsyncOpenCallback&& async
                                                        std::shared_ptr<_impl::RealmCoordinator> coordinator,
                                                        bool rerun_on_launch)
 {
-    // Subscription initialization will occure in either of these 2 cases.
-    // 1. The realm file has been created (this is the first time we ever open the file). The latest
-    //    subscription version must be 0 when we open realm for the first time, and then become 1 as soon as the
-    //    subscription is committed. This will happen when the subscription initializer callback is invoked by
-    //    coordinator->get_realm().
-    // 2. we are instructed to run the subscription initializer via sync_config->rerun_init_subscription_on_open.
-    //    But we do that only if this is the first time we open realm.
+    // Attaching the subscription initializer to the latest subscription that was committed.
+    // This is going to be enough, for waiting that the subscription committed by init_subscription_initializer has
+    // been completed (either if it is the first time that the file is created or if rerun on launch was set to true).
+    // If the same Realm file is already opened, there is the possibility that this code may wait on a subscription
+    // that was not committed by init_subscription_initializer.
 
-    auto shared_realm = coordinator->get_realm();
+    auto shared_realm = coordinator->get_realm(nullptr, m_db_first_open);
     const auto init_subscription = shared_realm->get_latest_subscription_set();
+    const auto sub_state = init_subscription.state();
 
-    if (init_subscription.version() == 1 || (rerun_on_launch && m_db_first_open)) {
+    if ((sub_state != sync::SubscriptionSet::State::Complete) || (m_db_first_open && rerun_on_launch)) {
         // We need to wait until subscription initializer completes
         std::shared_ptr<AsyncOpenTask> self(shared_from_this());
         init_subscription.get_state_change_notification(sync::SubscriptionSet::State::Complete)

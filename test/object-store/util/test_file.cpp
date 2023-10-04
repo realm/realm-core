@@ -16,12 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <util/test_file.hpp>
+#include "util/test_file.hpp"
 
-#include <util/test_utils.hpp>
-#include <util/sync/baas_admin_api.hpp>
-
-#include <../util/crypt_key.hpp>
+#include "util/test_utils.hpp"
+#include "util/sync/baas_admin_api.hpp"
+#include "../util/crypt_key.hpp"
+#include "../util/test_path.hpp"
 
 #include <realm/db.hpp>
 #include <realm/disable_sync_to_disk.hpp>
@@ -32,6 +32,9 @@
 #include <realm/util/file.hpp>
 
 #if REALM_ENABLE_SYNC
+#include <realm/object-store/sync/mongo_client.hpp>
+#include <realm/object-store/sync/mongo_database.hpp>
+#include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
@@ -131,8 +134,7 @@ static const std::string fake_device_id = "123400000000000000000000";
 
 static std::shared_ptr<SyncUser> get_fake_user(app::App& app, const std::string& user_name)
 {
-    return app.sync_manager()->get_user(user_name, fake_refresh_token, fake_access_token, app.base_url(),
-                                        fake_device_id);
+    return app.sync_manager()->get_user(user_name, fake_refresh_token, fake_access_token, fake_device_id);
 }
 
 SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std::string user_name)
@@ -196,24 +198,30 @@ SyncServer::SyncServer(const SyncServer::Config& config)
                    using namespace std::literals::chrono_literals;
 
 #if TEST_ENABLE_LOGGING
-                   auto logger = new util::StderrLogger(realm::util::Logger::Level::TEST_LOGGING_LEVEL);
-                   m_logger.reset(logger);
+                   m_logger = util::Logger::get_default_logger();
+
 #else
                    // Logging is disabled, use a NullLogger to prevent printing anything
                    m_logger.reset(new util::NullLogger());
 #endif
 
-                   sync::Server::Config config;
-                   config.logger = m_logger;
-                   config.token_expiration_clock = this;
-                   config.listen_address = "127.0.0.1";
-                   config.disable_sync_to_disk = true;
+                   sync::Server::Config c;
+                   c.logger = m_logger;
+                   c.token_expiration_clock = this;
+                   c.listen_address = "127.0.0.1";
+                   c.disable_sync_to_disk = true;
+                   c.ssl = config.ssl;
+                   if (c.ssl) {
+                       c.ssl_certificate_path = test_util::get_test_resource_path() + "test_util_network_ssl_ca.pem";
+                       c.ssl_certificate_key_path =
+                           test_util::get_test_resource_path() + "test_util_network_ssl_key.pem";
+                   }
 
-                   return config;
+                   return c;
                })())
 {
     m_server.start();
-    m_url = util::format("ws://127.0.0.1:%1", m_server.listen_endpoint().port());
+    m_url = util::format("%1://127.0.0.1:%2", config.ssl ? "wss" : "ws", m_server.listen_endpoint().port());
     if (config.start_immediately)
         start();
 }
@@ -369,6 +377,47 @@ TestAppSession::~TestAppSession()
     }
 }
 
+std::vector<bson::BsonDocument> TestAppSession::get_documents(SyncUser& user, const std::string& object_type,
+                                                              size_t expected_count) const
+{
+    app::MongoClient remote_client = user.mongo_client("BackingDB");
+    app::MongoDatabase db = remote_client.db(m_app_session->config.mongo_dbname);
+    app::MongoCollection collection = db[object_type];
+    int sleep_time = 10;
+    timed_wait_for(
+        [&] {
+            uint64_t count = 0;
+            collection.count({}, [&](uint64_t c, util::Optional<app::AppError> error) {
+                REQUIRE(!error);
+                count = c;
+            });
+            if (count < expected_count) {
+                // querying the server too frequently makes it take longer to process the sync changesets we're
+                // waiting for
+                millisleep(sleep_time);
+                if (sleep_time < 500) {
+                    sleep_time *= 2;
+                }
+                return false;
+            }
+            return true;
+        },
+        std::chrono::minutes(5));
+
+    std::vector<bson::BsonDocument> documents;
+    collection.find({}, {},
+                    [&](util::Optional<std::vector<bson::Bson>>&& result, util::Optional<app::AppError> error) {
+                        REQUIRE(result);
+                        REQUIRE(!error);
+                        REQUIRE(result->size() == expected_count);
+                        documents.reserve(result->size());
+                        for (auto&& bson : *result) {
+                            REQUIRE(bson.type() == bson::Bson::Type::Document);
+                            documents.push_back(std::move(static_cast<bson::BsonDocument&>(bson)));
+                        }
+                    });
+    return documents;
+}
 #endif // REALM_ENABLE_AUTH_TESTS
 
 // MARK: - TestSyncManager

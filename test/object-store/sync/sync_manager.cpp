@@ -39,13 +39,12 @@ static const std::string dummy_device_id = "123400000000000000000000";
 
 namespace {
 bool validate_user_in_vector(std::vector<std::shared_ptr<SyncUser>> vector, const std::string& identity,
-                             const std::string& provider_type, const std::string& refresh_token,
-                             const std::string& access_token, const std::string& device_id)
+                             const std::string& refresh_token, const std::string& access_token,
+                             const std::string& device_id)
 {
     for (auto& user : vector) {
         if (user->identity() == identity && user->refresh_token() == refresh_token &&
-            provider_type == user->provider_type() && user->access_token() == access_token && user->has_device_id() &&
-            user->device_id() == device_id) {
+            user->access_token() == access_token && user->has_device_id() && user->device_id() == device_id) {
             return true;
         }
     }
@@ -63,7 +62,6 @@ TEST_CASE("sync_manager: basic properties and APIs", "[sync][sync manager]") {
 }
 
 TEST_CASE("sync_manager: `path_for_realm` API", "[sync][sync manager]") {
-    const std::string auth_server_url = "https://realm.example.org";
     const std::string raw_url = "realms://realm.example.org/a/b/~/123456/xyz";
 
     SECTION("should work properly without metadata") {
@@ -73,8 +71,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync][sync manager]") {
         auto base_path = fs::path{tsm.base_file_path()}.make_preferred() / "mongodb-realm" / "app_id" / identity;
         const auto expected = base_path / "realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz.realm";
         auto user = tsm.app()->sync_manager()->get_user(identity, ENCODE_FAKE_JWT("dummy_token"),
-                                                        ENCODE_FAKE_JWT("not_a_real_token"), auth_server_url,
-                                                        dummy_device_id);
+                                                        ENCODE_FAKE_JWT("not_a_real_token"), dummy_device_id);
         REQUIRE(user->identity() == identity);
         SyncConfig config(user, bson::Bson{});
         REQUIRE(tsm.app()->sync_manager()->path_for_realm(config, raw_url) == expected);
@@ -89,8 +86,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync][sync manager]") {
         auto base_path = fs::path{tsm.base_file_path()}.make_preferred() / "mongodb-realm" / "app_id" / identity;
         const auto expected = base_path / "realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz.realm";
         auto user = tsm.app()->sync_manager()->get_user(identity, ENCODE_FAKE_JWT("dummy_token"),
-                                                        ENCODE_FAKE_JWT("not_a_real_token"), auth_server_url,
-                                                        dummy_device_id);
+                                                        ENCODE_FAKE_JWT("not_a_real_token"), dummy_device_id);
         REQUIRE(user->identity() == identity);
         SyncConfig config(user, bson::Bson{});
         REQUIRE(tsm.app()->sync_manager()->path_for_realm(config, raw_url) == expected);
@@ -104,8 +100,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync][sync manager]") {
         const std::string identity = random_string(10);
         auto base_path = fs::path{tsm.base_file_path()}.make_preferred() / "mongodb-realm" / "app_id" / identity;
         auto user = tsm.app()->sync_manager()->get_user(identity, ENCODE_FAKE_JWT("dummy_token"),
-                                                        ENCODE_FAKE_JWT("not_a_real_token"), auth_server_url,
-                                                        dummy_device_id);
+                                                        ENCODE_FAKE_JWT("not_a_real_token"), dummy_device_id);
 
         // Directory should not be created until we get the path
         REQUIRE_DIR_PATH_DOES_NOT_EXIST(base_path);
@@ -184,10 +179,6 @@ TEST_CASE("sync_manager: user state management", "[sync][sync manager]") {
     TestSyncManager init_sync_manager(SyncManager::MetadataMode::NoEncryption);
     auto sync_manager = init_sync_manager.app()->sync_manager();
 
-    const std::string url_1 = "https://realm.example.org/1/";
-    const std::string url_2 = "https://realm.example.org/2/";
-    const std::string url_3 = "https://realm.example.org/3/";
-
     const std::string r_token_1 = ENCODE_FAKE_JWT("foo_token");
     const std::string r_token_2 = ENCODE_FAKE_JWT("bar_token");
     const std::string r_token_3 = ENCODE_FAKE_JWT("baz_token");
@@ -201,78 +192,66 @@ TEST_CASE("sync_manager: user state management", "[sync][sync manager]") {
     const std::string identity_3 = "user-baz";
 
     SECTION("should get all users that are created during run time") {
-        sync_manager->get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
-        sync_manager->get_user(identity_2, r_token_2, a_token_2, url_2, dummy_device_id);
+        sync_manager->get_user(identity_1, r_token_1, a_token_1, dummy_device_id);
+        sync_manager->get_user(identity_2, r_token_2, a_token_2, dummy_device_id);
         auto users = sync_manager->all_users();
         REQUIRE(users.size() == 2);
-        CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1, dummy_device_id));
-        CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2, dummy_device_id));
-    }
-
-    SECTION("should be able to distinguish users based solely on URL") {
-        sync_manager->get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
-        sync_manager->get_user(identity_1, r_token_1, a_token_1, url_2, dummy_device_id);
-        sync_manager->get_user(identity_1, r_token_1, a_token_1, url_3, dummy_device_id);
-        sync_manager->get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id); // existing
-        auto users = sync_manager->all_users();
-        REQUIRE(users.size() == 3);
-        CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1, dummy_device_id));
-        CHECK(validate_user_in_vector(users, identity_1, url_2, r_token_1, a_token_1, dummy_device_id));
-        CHECK(validate_user_in_vector(users, identity_1, url_2, r_token_1, a_token_1, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_1, r_token_1, a_token_1, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_2, r_token_2, a_token_2, dummy_device_id));
     }
 
     SECTION("should be able to distinguish users based solely on user ID") {
-        sync_manager->get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
-        sync_manager->get_user(identity_2, r_token_1, a_token_1, url_1, dummy_device_id);
-        sync_manager->get_user(identity_3, r_token_1, a_token_1, url_1, dummy_device_id);
-        sync_manager->get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id); // existing
+        sync_manager->get_user(identity_1, r_token_1, a_token_1, dummy_device_id);
+        sync_manager->get_user(identity_2, r_token_1, a_token_1, dummy_device_id);
+        sync_manager->get_user(identity_3, r_token_1, a_token_1, dummy_device_id);
+        sync_manager->get_user(identity_1, r_token_1, a_token_1, dummy_device_id); // existing
         auto users = sync_manager->all_users();
         REQUIRE(users.size() == 3);
-        CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1, dummy_device_id));
-        CHECK(validate_user_in_vector(users, identity_2, url_1, r_token_1, a_token_1, dummy_device_id));
-        CHECK(validate_user_in_vector(users, identity_3, url_1, r_token_1, a_token_1, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_1, r_token_1, a_token_1, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_2, r_token_1, a_token_1, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_3, r_token_1, a_token_1, dummy_device_id));
     }
 
     SECTION("should properly update state in response to users logging in and out") {
         auto r_token_3a = ENCODE_FAKE_JWT("qwerty");
         auto a_token_3a = ENCODE_FAKE_JWT("ytrewq");
 
-        auto u1 = sync_manager->get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
-        auto u2 = sync_manager->get_user(identity_2, r_token_2, a_token_2, url_2, dummy_device_id);
-        auto u3 = sync_manager->get_user(identity_3, r_token_3, a_token_3, url_3, dummy_device_id);
+        auto u1 = sync_manager->get_user(identity_1, r_token_1, a_token_1, dummy_device_id);
+        auto u2 = sync_manager->get_user(identity_2, r_token_2, a_token_2, dummy_device_id);
+        auto u3 = sync_manager->get_user(identity_3, r_token_3, a_token_3, dummy_device_id);
         auto users = sync_manager->all_users();
         REQUIRE(users.size() == 3);
-        CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1, dummy_device_id));
-        CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2, dummy_device_id));
-        CHECK(validate_user_in_vector(users, identity_3, url_3, r_token_3, a_token_3, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_1, r_token_1, a_token_1, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_2, r_token_2, a_token_2, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_3, r_token_3, a_token_3, dummy_device_id));
         // Log out users 1 and 3
         u1->log_out();
         u3->log_out();
         users = sync_manager->all_users();
         REQUIRE(users.size() == 3);
-        CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_2, r_token_2, a_token_2, dummy_device_id));
         // Log user 3 back in
-        u3 = sync_manager->get_user(identity_3, r_token_3a, a_token_3a, url_3, dummy_device_id);
+        u3 = sync_manager->get_user(identity_3, r_token_3a, a_token_3a, dummy_device_id);
         users = sync_manager->all_users();
         REQUIRE(users.size() == 3);
-        CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2, dummy_device_id));
-        CHECK(validate_user_in_vector(users, identity_3, url_3, r_token_3a, a_token_3a, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_2, r_token_2, a_token_2, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_3, r_token_3a, a_token_3a, dummy_device_id));
         // Log user 2 out
         u2->log_out();
         users = sync_manager->all_users();
         REQUIRE(users.size() == 3);
-        CHECK(validate_user_in_vector(users, identity_3, url_3, r_token_3a, a_token_3a, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_3, r_token_3a, a_token_3a, dummy_device_id));
     }
 
     SECTION("should return current user that was created during run time") {
         auto u_null = sync_manager->get_current_user();
         REQUIRE(u_null == nullptr);
 
-        auto u1 = sync_manager->get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
+        auto u1 = sync_manager->get_user(identity_1, r_token_1, a_token_1, dummy_device_id);
         auto u_current = sync_manager->get_current_user();
         REQUIRE(u_current == u1);
 
-        auto u2 = sync_manager->get_user(identity_2, r_token_2, a_token_2, url_2, dummy_device_id);
+        auto u2 = sync_manager->get_user(identity_2, r_token_2, a_token_2, dummy_device_id);
         // The current user has switched to return the most recently used: "u2"
         u_current = sync_manager->get_current_user();
         REQUIRE(u_current == u2);
@@ -290,9 +269,6 @@ TEST_CASE("sync_manager: persistent user state management", "[sync][sync manager
     // Open the metadata separately, so we can investigate it ourselves.
     SyncMetadataManager manager(file_manager.metadata_path(), false);
 
-    const std::string url_1 = "https://realm.example.org/1/";
-    const std::string url_2 = "https://realm.example.org/2/";
-    const std::string url_3 = "https://realm.example.org/3/";
     const std::string r_token_1 = ENCODE_FAKE_JWT("foo_token");
     const std::string r_token_2 = ENCODE_FAKE_JWT("bar_token");
     const std::string r_token_3 = ENCODE_FAKE_JWT("baz_token");
@@ -305,20 +281,20 @@ TEST_CASE("sync_manager: persistent user state management", "[sync][sync manager
         const std::string identity_2 = "bar-1";
         const std::string identity_3 = "baz-1";
         // First, create a few users and add them to the metadata.
-        auto u1 = manager.get_or_make_user_metadata(identity_1, url_1);
+        auto u1 = manager.get_or_make_user_metadata(identity_1);
         u1->set_access_token(a_token_1);
         u1->set_refresh_token(r_token_1);
         u1->set_device_id(dummy_device_id);
-        auto u2 = manager.get_or_make_user_metadata(identity_2, url_2);
+        auto u2 = manager.get_or_make_user_metadata(identity_2);
         u2->set_access_token(a_token_2);
         u2->set_refresh_token(r_token_2);
         u2->set_device_id(dummy_device_id);
-        auto u3 = manager.get_or_make_user_metadata(identity_3, url_3);
+        auto u3 = manager.get_or_make_user_metadata(identity_3);
         u3->set_access_token(a_token_3);
         u3->set_refresh_token(r_token_3);
         u3->set_device_id(dummy_device_id);
         // The fourth user is an "invalid" user: no token, so shouldn't show up.
-        auto u_invalid = manager.get_or_make_user_metadata("invalid_user", url_1);
+        auto u_invalid = manager.get_or_make_user_metadata("invalid_user");
         REQUIRE(manager.all_unmarked_users().size() == 4);
 
         SECTION("they should be added to the active users list when metadata is enabled") {
@@ -326,9 +302,9 @@ TEST_CASE("sync_manager: persistent user state management", "[sync][sync manager
             TestSyncManager tsm(config);
             auto users = tsm.app()->sync_manager()->all_users();
             REQUIRE(users.size() == 3);
-            REQUIRE(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1, dummy_device_id));
-            REQUIRE(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2, dummy_device_id));
-            REQUIRE(validate_user_in_vector(users, identity_3, url_3, r_token_3, a_token_3, dummy_device_id));
+            REQUIRE(validate_user_in_vector(users, identity_1, r_token_1, a_token_1, dummy_device_id));
+            REQUIRE(validate_user_in_vector(users, identity_2, r_token_2, a_token_2, dummy_device_id));
+            REQUIRE(validate_user_in_vector(users, identity_3, r_token_3, a_token_3, dummy_device_id));
         }
 
         SECTION("they should not be added to the active users list when metadata is disabled") {
@@ -348,20 +324,23 @@ TEST_CASE("sync_manager: persistent user state management", "[sync][sync manager
     std::vector<TestPath> paths_under_test;
 
     SECTION("when users are marked") {
-        const std::string provider_type = "user-pass";
         const std::string identity_1 = "foo-2";
         const std::string identity_2 = "bar-2";
         const std::string identity_3 = "baz-2";
 
         // Create the user metadata.
-        auto u1 = manager.get_or_make_user_metadata(identity_1, provider_type);
-        auto u2 = manager.get_or_make_user_metadata(identity_2, provider_type);
+        auto u1 = manager.get_or_make_user_metadata(identity_1);
+        auto u2 = manager.get_or_make_user_metadata(identity_2);
         // Don't mark this user for deletion.
-        auto u3 = manager.get_or_make_user_metadata(identity_3, provider_type);
+        auto u3 = manager.get_or_make_user_metadata(identity_3);
+
+        u1->set_legacy_identities({"legacy1"});
+        u2->set_legacy_identities({"legacy2"});
+        u3->set_legacy_identities({"legacy3"});
 
         {
             auto expected_u1_path = [&](const bson::Bson& partition) {
-                return ExpectedRealmPaths(tsm.base_file_path(), app_id, u1->identity(), u1->local_uuid(),
+                return ExpectedRealmPaths(tsm.base_file_path(), app_id, u1->identity(), u1->legacy_identities(),
                                           partition.to_string());
             };
             bson::Bson partition = "partition1";
@@ -394,12 +373,9 @@ TEST_CASE("sync_manager: persistent user state management", "[sync][sync manager
             auto sync_manager = tsm.app()->sync_manager();
 
             // Pre-populate the user directories.
-            auto user1 =
-                sync_manager->get_user(u1->identity(), r_token_1, a_token_1, u1->provider_type(), dummy_device_id);
-            auto user2 =
-                sync_manager->get_user(u2->identity(), r_token_2, a_token_2, u2->provider_type(), dummy_device_id);
-            auto user3 =
-                sync_manager->get_user(u3->identity(), r_token_3, a_token_3, u3->provider_type(), dummy_device_id);
+            auto user1 = sync_manager->get_user(u1->identity(), r_token_1, a_token_1, dummy_device_id);
+            auto user2 = sync_manager->get_user(u2->identity(), r_token_2, a_token_2, dummy_device_id);
+            auto user3 = sync_manager->get_user(u3->identity(), r_token_3, a_token_3, dummy_device_id);
             for (auto& dir : dirs_to_create) {
                 try_make_dir(dir);
             }
@@ -437,7 +413,7 @@ TEST_CASE("sync_manager: persistent user state management", "[sync][sync manager
             TestSyncManager tsm(config);
             auto users = tsm.app()->sync_manager()->all_users();
             REQUIRE(users.size() == 1);
-            REQUIRE(validate_user_in_vector(users, identity_3, provider_type, r_token_3, a_token_3, dummy_device_id));
+            REQUIRE(validate_user_in_vector(users, identity_3, r_token_3, a_token_3, dummy_device_id));
             REQUIRE_REALM_DOES_NOT_EXIST(paths[0]);
             REQUIRE_REALM_DOES_NOT_EXIST(paths[1]);
             REQUIRE_REALM_DOES_NOT_EXIST(paths[2]);
@@ -482,16 +458,13 @@ TEST_CASE("sync_manager: file actions", "[sync][sync manager]") {
     const std::string uuid_3 = "uuid-baz-1";
     const std::string uuid_4 = "uuid-baz-2";
 
-    const std::string local_uuid_1 = "foo-1";
-    const std::string local_uuid_2 = "bar-1";
-    const std::string local_uuid_3 = "baz-1";
-    const std::string local_uuid_4 = "baz-2";
+    const std::vector<std::string> legacy_identities;
 
     // Realm paths
-    const std::string realm_path_1 = file_manager.realm_file_path(uuid_1, local_uuid_1, realm_url, partition);
-    const std::string realm_path_2 = file_manager.realm_file_path(uuid_2, local_uuid_2, realm_url, partition);
-    const std::string realm_path_3 = file_manager.realm_file_path(uuid_3, local_uuid_3, realm_url, partition);
-    const std::string realm_path_4 = file_manager.realm_file_path(uuid_4, local_uuid_4, realm_url, partition);
+    const std::string realm_path_1 = file_manager.realm_file_path(uuid_1, legacy_identities, realm_url, partition);
+    const std::string realm_path_2 = file_manager.realm_file_path(uuid_2, legacy_identities, realm_url, partition);
+    const std::string realm_path_3 = file_manager.realm_file_path(uuid_3, legacy_identities, realm_url, partition);
+    const std::string realm_path_4 = file_manager.realm_file_path(uuid_4, legacy_identities, realm_url, partition);
 
     // On windows you can't delete a realm if the file is open elsewhere.
 #ifdef _WIN32
@@ -591,7 +564,7 @@ TEST_CASE("sync_manager: file actions", "[sync][sync manager]") {
 
         SECTION("should copy the Realm to the recovery_directory_path") {
             const std::string identity = "b241922032489d4836ecd0c82d0445f0";
-            const auto realm_base_path = file_manager.realm_file_path(identity, "", "realmtasks", partition);
+            const auto realm_base_path = file_manager.realm_file_path(identity, {}, "realmtasks", partition);
             std::string recovery_path = util::reserve_unique_file_name(
                 file_manager.recovery_directory_path(), util::create_timestamped_template("recovered_realm"));
             create_dummy_realm(realm_base_path);
@@ -738,9 +711,9 @@ TEST_CASE("sync_manager: set_session_multiplexing", "[sync][sync manager]") {
     sync_manager->set_session_multiplexing(sync_multiplexing_allowed);
 
     auto user_1 = sync_manager->get_user("user-name-1", ENCODE_FAKE_JWT("not_a_real_token"),
-                                         ENCODE_FAKE_JWT("samesies"), "https://realm.example.org", dummy_device_id);
+                                         ENCODE_FAKE_JWT("samesies"), dummy_device_id);
     auto user_2 = sync_manager->get_user("user-name-2", ENCODE_FAKE_JWT("not_a_real_token"),
-                                         ENCODE_FAKE_JWT("samesies"), "https://realm.example.org", dummy_device_id);
+                                         ENCODE_FAKE_JWT("samesies"), dummy_device_id);
 
     SyncTestFile file_1(user_1, "partition1", util::none);
     SyncTestFile file_2(user_1, "partition2", util::none);
@@ -784,7 +757,7 @@ TEST_CASE("sync_manager: has_existing_sessions", "[sync][sync manager][active se
     std::atomic<bool> error_handler_invoked(false);
     Realm::Config config;
     auto user = sync_manager->get_user("user-name", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("samesies"),
-                                       "https://realm.example.org", dummy_device_id);
+                                       dummy_device_id);
     auto create_session = [&](SyncSessionStopPolicy stop_policy) {
         std::shared_ptr<SyncSession> session = sync_session(
             user, "/test-dying-state",

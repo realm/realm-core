@@ -415,10 +415,6 @@ ColKey Table::add_column(Table& target, StringData name)
     Group* target_group = target.get_parent_group();
     REALM_ASSERT_RELEASE(origin_group && target_group);
     REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Only links to embedded objects are allowed.
-    if (is_asymmetric() && !target.is_embedded()) {
-        throw IllegalOperation("Object property not supported in asymmetric table");
-    }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
         throw IllegalOperation("Ephemeral objects not supported");
@@ -463,10 +459,6 @@ ColKey Table::add_column_list(Table& target, StringData name)
     Group* target_group = target.get_parent_group();
     REALM_ASSERT_RELEASE(origin_group && target_group);
     REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Only links to embedded objects are allowed.
-    if (is_asymmetric() && !target.is_embedded()) {
-        throw IllegalOperation("List of objects not supported in asymmetric table");
-    }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
         throw IllegalOperation("List of ephemeral objects not supported");
@@ -490,10 +482,6 @@ ColKey Table::add_column_set(Table& target, StringData name)
     REALM_ASSERT_RELEASE(origin_group == target_group);
     if (target.is_embedded())
         throw IllegalOperation("Set of embedded objects not supported");
-    // Outgoing links from an asymmetric table are not allowed.
-    if (is_asymmetric()) {
-        throw IllegalOperation("Set of objects not supported in asymmetric table");
-    }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
         throw IllegalOperation("Set of ephemeral objects not supported");
@@ -537,10 +525,6 @@ ColKey Table::add_column_dictionary(Table& target, StringData name, DataType key
     Group* target_group = target.get_parent_group();
     REALM_ASSERT_RELEASE(origin_group && target_group);
     REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Only links to embedded objects are allowed.
-    if (is_asymmetric() && !target.is_embedded()) {
-        throw IllegalOperation("Dictionary of objects not supported in asymmetric table");
-    }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
         throw IllegalOperation("Dictionary of ephemeral objects not supported");
