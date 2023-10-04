@@ -666,7 +666,6 @@ classes:
       get_or_create_object_with_primary_key: '(t: TableRef, pk: Mixed) -> std::pair<Obj, bool>'
       make_network_transport: '(runRequest: (request: const Request&, callback: util::UniqueFunction<(response: Response&&)>&&) off_thread) -> SharedGenericNetworkTransport'
       delete_data_for_object: '(realm: SharedRealm, object_type: StringData)'
-      is_empty_realm: '(realm: SharedRealm) -> bool'
       base64_decode: '(input: StringData) -> BinaryData'
       make_logger_factory: '(log: (level: LoggerLevel, message: const std::string&) off_thread) -> LoggerFactory'
       make_logger:  '(log: (level: LoggerLevel, message: const std::string&) off_thread) -> SharedLogger'
@@ -874,6 +873,7 @@ classes:
       is_in_transaction: bool
       is_frozen: bool
       is_in_migration: bool
+      is_empty: bool
 
       get_number_of_versions: uint64_t
       read_transaction_version: VersionID
@@ -933,7 +933,7 @@ classes:
     cppName: _impl::ObjectNotifier
     sharedPtrWrapped: SharedObjectNotifier
     constructors:
-      make: '(realm: SharedRealm, table: TableKey, obj: ObjKey)'
+      make: '(realm: SharedRealm, obj: Obj)'
     methods:
       add_callback: '(cb: (changes: ObjectChangeSet), keyPaths: util::Optional<KeyPathArray>) -> uint64_t'
       remove_callback: '(token: uint64_t)'
