@@ -131,9 +131,6 @@ functions:
               set_cmake_var realm_vars CMAKE_TOOLCHAIN_FILE PATH "${cmake_toolchain_file}"
           fi
 
-          set_cmake_var realm_vars REALM_TEST_LOGGING BOOL On
-          set_cmake_var realm_vars REALM_TEST_LOGGING_LEVEL STRING "debug"
-
           GENERATOR="${cmake_generator}"
           if [ -z "${cmake_generator|}" ]; then
               GENERATOR="Ninja Multi-Config"
@@ -256,6 +253,9 @@ functions:
 
           if [[ -n "${run_with_encryption}" ]]; then
               export UNITTEST_ENCRYPT_ALL=1
+          fi
+          if [[ -n "${test_log_level}" ]]; then
+              export UNITTEST_LOG_LEVEL="${test_log_level}"
           fi
           export TSAN_OPTIONS="suppressions=$(pwd)/test/tsan.suppress"
 
@@ -877,6 +877,7 @@ tasks:
     vars:
       test_label: objstore-local
       test_executable_name: "realm-object-store-tests"
+      test_log_level: debug
       verbose_test_output: true
   - func: "check branch state"
 
@@ -896,6 +897,7 @@ tasks:
     vars:
       test_label: objstore-baas
       test_executable_name: "realm-object-store-tests"
+      test_log_level: debug
       verbose_test_output: true
   - func: "check branch state"
 

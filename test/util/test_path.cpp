@@ -159,6 +159,19 @@ bool initialize_test_path(int argc, const char* argv[])
         g_path_prefix = argv[1];
     }
 
+    Logger::Level log_level = Logger::Level::off;
+    if (const char* str = getenv("UNITTEST_LOG_LEVEL"); str && *str) {
+        if (auto custom_level = Logger::level_from_string(str)) {
+            log_level = *custom_level;
+        }
+    }
+    if (log_level == Logger::Level::off) {
+        Logger::set_default_logger(std::make_shared<NullLogger>());
+    }
+    else {
+        Logger::set_default_logger(std::make_shared<util::StderrLogger>(log_level));
+    }
+
     return true;
 }
 
@@ -317,17 +330,7 @@ std::string TestDirNameGenerator::next()
 
 std::shared_ptr<DB> get_test_db(const std::string& path, const char* crypt_key)
 {
-    const char* str = getenv("UNITTEST_LOG_LEVEL");
-    realm::util::Logger::Level core_log_level = realm::util::Logger::Level::off;
-    if (str && strlen(str) != 0) {
-        std::istringstream in(str);
-        in.imbue(std::locale::classic());
-        in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
-        in >> core_log_level;
-    }
-
     DBOptions options;
-    options.logger = std::make_shared<util::StderrLogger>(core_log_level);
     options.encryption_key = crypt_key;
     return DB::create(make_in_realm_history(), path, options);
 }
