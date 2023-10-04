@@ -4915,6 +4915,59 @@ TEST_CASE("results: limit", "[results][limit]") {
     }
 }
 
+TEST_CASE("results: filter", "[results]") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({{"object", {{"id", PropertyType::Int}, {"val", PropertyType::String}}}});
+
+    auto t = r->read_group().get_table("class_object");
+    ColKey col_id(t->get_column_key("id")), col_val(t->get_column_key("val"));
+
+    std::set<std::string> keys;
+    {
+        r->begin_transaction();
+        for (int i = 1; i <= 1000; ++i) {
+            auto val = std::to_string(i);
+            t->create_object().set(col_id, i).set(col_val, val);
+            if (i % 100 == 0)
+                keys.insert(val);
+        }
+        r->commit_transaction();
+    }
+
+    auto predicate = [&](const Obj& o) {
+        return keys.find(o.get<String>(col_val)) != keys.end();
+    };
+
+    SECTION("Query for multiple values") {
+        Results res(r, t->where());
+        res = res.filter_by_method(predicate);
+        REQUIRE(res.size() == 10);
+        for (size_t i = 0; i < res.size(); ++i)
+            REQUIRE(res.get(i).get<Int>(col_id) == ((int(i) + 1) * 100));
+    }
+
+    SECTION("Combined with regular query and sort") {
+        auto res = Results(r, t->where().greater(col_id, 500));
+        REQUIRE(res.size() == 500);
+
+        // forward order: 600, 700,... 1000
+        res = res.filter_by_method(predicate);
+        REQUIRE(res.size() == 5);
+        for (size_t i = 0; i < res.size(); ++i)
+            REQUIRE(res.get(i).get<Int>(col_id) == (600 + int(i) * 100));
+
+        // reverse the order: 1000, 900... 600
+        res = res.sort(SortDescriptor({{col_id}}, {false}));
+        REQUIRE(res.size() == 5);
+        for (size_t i = 0; i < res.size(); ++i)
+            REQUIRE(res.get(i).get<Int>(col_id) == (1000 - int(i) * 100));
+    }
+}
+
 TEST_CASE("results: public name declared", "[results]") {
     InMemoryTestFile config;
     // config.cache = false;
