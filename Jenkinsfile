@@ -168,7 +168,7 @@ jobWrapper {
                 // Also publish to new S3 bucket.
                 deleteDir()
                 dir('temp') {
-                    withAWS(useNode: true) { // the `docker` nodes have an instance profile attached with the right permissions
+                    withAWS(useNode: true, region: 'us-east-1') { // the `docker` nodes have an instance profile attached with the right permissions
                         for (publishingStash in publishingStashes) {
                             dir(publishingStash) {
                                 unstash name: publishingStash
