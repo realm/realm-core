@@ -353,6 +353,11 @@ Schema Realm::get_full_schema()
     return actual_schema;
 }
 
+bool Realm::is_empty()
+{
+    return ObjectStore::is_empty(read_group());
+}
+
 Class Realm::get_class(StringData object_type)
 {
     auto it = m_schema.find(object_type);

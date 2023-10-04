@@ -81,7 +81,7 @@ struct Helpers {
     {
         realm->verify_thread();
         realm->verify_notifications_available();
-        auto notifier = std::make_shared<_impl::ObjectNotifier>(realm, obj.get_table()->get_key(), obj.get_key());
+        auto notifier = std::make_shared<_impl::ObjectNotifier>(realm, obj);
         _impl::RealmCoordinator::register_notifier(notifier);
         return notifier;
     }
@@ -172,11 +172,6 @@ struct Helpers {
     {
         auto& group = realm->read_group();
         ObjectStore::delete_data_for_object(group, object_type);
-    }
-
-    static bool is_empty_realm(const SharedRealm& realm)
-    {
-        return ObjectStore::is_empty(realm->read_group());
     }
 
     static OwnedBinaryData base64_decode(StringData input)
