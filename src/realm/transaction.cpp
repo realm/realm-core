@@ -565,25 +565,12 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         }
     }
     if (current_file_format_version < 24) {
-        // rewrite the string indexes with the comparison order
         for (auto k : table_keys) {
             auto t = get_table(k);
             t->migrate_set_orderings(); // rewrite sets to use the new string/binary order
-            // Strings in the index were stored in an incorrect order on platforms where
-            // char is signed; fix that here by rewriting them. This was due to using
-            // std::lexicographical_sort on char* arguments.
-            t->for_each_public_column([&](ColKey col) {
-                if (col.get_type() == col_type_String || col.get_type() == col_type_Mixed) {
-                    // FullText indexes are omitted because they store single words, and the
-                    // index/sort bug being fixed here only applies to items in the index that
-                    // are longer than 200 characters (see StringIndex::s_max_offset).
-                    if (t->search_index_type(col) == IndexType::General) {
-                        t->remove_search_index(col);
-                        t->add_search_index(col, IndexType::General);
-                    }
-                }
-                return IteratorControl::AdvanceToNext;
-            });
+            // Although StringIndex sort order has been changed in this format, we choose to
+            // avoid upgrading them because it affects a small niche case. Instead, there is a
+            // workaround in the String Index search code for not relying on items being ordered.
         }
     }
     // NOTE: Additional future upgrade steps go here.

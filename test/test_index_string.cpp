@@ -1285,7 +1285,9 @@ TEST_TYPES(StringIndex_InsertLongPrefix, string_column, nullable_string_column, 
     StringData base_b(std_base_b);
     StringData base_c(std_base_c);
     col.add(base_b);
+    ndx.verify();
     col.add(base_c);
+    ndx.verify();
 
     CHECK_EQUAL(col.find_first(base_b), 2);
     CHECK_EQUAL(col.find_first(base_c), 3);
@@ -1300,7 +1302,9 @@ TEST_TYPES(StringIndex_InsertLongPrefix, string_column, nullable_string_column, 
     StringData base2_b(std_base2_b);
     StringData base2_c(std_base2_c);
     col.add(base2_b);
+    ndx.verify();
     col.add(base2_c);
+    ndx.verify();
 
     CHECK_EQUAL(col.find_first(base2_b), 4);
     CHECK_EQUAL(col.find_first(base2_c), 5);

@@ -658,6 +658,7 @@ TEST_IF(Upgrade_Database_23, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE
     // string order changed in sets, and string indexes
     // The strings will be sorted according to the old ordering using signed chars
     std::string base(StringIndex::s_max_offset, 'a');
+
     // include long prefix strings > s_max_offset with non-ascii suffixes to test string ordering in the index
     std::vector<std::string> string_storage = {base + "aaaaa", base + "aaaaA", base + "aaaaʄ", base + "aaaaÆ",
                                                base + "aaaaæ"};
@@ -714,7 +715,7 @@ TEST_IF(Upgrade_Database_23, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE
         // This should cause an upgrade
         auto o = t->create_object_with_primary_key(20000);
         o.set(col_link, target_obj.get_key());
-
+        t->verify();
         // Check that we can delete all source objects
         for (auto& obj : *t) {
             obj.remove();
@@ -793,18 +794,36 @@ TEST_IF(Upgrade_Database_23, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE
 
         CHECK(t2->has_search_index(t2_col_id));
         CHECK(t2->has_search_index(t2_mixed_col));
+        // add duplicates to the mixed
+        std::vector<std::string> new_values = {base + "aaaa🎈", base + "aaaa🧵", base + "aaaa🧶", base + "aaaa🪢"};
+        for (auto& val : new_values) {
+            t2->create_object_with_primary_key(val).set(t2_mixed_col, Mixed{val});
+        }
+        set_values.insert(set_values.end(), new_values.begin(), new_values.end());
+        size_t pk = 0;
+        for (auto& val : set_values) {
+            t2->create_object_with_primary_key(util::format("pk %1", ++pk)).set(t2_mixed_col, val);
+        }
+
         for (auto& val : set_values) {
             if (val.is_type(type_String) || val.is_null()) {
                 StringData str = val.get<StringData>();
                 CHECK_EQUAL(t2->where().equal(t2_col_id, str).count(), 1);
-                CHECK_EQUAL(t2->where().equal(t2_mixed_col, val).count(), 1);
+                CHECK_EQUAL(t2->where().equal(t2_mixed_col, val).count(), 2);
                 // Check that the search index finds us the right object
                 auto k1 = t2->find_first(t2_col_id, str);
                 CHECK_EQUAL(t2->get_object(k1).get<String>(t2_col_id), str);
                 auto k2 = t2->find_first(t2_mixed_col, val);
                 CHECK_EQUAL(t2->get_object(k2).get_any(t2_mixed_col), val);
+                auto tv = t2->where().equal(t2_col_id, str).find_all();
+                CHECK_EQUAL(tv.size(), 1);
+                CHECK(k1 == tv.get_key(0));
+                auto tv2 = t2->where().equal(t2_mixed_col, val).find_all();
+                CHECK_EQUAL(tv2.size(), 2);
+                CHECK(k2 == tv2.get_key(0) || k2 == tv2.get_key(1));
             }
         }
+        t2->verify();
     }
 
 #else

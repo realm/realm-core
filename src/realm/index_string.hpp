@@ -25,6 +25,7 @@
 #include <set>
 
 #include <realm/array.hpp>
+#include <realm/column_integer.hpp>
 #include <realm/search_index.hpp>
 
 /*
@@ -268,6 +269,10 @@ public:
 
     bool operator()(int64_t key_value, const Mixed& b);
     bool operator()(const Mixed& a, int64_t key_value);
+
+    IntegerColumn::const_iterator find_start_of_unsorted(const Mixed& value, const IntegerColumn& key_values) const;
+    IntegerColumn::const_iterator find_end_of_unsorted(const Mixed& value, const IntegerColumn& key_values,
+                                                       IntegerColumn::const_iterator begin) const;
 
 private:
     const ClusterColumn m_column;
