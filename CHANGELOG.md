@@ -1,3 +1,32 @@
+# NEXT RELEASE
+
+### Enhancements
+* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* Allow collections of non-embedded links in asymmetric objects. ([PR #7003](https://github.com/realm/realm-core/pull/7003))
+* Flexible sync API improvements:
+  - Erase Subscriptions by class type for C API. 
+  - `MutableSubscriptionSet::erase(iterator)` now runs in constant time.
+  - Introduce `MutableSubscriptionSet::erase_by_id()`.
+  - Introduce `MutableSubscriptionSet::erase_by_class_name()`.
+  ([PR #7008](https://github.com/realm/realm-core/pull/7008))
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fixed an issue where Android.bp builds would fail with SSL certificat validation errors because we didn't include the trusted CA roots bundle. 
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Update tests to use global logger. ([PR #6917](https://github.com/realm/realm-core/pull/6917))
+
+----------------------------------------------
+
 # 13.22.0 Release notes
 
 ### Enhancements

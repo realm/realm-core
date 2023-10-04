@@ -25,6 +25,7 @@ CMakeScripts
 # Ignore build artifacts
 /build*
 /debug*
+/release*
 
 # Ignore all user files except one which includes execution path for test
 *.user
