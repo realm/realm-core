@@ -302,9 +302,11 @@ public:
     //
     // This approach also allows for zero overhead selection between the different
     // header encodings.
-    enum class Encoding { Packed, AofP, PofA, Flex, Unpacked };
+    enum class Encoding { Packed, AofP, PofA, Flex, WTypBits, WTypMult, WTypIgn };
     // * Packed: tightly packed array (any element size <= 64)
-    // * Unpacked: less tightly packed array (element size must be power of two)
+    // * WTypBits: less tightly packed. Correspond to wtype_Bits
+    // * WTypMult: less tightly packed. Correspond to wtype_Multiply
+    // * WTypIgn: single byte elements. Correspond to wtype_Ignore
     // encodings with more flexibility but lower number of elements:
     // * AofP: Array of pairs (2 element sizes, 1 element count)
     // * PofA: Pair of arrays (2 elememt sizes, 1 element count)
@@ -348,9 +350,19 @@ public:
     // Get the size in bytes (aligned to 8) of a block
     template <Encoding>
     static inline size_t get_byte_size(uint64_t* header);
-    // Compute required size in bytes
+    // Compute required size in bytes - multiple forms depending on encoding
+    template <Encoding>
+    inline size_t calc_size(size_t num_elements);
     template <Encoding>
     inline size_t calc_size(size_t num_elements, size_t element_size);
+    template <Encoding>
+    inline size_t calc_size(size_t num_elements, size_t elementA_size, size_t elementB_size);
+    template <Encoding>
+    inline size_t calc_size(size_t arrayA_num_elements, size_t arrayB_num_elements, size_t elementA_size,
+                            size_t elementB_size);
+    // TODO:
+    // get/set capacity
+    // get/set the type and flags -- they are a bit of a mess
 };
 
 
@@ -361,11 +373,23 @@ void inline NodeHeader::set_element_size<NodeHeader::Encoding::Packed>(uint64_t*
     ((uint16_t*)header)[2] = bits_per_element;
 }
 template <>
-void inline NodeHeader::set_element_size<NodeHeader::Encoding::Unpacked>(uint64_t* header, size_t bits_per_element)
+void inline NodeHeader::set_element_size<NodeHeader::Encoding::WTypBits>(uint64_t* header, size_t bits_per_element)
 {
     REALM_ASSERT(bits_per_element <= 64);
     // TODO: Only powers of two allowed
+    // TODO: Optimize
+    NodeHeader::set_wtype_in_header(wtype_Bits, (char*)header);
     NodeHeader::set_width_in_header(bits_per_element, (char*)header);
+}
+template <>
+void inline NodeHeader::set_element_size<NodeHeader::Encoding::WTypMult>(uint64_t* header, size_t bits_per_element)
+{
+    REALM_ASSERT(bits_per_element <= 64);
+    REALM_ASSERT((bits_per_element & 0x7) == 0);
+    // TODO: Only powers of two allowed
+    // TODO: Optimize
+    NodeHeader::set_wtype_in_header(wtype_Multiply, (char*)header);
+    NodeHeader::set_width_in_header(bits_per_element >> 3, (char*)header);
 }
 
 
@@ -377,9 +401,16 @@ inline size_t NodeHeader::get_element_size<NodeHeader::Encoding::Packed>(uint64_
     return bits_per_element;
 }
 template <>
-inline size_t NodeHeader::get_element_size<NodeHeader::Encoding::Unpacked>(uint64_t* header)
+inline size_t NodeHeader::get_element_size<NodeHeader::Encoding::WTypBits>(uint64_t* header)
 {
     auto bits_per_element = NodeHeader::get_width_from_header((char*)header);
+    REALM_ASSERT(bits_per_element <= 64);
+    return bits_per_element;
+}
+template <>
+inline size_t NodeHeader::get_element_size<NodeHeader::Encoding::WTypMult>(uint64_t* header)
+{
+    auto bits_per_element = NodeHeader::get_width_from_header((char*)header) << 3;
     REALM_ASSERT(bits_per_element <= 64);
     return bits_per_element;
 }
@@ -491,8 +522,24 @@ inline void NodeHeader::set_num_elements<NodeHeader::Encoding::Packed>(uint64_t*
     ((uint16_t*)header)[3] = num_elements;
 }
 template <>
-inline void NodeHeader::set_num_elements<NodeHeader::Encoding::Unpacked>(uint64_t* header, size_t num_elements)
+inline void NodeHeader::set_num_elements<NodeHeader::Encoding::WTypBits>(uint64_t* header, size_t num_elements)
 {
+    // TODO optimize
+    NodeHeader::set_wtype_in_header(wtype_Bits, (char*)header);
+    NodeHeader::set_size_in_header(num_elements, (char*)header);
+}
+template <>
+inline void NodeHeader::set_num_elements<NodeHeader::Encoding::WTypMult>(uint64_t* header, size_t num_elements)
+{
+    // TODO optimize
+    NodeHeader::set_wtype_in_header(wtype_Multiply, (char*)header);
+    NodeHeader::set_size_in_header(num_elements, (char*)header);
+}
+template <>
+inline void NodeHeader::set_num_elements<NodeHeader::Encoding::WTypIgn>(uint64_t* header, size_t num_elements)
+{
+    // TODO optimize
+    NodeHeader::set_wtype_in_header(wtype_Ignore, (char*)header);
     NodeHeader::set_size_in_header(num_elements, (char*)header);
 }
 template <>
@@ -542,7 +589,17 @@ inline size_t NodeHeader::get_num_elements<NodeHeader::Encoding::PofA>(uint64_t*
     return ((uint16_t*)header)[3];
 }
 template <>
-inline size_t NodeHeader::get_num_elements<NodeHeader::Encoding::Unpacked>(uint64_t* header)
+inline size_t NodeHeader::get_num_elements<NodeHeader::Encoding::WTypBits>(uint64_t* header)
+{
+    return NodeHeader::get_size_from_header((const char*)header);
+}
+template <>
+inline size_t NodeHeader::get_num_elements<NodeHeader::Encoding::WTypMult>(uint64_t* header)
+{
+    return NodeHeader::get_size_from_header((const char*)header);
+}
+template <>
+inline size_t NodeHeader::get_num_elements<NodeHeader::Encoding::WTypIgn>(uint64_t* header)
 {
     return NodeHeader::get_size_from_header((const char*)header);
 }
@@ -565,14 +622,24 @@ inline size_t NodeHeader::get_arrayB_num_elements<NodeHeader::Encoding::Flex>(ui
 
 
 // helper converting a number of bits into bytes and aligning to 8 byte boundary
-inline size_t align8(size_t n)
+inline size_t align_bits_to8(size_t n)
 {
     n = (n + 7) >> 3;
     return (n + 7) & ~size_t(7);
 }
 
 template <>
-inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::Unpacked>(uint64_t* header)
+inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::WTypBits>(uint64_t* header)
+{
+    return NodeHeader::get_byte_size_from_header((const char*)header);
+}
+template <>
+inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::WTypMult>(uint64_t* header)
+{
+    return NodeHeader::get_byte_size_from_header((const char*)header);
+}
+template <>
+inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::WTypIgn>(uint64_t* header)
 {
     return NodeHeader::get_byte_size_from_header((const char*)header);
 }
@@ -580,36 +647,74 @@ inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::Unpacked>(uint64_t
 template <>
 inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::Packed>(uint64_t* header)
 {
-    return NodeHeader::header_size + align8(get_num_elements<NodeHeader::Encoding::Packed>(header) *
-                                            get_element_size<NodeHeader::Encoding::Packed>(header));
+    return NodeHeader::header_size + align_bits_to8(get_num_elements<NodeHeader::Encoding::Packed>(header) *
+                                                    get_element_size<NodeHeader::Encoding::Packed>(header));
 }
 template <>
 inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::AofP>(uint64_t* header)
 {
-    return NodeHeader::header_size + align8(get_num_elements<NodeHeader::Encoding::AofP>(header) *
-                                            (get_elementA_size<NodeHeader::Encoding::AofP>(header) +
-                                             get_elementB_size<NodeHeader::Encoding::AofP>(header)));
+    return NodeHeader::header_size + align_bits_to8(get_num_elements<NodeHeader::Encoding::AofP>(header) *
+                                                    (get_elementA_size<NodeHeader::Encoding::AofP>(header) +
+                                                     get_elementB_size<NodeHeader::Encoding::AofP>(header)));
 }
 template <>
 inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::PofA>(uint64_t* header)
 {
-    return NodeHeader::header_size + align8(get_num_elements<NodeHeader::Encoding::PofA>(header) *
-                                            (get_elementA_size<NodeHeader::Encoding::PofA>(header) +
-                                             get_elementB_size<NodeHeader::Encoding::PofA>(header)));
+    return NodeHeader::header_size + align_bits_to8(get_num_elements<NodeHeader::Encoding::PofA>(header) *
+                                                    (get_elementA_size<NodeHeader::Encoding::PofA>(header) +
+                                                     get_elementB_size<NodeHeader::Encoding::PofA>(header)));
 }
 template <>
 inline size_t NodeHeader::get_byte_size<NodeHeader::Encoding::Flex>(uint64_t* header)
 {
-    return NodeHeader::header_size + align8(get_arrayA_num_elements<NodeHeader::Encoding::Flex>(header) *
-                                                get_elementA_size<NodeHeader::Encoding::PofA>(header) +
-                                            get_arrayB_num_elements<NodeHeader::Encoding::Flex>(header) *
-                                                get_elementB_size<NodeHeader::Encoding::PofA>(header));
+    return NodeHeader::header_size + align_bits_to8(get_arrayA_num_elements<NodeHeader::Encoding::Flex>(header) *
+                                                        get_elementA_size<NodeHeader::Encoding::PofA>(header) +
+                                                    get_arrayB_num_elements<NodeHeader::Encoding::Flex>(header) *
+                                                        get_elementB_size<NodeHeader::Encoding::PofA>(header));
 }
 
 template <>
-inline size_t NodeHeader::calc_size<NodeHeader::Encoding::Packed>(size_t num_elements, size_t elemement_size)
+inline size_t NodeHeader::calc_size<NodeHeader::Encoding::Packed>(size_t num_elements, size_t element_size)
 {
-    return NodeHeader::header_size + align8(num_elements * elemement_size);
+    return NodeHeader::header_size + align_bits_to8(num_elements * element_size);
+}
+template <>
+inline size_t NodeHeader::calc_size<NodeHeader::Encoding::WTypBits>(size_t num_elements, size_t element_size)
+{
+    return calc_byte_size(wtype_Bits, num_elements, element_size);
+    // return NodeHeader::header_size + align_bits_to8(num_elements * element_size);
+}
+template <>
+inline size_t NodeHeader::calc_size<NodeHeader::Encoding::WTypMult>(size_t num_elements, size_t element_size)
+{
+    return calc_byte_size(wtype_Multiply, num_elements, element_size);
+}
+
+
+template <>
+inline size_t NodeHeader::calc_size<NodeHeader::Encoding::WTypIgn>(size_t num_elements)
+{
+    return calc_byte_size(wtype_Ignore, num_elements, 0);
+}
+template <>
+inline size_t NodeHeader::calc_size<NodeHeader::Encoding::AofP>(size_t num_elements, size_t elementA_size,
+                                                                size_t elementB_size)
+{
+    return NodeHeader::header_size + align_bits_to8(num_elements * (elementA_size + elementB_size));
+}
+template <>
+inline size_t NodeHeader::calc_size<NodeHeader::Encoding::PofA>(size_t num_elements, size_t elementA_size,
+                                                                size_t elementB_size)
+{
+    return NodeHeader::header_size + align_bits_to8(num_elements * (elementA_size + elementB_size));
+}
+template <>
+inline size_t NodeHeader::calc_size<NodeHeader::Encoding::Flex>(size_t arrayA_num_elements,
+                                                                size_t arrayB_num_elements, size_t elementA_size,
+                                                                size_t elementB_size)
+{
+    return NodeHeader::header_size +
+           align_bits_to8(arrayA_num_elements * elementA_size + arrayB_num_elements * elementB_size);
 }
 
 } // namespace realm
