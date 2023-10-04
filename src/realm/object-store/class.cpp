@@ -22,13 +22,6 @@
 
 namespace realm {
 
-Class::Class(std::shared_ptr<Realm> r, StringData object_type)
-    : m_realm(std::move(r))
-    , m_object_schema(&*m_realm->schema().find(object_type))
-    , m_table(m_realm->read_group().get_table(m_object_schema->table_key))
-{
-}
-
 Class::Class(std::shared_ptr<Realm> r, const ObjectSchema* object_schema)
     : m_realm(std::move(r))
     , m_object_schema(object_schema)

@@ -32,10 +32,9 @@ class Query;
 
 class Class {
 public:
-    Class(std::shared_ptr<Realm> r, StringData object_type);
     Class(std::shared_ptr<Realm> r, const ObjectSchema* object_schema);
 
-    size_t nb_objects() const
+    size_t num_objects() const
     {
         return m_table->size();
     }

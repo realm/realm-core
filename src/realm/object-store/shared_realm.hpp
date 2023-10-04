@@ -239,10 +239,7 @@ public:
     {
         return m_schema;
     }
-    Class get_class(StringData object_type)
-    {
-        return {shared_from_this(), object_type};
-    }
+    Class get_class(StringData object_type);
     std::vector<Class> get_classes();
     uint64_t schema_version() const noexcept
     {

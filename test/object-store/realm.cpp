@@ -972,7 +972,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         // Create some content
         auto origin = Realm::get_shared_realm(config);
         origin->begin_transaction();
-        Class cls(origin, "object");
+        Class cls = origin->get_class("object");
         cls.create_object(0);
         origin->commit_transaction();
         wait_for_upload(*origin);
@@ -985,7 +985,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
             // Write some data
             SharedRealm realm = Realm::get_shared_realm(std::move(ref));
             realm->begin_transaction();
-            Class(realm, "object").create_object(2);
+            realm->get_class("object").create_object(2);
             realm->commit_transaction();
             wait_for_upload(*realm);
             wait_for_download(*realm);
@@ -1002,13 +1002,13 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
 
         // Now open a realm based on the realm file created above
         auto realm = Realm::get_shared_realm(config3);
-        Class cls2(realm, "object");
+        Class cls2 = realm->get_class("object");
         wait_for_download(*realm);
         wait_for_upload(*realm);
 
         // Make sure we have got a new client file id
         REQUIRE(realm->read_group().get_sync_file_id() != client_file_id);
-        REQUIRE(cls.nb_objects() == 3);
+        REQUIRE(cls.num_objects() == 3);
 
         // Check that we can continue committing to this realm
         realm->begin_transaction();
@@ -1019,7 +1019,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         // Check that this change is now in the original realm
         wait_for_download(*origin);
         origin->refresh();
-        REQUIRE(cls.nb_objects() == 4);
+        REQUIRE(cls.num_objects() == 4);
     }
 
     SECTION("downloads Realms which exist on the server") {

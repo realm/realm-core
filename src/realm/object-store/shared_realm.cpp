@@ -353,6 +353,15 @@ Schema Realm::get_full_schema()
     return actual_schema;
 }
 
+Class Realm::get_class(StringData object_type)
+{
+    auto it = m_schema.find(object_type);
+    if (it == m_schema.end()) {
+        throw LogicError(ErrorCodes::NoSuchTable, util::format("No type '%1'", object_type));
+    }
+    return {shared_from_this(), &*it};
+}
+
 std::vector<Class> Realm::get_classes()
 {
     std::vector<Class> ret;
