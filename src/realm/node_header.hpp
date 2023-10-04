@@ -215,7 +215,6 @@ public:
     }
 
 
-    // Helpers shared for all formats:
     static size_t get_capacity_from_header(const char* header) noexcept
     {
         typedef unsigned char uchar;
@@ -284,7 +283,7 @@ public:
     // A class may use one or multiple different encodings, depending
     // on the data it stores.
     // A value of 0x41 ('A') represents the "old" (core 13 or earlier)
-    // set of classes, which could all be represented by the Array class.
+    // set of Array_xxxx classes
     static uint8_t get_kind(uint64_t* header)
     {
         return ((uint8_t*)header)[3];
@@ -313,6 +312,19 @@ public:
     //   Choose between them according to spatial locality
     // Encodings with even more flexibility with even lower number of elements
     // * Flex: Pair of arrays (like PofA) but allowing different element count
+    //
+    // Encodings:     bytes:
+    // name:       |  b0   |  b1   |  b2   |  b3   |  b4   |  b5   |  b6   |  b7   |
+    // Packed      |  cap/chksum   | flgs  | kind  | bits pr elm   |  num elmnts   |
+    // AofP        |  cap/chksum   | flgs  | kind  | Abpe  | BBpe  |  num elmnts   |
+    // PofA        |  cap/chksum   | flgs  | kind  | Abpe  | BBpe  |  num elmnts   |
+    // Flex        |  cap/chksum   | flgs  | kind  | Abpe - BBpe -  Ane   -  Bne   |
+    // oldies      |     cap/chksum        | 'A'   | lots  |      num elements     |
+    //
+    // legend: cap = capacity, chksum = checksum, flgs = various flags,
+    //         elm = elements, Abpe = A bits per element, Bbpe = B bits per element
+    //         Ane = A num elements, Bne = B num elements,
+    //         lots = flags, wtype and width for old formats
     //
     // Setting element size for encodings with a single element size:
     template <Encoding>
@@ -360,8 +372,12 @@ public:
     template <Encoding>
     inline size_t calc_size(size_t arrayA_num_elements, size_t arrayB_num_elements, size_t elementA_size,
                             size_t elementB_size);
+    template <Encoding>
+    inline void set_capacity(uint64_t* header, size_t capacity);
+    template <Encoding>
+    inline size_t get_capacity(uint64_t* header);
+
     // TODO:
-    // get/set capacity
     // get/set the type and flags -- they are a bit of a mess
 };
 
@@ -716,6 +732,85 @@ inline size_t NodeHeader::calc_size<NodeHeader::Encoding::Flex>(size_t arrayA_nu
     return NodeHeader::header_size +
            align_bits_to8(arrayA_num_elements * elementA_size + arrayB_num_elements * elementB_size);
 }
+
+
+template <>
+inline void NodeHeader::set_capacity<NodeHeader::Encoding::WTypBits>(uint64_t* header, size_t capacity)
+{
+    NodeHeader::set_capacity_in_header(capacity, (char*)header);
+}
+template <>
+inline void NodeHeader::set_capacity<NodeHeader::Encoding::WTypMult>(uint64_t* header, size_t capacity)
+{
+    NodeHeader::set_capacity_in_header(capacity, (char*)header);
+}
+template <>
+inline void NodeHeader::set_capacity<NodeHeader::Encoding::WTypIgn>(uint64_t* header, size_t capacity)
+{
+    NodeHeader::set_capacity_in_header(capacity, (char*)header);
+}
+template <>
+inline void NodeHeader::set_capacity<NodeHeader::Encoding::Packed>(uint64_t* header, size_t capacity)
+{
+    REALM_ASSERT(capacity <= 65536);
+    ((uint16_t*)header)[0] = capacity;
+}
+template <>
+inline void NodeHeader::set_capacity<NodeHeader::Encoding::AofP>(uint64_t* header, size_t capacity)
+{
+    REALM_ASSERT(capacity <= 65536);
+    ((uint16_t*)header)[0] = capacity;
+}
+template <>
+inline void NodeHeader::set_capacity<NodeHeader::Encoding::PofA>(uint64_t* header, size_t capacity)
+{
+    REALM_ASSERT(capacity <= 65536);
+    ((uint16_t*)header)[0] = capacity;
+}
+template <>
+inline void NodeHeader::set_capacity<NodeHeader::Encoding::Flex>(uint64_t* header, size_t capacity)
+{
+    REALM_ASSERT(capacity <= 65536);
+    ((uint16_t*)header)[0] = capacity;
+}
+
+
+template <>
+inline size_t NodeHeader::get_capacity<NodeHeader::Encoding::WTypBits>(uint64_t* header)
+{
+    return NodeHeader::get_capacity_from_header((const char*)header);
+}
+template <>
+inline size_t NodeHeader::get_capacity<NodeHeader::Encoding::WTypMult>(uint64_t* header)
+{
+    return NodeHeader::get_capacity_from_header((const char*)header);
+}
+template <>
+inline size_t NodeHeader::get_capacity<NodeHeader::Encoding::WTypIgn>(uint64_t* header)
+{
+    return NodeHeader::get_capacity_from_header((const char*)header);
+}
+template <>
+inline size_t NodeHeader::get_capacity<NodeHeader::Encoding::Packed>(uint64_t* header)
+{
+    return ((uint16_t*)header)[0];
+}
+template <>
+inline size_t NodeHeader::get_capacity<NodeHeader::Encoding::AofP>(uint64_t* header)
+{
+    return ((uint16_t*)header)[0];
+}
+template <>
+inline size_t NodeHeader::get_capacity<NodeHeader::Encoding::PofA>(uint64_t* header)
+{
+    return ((uint16_t*)header)[0];
+}
+template <>
+inline size_t NodeHeader::get_capacity<NodeHeader::Encoding::Flex>(uint64_t* header)
+{
+    return ((uint16_t*)header)[0];
+}
+
 
 } // namespace realm
 
