@@ -1072,11 +1072,11 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
     return new_array.get_mem();
 }
 
-MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t size_value, int_fast64_t value,
-                     Allocator& alloc, size_t size_index, int_fast64_t index)
+MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t size, int_fast64_t value,
+                     Allocator& alloc)
 {
-    REALM_ASSERT(value == 0 || width_type == wtype_Bits || width_type == wtype_Flex);
-    REALM_ASSERT(size_value == 0 || width_type != wtype_Ignore);
+    REALM_ASSERT(value == 0 || width_type == wtype_Bits);
+    REALM_ASSERT(size == 0 || width_type != wtype_Ignore);
 
     bool is_inner_bptree_node = false, has_refs = false;
     switch (type) {
@@ -1091,29 +1091,11 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
             break;
     }
 
-    int value_width = 0;
+    int width = 0;
     size_t byte_size_0 = header_size;
-    if (index != 0 && width_type == wtype_Flex) {
-        // logic for flex array.
-        const auto index_width = int(bit_width(index));
-        const auto value_width = int(bit_width(value));
-        const auto byte_size = size_value * value_width + size_index * index_width;
-        MemRef mem = alloc.alloc(8 + byte_size);
-        char* header = mem.get_addr();
-        const auto width_flex_arrays =
-            ((num_bits_to_width_encoding(index_width) & 0xF) << 4) | (num_bits_to_width_encoding(value_width) & 0xF);
-        auto size = 0;
-        size |= size_index;
-        size |= (size_value << 8);
-        size |= (width_flex_arrays << 16);
-        init_header(header, is_inner_bptree_node, has_refs, context_flag, width_type, 0, size, byte_size);
-        return mem;
-    }
-
-    // normal logic normal array
     if (value != 0) {
-        value_width = int(bit_width(value));
-        byte_size_0 = calc_aligned_byte_size(size_value, value_width); // Throws
+        width = int(bit_width(value));
+        byte_size_0 = calc_aligned_byte_size(size, width); // Throws
     }
 
     // Adding zero to Array::initial_capacity to avoid taking the
@@ -1122,12 +1104,12 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     MemRef mem = alloc.alloc(byte_size); // Throws
     char* header = mem.get_addr();
 
-    init_header(header, is_inner_bptree_node, has_refs, context_flag, width_type, value_width, size_value, byte_size);
+    init_header(header, is_inner_bptree_node, has_refs, context_flag, width_type, width, size, byte_size);
 
     if (value != 0) {
         char* data = get_data_from_header(header);
-        size_t begin = 0, end = size_value;
-        REALM_TEMPEX(fill_direct, value_width, (data, begin, end, value));
+        size_t begin = 0, end = size;
+        REALM_TEMPEX(fill_direct, width, (data, begin, end, value));
     }
 
     return mem;

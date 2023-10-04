@@ -107,9 +107,11 @@ bool ArrayInteger::try_compress()
 
 bool ArrayInteger::is_in_compressed_format() const
 {
+    //
     const auto header = m_compressed_array.get_addr();
     if (header) {
-        return get_wtype_from_header(header) >= wtype_extend;
+        Encoding enconding{get_kind((uint64_t*)header)};
+        return enconding == Encoding::Flex;
     }
     return false;
 }
@@ -118,11 +120,11 @@ bool ArrayInteger::get_compressed_header_info(size_t& value_width, size_t& index
                                               size_t& index_size) const
 {
     if (is_in_compressed_format()) {
-        const auto addr = m_compressed_array.get_addr();
-        value_size = get_size_A_from_header(addr);
-        index_size = get_size_B_from_header(addr);
-        value_width = get_width_A_from_header(addr);
-        index_width = get_width_B_from_header(addr);
+        const auto addr = (uint64_t*)m_compressed_array.get_addr();
+        value_size = get_arrayA_num_elements<Encoding::Flex>(addr);
+        index_size = get_arrayB_num_elements<Encoding::Flex>(addr);
+        value_width = get_elementA_size<Encoding::Flex>(addr);
+        index_width = get_elementB_size<Encoding::Flex>(addr);
         return true;
     }
     return false;
@@ -150,17 +152,19 @@ bool ArrayInteger::try_compress(std::vector<int64_t>& values, std::vector<size_t
         v = std::distance(values.begin(), pos);
     }
 
-    const auto max_value = std::max_element(values.begin(), values.end());
-    const auto max_index = std::max_element(indices.begin(), indices.end());
-    const auto compressed_values_size = bit_width(*max_value) * values.size();
-    const auto compressed_indices_size = bit_width(*max_index) * indices.size();
+    const auto value = *std::max_element(values.begin(), values.end());
+    const auto index = *std::max_element(indices.begin(), indices.end());
+    const auto value_bit_width = bit_width(value);
+    const auto index_bit_width = bit_width(index);
+    const auto compressed_values_size = value_bit_width * values.size();
+    const auto compressed_indices_size = index_bit_width * indices.size();
     const auto compressed_size = compressed_values_size + compressed_indices_size;
-    const auto uncompressed_size = bit_width(*max_value) * size();
+    const auto uncompressed_size = value_bit_width * size();
 
     // compress array only if there is some gain
     if (compressed_size < uncompressed_size) {
-        m_compressed_array = Array::create_flex_array(Type::type_Normal, false, values.size(), *max_value,
-                                                      indices.size(), *max_index, m_alloc);
+        m_compressed_array = Array::create_flex_array(Type::type_Normal, false, values.size(), value_bit_width,
+                                                      indices.size(), index_bit_width, m_alloc);
         // release memory allocated for the array.
         Array::destroy();
         return true;

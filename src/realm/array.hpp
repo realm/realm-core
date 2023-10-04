@@ -147,8 +147,8 @@ public:
     /// Construct a compressed integer array. Return the ref to the underlying memory.
     /// All the elements will be initialized to the specif value, the calle will then need
     /// to fill the arrat with the specific elements.
-    static MemRef create_flex_array(Type, bool context_flag, size_t value_size, int_fast64_t value, size_t index_size,
-                                    int_fast64_t index, Allocator&);
+    static MemRef create_flex_array(Type type, bool context_flag, size_t array_value_elements, size_t value_bit_width,
+                                    size_t array_index_elements, size_t index_bit_width, Allocator& alloc);
 
     Type get_type() const noexcept;
 
@@ -479,7 +479,7 @@ protected:
     /// It is an error to specify a non-zero value unless the width
     /// type is wtype_Bits. It is also an error to specify a non-zero
     /// size if the width type is wtype_Ignore.
-    static MemRef create(Type, bool, WidthType, size_t, int_fast64_t, Allocator&, size_t = 0, int_fast64_t = 0);
+    static MemRef create(Type, bool, WidthType, size_t, int_fast64_t, Allocator&);
 
     // Overriding method in ArrayParent
     void update_child_ref(size_t, ref_type) override;
@@ -952,10 +952,19 @@ inline MemRef Array::create_array(Type type, bool context_flag, size_t size, int
     return create(type, context_flag, wtype_Bits, size, value, alloc); // Throws
 }
 
-inline MemRef Array::create_flex_array(Type type, bool context_flag, size_t value_size, int_fast64_t value,
-                                       size_t index_size, int_fast64_t index, Allocator& alloc)
+inline MemRef Array::create_flex_array(Type type, bool context_flag, size_t array_value_elements,
+                                       size_t value_bit_width, size_t array_index_elements, size_t index_bit_width,
+                                       Allocator& alloc)
 {
-    return create(type, context_flag, wtype_Flex, value_size, value, alloc, index_size, index); // Throws
+    const auto size = header_size + (array_value_elements * value_bit_width + array_index_elements * index_bit_width);
+    MemRef mem = create(type, context_flag, wtype_Bits, size, 0, alloc); // Throws
+    auto addr = (uint64_t*)mem.get_addr();
+    set_kind(addr, static_cast<std::underlying_type_t<Encoding>>(Encoding::Flex));
+    set_arrayA_num_elements<Encoding::Flex>(addr, array_value_elements);
+    set_arrayB_num_elements<Encoding::Flex>(addr, array_index_elements);
+    set_elementA_size<Encoding::Flex>(addr, value_bit_width);
+    set_elementB_size<Encoding::Flex>(addr, index_bit_width);
+    return mem;
 }
 
 

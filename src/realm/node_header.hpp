@@ -189,7 +189,7 @@ public:
         return (size_t(h[5]) << 16) + (size_t(h[6]) << 8) + h[7];
     }
 
-    static void set_width_in_header(int value, char* header) noexcept
+    static void set_width_in_header(size_t value, char* header) noexcept
     {
         // Pack width in 3 bits (log2)
         int w = 0;
@@ -287,11 +287,11 @@ public:
     static uint8_t get_kind(uint64_t* header)
     {
         return ((uint8_t*)header)[3];
-    };
+    }
     static void set_kind(uint64_t* header, uint8_t kind)
     {
         ((uint8_t*)header)[3] = kind;
-    };
+    }
 
     // Access to different header formats is done through specializations of a set
     // of access functions. This allows for defining ONLY the abilities which makes
@@ -585,7 +585,7 @@ template <>
 inline void NodeHeader::set_arrayA_num_elements<NodeHeader::Encoding::Flex>(uint64_t* header, size_t num_elements)
 {
     REALM_ASSERT(num_elements < 0b10000000000); // 10 bits
-    uint32_t word = ((uint32_t*)header)[1];
+    uint32_t& word = ((uint32_t*)header)[1];
     word &= ~(0b1111111111);
     word |= num_elements;
 }
@@ -593,7 +593,7 @@ template <>
 inline void NodeHeader::set_arrayB_num_elements<NodeHeader::Encoding::Flex>(uint64_t* header, size_t num_elements)
 {
     REALM_ASSERT(num_elements < 0b10000000000); // 10 bits
-    uint32_t word = ((uint32_t*)header)[1];
+    uint32_t& word = ((uint32_t*)header)[1];
     word &= ~(0b1111111111 << 10);
     word |= num_elements << 10;
 }
