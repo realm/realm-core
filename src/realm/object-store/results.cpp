@@ -57,7 +57,7 @@ Results::Results(SharedRealm r, Query q, DescriptorOrdering o)
 }
 
 Results::Results(const Class& cls)
-    : Results(cls.m_realm, cls.m_table)
+    : Results(cls.get_realm(), cls.get_table())
 {
 }
 

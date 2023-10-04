@@ -35,7 +35,7 @@ public:
     Class(std::shared_ptr<Realm> r, StringData object_type);
     Class(std::shared_ptr<Realm> r, const ObjectSchema* object_schema);
 
-    size_t size() const
+    size_t nb_objects() const
     {
         return m_table->size();
     }
@@ -51,16 +51,31 @@ public:
     {
         return m_table->get_column_key(name);
     }
+    std::shared_ptr<Realm> get_realm() const noexcept
+    {
+        return m_realm;
+    }
+    TableRef get_table() const noexcept
+    {
+        return m_table;
+    }
+    const ObjectSchema& get_schema() const noexcept
+    {
+        return *m_object_schema;
+    }
+
     Query get_query(const std::string& query_string, query_parser::Arguments& args,
-                    const query_parser::KeyPathMapping& mapping) const;
+                    const query_parser::KeyPathMapping& mapping) const
+    {
+        return m_table->query(query_string, args, mapping);
+    }
+
 
     std::pair<Obj, bool> create_object(Mixed primary_value);
     Obj create_object();
     Obj get_object(Mixed primary_value);
 
 private:
-    friend class Results;
-
     std::shared_ptr<Realm> m_realm;
     const ObjectSchema* m_object_schema;
     TableRef m_table;

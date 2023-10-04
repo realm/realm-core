@@ -1914,12 +1914,6 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
     return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
 }
 
-Query Class::get_query(const std::string& query_string, query_parser::Arguments& args,
-                       const query_parser::KeyPathMapping& mapping) const
-{
-    return m_table->query(query_string, args, mapping);
-}
-
 std::unique_ptr<Subexpr> LinkChain::column(const std::string& col)
 {
     auto col_key = m_current_table->get_column_key(col);

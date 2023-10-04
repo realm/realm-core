@@ -1008,7 +1008,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
 
         // Make sure we have got a new client file id
         REQUIRE(realm->read_group().get_sync_file_id() != client_file_id);
-        REQUIRE(cls.size() == 3);
+        REQUIRE(cls.nb_objects() == 3);
 
         // Check that we can continue committing to this realm
         realm->begin_transaction();
@@ -1019,7 +1019,7 @@ TEST_CASE("Get Realm using Async Open", "[sync][pbs][async open]") {
         // Check that this change is now in the original realm
         wait_for_download(*origin);
         origin->refresh();
-        REQUIRE(cls.size() == 4);
+        REQUIRE(cls.nb_objects() == 4);
     }
 
     SECTION("downloads Realms which exist on the server") {
