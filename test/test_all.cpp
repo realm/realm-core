@@ -470,14 +470,13 @@ bool run_tests(const std::shared_ptr<realm::util::Logger>& logger = nullptr)
     // Set intra test log level threshold
     {
         const char* str = getenv("UNITTEST_LOG_LEVEL");
-        if (str && strlen(str) != 0) {
-            std::istringstream in(str);
-            in.imbue(std::locale::classic());
-            in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
-            in >> config.intra_test_log_level;
-            bool bad = !in || in.get() != std::char_traits<char>::eof();
-            if (bad)
-                throw std::runtime_error("Bad intra test log level");
+        if (str && *str) {
+            if (auto level = realm::util::Logger::level_from_string(str)) {
+                config.intra_test_log_level = *level;
+            }
+            else {
+                throw std::runtime_error(util::format("Invalid log level '%1'", str));
+            }
         }
     }
 
