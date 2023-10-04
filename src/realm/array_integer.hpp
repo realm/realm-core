@@ -80,6 +80,9 @@ public:
     void move(Array& dst, size_t ndx);
     size_t size() const noexcept;
     bool is_empty() const noexcept;
+    void set_type(Type type);
+    void truncate(size_t new_size);
+    void truncate_and_destroy_children(size_t new_size);
 
     bool is_null(size_t) const
     {
@@ -89,6 +92,11 @@ public:
     bool find(value_type value, size_t start, size_t end, QueryStateBase* state, Callback callback) const;
 
 private:
+    // copy on write for compressed array
+    void copy_on_write();
+    void copy_on_write(size_t min_size);
+
+    // compression logic
     int64_t get_compressed_value(size_t ndx) const;
     bool try_compress(std::vector<int64_t>&, std::vector<size_t>&);
     bool is_in_compressed_format() const;

@@ -80,6 +80,49 @@ bool ArrayInteger::is_empty() const noexcept
     return size() == 0;
 }
 
+void ArrayInteger::set_type(Type type)
+{
+    if (is_in_compressed_format()) {
+        decompress();
+    }
+    Array::set_type(type);
+}
+
+void ArrayInteger::truncate(size_t new_size)
+{
+    if (is_in_compressed_format()) {
+        decompress();
+    }
+    Array::truncate(new_size);
+}
+
+void ArrayInteger::truncate_and_destroy_children(size_t new_size)
+{
+    if (is_in_compressed_format()) {
+        decompress();
+    }
+    Array::truncate_and_destroy_children(new_size);
+}
+
+void ArrayInteger::copy_on_write()
+{
+    if (is_in_compressed_format()) {
+        decompress();
+    }
+    Array::copy_on_write();
+}
+
+void ArrayInteger::copy_on_write(size_t min_size)
+{
+    if (is_in_compressed_format()) {
+        decompress();
+    }
+    Array::copy_on_write(min_size);
+}
+
+// TODO deal with Array:write()
+
+
 bool ArrayInteger::try_compress()
 {
     std::vector<int64_t> values;
@@ -107,7 +150,7 @@ bool ArrayInteger::try_compress()
 
 bool ArrayInteger::is_in_compressed_format() const
 {
-    //
+
     const auto header = m_compressed_array.get_addr();
     if (header) {
         Encoding enconding{get_kind((uint64_t*)header)};

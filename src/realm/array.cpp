@@ -222,6 +222,7 @@ void Array::init_from_mem(MemRef mem) noexcept
 
 void Array::update_from_parent() noexcept
 {
+    // TODO: this is going to crash in case the array is in compressed form... FIX this
     REALM_ASSERT_DEBUG(is_attached());
     ArrayParent* parent = get_parent();
     REALM_ASSERT_DEBUG(parent);
@@ -231,6 +232,7 @@ void Array::update_from_parent() noexcept
 
 void Array::set_type(Type type)
 {
+    // TODO: fix this, this is going to crash if array is in compressed format.
     REALM_ASSERT(is_attached());
 
     copy_on_write(); // Throws
@@ -1075,8 +1077,8 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t size, int_fast64_t value,
                      Allocator& alloc)
 {
-    REALM_ASSERT(value == 0 || width_type == wtype_Bits);
-    REALM_ASSERT(size == 0 || width_type != wtype_Ignore);
+    REALM_ASSERT_7(value, ==, 0, ||, width_type, ==, wtype_Bits);
+    REALM_ASSERT_7(size, ==, 0, ||, width_type, !=, wtype_Ignore);
 
     bool is_inner_bptree_node = false, has_refs = false;
     switch (type) {
@@ -1097,7 +1099,6 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
         width = int(bit_width(value));
         byte_size_0 = calc_aligned_byte_size(size, width); // Throws
     }
-
     // Adding zero to Array::initial_capacity to avoid taking the
     // address of that member
     size_t byte_size = std::max(byte_size_0, initial_capacity + 0);
