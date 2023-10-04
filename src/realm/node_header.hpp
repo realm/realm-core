@@ -377,8 +377,17 @@ public:
     template <Encoding>
     inline size_t get_capacity(uint64_t* header);
 
-    // TODO:
-    // get/set the type and flags -- they are a bit of a mess
+    // Accessing flags.
+    enum class Flags { // bit positions in flags "byte", used for masking
+        Context = 1,
+        HasRefs = 2,
+        InnerBPTree = 4,
+        // additional flags can be supported by new layouts, but old layout (kind=='A') is full
+    };
+    template <Encoding>
+    inline void set_flags(uint64_t* header, uint8_t flags);
+    template <Encoding>
+    inline uint8_t get_flags(uint64_t* header);
 };
 
 
@@ -809,6 +818,95 @@ template <>
 inline size_t NodeHeader::get_capacity<NodeHeader::Encoding::Flex>(uint64_t* header)
 {
     return ((uint16_t*)header)[0];
+}
+
+template <>
+inline void NodeHeader::set_flags<NodeHeader::Encoding::WTypBits>(uint64_t* header, uint8_t flags)
+{
+    REALM_ASSERT(flags <= 7);
+    auto h = (uint8_t*)header;
+    h[4] = (h[4] & 0b00011111) | flags << 5;
+}
+template <>
+inline void NodeHeader::set_flags<NodeHeader::Encoding::WTypMult>(uint64_t* header, uint8_t flags)
+{
+    REALM_ASSERT(flags <= 7);
+    auto h = (uint8_t*)header;
+    h[4] = (h[4] & 0b00011111) | flags << 5;
+}
+template <>
+inline void NodeHeader::set_flags<NodeHeader::Encoding::WTypIgn>(uint64_t* header, uint8_t flags)
+{
+    REALM_ASSERT(flags <= 7);
+    auto h = (uint8_t*)header;
+    h[4] = (h[4] & 0b00011111) | flags << 5;
+}
+template <>
+inline void NodeHeader::set_flags<NodeHeader::Encoding::Packed>(uint64_t* header, uint8_t flags)
+{
+    auto h = (uint8_t*)header;
+    h[2] = flags;
+}
+template <>
+inline void NodeHeader::set_flags<NodeHeader::Encoding::AofP>(uint64_t* header, uint8_t flags)
+{
+    auto h = (uint8_t*)header;
+    h[2] = flags;
+}
+template <>
+inline void NodeHeader::set_flags<NodeHeader::Encoding::PofA>(uint64_t* header, uint8_t flags)
+{
+    auto h = (uint8_t*)header;
+    h[2] = flags;
+}
+template <>
+inline void NodeHeader::set_flags<NodeHeader::Encoding::Flex>(uint64_t* header, uint8_t flags)
+{
+    auto h = (uint8_t*)header;
+    h[2] = flags;
+}
+
+template <>
+inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::WTypBits>(uint64_t* header)
+{
+    auto h = (uint8_t*)header;
+    return h[4] >> 5;
+}
+template <>
+inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::WTypMult>(uint64_t* header)
+{
+    auto h = (uint8_t*)header;
+    return h[4] >> 5;
+}
+template <>
+inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::WTypIgn>(uint64_t* header)
+{
+    auto h = (uint8_t*)header;
+    return h[4] >> 5;
+}
+template <>
+inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::Packed>(uint64_t* header)
+{
+    auto h = (uint8_t*)header;
+    return h[2];
+}
+template <>
+inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::AofP>(uint64_t* header)
+{
+    auto h = (uint8_t*)header;
+    return h[2];
+}
+template <>
+inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::PofA>(uint64_t* header)
+{
+    auto h = (uint8_t*)header;
+    return h[2];
+}
+template <>
+inline uint8_t NodeHeader::get_flags<NodeHeader::Encoding::Flex>(uint64_t* header)
+{
+    auto h = (uint8_t*)header;
+    return h[2];
 }
 
 
