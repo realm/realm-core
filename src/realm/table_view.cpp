@@ -557,8 +557,6 @@ void TableView::do_sort(const DescriptorOrdering& ordering)
         }
         else {
             if (using_indexpairs) {
-                // BaseDescriptor::Sorter predicate = base_descr->sorter(*m_table, index_pairs);
-                // base_descr->execute(index_pairs, predicate, nullptr);
                 apply_indexpairs();
             }
             base_descr->execute(*m_table, m_key_values, next);

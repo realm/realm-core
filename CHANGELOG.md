@@ -2,9 +2,6 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-<<<<<<< HEAD
-* Filtering by user-defined functions (PR [#7020](https://github.com/realm/realm-core/pull/7020))
-=======
 * Allow collections of non-embedded links in asymmetric objects. ([PR #7003](https://github.com/realm/realm-core/pull/7003))
 * Flexible sync API improvements:
   - Erase Subscriptions by class type for C API. 
@@ -12,7 +9,7 @@
   - Introduce `MutableSubscriptionSet::erase_by_id()`.
   - Introduce `MutableSubscriptionSet::erase_by_class_name()`.
   ([PR #7008](https://github.com/realm/realm-core/pull/7008))
->>>>>>> master
+* Filtering by user-defined functions (PR [#7020](https://github.com/realm/realm-core/pull/7020))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
