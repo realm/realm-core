@@ -24,6 +24,7 @@
 #include "realm/uuid.hpp"
 #include "realm/util/base64.hpp"
 #include "realm/util/overload.hpp"
+#include "realm/object-store/class.hpp"
 
 #define YY_NO_UNISTD_H 1
 #define YY_NO_INPUT 1

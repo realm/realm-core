@@ -168,7 +168,7 @@ public:
     size_t get_backlink_count() const;
     size_t get_backlink_count(const Table& origin, ColKey origin_col_key) const;
     ObjKey get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const;
-    TableView get_backlink_view(TableRef src_table, ColKey src_col_key);
+    TableView get_backlink_view(TableRef src_table, ColKey src_col_key) const;
 
     // To be used by the query system when a single object should
     // be tested. Will allow a function to be called in the context

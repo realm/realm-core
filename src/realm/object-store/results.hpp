@@ -36,6 +36,7 @@
 
 namespace realm {
 class Mixed;
+class Class;
 class SectionedResults;
 
 namespace _impl {
@@ -48,9 +49,14 @@ public:
     // or a wrapper around a query and a sort order which creates and updates
     // the tableview as needed
     Results();
+    Results(const Class&);
     Results(std::shared_ptr<Realm> r, ConstTableRef table);
     Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
+    Results(std::shared_ptr<Realm> r, const Obj& obj, TableKey src_table, ColKey src_col_key)
+        : Results(r, obj.get_backlink_view(r->read_group().get_table(src_table), src_col_key))
+    {
+    }
     Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list, DescriptorOrdering o);
     Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> collection, util::Optional<Query> q = {},
             SortDescriptor s = {});

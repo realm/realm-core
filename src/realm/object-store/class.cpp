@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2017 Realm Inc.
+// Copyright 2023 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,28 +16,34 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_OS_OBJECT_NOTIFIER_HPP
-#define REALM_OS_OBJECT_NOTIFIER_HPP
 
-#include <realm/object-store/impl/collection_notifier.hpp>
+#include <realm/object-store/class.hpp>
+#include <realm/object-store/shared_realm.hpp>
 
-#include <realm/keys.hpp>
-#include <realm/table.hpp>
+namespace realm {
 
-namespace realm::_impl {
-class ObjectNotifier : public CollectionNotifier {
-public:
-    ObjectNotifier(std::shared_ptr<Realm> realm, const Obj&);
+Class::Class(std::shared_ptr<Realm> r, const ObjectSchema* object_schema)
+    : m_realm(std::move(r))
+    , m_object_schema(object_schema)
+    , m_table(m_realm->read_group().get_table(m_object_schema->table_key))
+{
+}
 
-private:
-    TableRef m_table;
-    ObjKey m_obj_key;
-    TransactionChangeInfo* m_info = nullptr;
+std::pair<Obj, bool> Class::create_object(Mixed pk)
+{
+    bool did_create;
+    auto obj = m_table->create_object_with_primary_key(pk, &did_create);
+    return {obj, did_create};
+}
 
-    void run() override REQUIRES(!m_callback_mutex);
-    void reattach() override;
-    bool do_add_required_change_info(TransactionChangeInfo& info) override;
-};
-} // namespace realm::_impl
+Obj Class::create_object()
+{
+    return m_table->create_object();
+}
 
-#endif // REALM_OS_OBJECT_NOTIFIER_HPP
+Obj Class::get_object(Mixed pk)
+{
+    return m_table->get_object_with_primary_key(pk);
+}
+
+} // namespace realm
