@@ -1090,30 +1090,18 @@ private:
     SyncProgress m_progress;
 
     // In general, the local version produced by the last changeset in the local
-    // history. The uploading process will never advance beyond this point. The
-    // changeset that produced this version may, or may not contain changes of
-    // local origin.
+    // history. The changeset that produced this version may, or may not
+    // contain changes of local origin.
     //
     // It is set to the current version of the local Realm at session activation
     // time (although always zero for the initial empty Realm
-    // state). Thereafter, it is generally updated when the application calls
-    // recognize_sync_version() and when changesets are received from the server
-    // and integrated locally.
+    // state). Thereafter, it is updated when the application calls
+    // recognize_sync_version(), when changesets are received from the server
+    // and integrated locally, and when the uploading process discovers newer
+    // versions.
     //
     // INVARIANT: m_progress.upload.client_version <= m_last_version_available
     version_type m_last_version_available = 0;
-
-    // The target version for the upload process. When the upload cursor
-    // (`m_upload_progress`) reaches `m_upload_target_version`, uploading stops.
-    //
-    // In general, `m_upload_target_version` follows `m_last_version_available`
-    // as it is increased, but in some cases, `m_upload_target_version` will be
-    // kept fixed for a while in order to constrain the uploading process.
-    //
-    // Is set equal to `m_last_version_available` at session activation time.
-    //
-    // INVARIANT: m_upload_target_version <= m_last_version_available
-    version_type m_upload_target_version = 0;
 
     // In general, this is the position in the history reached while scanning
     // for changesets to be uploaded.
@@ -1121,10 +1109,9 @@ private:
     // Set to `m_progress.upload` at session activation time and whenever the
     // connection to the server is lost. When the connection is established, the
     // scanning for changesets to be uploaded then progresses from there towards
-    // `m_upload_target_version`.
+    // `m_last_version_available`.
     //
     // INVARIANT: m_progress.upload.client_version <= m_upload_progress.client_version
-    // INVARIANT: m_upload_progress.client_version <= m_upload_target_version
     UploadCursor m_upload_progress = {0, 0};
 
     // Set to `m_progress.upload.client_version` at session activation time and
@@ -1475,7 +1462,6 @@ inline bool ClientImpl::Session::do_recognize_sync_version(version_type version)
 {
     if (REALM_LIKELY(version > m_last_version_available)) {
         m_last_version_available = version;
-        m_upload_target_version = version;
         return true;
     }
     return false;
