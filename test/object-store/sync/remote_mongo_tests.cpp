@@ -16,17 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_ENABLE_MONGO_CLIENT_TESTS
-#define REALM_ENABLE_MONGO_CLIENT_TESTS 1
-#endif
-
-#if REALM_ENABLE_MONGO_CLIENT_TESTS
-
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 
-#include <sstream>
 #include <catch2/catch_all.hpp>
+
+#include <sstream>
 
 namespace realm::app {
 using bson::Bson;
@@ -61,7 +56,7 @@ std::string operator""_nows(const char* str, size_t len)
 }
 } // namespace
 
-TEST_CASE("Validate _nows helper", "[mongo]") {
+TEST_CASE("Validate _nows helper", "[sync][mongo]") {
     // WARNING: if you are debugging this test, be aware that catch can be inconsistent with leading whitespace when
     // printing mulit-line strings. You may want to do your own printing.
 
@@ -87,7 +82,7 @@ TEST_CASE("Validate _nows helper", "[mongo]") {
              mr bob)"_nows == "hello\nmr bob");
 }
 
-TEST_CASE("WatchStream SSE processing", "[mongo]") {
+TEST_CASE("WatchStream SSE processing", "[sync][mongo]") {
     WatchStream ws;
 
     SECTION("successes") {
@@ -248,7 +243,7 @@ TEST_CASE("WatchStream SSE processing", "[mongo]") {
 // Defining a shorthand so that it is less disruptive to put this after every line.
 #define REQ_ND REQUIRE(ws.state() == WatchStream::NEED_DATA)
 
-TEST_CASE("WatchStream line processing", "[mongo]") {
+TEST_CASE("WatchStream line processing", "[sync][mongo]") {
     WatchStream ws;
 
     SECTION("simple") {
@@ -508,7 +503,7 @@ TEST_CASE("WatchStream line processing", "[mongo]") {
     }
 }
 
-TEST_CASE("WatchStream buffer processing", "[mongo]") {
+TEST_CASE("WatchStream buffer processing", "[sync][mongo]") {
     WatchStream ws;
 
     SECTION("simple") {
@@ -612,6 +607,5 @@ TEST_CASE("WatchStream buffer processing", "[mongo]") {
 #endif
     }
 }
-} // namespace realm::app
 
-#endif
+} // namespace realm::app

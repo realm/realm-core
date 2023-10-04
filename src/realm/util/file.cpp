@@ -31,7 +31,6 @@
 
 #ifndef _WIN32
 #include <unistd.h>
-#include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/file.h> // BSD / Linux flock()
 #include <sys/statvfs.h>
@@ -508,6 +507,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
     int fd = ::open(path.c_str(), flags2, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (0 <= fd) {
         m_fd = fd;
+        m_have_lock = false;
         if (success)
             *success = true;
         return;
@@ -563,7 +563,8 @@ void File::close() noexcept
 
     if (m_fd < 0)
         return;
-    unlock();
+    if (m_have_lock)
+        unlock();
     int r = ::close(m_fd);
     REALM_ASSERT_RELEASE(r == 0);
     m_fd = -1;
@@ -945,7 +946,7 @@ void File::prealloc(size_t size)
         // so this is some other runtime error and not OutOfDiskSpace
         throw SystemError(err, "ftruncate() inside prealloc() failed");
     }
-#elif REALM_ANDROID || defined(_WIN32)
+#elif REALM_ANDROID || defined(_WIN32) || defined(__EMSCRIPTEN__)
 
     consume_space_interlocked();
 
@@ -1099,7 +1100,9 @@ static void _unlock(int m_fd)
     do {
         r = flock(m_fd, LOCK_UN);
     } while (r != 0 && errno == EINTR);
-    REALM_ASSERT_RELEASE_EX(r == 0 && "File::unlock()", r, errno);
+    if (r) {
+        throw SystemError(errno, "File::unlock() has failed");
+    }
 }
 #endif
 
@@ -1204,9 +1207,9 @@ bool File::rw_lock(bool exclusive, bool non_blocking)
 bool File::lock(bool exclusive, bool non_blocking)
 {
     REALM_ASSERT_RELEASE(is_attached());
+    REALM_ASSERT_RELEASE(!m_have_lock);
 
 #ifdef _WIN32 // Windows version
-    REALM_ASSERT_RELEASE(!m_have_lock);
 
     // Under Windows a file lock must be explicitely released before
     // the file is closed. It will eventually be released by the
@@ -1251,8 +1254,10 @@ bool File::lock(bool exclusive, bool non_blocking)
     if (non_blocking)
         operation |= LOCK_NB;
     do {
-        if (flock(m_fd, operation) == 0)
+        if (flock(m_fd, operation) == 0) {
+            m_have_lock = true;
             return true;
+        }
     } while (errno == EINTR);
     int err = errno; // Eliminate any risk of clobbering
     if (err == EWOULDBLOCK)
@@ -1263,26 +1268,21 @@ bool File::lock(bool exclusive, bool non_blocking)
 
 void File::unlock() noexcept
 {
-#ifdef _WIN32 // Windows version
     if (!m_have_lock)
         return;
 
+#ifdef _WIN32 // Windows version
     OVERLAPPED overlapped;
     overlapped.hEvent = 0;
     overlapped.OffsetHigh = 0;
     overlapped.Offset = 0;
     overlapped.Pointer = 0;
     BOOL r = UnlockFileEx(m_fd, 0, 1, 0, &overlapped);
-
     REALM_ASSERT_RELEASE(r);
-    m_have_lock = false;
 #else
-    // The Linux man page for flock() does not state explicitely that
-    // unlocking is idempotent, however, we will assume it since there
-    // is no mention of the error that would be reported if a
-    // non-locked file were unlocked.
     _unlock(m_fd);
 #endif
+    m_have_lock = false;
 }
 
 void File::rw_unlock() noexcept
@@ -1944,7 +1944,8 @@ DirScanner::~DirScanner() noexcept
 
 bool DirScanner::next(std::string& name)
 {
-#if !defined(__linux__) && !REALM_PLATFORM_APPLE && !REALM_WINDOWS && !REALM_UWP && !REALM_ANDROID
+#if !defined(__linux__) && !REALM_PLATFORM_APPLE && !REALM_WINDOWS && !REALM_UWP && !REALM_ANDROID &&                \
+    !defined(__EMSCRIPTEN__)
 #error "readdir() is not known to be thread-safe on this platform"
 #endif
 

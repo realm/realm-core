@@ -19,6 +19,7 @@
 #ifndef REALM_TABLE_REF_HPP
 #define REALM_TABLE_REF_HPP
 
+#include <cstdint>
 #include <cstddef>
 #include <ostream>
 namespace realm {

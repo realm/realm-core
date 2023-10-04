@@ -340,11 +340,12 @@ private:
     friend class TableView;
     template <class, class>
     friend class Collection;
-    template <class, class>
+    template <class>
     friend class CollectionBaseImpl;
     template <class>
     friend class Lst;
     friend class LnkLst;
+    friend class LinkCount;
     friend class Dictionary;
     friend class LinkMap;
     template <class>

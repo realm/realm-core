@@ -104,27 +104,28 @@ void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInf
 
 namespace realm {
 
-std::map<DB::TransactStage, const char*> log_messages = {
-    {DB::TransactStage::transact_Frozen, "Start frozen: %1"},
-    {DB::TransactStage::transact_Writing, "Start write: %1"},
-    {DB::TransactStage::transact_Reading, "Start read: %1"},
+std::map<DB::TransactStage, const char*> log_stage = {
+    {DB::TransactStage::transact_Frozen, "frozen"},
+    {DB::TransactStage::transact_Writing, "write"},
+    {DB::TransactStage::transact_Reading, "read"},
 };
 
 Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage)
     : Group(alloc)
     , db(_db)
     , m_read_lock(rli)
+    , m_log_id(util::gen_log_id(this))
 {
-    if (db->m_logger) {
-        db->m_logger->log(util::Logger::Level::trace, log_messages[stage], rli.m_version);
-    }
     bool writable = stage == DB::transact_Writing;
     m_transact_stage = DB::transact_Ready;
-    set_metrics(db->m_metrics);
     set_transact_stage(stage);
     m_alloc.note_reader_start(this);
     attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable,
                   VersionID{rli.m_version, rli.m_reader_idx});
+    if (db->m_logger) {
+        db->m_logger->log(util::Logger::Level::trace, "Start %1 %2: %3 ref %4", log_stage[stage], m_log_id,
+                          rli.m_version, m_read_lock.m_top_ref);
+    }
 }
 
 Transaction::~Transaction()
@@ -277,7 +278,11 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
         remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false); // Throws
         return VersionID{version, new_read_lock.m_reader_idx};
     }
-    catch (...) {
+    catch (std::exception& e) {
+        if (db->m_logger) {
+            db->m_logger->log(util::Logger::Level::error, "Tr %1: Commit failed with exception: \"%2\"", m_log_id,
+                              e.what());
+        }
         // In case of failure, further use of the transaction for reading is unsafe
         set_transact_stage(DB::transact_Ready);
         throw;
@@ -322,12 +327,20 @@ TransactionRef Transaction::freeze()
 TransactionRef Transaction::duplicate()
 {
     auto version = VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
-    if (m_transact_stage == DB::transact_Reading)
-        return db->start_read(version);
-    if (m_transact_stage == DB::transact_Frozen)
-        return db->start_frozen(version);
-
-    throw WrongTransactionState("Can only duplicate a read/frozen transaction");
+    switch (m_transact_stage) {
+        case DB::transact_Ready:
+            throw WrongTransactionState("Cannot duplicate a transaction which does not have a read lock.");
+        case DB::transact_Reading:
+            return db->start_read(version);
+        case DB::transact_Frozen:
+            return db->start_frozen(version);
+        case DB::transact_Writing:
+            if (get_commit_size() != 0)
+                throw WrongTransactionState(
+                    "Can only duplicate a write transaction before any changes have been made.");
+            return db->start_read(version);
+    }
+    REALM_UNREACHABLE();
 }
 
 void Transaction::copy_to(TransactionRef dest) const
@@ -714,7 +727,11 @@ void Transaction::complete_async_commit()
     DB::ReadLockInfo read_lock;
     try {
         read_lock = db->grab_read_lock(DB::ReadLockInfo::Live, VersionID());
-        GroupWriter out(*this);
+        if (db->m_logger) {
+            db->m_logger->log(util::Logger::Level::trace, "Tr %1: Committing ref %2 to disk", m_log_id,
+                              read_lock.m_top_ref);
+        }
+        GroupCommitter out(*this);
         out.commit(read_lock.m_top_ref); // Throws
         // we must release the write mutex before the callback, because the callback
         // is allowed to re-request it.
@@ -724,8 +741,12 @@ void Transaction::complete_async_commit()
             m_oldest_version_not_persisted.reset();
         }
     }
-    catch (...) {
+    catch (const std::exception& e) {
         m_commit_exception = std::current_exception();
+        if (db->m_logger) {
+            db->m_logger->log(util::Logger::Level::error, "Tr %1: Committing to disk failed with exception: \"%2\"",
+                              m_log_id, e.what());
+        }
         m_async_commit_has_failed = true;
         db->release_read_lock(read_lock);
     }
@@ -843,7 +864,7 @@ void Transaction::acquire_write_lock()
 void Transaction::do_end_read() noexcept
 {
     if (db->m_logger)
-        db->m_logger->log(util::Logger::Level::trace, "End transaction");
+        db->m_logger->log(util::Logger::Level::trace, "End transaction %1", m_log_id);
 
     prepare_for_close();
     detach();
@@ -906,41 +927,6 @@ void Transaction::initialize_replication()
 
 void Transaction::set_transact_stage(DB::TransactStage stage) noexcept
 {
-#if REALM_METRICS
-    REALM_ASSERT(m_metrics == db->m_metrics);
-    if (m_metrics) { // null if metrics are disabled
-        size_t free_space;
-        size_t used_space;
-        db->get_stats(free_space, used_space);
-        size_t total_size = used_space + free_space;
-
-        size_t num_objects = m_total_rows;
-        size_t num_available_versions = static_cast<size_t>(db->get_number_of_versions());
-        size_t num_decrypted_pages = realm::util::get_num_decrypted_pages();
-
-        if (stage == DB::transact_Reading) {
-            if (m_transact_stage == DB::transact_Writing) {
-                m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions,
-                                                 num_decrypted_pages);
-            }
-            m_metrics->start_read_transaction();
-        }
-        else if (stage == DB::transact_Writing) {
-            if (m_transact_stage == DB::transact_Reading) {
-                m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions,
-                                                num_decrypted_pages);
-            }
-            m_metrics->start_write_transaction();
-        }
-        else if (stage == DB::transact_Ready) {
-            m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions,
-                                            num_decrypted_pages);
-            m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions,
-                                             num_decrypted_pages);
-        }
-    }
-#endif
-
     m_transact_stage = stage;
 }
 

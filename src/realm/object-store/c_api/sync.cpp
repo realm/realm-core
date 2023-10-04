@@ -122,63 +122,6 @@ static_assert(realm_flx_sync_subscription_set_state_e(SubscriptionSet::State::Un
 
 } // namespace
 
-realm_sync_error_code_t to_capi(const Status& status, std::string& message)
-{
-    auto ret = realm_sync_error_code_t();
-
-    auto error_code = status.get_std_error_code();
-    const std::error_category& category = error_code.category();
-    if (category == realm::sync::client_error_category()) {
-        ret.category = RLM_SYNC_ERROR_CATEGORY_CLIENT;
-    }
-    else if (category == realm::sync::protocol_error_category()) {
-        if (realm::sync::is_session_level_error(realm::sync::ProtocolError(error_code.value()))) {
-            ret.category = RLM_SYNC_ERROR_CATEGORY_SESSION;
-        }
-        else {
-            ret.category = RLM_SYNC_ERROR_CATEGORY_CONNECTION;
-        }
-    }
-    else if (category == std::system_category() || category == realm::util::error::basic_system_error_category()) {
-        ret.category = RLM_SYNC_ERROR_CATEGORY_SYSTEM;
-    }
-    else if (category == realm::sync::websocket::websocket_error_category()) {
-        ret.category = RLM_SYNC_ERROR_CATEGORY_WEBSOCKET;
-    }
-    else {
-        ret.category = RLM_SYNC_ERROR_CATEGORY_UNKNOWN;
-    }
-
-    ret.value = error_code.value();
-    message = error_code.message(); // pass the string to the caller for lifetime purposes
-    ret.message = message.c_str();
-    ret.category_name = category.name();
-
-
-    return ret;
-}
-
-void sync_error_to_error_code(const realm_sync_error_code_t& sync_error_code, std::error_code* error_code_out)
-{
-    if (error_code_out) {
-        const realm_sync_error_category_e category = sync_error_code.category;
-        if (category == RLM_SYNC_ERROR_CATEGORY_CLIENT) {
-            error_code_out->assign(sync_error_code.value, realm::sync::client_error_category());
-        }
-        else if (category == RLM_SYNC_ERROR_CATEGORY_SESSION || category == RLM_SYNC_ERROR_CATEGORY_CONNECTION) {
-            error_code_out->assign(sync_error_code.value, realm::sync::protocol_error_category());
-        }
-        else if (category == RLM_SYNC_ERROR_CATEGORY_SYSTEM) {
-            error_code_out->assign(sync_error_code.value, std::system_category());
-        }
-        else if (category == RLM_SYNC_ERROR_CATEGORY_WEBSOCKET) {
-            error_code_out->assign(sync_error_code.value, realm::sync::websocket::websocket_error_category());
-        }
-        else if (category == RLM_SYNC_ERROR_CATEGORY_UNKNOWN) {
-            error_code_out->assign(sync_error_code.value, realm::util::error::basic_system_error_category());
-        }
-    }
-}
 
 static Query add_ordering_to_realm_query(Query realm_query, const DescriptorOrdering& ordering)
 {
@@ -272,7 +215,7 @@ RLM_API void realm_sync_client_config_set_fast_reconnect_limit(realm_sync_client
 /// @param config pointer to sync client config created by realm_sync_client_config_new()
 /// @param on_thread_create callback invoked when the object store thread is created
 /// @param on_thread_destroy callback invoked when the object store thread is destroyed
-/// @param on_error callback invoked to signal to the listener that some error has occured.
+/// @param on_error callback invoked to signal to the listener that some error has occurred.
 /// @param user_data pointer to user defined data that is provided to each of the callback functions
 /// @param free_userdata callback invoked when the user_data is to be freed
 RLM_API void realm_sync_client_config_set_default_binding_thread_observer(
@@ -314,8 +257,7 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         auto c_error = realm_sync_error_t();
 
         std::string error_code_message;
-        c_error.error_code = to_capi(error.to_status(), error_code_message);
-        c_error.detailed_message = error.what();
+        c_error.status = to_capi(error.status);
         c_error.is_fatal = error.is_fatal;
         c_error.is_unrecognized_by_client = error.is_unrecognized_by_client;
         c_error.is_client_reset_requested = error.is_client_reset_requested();
@@ -466,6 +408,18 @@ RLM_API void realm_sync_config_set_after_client_reset_handler(realm_sync_config_
         }
     };
     config->notify_after_client_reset = std::move(cb);
+}
+
+RLM_API void realm_sync_config_set_initial_subscription_handler(
+    realm_sync_config_t* config, realm_async_open_task_init_subscription_func_t callback, bool rerun_on_open,
+    realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
+{
+    auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](SharedRealm realm) {
+        realm_t r{realm};
+        callback(&r, userdata.get());
+    };
+    config->subscription_initializer = std::move(cb);
+    config->rerun_init_subscription_on_open = rerun_on_open;
 }
 
 RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_latest_subscription_set(const realm_t* realm)
@@ -655,13 +609,7 @@ RLM_API bool realm_sync_subscription_set_erase_by_id(realm_flx_sync_mutable_subs
     REALM_ASSERT(subscription_set != nullptr && id != nullptr);
     *erased = false;
     return wrap_err([&] {
-        auto it = std::find_if(subscription_set->begin(), subscription_set->end(), [id](const Subscription& sub) {
-            return from_capi(*id) == sub.id;
-        });
-        if (it != subscription_set->end()) {
-            subscription_set->erase(it);
-            *erased = true;
-        }
+        *erased = subscription_set->erase_by_id(from_capi(*id));
         return true;
     });
 }
@@ -697,6 +645,18 @@ RLM_API bool realm_sync_subscription_set_erase_by_results(realm_flx_sync_mutable
     return wrap_err([&]() {
         auto realm_query = add_ordering_to_realm_query(results->get_query(), results->get_ordering());
         *erased = subscription_set->erase(realm_query);
+        return true;
+    });
+}
+
+RLM_API bool
+realm_sync_subscription_set_erase_by_class_name(realm_flx_sync_mutable_subscription_set_t* subscription_set,
+                                                const char* object_class_name, bool* erased)
+{
+    REALM_ASSERT(subscription_set != nullptr && object_class_name != nullptr);
+    *erased = false;
+    return wrap_err([&]() {
+        *erased = subscription_set->erase_by_class_name(object_class_name);
         return true;
     });
 }
@@ -843,9 +803,8 @@ RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_
 {
     util::UniqueFunction<void(Status)> cb =
         [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](Status s) {
-            if (s.get_std_error_code()) {
-                std::string error_code_message;
-                realm_sync_error_code_t error = to_capi(s, error_code_message);
+            if (!s.is_ok()) {
+                realm_error_t error = to_capi(s);
                 done(userdata.get(), &error);
             }
             else {
@@ -862,9 +821,8 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
 {
     util::UniqueFunction<void(Status)> cb =
         [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](Status s) {
-            if (s.get_std_error_code()) {
-                std::string error_code_message;
-                realm_sync_error_code_t error = to_capi(s, error_code_message);
+            if (!s.is_ok()) {
+                realm_error_t error = to_capi(s);
                 done(userdata.get(), &error);
             }
             else {
@@ -874,15 +832,14 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
     (*session)->wait_for_upload_completion(std::move(cb));
 }
 
-RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session, int error_code,
-                                                         int error_category, const char* error_message, bool is_fatal)
+RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session,
+                                                         realm_errno_e error_code, const char* error_str,
+                                                         bool is_fatal)
 {
     REALM_ASSERT(session);
-    realm_sync_error_code_t sync_error{static_cast<realm_sync_error_category_e>(error_category), error_code,
-                                       error_message};
-    std::error_code err;
-    sync_error_to_error_code(sync_error, &err);
-    SyncSession::OnlyForTesting::handle_error(*session->get(), sync::SessionErrorInfo{err, error_message, !is_fatal});
+    SyncSession::OnlyForTesting::handle_error(
+        *session->get(),
+        sync::SessionErrorInfo{Status{static_cast<ErrorCodes::Error>(error_code), error_str}, !is_fatal});
 }
 
 } // namespace realm::c_api

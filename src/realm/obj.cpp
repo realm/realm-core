@@ -32,6 +32,9 @@
 #include "realm/cluster_tree.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/dictionary.hpp"
+#if REALM_ENABLE_GEOSPATIAL
+#include "realm/geospatial.hpp"
+#endif
 #include "realm/link_translator.hpp"
 #include "realm/index_string.hpp"
 #include "realm/object_converter.hpp"
@@ -277,6 +280,33 @@ T Obj::get(ColKey col_key) const
 
     return _get<T>(col_key.get_index());
 }
+
+#if REALM_ENABLE_GEOSPATIAL
+
+template <>
+Geospatial Obj::get(ColKey col_key) const
+{
+    m_table->check_column(col_key);
+    ColumnType type = col_key.get_type();
+    REALM_ASSERT(type == ColumnTypeTraits<Link>::column_id);
+    return Geospatial::from_link(get_linked_object(col_key));
+}
+
+template <>
+std::optional<Geospatial> Obj::get(ColKey col_key) const
+{
+    m_table->check_column(col_key);
+    ColumnType type = col_key.get_type();
+    REALM_ASSERT(type == ColumnTypeTraits<Link>::column_id);
+
+    auto geo = get_linked_object(col_key);
+    if (!geo) {
+        return {};
+    }
+    return Geospatial::from_link(geo);
+}
+
+#endif
 
 template <class T>
 T Obj::_get(ColKey::Idx col_ndx) const
@@ -1677,6 +1707,59 @@ inline void Obj::set_spec<ArrayString>(ArrayString& values, ColKey col_key)
     values.set_spec(spec, spec_ndx);
 }
 
+#if REALM_ENABLE_GEOSPATIAL
+
+template <>
+Obj& Obj::set(ColKey col_key, Geospatial value, bool)
+{
+    update_if_needed();
+    get_table()->check_column(col_key);
+    auto type = col_key.get_type();
+
+    if (type != ColumnTypeTraits<Link>::column_id)
+        throw InvalidArgument(ErrorCodes::TypeMismatch,
+                              util::format("Property '%1' must be a link to set a Geospatial value",
+                                           get_table()->get_column_name(col_key)));
+
+    Obj geo = get_linked_object(col_key);
+    if (!geo) {
+        geo = create_and_set_linked_object(col_key);
+    }
+    value.assign_to(geo);
+    return *this;
+}
+
+template <>
+Obj& Obj::set(ColKey col_key, std::optional<Geospatial> value, bool)
+{
+    update_if_needed();
+    auto table = get_table();
+    table->check_column(col_key);
+    auto type = col_key.get_type();
+    auto attrs = col_key.get_attrs();
+
+    if (type != ColumnTypeTraits<Link>::column_id)
+        throw InvalidArgument(ErrorCodes::TypeMismatch,
+                              util::format("Property '%1' must be a link to set a Geospatial value",
+                                           get_table()->get_column_name(col_key)));
+    if (!value && !attrs.test(col_attr_Nullable))
+        throw NotNullable(Group::table_name_to_class_name(table->get_name()), table->get_column_name(col_key));
+
+    if (!value) {
+        set_null(col_key);
+    }
+    else {
+        Obj geo = get_linked_object(col_key);
+        if (!geo) {
+            geo = create_and_set_linked_object(col_key);
+        }
+        value->assign_to(geo);
+    }
+    return *this;
+}
+
+#endif
+
 template <class T>
 Obj& Obj::set(ColKey col_key, T value, bool is_default)
 {
@@ -1953,7 +2036,11 @@ bool Obj::remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state)
     if (old_link && old_link.get_obj_key()) {
         REALM_ASSERT(m_table->valid_column(col_key));
         ObjKey old_key = old_link.get_obj_key();
-        auto target_obj = m_table->get_parent_group()->get_object(old_link);
+        auto target_obj = m_table->get_parent_group()->try_get_object(old_link);
+        REALM_ASSERT_DEBUG(target_obj);
+        if (!target_obj) {
+            return false;
+        }
         TableRef target_table = target_obj.get_table();
         ColKey backlink_col_key;
         auto type = col_key.get_type();

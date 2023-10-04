@@ -176,13 +176,13 @@ void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<Sync
     }
 
     if (did_create) {
-        m_logger.trace("Created new pending bootstrap object for query version %1", query_version);
+        m_logger.debug("Created new pending bootstrap object for query version %1", query_version);
     }
     else {
-        m_logger.trace("Added batch to pending bootstrap object for query version %1", query_version);
+        m_logger.debug("Added batch to pending bootstrap object for query version %1", query_version);
     }
     if (progress) {
-        m_logger.trace("Finalized pending bootstrap object for query version %1", query_version);
+        m_logger.debug("Finalized pending bootstrap object for query version %1", query_version);
     }
     m_has_pending = true;
 }
@@ -311,12 +311,12 @@ void PendingBootstrapStore::pop_front_pending(const TransactionRef& tr, size_t c
     }
 
     if (changeset_list.is_empty()) {
-        m_logger.trace("Removing pending bootstrap obj for query version %1",
+        m_logger.debug("Removing pending bootstrap obj for query version %1",
                        bootstrap_obj.get<int64_t>(m_query_version));
         bootstrap_obj.remove();
     }
     else {
-        m_logger.trace("Removing pending bootstrap batch for query version %1. %2 changeset remaining",
+        m_logger.debug("Removing pending bootstrap batch for query version %1. %2 changeset remaining",
                        bootstrap_obj.get<int64_t>(m_query_version), changeset_list.size());
     }
 

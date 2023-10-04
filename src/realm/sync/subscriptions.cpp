@@ -33,6 +33,8 @@
 #include <initializer_list>
 #include <stdexcept>
 
+#include <algorithm>
+
 namespace realm::sync {
 namespace {
 // Schema version history:
@@ -273,11 +275,24 @@ void MutableSubscriptionSet::check_is_mutable() const
     }
 }
 
+// This uses the 'swap and pop' idiom to run in constant time.
+// The iterator returned is:
+//  1. end(), if the last subscription is removed
+//  2. same iterator it is passed (but pointing to the last subscription in set), otherwise
 MutableSubscriptionSet::iterator MutableSubscriptionSet::erase(const_iterator it)
 {
     check_is_mutable();
     REALM_ASSERT(it != end());
-    return m_subs.erase(it);
+    if (it == std::prev(m_subs.end())) {
+        m_subs.pop_back();
+        return end();
+    }
+    auto back = std::prev(m_subs.end());
+    // const_iterator to iterator in constant time (See https://stackoverflow.com/a/10669041)
+    auto iterator = m_subs.erase(it, it);
+    std::swap(*iterator, *back);
+    m_subs.pop_back();
+    return iterator;
 }
 
 bool MutableSubscriptionSet::erase(StringData name)
@@ -286,7 +301,8 @@ bool MutableSubscriptionSet::erase(StringData name)
     auto ptr = find(name);
     if (!ptr)
         return false;
-    m_subs.erase(m_subs.begin() + (ptr - &m_subs.front()));
+    auto it = m_subs.begin() + (ptr - &m_subs.front());
+    erase(it);
     return true;
 }
 
@@ -296,7 +312,31 @@ bool MutableSubscriptionSet::erase(const Query& query)
     auto ptr = find(query);
     if (!ptr)
         return false;
-    m_subs.erase(m_subs.begin() + (ptr - &m_subs.front()));
+    auto it = m_subs.begin() + (ptr - &m_subs.front());
+    erase(it);
+    return true;
+}
+
+bool MutableSubscriptionSet::erase_by_class_name(StringData object_class_name)
+{
+    // TODO: Use std::erase_if when switching to C++20.
+    auto it = std::remove_if(m_subs.begin(), m_subs.end(), [&object_class_name](const Subscription& sub) {
+        return sub.object_class_name == object_class_name;
+    });
+    auto erased = end() - it;
+    m_subs.erase(it, end());
+    return erased > 0;
+}
+
+bool MutableSubscriptionSet::erase_by_id(ObjectId id)
+{
+    auto it = std::find_if(m_subs.begin(), m_subs.end(), [&id](const Subscription& sub) -> bool {
+        return sub.id == id;
+    });
+    if (it == end()) {
+        return false;
+    }
+    erase(it);
     return true;
 }
 
@@ -674,10 +714,20 @@ SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t
         load_sync_metadata_schema(tr, &internal_tables);
     }
 
-    // There should always be at least one subscription set so that the user can always wait for synchronizationon
-    // on the result of get_latest().
-    if (auto sub_sets = tr->get_table(m_sub_set_table); sub_sets->is_empty()) {
+    // Make sure the subscription set table is properly initialized
+    initialize_subscriptions_table(std::move(tr), false);
+}
+
+void SubscriptionStore::initialize_subscriptions_table(TransactionRef&& tr, bool clear_table)
+{
+    if (auto sub_sets = tr->get_table(m_sub_set_table); clear_table || sub_sets->is_empty()) {
         tr->promote_to_write();
+        // If erase_table is true, clear out the sub_sets table
+        if (clear_table) {
+            sub_sets->clear();
+        }
+        // There should always be at least one subscription set so that the user can always wait
+        // for synchronizationon on the result of get_latest().
         auto zero_sub = sub_sets->create_object_with_primary_key(Mixed{int64_t(0)});
         zero_sub.set(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Pending));
         zero_sub.set(m_sub_set_snapshot_version, tr->get_version());
@@ -798,6 +848,42 @@ std::vector<SubscriptionSet> SubscriptionStore::get_pending_subscriptions() cons
     return subscriptions_to_recover;
 }
 
+void SubscriptionStore::notify_all_state_change_notifications(Status status)
+{
+    std::unique_lock<std::mutex> lk(m_pending_notifications_mutex);
+    m_pending_notifications_cv.wait(lk, [&] {
+        return m_outstanding_requests == 0;
+    });
+
+    auto to_finish = std::move(m_pending_notifications);
+    lk.unlock();
+
+    // Just complete/cancel the pending notifications - this function does not alter the
+    // state of any pending subscriptions
+    for (auto& req : to_finish) {
+        req.promise.set_error(status);
+    }
+}
+
+void SubscriptionStore::terminate()
+{
+    // Clear out and initialize the subscription store
+    initialize_subscriptions_table(m_db->start_read(), true);
+
+    std::unique_lock<std::mutex> lk(m_pending_notifications_mutex);
+    m_pending_notifications_cv.wait(lk, [&] {
+        return m_outstanding_requests == 0;
+    });
+    auto to_finish = std::move(m_pending_notifications);
+    m_min_outstanding_version = 0;
+
+    lk.unlock();
+
+    for (auto& req : to_finish) {
+        req.promise.emplace_value(SubscriptionSet::State::Superseded);
+    }
+}
+
 MutableSubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version_id)
 {
     auto tr = m_db->start_write();
@@ -853,35 +939,6 @@ void SubscriptionStore::supercede_prior_to(TransactionRef tr, int64_t version_id
     Query remove_query(sub_sets);
     remove_query.less(sub_sets->get_primary_key_column(), version_id);
     remove_query.remove();
-}
-
-void SubscriptionStore::supercede_all_except(MutableSubscriptionSet& mut_sub) const
-{
-    auto version_to_keep = mut_sub.version();
-    supercede_prior_to(mut_sub.m_tr, version_to_keep);
-
-    std::list<SubscriptionStore::NotificationRequest> to_finish;
-    std::unique_lock<std::mutex> lk(m_pending_notifications_mutex);
-    m_pending_notifications_cv.wait(lk, [&] {
-        return m_outstanding_requests == 0;
-    });
-    for (auto it = m_pending_notifications.begin(); it != m_pending_notifications.end();) {
-        if (it->version != version_to_keep) {
-            to_finish.splice(to_finish.end(), m_pending_notifications, it++);
-        }
-        else {
-            ++it;
-        }
-    }
-
-    REALM_ASSERT_EX(version_to_keep >= m_min_outstanding_version, version_to_keep, m_min_outstanding_version);
-    m_min_outstanding_version = version_to_keep;
-
-    lk.unlock();
-
-    for (auto& req : to_finish) {
-        req.promise.emplace_value(SubscriptionSet::State::Superseded);
-    }
 }
 
 MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSet& set) const

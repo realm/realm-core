@@ -139,15 +139,19 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/column_integer.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/dictionary.hpp>
+#if REALM_ENABLE_GEOSPATIAL
+#include <realm/geospatial.hpp>
+#endif
 #include <realm/table.hpp>
 #include <realm/index_string.hpp>
 #include <realm/query.hpp>
 #include <realm/list.hpp>
 #include <realm/set.hpp>
 #include <realm/query_value.hpp>
-#include <realm/metrics/query_info.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/serializer.hpp>
+
+#include <external/mpark/variant.hpp>
 
 #include <numeric>
 #include <algorithm>
@@ -238,7 +242,7 @@ class ValueBase {
 public:
     using ValueType = QueryValue;
 
-    static const size_t chunk_size = 8;
+    static constexpr size_t chunk_size = 8;
     bool m_from_list = false;
 
     ValueBase() = default;
@@ -483,7 +487,7 @@ public:
                         }
                         else {
                             if (left[left_idx] < right[right_idx]) {
-                                if (any && left_idx < left_size) {
+                                if (any && left_idx < left_size - 1) {
                                     left_idx++;
                                 }
                                 else {
@@ -534,10 +538,7 @@ public:
                         }
                     }
                 }
-                if (compare_left == Compare::None || compare_left == Compare::All) {
-                    return true;
-                }
-                return false;
+                return compare_left == Compare::None || compare_left == Compare::All;
             };
 
             for (size_t i = 0; i < right_size; i++) {
@@ -578,10 +579,7 @@ public:
                         }
                     }
                 }
-                if (compare_right == Compare::None || compare_right == Compare::All) {
-                    return true;
-                }
-                return false;
+                return compare_right == Compare::None || compare_right == Compare::All;
             };
 
             for (size_t i = 0; i < left_size; i++) {
@@ -649,8 +647,7 @@ private:
 
 class Expression {
 public:
-    Expression() {}
-    virtual ~Expression() {}
+    virtual ~Expression() = default;
 
     virtual double init()
     {
@@ -675,7 +672,7 @@ std::unique_ptr<Expression> make_expression(Args&&... args)
 
 class Subexpr {
 public:
-    virtual ~Subexpr() {}
+    virtual ~Subexpr() = default;
 
     virtual std::unique_ptr<Subexpr> clone() const = 0;
 
@@ -741,7 +738,7 @@ public:
         REALM_ASSERT(false); // Unimplemented
     }
 
-    virtual Mixed get_mixed()
+    virtual Mixed get_mixed() const
     {
         return {};
     }
@@ -1165,6 +1162,17 @@ public:
     }
 };
 
+#if REALM_ENABLE_GEOSPATIAL
+template <>
+class Subexpr2<Geospatial> : public Subexpr, public Overloads<Geospatial, Geospatial> {
+public:
+    DataType get_type() const final
+    {
+        return type_Geospatial;
+    }
+};
+#endif
+
 struct TrueExpression : Expression {
     size_t find_first(size_t start, size_t end) const override
     {
@@ -1307,7 +1315,7 @@ public:
         m_comparison_type = type;
     }
 
-    Mixed get_mixed() override
+    Mixed get_mixed() const override
     {
         return get(0);
     }
@@ -1435,84 +1443,43 @@ private:
     OwnedBinaryData m_buffer;
 };
 
+#if REALM_ENABLE_GEOSPATIAL
+class ConstantGeospatialValue : public Value<Geospatial> {
+public:
+    ConstantGeospatialValue(const Geospatial& geo)
+        : Value()
+        , m_geospatial(geo)
+    {
+        if (geo.get_type() != Geospatial::Type::Invalid) {
+            set(0, Mixed{&m_geospatial});
+        }
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new ConstantGeospatialValue(*this));
+    }
+
+private:
+    ConstantGeospatialValue(const ConstantGeospatialValue& other)
+        : Value()
+        , m_geospatial(other.m_geospatial)
+    {
+        if (m_geospatial.get_type() != Geospatial::Type::Invalid) {
+            set(0, Mixed{&m_geospatial});
+        }
+    }
+    Geospatial m_geospatial;
+};
+#endif
+
 // Classes used for LinkMap (see below).
-struct LinkMapFunction {
-    // Your consume() method is given key within the linked-to table as argument, and you must return whether or
-    // not you want the LinkMapFunction to exit (return false) or continue (return true) harvesting the link tree
-    // for the current main table object (it will be a link tree if you have multiple type_LinkList columns
-    // in a link()->link() query.
-    virtual bool consume(ObjKey) = 0;
-};
 
-struct FindNullLinks : public LinkMapFunction {
-    bool consume(ObjKey) override
-    {
-        m_has_link = true;
-        return false; // we've found a key, so this can't be a null-link, so exit link harvesting
-    }
+// Your function is given key within the linked-to table as argument, and you must return whether or not you want the
+// LinkMapFunction to exit (return false) or continue (return true) harvesting the link tree for the current main
+// table object (it will be a link tree if you have multiple type_LinkList columns in a link()->link() query.
 
-    bool m_has_link = false;
-};
-
-struct MakeLinkVector : public LinkMapFunction {
-    MakeLinkVector(std::vector<ObjKey>& result)
-        : m_links(result)
-    {
-    }
-
-    bool consume(ObjKey key) override
-    {
-        m_links.push_back(key);
-        return true; // continue evaluation
-    }
-    std::vector<ObjKey>& m_links;
-};
-
-struct UnaryLinkResult : public LinkMapFunction {
-    bool consume(ObjKey key) override
-    {
-        m_result = key;
-        return false; // exit search, only one result ever expected
-    }
-    ObjKey m_result;
-};
-
-struct CountLinks : public LinkMapFunction {
-    bool consume(ObjKey) override
-    {
-        m_link_count++;
-        return true;
-    }
-
-    size_t result() const
-    {
-        return m_link_count;
-    }
-
-    size_t m_link_count = 0;
-};
-
-struct CountBacklinks : public LinkMapFunction {
-    CountBacklinks(ConstTableRef t)
-        : m_table(t)
-    {
-    }
-
-    bool consume(ObjKey key) override
-    {
-        m_link_count += m_table.unchecked_ptr()->get_object(key).get_backlink_count();
-        return true;
-    }
-
-    size_t result() const
-    {
-        return m_link_count;
-    }
-
-    ConstTableRef m_table;
-    size_t m_link_count = 0;
-};
-
+using LinkMapFunction = util::FunctionRef<bool(ObjKey)>;
 
 /*
 The LinkMap and LinkMapFunction classes are used for query conditions on links themselves (contrary to conditions on
@@ -1567,28 +1534,26 @@ public:
     void set_cluster(const Cluster* cluster)
     {
         Allocator& alloc = get_base_table()->get_alloc();
-        m_array_ptr = nullptr;
+        ArrayPayload* array_ptr;
         switch (m_link_types[0]) {
             case col_type_Link:
                 if (m_link_column_keys[0].is_dictionary()) {
-                    m_array_ptr = LeafPtr(new (&m_storage.m_dict) ArrayInteger(alloc));
+                    array_ptr = &m_leaf.emplace<ArrayInteger>(alloc);
                 }
                 else {
-                    m_array_ptr = LeafPtr(new (&m_storage.m_list) ArrayKey(alloc));
+                    array_ptr = &m_leaf.emplace<ArrayKey>(alloc);
                 }
                 break;
             case col_type_LinkList:
-                m_array_ptr = LeafPtr(new (&m_storage.m_linklist) ArrayList(alloc));
+                array_ptr = &m_leaf.emplace<ArrayList>(alloc);
                 break;
             case col_type_BackLink:
-                m_array_ptr = LeafPtr(new (&m_storage.m_backlink) ArrayBacklink(alloc));
+                array_ptr = &m_leaf.emplace<ArrayBacklink>(alloc);
                 break;
             default:
-                break;
+                REALM_UNREACHABLE();
         }
-        // m_tables[0]->report_invalid_key(m_link_column_keys[0]);
-        cluster->init_leaf(m_link_column_keys[0], m_array_ptr.get());
-        m_leaf_ptr = m_array_ptr.get();
+        cluster->init_leaf(m_link_column_keys[0], array_ptr);
     }
 
     void collect_dependencies(std::vector<TableKey>& tables) const;
@@ -1598,9 +1563,12 @@ public:
     ObjKey get_unary_link_or_not_found(size_t index) const
     {
         REALM_ASSERT(m_only_unary_links);
-        UnaryLinkResult res;
-        map_links(index, res);
-        return res.m_result;
+        ObjKey result;
+        map_links(index, [&](ObjKey key) {
+            result = key;
+            return false; // exit search, only one result ever expected
+        });
+        return result;
     }
 
     std::vector<ObjKey> get_links(size_t index) const
@@ -1614,19 +1582,26 @@ public:
 
     size_t count_links(size_t row) const
     {
-        CountLinks counter;
-        map_links(row, counter);
-        return counter.result();
+        size_t count = 0;
+        map_links(row, [&](ObjKey) {
+            ++count;
+            return true;
+        });
+        return count;
     }
 
     size_t count_all_backlinks(size_t row) const
     {
-        CountBacklinks counter(get_target_table());
-        map_links(row, counter);
-        return counter.result();
+        size_t count = 0;
+        auto table = get_target_table().unchecked_ptr();
+        map_links(row, [&](ObjKey key) {
+            count += table->get_object(key).get_backlink_count();
+            return true;
+        });
+        return count;
     }
 
-    void map_links(size_t row, LinkMapFunction& lm) const
+    void map_links(size_t row, LinkMapFunction lm) const
     {
         map_links(0, row, lm);
     }
@@ -1652,33 +1627,32 @@ public:
         return !m_link_column_keys.empty();
     }
 
-    static ref_type get_ref(const ArrayPayload* array_payload, ColumnType type, size_t ndx);
+    ColKey pop_last()
+    {
+        ColKey col = m_link_column_keys.back();
+        m_link_column_keys.pop_back();
+        m_tables.pop_back();
+        return col;
+    }
 
 private:
-    void map_links(size_t column, ObjKey key, LinkMapFunction& lm) const;
-    void map_links(size_t column, size_t row, LinkMapFunction& lm) const;
+    bool map_links(size_t column, ObjKey key, LinkMapFunction lm) const;
+    void map_links(size_t column, size_t row, LinkMapFunction lm) const;
 
     void get_links(size_t row, std::vector<ObjKey>& result) const
     {
-        MakeLinkVector mlv = MakeLinkVector(result);
-        map_links(row, mlv);
+        map_links(row, [&](ObjKey key) {
+            result.push_back(key);
+            return true; // continue evaluation
+        });
     }
 
     mutable std::vector<ColKey> m_link_column_keys;
     std::vector<ColumnType> m_link_types;
     std::vector<ConstTableRef> m_tables;
     bool m_only_unary_links = true;
-    // Leaf cache
-    using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
-    union Storage {
-        typename std::aligned_storage<sizeof(ArrayKey), alignof(ArrayKey)>::type m_list;
-        typename std::aligned_storage<sizeof(ArrayInteger), alignof(ArrayKey)>::type m_dict;
-        typename std::aligned_storage<sizeof(ArrayList), alignof(ArrayList)>::type m_linklist;
-        typename std::aligned_storage<sizeof(ArrayList), alignof(ArrayList)>::type m_backlink;
-    };
-    Storage m_storage;
-    LeafPtr m_array_ptr;
-    const ArrayPayload* m_leaf_ptr = nullptr;
+
+    mpark::variant<mpark::monostate, ArrayKey, ArrayInteger, ArrayList, ArrayBacklink> m_leaf;
 
     template <class>
     friend Query compare(const Subexpr2<Link>&, const Obj&);
@@ -1859,23 +1833,19 @@ public:
 
     void set_cluster(const Cluster* cluster) override
     {
-        m_array_ptr = nullptr;
-        m_leaf_ptr = nullptr;
         if (links_exist()) {
             m_link_map.set_cluster(cluster);
         }
         else {
-            // Create new Leaf
-            m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_link_map.get_base_table()->get_alloc()));
-            cluster->init_leaf(m_column_key, m_array_ptr.get());
-            m_leaf_ptr = m_array_ptr.get();
+            m_leaf.emplace(m_link_map.get_base_table()->get_alloc());
+            cluster->init_leaf(m_column_key, &*m_leaf);
         }
     }
 
     void evaluate(size_t index, ValueBase& destination) override
     {
         if (links_exist()) {
-            REALM_ASSERT(m_leaf_ptr == nullptr);
+            REALM_ASSERT(!m_leaf);
 
             if (m_link_map.only_unary_links()) {
                 REALM_ASSERT(destination.size() == 1);
@@ -1920,14 +1890,14 @@ public:
         }
         else {
             // Not a link column
-            REALM_ASSERT(m_leaf_ptr != nullptr);
+            REALM_ASSERT(m_leaf);
             REALM_ASSERT(destination.size() == 1);
             REALM_ASSERT(!destination.m_from_list);
-            if (m_leaf_ptr->is_null(index)) {
+            if (m_leaf->is_null(index)) {
                 destination.set_null(0);
             }
             else {
-                destination.set(0, m_leaf_ptr->get(index));
+                destination.set(0, m_leaf->get(index));
             }
         }
     }
@@ -1957,13 +1927,8 @@ private:
     using ObjPropertyExpr<T>::m_link_map;
     using ObjPropertyExpr<T>::m_column_key;
 
-    // Leaf cache
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
-    using LeafPtr = std::unique_ptr<LeafType, PlacementDelete>;
-    LeafCacheStorage m_leaf_cache_storage;
-    LeafPtr m_array_ptr;
-    LeafType* m_leaf_ptr = nullptr;
+    std::optional<LeafType> m_leaf;
 };
 
 template <>
@@ -2203,19 +2168,20 @@ public:
 
     size_t find_first(size_t start, size_t end) const override
     {
-        for (; start < end;) {
-            FindNullLinks fnl;
-            m_link_map.map_links(start, fnl);
-            if (fnl.m_has_link == has_links)
+        for (; start < end; ++start) {
+            bool found_link = false;
+            m_link_map.map_links(start, [&](ObjKey) {
+                found_link = true;
+                return false; // we've found a key, so this can't be a null-link, so exit link harvesting
+            });
+            if (found_link == has_links)
                 return start;
-
-            start++;
         }
 
         return not_found;
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         return state.describe_columns(m_link_map, ColKey()) + (has_links ? " != NULL" : " == NULL");
     }
@@ -2240,10 +2206,14 @@ public:
     LinkCount(const LinkMap& link_map)
         : m_link_map(link_map)
     {
+        if (m_link_map.get_nb_hops() > 1) {
+            m_column_key = m_link_map.pop_last();
+        }
     }
     LinkCount(LinkCount const& other)
         : Subexpr2<Int>(other)
         , m_link_map(other.m_link_map)
+        , m_column_key(other.m_column_key)
     {
     }
 
@@ -2272,19 +2242,13 @@ public:
         m_link_map.collect_dependencies(tables);
     }
 
-    void evaluate(size_t index, ValueBase& destination) override
-    {
-        size_t count = m_link_map.count_links(index);
-        destination = Value<int64_t>(count);
-    }
+    void evaluate(size_t index, ValueBase& destination) override;
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
-    {
-        return state.describe_columns(m_link_map, ColKey()) + util::serializer::value_separator + "@count";
-    }
+    std::string description(util::serializer::SerialisationState& state) const override;
 
 private:
     LinkMap m_link_map;
+    ColKey m_column_key;
 };
 
 // Gives a count of all backlinks across all columns for the specified row.
@@ -2331,8 +2295,7 @@ public:
             m_link_map.set_cluster(cluster);
         }
         else {
-            m_keys = cluster->get_key_array();
-            m_offset = cluster->get_offset();
+            m_cluster = cluster;
         }
     }
 
@@ -2348,14 +2311,13 @@ public:
             count = m_link_map.count_all_backlinks(index);
         }
         else {
-            ObjKey key(m_keys->get(index) + m_offset);
-            const Obj obj = m_link_map.get_base_table()->get_object(key);
+            const Obj obj = m_link_map.get_base_table()->get_object(m_cluster->get_real_key(index));
             count = obj.get_backlink_count();
         }
         destination = Value<int64_t>(count);
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         std::string s;
         if (m_link_map.links_exist()) {
@@ -2366,10 +2328,135 @@ public:
     }
 
 private:
-    const ClusterKeyArray* m_keys = nullptr;
-    uint64_t m_offset = 0;
+    const Cluster* m_cluster = nullptr;
     LinkMap m_link_map;
 };
+
+#if REALM_ENABLE_GEOSPATIAL
+class GeoWithinCompare : public Expression {
+public:
+    GeoWithinCompare(const LinkMap& lm, Geospatial&& bounds, util::Optional<ExpressionComparisonType> comp_type)
+        : m_link_map(lm)
+        , m_bounds(std::move(bounds))
+        , m_region(m_bounds)
+        , m_comp_type(comp_type)
+    {
+        Status status = m_region.get_conversion_status();
+        if (!status.is_ok()) {
+            throw InvalidArgument(status.code(),
+                                  util::format("Invalid region in GEOWITHIN query for parameter '%1': '%2'", m_bounds,
+                                               status.reason()));
+        }
+    }
+
+    GeoWithinCompare(const GeoWithinCompare& other)
+        : m_link_map(other.m_link_map)
+        , m_bounds(other.m_bounds)
+        , m_region(m_bounds)
+        , m_comp_type(other.m_comp_type)
+    {
+    }
+
+    void set_base_table(ConstTableRef table) override
+    {
+        m_link_map.set_base_table(table);
+        m_coords_col = m_link_map.get_target_table()->get_column_key(Geospatial::c_geo_point_coords_col_name);
+        m_type_col = m_link_map.get_target_table()->get_column_key(Geospatial::c_geo_point_type_col_name);
+        if (!m_coords_col || !m_type_col || !m_coords_col.is_list() ||
+            m_coords_col.get_type() != ColumnType(ColumnType::Type::Double) ||
+            m_type_col.get_type() != ColumnType(ColumnType::Type::String) || m_type_col.is_collection()) {
+            util::serializer::SerialisationState none;
+            throw std::runtime_error(util::format(
+                "Query '%1' links to data in the wrong format for a geoWithin query", this->description(none)));
+        }
+        if (!m_link_map.get_target_table()->is_embedded()) {
+            throw std::runtime_error(util::format(
+                "A GEOWITHIN query can only operate on a link to an embedded class but '%1' is at the top level",
+                m_link_map.get_target_table()->get_class_name()));
+        }
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_link_map.set_cluster(cluster);
+    }
+
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_link_map.collect_dependencies(tables);
+    }
+
+    // Return main table of query (table on which table->where()... is invoked). Note that this is not the same as
+    // any linked-to payload tables
+    ConstTableRef get_base_table() const override
+    {
+        return m_link_map.get_base_table();
+    }
+
+    size_t find_first(size_t start, size_t end) const override
+    {
+        auto table = m_link_map.get_target_table();
+
+        while (start < end) {
+            bool found = false;
+            switch (m_comp_type.value_or(ExpressionComparisonType::Any)) {
+                case ExpressionComparisonType::Any: {
+                    m_link_map.map_links(start, [&](ObjKey key) {
+                        found = m_region.contains(
+                            Geospatial::point_from_obj(table->get_object(key), m_type_col, m_coords_col));
+                        return !found; // keep searching if not found, stop searching on first match
+                    });
+                    if (found)
+                        return start;
+                    break;
+                }
+                case ExpressionComparisonType::All: {
+                    m_link_map.map_links(start, [&](ObjKey key) {
+                        found = m_region.contains(
+                            Geospatial::point_from_obj(table->get_object(key), m_type_col, m_coords_col));
+                        return found; // keep searching until one the first non-match
+                    });
+                    if (found) // all matched
+                        return start;
+                    break;
+                }
+                case ExpressionComparisonType::None: {
+                    m_link_map.map_links(start, [&](ObjKey key) {
+                        found = m_region.contains(
+                            Geospatial::point_from_obj(table->get_object(key), m_type_col, m_coords_col));
+                        return !found; // keep searching until the first match
+                    });
+                    if (!found) // none matched
+                        return start;
+                    break;
+                }
+            }
+            start++;
+        }
+
+        return not_found;
+    }
+
+    std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return state.describe_expression_type(m_comp_type) + state.describe_columns(m_link_map, ColKey()) +
+               " GEOWITHIN " + util::serializer::print_value(m_bounds);
+    }
+
+    std::unique_ptr<Expression> clone() const override
+    {
+        return std::unique_ptr<Expression>(new GeoWithinCompare(*this));
+    }
+
+private:
+    LinkMap m_link_map;
+    Geospatial m_bounds;
+    GeoRegion m_region;
+    ColKey m_type_col;
+    ColKey m_coords_col;
+    util::Optional<ExpressionComparisonType> m_comp_type;
+};
+#endif
 
 template <class T, class TExpr>
 class SizeOperator : public Subexpr2<Int> {
@@ -2532,7 +2619,7 @@ public:
         destination = Value<ObjKey>(m_key);
     }
 
-    virtual std::string description(util::serializer::SerialisationState&) const override
+    std::string description(util::serializer::SerialisationState&) const override
     {
         return util::serializer::print_value(m_key);
     }
@@ -2590,6 +2677,13 @@ public:
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
         return make_expression<UnaryLinkCompare<true>>(m_link_map);
     }
+
+#if REALM_ENABLE_GEOSPATIAL
+    Query geo_within(Geospatial bounds) const
+    {
+        return make_expression<GeoWithinCompare>(m_link_map, std::move(bounds), m_comparison_type);
+    }
+#endif
 
     LinkCount count() const
     {
@@ -2733,13 +2827,8 @@ public:
 
     mutable ColKey m_column_key;
     LinkMap m_link_map;
-    // Leaf cache
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayInteger), alignof(Array)>::type;
-    using LeafPtr = std::unique_ptr<ArrayInteger, PlacementDelete>;
-    LeafCacheStorage m_leaf_cache_storage;
-    LeafPtr m_array_ptr;
-    ArrayInteger* m_leaf_ptr = nullptr;
-    util::Optional<ExpressionComparisonType> m_comparison_type;
+    std::optional<ArrayInteger> m_leaf;
+    std::optional<ExpressionComparisonType> m_comparison_type;
 };
 
 template <typename>
@@ -3126,15 +3215,8 @@ private:
     DataType m_key_type;
     ColKey m_column_key;
     LinkMap m_link_map;
-    util::Optional<ExpressionComparisonType> m_comparison_type;
-
-
-    // Leaf cache
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayInteger), alignof(Array)>::type;
-    using LeafPtr = std::unique_ptr<ArrayInteger, PlacementDelete>;
-    LeafCacheStorage m_leaf_cache_storage;
-    LeafPtr m_array_ptr;
-    ArrayInteger* m_leaf_ptr = nullptr;
+    std::optional<ExpressionComparisonType> m_comparison_type;
+    std::optional<ArrayInteger> m_leaf;
 };
 
 template <typename T>
@@ -3348,7 +3430,7 @@ public:
                 }
             }
             else {
-                if (auto ref = m_columns_collection.m_leaf_ptr->get(index)) {
+                if (auto ref = m_columns_collection.m_leaf->get(index)) {
                     Allocator& alloc = m_columns_collection.get_base_table()->get_alloc();
                     Dictionary dict(alloc, m_columns_collection.m_column_key, to_ref(ref));
                     destination.set(0, do_dictionary_agg(dict));
@@ -3392,7 +3474,7 @@ public:
         }
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         return m_columns_collection.description(state) + util::serializer::value_separator + Operation::description();
     }
@@ -3510,22 +3592,17 @@ public:
 
     void set_cluster(const Cluster* cluster) override
     {
-        m_array_ptr = nullptr;
-        m_leaf_ptr = nullptr;
         if (links_exist()) {
             m_link_map.set_cluster(cluster);
+            m_leaf = mpark::monostate();
         }
         else if (requires_null_column && is_nullable()) {
-            // Create new Leaf
-            m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) NullableLeafType(this->get_base_table()->get_alloc()));
-            cluster->init_leaf(m_column_key, m_array_ptr.get());
-            m_leaf_ptr = m_array_ptr.get();
+            auto& leaf = m_leaf.template emplace<NullableLeafType>(this->get_base_table()->get_alloc());
+            cluster->init_leaf(m_column_key, &leaf);
         }
         else {
-            // Create new Leaf
-            m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(this->get_base_table()->get_alloc()));
-            cluster->init_leaf(m_column_key, m_array_ptr.get());
-            m_leaf_ptr = m_array_ptr.get();
+            auto& leaf = m_leaf.template emplace<LeafType>(this->get_base_table()->get_alloc());
+            cluster->init_leaf(m_column_key, &leaf);
         }
     }
 
@@ -3535,7 +3612,7 @@ public:
         using U = typename LeafType2::value_type;
 
         if (links_exist()) {
-            REALM_ASSERT(m_leaf_ptr == nullptr);
+            REALM_ASSERT(mpark::holds_alternative<mpark::monostate>(m_leaf));
             if (m_link_map.only_unary_links()) {
                 destination.init(false, 1);
                 destination.set_null(0);
@@ -3560,32 +3637,26 @@ public:
             }
         }
         else {
-            REALM_ASSERT(m_leaf_ptr != nullptr);
-            auto leaf = static_cast<const LeafType2*>(m_leaf_ptr);
+            auto leaf = mpark::get_if<LeafType2>(&m_leaf);
+            REALM_ASSERT(leaf);
             // Not a Link column
             size_t colsize = leaf->size();
+
+            size_t rows = std::min(colsize - index, ValueBase::chunk_size);
 
             // Now load `ValueBase::chunk_size` rows from from the leaf into m_storage.
             if constexpr (std::is_same_v<U, int64_t>) {
                 // If it's an integer leaf, then it contains the method get_chunk() which copies
-                // these values in a super fast way (only feasible if more than chunk_size in column)
-                if (index + ValueBase::chunk_size <= colsize) {
-                    // If you want to modify 'chunk_size' then update Array::get_chunk()
-                    REALM_ASSERT_3(ValueBase::chunk_size, ==, 8);
+                // these values in a super fast way. If you want to modify 'chunk_size' then update Array::get_chunk()
+                REALM_ASSERT_3(ValueBase::chunk_size, ==, 8);
 
-                    auto leaf_2 = static_cast<const Array*>(leaf);
-                    int64_t res[ValueBase::chunk_size];
-                    leaf_2->get_chunk(index, res);
-
-                    destination.set(res, res + ValueBase::chunk_size);
-                    return;
-                }
+                int64_t res[ValueBase::chunk_size];
+                static_cast<const Array*>(leaf)->get_chunk(index, res);
+                destination.set(res, res + rows);
+                return;
             }
-            size_t rows = colsize - index;
-            if (rows > ValueBase::chunk_size)
-                rows = ValueBase::chunk_size;
-            destination.init(false, rows);
 
+            destination.init(false, rows);
             for (size_t t = 0; t < rows; t++) {
                 if (leaf->is_null(index + t)) {
                     destination.set_null(t);
@@ -3597,7 +3668,7 @@ public:
         }
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         return state.describe_expression_type(this->m_comparison_type) +
                state.describe_columns(m_link_map, m_column_key);
@@ -3630,14 +3701,10 @@ public:
 private:
     using ObjPropertyExpr<T>::m_link_map;
     using ObjPropertyExpr<T>::m_column_key;
-
-    // Leaf cache
-    using LeafCacheStorage =
-        typename std::aligned_storage<std::max(sizeof(LeafType), sizeof(NullableLeafType)), alignof(LeafType)>::type;
-    using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
-    LeafCacheStorage m_leaf_cache_storage;
-    LeafPtr m_array_ptr;
-    const ArrayPayload* m_leaf_ptr = nullptr;
+    using LeafStorage =
+        std::conditional_t<requires_null_column, mpark::variant<mpark::monostate, LeafType, NullableLeafType>,
+                           mpark::variant<mpark::monostate, LeafType>>;
+    LeafStorage m_leaf;
 };
 
 template <typename T, typename Operation>
@@ -3693,7 +3760,7 @@ public:
         REALM_ASSERT(false);
     }
 
-    virtual std::string description(util::serializer::SerialisationState&) const override
+    std::string description(util::serializer::SerialisationState&) const override
     {
         return ""; // by itself there are no conditions, see SubColumnAggregate
     }
@@ -3822,7 +3889,7 @@ public:
         }
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         util::serializer::SerialisationState empty_state(state.group);
         return state.describe_columns(m_link_map, ColKey()) + util::serializer::value_separator +
@@ -3882,7 +3949,7 @@ public:
         destination = Value<int64_t>(count);
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_link_map.get_base_table() != nullptr);
         std::string target = state.describe_columns(m_link_map, ColKey());
@@ -4064,10 +4131,9 @@ private:
     Mixed m_const_value;
 };
 
-template <class TCond>
-class Compare : public Expression {
+class CompareBase : public Expression {
 public:
-    Compare(std::unique_ptr<Subexpr> left, std::unique_ptr<Subexpr> right)
+    CompareBase(std::unique_ptr<Subexpr> left, std::unique_ptr<Subexpr> right)
         : m_left(std::move(left))
         , m_right(std::move(right))
     {
@@ -4097,6 +4163,94 @@ public:
             m_right->set_cluster(cluster);
         }
     }
+
+    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
+    // and binds it to a Query at a later time
+    ConstTableRef get_base_table() const override
+    {
+        ConstTableRef l = m_left->get_base_table();
+        ConstTableRef r = m_right->get_base_table();
+
+        // All main tables in each subexpression of a query (table.columns() or table.link()) must be the same.
+        REALM_ASSERT(l == nullptr || r == nullptr || l == r);
+
+        // nullptr pointer means expression which isn't yet associated with any table, or is a Value<T>
+        return (l) ? l : r;
+    }
+
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_left->collect_dependencies(tables);
+        m_right->collect_dependencies(tables);
+    }
+
+    size_t find_first_with_matches(size_t start, size_t end) const
+    {
+        if (m_index_end == 0 || start >= end)
+            return not_found;
+
+        ObjKey first_key = m_cluster->get_real_key(start);
+        ObjKey actual_key;
+
+        // Sequential lookup optimization: when the query isn't constrained
+        // to a LnkLst we'll get find_first() requests in ascending order,
+        // so we can do a simple linear scan.
+        if (m_index_get < m_index_end && m_matches[m_index_get] <= first_key) {
+            actual_key = m_matches[m_index_get];
+            // skip through keys which are in "earlier" leafs than the one selected by start..end:
+            while (first_key > actual_key) {
+                m_index_get++;
+                if (m_index_get == m_index_end)
+                    return not_found;
+                actual_key = m_matches[m_index_get];
+            }
+        }
+        // Otherwise if we get requests out of order we have to do a more
+        // expensive binary search
+        else {
+            auto it = std::lower_bound(m_matches.begin(), m_matches.end(), first_key);
+            if (it == m_matches.end())
+                return not_found;
+            actual_key = *it;
+        }
+
+        // if actual key is bigger than last key, it is not in this leaf
+        ObjKey last_key = start + 1 == end ? first_key : m_cluster->get_real_key(end - 1);
+        if (actual_key > last_key)
+            return not_found;
+
+        // key is known to be in this leaf, so find key whithin leaf keys
+        return m_cluster->lower_bound_key(ObjKey(actual_key.value - m_cluster->get_offset()));
+    }
+
+protected:
+    CompareBase(const CompareBase& other)
+        : m_left(other.m_left->clone())
+        , m_right(other.m_right->clone())
+    {
+        if (m_left->has_constant_evaluation()) {
+            m_left_const_values = dynamic_cast<ValueBase*>(m_left.get());
+        }
+        if (m_right->has_constant_evaluation()) {
+            m_right_const_values = dynamic_cast<ValueBase*>(m_right.get());
+        }
+    }
+
+    std::unique_ptr<Subexpr> m_left;
+    std::unique_ptr<Subexpr> m_right;
+    const Cluster* m_cluster;
+    ValueBase* m_left_const_values = nullptr;
+    ValueBase* m_right_const_values = nullptr;
+    bool m_has_matches = false;
+    std::vector<ObjKey> m_matches;
+    mutable size_t m_index_get = 0;
+    size_t m_index_end = 0;
+};
+
+template <class TCond>
+class Compare : public CompareBase {
+public:
+    using CompareBase::CompareBase;
 
     double init() override
     {
@@ -4155,64 +4309,10 @@ public:
         return dT;
     }
 
-    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
-    // and binds it to a Query at a later time
-    ConstTableRef get_base_table() const override
-    {
-        ConstTableRef l = m_left->get_base_table();
-        ConstTableRef r = m_right->get_base_table();
-
-        // All main tables in each subexpression of a query (table.columns() or table.link()) must be the same.
-        REALM_ASSERT(l == nullptr || r == nullptr || l == r);
-
-        // nullptr pointer means expression which isn't yet associated with any table, or is a Value<T>
-        return (l) ? l : r;
-    }
-
-    void collect_dependencies(std::vector<TableKey>& tables) const override
-    {
-        m_left->collect_dependencies(tables);
-        m_right->collect_dependencies(tables);
-    }
-
     size_t find_first(size_t start, size_t end) const override
     {
         if (m_has_matches) {
-            if (m_index_end == 0 || start >= end)
-                return not_found;
-
-            ObjKey first_key = m_cluster->get_real_key(start);
-            ObjKey actual_key;
-
-            // Sequential lookup optimization: when the query isn't constrained
-            // to a LnkLst we'll get find_first() requests in ascending order,
-            // so we can do a simple linear scan.
-            if (m_index_get < m_index_end && m_matches[m_index_get] <= first_key) {
-                actual_key = m_matches[m_index_get];
-                // skip through keys which are in "earlier" leafs than the one selected by start..end:
-                while (first_key > actual_key) {
-                    m_index_get++;
-                    if (m_index_get == m_index_end)
-                        return not_found;
-                    actual_key = m_matches[m_index_get];
-                }
-            }
-            // Otherwise if we get requests out of order we have to do a more
-            // expensive binary search
-            else {
-                auto it = std::lower_bound(m_matches.begin(), m_matches.end(), first_key);
-                if (it == m_matches.end())
-                    return not_found;
-                actual_key = *it;
-            }
-
-            // if actual key is bigger than last key, it is not in this leaf
-            ObjKey last_key = start + 1 == end ? first_key : m_cluster->get_real_key(end - 1);
-            if (actual_key > last_key)
-                return not_found;
-
-            // key is known to be in this leaf, so find key whithin leaf keys
-            return m_cluster->lower_bound_key(ObjKey(actual_key.value - m_cluster->get_offset()));
+            return find_first_with_matches(start, end);
         }
 
         size_t match;
@@ -4233,21 +4333,21 @@ public:
             if (match != not_found && match + start < end)
                 return start + match;
 
-            size_t rows = (left->m_from_list || right->m_from_list) ? 1 : minimum(right->size(), left->size());
+            size_t rows = (left->m_from_list || right->m_from_list) ? 1 : std::min(right->size(), left->size());
             start += rows;
         }
 
         return not_found; // no match
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         if constexpr (realm::is_any_v<TCond, BeginsWith, BeginsWithIns, EndsWith, EndsWithIns, Contains, ContainsIns,
                                       Like, LikeIns>) {
             // these string conditions have the arguments reversed but the order is important
             // operations ==, and != can be reversed because the produce the same results both ways
-            return util::serializer::print_value(m_right->description(state) + " " + TCond::description() + " " +
-                                                 m_left->description(state));
+            return util::serializer::print_value(util::format("%1 %2 %3", m_right->description(state),
+                                                              TCond::description(), m_left->description(state)));
         }
         else {
             state.target_table = m_right->get_target_table();
@@ -4262,29 +4362,6 @@ public:
     {
         return std::unique_ptr<Expression>(new Compare(*this));
     }
-
-private:
-    Compare(const Compare& other)
-        : m_left(other.m_left->clone())
-        , m_right(other.m_right->clone())
-    {
-        if (m_left->has_constant_evaluation()) {
-            m_left_const_values = dynamic_cast<ValueBase*>(m_left.get());
-        }
-        if (m_right->has_constant_evaluation()) {
-            m_right_const_values = dynamic_cast<ValueBase*>(m_right.get());
-        }
-    }
-
-    std::unique_ptr<Subexpr> m_left;
-    std::unique_ptr<Subexpr> m_right;
-    const Cluster* m_cluster;
-    ValueBase* m_left_const_values = nullptr;
-    ValueBase* m_right_const_values = nullptr;
-    bool m_has_matches = false;
-    std::vector<ObjKey> m_matches;
-    mutable size_t m_index_get = 0;
-    size_t m_index_end = 0;
 };
 } // namespace realm
 #endif // REALM_QUERY_EXPRESSION_HPP

@@ -292,17 +292,11 @@ public:
     // clang-format off
     // We don't care about fine-grained changes to collections and just do
     // object-level change tracking, which is covered by select_collection()
-    bool list_set(size_t) { return true; }
-    bool list_insert(size_t) { return true; }
-    bool list_move(size_t, size_t) { return true; }
-    bool list_erase(size_t) { return true; }
-    bool list_clear(size_t) { return true; }
-    bool dictionary_insert(size_t, Mixed const&) { return true; }
-    bool dictionary_set(size_t, Mixed const&) { return true; }
-    bool dictionary_erase(size_t, Mixed const&) { return true; }
-    bool set_insert(size_t) { return true; }
-    bool set_erase(size_t) { return true; }
-    bool set_clear(size_t) { return true; }
+    bool collection_set(size_t) { return true; }
+    bool collection_insert(size_t) { return true; }
+    bool collection_move(size_t, size_t) { return true; }
+    bool collection_erase(size_t) { return true; }
+    bool collection_clear(size_t) { return true; }
 
     // We don't run this code on arbitrary transactions that could perform schema changes
     bool insert_group_level_table(TableKey) { unexpected_instruction(); }
@@ -789,10 +783,10 @@ void AuditRealmPool::wait_for_upload(std::shared_ptr<SyncSession> session)
             std::string path = session->path();
             session->close();
             m_open_paths.erase(path);
-            if (status.get_std_error_code()) {
-                m_logger->error("Events: Upload on '%1' failed with error '%2'.", path, status.reason());
+            if (!status.is_ok()) {
+                m_logger->error("Events: Upload on '%1' failed with error '%2'.", path, status);
                 if (m_error_handler) {
-                    m_error_handler(SyncError(status.get_std_error_code(), status.reason(), false));
+                    m_error_handler(SyncError(std::move(status), false));
                 }
             }
             else {
@@ -879,8 +873,7 @@ void AuditRealmPool::open_new_realm()
     sync_config->error_handler = [error_handler = m_error_handler, weak_self = weak_from_this()](auto,
                                                                                                  SyncError error) {
         if (auto self = weak_self.lock()) {
-            self->m_logger->error("Events: Received sync error: %1 (ec=%2)", error.what(),
-                                  error.get_system_error().value());
+            self->m_logger->error("Events: Received sync error: %1", error.status);
         }
         if (error_handler) {
             error_handler(error);

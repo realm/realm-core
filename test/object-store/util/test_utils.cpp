@@ -16,18 +16,19 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/object-store/impl/realm_coordinator.hpp>
-#include "test_utils.hpp"
+#include <util/test_utils.hpp>
 
+#include <realm/string_data.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/demangle.hpp>
 #include <realm/util/file.hpp>
-#include <realm/string_data.hpp>
 
 #include <external/json/json.hpp>
 
 #include <iostream>
 #include <sys/stat.h>
+
 #ifndef _WIN32
 #include <unistd.h>
 #include <sys/types.h>
@@ -129,7 +130,7 @@ std::string encode_fake_jwt(const std::string& in, util::Optional<int64_t> exp, 
     using namespace std::chrono_literals;
     if (!exp) {
         std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
-        exp = std::chrono::system_clock::to_time_t(now + 30min);
+        exp = std::chrono::system_clock::to_time_t(now + 60min);
     }
     if (!iat) {
         std::chrono::system_clock::time_point now = std::chrono::system_clock::now();

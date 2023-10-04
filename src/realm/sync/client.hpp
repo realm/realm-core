@@ -23,8 +23,6 @@ class Client {
 public:
     using port_type = sync::port_type;
 
-    using Error = ClientError;
-
     static constexpr milliseconds_type default_connect_timeout = sync::default_connect_timeout;
     static constexpr milliseconds_type default_connection_linger_time = sync::default_connection_linger_time;
     static constexpr milliseconds_type default_ping_keepalive_period = sync::default_ping_keepalive_period;
@@ -62,6 +60,9 @@ public:
     ///
     /// Thread-safe.
     void cancel_reconnect_delay();
+
+    /// Forces all open connections to disconnect/reconnect. To be used in testing.
+    void voluntary_disconnect_all_connections();
 
     /// \brief Wait for session termination to complete.
     ///
@@ -174,7 +175,7 @@ public:
     using ProgressHandler = void(std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
                                  std::uint_fast64_t uploaded_bytes, std::uint_fast64_t uploadable_bytes,
                                  std::uint_fast64_t progress_version, std::uint_fast64_t snapshot_version);
-    using WaitOperCompletionHandler = util::UniqueFunction<void(std::error_code)>;
+    using WaitOperCompletionHandler = util::UniqueFunction<void(Status)>;
     using SSLVerifyCallback = bool(const std::string& server_address, port_type server_port, const char* pem_data,
                                    size_t pem_size, int preverify_ok, int depth);
 
@@ -203,6 +204,11 @@ public:
         /// On the MongoDB Realm-based Sync server, virtual paths are not coupled
         /// to file system paths, and thus, these restrictions do not apply.
         std::string realm_identifier = "";
+
+        /// The user id of the logged in user for this sync session. This will be used
+        /// along with the server_address/server_port/protocol_envelope to determine
+        /// which connection to the server this session will use.
+        std::string user_id;
 
         /// The protocol used for communicating with the server. See
         /// ProtocolEnvelope.
@@ -342,6 +348,11 @@ public:
         bool simulate_integration_error = false;
 
         std::function<SyncClientHookAction(const SyncClientHookData&)> on_sync_client_event_hook;
+
+        /// The reason this synchronization session is used for.
+        ///
+        /// Note: Currently only used in FLX sync.
+        SessionReason session_reason = SessionReason::Sync;
     };
 
     /// \brief Start a new session for the specified client-side Realm.
@@ -653,10 +664,10 @@ public:
     /// If incomplete wait operations exist when the session is terminated,
     /// those wait operations will be canceled. Session termination is an event
     /// that happens in the context of the client's event loop thread shortly
-    /// after the destruction of the session object. The std::error_code
+    /// after the destruction of the session object. The Status
     /// argument passed to the completion handler of a canceled wait operation
-    /// will be `util::error::operation_aborted`. For uncanceled wait operations
-    /// it will be `std::error_code{}`. Note that as long as the client's event
+    /// will be `ErrorCodes::OperationAborted`. For uncanceled wait operations
+    /// it will be `Status::OK()`. Note that as long as the client's event
     /// loop thread is running, all completion handlers will be called
     /// regardless of whether the operations get canceled or not.
     ///
@@ -725,6 +736,12 @@ public:
     void on_new_flx_sync_subscription(int64_t new_version);
 
     util::Future<std::string> send_test_command(std::string command_body);
+
+    /// Returns the app services connection id if the session is connected, otherwise
+    /// returns an empty string. This function blocks until the value is set from
+    /// the event loop thread. If an error occurs, this will throw an ExceptionForStatus
+    /// with the error.
+    std::string get_appservices_connection_id();
 
 private:
     SessionWrapper* m_impl = nullptr;

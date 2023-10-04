@@ -533,6 +533,147 @@ TEST(Sync_SubscriptionStoreSubSetHasTable)
     CHECK(table_set.empty());
 }
 
+TEST(Sync_SubscriptionStoreNotifyAll)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    SubscriptionStoreFixture fixture(sub_store_path);
+    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+
+    const Status status_abort(ErrorCodes::OperationAborted, "operation aborted");
+
+    size_t hit_count = 0;
+
+    auto state_handler = [this, &hit_count, &status_abort](StatusWith<SubscriptionSet::State> state) {
+        CHECK(!state.is_ok());
+        CHECK_EQUAL(state, status_abort);
+        hit_count++;
+    };
+
+    auto read_tr = fixture.db->start_read();
+    // We should have no subscriptions yet so this should return false.
+    auto table_set = store->get_tables_for_latest(*read_tr);
+    CHECK(table_set.empty());
+
+    Query query_a(read_tr->get_table(fixture.a_table_key));
+    query_a.equal(fixture.foo_col, StringData("JBR")).greater_equal(fixture.bar_col, int64_t(1));
+    Query query_b(read_tr->get_table(fixture.a_table_key));
+    query_b.equal(fixture.foo_col, "Realm");
+
+    // Create multiple pending subscriptions and notify all of them
+    {
+        auto mut_sub_set1 = store->get_latest().make_mutable_copy();
+        mut_sub_set1.insert_or_assign(query_a);
+        auto sub_set1 = mut_sub_set1.commit();
+
+        sub_set1.get_state_change_notification(SubscriptionSet::State::Complete)
+            .get_async([&state_handler](StatusWith<SubscriptionSet::State> state) {
+                state_handler(state);
+            });
+    }
+    {
+        auto mut_sub_set2 = store->get_latest().make_mutable_copy();
+        mut_sub_set2.insert_or_assign(query_b);
+        auto sub_set2 = mut_sub_set2.commit();
+
+        sub_set2.get_state_change_notification(SubscriptionSet::State::Complete)
+            .get_async([&state_handler](StatusWith<SubscriptionSet::State> state) {
+                state_handler(state);
+            });
+    }
+    {
+        auto mut_sub_set3 = store->get_latest().make_mutable_copy();
+        mut_sub_set3.insert_or_assign(query_a);
+        auto sub_set3 = mut_sub_set3.commit();
+
+        sub_set3.get_state_change_notification(SubscriptionSet::State::Complete)
+            .get_async([&state_handler](StatusWith<SubscriptionSet::State> state) {
+                state_handler(state);
+            });
+    }
+
+    auto pending_subs = store->get_pending_subscriptions();
+    CHECK_EQUAL(pending_subs.size(), 3);
+    for (auto& sub : pending_subs) {
+        CHECK_EQUAL(sub.state(), SubscriptionSet::State::Pending);
+    }
+
+    store->notify_all_state_change_notifications(status_abort);
+    CHECK_EQUAL(hit_count, 3);
+
+    // Any pending subscriptions should still be in the pending state after notify()
+    pending_subs = store->get_pending_subscriptions();
+    CHECK_EQUAL(pending_subs.size(), 3);
+    for (auto& sub : pending_subs) {
+        CHECK_EQUAL(sub.state(), SubscriptionSet::State::Pending);
+    }
+}
+
+TEST(Sync_SubscriptionStoreTerminate)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    SubscriptionStoreFixture fixture(sub_store_path);
+    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+
+    size_t hit_count = 0;
+
+    auto state_handler = [this, &hit_count](StatusWith<SubscriptionSet::State> state) {
+        CHECK(state.is_ok());
+        CHECK_EQUAL(state, SubscriptionSet::State::Superseded);
+        hit_count++;
+    };
+
+    auto read_tr = fixture.db->start_read();
+    // We should have no subscriptions yet so this should return false.
+    auto table_set = store->get_tables_for_latest(*read_tr);
+    CHECK(table_set.empty());
+
+    Query query_a(read_tr->get_table(fixture.a_table_key));
+    query_a.equal(fixture.foo_col, StringData("JBR")).greater_equal(fixture.bar_col, int64_t(1));
+    Query query_b(read_tr->get_table(fixture.a_table_key));
+    query_b.equal(fixture.foo_col, "Realm");
+
+    // Create multiple pending subscriptions and "terminate" all of them
+    {
+        auto mut_sub_set1 = store->get_latest().make_mutable_copy();
+        mut_sub_set1.insert_or_assign(query_a);
+        auto sub_set1 = mut_sub_set1.commit();
+
+        sub_set1.get_state_change_notification(SubscriptionSet::State::Complete)
+            .get_async([&state_handler](StatusWith<SubscriptionSet::State> state) {
+                state_handler(state);
+            });
+    }
+    {
+        auto mut_sub_set2 = store->get_latest().make_mutable_copy();
+        mut_sub_set2.insert_or_assign(query_b);
+        auto sub_set2 = mut_sub_set2.commit();
+
+        sub_set2.get_state_change_notification(SubscriptionSet::State::Complete)
+            .get_async([&state_handler](StatusWith<SubscriptionSet::State> state) {
+                state_handler(state);
+            });
+    }
+    {
+        auto mut_sub_set3 = store->get_latest().make_mutable_copy();
+        mut_sub_set3.insert_or_assign(query_a);
+        auto sub_set3 = mut_sub_set3.commit();
+
+        sub_set3.get_state_change_notification(SubscriptionSet::State::Complete)
+            .get_async([&state_handler](StatusWith<SubscriptionSet::State> state) {
+                state_handler(state);
+            });
+    }
+
+    CHECK_EQUAL(store->get_latest().version(), 3);
+    CHECK_EQUAL(store->get_pending_subscriptions().size(), 3);
+
+    store->terminate(); // notifications are called on this thread
+
+    CHECK_EQUAL(hit_count, 3);
+    CHECK_EQUAL(store->get_latest().version(), 0);
+    CHECK_EQUAL(store->get_pending_subscriptions().size(), 0);
+}
+
 // Copied from sync_metadata_schema.cpp
 constexpr static std::string_view c_flx_metadata_table("flx_metadata");
 constexpr static std::string_view c_meta_schema_version_field("schema_version");
@@ -700,6 +841,117 @@ TEST(Sync_SyncMetadataSchemaVersions_LegacyTable)
         CHECK(*schema_version == version);
         // Verify the legacy table has been deleted after the conversion
         CHECK(!tr->has_table(c_flx_metadata_table));
+    }
+}
+
+TEST(Sync_MutableSubscriptionSetOperations)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path);
+    SubscriptionStoreFixture fixture(sub_store_path);
+    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+
+    auto read_tr = fixture.db->start_read();
+    Query query_a(read_tr->get_table("class_a"));
+    query_a.greater_equal(fixture.bar_col, int64_t(1));
+    Query query_b(read_tr->get_table(fixture.a_table_key));
+    query_b.equal(fixture.foo_col, "Realm");
+    Query query_c(read_tr->get_table(fixture.a_table_key));
+
+    // insert_or_assign
+    {
+        auto out = store->get_latest().make_mutable_copy();
+        auto [it, inserted] = out.insert_or_assign("a sub", query_a);
+        CHECK(inserted);
+        auto named_id = it->id;
+        out.insert_or_assign("b sub", query_b);
+        CHECK_EQUAL(out.size(), 2);
+        std::tie(it, inserted) = out.insert_or_assign("a sub", query_a);
+        CHECK_NOT(inserted);
+        CHECK_EQUAL(it->id, named_id);
+        CHECK_EQUAL(out.size(), 2);
+    }
+
+    // find
+    {
+        auto out = store->get_latest().make_mutable_copy();
+        auto [it, inserted] = out.insert_or_assign("a sub", query_a);
+        std::tie(it, inserted) = out.insert_or_assign("b sub", query_b);
+        CHECK(out.find(query_b));
+        CHECK(out.find("a sub"));
+    }
+
+    // erase
+    {
+        auto out = store->get_latest().make_mutable_copy();
+        out.insert_or_assign("a sub", query_a);
+        out.insert_or_assign("b sub", query_b);
+        out.insert_or_assign("c sub", query_c);
+        CHECK_EQUAL(out.size(), 3);
+        auto it = out.erase(out.begin());
+        // Iterator points to last query inserted due do "swap and pop" idiom.
+        CHECK_EQUAL(it->query_string, query_c.get_description());
+        CHECK_EQUAL(out.size(), 2);
+        CHECK_NOT(out.erase("a sub"));
+        CHECK_EQUAL(out.size(), 2);
+        CHECK(out.erase(query_b));
+        CHECK_EQUAL(out.size(), 1);
+        CHECK(out.erase("c sub"));
+        CHECK_EQUAL(out.size(), 0);
+    }
+
+    // erase_by_class_name
+    {
+        auto out = store->get_latest().make_mutable_copy();
+        out.insert_or_assign("a sub", query_a);
+        out.insert_or_assign("b sub", query_b);
+        out.insert_or_assign("c sub", query_c);
+        // Nothing to erase.
+        CHECK_NOT(out.erase_by_class_name("foo"));
+        // Erase all queries for the class type of the first query.
+        CHECK(out.erase_by_class_name(out.begin()->object_class_name));
+        // No queries left.
+        CHECK_EQUAL(out.size(), 0);
+    }
+
+    // erase_by_id
+    {
+        auto out = store->get_latest().make_mutable_copy();
+        out.insert_or_assign("a sub", query_a);
+        out.insert_or_assign("b sub", query_b);
+        // Nothing to erase.
+        CHECK_NOT(out.erase_by_id(ObjectId::gen()));
+        // Erase first query.
+        CHECK(out.erase_by_id(out.begin()->id));
+        CHECK_EQUAL(out.size(), 1);
+    }
+
+    // clear
+    {
+        auto out = store->get_latest().make_mutable_copy();
+        out.insert_or_assign("a sub", query_a);
+        out.insert_or_assign("b sub", query_b);
+        out.insert_or_assign("c sub", query_c);
+        CHECK_EQUAL(out.size(), 3);
+        out.clear();
+        CHECK_EQUAL(out.size(), 0);
+    }
+
+    // import
+    {
+        auto out = store->get_latest().make_mutable_copy();
+        out.insert_or_assign("a sub", query_a);
+        out.insert_or_assign("b sub", query_b);
+        auto subs = out.commit();
+
+        // This is an empty subscription set.
+        auto out2 = store->get_active().make_mutable_copy();
+        out2.insert_or_assign("c sub", query_c);
+        out2.import(subs);
+        // "c sub" is erased when 'import' is used.
+        CHECK_EQUAL(out2.size(), 2);
+        // insert "c sub" again.
+        out2.insert_or_assign("c sub", query_c);
+        CHECK_EQUAL(out2.size(), 3);
     }
 }
 

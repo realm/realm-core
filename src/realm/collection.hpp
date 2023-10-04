@@ -19,7 +19,7 @@ struct CollectionIterator;
 /// Collections are bound to particular properties of an object. In a
 /// collection's public interface, the implementation must take care to keep the
 /// object consistent with the persisted state, mindful of the fact that the
-/// state may have changed as a consquence of modifications from other instances
+/// state may have changed as a consequence of modifications from other instances
 /// referencing the same persisted state.
 class CollectionBase {
 public:
@@ -326,7 +326,7 @@ struct AverageHelper<T, std::void_t<ColumnSumType<T>>> {
 /// Convenience base class for collections, which implements most of the
 /// relevant interfaces for a collection that is bound to an object accessor and
 /// representable as a BPlusTree<T>.
-template <class Interface, class Derived>
+template <class Interface>
 class CollectionBaseImpl : public Interface, protected ArrayParent {
 public:
     static_assert(std::is_base_of_v<CollectionBase, Interface>);
@@ -368,6 +368,17 @@ public:
     using Interface::get_table;
     using Interface::get_target_table;
 
+    bool operator==(const CollectionBaseImpl& other) const noexcept
+    {
+        return get_table() == other.get_table() && get_owner_key() == other.get_owner_key() &&
+               get_col_key() == other.get_col_key();
+    }
+
+    bool operator!=(const CollectionBaseImpl& other) const noexcept
+    {
+        return !(*this == other);
+    }
+
 protected:
     Obj m_obj;
     ColKey m_col_key;
@@ -391,17 +402,6 @@ protected:
 
     CollectionBaseImpl& operator=(const CollectionBaseImpl& other) = default;
     CollectionBaseImpl& operator=(CollectionBaseImpl&& other) = default;
-
-    bool operator==(const Derived& other) const noexcept
-    {
-        return get_table() == other.get_table() && get_owner_key() == other.get_owner_key() &&
-               get_col_key() == other.get_col_key();
-    }
-
-    bool operator!=(const Derived& other) const noexcept
-    {
-        return !(*this == other);
-    }
 
     /// Refresh the associated `Obj` (if needed), and update the internal
     /// content version number. This is meant to be called from a derived class
@@ -764,6 +764,10 @@ private:
     const L* m_list;
     size_t m_ndx = size_t(-1);
 };
+
+namespace _impl {
+size_t get_collection_size_from_ref(ref_type, Allocator& alloc);
+}
 
 } // namespace realm
 

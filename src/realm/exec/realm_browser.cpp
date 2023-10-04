@@ -5,7 +5,10 @@
 
 using namespace realm;
 
-bool get_table_ndx(size_t& ndx)
+#define LL long long
+#define ULL unsigned long long
+
+static bool get_table_ndx(size_t& ndx)
 {
     std::cout << "Table ndx? ";
     std::string inp;
@@ -16,7 +19,7 @@ bool get_table_ndx(size_t& ndx)
     return *endp == '\0';
 }
 
-bool get_range(size_t size, size_t& begin, size_t& end)
+static bool get_range(size_t size, size_t& begin, size_t& end)
 {
     std::cout << "Size " << size << ". Range? ";
     std::string inp;
@@ -46,7 +49,7 @@ bool get_range(size_t size, size_t& begin, size_t& end)
     return false;
 }
 
-void print_objects(ConstTableRef table, size_t begin, size_t end)
+static void print_objects(ConstTableRef table, size_t begin, size_t end)
 {
     printf("                 Object key");
     auto col_keys = table->get_column_keys();
@@ -57,7 +60,7 @@ void print_objects(ConstTableRef table, size_t begin, size_t end)
     for (size_t row = begin; row < end; row++) {
         printf("%5zu ", row);
         Obj obj = table->get_object(row);
-        printf(" %20zx", obj.get_key().value);
+        printf(" %20llx", (ULL)obj.get_key().value);
         for (auto col : col_keys) {
             auto col_type = table->get_column_type(col);
             if (table->get_column_attr(col).test(col_attr_Nullable) && obj.is_null(col)) {
@@ -70,7 +73,7 @@ void print_objects(ConstTableRef table, size_t begin, size_t end)
             }
             switch (col_type) {
                 case type_Int:
-                    printf(" %20ld", obj.get<Int>(col));
+                    printf(" %20lld", (LL)obj.get<Int>(col));
                     break;
                 case type_Bool:
                     printf(" %20s", obj.get<Bool>(col) ? "true" : "false");
@@ -106,7 +109,7 @@ void print_objects(ConstTableRef table, size_t begin, size_t end)
                     break;
                 }
                 case type_Link: {
-                    printf("      -> %12zx", obj.get<ObjKey>(col).value);
+                    printf("      -> %12llx", (ULL)obj.get<ObjKey>(col).value);
                     break;
                 }
                 case type_LinkList: {

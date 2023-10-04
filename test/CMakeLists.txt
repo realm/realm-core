@@ -3,7 +3,7 @@ add_custom_target(benchmarks)
 add_subdirectory(object-store)
 
 # AFL and LIBFUZZER not yet supported by Windows
-if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
+if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NOT EMSCRIPTEN)
     add_subdirectory(fuzzy)
     add_subdirectory(realm-fuzzer)
 endif()
@@ -53,7 +53,6 @@ set(CORE_TEST_SOURCES
     test_json.cpp
     test_link_query_view.cpp
     test_links.cpp
-    test_metrics.cpp
     test_mixed_null_assertions.cpp
     test_object_id.cpp
     test_optional.cpp
@@ -92,10 +91,14 @@ set(CORE_TEST_SOURCES
     test_util_scope_exit.cpp
     test_util_to_string.cpp
     test_uuid.cpp
-    )
+)
 
 if (REALM_ENABLE_ENCRYPTION)
     list(APPEND CORE_TEST_SOURCES test_encrypted_file_mapping.cpp)
+endif()
+
+if (REALM_ENABLE_GEOSPATIAL)
+    list(APPEND CORE_TEST_SOURCES test_query_geo.cpp)
 endif()
 
 set(LARGE_TEST_SOURCES
@@ -116,6 +119,12 @@ set(REALM_TEST_HEADERS
 set(FUZZY_TEST_SOURCES fuzz_group.cpp)
 
 set(CORE_TESTS ${CORE_TEST_SOURCES} ${LARGE_TEST_SOURCES} ${FUZZY_TEST_SOURCES})
+
+set_source_files_properties(test_query_geo.cpp PROPERTIES
+    INCLUDE_DIRECTORIES "${RealmCore_SOURCE_DIR}/src/external"
+    # the only flag not supported with pragma diagnostic disable in src file by gcc until 13.
+    COMPILE_FLAGS "$<$<CXX_COMPILER_ID:GNU>: -Wno-unknown-pragmas>"
+)
 
 # FIXME: Benchmarks
 
@@ -186,6 +195,7 @@ if(REALM_ENABLE_SYNC)
         test_sync_protocol_codec.cpp
         test_sync_subscriptions.cpp
         test_sync_pending_bootstraps.cpp
+        test_sync_error_backoff.cpp
         test_transform.cpp
         test_util_buffer_stream.cpp
         test_util_circular_buffer.cpp
@@ -234,7 +244,8 @@ if(REALM_ENABLE_SYNC)
     set_target_properties(SyncTests PROPERTIES OUTPUT_NAME "realm-sync-tests")
     set_target_resources(SyncTests "${TEST_RESOURCES}")
     enable_stdfilesystem(SyncTests)
-    target_link_libraries(SyncTests Sync SyncServer TestUtil)
+    # Sync lib is included with SyncServer
+    target_link_libraries(SyncTests TestUtil SyncServer)
     add_bundled_test(SyncTests)
 
     if(UNIX AND NOT APPLE)

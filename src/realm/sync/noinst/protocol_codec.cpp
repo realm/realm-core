@@ -26,9 +26,10 @@ void ClientProtocol::make_flx_bind_message(int protocol_version, OutputBuffer& o
                                            const nlohmann::json& json_data, const std::string& signed_user_token,
                                            bool need_client_file_ident, bool is_subserver)
 {
+    static_cast<void>(protocol_version);
     std::string json_data_stg;
     // Protocol version v8 and above accepts stringified json_data for the first data argument
-    if (protocol_version >= 8 && !json_data.empty()) {
+    if (!json_data.empty()) {
         json_data_stg = json_data.dump();
     }
 
@@ -285,6 +286,18 @@ void ServerProtocol::make_pong(OutputBuffer& out, milliseconds_type timestamp)
     out << "pong " << timestamp << "\n"; // Throws
 }
 
+void ServerProtocol::make_log_message(OutputBuffer& out, util::Logger::Level level, std::string message,
+                                      session_ident_type sess_id, std::optional<std::string> co_id)
+{
+    nlohmann::json log_msg_json;
+    log_msg_json["level"] = util::Logger::level_to_string(level);
+    log_msg_json["msg"] = message;
+    if (co_id) {
+        log_msg_json["co_id"] = *co_id;
+    }
+    std::string json_data_stg = log_msg_json.dump();
+    out << "log_message " << sess_id << " " << json_data_stg.length() << "\n" << json_data_stg;
+}
 
 std::string make_authorization_header(const std::string& signed_user_token)
 {

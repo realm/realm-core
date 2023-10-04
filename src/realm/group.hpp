@@ -31,7 +31,6 @@
 #include <realm/exceptions.hpp>
 #include <realm/impl/cont_transact_hist.hpp>
 #include <realm/impl/output_stream.hpp>
-#include <realm/metrics/metrics.hpp>
 #include <realm/table.hpp>
 #include <realm/util/features.h>
 #include <realm/util/input_stream.hpp>
@@ -43,7 +42,6 @@ class TableKeys;
 
 namespace _impl {
 class GroupFriend;
-class TransactLogParser;
 } // namespace _impl
 
 
@@ -327,6 +325,7 @@ public:
     void rename_table(StringData name, StringData new_name, bool require_unique_name = true);
 
     Obj get_object(ObjLink link);
+    Obj try_get_object(ObjLink link) noexcept;
     void validate(ObjLink link) const;
 
     //@}
@@ -615,9 +614,7 @@ private:
 
     util::UniqueFunction<void(const CascadeNotification&)> m_notify_handler;
     util::UniqueFunction<void()> m_schema_change_handler;
-    std::shared_ptr<metrics::Metrics> m_metrics;
     std::vector<ToDeleteRef> m_objects_to_delete;
-    size_t m_total_rows;
 
     Group(SlabAlloc* alloc) noexcept;
     void init_array_parents() noexcept;
@@ -690,13 +687,9 @@ private:
     void write(util::File& file, const char* encryption_key, uint_fast64_t version_number, TableWriter& writer) const;
     void write(std::ostream&, bool pad, uint_fast64_t version_numer, TableWriter& writer) const;
 
-    std::shared_ptr<metrics::Metrics> get_metrics() const noexcept;
-    void set_metrics(std::shared_ptr<metrics::Metrics> other) noexcept;
-    void update_num_objects();
-    class TransactAdvancer;
     /// Memory mappings must have been updated to reflect any growth in filesize before
     /// calling advance_transact()
-    void advance_transact(ref_type new_top_ref, util::NoCopyInputStream&, bool writable);
+    void advance_transact(ref_type new_top_ref, util::InputStream*, bool writable);
     void refresh_dirty_accessors();
     void flush_accessors_for_commit();
 
@@ -835,11 +828,9 @@ private:
 
     friend class Table;
     friend class GroupWriter;
+    friend class GroupCommitter;
     friend class DB;
     friend class _impl::GroupFriend;
-    friend class _impl::TransactLogParser;
-    friend class metrics::QueryInfo;
-    friend class metrics::Metrics;
     friend class Transaction;
     friend class TableKeyIterator;
     friend class CascadeState;
@@ -1176,16 +1167,6 @@ inline void Group::reset_free_space_tracking()
     m_alloc.reset_free_space_tracking(); // Throws
 }
 
-inline std::shared_ptr<metrics::Metrics> Group::get_metrics() const noexcept
-{
-    return m_metrics;
-}
-
-inline void Group::set_metrics(std::shared_ptr<metrics::Metrics> shared) noexcept
-{
-    m_metrics = shared;
-}
-
 // The purpose of this class is to give internal access to some, but
 // not all of the non-public parts of the Group class.
 class _impl::GroupFriend {
@@ -1329,7 +1310,9 @@ public:
     {
         // Nullify immediately if we don't need to send cascade notifications
         if (!notification_handler()) {
-            src_table.get_object(origin_key).nullify_link(src_col_key, target_link);
+            if (Obj obj = src_table.try_get_object(origin_key)) {
+                std::move(obj).nullify_link(src_col_key, target_link);
+            }
             return;
         }
 

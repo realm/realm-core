@@ -645,7 +645,7 @@ struct SetOfObjects : public LinkedCollectionBase {
         ColKey col = get_link_col_key(obj.get_table());
         obj.get_linkset(col).clear();
     }
-    size_t count_unresolved_links(Obj)
+    size_t count_unresolved_links(Obj&)
     {
         return 0;
     }

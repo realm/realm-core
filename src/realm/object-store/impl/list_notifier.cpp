@@ -61,7 +61,8 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     if (!m_list || !m_list->is_attached())
         return false; // origin row was deleted after the notification was added
 
-    info.lists.push_back({m_list->get_table()->get_key(), m_list->get_owner_key(), m_list->get_col_key(), &m_change});
+    info.collections.push_back(
+        {m_list->get_table()->get_key(), m_list->get_owner_key(), m_list->get_col_key(), &m_change});
 
     m_info = &info;
 
@@ -94,7 +95,7 @@ void ListNotifier::run()
 
     m_prev_size = m_list->size();
 
-    if (m_type == PropertyType::Object) {
+    if (m_info && m_type == PropertyType::Object) {
         auto object_did_change = get_modification_checker(*m_info, m_list->get_target_table());
         for (size_t i = 0; i < m_prev_size; ++i) {
             if (m_change.modifications.contains(i))

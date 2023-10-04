@@ -249,6 +249,9 @@ public:
     bool erase(StringData name);
     bool erase(const Query& query);
 
+    bool erase_by_class_name(StringData object_class_name);
+    bool erase_by_id(ObjectId id);
+
     // Updates the state of the transaction and optionally updates its error information.
     //
     // You may only set an error_str when the State is State::Error.
@@ -330,10 +333,6 @@ public:
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
     SubscriptionSet get_by_version(int64_t version_id) const;
 
-    // Fulfill all previous subscriptions by superceding them. This does not
-    // affect the mutable subscription identified by the parameter.
-    void supercede_all_except(MutableSubscriptionSet& mut_sub) const;
-
     // Returns true if there have been commits to the DB since the given version
     bool would_refresh(DB::version_type version) const noexcept;
 
@@ -348,6 +347,16 @@ public:
     util::Optional<PendingSubscription> get_next_pending_version(int64_t last_query_version,
                                                                  DB::version_type after_client_version) const;
     std::vector<SubscriptionSet> get_pending_subscriptions() const;
+
+    // Notify all subscription state change notification handlers on this subscription store with the
+    // provided Status - this does not change the state of any pending subscriptions.
+    // Does not necessarily need to be called from the event loop thread.
+    void notify_all_state_change_notifications(Status status);
+
+    // Reset SubscriptionStore and erase all current subscriptions and supersede any pending
+    // subscriptions. Must be called from the event loop thread to prevent data race issues
+    // with the subscription store.
+    void terminate();
 
 private:
     using std::enable_shared_from_this<SubscriptionStore>::weak_from_this;
@@ -374,6 +383,10 @@ protected:
 
     SubscriptionSet get_by_version_impl(int64_t flx_version, util::Optional<DB::VersionID> version) const;
     MutableSubscriptionSet make_mutable_copy(const SubscriptionSet& set) const;
+
+    // Ensure the subscriptions table is properly initialized
+    // If clear_table is true, the subscriptions table will be cleared before initialization
+    void initialize_subscriptions_table(TransactionRef&& tr, bool clear_table);
 
     friend class MutableSubscriptionSet;
     friend class Subscription;

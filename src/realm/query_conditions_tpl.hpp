@@ -68,7 +68,7 @@ public:
                 return true; // no match, continue searching
             }
             ++m_match_count;
-            m_minmax_key = (m_key_values ? m_key_values->get(index) : 0) + m_key_offset;
+            m_minmax_key = (m_key_values ? m_key_values->get(index) : index) + m_key_offset;
         }
         return m_limit > m_match_count;
     }

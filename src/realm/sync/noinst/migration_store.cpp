@@ -120,17 +120,30 @@ bool MigrationStore::is_migrated()
     return m_state == MigrationState::Migrated;
 }
 
-void MigrationStore::complete_migration()
+bool MigrationStore::is_rollback_in_progress()
+{
+    std::lock_guard lock{m_mutex};
+    return m_state == MigrationState::RollbackInProgress;
+}
+
+void MigrationStore::complete_migration_or_rollback()
 {
     // Ensure the migration table has been initialized
     bool loaded = load_data();
     REALM_ASSERT(loaded);
 
     std::unique_lock lock{m_mutex};
-    if (m_state != MigrationState::InProgress) {
+    if (m_state != MigrationState::InProgress && m_state != MigrationState::RollbackInProgress) {
         return;
     }
 
+    // Complete rollback.
+    if (m_state == MigrationState::RollbackInProgress) {
+        clear(std::move(lock)); // releases the lock
+        return;
+    }
+
+    // Complete migration.
     m_state = MigrationState::Migrated;
 
     auto tr = m_db->start_write();
@@ -162,7 +175,8 @@ std::shared_ptr<realm::SyncConfig> MigrationStore::convert_sync_config(std::shar
     // If load data failed in the constructor, m_state defaults to NotMigrated
 
     std::unique_lock lock{m_mutex};
-    if (config->flx_sync_requested || m_state == MigrationState::NotMigrated) {
+    if (config->flx_sync_requested || m_state == MigrationState::NotMigrated ||
+        m_state == MigrationState::RollbackInProgress) {
         return config;
     }
 
@@ -173,6 +187,16 @@ std::shared_ptr<realm::SyncConfig> MigrationStore::convert_sync_config(std::shar
             ErrorCodes::IllegalOperation,
             util::format("Partition value cannot be changed for migrated realms\n - original: %1\n -   config: %2",
                          m_migrated_partition, config->partition_value));
+    }
+
+    return convert_sync_config_to_flx(std::move(config));
+}
+
+std::shared_ptr<realm::SyncConfig>
+MigrationStore::convert_sync_config_to_flx(std::shared_ptr<realm::SyncConfig> config)
+{
+    if (config->flx_sync_requested) {
+        return config;
     }
 
     auto flx_config = std::make_shared<realm::SyncConfig>(*config); // deep copy
@@ -218,6 +242,25 @@ void MigrationStore::migrate_to_flx(std::string_view rql_query_string, std::stri
         REALM_ASSERT(m_query_string == query_string);
         REALM_ASSERT(m_migrated_partition == migrated_partition);
     }
+}
+
+void MigrationStore::rollback_to_pbs()
+{
+    // Ensure the migration table has been initialized
+    bool loaded = load_data();
+    REALM_ASSERT(loaded);
+
+    std::unique_lock lock{m_mutex};
+    // Can call rollback_to_pbs multiple times if rollback has not completed.
+    REALM_ASSERT(m_state != MigrationState::NotMigrated);
+    m_state = MigrationState::RollbackInProgress;
+
+    auto tr = m_db->start_write();
+    auto migration_table = tr->get_table(m_migration_table);
+    REALM_ASSERT(!migration_table->is_empty());
+    auto migration_store_obj = migration_table->get_object(0);
+    migration_store_obj.set(m_migration_state, int64_t(m_state));
+    tr->commit();
 }
 
 void MigrationStore::cancel_migration()
@@ -282,7 +325,7 @@ void MigrationStore::create_subscriptions(const SubscriptionStore& subs_store, c
     auto sub_count = mut_sub.size();
 
     auto tr = m_db->start_read();
-    // List of tables covered by latest subscription set.
+    // List of tables covered by the latest subscription set.
     auto tables = subs_store.get_tables_for_latest(*tr);
 
     // List of tables in the realm.

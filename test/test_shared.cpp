@@ -1392,15 +1392,28 @@ TEST(Many_ConcurrentReaders)
     sg_w->close();
 
     auto reader = [path_str]() {
+        std::stringstream logs;
         try {
+            auto logger = util::StreamLogger(logs);
+            DBOptions options;
+            options.logger = std::make_shared<util::StreamLogger>(logs);
+            options.logger->set_level_threshold(Logger::Level::all);
+            constexpr bool no_create = false;
             for (int i = 0; i < 1000; ++i) {
-                DBRef sg_r = DB::create(path_str);
+                DBRef sg_r = DB::create(path_str, no_create, options);
                 ReadTransaction rt(sg_r);
+                ConstTableRef t = rt.get_table("table");
+                auto col_key = t->get_column_key("column");
+                REALM_ASSERT(t->get_object(0).get<StringData>(col_key) == "string");
                 rt.get_group().verify();
             }
         }
-        catch (...) {
-            REALM_ASSERT(false);
+        catch (const std::exception& e) {
+            std::cerr << "Exception during Many_ConcurrentReaders:" << std::endl;
+            std::cerr << "Reason: '" << e.what() << "'" << std::endl;
+            std::cerr << logs.str();
+            constexpr bool unexpected_exception = false;
+            REALM_ASSERT_EX(unexpected_exception, e.what());
         }
     };
 
@@ -1628,7 +1641,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 #endif // encryption enabled
 
 // not ios or android
-//#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
+// #endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
 
 
 TEST(Shared_SpaceOveruse)

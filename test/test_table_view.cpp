@@ -24,6 +24,7 @@
 #include <sstream>
 #include <ostream>
 #include <cwchar>
+#include <chrono>
 
 #include <realm.hpp>
 
@@ -32,8 +33,12 @@
 #include "test.hpp"
 #include "test_table_helper.hpp"
 
+using namespace std::chrono;
+
 using namespace realm;
 using namespace test_util;
+
+extern unsigned int unit_test_random_seed;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -836,7 +841,7 @@ TEST(TableView_MultiColSort)
 
     TableView tv = table.where().find_all();
 
-    std::vector<std::vector<ColKey>> v = {{col_int}, {col_float}};
+    std::vector<std::vector<ExtendedColumnKey>> v = {{col_int}, {col_float}};
     std::vector<bool> a = {true, true};
 
     tv.sort(SortDescriptor{v, a});
@@ -1082,7 +1087,7 @@ TEST(TableView_SortOverLink)
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(tv[0].get<Int>(col_int), 2);
     CHECK_EQUAL(tv[1].get<Int>(col_int), 3);
-    std::vector<std::vector<ColKey>> v = {{col_link, col_str}};
+    std::vector<std::vector<ExtendedColumnKey>> v = {{col_link, col_str}};
     std::vector<bool> a = {true};
     tv.sort(SortDescriptor{v, a});
     CHECK_EQUAL(tv[0].get<Int>(col_int), 3);
@@ -1140,7 +1145,7 @@ TEST(TableView_SortOverMultiLink)
     CHECK_EQUAL(tv[2].get<Int>(col_int), 29);
     CHECK_EQUAL(tv[3].get<Int>(col_int), 30);
 
-    std::vector<std::vector<ColKey>> v = {{col_link1, col_link2, col_str}};
+    std::vector<std::vector<ExtendedColumnKey>> v = {{col_link1, col_link2, col_str}};
     std::vector<bool> a = {true};
     tv.sort(SortDescriptor{v, a});
     CHECK_EQUAL(tv.size(), 4);
@@ -1202,7 +1207,7 @@ struct DistinctDirect {
 
     SortDescriptor get_sort(std::initializer_list<ColKey> columns, std::vector<bool> ascending = {}) const
     {
-        std::vector<std::vector<ColKey>> column_indices;
+        std::vector<std::vector<ExtendedColumnKey>> column_indices;
         for (ColKey col : columns)
             column_indices.push_back({col});
         return SortDescriptor(column_indices, ascending);
@@ -1210,7 +1215,7 @@ struct DistinctDirect {
 
     DistinctDescriptor get_distinct(std::initializer_list<ColKey> columns) const
     {
-        std::vector<std::vector<ColKey>> column_indices;
+        std::vector<std::vector<ExtendedColumnKey>> column_indices;
         for (ColKey col : columns)
             column_indices.push_back({col});
         return DistinctDescriptor(column_indices);
@@ -1243,7 +1248,7 @@ struct DistinctOverLink {
 
     SortDescriptor get_sort(std::initializer_list<ColKey> columns, std::vector<bool> ascending = {}) const
     {
-        std::vector<std::vector<ColKey>> column_indices;
+        std::vector<std::vector<ExtendedColumnKey>> column_indices;
         for (ColKey col : columns)
             column_indices.push_back({m_col_link, col});
         return SortDescriptor(column_indices, ascending);
@@ -1251,7 +1256,7 @@ struct DistinctOverLink {
 
     DistinctDescriptor get_distinct(std::initializer_list<ColKey> columns) const
     {
-        std::vector<std::vector<ColKey>> column_indices;
+        std::vector<std::vector<ExtendedColumnKey>> column_indices;
         for (ColKey col : columns)
             column_indices.push_back({m_col_link, col});
         return DistinctDescriptor(column_indices);
@@ -2831,6 +2836,37 @@ TEST(TableView_CopyKeyValues)
     TestTableView yet_another_view(get_table_view(view)); // Using move constructor
     CHECK_EQUAL(yet_another_view.size(), 10);
     CHECK_EQUAL(yet_another_view.get_key(0), ObjKey(0));
+}
+
+TEST(TableView_SortFollowedByLimit)
+{
+    constexpr int limit = 100;
+    Table table;
+    auto col = table.add_column(type_Int, "first");
+    std::vector<int> values(10000);
+    std::iota(values.begin(), values.end(), 0);
+    std::shuffle(values.begin(), values.end(), std::mt19937(unit_test_random_seed));
+
+    for (auto i : values) {
+        table.create_object().set(col, i);
+    }
+
+    auto tv = table.where().find_all();
+    DescriptorOrdering ordering;
+    ordering.append_sort(SortDescriptor({{col}}));
+    ordering.append_limit(limit);
+
+    auto t1 = steady_clock::now();
+    tv.apply_descriptor_ordering(ordering);
+    auto t2 = steady_clock::now();
+
+    CHECK(t2 > t1);
+    // std::cout << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+
+    CHECK_EQUAL(tv.size(), limit);
+    for (int i = 0; i < limit; i++) {
+        CHECK_EQUAL(tv.get_object(i).get<Int>(col), i);
+    }
 }
 
 #endif // TEST_TABLE_VIEW
