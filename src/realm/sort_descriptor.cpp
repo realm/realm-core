@@ -577,6 +577,14 @@ bool DescriptorOrdering::will_apply_limit() const
     });
 }
 
+bool DescriptorOrdering::will_apply_filter() const
+{
+    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<BaseDescriptor>& desc) {
+        REALM_ASSERT(desc->is_valid());
+        return desc->get_type() == DescriptorType::Filter;
+    });
+}
+
 realm::util::Optional<size_t> DescriptorOrdering::get_min_limit() const
 {
     realm::util::Optional<size_t> min_limit;

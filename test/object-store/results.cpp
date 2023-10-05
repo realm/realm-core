@@ -4945,8 +4945,9 @@ TEST_CASE("results: filter", "[results]") {
     SECTION("Query for multiple values") {
         Results res(r, t->where());
         res = res.filter_by_method(predicate);
-        REQUIRE(res.size() == 10);
-        for (size_t i = 0; i < res.size(); ++i)
+        size_t sz = res.size();
+        REQUIRE(sz == 10);
+        for (size_t i = 0; i < sz; ++i)
             REQUIRE(res.get(i).get<Int>(col_id) == ((int(i) + 1) * 100));
     }
 
@@ -4956,14 +4957,16 @@ TEST_CASE("results: filter", "[results]") {
 
         // forward order: 600, 700,... 1000
         res = res.filter_by_method(predicate);
-        REQUIRE(res.size() == 5);
-        for (size_t i = 0; i < res.size(); ++i)
+        size_t sz = res.size();
+        REQUIRE(sz == 5);
+        for (size_t i = 0; i < sz; ++i)
             REQUIRE(res.get(i).get<Int>(col_id) == (600 + int(i) * 100));
 
         // reverse the order: 1000, 900... 600
         res = res.sort(SortDescriptor({{col_id}}, {false}));
-        REQUIRE(res.size() == 5);
-        for (size_t i = 0; i < res.size(); ++i)
+        sz = res.size();
+        REQUIRE(sz == 5);
+        for (size_t i = 0; i < sz; ++i)
             REQUIRE(res.get(i).get<Int>(col_id) == (1000 - int(i) * 100));
     }
 }

@@ -359,7 +359,7 @@ void TableView::clear()
 
     // Remove all invalid keys
     auto it = std::remove_if(m_key_values.begin(), m_key_values.end(), [this](const ObjKey& key) {
-        return m_table->is_valid(key);
+        return !m_table->is_valid(key);
     });
     m_key_values.erase(it, m_key_values.end());
 
