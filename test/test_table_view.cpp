@@ -2872,22 +2872,70 @@ TEST(TableView_SortFollowedByLimit)
 TEST(TableView_Filter)
 {
     Table table;
-    auto col = table.add_column(type_Int, "first");
-    std::vector<int> values(10000);
-    std::iota(values.begin(), values.end(), 0);
-    std::shuffle(values.begin(), values.end(), std::mt19937(unit_test_random_seed));
+    ColKey col = table.add_column(type_Int, "id");
 
-    for (auto i : values) {
-        table.create_object().set(col, i);
+    std::set<Int> keys;
+    {
+        for (int i = 1; i <= 1000; ++i) {
+            table.create_object().set(col, i);
+            if (i % 100 == 0)
+                keys.insert(i);
+        }
     }
 
-    TableView tv(table.where(), size_t(-1));
-    DescriptorOrdering ordering;
-    ordering.append_filter(FilterDescriptor([&](const Obj& obj) {
-        return obj.get<Int>(col) < 100;
-    }));
-    tv.apply_descriptor_ordering(ordering);
-    CHECK_EQUAL(tv.size(), 100);
+    // filtered by column 'val': 100, 200, 300... 1000
+    auto predicate = [&](const Obj& o) {
+        return keys.find(o.get<Int>(col)) != keys.end();
+    };
+
+    { // Test single querty for multiple values
+        TableView v = table.where().find_all();
+        v.filter(FilterDescriptor(predicate));
+        CHECK_EQUAL(10, v.size());
+        for (size_t i = 0; i < 10; ++i)
+            CHECK_EQUAL((i + 1) * 100, v[i].get<Int>(col));
+    }
+    { // Combined with regular query and sort
+        TableView v = table.where().greater(col, 500).find_all();
+        v.filter(FilterDescriptor(predicate));
+        CHECK_EQUAL(5, v.size());
+        for (size_t i = 0; i < 5; ++i)
+            CHECK_EQUAL(600 + i * 100, v[i].get<Int>(col));
+
+        // reverse the order: 1000, 900... 600
+        v.sort(col, false);
+        CHECK_EQUAL(5, v.size());
+        for (size_t i = 0; i < 5; ++i)
+            CHECK_EQUAL(1000 - i * 100, v[i].get<Int>(col));
+
+        // update query: 500, 400... 100
+        v.update_query(table.where().less_equal(col, 500));
+        CHECK_EQUAL(5, v.size());
+        for (size_t i = 0; i < 5; ++i)
+            CHECK_EQUAL(500 - i * 100, v[i].get<Int>(col));
+    }
+    { // apply filter through DescriptorOrdering
+        table.clear();
+        std::vector<int> values(10000);
+        std::iota(values.begin(), values.end(), 0);
+        std::shuffle(values.begin(), values.end(), std::mt19937(unit_test_random_seed));
+
+        for (auto i : values) {
+            table.create_object().set(col, i);
+        }
+
+        TableView tv(table.where(), size_t(-1));
+        DescriptorOrdering ordering;
+        ordering.append_filter(FilterDescriptor([&](const Obj& obj) {
+            return obj.get<Int>(col) < 100;
+        }));
+        tv.apply_descriptor_ordering(ordering);
+        CHECK_EQUAL(tv.size(), 100);
+
+        ordering.append_limit(LimitDescriptor(50));
+        tv.apply_descriptor_ordering(ordering);
+        CHECK_EQUAL(tv.size(), 50);
+    }
 }
 
 #endif // TEST_TABLE_VIEW

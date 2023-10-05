@@ -358,15 +358,11 @@ void TableView::clear()
         m_last_seen_versions == get_dependency_versions() && !m_descriptor_ordering.will_apply_distinct();
 
     // Remove all invalid keys
-    auto it = m_key_values.begin();
-    while (it != m_key_values.end()) {
-        if (m_table->is_valid(*it)) {
-            ++it;
-        }
-        else {
-            it = m_key_values.erase(it);
-        }
-    }
+    auto it = std::remove_if(m_key_values.begin(), m_key_values.end(), [this](const ObjKey& key) {
+        return !m_table->is_valid(key);
+    });
+    m_key_values.erase(it, m_key_values.end());
+
     _impl::TableFriend::batch_erase_objects(*get_parent(), m_key_values); // Throws
 
     // It is important to not accidentally bring us in sync, if we were
