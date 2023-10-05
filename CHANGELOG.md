@@ -24,6 +24,7 @@
 
 ### Internals
 * Update tests to use global logger. ([PR #6917](https://github.com/realm/realm-core/pull/6917))
+* bindgen is now part of the release
 
 ----------------------------------------------
 
