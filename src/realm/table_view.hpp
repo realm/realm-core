@@ -401,7 +401,7 @@ protected:
     void get_dependencies(TableVersions&) const final;
 
     void do_sync();
-    void do_sort(const DescriptorOrdering&);
+    void apply_descriptors(const DescriptorOrdering&);
 
     mutable ConstTableRef m_table;
     // The source column index that this view contain backlinks for.

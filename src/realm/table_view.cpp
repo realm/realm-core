@@ -423,7 +423,7 @@ void TableView::sort(SortDescriptor order)
     m_descriptor_ordering.append_sort(std::move(order), SortDescriptor::MergeMode::prepend);
     m_descriptor_ordering.collect_dependencies(m_table.unchecked_ptr());
 
-    do_sort(m_descriptor_ordering);
+    apply_descriptors(m_descriptor_ordering);
 }
 
 
@@ -484,12 +484,12 @@ void TableView::do_sync()
         m_query->do_find_all(st);
     }
 
-    do_sort(m_descriptor_ordering);
+    apply_descriptors(m_descriptor_ordering);
 
     get_dependencies(m_last_seen_versions);
 }
 
-void TableView::do_sort(const DescriptorOrdering& ordering)
+void TableView::apply_descriptors(const DescriptorOrdering& ordering)
 {
     if (ordering.is_empty())
         return;
