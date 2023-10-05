@@ -54,7 +54,7 @@ if [[ -n $BUILD ]]; then
         -D CMAKE_SYSTEM_NAME=Darwin \
         -D REALM_VERSION="${VERSION}" \
         -D REALM_BUILD_LIB_ONLY=ON \
-        -D REALM_ENABLE_GEOSPATIAL=OFF \
+        -D REALM_ENABLE_GEOSPATIAL=ON \
         -D CPACK_SYSTEM_NAME=macosx \
         -D CPACK_PACKAGE_DIRECTORY=.. \
         -D CMAKE_OSX_ARCHITECTURES='x86_64;arm64' \
