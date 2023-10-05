@@ -34,17 +34,6 @@ public:
     explicit ArrayInteger(Allocator&) noexcept;
     ~ArrayInteger() noexcept override {}
 
-    void destroy() noexcept
-    {
-        if (!is_in_compressed_format()) {
-            Array::destroy();
-        }
-        else {
-            m_alloc.free_(m_compressed_array);
-            m_compressed_array.set_addr(nullptr);
-        }
-    }
-
     static value_type default_value(bool)
     {
         return 0;
@@ -69,10 +58,7 @@ public:
     }
     Mixed get_any(size_t ndx) const override;
 
-    bool try_compress();
-    bool decompress();
-
-    // implement parent interface in order to deal with compressed arrays
+    // TODO: All these interface must return to the base class, where the encoding algorithm must run
     int64_t get(size_t ndx) const noexcept;
     void set(size_t ndx, int64_t value);
     void insert(size_t ndx, int_fast64_t value);
@@ -83,6 +69,7 @@ public:
     void set_type(Type type);
     void truncate(size_t new_size);
     void truncate_and_destroy_children(size_t new_size);
+    void destory();
 
     bool is_null(size_t) const
     {
@@ -95,15 +82,6 @@ private:
     // copy on write for compressed array
     void copy_on_write();
     void copy_on_write(size_t min_size);
-
-    // compression logic
-    int64_t get_compressed_value(size_t ndx) const;
-    bool try_compress(std::vector<int64_t>&, std::vector<size_t>&);
-    bool is_in_compressed_format() const;
-    bool get_compressed_header_info(size_t& value_width, size_t& index_width, size_t& value_size,
-                                    size_t& index_size) const;
-
-    MemRef m_compressed_array;
 };
 
 class ArrayIntNull : public Array, public ArrayPayload {
@@ -190,12 +168,6 @@ private:
 
 
 // Implementation:
-
-inline ArrayInteger::ArrayInteger(Allocator& allocator) noexcept
-    : Array(allocator)
-{
-    m_is_inner_bptree_node = false;
-}
 
 inline ArrayIntNull::ArrayIntNull(Allocator& allocator) noexcept
     : Array(allocator)

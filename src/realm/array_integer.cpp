@@ -22,8 +22,17 @@
 #include <realm/array_integer_tpl.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/column_integer.hpp>
+#include <realm/array_flex.hpp>
 
 using namespace realm;
+
+ArrayInteger::ArrayInteger(Allocator& allocator) noexcept
+    : Array(allocator)
+{
+    m_is_inner_bptree_node = false;
+    using Encoding = NodeHeader::Encoding;
+    set_encode_array(ArrayEncode::create_encoded_array(Encoding::Flex, *this));
+}
 
 Mixed ArrayInteger::get_any(size_t ndx) const
 {
@@ -32,47 +41,40 @@ Mixed ArrayInteger::get_any(size_t ndx) const
 
 int64_t ArrayInteger::get(size_t ndx) const noexcept
 {
-    if (is_in_compressed_format()) {
-        return get_compressed_value(ndx);
-    }
-    return Array::get(ndx);
+    return m_encode_array->get(ndx);
 }
 
 void ArrayInteger::set(size_t ndx, int64_t value)
 {
-    if (is_in_compressed_format())
-        decompress();
+    if (m_encode_array->is_encoded())
+        m_encode_array->decode();
     Array::set(ndx, value);
 }
 
 void ArrayInteger::insert(size_t ndx, int_fast64_t value)
 {
-    if (is_in_compressed_format())
-        decompress();
+    if (m_encode_array->is_encoded())
+        m_encode_array->decode();
     Array::insert(ndx, value);
 }
 
 void ArrayInteger::add(int_fast64_t value)
 {
-    if (is_in_compressed_format())
-        decompress();
+    if (m_encode_array->is_encoded())
+        m_encode_array->decode();
     Array::add(value);
 }
 
 void ArrayInteger::move(Array& dst, size_t ndx)
 {
-    if (is_in_compressed_format())
-        decompress();
+    if (m_encode_array->is_encoded())
+        m_encode_array->decode();
     Array::move(dst, ndx);
 }
 
 size_t ArrayInteger::size() const noexcept
 {
-    size_t value_width, index_width, value_size, index_size;
-    if (get_compressed_header_info(value_width, index_width, value_size, index_size)) {
-        return index_size;
-    }
-    return Array::size();
+    return m_encode_array->size();
 }
 
 bool ArrayInteger::is_empty() const noexcept
@@ -82,176 +84,47 @@ bool ArrayInteger::is_empty() const noexcept
 
 void ArrayInteger::set_type(Type type)
 {
-    if (is_in_compressed_format()) {
-        decompress();
-    }
+    if (m_encode_array->is_encoded())
+        m_encode_array->decode();
     Array::set_type(type);
 }
 
 void ArrayInteger::truncate(size_t new_size)
 {
-    if (is_in_compressed_format()) {
-        decompress();
-    }
+    if (m_encode_array->is_encoded())
+        m_encode_array->decode();
     Array::truncate(new_size);
 }
 
 void ArrayInteger::truncate_and_destroy_children(size_t new_size)
 {
-    if (is_in_compressed_format()) {
-        decompress();
-    }
+    if (m_encode_array->is_encoded())
+        m_encode_array->decode();
     Array::truncate_and_destroy_children(new_size);
+}
+
+void ArrayInteger::destory()
+{
+    // this is tmp
+    if (m_encode_array->is_encoded()) {
+        m_encode_array->decode();
+    }
 }
 
 void ArrayInteger::copy_on_write()
 {
-    if (is_in_compressed_format()) {
-        decompress();
-    }
+    if (m_encode_array->is_encoded())
+        m_encode_array->decode();
     Array::copy_on_write();
 }
 
 void ArrayInteger::copy_on_write(size_t min_size)
 {
-    if (is_in_compressed_format()) {
-        decompress();
-    }
+    if (m_encode_array->is_encoded())
+        m_encode_array->decode();
     Array::copy_on_write(min_size);
 }
 
-// TODO deal with Array:write()
-
-
-bool ArrayInteger::try_compress()
-{
-    std::vector<int64_t> values;
-    std::vector<size_t> indices;
-    if (!is_in_compressed_format() && try_compress(values, indices)) {
-        size_t value_width, index_width, value_size, index_size;
-        if (get_compressed_header_info(value_width, index_width, value_size, index_size)) {
-            const auto data = (uint64_t*)get_data_from_header(m_compressed_array.get_addr());
-            const auto offset = value_size * value_width;
-            bf_iterator it_value{data, 0, value_width, value_width, 0};
-            bf_iterator it_index{data, offset, index_width, index_width, 0};
-            for (size_t i = 0; i < values.size(); ++i) {
-                *it_value = values[i];
-                ++it_value;
-            }
-            for (size_t i = 0; i < indices.size(); ++i) {
-                *it_index = indices[i];
-                ++it_index;
-            }
-            return true;
-        }
-    }
-    return false;
-}
-
-bool ArrayInteger::is_in_compressed_format() const
-{
-
-    const auto header = m_compressed_array.get_addr();
-    if (header) {
-        Encoding enconding{get_kind((uint64_t*)header)};
-        return enconding == Encoding::Flex;
-    }
-    return false;
-}
-
-bool ArrayInteger::get_compressed_header_info(size_t& value_width, size_t& index_width, size_t& value_size,
-                                              size_t& index_size) const
-{
-    if (is_in_compressed_format()) {
-        const auto addr = (uint64_t*)m_compressed_array.get_addr();
-        value_size = get_arrayA_num_elements<Encoding::Flex>(addr);
-        index_size = get_arrayB_num_elements<Encoding::Flex>(addr);
-        value_width = get_elementA_size<Encoding::Flex>(addr);
-        index_width = get_elementB_size<Encoding::Flex>(addr);
-        return true;
-    }
-    return false;
-}
-
-
-bool ArrayInteger::try_compress(std::vector<int64_t>& values, std::vector<size_t>& indices)
-{
-    const auto sz = size();
-    values.reserve(sz);
-    indices.reserve(sz);
-
-    for (size_t i = 0; i < sz; ++i) {
-        auto item = get(i);
-        values.push_back(item);
-        indices.push_back(item);
-    }
-
-    std::sort(values.begin(), values.end());
-    auto last = std::unique(values.begin(), values.end());
-    values.erase(last, values.end());
-
-    for (auto& v : indices) {
-        auto pos = std::lower_bound(values.begin(), values.end(), v);
-        v = std::distance(values.begin(), pos);
-    }
-
-    const auto value = *std::max_element(values.begin(), values.end());
-    const auto index = *std::max_element(indices.begin(), indices.end());
-    const auto value_bit_width = bit_width(value);
-    const auto index_bit_width = bit_width(index);
-    const auto compressed_values_size = value_bit_width * values.size();
-    const auto compressed_indices_size = index_bit_width * indices.size();
-    const auto compressed_size = compressed_values_size + compressed_indices_size;
-    const auto uncompressed_size = value_bit_width * size();
-
-    // compress array only if there is some gain
-    if (compressed_size < uncompressed_size) {
-        m_compressed_array = Array::create_flex_array(Type::type_Normal, false, values.size(), value_bit_width,
-                                                      indices.size(), index_bit_width, m_alloc);
-        // release memory allocated for the array.
-        Array::destroy();
-        return true;
-    }
-    return false;
-}
-
-bool ArrayInteger::decompress()
-{
-    size_t value_width, index_width, value_size, index_size;
-    if (get_compressed_header_info(value_width, index_width, value_size, index_size)) {
-        create(); // recreate the array
-        const auto data = (uint64_t*)get_data_from_header(m_compressed_array.get_addr());
-        const auto offset = value_size * value_width;
-        bf_iterator index_iterator{data, offset, index_width, index_width, 0};
-        for (size_t i = 0; i < index_size; ++i) {
-            const auto index = (int)index_iterator.get_value();
-            const auto value = read_bitfield(data, index * value_width, value_width);
-            Array::insert(i, value);
-            ++index_iterator;
-        }
-        // free compressed array
-        m_alloc.free_(m_compressed_array);
-        m_compressed_array.set_addr(nullptr);
-        return true;
-    }
-    return false;
-}
-
-int64_t ArrayInteger::get_compressed_value(size_t ndx) const
-{
-    size_t value_width, index_width, value_size, index_size;
-    if (get_compressed_header_info(value_width, index_width, value_size, index_size)) {
-
-        if (ndx >= index_size)
-            return realm::not_found;
-
-        const auto data = (uint64_t*)get_data_from_header(m_compressed_array.get_addr());
-        const auto offset = (value_size * value_width) + (ndx * index_width);
-        const auto index = read_bitfield(data, offset, index_width);
-        return read_bitfield(data, index * value_width, value_width);
-    }
-    return realm::not_found;
-}
 
 Mixed ArrayIntNull::get_any(size_t ndx) const
 {

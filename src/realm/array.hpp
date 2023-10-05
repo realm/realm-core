@@ -23,11 +23,13 @@
 #include <realm/query_state.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/array_direct.hpp>
+#include <realm/array_encode.hpp>
 
 namespace realm {
 
 // Pre-definitions
 class GroupWriter;
+class ArrayEncode;
 namespace _impl {
 class ArrayWriterBase;
 }
@@ -95,6 +97,18 @@ public:
 
     ~Array() noexcept override {}
 
+    /// Set encoding/deconding array for this array in order to implement the
+    /// encoding algorithm selected for this type of Array.
+    /// The derived class is responsible to invoke this method and pass the
+    /// correct encoding array to this method.
+    void set_encode_array(ArrayEncode* encode_array);
+
+#ifdef REALM_DEBUG
+    // ONLY for testing
+    bool try_encode();
+    bool try_decode();
+#endif
+
     /// Create a new integer array of the specified type and size, and filled
     /// with the specified value, and attach this accessor to it. This does not
     /// modify the parent reference information of this accessor.
@@ -144,11 +158,6 @@ public:
     /// just the reference to the underlying memory. All elements will be
     /// initialized to the specified value.
     static MemRef create_array(Type, bool context_flag, size_t size, int_fast64_t value, Allocator&);
-    /// Construct a compressed integer array. Return the ref to the underlying memory.
-    /// All the elements will be initialized to the specif value, the calle will then need
-    /// to fill the arrat with the specific elements.
-    static MemRef create_flex_array(Type type, bool context_flag, size_t array_value_elements, size_t value_bit_width,
-                                    size_t array_index_elements, size_t index_bit_width, Allocator& alloc);
 
     Type get_type() const noexcept;
 
@@ -453,6 +462,11 @@ public:
     Array& operator=(const Array&) = delete; // not allowed
     Array(const Array&) = delete;            // not allowed
 
+    /// Takes a 64-bit value and returns the minimum number of bits needed
+    /// to fit the value. For alignment this is rounded up to nearest
+    /// log2. Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
+    static size_t bit_width(int64_t value);
+
 protected:
     // This returns the minimum value ("lower bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
@@ -513,12 +527,6 @@ protected:
     int64_t get_universal(const char* const data, const size_t ndx) const;
 
 protected:
-    /// Takes a 64-bit value and returns the minimum number of bits needed
-    /// to fit the value. For alignment this is rounded up to nearest
-    /// log2. Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
-    static size_t bit_width(int64_t value);
-
-protected:
     Getter m_getter = nullptr; // cached to avoid indirection
     const VTable* m_vtable = nullptr;
 
@@ -530,6 +538,8 @@ protected:
     bool m_has_refs;             // Elements whose first bit is zero are refs to subarrays.
     bool m_context_flag;         // Meaning depends on context.
 
+    ArrayEncode* m_encode_array = nullptr; // encode array for encoding and decoding array.
+
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
     ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified) const;
@@ -537,6 +547,12 @@ private:
 #ifdef REALM_DEBUG
     void report_memory_usage_2(MemUsageHandler&) const;
 #endif
+
+    // encode/decode this array if m_encode_array is set (essentially if there is an enconding/decondig algo
+    // associated)
+    bool encode_array();
+    bool decode_array();
+    bool is_encoded() const;
 
     friend class Allocator;
     friend class SlabAlloc;
@@ -952,28 +968,11 @@ inline MemRef Array::create_array(Type type, bool context_flag, size_t size, int
     return create(type, context_flag, wtype_Bits, size, value, alloc); // Throws
 }
 
-inline MemRef Array::create_flex_array(Type type, bool context_flag, size_t array_value_elements,
-                                       size_t value_bit_width, size_t array_index_elements, size_t index_bit_width,
-                                       Allocator& alloc)
-{
-    const auto size = header_size + (array_value_elements * value_bit_width + array_index_elements * index_bit_width);
-    MemRef mem = create(type, context_flag, wtype_Bits, size, 0, alloc); // Throws
-    auto addr = (uint64_t*)mem.get_addr();
-    set_kind(addr, static_cast<std::underlying_type_t<Encoding>>(Encoding::Flex));
-    set_arrayA_num_elements<Encoding::Flex>(addr, array_value_elements);
-    set_arrayB_num_elements<Encoding::Flex>(addr, array_index_elements);
-    set_elementA_size<Encoding::Flex>(addr, value_bit_width);
-    set_elementB_size<Encoding::Flex>(addr, index_bit_width);
-    return mem;
-}
-
-
 inline size_t Array::get_max_byte_size(size_t num_elems) noexcept
 {
     int max_bytes_per_elem = 8;
     return header_size + num_elems * max_bytes_per_elem;
 }
-
 
 inline void Array::update_child_ref(size_t child_ndx, ref_type new_ref)
 {

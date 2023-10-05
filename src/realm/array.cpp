@@ -25,6 +25,7 @@
 #include <realm/array_integer.hpp>
 #include <realm/array_key.hpp>
 #include <realm/impl/array_writer.hpp>
+#include <realm/array_encode.hpp>
 
 #include <array>
 #include <cstring> // std::memcpy
@@ -189,6 +190,28 @@ using namespace realm;
 using namespace realm::util;
 
 void QueryStateBase::dyncast() {}
+
+
+void Array::set_encode_array(ArrayEncode* encode_array)
+{
+    m_encode_array = encode_array;
+}
+
+#ifdef REALM_DEBUG
+
+bool Array::try_encode()
+{
+    REALM_ASSERT(m_encode_array);
+    return m_encode_array->encode();
+}
+
+bool Array::try_decode()
+{
+    REALM_ASSERT(m_encode_array);
+    return m_encode_array->decode();
+}
+
+#endif
 
 size_t Array::bit_width(int64_t v)
 {
@@ -550,6 +573,21 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
         int64_t v = (this->*old_getter)(i);
         (this->*(m_vtable->setter))(i, v);
     }
+}
+
+bool Array::encode_array()
+{
+    return m_encode_array ? m_encode_array->encode() : false;
+}
+
+bool Array::decode_array()
+{
+    return m_encode_array ? m_encode_array->decode() : false;
+}
+
+bool Array::is_encoded() const
+{
+    return m_encode_array ? m_encode_array->is_encoded() : false;
 }
 
 namespace {

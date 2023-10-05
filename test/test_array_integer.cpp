@@ -31,6 +31,9 @@
 using namespace realm;
 using namespace realm::test_util;
 
+
+#ifdef REALM_DEBUG
+
 TEST(Test_ArrayInt_no_compression_needed)
 {
     ArrayInteger a(Allocator::get_default());
@@ -40,7 +43,7 @@ TEST(Test_ArrayInt_no_compression_needed)
     a.add(5);
     a.add(10);
     a.add(15);
-    CHECK_NOT(a.try_compress()); // compression is not needed in this case.
+    CHECK_NOT(a.try_encode()); // compression is not needed in this case.
     CHECK(a.get(0) == 10);
     CHECK(a.get(1) == 5);
     CHECK(a.get(2) == 5);
@@ -62,10 +65,10 @@ TEST(Test_ArrayInt_compress_data)
     CHECK(a.size() == 6);
     // Current: [16388:16, 409:16, 16388:16, 16388:16, 409:16, 16388:16], space needed: 6*16 bits = 96 bits + header
     // compress the array is a good option.
-    CHECK(a.try_compress());
-    CHECK_NOT(a.try_compress());
-    CHECK(a.decompress());
-    CHECK(a.try_compress());
+    CHECK(a.try_encode());
+    CHECK_NOT(a.try_encode());
+    CHECK(a.try_decode());
+    CHECK(a.try_encode());
     // Compressed: [409:16, 16388:16][1:1,0:1,1:1,1:1,0:1,1:1], space needed: 2*16 bits + 6 * 1 bit = 38 bits + header
     CHECK(a.size() == 6);
     CHECK(a.get(0) == 16388);
@@ -85,7 +88,7 @@ TEST(Test_ArrayInt_compress_data)
     CHECK(a.get(5) == 16388);
     CHECK(a.get(6) == 20);
     // compress again.
-    CHECK(a.try_compress());
+    CHECK(a.try_encode());
     // array should now be in compressed form
     CHECK(a.get(0) == 16388);
     CHECK(a.get(1) == 409);
@@ -96,6 +99,8 @@ TEST(Test_ArrayInt_compress_data)
     CHECK(a.get(6) == 20);
     a.destroy();
 }
+
+#endif
 
 TEST(ArrayIntNull_SetNull)
 {
