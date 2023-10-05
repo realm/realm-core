@@ -24,6 +24,7 @@
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/class.hpp>
 #include <realm/object-store/sectioned_results.hpp>
 
 #include <realm/set.hpp>
@@ -54,6 +55,12 @@ Results::Results(SharedRealm r, Query q, DescriptorOrdering o)
     , m_mutex(m_realm && m_realm->is_frozen())
 {
 }
+
+Results::Results(const Class& cls)
+    : Results(cls.get_realm(), cls.get_table())
+{
+}
+
 
 Results::Results(SharedRealm r, ConstTableRef table)
     : m_realm(std::move(r))

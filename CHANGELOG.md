@@ -26,6 +26,7 @@
 ### Internals
 * Update tests to use global logger. ([PR #6917](https://github.com/realm/realm-core/pull/6917))
 * TableView::get_num_results_excluded_by_limit() has been removed. Hopefully not used by any SDK.
+* bindgen is now part of the release
 
 ----------------------------------------------
 

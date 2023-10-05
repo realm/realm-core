@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2017 Realm Inc.
+// Copyright 2022 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,28 +16,19 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_OS_OBJECT_NOTIFIER_HPP
-#define REALM_OS_OBJECT_NOTIFIER_HPP
+import { BoundSpec } from "./bound-model";
+import { Formatter } from "./formatter";
+import { Outputter } from "./outputter";
+import { Spec } from "./spec";
 
-#include <realm/object-store/impl/collection_notifier.hpp>
-
-#include <realm/keys.hpp>
-#include <realm/table.hpp>
-
-namespace realm::_impl {
-class ObjectNotifier : public CollectionNotifier {
-public:
-    ObjectNotifier(std::shared_ptr<Realm> realm, const Obj&);
-
-private:
-    TableRef m_table;
-    ObjKey m_obj_key;
-    TransactionChangeInfo* m_info = nullptr;
-
-    void run() override REQUIRES(!m_callback_mutex);
-    void reattach() override;
-    bool do_add_required_change_info(TransactionChangeInfo& info) override;
+export type TemplateContext = {
+  rawSpec: Spec;
+  spec: BoundSpec;
+  /**
+   * @param path The file path, relative to the output directory.
+   * @param formatter An optional formatter to run after the template has returned.
+   * The invocation is batched, such that a single formatter is only ever executed once but passed all file paths which use
+   * @returns An outputter, which can be used to write to the file.
+   */
+  file: (path: string, formatter?: Formatter) => Outputter;
 };
-} // namespace realm::_impl
-
-#endif // REALM_OS_OBJECT_NOTIFIER_HPP

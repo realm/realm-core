@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2017 Realm Inc.
+// Copyright 2022 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,28 +16,17 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_OS_OBJECT_NOTIFIER_HPP
-#define REALM_OS_OBJECT_NOTIFIER_HPP
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
-#include <realm/object-store/impl/collection_notifier.hpp>
+import { TemplateContext } from "./context";
 
-#include <realm/keys.hpp>
-#include <realm/table.hpp>
+export type Template = (context: TemplateContext) => void;
 
-namespace realm::_impl {
-class ObjectNotifier : public CollectionNotifier {
-public:
-    ObjectNotifier(std::shared_ptr<Realm> realm, const Obj&);
-
-private:
-    TableRef m_table;
-    ObjKey m_obj_key;
-    TransactionChangeInfo* m_info = nullptr;
-
-    void run() override REQUIRES(!m_callback_mutex);
-    void reattach() override;
-    bool do_add_required_change_info(TransactionChangeInfo& info) override;
-};
-} // namespace realm::_impl
-
-#endif // REALM_OS_OBJECT_NOTIFIER_HPP
+export async function importTemplate(path: string): Promise<Template> {
+  const template = (await import(pathToFileURL(resolve(path)).toString())) as { generate: Template };
+  if (typeof template !== "object" || typeof template.generate !== "function") {
+    throw new Error("Expected template to export a 'generate' function");
+  }
+  return template.generate;
+}

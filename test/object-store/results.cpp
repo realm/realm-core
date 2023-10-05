@@ -3572,8 +3572,7 @@ TEST_CASE("results: snapshots", "[results]") {
         auto linked_to_obj = *linked_to->begin();
         auto lv = object->begin()->get_linklist_ptr(col_link);
 
-        TableView backlinks = linked_to_obj.get_backlink_view(object, col_link);
-        Results results(r, std::move(backlinks));
+        Results results(r, linked_to_obj, object->get_key(), col_link);
 
         {
             // A newly-added row should not appear in the snapshot.
