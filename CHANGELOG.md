@@ -9,6 +9,7 @@
   - Introduce `MutableSubscriptionSet::erase_by_id()`.
   - Introduce `MutableSubscriptionSet::erase_by_class_name()`.
   ([PR #7008](https://github.com/realm/realm-core/pull/7008))
+* Filtering by user-defined functions (PR [#7020](https://github.com/realm/realm-core/pull/7020))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -24,6 +25,7 @@
 
 ### Internals
 * Update tests to use global logger. ([PR #6917](https://github.com/realm/realm-core/pull/6917))
+* TableView::get_num_results_excluded_by_limit() has been removed. Hopefully not used by any SDK.
 * bindgen is now part of the release
 
 ----------------------------------------------
