@@ -1145,11 +1145,11 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
     }
     else if (old_value.is_type(type_Dictionary)) {
         Dictionary dict(*this, col_key);
-        dict.remove_backlinks(state);
+        recurse = dict.remove_backlinks(state);
     }
     else if (old_value.is_type(type_List)) {
         Lst<Mixed> list(*this, col_key);
-        list.remove_backlinks(state);
+        recurse = list.remove_backlinks(state);
     }
 
     if (value.is_type(type_TypedLink)) {
@@ -2028,20 +2028,25 @@ CollectionPtr Obj::get_collection_by_stable_path(const StablePath& path) const
     while (level < path.size()) {
         auto& index = path[level];
         auto get_ref = [&]() -> std::pair<Mixed, PathElement> {
+            Mixed ref;
+            PathElement path_elem;
             if (collection->get_collection_type() == CollectionType::List) {
                 auto list_of_mixed = dynamic_cast<Lst<Mixed>*>(collection.get());
                 size_t ndx = list_of_mixed->find_index(index);
-                if (ndx == realm::not_found)
-                    return {Mixed{}, PathElement{}};
-                return {list_of_mixed->get(ndx), PathElement(ndx)};
+                if (ndx != realm::not_found) {
+                    ref = list_of_mixed->get(ndx);
+                    path_elem = ndx;
+                }
             }
             else {
                 auto dict = dynamic_cast<Dictionary*>(collection.get());
                 size_t ndx = dict->find_index(index);
-                if (ndx == realm::not_found)
-                    return {Mixed{}, PathElement{}};
-                return {dict->get_any(ndx), PathElement(dict->get_key(ndx).get_string())};
+                if (ndx != realm::not_found) {
+                    ref = dict->get_any(ndx);
+                    path_elem = dict->get_key(ndx).get_string();
+                }
             }
+            return {ref, path_elem};
         };
         auto [ref, path_elem] = get_ref();
         if (ref.is_type(type_List)) {

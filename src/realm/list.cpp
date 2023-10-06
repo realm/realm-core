@@ -418,9 +418,14 @@ void Lst<Mixed>::clear()
         if (Replication* repl = Base::get_replication()) {
             repl->list_clear(*this);
         }
-        size_t ndx = size();
-        while (ndx--) {
-            do_remove(ndx);
+        CascadeState state;
+        bool recurse = remove_backlinks(state);
+
+        m_tree->clear();
+
+        if (recurse) {
+            auto table = get_table_unchecked();
+            _impl::TableFriend::remove_recursive(*table, state); // Throws
         }
         bump_content_version();
     }
@@ -573,34 +578,14 @@ void Lst<Mixed>::do_insert(size_t ndx, Mixed value)
 
 void Lst<Mixed>::do_remove(size_t ndx)
 {
-    Mixed old_value = m_tree->get(ndx);
-    if (old_value.is_type(type_TypedLink, type_Dictionary, type_List)) {
+    CascadeState state;
+    bool recurse = clear_backlink(ndx, state);
 
-        bool recurse = false;
-        CascadeState state;
-        if (old_value.is_type(type_TypedLink)) {
-            auto old_link = old_value.get<ObjLink>();
-            if (old_link.get_obj_key().is_unresolved()) {
-                state.m_mode = CascadeState::Mode::All;
-            }
-            recurse = Base::remove_backlink(m_col_key, old_link, state);
-        }
-        else if (old_value.is_type(type_List)) {
-            get_list(ndx)->remove_backlinks(state);
-        }
-        else if (old_value.is_type(type_Dictionary)) {
-            get_dictionary(ndx)->remove_backlinks(state);
-        }
+    m_tree->erase(ndx);
 
-        m_tree->erase(ndx);
-
-        if (recurse) {
-            auto table = get_table_unchecked();
-            _impl::TableFriend::remove_recursive(*table, state); // Throws
-        }
-    }
-    else {
-        m_tree->erase(ndx);
+    if (recurse) {
+        auto table = get_table_unchecked();
+        _impl::TableFriend::remove_recursive(*table, state); // Throws
     }
 }
 
@@ -822,21 +807,37 @@ bool Lst<Mixed>::replace_link(ObjLink old_link, ObjLink replace_link)
     return false;
 }
 
-void Lst<Mixed>::remove_backlinks(CascadeState& state) const
+bool Lst<Mixed>::clear_backlink(size_t ndx, CascadeState& state) const
 {
-    size_t sz = size();
-    for (size_t ndx = 0; ndx < sz; ndx++) {
-        Mixed val = m_tree->get(ndx);
-        if (val.is_type(type_TypedLink)) {
-            Base::remove_backlink(m_col_key, val.get_link(), state);
+    Mixed value = m_tree->get(ndx);
+    if (value.is_type(type_TypedLink, type_Dictionary, type_List)) {
+        if (value.is_type(type_TypedLink)) {
+            auto link = value.get<ObjLink>();
+            if (link.get_obj_key().is_unresolved()) {
+                state.m_mode = CascadeState::Mode::All;
+            }
+            return Base::remove_backlink(m_col_key, link, state);
         }
-        else if (val.is_type(type_List)) {
-            get_list(ndx)->remove_backlinks(state);
+        else if (value.is_type(type_List)) {
+            return get_list(ndx)->remove_backlinks(state);
         }
-        else if (val.is_type(type_Dictionary)) {
-            get_dictionary(ndx)->remove_backlinks(state);
+        else if (value.is_type(type_Dictionary)) {
+            return get_dictionary(ndx)->remove_backlinks(state);
         }
     }
+    return false;
+}
+
+bool Lst<Mixed>::remove_backlinks(CascadeState& state) const
+{
+    size_t sz = size();
+    bool recurse = false;
+    for (size_t ndx = 0; ndx < sz; ndx++) {
+        if (clear_backlink(ndx, state)) {
+            recurse = true;
+        }
+    }
+    return recurse;
 }
 
 bool Lst<Mixed>::update_if_needed() const
