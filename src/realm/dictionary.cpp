@@ -800,23 +800,16 @@ bool Dictionary::replace_link(ObjLink old_link, ObjLink replace_link)
     return false;
 }
 
-void Dictionary::remove_backlinks(CascadeState& state) const
+bool Dictionary::remove_backlinks(CascadeState& state) const
 {
     size_t sz = size();
+    bool recurse = false;
     for (size_t ndx = 0; ndx < sz; ndx++) {
-        auto val = m_values->get(ndx);
-        if (val.is_type(type_TypedLink)) {
-            Base::remove_backlink(m_col_key, val.get_link(), state);
-        }
-        else if (val.is_type(type_Dictionary)) {
-            auto key = do_get_key(ndx);
-            get_dictionary(key.get_string())->remove_backlinks(state);
-        }
-        else if (val.is_type(type_List)) {
-            auto key = do_get_key(ndx);
-            get_list(key.get_string())->remove_backlinks(state);
+        if (clear_backlink(ndx, state)) {
+            recurse = true;
         }
     }
+    return recurse;
 }
 
 size_t Dictionary::find_first(Mixed value) const
@@ -827,16 +820,12 @@ size_t Dictionary::find_first(Mixed value) const
 void Dictionary::clear()
 {
     if (size() > 0) {
-        Replication* repl = get_replication();
-        bool recurse = false;
-        CascadeState cascade_state(CascadeState::Mode::Strong);
-        if (repl) {
+        if (Replication* repl = get_replication()) {
             repl->dictionary_clear(*this);
         }
-        for (auto&& elem : *this) {
-            if (clear_backlink(elem.second, cascade_state))
-                recurse = true;
-        }
+        CascadeState cascade_state(CascadeState::Mode::Strong);
+        bool recurse = remove_backlinks(cascade_state);
+
         // Just destroy the whole cluster
         m_dictionary_top->destroy_deep();
         m_dictionary_top.reset();
@@ -958,16 +947,8 @@ Mixed Dictionary::do_get(size_t ndx) const
 
 void Dictionary::do_erase(size_t ndx, Mixed key)
 {
-    auto old_value = m_values->get(ndx);
     CascadeState cascade_state(CascadeState::Mode::Strong);
-    bool recurse = clear_backlink(old_value, cascade_state);
-
-    if (old_value.is_type(type_List)) {
-        get_list(key.get_string())->remove_backlinks(cascade_state);
-    }
-    else if (old_value.is_type(type_Dictionary)) {
-        get_dictionary(key.get_string())->remove_backlinks(cascade_state);
-    }
+    bool recurse = clear_backlink(ndx, cascade_state);
 
     if (recurse)
         _impl::TableFriend::remove_recursive(*get_table_unchecked(), cascade_state); // Throws
@@ -1002,10 +983,19 @@ std::pair<Mixed, Mixed> Dictionary::do_get_pair(size_t ndx) const
     return {do_get_key(ndx), do_get(ndx)};
 }
 
-bool Dictionary::clear_backlink(Mixed value, CascadeState& state) const
+bool Dictionary::clear_backlink(size_t ndx, CascadeState& state) const
 {
+    auto value = m_values->get(ndx);
     if (value.is_type(type_TypedLink)) {
         return Base::remove_backlink(m_col_key, value.get_link(), state);
+    }
+    if (value.is_type(type_Dictionary)) {
+        auto key = do_get_key(ndx);
+        return get_dictionary(key.get_string())->remove_backlinks(state);
+    }
+    if (value.is_type(type_List)) {
+        auto key = do_get_key(ndx);
+        return get_list(key.get_string())->remove_backlinks(state);
     }
     return false;
 }
