@@ -1,7 +1,6 @@
-# NEXT RELEASE
+# 13.23.0 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Allow collections of non-embedded links in asymmetric objects. ([PR #7003](https://github.com/realm/realm-core/pull/7003))
 * Flexible sync API improvements:
   - Erase Subscriptions by class type for C API. 
@@ -12,7 +11,6 @@
 * Filtering by user-defined functions (PR [#7020](https://github.com/realm/realm-core/pull/7020))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed an issue where Android.bp builds would fail with SSL certificat validation errors because we didn't include the trusted CA roots bundle. 
 
 ### Breaking changes
