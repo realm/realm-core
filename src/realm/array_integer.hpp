@@ -58,19 +58,6 @@ public:
     }
     Mixed get_any(size_t ndx) const override;
 
-    // TODO: All these interface must return to the base class, where the encoding algorithm must run
-    int64_t get(size_t ndx) const noexcept;
-    void set(size_t ndx, int64_t value);
-    void insert(size_t ndx, int_fast64_t value);
-    void add(int_fast64_t value);
-    void move(Array& dst, size_t ndx);
-    size_t size() const noexcept;
-    bool is_empty() const noexcept;
-    void set_type(Type type);
-    void truncate(size_t new_size);
-    void truncate_and_destroy_children(size_t new_size);
-    void destory();
-
     bool is_null(size_t) const
     {
         return false;

@@ -216,6 +216,13 @@ public:
         update_width_cache_from_header();
     }
 
+    size_t size() const noexcept;
+
+    bool is_empty() const noexcept
+    {
+        return size() == 0;
+    }
+
     /// Remove the element at the specified index, and move elements at higher
     /// indexes to the next lower index.
     ///
@@ -539,7 +546,6 @@ protected:
     bool m_context_flag;         // Meaning depends on context.
 
     ArrayEncode* m_encode_array = nullptr; // encode array for encoding and decoding array.
-
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
     ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified) const;
@@ -550,8 +556,8 @@ private:
 
     // encode/decode this array if m_encode_array is set (essentially if there is an enconding/decondig algo
     // associated)
-    bool encode_array();
-    bool decode_array();
+    bool encode_array() const;
+    bool decode_array() const;
     bool is_encoded() const;
 
     friend class Allocator;
@@ -722,11 +728,14 @@ int64_t Array::get_universal(const char* data, size_t ndx) const
 template <size_t w>
 int64_t Array::get(size_t ndx) const noexcept
 {
+    decode_array();
+    REALM_ASSERT_DEBUG(is_attached());
     return get_universal<w>(m_data, ndx);
 }
 
 inline int64_t Array::get(size_t ndx) const noexcept
 {
+    decode_array();
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
     return (this->*m_getter)(ndx);
@@ -760,6 +769,7 @@ inline int64_t Array::back() const noexcept
 
 inline ref_type Array::get_as_ref(size_t ndx) const noexcept
 {
+    decode_array();
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG_EX(m_has_refs, m_ref, ndx, m_size);
     int64_t v = get(ndx);

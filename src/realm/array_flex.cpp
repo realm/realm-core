@@ -64,16 +64,23 @@ bool ArrayFlex::decode()
         const auto data = (uint64_t*)NodeHeader::get_data_from_header(m_encoded_array.get_addr());
         const auto offset = value_size * value_width;
         // re-insert elememnt
+        std::vector<uint64_t> origin_vector;
+        origin_vector.reserve(index_size);
         bf_iterator index_iterator{data, offset, index_width, index_width, 0};
         for (size_t i = 0; i < index_size; ++i) {
             const auto index = (int)index_iterator.get_value();
             const auto value = read_bitfield(data, index * value_width, value_width);
-            m_array.insert(i, value);
+            // avoid to call Array::insert that calls decode.
+            origin_vector.push_back(value);
             ++index_iterator;
         }
         // free encoded array
         m_array.get_alloc().free_(m_encoded_array);
         m_encoded_array.set_addr(nullptr);
+
+        for (auto value : origin_vector)
+            m_array.add(value);
+
         return true;
     }
     return false;
@@ -160,7 +167,7 @@ bool ArrayFlex::try_encode(std::vector<int64_t>& values, std::vector<size_t>& in
     // constantly equal to 8 bytes.
     if (compressed_size < uncompressed_size) {
         // allocate new space for the encoded array
-        const size_t size = Array::header_size + (values.size() * value_bit_width + indices.size() * index_bit_width);
+        const size_t size = Array::header_size + compressed_size;
         m_encoded_array = Array::create_array(Array::Type::type_Normal, false, size, 0, m_array.get_alloc());
         auto addr = (uint64_t*)m_encoded_array.get_addr();
         using Encoding = NodeHeader::Encoding;

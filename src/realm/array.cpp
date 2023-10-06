@@ -235,6 +235,7 @@ size_t Array::bit_width(int64_t v)
 
 void Array::init_from_mem(MemRef mem) noexcept
 {
+    // TODO. here we need to recreate the encoded array if we read so from disk.
     char* header = Node::init_from_mem(mem);
     // Parse header
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
@@ -245,8 +246,8 @@ void Array::init_from_mem(MemRef mem) noexcept
 
 void Array::update_from_parent() noexcept
 {
-    // TODO: this is going to crash in case the array is in compressed form... FIX this
-    REALM_ASSERT_DEBUG(is_attached());
+    // checking the parent should have nothhing to do with m_data, decoding while updating the parent may be needed if
+    // I am wrong. REALM_ASSERT_DEBUG(is_attached());
     ArrayParent* parent = get_parent();
     REALM_ASSERT_DEBUG(parent);
     ref_type new_ref = get_ref_from_parent();
@@ -255,7 +256,8 @@ void Array::update_from_parent() noexcept
 
 void Array::set_type(Type type)
 {
-    // TODO: fix this, this is going to crash if array is in compressed format.
+    decode_array();
+
     REALM_ASSERT(is_attached());
 
     copy_on_write(); // Throws
@@ -283,6 +285,8 @@ void Array::set_type(Type type)
 
 void Array::destroy_children(size_t offset) noexcept
 {
+    decode_array();
+
     for (size_t i = offset; i != m_size; ++i) {
         int64_t value = get(i);
 
@@ -304,6 +308,8 @@ void Array::destroy_children(size_t offset) noexcept
 
 ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 {
+    // here we might want to compress the array and write down.
+
     // Write flat array
     const char* header = get_header_from_data(m_data);
     size_t byte_size = get_byte_size();
@@ -316,6 +322,9 @@ ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 
 ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified) const
 {
+    // This is recursively expanding each array and writing it down to disk...
+    // We need to verify if for encoded arrays we need to do anything special.
+
     // Temp array for updated refs
     Array new_array(Allocator::get_default());
     Type type = m_is_inner_bptree_node ? type_InnerBptreeNode : type_HasRefs;
@@ -347,6 +356,8 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
     REALM_ASSERT_3(end - begin, <=, m_size - dest_begin);
     REALM_ASSERT(!(dest_begin >= begin && dest_begin < end)); // Required by std::copy
 
+    decode_array();
+
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
@@ -374,6 +385,8 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
 
 void Array::move(Array& dst, size_t ndx)
 {
+    decode_array();
+
     size_t dest_begin = dst.m_size;
     size_t nb_to_move = m_size - ndx;
     dst.copy_on_write();
@@ -395,6 +408,8 @@ void Array::move(Array& dst, size_t ndx)
 
 void Array::set(size_t ndx, int64_t value)
 {
+    decode_array();
+
     REALM_ASSERT_3(ndx, <, m_size);
     if ((this->*(m_vtable->getter))(ndx) == value)
         return;
@@ -454,6 +469,8 @@ void Array::insert(size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_DEBUG(ndx <= m_size);
 
+    decode_array();
+
     const auto old_width = m_width;
     const auto old_size = m_size;
     const Getter old_getter = m_getter; // Save old getter before potential width expansion
@@ -504,6 +521,8 @@ void Array::insert(size_t ndx, int_fast64_t value)
 
 void Array::truncate(size_t new_size)
 {
+    decode_array();
+
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(new_size, <=, m_size);
 
@@ -528,6 +547,8 @@ void Array::truncate(size_t new_size)
 
 void Array::truncate_and_destroy_children(size_t new_size)
 {
+    decode_array();
+
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(new_size, <=, m_size);
 
@@ -575,17 +596,24 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
     }
 }
 
-bool Array::encode_array()
+size_t Array::size() const noexcept
 {
-    return m_encode_array ? m_encode_array->encode() : false;
+    if (is_encoded())
+        return m_encode_array->size();
+    return Node::size();
 }
 
-bool Array::decode_array()
+inline bool Array::encode_array() const
 {
-    return m_encode_array ? m_encode_array->decode() : false;
+    return !Array::is_encoded() ? m_encode_array->encode() : false;
 }
 
-bool Array::is_encoded() const
+inline bool Array::decode_array() const
+{
+    return Array::is_encoded() ? m_encode_array->decode() : false;
+}
+
+inline bool Array::is_encoded() const
 {
     return m_encode_array ? m_encode_array->is_encoded() : false;
 }
