@@ -459,10 +459,6 @@ ColKey Table::add_column_list(Table& target, StringData name)
     Group* target_group = target.get_parent_group();
     REALM_ASSERT_RELEASE(origin_group && target_group);
     REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Only links to embedded objects are allowed.
-    if (is_asymmetric() && !target.is_embedded()) {
-        throw IllegalOperation("List of objects not supported in asymmetric table");
-    }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
         throw IllegalOperation("List of ephemeral objects not supported");
@@ -486,10 +482,6 @@ ColKey Table::add_column_set(Table& target, StringData name)
     REALM_ASSERT_RELEASE(origin_group == target_group);
     if (target.is_embedded())
         throw IllegalOperation("Set of embedded objects not supported");
-    // Outgoing links from an asymmetric table are not allowed.
-    if (is_asymmetric()) {
-        throw IllegalOperation("Set of objects not supported in asymmetric table");
-    }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
         throw IllegalOperation("Set of ephemeral objects not supported");
@@ -533,10 +525,6 @@ ColKey Table::add_column_dictionary(Table& target, StringData name, DataType key
     Group* target_group = target.get_parent_group();
     REALM_ASSERT_RELEASE(origin_group && target_group);
     REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Only links to embedded objects are allowed.
-    if (is_asymmetric() && !target.is_embedded()) {
-        throw IllegalOperation("Dictionary of objects not supported in asymmetric table");
-    }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
         throw IllegalOperation("Dictionary of ephemeral objects not supported");
@@ -2171,8 +2159,6 @@ void Table::ensure_graveyard()
 
 void Table::batch_erase_rows(const KeyColumn& keys)
 {
-    Group* g = get_parent_group();
-
     size_t num_objs = keys.size();
     std::vector<ObjKey> vec;
     vec.reserve(num_objs);
@@ -2182,12 +2168,20 @@ void Table::batch_erase_rows(const KeyColumn& keys)
             vec.push_back(key);
         }
     }
+
     sort(vec.begin(), vec.end());
     vec.erase(unique(vec.begin(), vec.end()), vec.end());
 
+    batch_erase_objects(vec);
+}
+
+void Table::batch_erase_objects(std::vector<ObjKey>& keys)
+{
+    Group* g = get_parent_group();
+
     if (has_any_embedded_objects() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::Strong, g);
-        std::for_each(vec.begin(), vec.end(), [this, &state](ObjKey k) {
+        std::for_each(keys.begin(), keys.end(), [this, &state](ObjKey k) {
             state.m_to_be_deleted.emplace_back(m_key, k);
         });
         nullify_links(state);
@@ -2195,15 +2189,15 @@ void Table::batch_erase_rows(const KeyColumn& keys)
     }
     else {
         CascadeState state(CascadeState::Mode::None, g);
-        for (auto k : vec) {
+        for (auto k : keys) {
             if (g) {
                 m_clusters.nullify_links(k, state);
             }
             m_clusters.erase(k, state);
         }
     }
+    keys.clear();
 }
-
 
 void Table::clear()
 {

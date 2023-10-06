@@ -514,7 +514,7 @@ bool TestList::run(Config config)
 
     std::shared_ptr<util::Logger> shared_logger;
     if (config.logger) {
-        shared_logger = std::make_shared<util::ThreadSafeLogger>(config.logger);
+        shared_logger = config.logger;
     }
     else {
         if (config.log_timestamps) {
@@ -524,7 +524,7 @@ bool TestList::run(Config config)
             shared_logger = std::make_shared<util::TimestampStderrLogger>(std::move(config)); // Throws
         }
         else {
-            shared_logger = std::make_shared<util::StderrLogger>(); // Throws
+            shared_logger = util::Logger::get_default_logger(); // Throws
         }
     }
 

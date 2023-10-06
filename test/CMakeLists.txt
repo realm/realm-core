@@ -247,7 +247,8 @@ if(REALM_ENABLE_SYNC)
     set_target_properties(SyncTests PROPERTIES OUTPUT_NAME "realm-sync-tests")
     set_target_resources(SyncTests "${TEST_RESOURCES}")
     enable_stdfilesystem(SyncTests)
-    target_link_libraries(SyncTests Sync SyncServer TestUtil)
+    # Sync lib is included with SyncServer
+    target_link_libraries(SyncTests TestUtil SyncServer)
     add_bundled_test(SyncTests)
 
     if(UNIX AND NOT APPLE)

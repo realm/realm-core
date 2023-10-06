@@ -147,6 +147,38 @@ namespace realm {
 // However, these are problems that you should expect, since the activity is spread over multiple
 // transactions.
 
+class KeyValues : public std::vector<ObjKey> {
+public:
+    KeyValues() = default;
+    void create()
+    {
+        m_attached = true;
+    }
+    bool is_attached() const
+    {
+        return m_attached;
+    }
+    void add(ObjKey k)
+    {
+        push_back(k);
+    }
+    ObjKey get(size_t n) const
+    {
+        return operator[](n);
+    }
+    size_t find_first(ObjKey k) const
+    {
+        auto it = std::find(begin(), end(), k);
+        if (it != end()) {
+            return it - begin();
+        }
+        return realm::not_found;
+    }
+
+private:
+    bool m_attached = false;
+};
+
 class TableView : public ObjList {
 public:
     /// Construct null view (no memory allocated).
@@ -330,13 +362,6 @@ public:
     // Sort m_key_values according to multiple columns
     void sort(SortDescriptor order);
 
-    // Get the number of total results which have been filtered out because a number of "LIMIT" operations have
-    // been applied. This number only applies to the last sync.
-    size_t get_num_results_excluded_by_limit() const noexcept
-    {
-        return m_limit_count;
-    }
-
     // Remove rows that are duplicated with respect to the column set passed as argument.
     // distinct() will preserve the original order of the row pointers, also if the order is a result of sort()
     // If two rows are identical (for the given set of distinct-columns), then the last row is removed.
@@ -345,6 +370,7 @@ public:
     void distinct(ColKey column);
     void distinct(DistinctDescriptor columns);
     void limit(LimitDescriptor limit);
+    void filter(FilterDescriptor filter);
 
     // Replace the order of sort and distinct operations, bypassing manually
     // calling sort and distinct. This is a convenience method for bindings.
@@ -375,7 +401,7 @@ protected:
     void get_dependencies(TableVersions&) const final;
 
     void do_sync();
-    void do_sort(const DescriptorOrdering&);
+    void apply_descriptors(const DescriptorOrdering&);
 
     mutable ConstTableRef m_table;
     // The source column index that this view contain backlinks for.
@@ -388,30 +414,11 @@ protected:
 
     // Stores the ordering criteria of applied sort and distinct operations.
     DescriptorOrdering m_descriptor_ordering;
-    size_t m_limit_count = 0;
 
     // A valid query holds a reference to its table which must match our m_table.
     std::optional<Query> m_query;
     // parameters for findall, needed to rerun the query
     size_t m_limit = size_t(-1);
-
-    // FIXME: This class should eventually be replaced by std::vector<ObjKey>
-    // It implements a vector of ObjKey, where the elements are held in the
-    // heap (default allocator is the only option)
-    class KeyValues : public KeyColumn {
-    public:
-        KeyValues()
-            : KeyColumn(Allocator::get_default())
-        {
-        }
-        KeyValues(const KeyValues&) = delete;
-        ~KeyValues()
-        {
-            destroy();
-        }
-        void move_from(KeyValues&);
-        void copy_from(const KeyValues&);
-    };
 
     mutable TableVersions m_last_seen_versions;
     KeyValues m_key_values;
@@ -485,9 +492,8 @@ inline TableView::TableView(const TableView& tv)
     , m_query(tv.m_query)
     , m_limit(tv.m_limit)
     , m_last_seen_versions(tv.m_last_seen_versions)
+    , m_key_values(tv.m_key_values)
 {
-    m_key_values.copy_from(tv.m_key_values);
-    m_limit_count = tv.m_limit_count;
 }
 
 inline TableView::TableView(TableView&& tv) noexcept
@@ -501,20 +507,18 @@ inline TableView::TableView(TableView&& tv) noexcept
     // if we are created from a table view which is outdated, take care to use the outdated
     // version number so that we can later trigger a sync if needed.
     , m_last_seen_versions(std::move(tv.m_last_seen_versions))
+    , m_key_values(std::move(tv.m_key_values))
 {
-    m_key_values.move_from(tv.m_key_values);
-    m_limit_count = tv.m_limit_count;
 }
 
 inline TableView& TableView::operator=(TableView&& tv) noexcept
 {
     m_table = std::move(tv.m_table);
 
-    m_key_values.move_from(tv.m_key_values);
+    m_key_values = std::move(tv.m_key_values);
     m_query = std::move(tv.m_query);
     m_last_seen_versions = tv.m_last_seen_versions;
     m_limit = tv.m_limit;
-    m_limit_count = tv.m_limit_count;
     m_source_column_key = tv.m_source_column_key;
     m_linked_obj = tv.m_linked_obj;
     m_collection_source = std::move(tv.m_collection_source);
@@ -528,12 +532,11 @@ inline TableView& TableView::operator=(const TableView& tv)
     if (this == &tv)
         return *this;
 
-    m_key_values.copy_from(tv.m_key_values);
+    m_key_values = tv.m_key_values;
 
     m_query = tv.m_query;
     m_last_seen_versions = tv.m_last_seen_versions;
     m_limit = tv.m_limit;
-    m_limit_count = tv.m_limit_count;
     m_source_column_key = tv.m_source_column_key;
     m_linked_obj = tv.m_linked_obj;
     m_collection_source = tv.m_collection_source ? tv.m_collection_source->clone_obj_list() : LinkCollectionPtr{};
