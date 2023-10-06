@@ -203,6 +203,7 @@ public:
     }
 
     void migrate();
+    void migration_resort();
 
 private:
     // Friend because it needs access to `m_tree` in the implementation of
@@ -261,6 +262,7 @@ private:
     void do_insert(size_t ndx, T value);
     void do_erase(size_t ndx);
     void do_clear();
+    void do_resort(size_t from, size_t to);
 
     iterator find_impl(const T& value) const;
 
@@ -472,6 +474,12 @@ template <>
 void Set<Mixed>::do_clear();
 template <>
 void Set<Mixed>::migrate();
+template <>
+void Set<Mixed>::migration_resort();
+template <>
+void Set<StringData>::migration_resort();
+template <>
+void Set<BinaryData>::migration_resort();
 
 /// Compare set elements.
 ///

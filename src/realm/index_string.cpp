@@ -104,7 +104,8 @@ int64_t IndexArray::from_list<index_FindFirst>(const Mixed& value, InternalFindR
     SortedListComparator slc(column);
 
     IntegerColumn::const_iterator it_end = key_values.cend();
-    IntegerColumn::const_iterator lower = std::lower_bound(key_values.cbegin(), it_end, value, slc);
+    IntegerColumn::const_iterator lower = slc.find_start_of_unsorted(value, key_values);
+
     if (lower == it_end)
         return null_key.value;
 
@@ -124,7 +125,7 @@ int64_t IndexArray::from_list<index_Count>(const Mixed& value, InternalFindResul
     SortedListComparator slc(column);
 
     IntegerColumn::const_iterator it_end = key_values.cend();
-    IntegerColumn::const_iterator lower = std::lower_bound(key_values.cbegin(), it_end, value, slc);
+    IntegerColumn::const_iterator lower = slc.find_start_of_unsorted(value, key_values);
     if (lower == it_end)
         return 0;
 
@@ -134,7 +135,7 @@ int64_t IndexArray::from_list<index_Count>(const Mixed& value, InternalFindResul
     if (actual != value)
         return 0;
 
-    IntegerColumn::const_iterator upper = std::upper_bound(lower, it_end, value, slc);
+    IntegerColumn::const_iterator upper = slc.find_end_of_unsorted(value, key_values, lower);
     int64_t cnt = upper - lower;
 
     return cnt;
@@ -147,7 +148,8 @@ int64_t IndexArray::from_list<index_FindAll_nocopy>(const Mixed& value, Internal
 {
     SortedListComparator slc(column);
     IntegerColumn::const_iterator it_end = key_values.cend();
-    IntegerColumn::const_iterator lower = std::lower_bound(key_values.cbegin(), it_end, value, slc);
+    IntegerColumn::const_iterator lower = slc.find_start_of_unsorted(value, key_values);
+
     if (lower == it_end)
         return size_t(FindRes_not_found);
 
@@ -179,7 +181,7 @@ int64_t IndexArray::from_list<index_FindAll_nocopy>(const Mixed& value, Internal
     // Last result is not equal, find the upper bound of the range of results.
     // Note that we are passing upper which is cend() - 1 here as we already
     // checked the last item manually.
-    upper = std::upper_bound(lower, upper, value, slc);
+    upper = slc.find_end_of_unsorted(value, key_values, lower);
 
     result_ref.payload = from_ref(key_values.get_ref());
     result_ref.start_ndx = lower.get_position();
@@ -339,7 +341,7 @@ void IndexArray::from_list_all(const Mixed& value, std::vector<ObjKey>& result, 
     SortedListComparator slc(column);
 
     IntegerColumn::const_iterator it_end = rows.cend();
-    IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
+    IntegerColumn::const_iterator lower = slc.find_start_of_unsorted(value, rows);
     if (lower == it_end)
         return;
 
@@ -349,7 +351,7 @@ void IndexArray::from_list_all(const Mixed& value, std::vector<ObjKey>& result, 
     if (a != value)
         return;
 
-    IntegerColumn::const_iterator upper = std::upper_bound(lower, it_end, value, slc);
+    IntegerColumn::const_iterator upper = slc.find_end_of_unsorted(value, rows, lower);
 
     // Copy all matches into result column
     size_t sz = result.size() + (upper - lower);
@@ -802,7 +804,7 @@ void StringIndex::insert_to_existing_list_at_lower(ObjKey key, Mixed value, Inte
     // At this point there exists duplicates of this value, we need to
     // insert value beside it's duplicates so that rows are also sorted
     // in ascending order.
-    IntegerColumn::const_iterator upper = std::upper_bound(lower, list.cend(), value, slc);
+    IntegerColumn::const_iterator upper = slc.find_end_of_unsorted(value, list, lower);
     // find insert position (the list has to be kept in sorted order)
     // In most cases the refs will be added to the end. So we test for that
     // first to see if we can avoid the binary search for insert position
@@ -812,6 +814,7 @@ void StringIndex::insert_to_existing_list_at_lower(ObjKey key, Mixed value, Inte
         list.insert(upper.get_position(), key.value);
     }
     else {
+        // insert into the group of duplicates, keeping object keys sorted
         IntegerColumn::const_iterator inner_lower = std::lower_bound(lower, upper, key.value);
         list.insert(inner_lower.get_position(), key.value);
     }
@@ -821,7 +824,7 @@ void StringIndex::insert_to_existing_list(ObjKey key, Mixed value, IntegerColumn
 {
     SortedListComparator slc(m_target_column);
     IntegerColumn::const_iterator it_end = list.cend();
-    IntegerColumn::const_iterator lower = std::lower_bound(list.cbegin(), it_end, value, slc);
+    IntegerColumn::const_iterator lower = slc.find_start_of_unsorted(value, list);
 
     if (lower == it_end) {
         // Not found and everything is less, just append it to the end.
@@ -1176,7 +1179,7 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
             if (index_data == index_data_2 || suboffset > s_max_offset) {
                 // These strings have the same prefix up to this point but we
                 // don't want to recurse further, create a list in sorted order.
-                bool row_ndx_first = value.compare_signed(v2) < 0;
+                bool row_ndx_first = value < v2;
                 Array row_list(alloc);
                 row_list.create(Array::type_Normal); // Throws
                 row_list.add(row_ndx_first ? obj_key.value : obj_key2.value);
@@ -1213,7 +1216,7 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
                 return reconstruct_string(offset, key, index_data) == value.get_string();
             }
             SortedListComparator slc(m_target_column);
-            lower = std::lower_bound(sub.cbegin(), it_end, value, slc);
+            lower = slc.find_start_of_unsorted(value, sub);
 
             if (lower != it_end) {
                 Mixed lower_value = get(ObjKey(*lower));
@@ -1623,7 +1626,7 @@ bool has_duplicate_values(const Array& node, const ClusterColumn& target_col) no
             SortedListComparator slc(target_col);
             while (it != it_end) {
                 Mixed it_data = target_col.get_value(ObjKey(*it));
-                IntegerColumn::const_iterator next = std::upper_bound(it, it_end, it_data, slc);
+                IntegerColumn::const_iterator next = slc.find_end_of_unsorted(it_data, sub, it);
                 size_t count_of_value = next - it; // row index subtraction in `sub`
                 if (count_of_value > 1) {
                     return true;
@@ -1753,36 +1756,90 @@ void StringIndex::node_add_key(ref_type ref)
     m_array->add(ref);
 }
 
-// Must return true if value of object(key) is less than needle.
-bool SortedListComparator::operator()(int64_t key_value, Mixed needle) // used in lower_bound
+// Must return true if value of object(key) is less than 'b'.
+bool SortedListComparator::operator()(int64_t key_value, const Mixed& b) // used in lower_bound
 {
     Mixed a = m_column.get_value(ObjKey(key_value));
-    if (a.is_null() && !needle.is_null())
+    if (a.is_null() && !b.is_null())
         return true;
-    else if (needle.is_null() && !a.is_null())
+    else if (b.is_null() && !a.is_null())
         return false;
-    else if (a.is_null() && needle.is_null())
+    else if (a.is_null() && b.is_null())
         return false;
-
-    if (a == needle)
-        return false;
-
-    // The Mixed::operator< uses a lexicograpical comparison, therefore we
-    // cannot use our utf8_compare here because we need to be consistent with
-    // using the same compare method as how these strings were they were put
-    // into this ordered column in the first place.
-    return a.compare_signed(needle) < 0;
+    return a.compare(b) < 0;
 }
 
 
-// Must return true if value of needle is less than value of object(key).
-bool SortedListComparator::operator()(Mixed needle, int64_t key_value) // used in upper_bound
+// Must return true if value of 'a' is less than value of object(key).
+bool SortedListComparator::operator()(const Mixed& a, int64_t key_value) // used in upper_bound
 {
-    Mixed a = m_column.get_value(ObjKey(key_value));
-    if (needle == a) {
+    Mixed b = m_column.get_value(ObjKey(key_value));
+    if (a.is_null() && !b.is_null())
+        return true;
+    else if (b.is_null() && !a.is_null())
         return false;
+    else if (a.is_null() && b.is_null())
+        return false;
+    return a.compare(b) < 0;
+}
+
+// TODO: the next time the StringIndex is migrated (post version 23) and sorted
+// properly in these lists replace this method with
+// std::lower_bound(key_values.cbegin(), it_end, value, slc);
+IntegerColumn::const_iterator SortedListComparator::find_start_of_unsorted(const Mixed& value,
+                                                                           const IntegerColumn& key_values) const
+{
+    if (key_values.size() >= 2) {
+        Mixed first = m_column.get_value(ObjKey(key_values.get(0)));
+        Mixed last = m_column.get_value(ObjKey(key_values.get(key_values.size() - 1)));
+        if (first == last) {
+            if (value.compare(first) <= 0) {
+                return key_values.cbegin();
+            }
+            else {
+                return key_values.cend();
+            }
+        }
     }
-    return !(*this)(key_value, needle);
+
+    IntegerColumn::const_iterator it = key_values.cbegin();
+    IntegerColumn::const_iterator end = key_values.cend();
+    IntegerColumn::const_iterator first_greater = end;
+    while (it != end) {
+        Mixed val_it = m_column.get_value(ObjKey(*it));
+        int cmp = val_it.compare(value);
+        if (cmp == 0) {
+            return it;
+        }
+        if (cmp > 0 && first_greater == end) {
+            first_greater = it;
+        }
+        ++it;
+    }
+    return first_greater;
+}
+
+// TODO: same as above, change to std::upper_bound(lower, it_end, value, slc);
+IntegerColumn::const_iterator SortedListComparator::find_end_of_unsorted(const Mixed& value,
+                                                                         const IntegerColumn& key_values,
+                                                                         IntegerColumn::const_iterator begin) const
+{
+    IntegerColumn::const_iterator end = key_values.cend();
+    if (begin != end && end - begin > 0) {
+        // optimization: check the last element first
+        Mixed last = m_column.get_value(ObjKey(*(key_values.cend() - 1)));
+        if (last == value) {
+            return key_values.cend();
+        }
+    }
+    while (begin != end) {
+        Mixed val_it = m_column.get_value(ObjKey(*begin));
+        if (value.compare(val_it) != 0) {
+            return begin;
+        }
+        ++begin;
+    }
+    return end;
 }
 
 // LCOV_EXCL_START ignore debug functions
@@ -1841,7 +1898,7 @@ void StringIndex::verify() const
                     while (it != it_end) {
                         Mixed it_data = get(ObjKey(*it));
                         size_t it_row = to_size_t(*it);
-                        REALM_ASSERT(previous.compare_signed(it_data) <= 0);
+                        REALM_ASSERT(previous <= it_data);
                         if (it != sub.cbegin() && previous == it_data) {
                             REALM_ASSERT_EX(it_row > last_row, it_row, last_row);
                         }

@@ -23,6 +23,7 @@
 #include <realm/dictionary.hpp>
 #include <realm/table_view.hpp>
 #include <realm/group_writer.hpp>
+
 namespace {
 
 using namespace realm;
@@ -560,6 +561,15 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         for (auto k : table_keys) {
             auto t = get_table(k);
             t->migrate_sets_and_dictionaries();
+        }
+    }
+    if (current_file_format_version < 24) {
+        for (auto k : table_keys) {
+            auto t = get_table(k);
+            t->migrate_set_orderings(); // rewrite sets to use the new string/binary order
+            // Although StringIndex sort order has been changed in this format, we choose to
+            // avoid upgrading them because it affects a small niche case. Instead, there is a
+            // workaround in the String Index search code for not relying on items being ordered.
         }
     }
     // NOTE: Additional future upgrade steps go here.
