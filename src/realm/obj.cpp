@@ -211,6 +211,11 @@ bool Obj::compare_values(Mixed val1, Mixed val2, ColKey ck, Obj other, StringDat
                 Lst<Mixed> lst2(other, other.get_column_key(col_name));
                 return compare_list_in_mixed(lst1, lst2, ck, other, col_name);
             }
+            else if(type == type_Set) {
+                Set<Mixed> set1(*this, ck);
+                Set<Mixed> set2(other, other.get_column_key(col_name));
+                return set1 == set2;
+            }
             else if (type == type_Dictionary) {
                 Dictionary dict1(*this, ck);
                 Dictionary dict2(other, other.get_column_key(col_name));
