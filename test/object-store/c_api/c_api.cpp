@@ -6104,14 +6104,21 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
 
     DefaultSocketProvider default_socket_provider(util::Logger::get_default_logger(), "SocketProvider");
 
+    static std::mutex catch_mutex;
+#define LOCKED_REQUIRE(...)                                                                                          \
+    do {                                                                                                             \
+        std::lock_guard lock(catch_mutex);                                                                           \
+        REQUIRE(__VA_ARGS__);                                                                                        \
+    } while (0)
+
     auto free_fn = [](realm_userdata_t user_ptr) {
         auto test_data = static_cast<TestData*>(user_ptr);
-        REQUIRE(test_data);
+        LOCKED_REQUIRE(test_data);
         test_data->free_count++;
     };
     auto post_fn = [](realm_userdata_t userdata, realm_sync_socket_callback_t* callback) {
         auto test_data = static_cast<TestData*>(userdata);
-        REQUIRE(test_data);
+        LOCKED_REQUIRE(test_data);
         auto cb = [callback_copy = callback](Status s) {
             realm_sync_socket_post_complete(callback_copy, static_cast<realm_errno_e>(s.code()), s.reason().c_str());
         };
@@ -6120,13 +6127,13 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
     auto create_timer_fn = [](realm_userdata_t userdata, uint64_t delay_ms,
                               realm_sync_socket_callback_t* callback) -> realm_sync_socket_timer_t {
         auto test_data = static_cast<TestData*>(userdata);
-        REQUIRE(test_data);
+        LOCKED_REQUIRE(test_data);
         return static_cast<realm_sync_socket_timer_t>(new TestSyncTimer(
             *test_data->socket_provider, std::chrono::milliseconds(delay_ms), std::move(**callback)));
     };
     auto cancel_timer_fn = [](realm_userdata_t, realm_sync_socket_timer_t sync_timer) {
         auto timer = static_cast<TestSyncTimer*>(sync_timer);
-        REQUIRE(timer);
+        LOCKED_REQUIRE(timer);
         timer->cancel();
     };
     auto free_timer_fn = [](realm_userdata_t, realm_sync_socket_timer_t sync_timer) {
@@ -6136,14 +6143,14 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
         [](realm_userdata_t userdata, realm_websocket_endpoint_t endpoint,
            realm_websocket_observer_t* realm_websocket_observer) -> realm_sync_socket_websocket_t {
         auto test_data = static_cast<TestData*>(userdata);
-        REQUIRE(test_data);
+        LOCKED_REQUIRE(test_data);
         return static_cast<realm_sync_socket_websocket_t>(
             new TestWebSocket(*test_data->socket_provider, endpoint, realm_websocket_observer));
     };
     auto websocket_async_write_fn = [](realm_userdata_t, realm_sync_socket_websocket_t sync_websocket,
                                        const char* data, size_t size, realm_sync_socket_callback_t* callback) {
         auto websocket = static_cast<TestWebSocket*>(sync_websocket);
-        REQUIRE(websocket);
+        LOCKED_REQUIRE(websocket);
         websocket->async_write_binary(util::Span{data, size}, std::move(**callback));
         realm_release(callback);
     };
@@ -6165,12 +6172,13 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
         SyncTestFile test_config(harness.app()->current_user(), harness.schema(),
                                  realm::SyncConfig::FLXSyncEnabled{});
         auto realm = Realm::get_shared_realm(test_config);
-        REQUIRE(!wait_for_download(*realm));
+        bool wait_success = wait_for_download(*realm);
+        LOCKED_REQUIRE(!wait_success);
 
         realm_release(socket_provider);
     }
 
     default_socket_provider.stop(true);
-    REQUIRE(test_data.free_count == 1);
+    LOCKED_REQUIRE(test_data.free_count == 1);
 }
 #endif // REALM_ENABLE_AUTH_TESTS
