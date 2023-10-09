@@ -4705,7 +4705,7 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 auto n_list = list.get_list(0);
                 n_list.insert(0, Mixed{30});
                 list.insert_collection(1, CollectionType::List);
-                n_list = list.get_list(0);
+                n_list = list.get_list(1);
                 n_list.insert(0, Mixed{31});
             })
             ->make_local_changes([&](SharedRealm local_realm) {
@@ -4729,6 +4729,8 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 List list{remote_realm, obj, col};
                 REQUIRE(list.size() == 2);
                 list.remove(0);
+                auto n_list = list.get_list(0);
+                REQUIRE(n_list.get_any(0).get_int() == 31);
             })
             ->on_post_reset([&](SharedRealm local_realm) {
                 advance_and_notify(*local_realm);
@@ -4739,10 +4741,18 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                 if (test_mode == ClientResyncMode::DiscardLocal) {
                     List list{local_realm, obj, col};
                     REQUIRE(list.size() == 1);
+                    auto n_list = list.get_list(0);
+                    REQUIRE(n_list.get_any(0).get_int() == 31);
                 }
                 else {
                     List list{local_realm, obj, col};
                     REQUIRE(list.size() == 2);
+                    auto n_list1 = list.get_list(0);
+                    auto n_list2 = list.get_list(1);
+                    REQUIRE(n_list1.size() == 1);
+                    REQUIRE(n_list2.size() == 1);
+                    REQUIRE(n_list1.get_any(0).get_int() == 50);
+                    REQUIRE(n_list2.get_any(0).get_int() == 31);
                 }
             })
             ->run();
@@ -4801,6 +4811,9 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
                     auto col = table->get_column_key("any_mixed");
                     List list{local_realm, obj, col};
                     REQUIRE(list.size() == 1);
+                    auto nlist = list.get_list(0);
+                    REQUIRE(nlist.size() == 1);
+                    REQUIRE(nlist.get_any(0).get_int() == 50);
                 }
             })
             ->run();

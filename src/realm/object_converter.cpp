@@ -749,6 +749,4 @@ void InterRealmObjectConverter::copy(const Obj& src, Obj& dst, bool* update_out)
     }
 }
 
-//
-
 } // namespace realm::converters
