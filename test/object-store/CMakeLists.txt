@@ -200,4 +200,7 @@ if(NOT APPLE AND NOT EMSCRIPTEN AND NOT WINDOWS_STORE)
 endif()
 
 add_subdirectory(notifications-fuzzer)
-add_subdirectory(benchmarks)
+
+if(NOT EMSCRIPTEN AND NOT WINDOWS_STORE)
+    add_subdirectory(benchmarks)
+endif()
