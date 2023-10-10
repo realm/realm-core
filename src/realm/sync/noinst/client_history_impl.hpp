@@ -160,7 +160,7 @@ public:
     /// synchronization proper, and it must store the identifier and use it to
     /// reestablish the connection between the client file and the server file
     /// when engaging in future synchronization sessions.
-    void set_client_file_ident(SaltedFileIdent client_file_ident, bool fix_up_object_ids);
+    void set_client_file_ident(SaltedFileIdent client_file_ident);
 
     /// Stores the synchronization progress in the associated Realm file in a
     /// way that makes it available via get_status() during future
@@ -428,7 +428,6 @@ private:
     void do_trim_sync_history(std::size_t n);
     void clamp_sync_version_range(version_type& begin, version_type& end) const noexcept;
     Transformer& get_transformer();
-    void fix_up_client_file_ident_in_stored_changesets(Transaction&, file_ident_type);
     void record_current_schema_version();
     static void record_current_schema_version(Array& schema_versions, version_type snapshot_version);
     void compress_stored_changesets();

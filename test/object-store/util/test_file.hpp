@@ -102,7 +102,7 @@ void on_change_but_no_notify(realm::Realm& realm);
 #if TEST_ENABLE_LOGGING
 #define TEST_LOGGING_LEVEL all
 #else
-#define TEST_LOGGING_LEVEL off
+#define TEST_LOGGING_LEVEL debug
 #endif // TEST_ENABLE_LOGGING
 #endif // TEST_LOGGING_LEVEL
 

@@ -250,7 +250,6 @@ private:
     const bool m_dry_run; // For testing purposes only
     const bool m_enable_default_port_hack;
     const bool m_disable_upload_compaction;
-    const bool m_fix_up_object_ids;
     const std::function<RoundtripTimeHandler> m_roundtrip_time_handler;
     const std::string m_user_agent_string;
     std::shared_ptr<SyncSocketProvider> m_socket_provider;
@@ -1050,8 +1049,6 @@ private:
 
     bool m_is_flx_sync_session = false;
 
-    bool m_fix_up_object_ids = false;
-
     // These are reset when the session is activated, and again whenever the
     // connection is lost or the rebinding process is initiated.
     bool m_enlisted_to_send;
@@ -1464,7 +1461,6 @@ inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, s
     , m_ident{ident}
     , m_try_again_delay_info(conn.get_client().m_reconnect_backoff_info, conn.get_client().get_random())
     , m_is_flx_sync_session(conn.is_flx_sync_connection())
-    , m_fix_up_object_ids(get_client().m_fix_up_object_ids)
     , m_wrapper{wrapper}
 {
     if (get_client().m_disable_upload_activation_delay)
