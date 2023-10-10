@@ -1469,7 +1469,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
 
         validate_sync_error(
             std::move(error_future).get(), invalid_obj, "TopLevel",
-            util::format("write to \"%1\" in table \"TopLevel\" not allowed", invalid_obj.to_string()));
+            util::format("write to ObjectID(\"%1\") in table \"TopLevel\" not allowed", invalid_obj.to_string()));
 
         wait_for_advance(*realm);
 
@@ -1500,7 +1500,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
 
         validate_sync_error(
             std::move(error_future).get(), invalid_obj, "TopLevel",
-            util::format("write to \"%1\" in table \"TopLevel\" not allowed", invalid_obj.to_string()));
+            util::format("write to ObjectID(\"%1\") in table \"TopLevel\" not allowed", invalid_obj.to_string()));
 
         wait_for_advance(*realm);
 
@@ -1575,7 +1575,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             realm->commit_transaction();
 
             validate_sync_error(std::move(error_future).get(), 123456, "Int PK",
-                                "write to \"123456\" in table \"Int PK\" not allowed");
+                                "write to 123456 in table \"Int PK\" not allowed");
         }
 
         SECTION("short string") {
@@ -1613,7 +1613,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             realm->commit_transaction();
 
             validate_sync_error(std::move(error_future).get(), pk, "UUID PK",
-                                util::format("write to \"UUID(%1)\" in table \"UUID PK\" not allowed", pk));
+                                util::format("write to UUID(%1) in table \"UUID PK\" not allowed", pk));
         }
     }
 
@@ -3315,7 +3315,6 @@ TEST_CASE("flx: data ingest - write not allowed", "[sync][flx][data ingest][baas
         Object::create(c, realm, "Asymmetric",
                        std::any(AnyDict{{"_id", ObjectId::gen()}, {"embedded_obj", AnyDict{{"value", "foo"s}}}}));
         realm->commit_transaction();
-        wait_for_upload(*realm);
     }
 
     error_received_pf.future.get();
@@ -3894,7 +3893,8 @@ TEST_CASE("flx: compensating write errors get re-sent across sessions", "[sync][
     REQUIRE(write_info.primary_key.is_type(type_ObjectId));
     REQUIRE(write_info.primary_key.get_object_id() == test_obj_id_2);
     REQUIRE(write_info.object_name == "TopLevel");
-    REQUIRE(write_info.reason == util::format("write to \"%1\" in table \"TopLevel\" not allowed", test_obj_id_2));
+    REQUIRE(write_info.reason ==
+            util::format("write to ObjectID(\"%1\") in table \"TopLevel\" not allowed", test_obj_id_2));
     auto top_level_table = realm->read_group().get_table("class_TopLevel");
     REQUIRE(top_level_table->is_empty());
 }

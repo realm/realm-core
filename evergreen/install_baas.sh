@@ -17,9 +17,9 @@ case $(uname -s) in
     Darwin)
         if [[ "$(uname -m)" == "arm64" ]]; then
             export GOARCH=arm64
-            STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/static.realm.io/stitch-support/stitch-support-macos-arm64-6.1.0-rc3-8-gb6e0525.tgz"
-            STITCH_ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_75b3f1896aaa2e344817795c8bfc5cb6b2f2c310_632211a5d1fe0757f8c416fa_22_09_14_17_38_46/assisted_agg"
-            GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.19.3.darwin-arm64.tar.gz"
+            STITCH_SUPPORT_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-support/macos-arm64/stitch-support-6.1.0-alpha-527-g796351f.tgz"
+            STITCH_ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_1e7861d9b7462f01ea220fad334f10e00f0f3cca_6513254ad6d80abfffa5fbdc_23_09_26_18_39_06/assisted_agg"
+            GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.21.1.darwin-arm64.tar.gz"
             MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-arm64-enterprise-6.0.0-rc13.tgz"
             MONGOSH_DOWNLOAD_URL="https://downloads.mongodb.com/compass/mongosh-1.5.0-darwin-arm64.zip"
 
@@ -34,9 +34,9 @@ case $(uname -s) in
             export GOMAXPROCS
         else
             export GOARCH=amd64
-            STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/static.realm.io/stitch-support/stitch-support-macos-4.4.17-rc1-2-g85de0cc.tgz"
-            STITCH_ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_75b3f1896aaa2e344817795c8bfc5cb6b2f2c310_632211a5d1fe0757f8c416fa_22_09_14_17_38_46/assisted_agg"
-            GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.19.1.darwin-amd64.tar.gz"
+            STITCH_SUPPORT_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-support/macos-arm64/stitch-support-4.4.17-rc1-2-g85de0cc.tgz"
+            STITCH_ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_1e7861d9b7462f01ea220fad334f10e00f0f3cca_6513254ad6d80abfffa5fbdc_23_09_26_18_39_06/assisted_agg"
+            GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.21.1.darwin-amd64.tar.gz"
             MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-x86_64-enterprise-5.0.3.tgz"
         fi
 
@@ -44,11 +44,18 @@ case $(uname -s) in
         JQ_DOWNLOAD_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/jq-1.6-darwin-amd64"
     ;;
     Linux)
-        GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.19.1.linux-amd64.tar.gz"
+        GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.21.1.linux-amd64.tar.gz"
         JQ_DOWNLOAD_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/jq-1.6-linux-amd64"
         NODE_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/node-v14.17.0-linux-x64.tar.gz"
 
-        # Detect what distro/versionf of Linux we are running on to download the right version of MongoDB to download
+        # Only x86_64 Linux machines are supported
+        linux_arch="$(uname -m)"
+        if [[ "${linux_arch}" != "x86_64" ]]; then
+            echo "Error: only x86_64 Linux machines are supported: ${linux_arch}"
+            exit 1
+        fi
+
+        # Detect what distro/version of Linux we are running on to determine the right version of MongoDB to download
         # /etc/os-release covers debian/ubuntu/suse
         if [[ -e /etc/os-release ]]; then
             # Amazon Linux 2 comes back as 'amzn'
@@ -64,33 +71,33 @@ case $(uname -s) in
         case $DISTRO_NAME in
             ubuntu | linuxmint)
                 MONGODB_DOWNLOAD_URL="http://downloads.10gen.com/linux/mongodb-linux-$(uname -m)-enterprise-ubuntu${DISTRO_VERSION_MAJOR}04-5.0.3.tgz"
-                STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_ubuntu2004_x86_64_86b48e3cb2a8d5bbf3d18281c9f42c1835bbb83b_22_11_08_03_08_06/libmongo-ubuntu2004-x86_64.so"
+                STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_ubuntu2004_x86_64_patch_1e7861d9b7462f01ea220fad334f10e00f0f3cca_65135b432fbabe741bd24429_23_09_26_22_29_24/libmongo-ubuntu2004-x86_64.so"
                 STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/static.realm.io/stitch-support/stitch-support-ubuntu2004-4.4.17-rc1-2-g85de0cc.tgz"
             ;;
             rhel)
                 case ${DISTRO_VERSION_MAJOR} in
                     7)
                         MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/linux/mongodb-linux-x86_64-enterprise-rhel70-5.0.3.tgz"
-                        STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_linux_64_86b48e3cb2a8d5bbf3d18281c9f42c1835bbb83b_22_11_08_03_08_06/libmongo.so"
-                        STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/static.realm.io/stitch-support/stitch-support-rhel70-4.4.17-rc1-2-g85de0cc.tgz"
+                        STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_linux_64_patch_1e7861d9b7462f01ea220fad334f10e00f0f3cca_65135b432fbabe741bd24429_23_09_26_22_29_24/libmongo.so"
+                        STITCH_SUPPORT_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-support/linux-x64/stitch-support-4.4.17-rc1-2-g85de0cc.tgz"
                     ;;
                     *)
-                        echo "Unsupported version of RHEL ${DISTRO_VERSION}"
+                        echo "Error: unsupported version of RHEL ${DISTRO_VERSION}"
                         exit 1
                     ;;
                 esac
             ;;
             *)
                 if [[ -z "${MONGODB_DOWNLOAD_URL}" ]]; then
-                    echo "Missing MONGODB_DOWNLOAD_URL env variable to download mongodb from."
+                    echo "Error: missing MONGODB_DOWNLOAD_URL env variable to download mongodb from."
                     exit 1
                 fi
                 if [[ -z "${STITCH_ASSISTED_AGG_LIB_PATH}" ]]; then
-                    echo "Missing STITCH_ASSISTED_AGG_LIB_PATH env variable to find assisted agg libmongo.so"
+                    echo "Error: missing STITCH_ASSISTED_AGG_LIB_PATH env variable to find assisted agg libmongo.so"
                     exit 1
                 fi
                 if [[ -z "${STITCH_SUPPORT_LIB_PATH}" ]]; then
-                    echo "Missing STITCH_SUPPORT_LIB_PATH env variable to find the mongo stitch support library"
+                    echo "Error: missing STITCH_SUPPORT_LIB_PATH env variable to find the mongo stitch support library"
                     exit 1
                 fi
             ;;
@@ -98,15 +105,15 @@ case $(uname -s) in
     ;;
     *)
         if [[ -z "${MONGODB_DOWNLOAD_URL}" ]]; then
-            echo "Missing MONGODB_DOWNLOAD_URL env variable to download mongodb from."
+            echo "Error: missing MONGODB_DOWNLOAD_URL env variable to download mongodb from."
             exit 1
         fi
         if [[ -z "${STITCH_ASSISTED_AGG_LIB_PATH}" ]]; then
-            echo "Missing STITCH_ASSISTED_AGG_LIB_PATH env variable to find assisted agg libmongo.so"
+            echo "Error: missing STITCH_ASSISTED_AGG_LIB_PATH env variable to find assisted agg libmongo.so"
             exit 1
         fi
         if [[ -z "${STITCH_SUPPORT_LIB_PATH}" ]]; then
-            echo "Missing STITCH_SUPPORT_LIB_PATH env variable to find the mongo stitch support library"
+            echo "Error: missing STITCH_SUPPORT_LIB_PATH env variable to find the mongo stitch support library"
             exit 1
         fi
         exit 1
@@ -454,7 +461,7 @@ echo "Adding fake appid to skip baas server drop optimization"
 echo "Starting baas app server"
 
 "${WORK_PATH}/baas_server" \
-    --configFile=etc/configs/test_config.json --configFile="${BASE_PATH}/config_overrides.json" > "${BAAS_SERVER_LOG}" 2>&1 &
+    --configFile=etc/configs/test_config.json --configFile=etc/configs/test_rcore_config.json > "${BAAS_SERVER_LOG}" 2>&1 &
 echo $! > "${BAAS_PID_FILE}"
 
 WAIT_BAAS_OPTS=()
@@ -472,7 +479,7 @@ ${CURL} 'http://localhost:9090/api/admin/v3.0/auth/providers/local-userpass/logi
   --silent \
   --fail \
   --output /dev/null \
-  --data-raw '{"username":"unique_user@domain.com","password":"password"}'
+  --data '{"username":"unique_user@domain.com","password":"password"}'
 
 "${MONGO_BINARIES_DIR}/bin/${MONGOSH}"  --quiet mongodb://localhost:26000/auth "${BASE_PATH}/add_admin_roles.js"
 

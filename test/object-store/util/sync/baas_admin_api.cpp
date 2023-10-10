@@ -84,7 +84,7 @@ public:
     {
     }
 
-    nlohmann::json property_to_jsonschema(const Property& prop, const IncludePropCond& include_prop);
+    nlohmann::json property_to_jsonschema(const Property& prop);
     nlohmann::json object_schema_to_jsonschema(const ObjectSchema& obj_schema, const IncludePropCond& include_prop,
                                                bool clear_path = false);
     nlohmann::json object_schema_to_baas_schema(const ObjectSchema& obj_schema, IncludePropCond include_prop);
@@ -111,7 +111,7 @@ nlohmann::json BaasRuleBuilder::object_schema_to_jsonschema(const ObjectSchema& 
         if (clear_path) {
             m_current_path.clear();
         }
-        properties.emplace(prop.name, property_to_jsonschema(prop, include_prop));
+        properties.emplace(prop.name, property_to_jsonschema(prop));
         if (!is_nullable(prop.type) && !is_collection(prop.type)) {
             required.push_back(prop.name);
         }
@@ -124,7 +124,7 @@ nlohmann::json BaasRuleBuilder::object_schema_to_jsonschema(const ObjectSchema& 
     };
 }
 
-nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop, const IncludePropCond& include_prop)
+nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop)
 {
     nlohmann::json type_output;
 
@@ -192,7 +192,7 @@ nlohmann::json BaasRuleBuilder::object_schema_to_baas_schema(const ObjectSchema&
     auto schema_json = object_schema_to_jsonschema(obj_schema, include_prop, true);
     auto& prop_sub_obj = schema_json["properties"];
     if (!prop_sub_obj.contains(m_partition_key.name) && !m_is_flx_sync) {
-        prop_sub_obj.emplace(m_partition_key.name, property_to_jsonschema(m_partition_key, include_prop));
+        prop_sub_obj.emplace(m_partition_key.name, property_to_jsonschema(m_partition_key));
         if (!is_nullable(m_partition_key.type)) {
             schema_json["required"].push_back(m_partition_key.name);
         }

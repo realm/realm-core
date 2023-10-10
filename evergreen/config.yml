@@ -887,7 +887,7 @@ tasks:
   commands:
   - func: "launch remote baas"
     vars:
-      baas_branch: d51918a5b10d6bbea1df2a5aca493b6c0fb0c7fc
+      baas_branch: 27f42f55a7944ed7d8ba9fad1854a4b22714cb8d
   - func: "compile"
     vars:
       target_to_build: ObjectStoreTests
