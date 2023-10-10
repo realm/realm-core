@@ -547,7 +547,46 @@ bool RecoverLocalChangesetsHandler::resolve_path(ListPath& path, Obj remote_obj,
                 return false;
             }
         }
-        else { // single link to embedded object
+        else if (col.get_type() == col_type_Mixed) {
+            StringData col_name = remote_obj.get_table()->get_column_name(col);
+            auto local_any = local_obj.get_any(col_name);
+            auto remote_any = remote_obj.get_any(col);
+
+            if (local_any.is_type(type_List) && remote_any.is_type(type_List)) {
+                ++it;
+                if (it == path.end()) {
+                    auto local_col = local_obj.get_table()->get_column_key(col_name);
+                    Lst<Mixed> local_list{local_obj, local_col};
+                    Lst<Mixed> remote_list{remote_obj, col};
+                    callback(remote_list, local_list);
+                    return true;
+                }
+                else {
+                    // same as above.
+                    REALM_UNREACHABLE();
+                }
+            }
+            else if (local_any.is_type(type_Dictionary) && remote_any.is_type(type_Dictionary)) {
+                ++it;
+                REALM_ASSERT(it != path.end());
+                REALM_ASSERT(it->type == ListPath::Element::Type::InternKey);
+                StringData col_name = remote_obj.get_table()->get_column_name(col);
+                auto local_col = local_obj.get_table()->get_column_key(col_name);
+                Dictionary remote_dict{remote_obj, col};
+                Dictionary local_dict{local_obj, local_col};
+                StringData dict_key = m_intern_keys.get_key(it->intern_key);
+                if (remote_dict.contains(dict_key) && local_dict.contains(dict_key)) {
+                    remote_obj = remote_dict.get_object(dict_key);
+                    local_obj = local_dict.get_object(dict_key);
+                    ++it;
+                }
+                else {
+                    return false;
+                }
+            }
+        }
+        else {
+            // single link to embedded object
             // Neither embedded object sets nor Mixed(TypedLink) to embedded objects are supported.
             REALM_ASSERT_EX(!col.is_collection(), col);
             REALM_ASSERT_EX(col.get_type() == col_type_Link, col);

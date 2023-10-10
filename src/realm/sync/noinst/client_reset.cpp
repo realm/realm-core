@@ -294,7 +294,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
                 // column preexists in dest, make sure the types match
                 if (col_key.get_type() != col_key_dst.get_type()) {
                     throw ClientResetFailed(util::format(
-                        "Incompatable column type change detected during client reset for '%1.%2' (%3 vs %4)",
+                        "Incompatible column type change detected during client reset for '%1.%2' (%3 vs %4)",
                         table_name, col_name, col_key.get_type(), col_key_dst.get_type()));
                 }
                 ColumnAttrMask src_col_attrs = col_key.get_attrs();

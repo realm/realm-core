@@ -832,43 +832,60 @@ TEST(List_NestedCollection_Links)
     auto list_col = origin->add_column_list(type_Mixed, "any_list");
     auto any_col = origin->add_column(type_Mixed, "any");
 
-    Obj o = origin->create_object();
     Obj target_obj1 = target->create_object();
     Obj target_obj2 = target->create_object();
-
-    Lst<Mixed> list = o.get_list<Mixed>(list_col);
-    list.insert_collection(0, CollectionType::Dictionary);
-    list.insert_collection(1, CollectionType::Dictionary);
-
-    // Create link from a dictionary contained in a list
-    auto dict0 = list.get_dictionary(0);
-    dict0->insert("Key", target_obj2.get_link());
-
-    // Create link from a list contained in a dictionary contained in a list
-    auto dict1 = list.get_dictionary(1);
-    dict1->insert_collection("Hello", CollectionType::List);
-    ListMixedPtr list1 = dict1->get_list("Hello");
-    list1->add(target_obj1.get_link());
-
-    // Create link from a collection nested in a Mixed property
-    o.set_collection(any_col, CollectionType::Dictionary);
-    auto dict_any = o.get_dictionary(any_col);
-    dict_any.insert("Godbye", target_obj1.get_link());
-
-    // Check that backlinks are created
-    CHECK_EQUAL(target_obj1.get_backlink_count(), 2);
-    CHECK_EQUAL(target_obj2.get_backlink_count(), 1);
+    Obj target_obj3 = target->create_object();
     tr->commit_and_continue_as_read();
 
+    Obj o;
+    ListMixedPtr list;
+    ListMixedPtr list1;
+    ListMixedPtr list2;
+    Dictionary dict_any;
+
+    auto create_links = [&]() {
+        tr->promote_to_write();
+        o = origin->create_object();
+        list = o.get_list_ptr<Mixed>(list_col);
+        list->insert_collection(0, CollectionType::Dictionary);
+        list->insert_collection(1, CollectionType::Dictionary);
+
+        // Create link from a dictionary contained in a list
+        auto dict0 = list->get_dictionary(0);
+        dict0->insert("Key", target_obj2.get_link());
+
+        // Create link from a list contained in a dictionary contained in a list
+        auto dict1 = list->get_dictionary(1);
+        dict1->insert_collection("Hello", CollectionType::List);
+        list1 = dict1->get_list("Hello");
+        list1->add(target_obj1.get_link());
+
+        // Create link from a collection nested in a Mixed property
+        o.set_collection(any_col, CollectionType::Dictionary);
+        dict_any = o.get_dictionary(any_col);
+        dict_any.insert("Godbye", target_obj1.get_link());
+
+        // Create link from a list nested in a collection nested in a Mixed property
+        dict_any.insert_collection("List", CollectionType::List);
+        list2 = dict_any.get_list("List");
+        list2->add(target_obj3.get_link());
+        tr->commit_and_continue_as_read();
+        // Check that backlinks are created
+        CHECK_EQUAL(target_obj1.get_backlink_count(), 2);
+        CHECK_EQUAL(target_obj2.get_backlink_count(), 1);
+        CHECK_EQUAL(target_obj3.get_backlink_count(), 1);
+    };
+
+    create_links();
+
+    // When target object is removed, link should be removed from list
     tr->promote_to_write();
     target_obj1.remove();
     tr->commit_and_continue_as_read();
 
-    // When target object is removed, link should be removed from list
     CHECK_EQUAL(list1->size(), 0);
     // and cleared in dictionary
     CHECK_EQUAL(dict_any.get("Godbye"), Mixed());
-
     tr->promote_to_write();
     // Create links again
     target_obj1 = target->create_object();
@@ -877,15 +894,25 @@ TEST(List_NestedCollection_Links)
     CHECK_EQUAL(target_obj1.get_backlink_count(), 2);
 
     // When list is removed, backlink should go
-    list.remove(1);
+    list->remove(1);
     CHECK_EQUAL(target_obj1.get_backlink_count(), 1);
     // This will implicitly delete dict_any
     o.set(any_col, Mixed(5));
     CHECK_EQUAL(target_obj1.get_backlink_count(), 0);
+    CHECK_EQUAL(target_obj3.get_backlink_count(), 0);
     // Link still there
     CHECK_EQUAL(target_obj2.get_backlink_count(), 1);
     o.remove();
     CHECK_EQUAL(target_obj2.get_backlink_count(), 0);
+    tr->commit_and_continue_as_read();
+
+    create_links();
+    // Clearing dictionary should remove links
+    tr->promote_to_write();
+    dict_any.clear();
+    tr->commit_and_continue_as_read();
+    CHECK_EQUAL(target_obj1.get_backlink_count(), 1);
+    CHECK_EQUAL(target_obj3.get_backlink_count(), 0);
 }
 
 TEST(List_NestedCollection_Unresolved)
