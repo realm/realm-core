@@ -4151,6 +4151,10 @@ TEST_CASE("client reset with nested collection", "[client reset][local][nested c
     if (!util::EventLoop::has_implementation())
         return;
 
+    // remove this check once sync is ready
+    if (!realm::sync::SYNC_SUPPORTS_NESTED_COLLECTIONS)
+        return;
+
     TestSyncManager init_sync_manager;
     SyncTestFile config(init_sync_manager.app(), "default");
     config.cache = false;
