@@ -1379,12 +1379,12 @@ bool QueryStateFindFirst::match(size_t index, Mixed) noexcept
 }
 
 template <>
-bool QueryStateFindAll<KeyColumn>::match(size_t index, Mixed) noexcept
+bool QueryStateFindAll<std::vector<ObjKey>>::match(size_t index, Mixed) noexcept
 {
     ++m_match_count;
 
     int64_t key_value = (m_key_values ? m_key_values->get(index) : index) + m_key_offset;
-    m_keys.add(ObjKey(key_value));
+    m_keys.push_back(ObjKey(key_value));
 
     return (m_limit > m_match_count);
 }

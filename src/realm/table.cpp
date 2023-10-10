@@ -429,7 +429,7 @@ ColKey Table::add_column(Table& target, StringData name, std::optional<Collectio
     Group* target_group = target.get_parent_group();
     REALM_ASSERT_RELEASE(origin_group && target_group);
     REALM_ASSERT_RELEASE(origin_group == target_group);
-    // Incoming links from an asymmetric table are not allowed.
+    // Links to an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
         throw IllegalOperation("Ephemeral objects not supported");
     }
@@ -445,6 +445,8 @@ ColKey Table::add_column(Table& target, StringData name, std::optional<Collectio
                 data_type = type_LinkList;
                 break;
             case CollectionType::Set:
+                if (target.is_embedded())
+                    throw IllegalOperation("Set of embedded objects not supported");
                 attr.set(col_attr_Set);
                 break;
             case CollectionType::Dictionary:
@@ -1274,6 +1276,36 @@ void Table::migrate_sets_and_dictionaries()
     }
 }
 
+void Table::migrate_set_orderings()
+{
+    std::vector<ColKey> to_migrate;
+    for (auto col : get_column_keys()) {
+        if (col.is_set() && (col.get_type() == col_type_Mixed || col.get_type() == col_type_String ||
+                             col.get_type() == col_type_Binary)) {
+            to_migrate.push_back(col);
+        }
+    }
+    if (to_migrate.size()) {
+        for (auto obj : *this) {
+            for (auto col : to_migrate) {
+                if (col.get_type() == col_type_Mixed) {
+                    auto set = obj.get_set<Mixed>(col);
+                    set.migration_resort();
+                }
+                else if (col.get_type() == col_type_Binary) {
+                    auto set = obj.get_set<BinaryData>(col);
+                    set.migration_resort();
+                }
+                else {
+                    REALM_ASSERT_3(col.get_type(), ==, col_type_String);
+                    auto set = obj.get_set<String>(col);
+                    set.migration_resort();
+                }
+            }
+        }
+    }
+}
+
 StringData Table::get_name() const noexcept
 {
     const Array& real_top = m_top;
@@ -1410,8 +1442,6 @@ void Table::ensure_graveyard()
 
 void Table::batch_erase_rows(const KeyColumn& keys)
 {
-    Group* g = get_parent_group();
-
     size_t num_objs = keys.size();
     std::vector<ObjKey> vec;
     vec.reserve(num_objs);
@@ -1421,12 +1451,20 @@ void Table::batch_erase_rows(const KeyColumn& keys)
             vec.push_back(key);
         }
     }
+
     sort(vec.begin(), vec.end());
     vec.erase(unique(vec.begin(), vec.end()), vec.end());
 
+    batch_erase_objects(vec);
+}
+
+void Table::batch_erase_objects(std::vector<ObjKey>& keys)
+{
+    Group* g = get_parent_group();
+
     if (has_any_embedded_objects() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::Strong, g);
-        std::for_each(vec.begin(), vec.end(), [this, &state](ObjKey k) {
+        std::for_each(keys.begin(), keys.end(), [this, &state](ObjKey k) {
             state.m_to_be_deleted.emplace_back(m_key, k);
         });
         nullify_links(state);
@@ -1434,15 +1472,15 @@ void Table::batch_erase_rows(const KeyColumn& keys)
     }
     else {
         CascadeState state(CascadeState::Mode::None, g);
-        for (auto k : vec) {
+        for (auto k : keys) {
             if (g) {
                 m_clusters.nullify_links(k, state);
             }
             m_clusters.erase(k, state);
         }
     }
+    keys.clear();
 }
-
 
 void Table::clear()
 {

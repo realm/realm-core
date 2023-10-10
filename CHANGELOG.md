@@ -12,12 +12,14 @@
 * Fixed equality queries on a Mixed property with an index possibly returning the wrong result if values of different types happened to have the same StringIndex hash. ([6407](https://github.com/realm/realm-core/issues/6407) since v11.0.0-beta.5).
 * If you have more than 8388606 links pointing to one specific object, the program will crash. ([#6577](https://github.com/realm/realm-core/issues/6577), since v6.0.0)
 * Query for NULL value in Dictionary<Mixed> would give wrong results ([6748])(https://github.com/realm/realm-core/issues/6748), since v10.0.0)
+* A Realm generated on a non-apple ARM 64 device and copied to another platform (and vice-versa) were non-portable due to a sorting order difference. This impacts strings or binaries that have their first difference at a non-ascii character. These items may not be found in a set, or in an indexed column if the strings had a long common prefix (> 200 characters). ([PR # 6670](https://github.com/realm/realm-core/pull/6670), since 2.0.0-rc7 for indexes, and since since the introduction of sets in v10.2.0)
 
 ### Breaking changes
 * Support for upgrading from Realm files produced by RealmCore v5.23.9 or earlier is no longer supported.
 * Remove `set_string_compare_method`, only one sort method is now supported which was previously called `STRING_COMPARE_CORE`.
 * BinaryData and StringData are now strongly typed for comparisons and queries. This change is especially relevant when querying for a string constant on a Mixed property, as now only strings will be returned. If searching for BinaryData is desired, then that type must be specified by the constant. In RQL the new way to specify a binary constant is to use `mixed = bin('xyz')` or `mixed = binary('xyz')`. ([6407](https://github.com/realm/realm-core/issues/6407)).
 * In the C API, `realm_collection_changes_get_num_changes` and `realm_dictionary_get_changes` have got an extra parameter to receive information on the deletion of the entire collection.
+* Sorting order of strings has changed to use standard unicode codepoint order instead of grouping similar english letters together. A noticeable change will be from "aAbBzZ" to "ABZabz". ([2573](https://github.com/realm/realm-core/issues/2573))
 
 ### Compatibility
 * Fileformat: Generates files with format v24. Reads and automatically upgrade from fileformat v10. If you want to upgrade from an earlier file format version you will have to use RealmCore v13.x.y or earlier.
@@ -26,6 +28,58 @@
 
 ### Internals
 * Refactoring of the StringIndex interface.
+
+----------------------------------------------
+
+# 13.23.0 Release notes
+
+### Enhancements
+* Allow collections of non-embedded links in asymmetric objects. ([PR #7003](https://github.com/realm/realm-core/pull/7003))
+* Flexible sync API improvements:
+  - Erase Subscriptions by class type for C API. 
+  - `MutableSubscriptionSet::erase(iterator)` now runs in constant time.
+  - Introduce `MutableSubscriptionSet::erase_by_id()`.
+  - Introduce `MutableSubscriptionSet::erase_by_class_name()`.
+  ([PR #7008](https://github.com/realm/realm-core/pull/7008))
+* Filtering by user-defined functions (PR [#7020](https://github.com/realm/realm-core/pull/7020))
+
+### Fixed
+* Fixed an issue where Android.bp builds would fail with SSL certificat validation errors because we didn't include the trusted CA roots bundle. 
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Update tests to use global logger. ([PR #6917](https://github.com/realm/realm-core/pull/6917))
+* TableView::get_num_results_excluded_by_limit() has been removed. Hopefully not used by any SDK.
+* bindgen is now part of the release
+
+----------------------------------------------
+
+# 13.22.0 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Fixed issue with double delete when using the CAPI for timers in platform networking ([#6993](https://github.com/realm/realm-core/issues/6993), since v13.3.0).
+* Receiving a write_not_allowed error from the server would have led to a crash. ([#6978](https://github.com/realm/realm-core/issues/6978), since v13.2.0)
+
+### Breaking changes
+* Platform Networking CAPI has been updated to provide separate functions (instead of 1) for executing callback handlers depending on purpose ([PR #6994](https://github.com/realm/realm-core/pull/6994)).
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
 
 ----------------------------------------------
 

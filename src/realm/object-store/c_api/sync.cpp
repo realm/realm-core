@@ -609,13 +609,7 @@ RLM_API bool realm_sync_subscription_set_erase_by_id(realm_flx_sync_mutable_subs
     REALM_ASSERT(subscription_set != nullptr && id != nullptr);
     *erased = false;
     return wrap_err([&] {
-        auto it = std::find_if(subscription_set->begin(), subscription_set->end(), [id](const Subscription& sub) {
-            return from_capi(*id) == sub.id;
-        });
-        if (it != subscription_set->end()) {
-            subscription_set->erase(it);
-            *erased = true;
-        }
+        *erased = subscription_set->erase_by_id(from_capi(*id));
         return true;
     });
 }
@@ -651,6 +645,18 @@ RLM_API bool realm_sync_subscription_set_erase_by_results(realm_flx_sync_mutable
     return wrap_err([&]() {
         auto realm_query = add_ordering_to_realm_query(results->get_query(), results->get_ordering());
         *erased = subscription_set->erase(realm_query);
+        return true;
+    });
+}
+
+RLM_API bool
+realm_sync_subscription_set_erase_by_class_name(realm_flx_sync_mutable_subscription_set_t* subscription_set,
+                                                const char* object_class_name, bool* erased)
+{
+    REALM_ASSERT(subscription_set != nullptr && object_class_name != nullptr);
+    *erased = false;
+    return wrap_err([&]() {
+        *erased = subscription_set->erase_by_class_name(object_class_name);
         return true;
     });
 }

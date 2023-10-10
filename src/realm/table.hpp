@@ -326,7 +326,7 @@ public:
     /// Does the key refer to an object within the table?
     bool is_valid(ObjKey key) const noexcept
     {
-        return m_clusters.is_valid(key);
+        return key && m_clusters.is_valid(key);
     }
     GlobalKey get_object_id(ObjKey key) const;
     Obj get_object(ObjKey key) const
@@ -736,6 +736,7 @@ private:
     TableRef m_own_ref;
 
     void batch_erase_rows(const KeyColumn& keys);
+    void batch_erase_objects(std::vector<ObjKey>& keys);
     size_t do_set_link(ColKey col_key, size_t row_ndx, size_t target_row_ndx);
 
     void populate_search_index(ColKey col_key);
@@ -747,6 +748,7 @@ private:
 
     // Migration support
     void migrate_sets_and_dictionaries();
+    void migrate_set_orderings();
 
     /// Disable copying assignment.
     ///
@@ -1416,6 +1418,10 @@ public:
         table.remove_recursive(rows); // Throws
     }
 
+    static void batch_erase_objects(Table& table, std::vector<ObjKey>& keys)
+    {
+        table.batch_erase_objects(keys); // Throws
+    }
     static void batch_erase_rows(Table& table, const KeyColumn& keys)
     {
         table.batch_erase_rows(keys); // Throws
