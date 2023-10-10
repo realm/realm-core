@@ -314,7 +314,7 @@ int main(int argc, const char** argv)
                              }
                          },
                          [&](const ServerIdentMessage& ident_message) {
-                             history.set_client_file_ident(ident_message.file_ident, true);
+                             history.set_client_file_ident(ident_message.file_ident);
                          }},
                      message);
     }

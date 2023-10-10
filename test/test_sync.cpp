@@ -6578,7 +6578,7 @@ TEST(Sync_DanglingLinksCountInPriorSize)
     ClientReplication repl;
     auto local_db = realm::DB::create(repl, path);
     auto& history = repl.get_history();
-    history.set_client_file_ident(sync::SaltedFileIdent{1, 123456}, true);
+    history.set_client_file_ident(sync::SaltedFileIdent{1, 123456});
 
     version_type last_version, last_version_observed = 0;
     auto dump_uploadable = [&] {
@@ -6853,7 +6853,7 @@ TEST(Sync_NonIncreasingServerVersions)
     TEST_CLIENT_DB(db);
 
     auto& history = get_history(db);
-    history.set_client_file_ident(SaltedFileIdent{2, 0x1234567812345678}, false);
+    history.set_client_file_ident(SaltedFileIdent{2, 0x1234567812345678});
     timestamp_type timestamp{1};
     history.set_local_origin_timestamp_source([&] {
         return ++timestamp;
@@ -6926,7 +6926,7 @@ TEST(Sync_InvalidChangesetFromServer)
     TEST_CLIENT_DB(db);
 
     auto& history = get_history(db);
-    history.set_client_file_ident(SaltedFileIdent{2, 0x1234567812345678}, false);
+    history.set_client_file_ident(SaltedFileIdent{2, 0x1234567812345678});
 
     instr::CreateObject bad_instr;
     bad_instr.object = InternString{1};
@@ -7004,7 +7004,7 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
     TEST_CLIENT_DB(db);
 
     auto& history = get_history(db);
-    history.set_client_file_ident(SaltedFileIdent{1, 0x1234567812345678}, false);
+    history.set_client_file_ident(SaltedFileIdent{1, 0x1234567812345678});
     timestamp_type timestamp{1};
     history.set_local_origin_timestamp_source([&] {
         return ++timestamp;
@@ -7173,7 +7173,7 @@ TEST(Sync_ServerVersionsSkippedFromDownloadCursor)
     TEST_CLIENT_DB(db);
 
     auto& history = get_history(db);
-    history.set_client_file_ident(SaltedFileIdent{2, 0x1234567812345678}, false);
+    history.set_client_file_ident(SaltedFileIdent{2, 0x1234567812345678});
     timestamp_type timestamp{1};
     history.set_local_origin_timestamp_source([&] {
         return ++timestamp;

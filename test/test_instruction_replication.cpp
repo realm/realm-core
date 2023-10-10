@@ -31,9 +31,7 @@ struct Fixture {
         , sg_1(DB::create(*history_1, path_1))
         , sg_2(DB::create(*history_2, path_2))
     {
-        // This is to ensure that peer IDs in Object IDs are populated.
-        bool fix_up_object_ids = true;
-        history_1->get_history().set_client_file_ident({1, 123}, fix_up_object_ids);
+        history_1->get_history().set_client_file_ident({1, 123});
     }
 
     void replay_transactions()

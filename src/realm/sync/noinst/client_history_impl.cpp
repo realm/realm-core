@@ -270,7 +270,7 @@ void ClientHistory::get_status(version_type& current_client_version, SaltedFileI
 }
 
 
-void ClientHistory::set_client_file_ident(SaltedFileIdent client_file_ident, bool fix_up_object_ids)
+void ClientHistory::set_client_file_ident(SaltedFileIdent client_file_ident)
 {
     REALM_ASSERT(client_file_ident.ident != 0);
 
@@ -286,10 +286,6 @@ void ClientHistory::set_client_file_ident(SaltedFileIdent client_file_ident, boo
              RefOrTagged::make_tagged(client_file_ident.salt)); // Throws
     root.set(s_progress_download_client_version_iip, RefOrTagged::make_tagged(0));
     root.set(s_progress_upload_client_version_iip, RefOrTagged::make_tagged(0));
-
-    if (fix_up_object_ids) {
-        fix_up_client_file_ident_in_stored_changesets(*wt, client_file_ident.ident); // Throws
-    }
 
     // Note: This transaction produces an empty changeset. Empty changesets are
     // not uploaded to the server.
@@ -1022,98 +1018,6 @@ void ClientHistory::do_trim_sync_history(std::size_t n)
 
         m_sync_history_base_version += n;
     }
-}
-
-void ClientHistory::fix_up_client_file_ident_in_stored_changesets(Transaction& group,
-                                                                  file_ident_type client_file_ident)
-{
-    // Must be in write transaction!
-
-    REALM_ASSERT(client_file_ident != 0);
-    auto promote_global_key = [client_file_ident](GlobalKey* oid) {
-        if (oid->hi() == 0) {
-            // client_file_ident == 0
-            *oid = GlobalKey{uint64_t(client_file_ident), oid->lo()};
-            return true;
-        }
-        return false;
-    };
-
-    Group::TableNameBuffer buffer;
-    auto get_table_for_class = [&](StringData class_name) -> ConstTableRef {
-        REALM_ASSERT(class_name.size() < Group::max_table_name_length - 6);
-        return group.get_table(Group::class_name_to_table_name(class_name, buffer));
-    };
-
-    util::compression::CompressMemoryArena arena;
-    util::AppendBuffer<char> compressed;
-
-    // Fix up changesets.
-    Array& root = m_arrays->root;
-    uint64_t uploadable_bytes = root.get_as_ref_or_tagged(s_progress_uploadable_bytes_iip).get_as_int();
-    for (size_t i = 0; i < sync_history_size(); ++i) {
-        // We could have opened a pre-provisioned realm file. In this case we can skip the entries downloaded
-        // from the server.
-        if (m_arrays->origin_file_idents.get(i) != 0)
-            continue;
-
-        ChunkedBinaryData changeset{m_arrays->changesets, i};
-        ChunkedBinaryInputStream is{changeset};
-        size_t decompressed_size;
-        auto decompressed = util::compression::decompress_nonportable_input_stream(is, decompressed_size);
-        if (!decompressed)
-            continue;
-        Changeset log;
-        parse_changeset(*decompressed, log);
-
-        bool did_modify = false;
-        auto last_class_name = InternString::npos;
-        ConstTableRef selected_table;
-        for (auto instr : log) {
-            if (!instr)
-                continue;
-
-            if (auto obj_instr = instr->get_if<Instruction::ObjectInstruction>()) {
-                // Cache the TableRef
-                if (obj_instr->table != last_class_name) {
-                    StringData class_name = log.get_string(obj_instr->table);
-                    last_class_name = obj_instr->table;
-                    selected_table = get_table_for_class(class_name);
-                }
-
-                // Fix up instructions using GlobalKey to identify objects.
-                if (auto global_key = mpark::get_if<GlobalKey>(&obj_instr->object)) {
-                    did_modify = promote_global_key(global_key);
-                }
-
-                // Fix up the payload for Set and ArrayInsert.
-                Instruction::Payload* payload = nullptr;
-                if (auto set_instr = instr->get_if<Instruction::Update>()) {
-                    payload = &set_instr->value;
-                }
-                else if (auto list_insert_instr = instr->get_if<Instruction::ArrayInsert>()) {
-                    payload = &list_insert_instr->value;
-                }
-
-                if (payload && payload->type == Instruction::Payload::Type::Link) {
-                    if (auto global_key = mpark::get_if<GlobalKey>(&payload->data.link.target)) {
-                        did_modify = promote_global_key(global_key);
-                    }
-                }
-            }
-        }
-
-        if (did_modify) {
-            ChangesetEncoder::Buffer modified;
-            encode_changeset(log, modified);
-            util::compression::allocate_and_compress_nonportable(arena, modified, compressed);
-            m_arrays->changesets.set(i, BinaryData{compressed.data(), compressed.size()}); // Throws
-
-            uploadable_bytes += modified.size() - decompressed_size;
-        }
-    }
-
-    root.set(s_progress_uploadable_bytes_iip, RefOrTagged::make_tagged(uploadable_bytes));
 }
 
 void ClientHistory::set_group(Group* group, bool updated)
