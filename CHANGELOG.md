@@ -7,6 +7,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * `SyncManager::path_for_realm()` would return `/<path>/filename.realm.realm` if `custom_file_name` was set to `filename.realm` and the file didn't exist. It would correctly return `/<path>/filename.realm` if the file already existed. After this fix `/<path>/filename.realm` is returned in all cases. ([#7038](https://github.com/realm/realm-core/issues/7038))
+* Fixed a bug preventing SSL handshake from completing successfuly due to failed hostname verification when linking against BoringSSL. (PR [#7034](https://github.com/realm/realm-core/pull/7034))
 
 ### Breaking changes
 * None.
@@ -34,7 +35,7 @@
 * Filtering by user-defined functions (PR [#7020](https://github.com/realm/realm-core/pull/7020))
 
 ### Fixed
-* Fixed an issue where Android.bp builds would fail with SSL certificat validation errors because we didn't include the trusted CA roots bundle.
+* Fixed an issue where Android.bp builds would fail with SSL certificate validation errors because we didn't include the trusted CA roots bundle. (PR [#7022](https://github.com/realm/realm-core/pull/7022))
 
 ### Breaking changes
 * None.
