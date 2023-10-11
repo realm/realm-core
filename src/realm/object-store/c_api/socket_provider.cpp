@@ -11,7 +11,7 @@ namespace {
 // CAPI implementation details for canceling and deleting the timer resources.
 struct CAPITimer : sync::SyncSocketProvider::Timer {
 public:
-    CAPITimer(realm_userdata_t userdata, int64_t delay_ms, realm_sync_socket_callback_t* handler,
+    CAPITimer(realm_userdata_t userdata, int64_t delay_ms, realm_sync_socket_timer_callback_t* handler,
               realm_sync_socket_create_timer_func_t create_timer_func,
               realm_sync_socket_timer_canceled_func_t cancel_timer_func,
               realm_sync_socket_timer_free_func_t free_timer_func)
@@ -53,35 +53,25 @@ private:
     realm_sync_socket_timer_free_func_t m_timer_free = nullptr;
 };
 
-static void realm_sync_socket_op_complete(realm_sync_socket_callback* realm_callback,
-                                          realm_sync_socket_callback_result_e result, const char* reason)
-{
-    if (realm_callback->get() != nullptr) {
-        auto complete_status = result == RLM_ERR_SYNC_SOCKET_SUCCESS
-                                   ? Status::OK()
-                                   : Status{static_cast<ErrorCodes::Error>(result), reason};
-        (*(realm_callback->get()))(complete_status);
-        // Keep the container, but release the handler so it can't be called twice.
-        realm_callback->reset();
-    }
-    realm_release(realm_callback);
-}
-
-RLM_API void realm_sync_socket_timer_complete(realm_sync_socket_callback* timer_handler,
+RLM_API void realm_sync_socket_timer_complete(realm_sync_socket_timer_callback_t* timer_handler,
                                               realm_sync_socket_callback_result_e result, const char* reason)
 {
-    realm_sync_socket_op_complete(timer_handler, result, reason);
+    if (!timer_handler)
+        return;
+
+    (*timer_handler)(result, reason);
+    realm_release(timer_handler);
 }
 
-RLM_API void realm_sync_socket_timer_canceled(realm_sync_socket_callback* timer_handler)
+RLM_API void realm_sync_socket_timer_canceled(realm_sync_socket_timer_callback_t* timer_handler)
 {
-    realm_sync_socket_op_complete(timer_handler, RLM_ERR_SYNC_SOCKET_OPERATION_ABORTED, "Timer canceled");
+    realm_sync_socket_timer_complete(timer_handler, RLM_ERR_SYNC_SOCKET_OPERATION_ABORTED, "Timer canceled");
 }
 
 // This class represents a websocket instance provided by the CAPI implememtation for sending
 // and receiving data and connection state from the websocket. This class is used directly by
 // the sync client.
-struct CAPIWebSocket : sync::WebSocketInterface {
+struct CAPIWebSocket : sync::WebSocketInterface, WriteCallbackManager, std::enable_shared_from_this<CAPIWebSocket> {
 public:
     CAPIWebSocket(realm_userdata_t userdata, realm_sync_socket_connect_func_t websocket_connect_func,
                   realm_sync_socket_websocket_async_write_func_t websocket_write_func,
@@ -111,20 +101,55 @@ public:
     }
 
     /// Destroys the web socket instance.
-    ~CAPIWebSocket()
+    virtual ~CAPIWebSocket()
     {
         m_websocket_free(m_userdata, m_socket);
         realm_release(m_observer);
+        // Release any remaining write callbacks that weren't completed
+        release_all_callbacks();
     }
 
     void async_write_binary(util::Span<const char> data, sync::SyncSocketProvider::FunctionHandler&& handler) final
     {
-        auto shared_handler = std::make_shared<sync::SyncSocketProvider::FunctionHandler>(std::move(handler));
-        m_websocket_async_write(m_userdata, m_socket, data.data(), data.size(),
-                                new realm_sync_socket_callback_t(std::move(shared_handler)));
+        m_websocket_async_write(m_userdata, m_socket, data.data(), data.size(), create_callback(std::move(handler)));
     }
 
 private:
+    realm_sync_socket_write_callback_t* create_callback(sync::SyncSocketProvider::FunctionHandler&& handler) override
+    {
+        auto shared_handler = std::make_shared<sync::SyncSocketProvider::FunctionHandler>(std::move(handler));
+        auto* callback = new realm_sync_socket_write_callback_t(shared_handler, weak_from_this());
+        std::lock_guard lock(m_callback_mutex);
+        m_pending_callbacks.emplace(callback);
+        return callback;
+    }
+
+    bool remove_callback(realm_sync_socket_write_callback_t* callback) override
+    {
+        if (callback) {
+            std::lock_guard lock(m_callback_mutex);
+            auto removed = m_pending_callbacks.erase(callback);
+            REALM_ASSERT_3(removed, ==, 1);
+            if (removed > 0) {
+                realm_release(callback);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void release_all_callbacks()
+    {
+        // Websocket is being destroyed, delete any remaining callback handlers
+        std::lock_guard lock(m_callback_mutex);
+        for (auto it = m_pending_callbacks.begin(); it != m_pending_callbacks.end(); ++it) {
+            if (*it) {
+                realm_release(*it);
+            }
+        }
+        m_pending_callbacks.clear();
+    }
+
     // A pointer to the CAPI implementation's websocket instance. This is provided by
     // the m_websocket_connect() function when this websocket instance is created.
     realm_sync_socket_websocket_t m_socket = nullptr;
@@ -132,6 +157,11 @@ private:
     // A wrapped reference to the websocket observer in the sync client that receives the
     // websocket status callbacks. This is provided by the Sync Client.
     realm_websocket_observer_t* m_observer = nullptr;
+
+    // Keep track of the async write callbacks so they can be destroyed if the websocket
+    // is destroyed before the callback has a chance to be called.
+    std::set<realm_sync_socket_write_callback_t*> m_pending_callbacks;
+    std::mutex m_callback_mutex;
 
     // These values were originally provided to the socket_provider instance by the CAPI
     // implementation when it was created.
@@ -148,6 +178,7 @@ public:
     CAPIWebSocketObserver(std::unique_ptr<sync::WebSocketObserver> observer)
         : m_observer(std::move(observer))
     {
+        REALM_ASSERT_EX(m_observer, "WebSocketObserver cannot be null");
     }
 
     ~CAPIWebSocketObserver() = default;
@@ -238,14 +269,14 @@ struct CAPISyncSocketProvider : sync::SyncSocketProvider {
     void post(FunctionHandler&& handler) final
     {
         auto shared_handler = std::make_shared<FunctionHandler>(std::move(handler));
-        m_post(m_userdata, new realm_sync_socket_callback_t(std::move(shared_handler)));
+        m_post(m_userdata, new realm_sync_socket_post_callback_t(std::move(shared_handler)));
     }
 
     SyncTimer create_timer(std::chrono::milliseconds delay, FunctionHandler&& handler) final
     {
         auto shared_handler = std::make_shared<FunctionHandler>(std::move(handler));
         return std::make_unique<CAPITimer>(m_userdata, delay.count(),
-                                           new realm_sync_socket_callback_t(std::move(shared_handler)),
+                                           new realm_sync_socket_timer_callback_t(std::move(shared_handler)),
                                            m_timer_create, m_timer_cancel, m_timer_free);
     }
 };
@@ -275,38 +306,60 @@ RLM_API realm_sync_socket_t* realm_sync_socket_new(
     });
 }
 
-RLM_API void realm_sync_socket_post_complete(realm_sync_socket_callback* post_handler,
+RLM_API void realm_sync_socket_post_complete(realm_sync_socket_post_callback_t* post_handler,
                                              realm_sync_socket_callback_result_e result, const char* reason)
 {
-    realm_sync_socket_op_complete(post_handler, result, reason);
+    if (!post_handler)
+        return;
+
+    (*post_handler)(result, reason);
+    realm_release(post_handler);
 }
 
-RLM_API void realm_sync_socket_write_complete(realm_sync_socket_callback_t* write_handler,
+RLM_API void realm_sync_socket_write_complete(realm_sync_socket_write_callback_t* write_handler,
                                               realm_sync_socket_callback_result_e result, const char* reason)
 {
-    realm_sync_socket_op_complete(write_handler, result, reason);
+    if (!write_handler)
+        return;
+
+    (*write_handler)(result, reason);
+
+    // The callback handler may have destroyed the websocket - make sure it's still around
+    auto callback_mgr = write_handler->callback_mgr.lock();
+    // If we locked the callback_mgr, call the remove function to release the object
+    if (callback_mgr) {
+        callback_mgr->remove_callback(write_handler); // Releases callback handler
+    }
 }
 
 RLM_API void realm_sync_socket_websocket_connected(realm_websocket_observer_t* realm_websocket_observer,
                                                    const char* protocol)
 {
-    realm_websocket_observer->get()->websocket_connected_handler(protocol);
+    if (realm_websocket_observer)
+        realm_websocket_observer->get()->websocket_connected_handler(protocol);
 }
 
 RLM_API void realm_sync_socket_websocket_error(realm_websocket_observer_t* realm_websocket_observer)
 {
-    realm_websocket_observer->get()->websocket_error_handler();
+    if (realm_websocket_observer)
+        realm_websocket_observer->get()->websocket_error_handler();
 }
 
 RLM_API bool realm_sync_socket_websocket_message(realm_websocket_observer_t* realm_websocket_observer,
                                                  const char* data, size_t data_size)
 {
+    if (!realm_websocket_observer)
+        return false;
+
     return realm_websocket_observer->get()->websocket_binary_message_received(util::Span{data, data_size});
 }
 
 RLM_API bool realm_sync_socket_websocket_closed(realm_websocket_observer_t* realm_websocket_observer, bool was_clean,
                                                 realm_web_socket_errno_e code, const char* reason)
 {
+    if (!realm_websocket_observer)
+        return false;
+
     return realm_websocket_observer->get()->websocket_closed_handler(
         was_clean, static_cast<sync::websocket::WebSocketError>(code), reason);
 }

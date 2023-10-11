@@ -21,6 +21,7 @@
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/sync/binding_callback_thread_observer.hpp>
+#include <realm/sync/socket_provider.hpp>
 #include <realm/sync/subscriptions.hpp>
 #endif
 
@@ -800,11 +801,6 @@ struct realm_sync_socket_callback : realm::c_api::WrapC,
     {
     }
 
-    realm_sync_socket_callback* clone() const override
-    {
-        return new realm_sync_socket_callback{*this};
-    }
-
     bool equals(const WrapC& other) const noexcept final
     {
         if (auto ptr = dynamic_cast<const realm_sync_socket_callback*>(&other)) {
@@ -812,7 +808,41 @@ struct realm_sync_socket_callback : realm::c_api::WrapC,
         }
         return false;
     }
+
+    void operator()(realm_sync_socket_callback_result_e result, const char* reason)
+    {
+        if (!get()) {
+            return;
+        }
+
+        auto complete_status = result == RLM_ERR_SYNC_SOCKET_SUCCESS
+                                   ? realm::Status::OK()
+                                   : realm::Status{static_cast<realm::ErrorCodes::Error>(result), reason};
+        (*get())(complete_status);
+    }
 };
+
+struct WriteCallbackManager {
+    virtual ~WriteCallbackManager() = default;
+
+    // Create the callback with the given callback function handler
+    virtual realm_sync_socket_write_callback_t*
+    create_callback(realm::sync::SyncSocketProvider::FunctionHandler&&) = 0;
+    // Stop tracking the callback or return false if not found
+    virtual bool remove_callback(realm_sync_socket_write_callback_t*) = 0;
+};
+
+struct realm_sync_socket_write_callback : realm_sync_socket_callback {
+    explicit realm_sync_socket_write_callback(std::shared_ptr<realm::sync::SyncSocketProvider::FunctionHandler> ptr,
+                                              std::weak_ptr<WriteCallbackManager> mgr)
+        : realm_sync_socket_callback(std::move(ptr))
+        , callback_mgr(std::move(mgr))
+    {
+    }
+
+    std::weak_ptr<WriteCallbackManager> callback_mgr;
+};
+
 
 struct CBindingThreadObserver : public realm::BindingCallbackThreadObserver {
 public:

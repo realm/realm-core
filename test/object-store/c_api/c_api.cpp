@@ -6089,7 +6089,7 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
     struct TestSyncTimer : realm::c_api::WrapC, SyncSocketProvider::Timer {
     public:
         TestSyncTimer(DefaultSocketProvider* socket_provider, std::chrono::milliseconds delay,
-                      realm_sync_socket_callback_t* callback)
+                      realm_sync_socket_timer_callback_t* callback)
         {
             REALM_ASSERT(socket_provider);
             m_timer = socket_provider->create_timer(delay, [capi_callback = callback](Status s) {
@@ -6120,7 +6120,7 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
         REQUIRE(test_data);
         test_data->free_count++;
     };
-    auto post_fn = [](realm_userdata_t userdata, realm_sync_socket_callback_t* callback) {
+    auto post_fn = [](realm_userdata_t userdata, realm_sync_socket_post_callback_t* callback) {
         auto test_data = static_cast<TestData*>(userdata);
         REQUIRE(test_data);
         REQUIRE(test_data->socket_provider);
@@ -6130,7 +6130,7 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
         });
     };
     auto create_timer_fn = [](realm_userdata_t userdata, uint64_t delay_ms,
-                              realm_sync_socket_callback_t* callback) -> realm_sync_socket_timer_t {
+                              realm_sync_socket_timer_callback_t* callback) -> realm_sync_socket_timer_t {
         auto test_data = static_cast<TestData*>(userdata);
         REQUIRE(test_data);
         return new TestSyncTimer(test_data->socket_provider, std::chrono::milliseconds(delay_ms), callback);
@@ -6157,7 +6157,7 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
         return new TestWebSocket(test_data->socket_provider, endpoint, realm_websocket_observer);
     };
     auto websocket_async_write_fn = [](realm_userdata_t userdata, realm_sync_socket_websocket_t sync_websocket,
-                                       const char* data, size_t size, realm_sync_socket_callback_t* callback) {
+                                       const char* data, size_t size, realm_sync_socket_write_callback_t* callback) {
         auto test_data = static_cast<TestData*>(userdata);
         REQUIRE(test_data);
         REQUIRE(test_data->socket_provider);

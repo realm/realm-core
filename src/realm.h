@@ -356,34 +356,61 @@ typedef struct realm_websocket_endpoint {
 } realm_websocket_endpoint_t;
 
 typedef struct realm_sync_socket realm_sync_socket_t;
-typedef struct realm_sync_socket_callback realm_sync_socket_callback_t;
+typedef struct realm_sync_socket_callback realm_sync_socket_post_callback_t;
+typedef struct realm_sync_socket_callback realm_sync_socket_timer_callback_t;
+typedef struct realm_sync_socket_write_callback realm_sync_socket_write_callback_t;
 typedef void* realm_sync_socket_timer_t;
 typedef void* realm_sync_socket_websocket_t;
 typedef struct realm_websocket_observer realm_websocket_observer_t;
 
+// Called when the Sync Client posts a callback handler to be run within the context
+// of the event loop.
+// The post_callback pointer does not need to be released by the CAPI implementation.
 typedef void (*realm_sync_socket_post_func_t)(realm_userdata_t userdata,
-                                              realm_sync_socket_callback_t* realm_callback);
+                                              realm_sync_socket_post_callback_t* post_callback);
 
+// Called when a Sync Socket Timer is being created, which will start the timer countdown
+// immediately. The Timer CAPI implementation will need to be stored locally so it can
+// be used when calling realm_sync_socket_timer_complete() when the timer countdown
+// reaches 0 (i.e. expired) or realm_sync_socket_timer_canceled() when the timer is canceled.
+// The timer_callback pointer does not need to be released by the CAPI implementation.
 typedef realm_sync_socket_timer_t (*realm_sync_socket_create_timer_func_t)(
-    realm_userdata_t userdata, uint64_t delay_ms, realm_sync_socket_callback_t* realm_callback);
+    realm_userdata_t userdata, uint64_t delay_ms, realm_sync_socket_timer_callback_t* timer_callback);
 
+// Called when a Sync Socket Timer has been explicitly canceled or the Timer is being
+// destroyed. Use the realm_sync_socket_timer_canceled() function to notify the Sync Client
+// that the timer cancel is complete. NOTE: This function will always be called before the
+// timer is destroyed (even if the timer has completed), but the timer callback should only
+// be executed one time.
 typedef void (*realm_sync_socket_timer_canceled_func_t)(realm_userdata_t userdata,
                                                         realm_sync_socket_timer_t timer_userdata);
 
+// Called when the timer object has been destroyed so the Sync Socket Timer CAPI
+// implementation can clean up its timer resources.
 typedef void (*realm_sync_socket_timer_free_func_t)(realm_userdata_t userdata,
                                                     realm_sync_socket_timer_t timer_userdata);
 
+// Called when the Sync Client is initiating a connection to the server. The endpoint
+// structure contains the server address/URL and the websocket_observer will need to
+// be stored locally in the WebSocket CAPI implementation so it can be used with the
+// realm_sync_socket_websocket_[connected|message|error|closed]() functions when
+// providing WebSocket status or data to the Sync Client.
 typedef realm_sync_socket_websocket_t (*realm_sync_socket_connect_func_t)(
-    realm_userdata_t userdata, realm_websocket_endpoint_t endpoint,
-    realm_websocket_observer_t* realm_websocket_observer);
+    realm_userdata_t userdata, realm_websocket_endpoint_t endpoint, realm_websocket_observer_t* websocket_observer);
 
+// Called by a connection in the Sync Client when it needs to send data to the server. The
+// write_callback is used with realm_sync_socket_write_complete() to inform the connection
+// that the data has been transferred successfully.
+// The write_callback pointer does not need to be released by the CAPI implementation.
 typedef void (*realm_sync_socket_websocket_async_write_func_t)(realm_userdata_t userdata,
-                                                               realm_sync_socket_websocket_t websocket_userdata,
+                                                               realm_sync_socket_websocket_t websocket,
                                                                const char* data, size_t size,
-                                                               realm_sync_socket_callback_t* realm_callback);
+                                                               realm_sync_socket_write_callback_t* write_callback);
 
+// Called when the websocket has been destroyed in the Sync Client - no more write callbacks or observer
+// functions should be called when this function is called.
 typedef void (*realm_sync_socket_websocket_free_func_t)(realm_userdata_t userdata,
-                                                        realm_sync_socket_websocket_t websocket_userdata);
+                                                        realm_sync_socket_websocket_t websocket);
 
 /**
  * Get the VersionID of the current transaction.
@@ -4104,7 +4131,7 @@ RLM_API realm_sync_socket_t* realm_sync_socket_new(
  * @param reason a string describing details about the error that occurred or empty string if no error.
  * NOTE: This function must be called by the event loop execution thread.
  */
-RLM_API void realm_sync_socket_timer_complete(realm_sync_socket_callback_t* timer_handler,
+RLM_API void realm_sync_socket_timer_complete(realm_sync_socket_timer_callback_t* timer_handler,
                                               realm_sync_socket_callback_result_e result, const char* reason);
 
 /**
@@ -4113,7 +4140,7 @@ RLM_API void realm_sync_socket_timer_complete(realm_sync_socket_callback_t* time
  * @param timer_handler the timer callback handler that was provided when the timer was created.
  * NOTE: This function must be called by the event loop execution thread.
  */
-RLM_API void realm_sync_socket_timer_canceled(realm_sync_socket_callback_t* timer_handler);
+RLM_API void realm_sync_socket_timer_canceled(realm_sync_socket_timer_callback_t* timer_handler);
 
 /**
  * To be called to execute the callback function provided to the post_func when the event loop executes
@@ -4125,7 +4152,7 @@ RLM_API void realm_sync_socket_timer_canceled(realm_sync_socket_callback_t* time
  * @param reason a string describing details about the error that occurred or empty string if no error.
  * NOTE: This function must be called by the event loop execution thread.
  */
-RLM_API void realm_sync_socket_post_complete(realm_sync_socket_callback_t* post_handler,
+RLM_API void realm_sync_socket_post_complete(realm_sync_socket_post_callback_t* post_handler,
                                              realm_sync_socket_callback_result_e result, const char* reason);
 
 /**
@@ -4138,7 +4165,7 @@ RLM_API void realm_sync_socket_post_complete(realm_sync_socket_callback_t* post_
  * @param reason a string describing details about the error that occurred or empty string if no error.
  * NOTE: This function must be called by the event loop execution thread.
  */
-RLM_API void realm_sync_socket_write_complete(realm_sync_socket_callback_t* write_handler,
+RLM_API void realm_sync_socket_write_complete(realm_sync_socket_write_callback_t* write_handler,
                                               realm_sync_socket_callback_result_e result, const char* reason);
 
 /**
