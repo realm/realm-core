@@ -140,15 +140,8 @@ struct BenchmarkLocalClientReset : public reset_utils::TestClientReset {
         VersionID current_local_version = wt_local.get_version_of_current_transaction();
 
         class NullLogger : public util::Logger {
-        public:
-            NullLogger()
-                : Logger{util::Logger::Level::off}
-            {
-            }
-
-        protected:
             // Since we don't want to log anything, do_log() does nothing
-            void do_log(Level, const std::string&) override {}
+            void do_log(const util::LogCategory&, Level, const std::string&) override {}
         } logger;
 
         if (m_mode == ClientResyncMode::Recover) {

@@ -150,8 +150,8 @@ TEST(Util_Logger_LevelThreshold)
 TEST(Util_Logger_LocalThresholdLogger)
 {
     using namespace realm::util;
-    // Save the original level
-    auto orig_level = Logger::get_default_level_threshold();
+    // Get the original level
+    auto orig_level = LogCategory::realm.get_default_level_threshold();
 
     auto base_logger = std::make_shared<StderrLogger>();
     auto lt_logger = std::make_shared<LocalThresholdLogger>(base_logger);
@@ -188,8 +188,7 @@ TEST(Util_Logger_LocalThresholdLogger)
     CHECK(lt_logger2->get_level_threshold() == Logger::Level::all);
     CHECK(prefix_logger2.get_level_threshold() == Logger::Level::all);
 
-    // Restore original level
-    Logger::set_default_level_threshold(orig_level);
+    CHECK_EQUAL(orig_level, LogCategory::realm.get_default_level_threshold());
 }
 
 
