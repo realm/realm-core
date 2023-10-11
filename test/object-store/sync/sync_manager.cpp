@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <util/event_loop.hpp>
+#include <util/test_path.hpp>
 #include <util/test_utils.hpp>
 #include <util/sync/session_util.hpp>
 #include <util/sync/sync_test_utils.hpp>
@@ -29,8 +30,6 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/scope_exit.hpp>
-
-#include <fstream>
 
 using namespace realm;
 using namespace realm::util;
@@ -187,7 +186,10 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync][sync manager]") {
         SECTION("Custom filename for Flexible Sync with an existing path") {
             SyncConfig config(user, SyncConfig::FLXSyncEnabled{});
             std::string path = sync_manager->path_for_realm(config, util::make_optional<std::string>("custom.realm"));
-            std::ofstream existing_realm_file(path.c_str());
+            realm::test_util::TestPathGuard guard(path);
+            realm::util::File existing_realm_file(path, File::mode_Write);
+            existing_realm_file.write(std::string("test"));
+            existing_realm_file.sync();
             REQUIRE(sync_manager->path_for_realm(config, util::make_optional<std::string>("custom.realm")) ==
                     base_path / "custom.realm");
         }
