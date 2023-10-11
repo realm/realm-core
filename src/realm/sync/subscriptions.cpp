@@ -616,7 +616,7 @@ SubscriptionStoreRef SubscriptionStore::create(DBRef db)
 SubscriptionStore::SubscriptionStore(DBRef db)
     : m_db(std::move(db))
 {
-    std::vector<SyncMetadataTable> internal_tables{
+    SyncMetadataTable internal_tables[] = {
         {&m_sub_set_table,
          c_flx_subscription_sets_table,
          {&m_sub_set_version_num, c_flx_sub_sets_version_field, type_Int},
@@ -640,22 +640,7 @@ SubscriptionStore::SubscriptionStore(DBRef db)
     };
 
     auto tr = m_db->start_read();
-    SyncMetadataSchemaVersions schema_versions(tr);
-
-    if (auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_subscription_store);
-        !schema_version) {
-        tr->promote_to_write();
-        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_subscription_store, c_flx_schema_version);
-        create_sync_metadata_schema(tr, &internal_tables);
-        tr->commit_and_continue_as_read();
-    }
-    else {
-        if (*schema_version != c_flx_schema_version) {
-            throw RuntimeError(ErrorCodes::UnsupportedFileFormatVersion,
-                               "Invalid schema version for flexible sync metadata");
-        }
-        load_sync_metadata_schema(tr, &internal_tables);
-    }
+    initialize_schema(*tr, internal_schema_groups::c_flx_subscription_store, c_flx_schema_version, internal_tables);
 
     // Make sure the subscription set table is properly initialized
     initialize_subscriptions_table(std::move(tr), false);

@@ -64,7 +64,7 @@ PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger& logger)
     : m_db(std::move(db))
     , m_logger(logger)
 {
-    std::vector<SyncMetadataTable> internal_tables{
+    SyncMetadataTable internal_tables[] = {
         {&m_table,
          c_pending_bootstrap_table,
          {&m_query_version, c_pending_bootstrap_query_version, type_Int},
@@ -97,20 +97,7 @@ PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger& logger)
          }}};
 
     auto tr = m_db->start_read();
-    SyncMetadataSchemaVersions schema_versions(tr);
-    if (auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_pending_bootstraps)) {
-        if (*schema_version != c_schema_version) {
-            throw RuntimeError(ErrorCodes::SchemaVersionMismatch,
-                               "Invalid schema version for FLX sync pending bootstrap table group");
-        }
-        load_sync_metadata_schema(tr, &internal_tables);
-    }
-    else {
-        tr->promote_to_write();
-        create_sync_metadata_schema(tr, &internal_tables);
-        schema_versions.set_version_for(tr, internal_schema_groups::c_pending_bootstraps, c_schema_version);
-        tr->commit_and_continue_as_read();
-    }
+    initialize_schema(*tr, internal_schema_groups::c_pending_bootstraps, c_schema_version, internal_tables);
 
     if (auto bootstrap_table = tr->get_table(m_table); !bootstrap_table->is_empty()) {
         m_has_pending = true;

@@ -194,11 +194,12 @@ if(REALM_ENABLE_SYNC)
         test_stable_ids.cpp
         test_sync.cpp
         test_sync_auth.cpp
-        test_sync_history_migration.cpp
-        test_sync_protocol_codec.cpp
-        test_sync_subscriptions.cpp
-        test_sync_pending_bootstraps.cpp
         test_sync_error_backoff.cpp
+        test_sync_history_migration.cpp
+        test_sync_pending_bootstraps.cpp
+        test_sync_protocol_codec.cpp
+        test_sync_schema_metadata.cpp
+        test_sync_subscriptions.cpp
         test_transform.cpp
         test_util_buffer_stream.cpp
         test_util_circular_buffer.cpp

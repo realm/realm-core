@@ -167,6 +167,10 @@ public:
         : Mixed(StringData(s))
     {
     }
+    Mixed(std::string_view s) noexcept
+        : Mixed(StringData(s))
+    {
+    }
 
     DataType get_type() const noexcept
     {

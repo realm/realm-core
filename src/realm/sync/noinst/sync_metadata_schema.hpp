@@ -20,6 +20,7 @@
 
 #include <realm/data_type.hpp>
 #include <realm/keys.hpp>
+#include <realm/util/span.hpp>
 
 #include <memory>
 #include <stdexcept>
@@ -28,7 +29,6 @@
 
 namespace realm {
 class Transaction;
-using TransactionRef = std::shared_ptr<Transaction>;
 } // namespace realm
 
 namespace realm::sync {
@@ -43,9 +43,10 @@ constexpr static std::string_view c_flx_migration_store("flx_migration_store");
  * to the Schema/ObjectSchema/Property types in object store, but are lighter weight and have no dependencies
  * outside of core.
  *
- * The two functions for interacting with them are:
+ * The functions for interacting with them are:
  * create_sync_metadata_schema - which takes a write transaction and a group of tables, and creates them.
  * load_sync_metadata_schema - validates and loads a group of tables.
+ * initialize_schema - validate and load a group of tables, creating them if needed
  *
  * The SyncMetadataTable/SyncMetadataColumn classes each have an out parameter `key_out` that is the core key
  * type for the table/column that will get updated when it's created/loaded/validated.
@@ -117,29 +118,27 @@ struct SyncMetadataTable {
     }
 };
 
-void create_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadataTable>* tables);
-void load_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadataTable>* tables);
+void create_sync_metadata_schema(Transaction& tr, util::Span<SyncMetadataTable> tables);
+void load_sync_metadata_schema(const Transaction& tr, util::Span<SyncMetadataTable> tables);
+void initialize_schema(Transaction& tr, std::string_view schema_group, int64_t schema_version,
+                       util::Span<SyncMetadataTable> tables, bool create_if_missing = true);
 
-class SyncMetadataSchemaVersionsReader {
+// SyncMetadataSchemaVersions manages the schema version numbers for different groups of internal tables used
+// within sync.
+class SyncMetadataSchemaVersions {
 public:
-    explicit SyncMetadataSchemaVersionsReader(const TransactionRef& ref);
+    SyncMetadataSchemaVersions(Transaction& tr);
 
-    std::optional<int64_t> get_version_for(const TransactionRef& tr, std::string_view schema_group_name);
+    std::optional<int64_t> get_version_for(Transaction& tr, std::string_view schema_group_name);
+    void set_version_for(Transaction& tr, std::string_view schema_group_name, int64_t version);
 
-protected:
+private:
     TableKey m_table;
     ColKey m_version_field;
     ColKey m_schema_group_field;
-};
+    std::optional<int64_t> m_legacy_version;
 
-
-// SyncMetadataSchemas manages the schema version numbers for different groups of internal tables used
-// within sync.
-class SyncMetadataSchemaVersions : public SyncMetadataSchemaVersionsReader {
-public:
-    explicit SyncMetadataSchemaVersions(const TransactionRef& ref);
-
-    void set_version_for(const TransactionRef& tr, std::string_view schema_group_name, int64_t version);
+    void initialize_schema(Transaction& tr);
 };
 
 } // namespace realm::sync

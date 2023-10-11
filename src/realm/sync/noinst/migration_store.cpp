@@ -46,7 +46,7 @@ bool MigrationStore::load_data(bool read_only)
         return true; // already initialized
     }
 
-    std::vector<SyncMetadataTable> internal_tables{
+    SyncMetadataTable internal_tables[] = {
         {&m_migration_table,
          c_flx_migration_table,
          {
@@ -59,37 +59,14 @@ bool MigrationStore::load_data(bool read_only)
          }},
     };
 
-    std::optional<int64_t> schema_version;
     auto tr = m_db->start_read();
-    if (read_only) {
-        // Writing is disabled
-        SyncMetadataSchemaVersionsReader schema_versions(tr);
-        schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_migration_store);
-        if (!schema_version) {
-            return false; // Either table is not initialized or version does not exist
-        }
-    }
-    else { // writable
-        SyncMetadataSchemaVersions schema_versions(tr);
-        schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_migration_store);
-        // Create the version and metadata_schema if it doesn't exist
-        if (!schema_version) {
-            tr->promote_to_write();
-            schema_versions.set_version_for(tr, internal_schema_groups::c_flx_migration_store, c_schema_version);
-            create_sync_metadata_schema(tr, &internal_tables);
-            tr->commit_and_continue_as_read();
-        }
-    }
-    // Load the metadata schema unless it was just created
+    bool create_if_missing = !read_only;
+    initialize_schema(*tr, internal_schema_groups::c_flx_migration_store, c_schema_version, internal_tables,
+                      create_if_missing);
     if (!m_migration_table) {
-        if (*schema_version != c_schema_version) {
-            throw RuntimeError(ErrorCodes::UnsupportedFileFormatVersion,
-                               "Invalid schema version for flexible sync migration store metadata");
-        }
-        load_sync_metadata_schema(tr, &internal_tables);
+        REALM_ASSERT(read_only);
+        return false;
     }
-
-    REALM_ASSERT(m_migration_table);
 
     // Read the migration object if exists, or default to not migrated
     if (auto migration_table = tr->get_table(m_migration_table); !migration_table->is_empty()) {
