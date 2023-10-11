@@ -914,19 +914,6 @@ void SyncSession::create_sync_session()
 
     std::weak_ptr<SyncSession> weak_self = weak_from_this();
 
-    // Configure the sync transaction callback.
-    auto wrapped_callback = [weak_self](VersionID old_version, VersionID new_version) {
-        std::function<TransactionCallback> callback;
-        if (auto self = weak_self.lock()) {
-            util::CheckedLockGuard l(self->m_state_mutex);
-            callback = self->m_sync_transact_callback;
-        }
-        if (callback) {
-            callback(old_version, new_version);
-        }
-    };
-    m_session->set_sync_transact_callback(std::move(wrapped_callback));
-
     // Set up the wrapped progress handler callback
     m_session->set_progress_handler([weak_self](uint_fast64_t downloaded, uint_fast64_t downloadable,
                                                 uint_fast64_t uploaded, uint_fast64_t uploadable,
@@ -972,12 +959,6 @@ void SyncSession::create_sync_session()
                 self->handle_error(std::move(*error));
             }
         });
-}
-
-void SyncSession::set_sync_transact_callback(std::function<sync::Session::SyncTransactCallback>&& callback)
-{
-    util::CheckedLockGuard l(m_state_mutex);
-    m_sync_transact_callback = std::move(callback);
 }
 
 void SyncSession::nonsync_transact_notify(sync::version_type version)
@@ -1383,16 +1364,7 @@ void SyncSession::create_subscription_store()
     // remain valid afterwards for the life of the SyncSession, but m_flx_subscription_store
     // will be reset when rolling back to PBS after a client FLX migration
     if (!m_subscription_store_base) {
-        m_subscription_store_base = sync::SubscriptionStore::create(m_db, [this](int64_t new_version) {
-            util::CheckedLockGuard lk(m_state_mutex);
-            if (m_state != State::Active && m_state != State::WaitingForAccessToken) {
-                return;
-            }
-            // There may be no session yet (i.e., waiting to refresh the access token).
-            if (m_session) {
-                m_session->on_new_flx_sync_subscription(new_version);
-            }
-        });
+        m_subscription_store_base = sync::SubscriptionStore::create(m_db);
     }
 
     // m_subscription_store_base is always around for the life of SyncSession, but the
