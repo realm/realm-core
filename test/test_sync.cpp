@@ -271,7 +271,7 @@ TEST(Sync_AsyncWaitForDownloadCompletion)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 
     // Again
@@ -291,7 +291,7 @@ TEST(Sync_AsyncWaitForDownloadCompletion)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 }
 
@@ -340,7 +340,7 @@ TEST(Sync_AsyncWaitForSyncCompletion)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 }
 
@@ -455,7 +455,7 @@ TEST(Sync_WaitForDownloadCompletion)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 
     // Again
@@ -475,7 +475,7 @@ TEST(Sync_WaitForDownloadCompletion)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 }
 
@@ -687,7 +687,7 @@ TEST(Sync_Replication)
     const Group& group_2 = rt_2;
     group_1.verify();
     group_2.verify();
-    CHECK(compare_groups(rt_1, rt_2));
+    CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     ConstTableRef table = group_1.get_table("class_foo");
     CHECK_EQUAL(100, table->size());
 }
@@ -745,7 +745,7 @@ TEST(Sync_Merge)
     const Group& group_2 = rt_2;
     group_1.verify();
     group_2.verify();
-    CHECK(compare_groups(rt_1, rt_2));
+    CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     ConstTableRef table = group_1.get_table("class_foo");
     CHECK_EQUAL(4, table->size());
 }
@@ -950,7 +950,7 @@ TEST(Sync_LateBind)
     const Group& group_2 = rt_2;
     group_1.verify();
     group_2.verify();
-    CHECK(compare_groups(rt_1, rt_2));
+    CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     CHECK_EQUAL(2, group_1.size());
 }
 
@@ -1535,7 +1535,7 @@ TEST(Sync_FailingReadsOnClientSide)
     const Group& group_2 = rt_2;
     group_1.verify();
     group_2.verify();
-    CHECK(compare_groups(rt_1, rt_2));
+    CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
 }
 
 
@@ -1595,7 +1595,7 @@ TEST(Sync_FailingReadsOnServerSide)
     const Group& group_2 = rt_2;
     group_1.verify();
     group_2.verify();
-    CHECK(compare_groups(rt_1, rt_2));
+    CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
 }
 
 
@@ -2297,7 +2297,7 @@ TEST(Sync_SingleClientUploadForever_CreateObjects)
 {
     int_fast32_t number_of_transactions = 100; // Set to low number in ordinary testing.
 
-    util::Logger& logger = *(test_context.logger);
+    util::Logger& logger = *test_context.logger;
 
     logger.info("Sync_SingleClientUploadForever_CreateObjects test. Number of transactions = %1",
                 number_of_transactions);
@@ -2359,7 +2359,7 @@ TEST(Sync_SingleClientUploadForever_MutateObject)
 {
     int_fast32_t number_of_transactions = 100; // Set to low number in ordinary testing.
 
-    util::Logger& logger = *(test_context.logger);
+    util::Logger& logger = *test_context.logger;
 
     logger.info("Sync_SingleClientUploadForever_MutateObject test. Number of transactions = %1",
                 number_of_transactions);
@@ -2517,7 +2517,7 @@ TEST(Sync_LargeUploadDownloadPerformance)
     for (int i = 0; i < number_of_download_clients; ++i) {
         ReadTransaction rt_1(db_upload);
         ReadTransaction rt_2(dbs[i]);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 }
 
@@ -2581,7 +2581,7 @@ TEST_IF(Sync_4GB_Messages, false)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 }
 
@@ -3310,7 +3310,7 @@ TEST(Sync_UploadDownloadProgress_2)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 }
 
@@ -4746,7 +4746,7 @@ TEST(Sync_UploadLogCompactionEnabled)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
         ConstTableRef table = rt_1.get_table("class_foo");
         CHECK_EQUAL(2, table->size());
         CHECK_EQUAL(9999, table->begin()->get<Int>("integer column"));
@@ -4804,7 +4804,7 @@ TEST(Sync_UploadLogCompactionDisabled)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
         ConstTableRef table = rt_1.get_table("class_foo");
         CHECK_EQUAL(2, table->size());
         CHECK_EQUAL(9999, table->begin()->get<Int>("integer column"));
@@ -4895,7 +4895,7 @@ TEST(Sync_ContainerInsertAndSetLogCompaction)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 }
 
@@ -4939,7 +4939,7 @@ TEST(Sync_MultipleContainerColumns)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
 
         ConstTableRef table = rt_1.get_table("class_Table");
         const Obj row = *table->begin();
@@ -5130,7 +5130,7 @@ TEST(Sync_ServerSideModify_Randomize)
 
     ReadTransaction rt_1{db_1};
     ReadTransaction rt_2{db_2};
-    CHECK(compare_groups(rt_1, rt_2, *(test_context.logger)));
+    CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
 }
 
 
@@ -5545,7 +5545,7 @@ TEST_IF(Sync_Issue2104, false)
     bool backup_whole_realm;
     _impl::ServerHistory::IntegrationResult result;
     history.integrate_client_changesets(integratable_changesets, version_info, backup_whole_realm, result,
-                                        *(test_context.logger));
+                                        *test_context.logger);
 }
 
 
@@ -6961,7 +6961,7 @@ TEST(Sync_TransformAgainstEmptyReciprocalChangeset)
     const Group& group_2 = rt_2;
     group_1.verify();
     group_2.verify();
-    CHECK(compare_groups(rt_1, rt_2));
+    CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
 }
 
 TEST(Sync_ServerVersionsSkippedFromDownloadCursor)

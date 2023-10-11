@@ -72,7 +72,7 @@ TEST(ClientReset_NoLocalChanges)
     SHARED_GROUP_TEST_PATH(path_1); // The writer.
     SHARED_GROUP_TEST_PATH(path_2); // The resetting client.
 
-    auto& logger = *(test_context.logger);
+    auto& logger = *test_context.logger;
 
     const std::string server_path = "/data";
 
@@ -270,7 +270,7 @@ TEST(ClientReset_InitialLocalChanges)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        CHECK(compare_groups(rt_1, rt_2));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
 
         const Group& group = rt_2.get_group();
         ConstTableRef table = group.get_table("class_table");
@@ -304,8 +304,7 @@ TEST(ClientReset_InitialLocalChanges)
     {
         ReadTransaction rt_1(db_1);
         ReadTransaction rt_2(db_2);
-        util::StderrLogger logger;
-        CHECK(compare_groups(rt_1, rt_2, logger));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
     }
 }
 
@@ -419,7 +418,7 @@ TEST(ClientReset_ThreeClients)
     SHARED_GROUP_TEST_PATH(path_2);
     SHARED_GROUP_TEST_PATH(path_3);
 
-    auto& logger = *(test_context.logger);
+    auto& logger = *test_context.logger;
 
     const std::string server_path = "/data";
 
@@ -687,9 +686,9 @@ TEST(ClientReset_ThreeClients)
         ReadTransaction rt_1(sg_1);
         ReadTransaction rt_2(sg_2);
         ReadTransaction rt_3(sg_3);
-        CHECK(compare_groups(rt_1, rt_2));
-        CHECK(compare_groups(rt_1, rt_3));
-        CHECK(compare_groups(rt_2, rt_3));
+        CHECK(compare_groups(rt_1, rt_2, *test_context.logger));
+        CHECK(compare_groups(rt_1, rt_3, *test_context.logger));
+        CHECK(compare_groups(rt_2, rt_3, *test_context.logger));
     }
 }
 
