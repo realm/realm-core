@@ -224,9 +224,7 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property& prop
         case PropertyType::LinkingObjects: {
             auto target_object_schema = m_realm->schema().find(property.object_type);
             auto link_property = target_object_schema->property_for_name(property.link_origin_property_name);
-            auto table = m_realm->read_group().get_table(target_object_schema->table_key);
-            auto tv = const_cast<Obj&>(m_obj).get_backlink_view(table, ColKey(link_property->column_key));
-            return ctx.box(Results(m_realm, std::move(tv)));
+            return ctx.box(Results(m_realm, m_obj, target_object_schema->table_key, link_property->column_key));
         }
         default:
             REALM_UNREACHABLE();

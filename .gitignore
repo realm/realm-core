@@ -98,3 +98,8 @@ compile_commands.json
 # Swift package manager
 /.swiftpm
 /.build
+
+# Bindgen generated files and npm stuff
+/bindgen/generated/
+node_modules/
+tsconfig.tsbuildinfo

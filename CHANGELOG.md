@@ -2,6 +2,28 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* None.
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fixed a bug preventing SSL handshake from completing successfuly due to failed hostname verification when linking against BoringSSL. (PR [#7034](https://github.com/realm/realm-core/pull/7034))
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 13.23.0 Release notes
+
+### Enhancements
 * Allow collections of non-embedded links in asymmetric objects. ([PR #7003](https://github.com/realm/realm-core/pull/7003))
 * Flexible sync API improvements:
   - Erase Subscriptions by class type for C API. 
@@ -9,11 +31,11 @@
   - Introduce `MutableSubscriptionSet::erase_by_id()`.
   - Introduce `MutableSubscriptionSet::erase_by_class_name()`.
   ([PR #7008](https://github.com/realm/realm-core/pull/7008))
+* Filtering by user-defined functions (PR [#7020](https://github.com/realm/realm-core/pull/7020))
 * Added separate enum for callback handler result values in the platform networking C API. ([PR #7015](https://github.com/realm/realm-core/pull/7015))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed an issue where Android.bp builds would fail with SSL certificate validation errors because we didn't include the trusted CA roots bundle. (PR [#7022](https://github.com/realm/realm-core/pull/7022))
 
 ### Breaking changes
 * None.
@@ -25,6 +47,8 @@
 
 ### Internals
 * Update tests to use global logger. ([PR #6917](https://github.com/realm/realm-core/pull/6917))
+* TableView::get_num_results_excluded_by_limit() has been removed. Hopefully not used by any SDK.
+* bindgen is now part of the release
 
 ----------------------------------------------
 

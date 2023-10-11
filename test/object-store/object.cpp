@@ -2387,7 +2387,7 @@ TEST_CASE("Asymmetric Object") {
         // Object returned is not valid.
         REQUIRE(!obj.get_obj().is_valid());
         // Object gets deleted immediately.
-        REQUIRE(ObjectStore::is_empty(realm->read_group()));
+        REQUIRE(realm->is_empty());
     }
 
     SECTION("Outgoing link not allowed") {

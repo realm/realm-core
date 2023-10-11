@@ -3085,6 +3085,36 @@ TEST_CASE("notifications: results", "[notifications][results]") {
         }
     }
 
+    SECTION("filter notifications") {
+        results = results.filter_by_method([&](const Obj& obj) {
+            return obj.get<Int>(col_value) > 5;
+        });
+
+        int notification_calls = 0;
+        CollectionChangeSet change;
+        auto token = results.add_notification_callback([&](CollectionChangeSet c) {
+            change = c;
+            ++notification_calls;
+        });
+
+        advance_and_notify(*r);
+
+        SECTION("modifications that leave a non-matching row non-matching do not send notifications") {
+            write([&] {
+                table->get_object(object_keys[2]).set(col_value, 5);
+            });
+            REQUIRE(notification_calls == 1);
+        }
+
+        SECTION("modifying a matching row and leaving it matching marks that row as modified") {
+            write([&] {
+                table->get_object(object_keys[3]).set(col_value, 9);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.modifications, 0);
+        }
+    }
+
     SECTION("schema changes") {
         CollectionChangeSet change;
         auto token = results.add_notification_callback([&](CollectionChangeSet c) {
@@ -3542,8 +3572,7 @@ TEST_CASE("results: snapshots", "[results]") {
         auto linked_to_obj = *linked_to->begin();
         auto lv = object->begin()->get_linklist_ptr(col_link);
 
-        TableView backlinks = linked_to_obj.get_backlink_view(object, col_link);
-        Results results(r, std::move(backlinks));
+        Results results(r, linked_to_obj, object->get_key(), col_link);
 
         {
             // A newly-added row should not appear in the snapshot.
@@ -4882,6 +4911,62 @@ TEST_CASE("results: limit", "[results][limit]") {
         auto limited = r.limit(0);
         REQUIRE_EXCEPTION(limited.filter(table->where()), IllegalOperation,
                           "Filtering a Results with a limit is not yet implemented");
+    }
+}
+
+TEST_CASE("results: filter", "[results]") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({{"object", {{"id", PropertyType::Int}, {"val", PropertyType::String}}}});
+
+    auto t = r->read_group().get_table("class_object");
+    ColKey col_id(t->get_column_key("id")), col_val(t->get_column_key("val"));
+
+    std::set<std::string> keys;
+    {
+        r->begin_transaction();
+        for (int i = 1; i <= 1000; ++i) {
+            auto val = std::to_string(i);
+            t->create_object().set(col_id, i).set(col_val, val);
+            if (i % 100 == 0)
+                keys.insert(val);
+        }
+        r->commit_transaction();
+    }
+
+    auto predicate = [&](const Obj& o) {
+        return keys.find(o.get<String>(col_val)) != keys.end();
+    };
+
+    SECTION("Query for multiple values") {
+        Results res(r, t->where());
+        res = res.filter_by_method(predicate);
+        size_t sz = res.size();
+        REQUIRE(sz == 10);
+        for (size_t i = 0; i < sz; ++i)
+            REQUIRE(res.get(i).get<Int>(col_id) == ((int(i) + 1) * 100));
+    }
+
+    SECTION("Combined with regular query and sort") {
+        auto res = Results(r, t->where().greater(col_id, 500));
+        REQUIRE(res.size() == 500);
+
+        // forward order: 600, 700,... 1000
+        res = res.filter_by_method(predicate);
+        size_t sz = res.size();
+        REQUIRE(sz == 5);
+        for (size_t i = 0; i < sz; ++i)
+            REQUIRE(res.get(i).get<Int>(col_id) == (600 + int(i) * 100));
+
+        // reverse the order: 1000, 900... 600
+        res = res.sort(SortDescriptor({{col_id}}, {false}));
+        sz = res.size();
+        REQUIRE(sz == 5);
+        for (size_t i = 0; i < sz; ++i)
+            REQUIRE(res.get(i).get<Int>(col_id) == (1000 - int(i) * 100));
     }
 }
 
