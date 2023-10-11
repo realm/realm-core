@@ -281,8 +281,9 @@ if(REALM_NEEDS_OPENSSL OR REALM_FORCE_OPENSSL)
 
         include(${OPENSSL_CMAKE_INCLUDE_FILE})
     endif()
-
-    set(OPENSSL_USE_STATIC_LIBS ON)
+    if(NOT DEFINED OPENSSL_USE_STATIC_LIBS)
+        set(OPENSSL_USE_STATIC_LIBS ON) # prefer static linking, but let users override
+    endif()
     find_package(OpenSSL REQUIRED)
     set(REALM_HAVE_OPENSSL ON)
     string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" OPENSSL_VERSION_MAJOR_MINOR "${OPENSSL_VERSION}")
