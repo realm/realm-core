@@ -381,6 +381,12 @@ void DefaultWebSocketImpl::initiate_ssl_handshake()
             }
             else if (!m_endpoint.ssl_verify_callback) {
                 m_ssl_context->use_default_verify(); // Throws
+#if REALM_INCLUDE_CERTS
+                // On platforms like Windows or Android where OpenSSL is not normally found
+                // `use_default_verify()` won't actually be able to load any default certificates.
+                // That's why we bundle a set of trusted certificates ourselves.
+                m_ssl_context->use_included_certificate_roots(); // Throws
+#endif
             }
         }
     }
@@ -394,13 +400,6 @@ void DefaultWebSocketImpl::initiate_ssl_handshake()
         if (!m_endpoint.ssl_trust_certificate_path) {
             if (m_endpoint.ssl_verify_callback) {
                 m_ssl_stream->use_verify_callback(m_endpoint.ssl_verify_callback);
-            }
-            else {
-                // The included certificates are used if neither the trust
-                // certificate nor the callback function is set.
-#if REALM_INCLUDE_CERTS
-                m_ssl_stream->use_included_certificates(); // Throws
-#endif
             }
         }
     }
