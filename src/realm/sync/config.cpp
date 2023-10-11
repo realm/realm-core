@@ -25,48 +25,34 @@
 #include <ostream>
 
 namespace realm {
+namespace {
 
+constexpr static std::string_view s_middle_part(" Logs: ");
+std::string format_sync_error_message(const Status& status, std::optional<std::string_view> log_url)
+{
+    if (!log_url) {
+        return status.reason();
+    }
+
+    return util::format("%1%2%3", status.reason(), s_middle_part, *log_url);
+}
+
+} // namespace
 // sync defines its own copy of port_type to avoid depending on network.hpp, but they should be the same.
 static_assert(std::is_same_v<sync::port_type, sync::network::Endpoint::port_type>);
 
 using ProtocolError = realm::sync::ProtocolError;
 
-static const constexpr std::string_view s_middle(" Logs: ");
-
-SyncError::SyncError(std::error_code error_code, std::string_view msg, bool is_fatal,
-                     std::optional<std::string_view> serverLog,
+SyncError::SyncError(Status orig_status, bool is_fatal, std::optional<std::string_view> server_log,
                      std::vector<sync::CompensatingWriteErrorInfo> compensating_writes)
-    : SystemError(error_code, serverLog ? util::format("%1%2%3", msg, s_middle, *serverLog) : std::string(msg))
+    : status(orig_status.code(), format_sync_error_message(orig_status, server_log))
     , is_fatal(is_fatal)
-    , simple_message(std::string_view(what(), msg.size()))
+    , simple_message(std::string_view(status.reason()).substr(0, orig_status.reason().size()))
     , compensating_writes_info(std::move(compensating_writes))
 {
-    if (serverLog) {
-        logURL = std::string_view(what() + msg.size() + s_middle.size(), serverLog->size());
+    if (server_log) {
+        logURL = std::string_view(status.reason()).substr(simple_message.size() + s_middle_part.size());
     }
-}
-
-bool SyncError::is_client_error() const
-{
-    return get_category() == realm::sync::client_error_category();
-}
-
-/// The error is a protocol error, which may either be connection-level or session-level.
-bool SyncError::is_connection_level_protocol_error() const
-{
-    if (get_category() != realm::sync::protocol_error_category()) {
-        return false;
-    }
-    return !realm::sync::is_session_level_error(static_cast<ProtocolError>(get_system_error().value()));
-}
-
-/// The error is a connection-level protocol error.
-bool SyncError::is_session_level_protocol_error() const
-{
-    if (get_category() != realm::sync::protocol_error_category()) {
-        return false;
-    }
-    return realm::sync::is_session_level_error(static_cast<ProtocolError>(get_system_error().value()));
 }
 
 /// The error indicates a client reset situation.
@@ -76,7 +62,7 @@ bool SyncError::is_client_reset_requested() const
         server_requests_action == sync::ProtocolErrorInfo::Action::ClientResetNoRecovery) {
         return true;
     }
-    if (get_system_error() == make_error_code(sync::Client::Error::auto_client_reset_failure)) {
+    if (status == ErrorCodes::AutoClientResetFailed) {
         return true;
     }
     return false;

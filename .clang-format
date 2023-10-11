@@ -1,4 +1,6 @@
 ---
+# Don't try to format any languages not described by this file
+DisableFormat: true
 BasedOnStyle: LLVM
 AccessModifierOffset: -4
 AlignAfterOpenBracket: Align
@@ -56,7 +58,6 @@ ConstructorInitializerIndentWidth: 4
 ContinuationIndentWidth: 4
 Cpp11BracedListStyle: true
 DerivePointerAlignment: false
-DisableFormat:   false
 ExperimentalAutoDetectBinPacking: false
 FixNamespaceComments: true
 ForEachMacros:
@@ -125,5 +126,10 @@ StatementMacros:
   - QT_REQUIRE_VERSION
 TabWidth:        4
 UseTab:          Never
+---
+Language: Cpp
+DisableFormat:   false
+---
+Language: ObjC
+DisableFormat:   false
 ...
-

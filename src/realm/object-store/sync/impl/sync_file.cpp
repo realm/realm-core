@@ -295,11 +295,11 @@ bool SyncFileManager::copy_realm_file(const std::string& old_path, const std::st
     return true;
 }
 
-bool SyncFileManager::remove_realm(const std::string& user_identity, const std::string& local_identity,
+bool SyncFileManager::remove_realm(const std::string& user_identity,
+                                   const std::vector<std::string>& legacy_user_identities,
                                    const std::string& raw_realm_path, const std::string& partition) const
 {
-    util::Optional<std::string> existing =
-        get_existing_realm_file_path(user_identity, local_identity, raw_realm_path, partition);
+    auto existing = get_existing_realm_file_path(user_identity, legacy_user_identities, raw_realm_path, partition);
     if (existing) {
         return remove_realm(*existing);
     }
@@ -327,10 +327,10 @@ static bool try_file_remove(const std::string& path) noexcept
     }
 }
 
-util::Optional<std::string> SyncFileManager::get_existing_realm_file_path(const std::string& user_identity,
-                                                                          const std::string& local_user_identity,
-                                                                          const std::string& realm_file_name,
-                                                                          const std::string& partition) const
+util::Optional<std::string>
+SyncFileManager::get_existing_realm_file_path(const std::string& user_identity,
+                                              const std::vector<std::string>& legacy_user_identities,
+                                              const std::string& realm_file_name, const std::string& partition) const
 {
     std::string preferred_name = preferred_realm_path_without_suffix(user_identity, realm_file_name);
     if (try_file_exists(preferred_name)) {
@@ -365,14 +365,14 @@ util::Optional<std::string> SyncFileManager::get_existing_realm_file_path(const 
         }
     }
 
-    if (!local_user_identity.empty()) {
+    for (auto& legacy_identity : legacy_user_identities) {
         // retain support for legacy paths
-        std::string old_path = legacy_realm_file_path(local_user_identity, realm_file_name);
+        std::string old_path = legacy_realm_file_path(legacy_identity, realm_file_name);
         if (try_file_exists(old_path)) {
             return old_path;
         }
         // retain support for legacy local identity paths
-        std::string old_local_identity_path = legacy_local_identity_path(local_user_identity, partition);
+        std::string old_local_identity_path = legacy_local_identity_path(legacy_identity, partition);
         if (try_file_exists(old_local_identity_path)) {
             return old_local_identity_path;
         }
@@ -381,11 +381,12 @@ util::Optional<std::string> SyncFileManager::get_existing_realm_file_path(const 
     return util::none;
 }
 
-std::string SyncFileManager::realm_file_path(const std::string& user_identity, const std::string& local_user_identity,
+std::string SyncFileManager::realm_file_path(const std::string& user_identity,
+                                             const std::vector<std::string>& legacy_user_identities,
                                              const std::string& realm_file_name, const std::string& partition) const
 {
-    util::Optional<std::string> existing_path =
-        get_existing_realm_file_path(user_identity, local_user_identity, realm_file_name, partition);
+    auto existing_path =
+        get_existing_realm_file_path(user_identity, legacy_user_identities, realm_file_name, partition);
     if (existing_path) {
         return *existing_path;
     }

@@ -112,10 +112,13 @@ TEST(Geospatial_Assignment)
 
     Geospatial geo_box(GeoBox{GeoPoint{1.1, 2.2}, GeoPoint{3.3, 4.4}});
     CHECK(*GeoBox::from_polygon(geo_box.get<GeoBox>().to_polygon()) == geo_box.get<GeoBox>());
-    std::string_view err_msg = "The only Geospatial type currently supported for storage is 'point'";
-    CHECK_THROW_CONTAINING_MESSAGE(obj.set(location_column_key, geo_box), err_msg);
+    std::string_view err_msg_box = "Attempting to store a 'Box' in  class 'Location' but the only Geospatial type "
+                                   "currently supported for storage is 'Point'";
+    CHECK_THROW_CONTAINING_MESSAGE(obj.set(location_column_key, geo_box), err_msg_box);
     Geospatial geo_circle(GeoCircle{10, GeoPoint{1.1, 2.2}});
-    CHECK_THROW_CONTAINING_MESSAGE(obj.set(location_column_key, geo_circle), err_msg);
+    std::string_view err_msg_circle = "Attempting to store a 'Circle' in  class 'Location' but the only Geospatial "
+                                      "type currently supported for storage is 'Point'";
+    CHECK_THROW_CONTAINING_MESSAGE(obj.set(location_column_key, geo_circle), err_msg_circle);
 }
 
 TEST(Geospatial_invalid_format)
@@ -137,10 +140,31 @@ TEST(Geospatial_invalid_format)
 TEST(Query_GeoWithinBasics)
 {
     Group g;
-    std::vector<Geospatial> data = {GeoPoint{-2, -1},   GeoPoint{-1, -2}, GeoPoint{0, 0},
-                                    GeoPoint{0.5, 0.5}, GeoPoint{1, 1},   GeoPoint{2, 2}};
+    std::vector<Geospatial> data = {GeoPoint{-2, -1}, GeoPoint{-1, -2},  GeoPoint{0, 0}, GeoPoint{0.5, 0.5},
+                                    GeoPoint{1, 1},   GeoPoint{2, 2, 2}, GeoPoint()};
     TableRef table = setup_with_points(g, data);
     ColKey location_column_key = table->get_column_key("location");
+    // an object with null link location
+    table->create_object_with_primary_key(-42);
+    // an object with a location that doesn't have properties set on the point
+    Obj invalid_point = table->create_object_with_primary_key(-43);
+    invalid_point.create_and_set_linked_object(location_column_key);
+    // an object with the correct 'Point' but invalid coordinates
+    Obj invalid_coords = table->create_object_with_primary_key(-44);
+    Obj embedded_invalid = invalid_coords.create_and_set_linked_object(location_column_key);
+    embedded_invalid.set(embedded_invalid.get_table()->get_column_key("type"), "Point");
+    // an object with 4 elements in the coordinate list
+    Obj excess_coords = table->create_object_with_primary_key(-44);
+    Obj embedded_excess = excess_coords.create_and_set_linked_object(location_column_key);
+    embedded_excess.set(embedded_excess.get_table()->get_column_key("type"), "Point");
+    auto list = embedded_excess.get_list<double>(embedded_excess.get_table()->get_column_key("coordinates"));
+    list.add(2);
+    list.add(2);
+    list.add(2);
+    list.add(2);
+    Geospatial geo_excess = excess_coords.get<Geospatial>(location_column_key);
+    CHECK(geo_excess.is_valid() == Status::OK());
+
     for (size_t i = 0; i < data.size(); ++i) {
         Obj obj = table->get_object_with_primary_key(int64_t(i));
         CHECK(obj);

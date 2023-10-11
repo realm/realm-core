@@ -187,8 +187,8 @@ private:
     {
         auto observer = reinterpret_cast<WebSocketObserver*>(user_data);
         REALM_ASSERT(event->code >= 1000 && event->code < 5000);
-        auto status = event->code == 1000 ? Status::OK() : Status(ErrorCodes::Error(event->code), event->reason);
-        observer->websocket_closed_handler(event->wasClean, std::move(status));
+        observer->websocket_closed_handler(event->wasClean, static_cast<websocket::WebSocketError>(event->code),
+                                           event->reason);
         return EM_TRUE;
     }
 

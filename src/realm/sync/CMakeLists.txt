@@ -60,6 +60,7 @@ set(SYNC_NETWORK_INSTALL_HEADERS
     network/network.hpp
     network/network_ssl.hpp
     network/websocket.hpp
+    network/websocket_error.hpp
 )
 
 set(NOINST_HEADERS
@@ -82,6 +83,7 @@ set(NOINST_HEADERS
 
 set(SYNC_HEADERS ${IMPL_INSTALL_HEADESR}
     ${SYNC_INSTALL_HEADERS}
+    ${SYNC_NETWORK_INSTALL_HEADERS}
     ${NOINST_HEADERS})
 
 add_library(Sync STATIC ${SYNC_SOURCES} ${SYNC_HEADERS})

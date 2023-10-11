@@ -70,7 +70,6 @@
 #include <set>
 
 using namespace realm;
-using namespace realm::metrics;
 using namespace realm::test_util;
 using namespace realm::util;
 
@@ -2870,165 +2869,122 @@ TEST(Parser_Limit)
     // solely limit
     TableView tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 3);
     tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
     tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(2)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(3)");
     CHECK_EQUAL(tv.size(), 3);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(4)");
     CHECK_EQUAL(tv.size(), 3);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
 
     // sort + limit
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 3);
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(2)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     CHECK_EQUAL(tv[1].get<String>(name_col), "Ben");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(3)");
     CHECK_EQUAL(tv.size(), 3);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     CHECK_EQUAL(tv[1].get<String>(name_col), "Ben");
     CHECK_EQUAL(tv[2].get<String>(name_col), "Frank");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(4)");
     CHECK_EQUAL(tv.size(), 3);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
 
     // sort + distinct + limit
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(2)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     CHECK_EQUAL(tv[1].get<String>(name_col), "Frank");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(3)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     CHECK_EQUAL(tv[1].get<String>(name_col), "Frank");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(4)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
 
     // query + limit
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(2)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(3)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(4)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
 
     // compound query + limit
     tv = get_sorted_view(people, "age < 30 && name == 'Adam' LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     tv = get_sorted_view(people, "age < 30 && name == 'Adam' LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
 
     // limit multiple times, order matters
     tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(2) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
     tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(3) LIMIT(2) LIMIT(1) LIMIT(10)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
     tv = get_sorted_view(people, "age > 0 SORT(name ASC) LIMIT(2)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     CHECK_EQUAL(tv[1].get<String>(name_col), "Ben");
     tv = get_sorted_view(people, "age > 0 LIMIT(2) SORT(name ASC)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     CHECK_EQUAL(tv[1].get<String>(name_col), "Frank");
     tv = get_sorted_view(people, "age > 0 SORT(name ASC) LIMIT(2) DISTINCT(age)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1); // the other result is excluded by distinct not limit
     tv = get_sorted_view(people, "age > 0 SORT(name DESC) LIMIT(2) SORT(age ASC) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
     CHECK_EQUAL(tv[0].get<String>(name_col), "Ben");
 
     // size_unlimited() checks
     tv = get_sorted_view(people, "age == 30");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "age == 30 LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     tv = get_sorted_view(people, "age == 1000");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "age == 1000 LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "age == 1000 SORT(name ASC)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "age == 1000 SORT(name ASC) LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "age == 28 SORT(name ASC)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "age == 28 SORT(name ASC) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     tv = get_sorted_view(people, "age == 28 DISTINCT(age)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "age == 28 DISTINCT(age) LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     tv = get_sorted_view(people, "age == 28 SORT(name ASC) DISTINCT(age)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "age == 28 SORT(name ASC) DISTINCT(age) LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
     tv = get_sorted_view(people, "FALSEPREDICATE");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "FALSEPREDICATE LIMIT(0)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
     tv = get_sorted_view(people, "FALSEPREDICATE LIMIT(1)");
     CHECK_EQUAL(tv.size(), 0);
-    CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
 
     // errors
     CHECK_THROW_ANY(get_sorted_view(people, "TRUEPREDICATE LIMIT(-1)"));    // only accepting positive integers
@@ -5775,11 +5731,21 @@ TEST(Parser_Geospatial)
         GeoPolygon{{{GeoPoint{0, 0}, GeoPoint{1, 0}, GeoPoint{1, 1}, GeoPoint{0, 1}, GeoPoint{0, 0}}}}};
     Geospatial invalid;
     Geospatial point{GeoPoint{0, 0}};
-    std::vector<Mixed> args = {Mixed{&box},          Mixed{&circle}, Mixed{&polygon}, Mixed{&invalid},
-                               Mixed{realm::null()}, Mixed{1.2},     Mixed{1000},     Mixed{"string value"}};
+    std::string str_of_box = box.to_string();
+    std::string str_of_circle = circle.to_string();
+    std::string str_of_polygon = polygon.to_string();
+    std::string str_of_point = point.to_string();
+    std::vector<Mixed> args = {Mixed{&box},          Mixed{&circle},        Mixed{&polygon},
+                               Mixed{&invalid},      Mixed{realm::null()},  Mixed{1.2},
+                               Mixed{1000},          Mixed{"string value"}, Mixed{str_of_box},
+                               Mixed{str_of_circle}, Mixed{str_of_polygon}, Mixed{str_of_point}};
+
     verify_query_sub(test_context, table, "location GEOWITHIN $0", args, 1);
     verify_query_sub(test_context, table, "location GEOWITHIN $1", args, 4);
     verify_query_sub(test_context, table, "location GEOWITHIN $2", args, 1);
+    verify_query_sub(test_context, table, "location GEOWITHIN $8", args, 1);
+    verify_query_sub(test_context, table, "location GEOWITHIN $9", args, 4);
+    verify_query_sub(test_context, table, "location GEOWITHIN $10", args, 1);
 
     GeoCircle c = circle.get<GeoCircle>();
     std::vector<Mixed> coord_args = {Mixed{c.center.longitude}, Mixed{c.center.latitude}, Mixed{c.radius_radians}};
@@ -5837,8 +5803,18 @@ TEST(Parser_Geospatial)
                                          "But the provided type is 'int'") != std::string::npos));
     CHECK_THROW_EX(
         verify_query_sub(test_context, table, "location GEOWITHIN $7", args, 1), query_parser::InvalidQueryError,
-        CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a geospatial constant value. "
-                                         "But the provided type is 'string'") != std::string::npos));
+        CHECK(std::string(e.what()).find(
+                  "Invalid syntax in serialized geospatial object at argument 7: 'Invalid predicate: 'string value': "
+                  "syntax error, unexpected identifier, expecting geobox or geopolygon or geocircle or argument'") !=
+              std::string::npos));
+
+    CHECK_THROW_EX(verify_query_sub(test_context, table, "location GEOWITHIN $11", args, 1),
+                   query_parser::InvalidQueryError,
+                   CHECK(std::string(e.what()).find(
+                             "Invalid syntax in serialized geospatial object at argument 11: 'Invalid predicate: "
+                             "'GeoPoint([0, 0])': syntax error, unexpected identifier, expecting geobox or "
+                             "geopolygon or geocircle or argument'") != std::string::npos));
+
     CHECK_THROW_EX(verify_query_sub(test_context, table, "location GEOWITHIN $3", args, 0),
                    query_parser::InvalidQueryError,
                    CHECK(std::string(e.what()).find("The right hand side of 'geoWithin' must be a valid "
@@ -5917,6 +5893,23 @@ TEST(Parser_RecursiveLogial)
     q = table->query(query, args, {});
     q_count = q.count();
     CHECK_EQUAL(q_count, 1);
+}
+
+TEST(Parser_issue6831)
+{
+    Group g;
+    auto plant = g.add_table_with_primary_key("Plant", type_ObjectId, "id");
+    plant->add_column(type_String, "Name");
+    auto inventory = g.add_table_with_primary_key("Inventory", type_String, "id");
+    inventory->add_column_dictionary(*plant, "Plants");
+
+    auto petunia = plant->create_object_with_primary_key(ObjectId::gen());
+    petunia.set("Name", "Petunia");
+    auto obj = inventory->create_object_with_primary_key("Inv");
+    auto dict = obj.get_dictionary("Plants");
+    dict.insert("Petunia", petunia);
+    auto q = inventory->query("Plants.@keys == 'Petunia'");
+    CHECK_EQUAL(q.count(), 1);
 }
 
 #endif // TEST_PARSER

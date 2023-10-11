@@ -550,18 +550,6 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
     }
 }
 
-void Array::set_all_to_zero()
-{
-    if (m_size == 0 || m_width == 0)
-        return;
-
-    copy_on_write(); // Throws
-
-    set_width_in_header(0, get_header());
-    update_width_cache_from_header();
-}
-
-
 namespace {
 
 template <size_t width>
@@ -646,7 +634,6 @@ size_t find_zero(uint64_t v)
 }
 
 } // namespace
-
 
 
 int64_t Array::sum(size_t start, size_t end) const
@@ -1392,12 +1379,12 @@ bool QueryStateFindFirst::match(size_t index, Mixed) noexcept
 }
 
 template <>
-bool QueryStateFindAll<KeyColumn>::match(size_t index, Mixed) noexcept
+bool QueryStateFindAll<std::vector<ObjKey>>::match(size_t index, Mixed) noexcept
 {
     ++m_match_count;
 
     int64_t key_value = (m_key_values ? m_key_values->get(index) : index) + m_key_offset;
-    m_keys.add(ObjKey(key_value));
+    m_keys.push_back(ObjKey(key_value));
 
     return (m_limit > m_match_count);
 }

@@ -20,6 +20,7 @@
 #define REALM_REALM_HPP
 
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/class.hpp>
 
 #include <realm/util/optional.hpp>
 #include <realm/util/functional.hpp>
@@ -238,6 +239,9 @@ public:
     {
         return m_schema;
     }
+    bool is_empty();
+    Class get_class(StringData object_type);
+    std::vector<Class> get_classes();
     uint64_t schema_version() const noexcept
     {
         return m_schema_version;

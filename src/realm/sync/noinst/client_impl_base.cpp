@@ -1,4 +1,3 @@
-#include "realm/sync/protocol.hpp"
 #include <system_error>
 #include <sstream>
 
@@ -14,6 +13,7 @@
 #include <realm/sync/impl/clock.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/sync/network/http.hpp>
+#include <realm/sync/network/websocket.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/sync/noinst/compact_changesets.hpp>
@@ -24,7 +24,6 @@
 #include <realm/sync/network/websocket.hpp> // Only for websocket::Error TODO remove
 
 // NOTE: The protocol specification is in `/doc/protocol.md`
-
 
 using namespace realm;
 using namespace _impl;
@@ -44,36 +43,45 @@ using OutputBuffer                = ClientImpl::OutputBuffer;
 using ReceivedChangesets          = ClientProtocol::ReceivedChangesets;
 // clang-format on
 
-void ErrorTryAgainBackoffInfo::update(const ProtocolErrorInfo& info)
+void ClientImpl::ReconnectInfo::reset() noexcept
 {
-    if (triggering_error && static_cast<ProtocolError>(info.raw_error_code) == *triggering_error) {
-        return;
-    }
-
-    delay_info = info.resumption_delay_interval.value_or(ResumptionDelayInfo{});
-    cur_delay_interval = util::none;
-    triggering_error = static_cast<ProtocolError>(info.raw_error_code);
+    m_backoff_state.reset();
+    scheduled_reset = false;
 }
 
-void ErrorTryAgainBackoffInfo::reset()
+
+void ClientImpl::ReconnectInfo::update(ConnectionTerminationReason new_reason,
+                                       std::optional<ResumptionDelayInfo> new_delay_info)
 {
-    triggering_error = util::none;
-    cur_delay_interval = util::none;
-    delay_info = ResumptionDelayInfo{};
+    m_backoff_state.update(new_reason, new_delay_info);
 }
 
-std::chrono::milliseconds ErrorTryAgainBackoffInfo::delay_interval()
+
+std::chrono::milliseconds ClientImpl::ReconnectInfo::delay_interval()
 {
-    if (!cur_delay_interval) {
-        cur_delay_interval = delay_info.resumption_delay_interval;
-        return *cur_delay_interval;
+    if (scheduled_reset) {
+        reset();
     }
-    if (*cur_delay_interval >= delay_info.max_resumption_delay_interval) {
-        return delay_info.max_resumption_delay_interval;
+
+    if (!m_backoff_state.triggering_error) {
+        return std::chrono::milliseconds::zero();
     }
-    *cur_delay_interval *= delay_info.resumption_delay_backoff_multiplier;
-    return *cur_delay_interval;
+
+    switch (*m_backoff_state.triggering_error) {
+        case ConnectionTerminationReason::closed_voluntarily:
+            return std::chrono::milliseconds::zero();
+        case ConnectionTerminationReason::server_said_do_not_reconnect:
+            return std::chrono::milliseconds::max();
+        default:
+            if (m_reconnect_mode == ReconnectMode::testing) {
+                return std::chrono::milliseconds::max();
+            }
+
+            REALM_ASSERT(m_reconnect_mode == ReconnectMode::normal);
+            return m_backoff_state.delay_interval();
+    }
 }
+
 
 bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
                                       port_type& port, std::string& path) const
@@ -128,7 +136,7 @@ bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& 
 
 
 ClientImpl::ClientImpl(ClientConfig config)
-    : logger_ptr{config.logger ? std::move(config.logger) : std::make_shared<util::StderrLogger>()}
+    : logger_ptr{config.logger ? std::move(config.logger) : util::Logger::get_default_logger()}
     , logger{*logger_ptr}
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}
@@ -136,6 +144,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_ping_keepalive_period{config.ping_keepalive_period}
     , m_pong_keepalive_timeout{config.pong_keepalive_timeout}
     , m_fast_reconnect_limit{config.fast_reconnect_limit}
+    , m_reconnect_backoff_info{config.reconnect_backoff_info}
     , m_disable_upload_activation_delay{config.disable_upload_activation_delay}
     , m_dry_run{config.dry_run}
     , m_enable_default_port_hack{config.enable_default_port_hack}
@@ -177,6 +186,10 @@ ClientImpl::ClientImpl(ClientConfig config)
                  config.disable_upload_compaction); // Throws
     logger.debug("Config param: disable_sync_to_disk = %1",
                  config.disable_sync_to_disk); // Throws
+    logger.debug("Config param: reconnect backoff info: max_delay: %1 ms, initial_delay: %2 ms, multiplier: %3",
+                 m_reconnect_backoff_info.max_resumption_delay_interval.count(),
+                 m_reconnect_backoff_info.resumption_delay_interval.count(),
+                 m_reconnect_backoff_info.resumption_delay_backoff_multiplier);
 
     if (config.reconnect_mode != ReconnectMode::normal) {
         logger.warn("Testing/debugging feature 'nonnormal reconnect mode' enabled - "
@@ -226,12 +239,13 @@ void ClientImpl::post(SyncSocketProvider::FunctionHandler&& handler)
         m_drained = false;
     }
     m_socket_provider->post([handler = std::move(handler), this](Status status) {
+        auto decr_guard = util::make_scope_exit([&]() noexcept {
+            std::lock_guard lock(m_drain_mutex);
+            REALM_ASSERT(m_outstanding_posts);
+            --m_outstanding_posts;
+            m_drain_cv.notify_all();
+        });
         handler(status);
-
-        std::lock_guard lock(m_drain_mutex);
-        REALM_ASSERT(m_outstanding_posts);
-        --m_outstanding_posts;
-        m_drain_cv.notify_all();
     });
 }
 
@@ -360,23 +374,18 @@ void Connection::cancel_reconnect_delay()
         initiate_reconnect_wait(); // Throws
         return;
     }
+
+    // If we are not disconnected, then we need to make sure the next time we get disconnected
+    // that we are allowed to re-connect as quickly as possible.
+    //
+    // Setting m_reconnect_info.scheduled_reset will cause initiate_reconnect_wait to reset the
+    // backoff/delay state before calculating the next delay, unless a PONG message is received
+    // for the urgent PING message we send below.
+    //
+    // If we get a PONG message for the urgent PING message sent below, then the connection is
+    // healthy and we can calculate the next delay normally.
     if (m_state != ConnectionState::disconnected) {
-        // A currently established connection, or an in-progress attempt to
-        // establish the connection may be about to fail for a reason that
-        // precedes the invocation of Session::cancel_reconnect_delay(). For
-        // that reason, it is important that at least one new reconnect attempt
-        // is initiated without delay after the invocation of
-        // Session::cancel_reconnect_delay(). The operation that resets the
-        // reconnect delay (ReconnectInfo::reset()) needs to be postponed,
-        // because some parts of `m_reconnect_info` may get clobbered before
-        // initiate_reconnect_wait() is called again.
-        //
-        // If a PONG message arrives, and it is a response to the urgent PING
-        // message sent below, `m_reconnect_info.m_scheduled_reset` will be
-        // reset back to false, because in that case, we know that the
-        // connection was not about to fail for a reason that preceded the
-        // invocation of cancel_reconnect_delay().
-        m_reconnect_info.m_scheduled_reset = true;
+        m_reconnect_info.scheduled_reset = true;
         m_ping_after_scheduled_reset_of_reconnect_info = false;
 
         schedule_urgent_ping(); // Throws
@@ -452,20 +461,25 @@ void Connection::websocket_connected_handler(const std::string& protocol)
                     (value_2 >= get_oldest_supported_protocol_version() && value_2 <= get_current_protocol_version());
                 if (good_version) {
                     logger.detail("Negotiated protocol version: %1", value_2);
+                    // For now, grab the connection ID from the websocket if it supports it. In the future, the server
+                    // will provide the appservices connection ID via a log message.
+                    // TODO: Remove once the server starts sending the connection ID
+                    receive_appservices_request_id(m_websocket->get_appservices_request_id());
                     m_negotiated_protocol_version = value_2;
                     handle_connection_established(); // Throws
                     return;
                 }
             }
         }
-        logger.error("Bad protocol info from server: '%1'", protocol); // Throws
+        close_due_to_client_side_error({ErrorCodes::SyncProtocolNegotiationFailed,
+                                        util::format("Bad protocol info from server: '%1'", protocol)},
+                                       IsFatal{true}, ConnectionTerminationReason::bad_headers_in_http_response);
     }
     else {
-        logger.error("Missing protocol info from server"); // Throws
+        close_due_to_client_side_error(
+            {ErrorCodes::SyncProtocolNegotiationFailed, "Missing protocol info from server"}, IsFatal{true},
+            ConnectionTerminationReason::bad_headers_in_http_response);
     }
-    m_reconnect_info.m_reason = ConnectionTerminationReason::bad_headers_in_http_response;
-    bool is_fatal = true;
-    close_due_to_client_side_error(ClientError::bad_protocol_from_server, std::nullopt, is_fatal); // Throws
 }
 
 
@@ -475,10 +489,12 @@ bool Connection::websocket_binary_message_received(util::Span<const char> data)
         logger.debug("Received binary message after connection was force closed");
         return false;
     }
-    std::error_code ec;
+
     using sf = SimulatedFailure;
-    if (sf::trigger(sf::sync_client__read_head, ec)) {
-        read_or_write_error(ec, "simulated read error");
+    if (sf::check_trigger(sf::sync_client__read_head)) {
+        close_due_to_client_side_error(
+            {ErrorCodes::RuntimeError, "Simulated failure during sync client websocket read"}, IsFatal{false},
+            ConnectionTerminationReason::read_or_write_error);
         return bool(m_websocket);
     }
 
@@ -492,30 +508,30 @@ void Connection::websocket_error_handler()
     m_websocket_error_received = true;
 }
 
-bool Connection::websocket_closed_handler(bool was_clean, Status status)
+bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_code, std::string_view msg)
 {
     if (m_force_closed) {
         logger.debug("Received websocket close message after connection was force closed");
         return false;
     }
-    logger.info("Closing the websocket with status='%1', was_clean='%2'", status, was_clean);
-    auto error_code = status.get_std_error_code();
+    logger.info("Closing the websocket with error code=%1, message='%2', was_clean=%3", error_code, msg, was_clean);
 
-    switch (static_cast<WebSocketError>(error_code.value())) {
+    switch (error_code) {
         case WebSocketError::websocket_ok:
             break;
         case WebSocketError::websocket_resolve_failed:
             [[fallthrough]];
         case WebSocketError::websocket_connection_failed: {
-            m_reconnect_info.m_reason = ConnectionTerminationReason::connect_operation_failed;
-            constexpr bool try_again = true;
-            involuntary_disconnect(SessionErrorInfo{error_code, try_again}); // Throws
+            SessionErrorInfo error_info(
+                {ErrorCodes::SyncConnectFailed, util::format("Failed to connect to sync: %1", msg)}, IsFatal{false});
+            involuntary_disconnect(std::move(error_info), ConnectionTerminationReason::connect_operation_failed);
             break;
         }
         case WebSocketError::websocket_read_error:
             [[fallthrough]];
         case WebSocketError::websocket_write_error: {
-            read_or_write_error(error_code, status.reason()); // Throws
+            close_due_to_transient_error({ErrorCodes::ConnectionClosed, msg},
+                                         ConnectionTerminationReason::read_or_write_error);
             break;
         }
         case WebSocketError::websocket_going_away:
@@ -533,72 +549,75 @@ bool Connection::websocket_closed_handler(bool was_clean, Status status)
         case WebSocketError::websocket_no_status_received:
             [[fallthrough]];
         case WebSocketError::websocket_invalid_extension: {
-            m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
-            constexpr bool try_again = true;
-            SessionErrorInfo error_info{error_code, status.reason(), try_again};
-            involuntary_disconnect(std::move(error_info)); // Throws
+            close_due_to_client_side_error({ErrorCodes::SyncProtocolInvariantFailed, msg}, IsFatal{false},
+                                           ConnectionTerminationReason::websocket_protocol_violation); // Throws
             break;
         }
         case WebSocketError::websocket_message_too_big: {
-            m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
-            constexpr bool try_again = true;
-            auto ec = make_error_code(ProtocolError::limits_exceeded);
-            auto message =
-                util::format("Sync websocket closed because the server received a message that was too large: %1",
-                             status.reason());
-            SessionErrorInfo error_info(ec, message, try_again);
+            auto message = util::format(
+                "Sync websocket closed because the server received a message that was too large: %1", msg);
+            SessionErrorInfo error_info(Status(ErrorCodes::LimitExceeded, std::move(message)), IsFatal{false});
             error_info.server_requests_action = ProtocolErrorInfo::Action::ClientReset;
-            involuntary_disconnect(std::move(error_info)); // Throws
+            involuntary_disconnect(std::move(error_info),
+                                   ConnectionTerminationReason::websocket_protocol_violation); // Throws
             break;
         }
         case WebSocketError::websocket_tls_handshake_failed: {
-            error_code = ClientError::ssl_server_cert_rejected;
-            constexpr bool is_fatal = false;
-            m_reconnect_info.m_reason = ConnectionTerminationReason::ssl_certificate_rejected;
-            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            close_due_to_client_side_error(
+                Status(ErrorCodes::TlsHandshakeFailed, util::format("TLS handshake failed: %1", msg)), IsFatal{false},
+                ConnectionTerminationReason::ssl_certificate_rejected); // Throws
             break;
         }
-        case WebSocketError::websocket_client_too_old: {
-            error_code = ClientError::client_too_old_for_server;
-            constexpr bool is_fatal = true;
-            m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
-            break;
-        }
-        case WebSocketError::websocket_client_too_new: {
-            error_code = ClientError::client_too_new_for_server;
-            constexpr bool is_fatal = true;
-            m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
-            break;
-        }
+        case WebSocketError::websocket_client_too_old:
+            [[fallthrough]];
+        case WebSocketError::websocket_client_too_new:
+            [[fallthrough]];
         case WebSocketError::websocket_protocol_mismatch: {
-            error_code = ClientError::protocol_mismatch;
-            constexpr bool is_fatal = true;
-            m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            close_due_to_client_side_error({ErrorCodes::SyncProtocolNegotiationFailed, msg}, IsFatal{true},
+                                           ConnectionTerminationReason::http_response_says_fatal_error); // Throws
             break;
         }
-        case WebSocketError::websocket_fatal_error:
-            [[fallthrough]];
+        case WebSocketError::websocket_fatal_error: {
+            involuntary_disconnect(SessionErrorInfo({ErrorCodes::ConnectionClosed, msg}, IsFatal{true}),
+                                   ConnectionTerminationReason::http_response_says_fatal_error);
+            break;
+        }
         case WebSocketError::websocket_forbidden: {
-            constexpr bool is_fatal = true;
-            m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            SessionErrorInfo error_info({ErrorCodes::AuthError, msg}, IsFatal{true});
+            error_info.server_requests_action = ProtocolErrorInfo::Action::LogOutUser;
+            involuntary_disconnect(std::move(error_info),
+                                   ConnectionTerminationReason::http_response_says_fatal_error);
             break;
         }
-        case WebSocketError::websocket_unauthorized:
-            [[fallthrough]];
-        case WebSocketError::websocket_moved_permanently:
-            [[fallthrough]];
+        case WebSocketError::websocket_unauthorized: {
+            SessionErrorInfo error_info(
+                {ErrorCodes::AuthError,
+                 util::format("Websocket was closed because of an authentication issue: %1", msg)},
+                IsFatal{false});
+            error_info.server_requests_action = ProtocolErrorInfo::Action::RefreshUser;
+            involuntary_disconnect(std::move(error_info),
+                                   ConnectionTerminationReason::http_response_says_nonfatal_error);
+            break;
+        }
+        case WebSocketError::websocket_moved_permanently: {
+            SessionErrorInfo error_info({ErrorCodes::ConnectionClosed, msg}, IsFatal{false});
+            error_info.server_requests_action = ProtocolErrorInfo::Action::RefreshLocation;
+            involuntary_disconnect(std::move(error_info),
+                                   ConnectionTerminationReason::http_response_says_nonfatal_error);
+            break;
+        }
+        case WebSocketError::websocket_abnormal_closure: {
+            SessionErrorInfo error_info({ErrorCodes::ConnectionClosed, msg}, IsFatal{false});
+            error_info.server_requests_action = ProtocolErrorInfo::Action::RefreshUser;
+            involuntary_disconnect(std::move(error_info),
+                                   ConnectionTerminationReason::http_response_says_nonfatal_error);
+            break;
+        }
         case WebSocketError::websocket_internal_server_error:
             [[fallthrough]];
-        case WebSocketError::websocket_abnormal_closure:
-            [[fallthrough]];
         case WebSocketError::websocket_retry_error: {
-            constexpr bool is_fatal = false;
-            m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_nonfatal_error;
-            close_due_to_client_side_error(error_code, status.reason(), is_fatal); // Throws
+            involuntary_disconnect(SessionErrorInfo({ErrorCodes::ConnectionClosed, msg}, IsFatal{false}),
+                                   ConnectionTerminationReason::http_response_says_nonfatal_error);
             break;
         }
     }
@@ -619,155 +638,32 @@ void Connection::initiate_reconnect_wait()
         return;
     }
 
-    using milliseconds_lim = ReconnectInfo::milliseconds_lim;
-
-    constexpr milliseconds_type min_delay = 1000;   // 1 second (barring deductions)
-    constexpr milliseconds_type max_delay = 300000; // 5 minutes
-
-    // Delay must increase when scaled by a factor greater than 1.
-    static_assert(min_delay > 0, "");
-    static_assert(max_delay >= min_delay, "");
-
-    if (m_reconnect_info.m_scheduled_reset)
-        m_reconnect_info.reset();
-
-    bool infinite_delay = false;
-    milliseconds_type remaining_delay = 0;
-    if (!m_reconnect_info.m_reason) {
-        // Delay in progress. `m_time_point` specifies when the delay expires.
-        if (m_reconnect_info.m_time_point == milliseconds_lim::max()) {
-            infinite_delay = true;
-        }
-        else {
-            milliseconds_type now = monotonic_clock_now();
-            if (now < m_reconnect_info.m_time_point)
-                remaining_delay = m_reconnect_info.m_time_point - now;
-        }
-    }
-    else {
-        // Compute a new reconnect delay
-        bool zero_delay = false;
-        switch (m_client.get_reconnect_mode()) {
-            case ReconnectMode::normal:
-                break;
-            case ReconnectMode::testing:
-                if (was_voluntary(*m_reconnect_info.m_reason)) {
-                    zero_delay = true;
-                }
-                else {
-                    infinite_delay = true;
-                }
-                break;
-        }
-
-        // Calculate delay
-        milliseconds_type delay = 0;
-        bool record_delay_as_zero = false;
-        if (!zero_delay && !infinite_delay) {
-            switch (*m_reconnect_info.m_reason) {
-                case ConnectionTerminationReason::closed_voluntarily:
-                case ConnectionTerminationReason::read_or_write_error:
-                case ConnectionTerminationReason::pong_timeout:
-                    // Minimum delay after successful connect operation
-                    delay = min_delay;
-                    break;
-                case ConnectionTerminationReason::connect_operation_failed:
-                case ConnectionTerminationReason::http_response_says_nonfatal_error:
-                case ConnectionTerminationReason::sync_connect_timeout:
-                    // The last attempt at establishing a connection failed. In
-                    // this case, the reconnect delay will increase with the
-                    // number of consecutive failures.
-                    delay = m_reconnect_info.m_delay;
-                    // Double the previous delay
-                    if (util::int_multiply_with_overflow_detect(delay, 2))
-                        delay = milliseconds_lim::max();
-                    // Raise to minimum delay in case last delay was zero
-                    if (delay < min_delay)
-                        delay = min_delay;
-                    // Cut off at a fixed maximum delay
-                    if (delay > max_delay)
-                        delay = max_delay;
-                    break;
-                case ConnectionTerminationReason::server_said_try_again_later:
-                    record_delay_as_zero = true;
-                    delay = m_reconnect_info.m_try_again_delay_info.delay_interval().count();
-                    break;
-                case ConnectionTerminationReason::ssl_certificate_rejected:
-                case ConnectionTerminationReason::ssl_protocol_violation:
-                case ConnectionTerminationReason::websocket_protocol_violation:
-                case ConnectionTerminationReason::http_response_says_fatal_error:
-                case ConnectionTerminationReason::bad_headers_in_http_response:
-                case ConnectionTerminationReason::sync_protocol_violation:
-                case ConnectionTerminationReason::server_said_do_not_reconnect:
-                case ConnectionTerminationReason::missing_protocol_feature:
-                    // Use a significantly longer delay in this case to avoid
-                    // disturbing the server too much. It does make sense to try
-                    // again eventually, because the server may get restarted in
-                    // such a way the that problem goes away.
-                    delay = 3600000L; // 1 hour
-                    record_delay_as_zero = true;
-                    break;
-            }
-
-            // Make a randomized deduction of up to 25% to prevent a large
-            // number of clients from trying to reconnect in synchronicity.
-            auto distr = std::uniform_int_distribution<milliseconds_type>(0, delay / 4);
-            milliseconds_type randomized_deduction = distr(m_client.get_random());
-            delay -= randomized_deduction;
-
-            // Finally, deduct the time that has already passed since the last
-            // connection attempt.
-            milliseconds_type now = monotonic_clock_now();
-            REALM_ASSERT_3(now, >=, m_reconnect_info.m_time_point);
-            milliseconds_type time_since_delay_start = now - m_reconnect_info.m_time_point;
-            if (time_since_delay_start < delay)
-                remaining_delay = delay - time_since_delay_start;
-        }
-
-        // Calculate expiration time for delay
-        milliseconds_type time_point;
-        if (infinite_delay) {
-            time_point = milliseconds_lim::max();
-        }
-        else {
-            time_point = m_reconnect_info.m_time_point;
-            if (util::int_add_with_overflow_detect(time_point, delay))
-                time_point = milliseconds_lim::max();
-        }
-
-        // Indicate that a new delay is now in progress
-        m_reconnect_info.m_reason = util::none;
-        m_reconnect_info.m_time_point = time_point;
-        if (record_delay_as_zero) {
-            m_reconnect_info.m_delay = 0;
-        }
-        else {
-            m_reconnect_info.m_delay = delay;
-        }
-    }
-
-    if (infinite_delay) {
+    m_reconnect_delay_in_progress = true;
+    auto delay = m_reconnect_info.delay_interval();
+    if (delay == std::chrono::milliseconds::max()) {
         logger.detail("Reconnection delayed indefinitely"); // Throws
         // Not actually starting a timer corresponds to an infinite wait
-        m_reconnect_delay_in_progress = true;
         m_nonzero_reconnect_delay = true;
         return;
     }
 
-    if (remaining_delay > 0) {
-        logger.detail("Allowing reconnection in %1 milliseconds",
-                      remaining_delay); // Throws
+    if (delay == std::chrono::milliseconds::zero()) {
+        m_nonzero_reconnect_delay = false;
+    }
+    else {
+        logger.detail("Allowing reconnection in %1 milliseconds", delay.count()); // Throws
+        m_nonzero_reconnect_delay = true;
     }
 
-    m_reconnect_disconnect_timer =
-        m_client.create_timer(std::chrono::milliseconds(remaining_delay), [this](Status status) {
-            // If the operation is aborted, the connection object may have been
-            // destroyed.
-            if (status != ErrorCodes::OperationAborted)
-                handle_reconnect_wait(status); // Throws
-        });                                    // Throws
-    m_reconnect_delay_in_progress = true;
-    m_nonzero_reconnect_delay = (remaining_delay > 0);
+    // We create a timer for the reconnect_disconnect timer even if the delay is zero because
+    // we need it to be cancelable in case the connection is terminated before the timer
+    // callback is run.
+    m_reconnect_disconnect_timer = m_client.create_timer(delay, [this](Status status) {
+        // If the operation is aborted, the connection object may have been
+        // destroyed.
+        if (status != ErrorCodes::OperationAborted)
+            handle_reconnect_wait(status); // Throws
+    });                                    // Throws
 }
 
 
@@ -778,6 +674,7 @@ void Connection::handle_reconnect_wait(Status status)
         throw Exception(status);
     }
 
+    REALM_ASSERT(m_reconnect_delay_in_progress);
     m_reconnect_delay_in_progress = false;
 
     if (m_num_active_unsuspended_sessions > 0)
@@ -821,13 +718,13 @@ struct Connection::WebSocketObserverShim : public sync::WebSocketObserver {
         return conn->websocket_binary_message_received(data);
     }
 
-    bool websocket_closed_handler(bool was_clean, Status status) override
+    bool websocket_closed_handler(bool was_clean, WebSocketError error_code, std::string_view msg) override
     {
         if (sentinel->destroyed) {
             return true;
         }
 
-        return conn->websocket_closed_handler(was_clean, std::move(status));
+        return conn->websocket_closed_handler(was_clean, error_code, msg);
     }
 };
 
@@ -843,21 +740,8 @@ void Connection::initiate_reconnect()
     m_websocket_sentinel = util::make_bind<LifecycleSentinel>();
     m_websocket.reset();
 
-    // In most cases, the reconnect delay will be counting from the point in
-    // time of the initiation of the last reconnect operation (the initiation of
-    // the DNS resolve operation). It may also be counting from the point in
-    // time of the reception of an ERROR message, but in that case we can simply
-    // update `m_reconnect_info.m_time_point`.
-    m_reconnect_info.m_time_point = monotonic_clock_now();
-
     // Watchdog
     initiate_connect_wait(); // Throws
-
-    // There are three outcomes of the connection operation; success, failure,
-    // or cancellation. Since it is complicated to update the connection
-    // termination reason on cancellation, we mark it as voluntarily closed now, and then
-    // change it if the outcome ends up being success or failure.
-    m_reconnect_info.m_reason = ConnectionTerminationReason::closed_voluntarily;
 
     std::vector<std::string> sec_websocket_protocol;
     {
@@ -920,10 +804,11 @@ void Connection::handle_connect_wait(Status status)
     }
 
     REALM_ASSERT_EX(m_state == ConnectionState::connecting, m_state);
-    m_reconnect_info.m_reason = ConnectionTerminationReason::sync_connect_timeout;
     logger.info("Connect timeout"); // Throws
-    constexpr bool try_again = true;
-    involuntary_disconnect(SessionErrorInfo{ClientError::connect_timeout, try_again}); // Throws
+    involuntary_disconnect(
+        SessionErrorInfo{Status{ErrorCodes::SyncConnectTimeout, "Sync connection was not fully established in time"},
+                         IsFatal{false}},
+        ConnectionTerminationReason::sync_connect_timeout); // Throws
 }
 
 
@@ -933,11 +818,6 @@ void Connection::handle_connection_established()
     m_connect_timer.reset();
 
     m_state = ConnectionState::connected;
-
-    // TODO(RCORE-1380) get this information in-band rather than from the websocket.
-    if (auto coid = m_websocket->get_appservices_request_id(); !coid.empty()) {
-        logger.info("Connected to app services with request id: \"%1\"", coid);
-    }
 
     milliseconds_type now = monotonic_clock_now();
     m_pong_wait_started_at = now; // Initially, no time was spent waiting for a PONG message
@@ -1061,8 +941,8 @@ void Connection::handle_pong_timeout()
 {
     REALM_ASSERT(m_waiting_for_pong);
     logger.debug("Timeout on reception of PONG message"); // Throws
-    m_reconnect_info.m_reason = ConnectionTerminationReason::pong_timeout;
-    close_due_to_client_side_error(ClientError::pong_timeout, std::nullopt, false);
+    close_due_to_transient_error({ErrorCodes::ConnectionClosed, "Timed out waiting for PONG response from server"},
+                                 ConnectionTerminationReason::pong_timeout);
 }
 
 
@@ -1138,7 +1018,7 @@ void Connection::send_ping()
     REALM_ASSERT(m_send_ping);
 
     m_send_ping = false;
-    if (m_reconnect_info.m_scheduled_reset)
+    if (m_reconnect_info.scheduled_reset)
         m_ping_after_scheduled_reset_of_reconnect_info = true;
 
     m_last_ping_sent_at = monotonic_clock_now();
@@ -1227,34 +1107,30 @@ void Connection::handle_disconnect_wait(Status status)
 }
 
 
-void Connection::read_or_write_error(std::error_code ec, std::string_view msg)
+void Connection::close_due_to_protocol_error(Status status)
 {
-    m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
-    bool is_fatal = false;
-    close_due_to_client_side_error(ec, msg, is_fatal); // Throws
+    SessionErrorInfo error_info(std::move(status), IsFatal{true});
+    error_info.server_requests_action = ProtocolErrorInfo::Action::ProtocolViolation;
+    involuntary_disconnect(std::move(error_info),
+                           ConnectionTerminationReason::sync_protocol_violation); // Throws
 }
 
 
-void Connection::close_due_to_protocol_error(std::error_code ec, std::optional<std::string_view> msg)
+void Connection::close_due_to_client_side_error(Status status, IsFatal is_fatal, ConnectionTerminationReason reason)
 {
-    m_reconnect_info.m_reason = ConnectionTerminationReason::sync_protocol_violation;
-    bool is_fatal = true;                              // A sync protocol violation is a fatal error
-    close_due_to_client_side_error(ec, msg, is_fatal); // Throws
+    logger.info("Connection closed due to error: %1", status); // Throws
+
+    involuntary_disconnect(SessionErrorInfo{std::move(status), is_fatal}, reason); // Throw
 }
 
 
-// Close connection due to error discovered on the client-side.
-void Connection::close_due_to_client_side_error(std::error_code ec, std::optional<std::string_view> msg,
-                                                bool is_fatal)
+void Connection::close_due_to_transient_error(Status status, ConnectionTerminationReason reason)
 {
-    logger.info("Connection closed due to error"); // Throws
-    const bool try_again = !is_fatal;
-    std::string message = ec.message();
-    if (msg) {
-        message += ": ";
-        message += *msg;
-    }
-    involuntary_disconnect(SessionErrorInfo{ec, message, try_again}); // Throws
+    logger.info("Connection closed due to transient error: %1", status); // Throws
+    SessionErrorInfo error_info{std::move(status), IsFatal{false}};
+    error_info.server_requests_action = ProtocolErrorInfo::Action::Transient;
+
+    involuntary_disconnect(std::move(error_info), reason); // Throw
 }
 
 
@@ -1262,29 +1138,13 @@ void Connection::close_due_to_client_side_error(std::error_code ec, std::optiona
 // reported to the client by way of a connection-level ERROR message.
 void Connection::close_due_to_server_side_error(ProtocolError error_code, const ProtocolErrorInfo& info)
 {
-    if (info.try_again) {
-        m_reconnect_info.m_reason = ConnectionTerminationReason::server_said_try_again_later;
-    }
-    else {
-        m_reconnect_info.m_reason = ConnectionTerminationReason::server_said_do_not_reconnect;
-    }
-
-    m_reconnect_info.m_try_again_delay_info.update(info);
-
-    // When the server asks us to reconnect later, it is important to make the
-    // reconnect delay start at the time of the reception of the ERROR message,
-    // rather than at the initiation of the connection, as is usually the
-    // case. This is because the message may arrive at a point in time where the
-    // connection has been open for a long time, so if we let the delay count
-    // from the initiation of the connection, it could easly end up as no delay
-    // at all.
-    m_reconnect_info.m_time_point = monotonic_clock_now();
-
     logger.info("Connection closed due to error reported by server: %1 (%2)", info.message,
                 int(error_code)); // Throws
 
-    std::error_code ec = make_error_code(error_code);
-    involuntary_disconnect(SessionErrorInfo{info, ec}); // Throws
+    const auto reason = info.is_fatal ? ConnectionTerminationReason::server_said_do_not_reconnect
+                                      : ConnectionTerminationReason::server_said_try_again_later;
+    involuntary_disconnect(SessionErrorInfo{info, protocol_error_to_status(error_code, info.message)},
+                           reason); // Throws
 }
 
 
@@ -1347,16 +1207,16 @@ void Connection::receive_pong(milliseconds_type timestamp)
 
     bool legal_at_this_time = (m_waiting_for_pong && !m_send_ping);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
-        logger.error("Illegal message at this time");
-        std::error_code ec = ClientError::bad_message_order;
-        close_due_to_protocol_error(ec); // Throws
+        close_due_to_protocol_error(
+            {ErrorCodes::SyncProtocolInvariantFailed, "Received PONG message when it was not valid"}); // Throws
         return;
     }
 
     if (REALM_UNLIKELY(timestamp != m_last_ping_sent_at)) {
-        logger.error("Bad timestamp in PONG message");
-        std::error_code ec = ClientError::bad_timestamp;
-        close_due_to_protocol_error(ec); // Throws
+        close_due_to_protocol_error(
+            {ErrorCodes::SyncProtocolInvariantFailed,
+             util::format("Received PONG message with an invalid timestamp (expected %1, received %2)",
+                          m_last_ping_sent_at, timestamp)}); // Throws
         return;
     }
 
@@ -1369,9 +1229,9 @@ void Connection::receive_pong(milliseconds_type timestamp)
     // the last invocation of cancel_reconnect_delay(), then the connection is
     // still good, and we do not have to skip the next reconnect delay.
     if (m_ping_after_scheduled_reset_of_reconnect_info) {
-        REALM_ASSERT(m_reconnect_info.m_scheduled_reset);
+        REALM_ASSERT(m_reconnect_info.scheduled_reset);
         m_ping_after_scheduled_reset_of_reconnect_info = false;
-        m_reconnect_info.m_scheduled_reset = false;
+        m_reconnect_info.scheduled_reset = false;
     }
 
     m_heartbeat_timer.reset();
@@ -1396,7 +1256,10 @@ Session* Connection::find_and_validate_session(session_ident_type session_ident,
     // Check the history to see if the message received was for a previous session
     if (auto it = m_session_history.find(session_ident); it == m_session_history.end()) {
         logger.error("Bad session identifier in %1 message, session_ident = %2", message, session_ident);
-        close_due_to_protocol_error(ClientError::bad_session_ident); // Throws
+        close_due_to_protocol_error(
+            {ErrorCodes::SyncProtocolInvariantFailed,
+             util::format("Received message %1 for session iden %2 when that session never existed", message,
+                          session_ident)});
     }
     else {
         logger.error("Received %1 message for closed session, session_ident = %2", message,
@@ -1413,9 +1276,8 @@ void Connection::receive_error_message(const ProtocolErrorInfo& info, session_id
         if (REALM_UNLIKELY(!sess)) {
             return;
         }
-        std::error_code ec = sess->receive_error_message(info); // Throws
-        if (ec) {
-            close_due_to_protocol_error(ec); // Throws
+        if (auto status = sess->receive_error_message(info); !status.is_ok()) {
+            close_due_to_protocol_error(std::move(status)); // Throws
             return;
         }
 
@@ -1425,8 +1287,8 @@ void Connection::receive_error_message(const ProtocolErrorInfo& info, session_id
         return;
     }
 
-    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, session_ident=%4, error_action=%5)",
-                info.message, info.raw_error_code, info.try_again, session_ident,
+    logger.info("Received: ERROR \"%1\" (error_code=%2, is_fatal=%3, session_ident=%4, error_action=%5)",
+                info.message, info.raw_error_code, info.is_fatal, session_ident,
                 info.server_requests_action); // Throws
 
     bool known_error_code = bool(get_protocol_error_message(info.raw_error_code));
@@ -1436,12 +1298,16 @@ void Connection::receive_error_message(const ProtocolErrorInfo& info, session_id
             close_due_to_server_side_error(error_code, info); // Throws
             return;
         }
-        logger.error("Not a connection-level error code"); // Throws
+        close_due_to_protocol_error(
+            {ErrorCodes::SyncProtocolInvariantFailed,
+             util::format("Received ERROR message with a non-connection-level error code %1 without a session ident",
+                          info.raw_error_code)});
     }
     else {
-        logger.error("Unknown error code"); // Throws
+        close_due_to_protocol_error(
+            {ErrorCodes::SyncProtocolInvariantFailed,
+             util::format("Received ERROR message with unknown error code %1", info.raw_error_code)});
     }
-    close_due_to_protocol_error(ClientError::bad_error_code); // Throws
 }
 
 
@@ -1449,13 +1315,13 @@ void Connection::receive_query_error_message(int raw_error_code, std::string_vie
                                              session_ident_type session_ident)
 {
     if (session_ident == 0) {
-        logger.error("Received query error message for session ident 0."); // throws;
-        return close_due_to_protocol_error(ClientError::bad_session_ident);
+        return close_due_to_protocol_error(
+            {ErrorCodes::SyncProtocolInvariantFailed, "Received query error message for session ident 0"});
     }
 
     if (!is_flx_sync_connection()) {
-        logger.error("Received query error message on a non-FLX sync connection");
-        return close_due_to_protocol_error(ClientError::bad_protocol_from_server);
+        return close_due_to_protocol_error({ErrorCodes::SyncProtocolInvariantFailed,
+                                            "Received a FLX query error message on a non-FLX sync connection"});
     }
 
     Session* sess = find_and_validate_session(session_ident, "QUERY_ERROR");
@@ -1463,8 +1329,8 @@ void Connection::receive_query_error_message(int raw_error_code, std::string_vie
         return;
     }
 
-    if (auto ec = sess->receive_query_error_message(raw_error_code, message, query_version)) {
-        close_due_to_protocol_error(ec);
+    if (auto status = sess->receive_query_error_message(raw_error_code, message, query_version); !status.is_ok()) {
+        close_due_to_protocol_error(std::move(status));
     }
 }
 
@@ -1476,9 +1342,8 @@ void Connection::receive_ident_message(session_ident_type session_ident, SaltedF
         return;
     }
 
-    std::error_code ec = sess->receive_ident_message(client_file_ident); // Throws
-    if (ec)
-        close_due_to_protocol_error(ec); // Throws
+    if (auto status = sess->receive_ident_message(client_file_ident); !status.is_ok())
+        close_due_to_protocol_error(std::move(status)); // Throws
 }
 
 void Connection::receive_download_message(session_ident_type session_ident, const SyncProgress& progress,
@@ -1491,8 +1356,11 @@ void Connection::receive_download_message(session_ident_type session_ident, cons
         return;
     }
 
-    sess->receive_download_message(progress, downloadable_bytes, batch_state, query_version,
-                                   received_changesets); // Throws
+    if (auto status = sess->receive_download_message(progress, downloadable_bytes, batch_state, query_version,
+                                                     received_changesets);
+        !status.is_ok()) {
+        close_due_to_protocol_error(std::move(status));
+    }
 }
 
 void Connection::receive_mark_message(session_ident_type session_ident, request_ident_type request_ident)
@@ -1502,9 +1370,8 @@ void Connection::receive_mark_message(session_ident_type session_ident, request_
         return;
     }
 
-    std::error_code ec = sess->receive_mark_message(request_ident); // Throws
-    if (ec)
-        close_due_to_protocol_error(ec); // Throws
+    if (auto status = sess->receive_mark_message(request_ident); !status.is_ok())
+        close_due_to_protocol_error(std::move(status)); // Throws
 }
 
 
@@ -1515,9 +1382,8 @@ void Connection::receive_unbound_message(session_ident_type session_ident)
         return;
     }
 
-    std::error_code ec = sess->receive_unbound_message(); // Throws
-    if (ec) {
-        close_due_to_protocol_error(ec); // Throws
+    if (auto status = sess->receive_unbound_message(); !status.is_ok()) {
+        close_due_to_protocol_error(std::move(status)); // Throws
         return;
     }
 
@@ -1535,40 +1401,50 @@ void Connection::receive_test_command_response(session_ident_type session_ident,
         return;
     }
 
-    if (auto ec = sess->receive_test_command_response(request_ident, body)) {
-        close_due_to_protocol_error(ec);
+    if (auto status = sess->receive_test_command_response(request_ident, body); !status.is_ok()) {
+        close_due_to_protocol_error(std::move(status));
     }
 }
 
 
-void Connection::handle_protocol_error(ClientProtocol::Error error)
+void Connection::receive_server_log_message(session_ident_type session_ident, util::Logger::Level level,
+                                            std::string_view message)
 {
-    switch (error) {
-        case ClientProtocol::Error::unknown_message:
-            close_due_to_protocol_error(ClientError::unknown_message); // Throws
-            break;
-        case ClientProtocol::Error::bad_syntax:
-            close_due_to_protocol_error(ClientError::bad_syntax); // Throws
-            break;
-        case ClientProtocol::Error::limits_exceeded:
-            close_due_to_protocol_error(ClientError::limits_exceeded); // Throws
-            break;
-        case ClientProtocol::Error::bad_decompression:
-            close_due_to_protocol_error(ClientError::bad_compression); // Throws
-            break;
-        case ClientProtocol::Error::bad_changeset_header_syntax:
-            close_due_to_protocol_error(ClientError::bad_changeset_header_syntax); // Throws
-            break;
-        case ClientProtocol::Error::bad_changeset_size:
-            close_due_to_protocol_error(ClientError::bad_changeset_size); // Throws
-            break;
-        case ClientProtocol::Error::bad_server_version:
-            close_due_to_protocol_error(ClientError::bad_server_version); // Throws
-            break;
-        case ClientProtocol::Error::bad_error_code:
-            close_due_to_protocol_error(ClientError::bad_error_code); // Throws
-            break;
+    std::string prefix;
+    if (REALM_LIKELY(!m_appservices_coid.empty())) {
+        prefix = util::format("Server[%1]", m_appservices_coid);
     }
+    else {
+        prefix = "Server";
+    }
+
+    if (session_ident != 0) {
+        if (auto sess = get_session(session_ident)) {
+            sess->logger.log(level, "%1 log: %2", prefix, message);
+            return;
+        }
+
+        logger.log(level, "%1 log for unknown session %2: %3", prefix, session_ident, message);
+        return;
+    }
+
+    logger.log(level, "%1 log: %2", prefix, message);
+}
+
+
+void Connection::receive_appservices_request_id(std::string_view coid)
+{
+    // Only set once per connection
+    if (!coid.empty() && m_appservices_coid.empty()) {
+        m_appservices_coid = coid;
+        logger.info("Connected to app services with request id: \"%1\"", m_appservices_coid);
+    }
+}
+
+
+void Connection::handle_protocol_error(Status status)
+{
+    close_due_to_protocol_error(std::move(status));
 }
 
 
@@ -1591,11 +1467,7 @@ void Connection::enlist_to_send(Session* sess)
 
 std::string Connection::get_active_appservices_connection_id()
 {
-    if (!m_websocket) {
-        return {};
-    }
-
-    return std::string{m_websocket->get_appservices_request_id()};
+    return m_appservices_coid;
 }
 
 void Session::cancel_resumption_delay()
@@ -1629,15 +1501,17 @@ void Session::gather_pending_compensating_writes(util::Span<Changeset> changeset
     REALM_ASSERT_DEBUG(
         std::is_sorted(m_pending_compensating_write_errors.begin(), m_pending_compensating_write_errors.end(),
                        [](const ProtocolErrorInfo& lhs, const ProtocolErrorInfo& rhs) {
-                           return lhs.compensating_write_server_version < rhs.compensating_write_server_version;
+                           REALM_ASSERT_DEBUG(lhs.compensating_write_server_version.has_value());
+                           REALM_ASSERT_DEBUG(rhs.compensating_write_server_version.has_value());
+                           return *lhs.compensating_write_server_version < *rhs.compensating_write_server_version;
                        }));
 #endif
 
     while (!m_pending_compensating_write_errors.empty() &&
-           m_pending_compensating_write_errors.front().compensating_write_server_version <=
+           *m_pending_compensating_write_errors.front().compensating_write_server_version <=
                changesets.back().version) {
         auto& cur_error = m_pending_compensating_write_errors.front();
-        REALM_ASSERT_3(cur_error.compensating_write_server_version, >=, changesets.front().version);
+        REALM_ASSERT_3(*cur_error.compensating_write_server_version, >=, changesets.front().version);
         out->push_back(std::move(cur_error));
         m_pending_compensating_write_errors.pop_front();
     }
@@ -1652,8 +1526,9 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
     auto& history = repl.get_history();
     if (received_changesets.empty()) {
         if (download_batch_state == DownloadBatchState::MoreToCome) {
-            throw IntegrationException(ClientError::bad_progress,
-                                       "received empty download message that was not the last in batch");
+            throw IntegrationException(ErrorCodes::SyncProtocolInvariantFailed,
+                                       "received empty download message that was not the last in batch",
+                                       ProtocolError::bad_progress);
         }
         history.set_sync_progress(progress, &downloadable_bytes, version_info); // Throws
         return;
@@ -1679,11 +1554,13 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
     for (const auto& pending_error : pending_compensating_write_errors) {
         logger.info("Reporting compensating write for client version %1 in server version %2: %3",
                     pending_error.compensating_write_rejected_client_version,
-                    pending_error.compensating_write_server_version, pending_error.message);
+                    *pending_error.compensating_write_server_version, pending_error.message);
         try {
-            ProtocolError error_code = ProtocolError(pending_error.raw_error_code);
-            on_connection_state_changed(m_conn.get_state(),
-                                        SessionErrorInfo{pending_error, make_error_code(error_code)});
+            on_connection_state_changed(
+                m_conn.get_state(),
+                SessionErrorInfo{pending_error,
+                                 protocol_error_to_status(static_cast<ProtocolError>(pending_error.raw_error_code),
+                                                          pending_error.message)});
         }
         catch (...) {
             logger.error("Exception thrown while reporting compensating write: %1", exception_to_status());
@@ -1696,16 +1573,13 @@ void Session::on_integration_failure(const IntegrationException& error)
 {
     REALM_ASSERT_EX(m_state == Active, m_state);
     REALM_ASSERT(!m_client_error && !m_error_to_send);
-    logger.error("Failed to integrate downloaded changesets: %1", error.what());
+    logger.error("Failed to integrate downloaded changesets: %1", error.to_status());
 
     m_client_error = util::make_optional<IntegrationException>(error);
     m_error_to_send = true;
 
-    constexpr bool try_again = true;
-    std::error_code error_code = error.code();
-    auto msg = error_code.message() + ": " + error.what();
     // Surface the error to the user otherwise is lost.
-    on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{error.code(), std::move(msg), try_again});
+    on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{error.to_status(), IsFatal{false}});
 
     // Since the deactivation process has not been initiated, the UNBIND
     // message cannot have been sent unless an ERROR message was received.
@@ -1812,9 +1686,11 @@ void Session::activate()
     REALM_ASSERT_3(m_last_version_available, >=, m_progress.upload.client_version);
 
     logger.debug("last_version_available  = %1", m_last_version_available);           // Throws
-    logger.debug("progress_server_version = %1", m_progress.download.server_version); // Throws
-    logger.debug("progress_client_version = %1",
-                 m_progress.download.last_integrated_client_version); // Throws
+    logger.debug("progress_download_server_version = %1", m_progress.download.server_version); // Throws
+    logger.debug("progress_download_client_version = %1",
+                 m_progress.download.last_integrated_client_version);                                      // Throws
+    logger.debug("progress_upload_server_version = %1", m_progress.upload.last_integrated_server_version); // Throws
+    logger.debug("progress_upload_client_version = %1", m_progress.upload.client_version);                 // Throws
 
     reset_protocol_state();
     m_state = Active;
@@ -1829,7 +1705,7 @@ void Session::activate()
         logger.error("Error integrating bootstrap changesets: %1", error.what());
         m_suspended = true;
         m_conn.one_less_active_unsuspended_session(); // Throws
-        on_suspended(SessionErrorInfo{error.code(), false});
+        on_suspended(SessionErrorInfo{Status{error.code(), error.what()}, IsFatal{true}});
     }
 
     if (has_pending_client_reset) {
@@ -2013,6 +1889,7 @@ void Session::send_bind_message()
         if (auto migrated_partition = get_migration_store()->get_migrated_partition()) {
             bind_json_data["migratedPartition"] = *migrated_partition;
         }
+        bind_json_data["sessionReason"] = static_cast<uint64_t>(get_session_reason());
         if (logger.would_log(util::Logger::Level::debug)) {
             std::string json_data_dump;
             if (!bind_json_data.empty()) {
@@ -2132,8 +2009,6 @@ void Session::send_upload_message()
                 m_last_sent_flx_query_version, m_upload_progress.client_version);
         }
         if (m_pending_flx_sub_set && m_pending_flx_sub_set->snapshot_version < m_upload_target_version) {
-            logger.trace("Limiting UPLOAD message up to version %1 to send QUERY version %2",
-                         m_pending_flx_sub_set->snapshot_version, m_pending_flx_sub_set->query_version);
             target_upload_version = m_pending_flx_sub_set->snapshot_version;
         }
     }
@@ -2148,9 +2023,22 @@ void Session::send_upload_message()
     if (uploadable_changesets.empty()) {
         // Nothing more to upload right now
         check_for_upload_completion(); // Throws
+        // If we need to limit upload up to some version other than the last client version available and there are no
+        // changes to upload, then there is no need to send an empty message.
+        if (target_upload_version != m_upload_target_version) {
+            logger.debug("Empty UPLOAD was skipped (progress_client_version=%1, progress_server_version=%2)",
+                         m_upload_progress.client_version, m_upload_progress.last_integrated_server_version);
+            // Other messages may be waiting to be sent
+            return enlist_to_send(); // Throws
+        }
     }
     else {
         m_last_version_selected_for_upload = uploadable_changesets.back().progress.client_version;
+    }
+
+    if (m_is_flx_sync_session && m_pending_flx_sub_set && target_upload_version != m_upload_target_version) {
+        logger.trace("Limiting UPLOAD message up to version %1 to send QUERY version %2",
+                     m_pending_flx_sub_set->snapshot_version, m_pending_flx_sub_set->query_version);
     }
 
     version_type progress_client_version = m_upload_progress.client_version;
@@ -2183,10 +2071,15 @@ void Session::send_upload_message()
 #if REALM_DEBUG
             ChunkedBinaryInputStream in{changeset_data};
             Changeset log;
-            parse_changeset(in, log);
-            std::stringstream ss;
-            log.print(ss);
-            logger.trace("Changeset (parsed):\n%1", ss.str());
+            try {
+                parse_changeset(in, log);
+                std::stringstream ss;
+                log.print(ss);
+                logger.trace("Changeset (parsed):\n%1", ss.str());
+            }
+            catch (const BadChangesetError& err) {
+                logger.error("Unable to parse changeset: %1", err.what());
+            }
 #endif
         }
 
@@ -2292,18 +2185,17 @@ void Session::send_json_error_message()
     ClientProtocol& protocol = m_conn.get_client_protocol();
     OutputBuffer& out = m_conn.get_output_buffer();
     session_ident_type session_ident = get_ident();
-    auto client_error = m_client_error->code();
-    auto protocol_error = client_error_to_protocol_error(client_error);
-    auto message = m_client_error->what();
+    auto protocol_error = m_client_error->error_for_server;
 
+    auto message = util::format("%1", m_client_error->to_status());
     logger.info("Sending: ERROR \"%1\" (error_code=%2, session_ident=%3)", message, static_cast<int>(protocol_error),
                 session_ident); // Throws
 
     nlohmann::json error_body_json;
-    error_body_json["message"] = message;
+    error_body_json["message"] = std::move(message);
     protocol.make_json_error_message(out, session_ident, static_cast<int>(protocol_error),
                                      error_body_json.dump()); // Throws
-    m_conn.initiate_write_message(out, this); // Throws
+    m_conn.initiate_write_message(out, this);                 // Throws
 
     m_error_to_send = false;
     enlist_to_send(); // Throws
@@ -2334,7 +2226,7 @@ void Session::send_test_command_message()
 }
 
 
-std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident)
+Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
 {
     logger.debug("Received: IDENT(client_file_ident=%1, client_file_ident_salt=%2)", client_file_ident.ident,
                  client_file_ident.salt); // Throws
@@ -2343,21 +2235,18 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
     // because in that case, the associated Realm and SessionWrapper must
     // not be accessed any longer.
     if (m_state != Active)
-        return std::error_code{}; // Success
+        return Status::OK(); // Success
 
     bool legal_at_this_time = (m_bind_message_sent && !have_client_file_ident() && !m_error_message_received &&
                                !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
-        logger.error("Illegal message at this time");
-        return ClientError::bad_message_order;
+        return {ErrorCodes::SyncProtocolInvariantFailed, "Received IDENT message when it was not legal"};
     }
     if (REALM_UNLIKELY(client_file_ident.ident < 1)) {
-        logger.error("Bad client file identifier in IDENT message");
-        return ClientError::bad_client_file_ident;
+        return {ErrorCodes::SyncProtocolInvariantFailed, "Bad client file identifier in IDENT message"};
     }
     if (REALM_UNLIKELY(client_file_ident.salt == 0)) {
-        logger.error("Bad client file identifier salt in IDENT message");
-        return ClientError::bad_client_file_ident_salt;
+        return {ErrorCodes::SyncProtocolInvariantFailed, "Bad client file identifier salt in IDENT message"};
     }
 
     m_client_file_ident = client_file_ident;
@@ -2365,7 +2254,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
     if (REALM_UNLIKELY(get_client().is_dry_run())) {
         // Ready to send the IDENT message
         ensure_enlisted_to_send(); // Throws
-        return std::error_code{};  // Success
+        return Status::OK();       // Success
     }
 
     // access before the client reset (if applicable) because
@@ -2439,14 +2328,15 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         did_client_reset = client_reset_if_needed();
     }
     catch (const std::exception& e) {
-        auto err_msg = util::format("A fatal error occured during client reset: '%1'", e.what());
+        auto err_msg = util::format("A fatal error occurred during client reset: '%1'", e.what());
         logger.error(err_msg.c_str());
-        SessionErrorInfo err_info(make_error_code(ClientError::auto_client_reset_failure), err_msg, false);
+        SessionErrorInfo err_info(Status{ErrorCodes::AutoClientResetFailed, err_msg}, IsFatal{true});
         suspend(err_info);
-        return {};
+        return Status::OK();
     }
     if (!did_client_reset) {
-        repl.get_history().set_client_file_ident(client_file_ident, m_fix_up_object_ids); // Throws
+        repl.get_history().set_client_file_ident(client_file_ident,
+                                                 m_fix_up_object_ids); // Throws
         m_progress.download.last_integrated_client_version = 0;
         m_progress.upload.client_version = 0;
         m_last_version_selected_for_upload = 0;
@@ -2454,18 +2344,19 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
 
     // Ready to send the IDENT message
     ensure_enlisted_to_send(); // Throws
-    return std::error_code{};  // Success
+    return Status::OK();       // Success
 }
 
-void Session::receive_download_message(const SyncProgress& progress, std::uint_fast64_t downloadable_bytes,
-                                       DownloadBatchState batch_state, int64_t query_version,
-                                       const ReceivedChangesets& received_changesets)
+Status Session::receive_download_message(const SyncProgress& progress, std::uint_fast64_t downloadable_bytes,
+                                         DownloadBatchState batch_state, int64_t query_version,
+                                         const ReceivedChangesets& received_changesets)
 {
+    REALM_ASSERT_EX(query_version >= 0, query_version);
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm and SessionWrapper must
     // not be accessed any longer.
     if (m_state != Active)
-        return;
+        return Status::OK();
 
     if (is_steady_state_download_message(batch_state, query_version)) {
         batch_state = DownloadBatchState::SteadyState;
@@ -2484,34 +2375,31 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
     // changeset over and over again.
     if (m_client_error) {
         logger.debug("Ignoring download message because the client detected an integration error");
-        return;
+        return Status::OK();
     }
 
     bool legal_at_this_time = (m_ident_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
-        logger.error("Illegal message at this time");
-        m_conn.close_due_to_protocol_error(ClientError::bad_message_order);
-        return;
+        return {ErrorCodes::SyncProtocolInvariantFailed, "Received DOWNLOAD message when it was not legal"};
     }
-    int error_code = 0;
-    if (REALM_UNLIKELY(!check_received_sync_progress(progress, error_code))) {
-        logger.error("Bad sync progress received (%1)", error_code);
-        m_conn.close_due_to_protocol_error(ClientError::bad_progress);
-        return;
+    if (auto status = check_received_sync_progress(progress); REALM_UNLIKELY(!status.is_ok())) {
+        logger.error("Bad sync progress received (%1)", status);
+        return status;
     }
 
     version_type server_version = m_progress.download.server_version;
     version_type last_integrated_client_version = m_progress.download.last_integrated_client_version;
     for (const Transformer::RemoteChangeset& changeset : received_changesets) {
-        // Check that per-changeset server version is strictly increasing, except in FLX sync where the server version
-        // must be increasing, but can stay the same during bootstraps.
+        // Check that per-changeset server version is strictly increasing, except in FLX sync where the server
+        // version must be increasing, but can stay the same during bootstraps.
         bool good_server_version = m_is_flx_sync_session ? (changeset.remote_version >= server_version)
                                                          : (changeset.remote_version > server_version);
+        // Each server version cannot be greater than the one in the header of the download message.
+        good_server_version = good_server_version && (changeset.remote_version <= progress.download.server_version);
         if (!good_server_version) {
-            logger.error("Bad server version in changeset header (DOWNLOAD) (%1, %2, %3)", changeset.remote_version,
-                         server_version, progress.download.server_version);
-            m_conn.close_due_to_protocol_error(ClientError::bad_server_version);
-            return;
+            return {ErrorCodes::SyncProtocolInvariantFailed,
+                    util::format("Bad server version in changeset header (DOWNLOAD) (%1, %2, %3)",
+                                 changeset.remote_version, server_version, progress.download.server_version)};
         }
         server_version = changeset.remote_version;
         // Check that per-changeset last integrated client version is "weakly"
@@ -2520,12 +2408,11 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
             (changeset.last_integrated_local_version >= last_integrated_client_version &&
              changeset.last_integrated_local_version <= progress.download.last_integrated_client_version);
         if (!good_client_version) {
-            logger.error("Bad last integrated client version in changeset header (DOWNLOAD) "
-                         "(%1, %2, %3)",
-                         changeset.last_integrated_local_version, last_integrated_client_version,
-                         progress.download.last_integrated_client_version);
-            m_conn.close_due_to_protocol_error(ClientError::bad_client_version);
-            return;
+            return {ErrorCodes::SyncProtocolInvariantFailed,
+                    util::format("Bad last integrated client version in changeset header (DOWNLOAD) "
+                                 "(%1, %2, %3)",
+                                 changeset.last_integrated_local_version, last_integrated_client_version,
+                                 progress.download.last_integrated_client_version)};
         }
         last_integrated_client_version = changeset.last_integrated_local_version;
         // Server shouldn't send our own changes, and zero is not a valid client
@@ -2533,22 +2420,22 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
         bool good_file_ident =
             (changeset.origin_file_ident > 0 && changeset.origin_file_ident != m_client_file_ident.ident);
         if (!good_file_ident) {
-            logger.error("Bad origin file identifier");
-            m_conn.close_due_to_protocol_error(ClientError::bad_origin_file_ident);
-            return;
+            return {ErrorCodes::SyncProtocolInvariantFailed,
+                    util::format("Bad origin file identifier in changeset header (DOWNLOAD)",
+                                 changeset.origin_file_ident)};
         }
     }
 
     auto hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageReceived, progress, query_version,
                                        batch_state, received_changesets.size());
     if (hook_action == SyncClientHookAction::EarlyReturn) {
-        return;
+        return Status::OK();
     }
     REALM_ASSERT_EX(hook_action == SyncClientHookAction::NoAction, hook_action);
 
     if (process_flx_bootstrap_message(progress, batch_state, query_version, received_changesets)) {
         clear_resumption_delay_state();
-        return;
+        return Status::OK();
     }
 
     initiate_integrate_changesets(downloadable_bytes, batch_state, progress, received_changesets); // Throws
@@ -2556,16 +2443,17 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
     hook_action = call_debug_hook(SyncClientHookEvent::DownloadMessageIntegrated, progress, query_version,
                                   batch_state, received_changesets.size());
     if (hook_action == SyncClientHookAction::EarlyReturn) {
-        return;
+        return Status::OK();
     }
     REALM_ASSERT_EX(hook_action == SyncClientHookAction::NoAction, hook_action);
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
     // after a retryable session error.
     clear_resumption_delay_state();
+    return Status::OK();
 }
 
-std::error_code Session::receive_mark_message(request_ident_type request_ident)
+Status Session::receive_mark_message(request_ident_type request_ident)
 {
     logger.debug("Received: MARK(request_ident=%1)", request_ident); // Throws
 
@@ -2573,38 +2461,39 @@ std::error_code Session::receive_mark_message(request_ident_type request_ident)
     // because in that case, the associated Realm and SessionWrapper must
     // not be accessed any longer.
     if (m_state != Active)
-        return std::error_code{}; // Success
+        return Status::OK(); // Success
 
     bool legal_at_this_time = (m_ident_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
-        logger.error("Illegal message at this time");
-        return ClientError::bad_message_order;
+        return {ErrorCodes::SyncProtocolInvariantFailed, "Received MARK message when it was not legal"};
     }
     bool good_request_ident =
         (request_ident <= m_last_download_mark_sent && request_ident > m_last_download_mark_received);
     if (REALM_UNLIKELY(!good_request_ident)) {
-        logger.error("Bad request identifier in MARK message");
-        return ClientError::bad_request_ident;
+        return {
+            ErrorCodes::SyncProtocolInvariantFailed,
+            util::format(
+                "Received MARK message with invalid request identifer (last mark sent: %1 last mark received: %2)",
+                m_last_download_mark_sent, m_last_download_mark_received)};
     }
 
     m_server_version_at_last_download_mark = m_progress.download.server_version;
     m_last_download_mark_received = request_ident;
     check_for_download_completion(); // Throws
 
-    return std::error_code{}; // Success
+    return Status::OK(); // Success
 }
 
 
 // The caller (Connection) must discard the session if the session has become
 // deactivated upon return.
-std::error_code Session::receive_unbound_message()
+Status Session::receive_unbound_message()
 {
     logger.debug("Received: UNBOUND");
 
     bool legal_at_this_time = (m_unbind_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
-        logger.error("Illegal message at this time");
-        return ClientError::bad_message_order;
+        return {ErrorCodes::SyncProtocolInvariantFailed, "Received UNBOUND message when it was not legal"};
     }
 
     // The fact that the UNBIND message has been sent, but an ERROR message has
@@ -2623,44 +2512,40 @@ std::error_code Session::receive_unbound_message()
         // Life cycle state is now Deactivated
     }
 
-    return std::error_code{}; // Success
+    return Status::OK(); // Success
 }
 
 
-std::error_code Session::receive_query_error_message(int error_code, std::string_view message, int64_t query_version)
+Status Session::receive_query_error_message(int error_code, std::string_view message, int64_t query_version)
 {
     logger.info("Received QUERY_ERROR \"%1\" (error_code=%2, query_version=%3)", message, error_code, query_version);
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm and SessionWrapper must
     // not be accessed any longer.
     if (m_state == Active) {
-        on_flx_sync_error(query_version, std::string_view(message.data(), message.size())); // throws
+        on_flx_sync_error(query_version, message); // throws
     }
-    return {};
+    return Status::OK();
 }
 
 // The caller (Connection) must discard the session if the session has become
 // deactivated upon return.
-std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
+Status Session::receive_error_message(const ProtocolErrorInfo& info)
 {
-    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, error_action=%4)", info.message,
-                info.raw_error_code, info.try_again, info.server_requests_action); // Throws
+    logger.info("Received: ERROR \"%1\" (error_code=%2, is_fatal=%3, error_action=%4)", info.message,
+                info.raw_error_code, info.is_fatal, info.server_requests_action); // Throws
 
     bool legal_at_this_time = (m_bind_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
-        logger.error("Illegal message at this time");
-        return ClientError::bad_message_order;
+        return {ErrorCodes::SyncProtocolInvariantFailed, "Received ERROR message when it was not legal"};
     }
 
-    bool known_error_code = bool(get_protocol_error_message(info.raw_error_code));
-    if (REALM_UNLIKELY(!known_error_code)) {
-        logger.error("Unknown error code"); // Throws
-        return ClientError::bad_error_code;
-    }
-    ProtocolError error_code = ProtocolError(info.raw_error_code);
-    if (REALM_UNLIKELY(!is_session_level_error(error_code))) {
-        logger.error("Not a session level error code"); // Throws
-        return ClientError::bad_error_code;
+    auto protocol_error = static_cast<ProtocolError>(info.raw_error_code);
+    auto status = protocol_error_to_status(protocol_error, info.message);
+    if (status != ErrorCodes::UnknownError && REALM_UNLIKELY(!is_session_level_error(protocol_error))) {
+        return {ErrorCodes::SyncProtocolInvariantFailed,
+                util::format("Received ERROR message for session with non-session-level error code %1",
+                             info.raw_error_code)};
     }
 
     // Can't process debug hook actions once the Session is undergoing deactivation, since
@@ -2668,24 +2553,25 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     if (m_state == Active) {
         auto debug_action = call_debug_hook(SyncClientHookEvent::ErrorMessageReceived, info);
         if (debug_action == SyncClientHookAction::EarlyReturn) {
-            return {};
+            return Status::OK();
         }
     }
 
     // For compensating write errors, we need to defer raising them to the SDK until after the server version
     // containing the compensating write has appeared in a download message.
-    if (error_code == ProtocolError::compensating_write) {
+    if (status == ErrorCodes::SyncCompensatingWrite) {
         // If the client is not active, the compensating writes will not be processed now, but will be
         // sent again the next time the client connects
         if (m_state == Active) {
+            REALM_ASSERT(info.compensating_write_server_version.has_value());
             m_pending_compensating_write_errors.push_back(info);
         }
-        return {};
+        return Status::OK();
     }
 
     m_error_message_received = true;
-    suspend(SessionErrorInfo{info, make_error_code(error_code)});
-    return {};
+    suspend(SessionErrorInfo{info, std::move(status)});
+    return Status::OK();
 }
 
 void Session::suspend(const SessionErrorInfo& info)
@@ -2712,11 +2598,11 @@ void Session::suspend(const SessionErrorInfo& info)
     // Notify the application of the suspension of the session if the session is
     // still in the Active state
     if (m_state == Active) {
-        m_conn.one_less_active_unsuspended_session();                      // Throws
-        on_suspended(info);                                                // Throws
+        m_conn.one_less_active_unsuspended_session(); // Throws
+        on_suspended(info);                           // Throws
     }
 
-    if (info.try_again) {
+    if (!info.is_fatal) {
         begin_resumption_delay(info);
     }
 
@@ -2725,7 +2611,7 @@ void Session::suspend(const SessionErrorInfo& info)
         ensure_enlisted_to_send(); // Throws
 }
 
-std::error_code Session::receive_test_command_response(request_ident_type ident, std::string_view body)
+Status Session::receive_test_command_response(request_ident_type ident, std::string_view body)
 {
     logger.info("Received: TEST_COMMAND \"%1\" (session_ident=%2, request_ident=%3)", body, m_ident, ident);
     auto it = std::find_if(m_pending_test_commands.begin(), m_pending_test_commands.end(),
@@ -2733,25 +2619,26 @@ std::error_code Session::receive_test_command_response(request_ident_type ident,
                                return command.id == ident;
                            });
     if (it == m_pending_test_commands.end()) {
-        logger.error("No matching pending test command for id %1", ident);
-        return ClientError::bad_request_ident;
+        return {ErrorCodes::SyncProtocolInvariantFailed,
+                util::format("Received test command response for a non-existent ident %1", ident)};
     }
 
     it->promise.emplace_value(std::string{body});
     m_pending_test_commands.erase(it);
 
-    return {};
+    return Status::OK();
 }
 
 void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)
 {
     REALM_ASSERT(!m_try_again_activation_timer);
 
-    m_try_again_delay_info.update(error_info);
+    m_try_again_delay_info.update(static_cast<sync::ProtocolError>(error_info.raw_error_code),
+                                  error_info.resumption_delay_interval);
     auto try_again_interval = m_try_again_delay_info.delay_interval();
     if (ProtocolError(error_info.raw_error_code) == ProtocolError::session_closed) {
-        // FIXME With compensating writes the server sends this error after completing a bootstrap. Doing the normal
-        // backoff behavior would result in waiting up to 5 minutes in between each query change which is
+        // FIXME With compensating writes the server sends this error after completing a bootstrap. Doing the
+        // normal backoff behavior would result in waiting up to 5 minutes in between each query change which is
         // not acceptable latency. So for this error code alone, we hard-code a 1 second retry interval.
         try_again_interval = std::chrono::milliseconds{1000};
     }
@@ -2775,53 +2662,59 @@ void Session::clear_resumption_delay_state()
     }
 }
 
-bool ClientImpl::Session::check_received_sync_progress(const SyncProgress& progress, int& error_code) noexcept
+Status ClientImpl::Session::check_received_sync_progress(const SyncProgress& progress) noexcept
 {
     const SyncProgress& a = m_progress;
     const SyncProgress& b = progress;
-    // Latest server version must be weakly increasing throughout a session.
+    std::string message;
     if (b.latest_server_version.version < a.latest_server_version.version) {
-        error_code = 1;
-        return false;
+        message = util::format("Latest server version in download messages must be weakly increasing throughout a "
+                               "session (current: %1, received: %2)",
+                               a.latest_server_version.version, b.latest_server_version.version);
     }
-    // Last integrated client version on server must be weakly increasing
-    // throughout a session.
     if (b.upload.client_version < a.upload.client_version) {
-        error_code = 2;
-        return false;
+        message = util::format("Last integrated client version in download messages must be weakly increasing "
+                               "throughout a session (current: %1, received: %2)",
+                               a.upload.client_version, b.upload.client_version);
     }
-    // Last integrated client version on server cannot be greater than the
-    // latest client version in existence.
     if (b.upload.client_version > m_last_version_available) {
-        error_code = 3;
-        return false;
+        message = util::format("Last integrated client version on server cannot be greater than the latest client "
+                               "version in existence (current: %1, received: %2)",
+                               m_last_version_available, b.upload.client_version);
     }
-    // Download cursor must be weakly increasing throughout a session
     if (b.download.server_version < a.download.server_version) {
-        error_code = 4;
-        return false;
+        message =
+            util::format("Download cursor must be weakly increasing throughout a session (current: %1, received: %2)",
+                         a.download.server_version, b.download.server_version);
     }
-    // Download cursor cannot be greater than the latest server version in
-    // existence.
     if (b.download.server_version > b.latest_server_version.version) {
-        error_code = 5;
-        return false;
+        message = util::format(
+            "Download cursor cannot be greater than the latest server version in existence (cursor: %1, latest: %2)",
+            b.download.server_version, b.latest_server_version.version);
     }
-    // The last integrated client version on the server at the position in the
-    // server's history of the download cursor must be weakly increasing
-    // throughout a session.
     if (b.download.last_integrated_client_version < a.download.last_integrated_client_version) {
-        error_code = 6;
-        return false;
+        message = util::format(
+            "Last integrated client version on the server at the position in the server's history of the download "
+            "cursor must be weakly increasing throughout a session (current: %1, received: %2)",
+            a.download.last_integrated_client_version, b.download.last_integrated_client_version);
     }
-    // The last integrated client version on the server at the position in the
-    // server's history of the download cursor cannot be greater than the latest
-    // client version integrated on the server.
     if (b.download.last_integrated_client_version > b.upload.client_version) {
-        error_code = 7;
-        return false;
+        message = util::format("Last integrated client version on the server in the position at the server's history "
+                               "of the download cursor cannot be greater than the latest client version integrated "
+                               "on the server (download: %1, upload: %2)",
+                               b.download.last_integrated_client_version, b.upload.client_version);
     }
-    return true;
+    if (b.download.server_version < b.upload.last_integrated_server_version) {
+        message = util::format(
+            "The server version of the download cursor cannot be less than the server version integrated in the "
+            "latest client version acknowledged by the server (download: %1, upload: %2)",
+            b.download.server_version, b.upload.last_integrated_server_version);
+    }
+
+    if (message.empty()) {
+        return Status::OK();
+    }
+    return {ErrorCodes::SyncProtocolInvariantFailed, std::move(message)};
 }
 
 

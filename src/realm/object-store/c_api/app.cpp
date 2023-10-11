@@ -192,17 +192,6 @@ RLM_API void realm_app_config_set_base_url(realm_app_config_t* config, const cha
     config->base_url = std::string(base_url);
 }
 
-RLM_API void realm_app_config_set_local_app_name(realm_app_config_t* config, const char* local_app_name) noexcept
-{
-    config->local_app_name = std::string(local_app_name);
-}
-
-RLM_API void realm_app_config_set_local_app_version(realm_app_config_t* config,
-                                                    const char* local_app_version) noexcept
-{
-    config->local_app_version = std::string(local_app_version);
-}
-
 RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t* config, uint64_t ms) noexcept
 {
     config->default_request_timeout_ms = ms;
@@ -653,11 +642,6 @@ RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_
     });
 }
 
-RLM_API const char* realm_user_get_local_identity(const realm_user_t* user) noexcept
-{
-    return (*user)->local_identity().c_str();
-}
-
 RLM_API char* realm_user_get_device_id(const realm_user_t* user) noexcept
 {
     if ((*user)->has_device_id()) {
@@ -665,11 +649,6 @@ RLM_API char* realm_user_get_device_id(const realm_user_t* user) noexcept
     }
 
     return nullptr;
-}
-
-RLM_API realm_auth_provider_e realm_user_get_auth_provider(const realm_user_t* user) noexcept
-{
-    return realm_auth_provider_e(enum_from_provider_type((*user)->provider_type()));
 }
 
 RLM_API bool realm_user_log_out(realm_user_t* user)

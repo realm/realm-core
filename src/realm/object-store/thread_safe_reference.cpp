@@ -124,7 +124,7 @@ class ThreadSafeReference::PayloadImpl<Object> : public ThreadSafeReference::Pay
 public:
     PayloadImpl(Object const& object)
         : Payload(*object.get_realm())
-        , m_key(object.obj().get_key())
+        , m_key(object.get_obj().get_key())
         , m_object_schema_name(object.get_object_schema().name)
     {
     }

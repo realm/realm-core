@@ -16,13 +16,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
+#include <util/event_loop.hpp>
+#include <util/test_file.hpp>
+#include <util/test_utils.hpp>
+#include <util/sync/baas_admin_api.hpp>
+#include <util/sync/flx_sync_harness.hpp>
 
-#include "sync/flx_sync_harness.hpp"
-#include "util/event_loop.hpp"
-#include "util/test_file.hpp"
-#include "util/test_utils.hpp"
-#include "util/baas_admin_api.hpp"
+#include <realm/set.hpp>
+#include <realm/list.hpp>
+#include <realm/dictionary.hpp>
 
 #include <realm/object-store/audit.hpp>
 #include <realm/object-store/audit_serializer.hpp>
@@ -32,7 +34,6 @@
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/shared_realm.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
-
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
@@ -40,9 +41,9 @@
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 
-#include <realm/set.hpp>
-#include <realm/list.hpp>
-#include <realm/dictionary.hpp>
+#include <realm/util/logger.hpp>
+
+#include <catch2/catch_all.hpp>
 
 #include <external/json/json.hpp>
 
@@ -166,51 +167,28 @@ void sort_events(std::vector<AuditEvent>& events)
 static std::vector<AuditEvent> get_audit_events_from_baas(TestAppSession& session, SyncUser& user,
                                                           size_t expected_count)
 {
-    auto& app_session = session.app_session();
-    app::MongoClient remote_client = user.mongo_client("BackingDB");
-    app::MongoDatabase db = remote_client.db(app_session.config.mongo_dbname);
-    app::MongoCollection collection = db["AuditEvent"];
-    std::vector<AuditEvent> events;
     static const std::set<std::string> nonmetadata_fields = {"activity", "event", "data", "realm_id"};
 
-    timed_wait_for(
-        [&] {
-            uint64_t count = 0;
-            collection.count({}, [&](uint64_t c, util::Optional<app::AppError> error) {
-                REQUIRE(!error);
-                count = c;
-            });
-            if (count < expected_count) {
-                millisleep(500); // slow down the number of retries
-                return false;
-            }
-            return true;
-        },
-        std::chrono::minutes(5));
-
-    collection.find({}, {},
-                    [&](util::Optional<std::vector<bson::Bson>>&& result, util::Optional<app::AppError> error) {
-                        REQUIRE(!error);
-                        REQUIRE(result->size() >= expected_count);
-                        events.reserve(result->size());
-                        for (auto bson : *result) {
-                            auto doc = static_cast<const bson::BsonDocument&>(bson).entries();
-                            AuditEvent event;
-                            event.activity = static_cast<std::string>(doc["activity"]);
-                            event.timestamp = static_cast<Timestamp>(doc["timestamp"]);
-                            if (auto it = doc.find("event"); it != doc.end() && it->second != bson::Bson()) {
-                                event.event = static_cast<std::string>(it->second);
-                            }
-                            if (auto it = doc.find("data"); it != doc.end() && it->second != bson::Bson()) {
-                                event.data = json::parse(static_cast<std::string>(it->second));
-                            }
-                            for (auto& [key, value] : doc) {
-                                if (value.type() == bson::Bson::Type::String && !nonmetadata_fields.count(key))
-                                    event.metadata.insert({key, static_cast<std::string>(value)});
-                            }
-                            events.push_back(event);
-                        }
-                    });
+    auto documents = session.get_documents(user, "AuditEvent", expected_count);
+    std::vector<AuditEvent> events;
+    events.reserve(documents.size());
+    for (auto document : documents) {
+        auto doc = document.entries();
+        AuditEvent event;
+        event.activity = static_cast<std::string>(doc["activity"]);
+        event.timestamp = static_cast<Timestamp>(doc["timestamp"]);
+        if (auto it = doc.find("event"); it != doc.end() && it->second != bson::Bson()) {
+            event.event = static_cast<std::string>(it->second);
+        }
+        if (auto it = doc.find("data"); it != doc.end() && it->second != bson::Bson()) {
+            event.data = json::parse(static_cast<std::string>(it->second));
+        }
+        for (auto& [key, value] : doc) {
+            if (value.type() == bson::Bson::Type::String && !nonmetadata_fields.count(key))
+                event.metadata.insert({key, static_cast<std::string>(value)});
+        }
+        events.push_back(event);
+    }
     sort_events(events);
     return events;
 }
@@ -282,7 +260,7 @@ struct TestClock {
 
 } // namespace
 
-TEST_CASE("audit object serialization") {
+TEST_CASE("audit object serialization", "[sync][pbs][audit]") {
     TestSyncManager test_session;
     SyncTestFile config(test_session.app(), "parent");
     config.cache = false;
@@ -321,8 +299,8 @@ TEST_CASE("audit object serialization") {
     config.audit_config = std::make_shared<AuditConfig>();
     auto serializer = std::make_shared<CustomSerializer>();
     config.audit_config->serializer = serializer;
-    config.audit_config->logger =
-        std::make_shared<util::ThreadSafeLogger>(std::make_shared<util::StderrLogger>(AUDIT_LOG_LEVEL));
+    config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(util::Logger::get_default_logger());
+    config.audit_config->logger->set_level_threshold(AUDIT_LOG_LEVEL);
     auto realm = Realm::get_shared_realm(config);
     auto audit = realm->audit_context();
     REQUIRE(audit);
@@ -1079,7 +1057,7 @@ TEST_CASE("audit object serialization") {
     }
 }
 
-TEST_CASE("audit management") {
+TEST_CASE("audit management", "[sync][pbs][audit]") {
     TestClock clock;
 
     TestSyncManager test_session;
@@ -1496,7 +1474,7 @@ TEST_CASE("audit management") {
 #endif
 }
 
-TEST_CASE("audit realm sharding") {
+TEST_CASE("audit realm sharding", "[sync][pbs][audit]") {
     // Don't start the server immediately so that we're forced to accumulate
     // a lot of local unuploaded data.
     TestSyncManager test_session{{}, {.start_immediately = false}};
@@ -1508,8 +1486,9 @@ TEST_CASE("audit realm sharding") {
         {"object", {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
     };
     config.audit_config = std::make_shared<AuditConfig>();
-    auto logger = std::make_shared<util::StderrLogger>(AUDIT_LOG_LEVEL);
-    config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(logger);
+    auto logger = std::make_shared<util::ThreadSafeLogger>(util::Logger::get_default_logger());
+    logger->set_level_threshold(AUDIT_LOG_LEVEL);
+    config.audit_config->logger = logger;
     auto realm = Realm::get_shared_realm(config);
     auto audit = realm->audit_context();
     REQUIRE(audit);
@@ -1612,7 +1591,7 @@ TEST_CASE("audit realm sharding") {
         // Open a different Realm with the same user and audit prefix
         SyncTestFile config(test_session.app(), "other");
         config.audit_config = std::make_shared<AuditConfig>();
-        config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(logger);
+        config.audit_config->logger = logger;
         auto realm = Realm::get_shared_realm(config);
         auto audit2 = realm->audit_context();
         REQUIRE(audit2);
@@ -1639,7 +1618,7 @@ TEST_CASE("audit realm sharding") {
         // Open the same Realm with a different audit prefix
         SyncTestFile config(test_session.app(), "parent");
         config.audit_config = std::make_shared<AuditConfig>();
-        config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(logger);
+        config.audit_config->logger = logger;
         config.audit_config->partition_value_prefix = "other";
         auto realm = Realm::get_shared_realm(config);
         auto audit2 = realm->audit_context();
@@ -1667,7 +1646,7 @@ static void generate_event(std::shared_ptr<Realm> realm, int call = 0)
     audit->end_scope(scope, assert_no_error);
 }
 
-TEST_CASE("audit integration tests") {
+TEST_CASE("audit integration tests", "[sync][pbs][audit][baas]") {
     // None of these tests need a deterministic clock, but the server rounding
     // timestamps to milliseconds can result in events not having monotonically
     // increasing timestamps with an actual clock.
@@ -1696,8 +1675,8 @@ TEST_CASE("audit integration tests") {
     SyncTestFile config(session.app()->current_user(), bson::Bson("default"));
     config.schema = schema;
     config.audit_config = std::make_shared<AuditConfig>();
-    config.audit_config->logger =
-        std::make_shared<util::ThreadSafeLogger>(std::make_shared<util::StderrLogger>(AUDIT_LOG_LEVEL));
+    config.audit_config->logger = std::make_shared<util::ThreadSafeLogger>(util::Logger::get_default_logger());
+    config.audit_config->logger->set_level_threshold(AUDIT_LOG_LEVEL);
 
     auto expect_error = [&](auto&& config, auto&& fn) -> SyncError {
         std::mutex mutex;
@@ -1782,7 +1761,7 @@ TEST_CASE("audit integration tests") {
     SECTION("invalid metadata properties") {
         config.audit_config->metadata = {{"invalid key", "value"}};
         auto error = expect_error(config, generate_event);
-        REQUIRE_THAT(error.what(), StartsWith("Invalid schema change"));
+        REQUIRE_THAT(error.status.reason(), StartsWith("Invalid schema change"));
         REQUIRE(error.is_fatal);
     }
 
@@ -1815,7 +1794,7 @@ TEST_CASE("audit integration tests") {
         config.audit_config = std::make_shared<AuditConfig>();
 
         auto error = expect_error(config, generate_event);
-        REQUIRE_THAT(error.what(), StartsWith("Invalid schema change"));
+        REQUIRE_THAT(error.status.reason(), StartsWith("Invalid schema change"));
         REQUIRE(error.is_fatal);
     }
 
@@ -1890,7 +1869,7 @@ TEST_CASE("audit integration tests") {
         SECTION("auditing with a flexible sync user reports a sync error") {
             config.audit_config->audit_user = harness.app()->current_user();
             auto error = expect_error(config, generate_event);
-            REQUIRE_THAT(error.what(),
+            REQUIRE_THAT(error.status.reason(),
                          Catch::Matchers::ContainsSubstring(
                              "Client connected using partition-based sync when app is using flexible sync"));
             REQUIRE(error.is_fatal);

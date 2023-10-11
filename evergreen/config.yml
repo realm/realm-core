@@ -1,3 +1,13 @@
+# Evergreen CI config script for the Realm Core codebase
+# Run types:
+# * Pull Requests:
+#   * add the "for_pull_requests" tag to the task to run for pull requests
+# * Nightly Builds:
+#   * Add the `"for_nightly_tests"` tag to the task for the "nightly_tests" alias to work
+#   * Add the `allowed_requesters: [ "ad_hoc", "patch" ]` entry to the nightly task to only run for periodic tests
+# * Commit Builds:
+#   * All other tasks will be included in the set run when a PR is merged to master
+
 # Some tests take up to 4 hours to run, so give a very generous timeout project-wide, but generally try to complete tasks within 30 minutes.
 exec_timeout_secs: 14400
 
@@ -9,6 +19,7 @@ functions:
         shell: bash
         script: |-
           set -o errexit
+          set -o pipefail
           set -o verbose
 
           if [[ "$OS" = "Windows_NT" ]]; then
@@ -43,6 +54,7 @@ functions:
         shell: bash
         script: |-
           set -o errexit
+          set -o pipefail
           set -o verbose
 
           if [ -d cmake_vars ]; then
@@ -62,7 +74,7 @@ functions:
               set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH $(./evergreen/abspath.sh ${cxx_compiler})
           fi
 
-          if [ -n "${run_tests_against_baas|}" ]; then
+          if [ -z "${disable_tests_against_baas|}" ]; then
               set_cmake_var baas_vars REALM_ENABLE_AUTH_TESTS BOOL On
               set_cmake_var baas_vars REALM_MONGODB_ENDPOINT STRING "http://localhost:9090"
           fi
@@ -128,6 +140,11 @@ functions:
               set_cmake_var generator_vars CMAKE_MAKE_PROGRAM PATH "${ninja|ninja}"
           fi
 
+          if [ -n "${curl_base|}" ]; then
+              set_cmake_var curl_vars CURL_LIBRARY PATH "$(./evergreen/abspath.sh ${curl_base}/lib/curl.lib)"
+              set_cmake_var curl_vars CURL_INCLUDE_DIR PATH "$(./evergreen/abspath.sh ${curl_base}/include)"
+          fi
+
           echo "Running cmake with these vars:"
           cat cmake_vars/*.txt | tee cmake_vars.txt
           echo
@@ -188,8 +205,13 @@ functions:
               export DEVELOPER_DIR="${xcode_developer_dir}"
           fi
 
+          # NOTE: These two values will be ANDed together for matching tests
+          TEST_FLAGS=
+          if [[ -n "${test_label}" ]]; then
+              TEST_FLAGS="-L ${test_label} "
+          fi
           if [[ -n "${test_filter}" ]]; then
-              TEST_FLAGS="-R ${test_filter}"
+              TEST_FLAGS+="-R ${test_filter} "
           fi
 
           if [[ -n "${verbose_test_output}" ]]; then
@@ -211,19 +233,25 @@ functions:
               [[ -d coverage_data ]] || mkdir coverage_data
               [[ -d coverage_binaries ]] || mkdir coverage_binaries
               export LLVM_PROFILE_FILE="$(pwd)/coverage_data/${task_name}-%p.profraw"
-              EXECUTABLE_PATH=$(find build -name ${test_executable_name} -type f)
-              EXECUTABLE_PATH=$(./evergreen/abspath.sh $EXECUTABLE_PATH)
+              EXECUTABLE_FILE="$(find build -name "${test_executable_name}" -type f)"
+              EXECUTABLE_PATH="$(./evergreen/abspath.sh "$EXECUTABLE_FILE")"
               if [[ -z "$EXECUTABLE_PATH" || ! -f "$EXECUTABLE_PATH" ]]; then
                 echo "Invalid executable path $EXECUTABLE_PATH"
                 exit 1
               fi
-              ln -s $EXECUTABLE_PATH coverage_binaries/${test_executable_name}
+              # The sym link may have been created by a previous task run
+              if [[ ! -f "coverage_binaries/${test_executable_name}" ]]; then
+                ln -s "$EXECUTABLE_PATH" "coverage_binaries/${test_executable_name}"
+              fi
           fi
 
           export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
+          if [[ -n "$UNITTEST_EVERGREEN_TEST_RESULTS" && -f "$UNITTEST_EVERGREEN_TEST_RESULTS" ]]; then
+              rm "$UNITTEST_EVERGREEN_TEST_RESULTS"
+          fi
           export UNITTEST_PROGRESS=1
           if [[ -n "${report_test_progress|}" ]]; then
-              export UNITTEST_PROGRESS=${report_test_progress|}
+              export UNITTEST_PROGRESS="${report_test_progress|}"
           fi
 
           if [[ -n "${run_with_encryption}" ]]; then
@@ -246,12 +274,46 @@ functions:
   - command: attach.results
     params:
       file_location: realm-core/${task_name}_results.json
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o pipefail
+        set -o verbose
+
+        if [[ -n "${disable_tests_against_baas|}" ]]; then
+          exit 0
+        fi
+
+        # Copy the baas_server log from the remote baas host if it exists
+        if [[ ! -f baas_host.yml || ! -f .baas_ssh_key ]]; then
+          echo "No remote baas host or remote baas host definitions not found"
+          exit 0
+        fi
+
+        BAAS_HOST_NAME=$(tr -d '"[]{}' < baas_host.yml | cut -d , -f 1 | awk -F : '{print $2}')
+        export BAAS_HOST_NAME
+
+        ssh_user="$(printf "ubuntu@%s" "$BAAS_HOST_NAME")"
+        ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i .baas_ssh_key"
+
+        # Copy the baas_server.log and mongod.log files from the remote baas host
+        REMOTE_PATH=/data/baas-remote/baas-work-dir
+        LOCAL_PATH=./baas-work-dir
+
+        mkdir -p "$LOCAL_PATH/"
+        mkdir -p "$LOCAL_PATH/mongodb-dbpath/"
+        scp $ssh_options $ssh_user:"$REMOTE_PATH/baas_server.log" "$LOCAL_PATH/baas_server.log" || true
+        scp $ssh_options $ssh_user:"$REMOTE_PATH/mongodb-dbpath/mongod.log" "$LOCAL_PATH/mongodb-dbpath/mongod.log" || true
+
   - command: s3.put
     params:
       aws_key: '${artifacts_aws_access_key}'
       aws_secret: '${artifacts_aws_secret_key}'
       local_file: 'realm-core/baas-work-dir/baas_server.log'
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/baas_server.log'
+      remote_file: 'realm-core-stable/${branch_name}/${task_id}/${execution}/baas_server.log'
       bucket: mciuploads
       permissions: public-read
       content_type: text/text
@@ -262,11 +324,22 @@ functions:
       aws_key: '${artifacts_aws_access_key}'
       aws_secret: '${artifacts_aws_secret_key}'
       local_file: 'realm-core/install_baas_output.log'
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/install_baas_output.log'
+      remote_file: 'realm-core-stable/${branch_name}/${task_id}/${execution}/install_baas_output.log'
       bucket: mciuploads
       permissions: public-read
       content_type: text/text
       display_name: install baas output
+      optional: true
+  - command: s3.put
+    params:
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      local_file: 'realm-core/baas-work-dir/mongodb-dbpath/mongod.log'
+      remote_file: 'realm-core-stable/${branch_name}/${task_id}/${execution}/mongod.log'
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/text
+      display_name: mongod logs
       optional: true
 
   "upload fuzzer results":
@@ -304,19 +377,35 @@ functions:
       shell: bash
       script: |-
         set -o errexit
+        set -o pipefail
         set -o verbose
 
-        if [[ -z "{run_tests_against_baas|}" ]]; then
+        if [[ -n "${disable_tests_against_baas|}" ]]; then
           exit 0
         fi
 
+        # Kill the local baas server process, if it exists
         BAAS_PID=$(pgrep baas_server)
-        if [[ -z "$BAAS_PID" ]]; then
-          echo "No baas pid found"
+        if [[ -n "$BAAS_PID" ]]; then
+          echo "Terminating local baas server..."
+          kill -3 $BAAS_PID
           exit 0
         fi
 
-        kill -3 $BAAS_PID
+        if [[ ! -f baas_host.yml || ! -f .baas_ssh_key ]]; then
+          echo "No remote baas host or remote baas host definitions not found"
+          exit 0
+        fi
+
+        BAAS_HOST_NAME=$(tr -d '"[]{}' < baas_host.yml | cut -d , -f 1 | awk -F : '{print $2}')
+        export BAAS_HOST_NAME
+
+        ssh_user="$(printf "ubuntu@%s" "$BAAS_HOST_NAME")"
+        ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i .baas_ssh_key"
+
+        # Kill the remote baas server process, if the definition files exist
+        echo "Terminating baas server on remote host..."
+        ssh $ssh_options $ssh_user "pkill -3 baas_server"
 
   - command: shell.exec
     params:
@@ -325,12 +414,15 @@ functions:
         set -o errexit
         set -o verbose
 
-        if [[ ! -d realm-core ]]; then
+        TOP_DIR=$(pwd)/realm-core
+        HANG_ANALYZER_PATH=$TOP_DIR/evergreen/hang_analyzer
+        REQUIREMENTS_PATH=$HANG_ANALYZER_PATH/requirements.txt
+
+        if [[ ! -d $TOP_DIR || ! -d $REQUIREMENTS_PATH ]]; then
           echo "No source directory exists. Not running hang analyzer"
           exit 1
         fi
 
-        TOP_DIR=$(pwd)/realm-core
         mkdir realm-core/hang_analyzer_workdir; cd realm-core/hang_analyzer_workdir
         ${python3|python3} -m venv venv
 
@@ -367,7 +459,6 @@ functions:
 
         python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" || exit 1
 
-        REQUIREMENTS_PATH=$TOP_DIR/evergreen/hang_analyzer/requirements.txt
         if [ "Windows_NT" = "$OS" ]; then
           REQUIREMENTS_PATH=$(cygpath -w $REQUIREMENTS_PATH)
         fi
@@ -376,20 +467,132 @@ functions:
 
         echo "Going to run hang analyzer"
 
-        HANG_ANALYZER_PATH=$TOP_DIR/evergreen/hang_analyzer
         if [ "Windows_NT" = "$OS" ]; then
           HANG_ANALYZER_PATH=$(cygpath -w $HANG_ANALYZER_PATH)
         fi
 
         python $HANG_ANALYZER_PATH
 
+  "launch remote baas":
+  - command: host.create
+    params:
+      provider: ec2
+      distro: ubuntu2004-medium
+  - command: host.list
+    params:
+      num_hosts: 1
+      path: realm-core/baas_host.yml
+      timeout_seconds: 600
+      wait: true
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: bash
+      # Do NOT use verbose for this script since it would reveal the values of secrets
+      script: |-
+        set -o errexit
+        set -o pipefail
+
+        if [[ -n "${disable_tests_against_baas|}" ]]; then
+          echo "Should not be using remote baas if the tests are not being used"
+          exit 0
+        fi
+
+        # Save the remote host ssh key and details to files
+        echo "${__project_aws_ssh_key_value}" > .baas_ssh_key
+        chmod 600 .baas_ssh_key
+
+        BAAS_HOST_NAME=$(tr -d '"[]{}' < baas_host.yml | cut -d , -f 1 | awk -F : '{print $2}')
+
+        # Github SSH host key updated 06/26/2023
+        # Use 'github_known_hosts' expansion for GITHUB_KNOWN_HOSTS below once EVG-20410 has been implemented
+        cat >baas_host_vars.sh <<EOF
+        export AWS_ACCESS_KEY_ID="${baas_secrets_aws_access_key}"
+        export AWS_SECRET_ACCESS_KEY="${baas_secrets_aws_secret_key}"
+        export BAAS_HOST_NAME="$BAAS_HOST_NAME"
+        export GITHUB_KNOWN_HOSTS="github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk="
+        EOF
+
+        chmod 700 baas_host_vars.sh
+        echo "baas remote host created: $BAAS_HOST_NAME"
+
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: bash
+      background: true
+      script: |-
+        set -o errexit
+        set -o pipefail
+        set -o verbose
+
+        if [[ -n "${disable_tests_against_baas|}" ]]; then
+          exit 0
+        fi
+
+        BAAS_USER=ubuntu
+
+        OPT_BAAS_BRANCH=
+        if [ -n "${baas_branch}" ]; then
+            OPT_BAAS_BRANCH="-b ${baas_branch}"
+        fi
+
+        # Run the setup_baas_host_local.sh script to configure and run baas on the remote host
+        # Add -v to this command for verbose script logging
+        ./evergreen/setup_baas_host_local.sh -w ./baas-work-dir -u $BAAS_USER $OPT_BAAS_BRANCH ./baas_host_vars.sh ./.baas_ssh_key 2>&1 | tee install_baas_output.log
+
+  "wait for baas to start":
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o verbose
+
+        if [[ -n "${disable_tests_against_baas|}" ]]; then
+          exit 0
+        fi
+
+        # Don't print out the tail of the log file
+        ./evergreen/wait_for_baas.sh -s -w ./baas-work-dir -l ""
+
+        echo "Baas is started!"
+
+  "check branch state":
+  - command: shell.exec
+    type: setup
+    params:
+      working_dir: realm-core
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o pipefail
+        set -o verbose
+
+        if [[ -n "${disable_tests_against_baas|}" ]]; then
+          exit 0
+        fi
+
+        # Fail the test if local/evergreen object store tests are defined and this is not a patch build
+        if [[ -f "build/objstore-tests.do-not-commit" ]]; then
+            if [[ -z "${is_patch}" ]]; then
+              echo "ERROR: Found custom object store tests for non-patch build"
+              echo "- Revert test/object-store/objstore-tests.do-not-commit and recommit"
+              exit 1
+            else
+              echo "WARNING: Custom object store tests are configured for this patch build"
+              echo "- Revert test/object-store/objstore-tests.do-not-commit before merging PR"
+            fi
+        fi
+
 timeout:
   - func: "run hang analyzer"
 
 tasks:
 - name: compile
-  tags: [ "for_pull_requests" ]
   exec_timeout_secs: 1800
+  tags: [ "for_pull_requests" ]
   commands:
   - func: "compile"
 
@@ -447,6 +650,28 @@ tasks:
         xcrun swift build
         xcrun swift run ObjectStoreTests
 
+- name: validate-installed-headers
+  exec_timeout_secs: 1800
+  commands:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: /bin/bash
+      script: |-
+        #!/bin/bash
+        set -o errexit
+        set -o pipefail
+        set -o verbose
+
+        if [ -n "${xcode_developer_dir}" ]; then
+            export DEVELOPER_DIR="${xcode_developer_dir}"
+        fi
+
+        ./tools/build-cocoa.sh -bm
+        find core/include/realm -name '*.hpp' -print0 | xargs -0 -P "${max_jobs}" -n 1 clang++ -c -o /dev/null -Icore/include -std=c++17
+
 - name: test-on-exfat
   exec_timeout_secs: 2700
   commands:
@@ -460,7 +685,9 @@ tasks:
       script: ../tools/run-tests-on-exfat.sh
 
 - name: valgrind
-  exec_timeout_secs: 18000
+  exec_timeout_secs: 14400
+  tags: [ "for_nightly_tests" ]
+  allowed_requesters: [ "ad_hoc", "patch" ]
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -579,6 +806,8 @@ tasks:
       display_name: bloaty-results
 
 - name: long-running-core-tests
+  tags: [ "for_nightly_tests" ]
+  allowed_requesters: [ "ad_hoc", "patch" ]
   commands:
   - func: "run tests"
     # The long-running tests can take a really long time on Windows, so we give the test up to 4
@@ -636,71 +865,39 @@ tasks:
       test_filter: SyncTests
       test_executable_name: "realm-sync-tests"
 
+# These are local object store tests; baas is not started, however some use the sync server
 - name: object-store-tests
-  tags: [ "test_suite", "for_pull_requests" ]
-  exec_timeout_secs: 2400
+  tags: [ "test_suite_remote_baas", "for_pull_requests" ]
+  exec_timeout_secs: 3600
   commands:
   - func: "compile"
     vars:
-      target_to_build: "ObjectStoreTests"
-      test_executable_name: "realm-object-store-tests"
-  # If we need to start a local copy of baas, do it in the background here in a separate script.
-  # Evergreen should take care of the lifetime of the processes we start here automatically.
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      shell: bash
-      background: true
-      script: |-
-        set -o errexit
-        set -o pipefail
-
-        export CURL=${curl|curl}
-
-        if [[ -n "${run_tests_against_baas|}" ]]; then
-            if [[ -z "${baas_secrets_aws_access_key|}" || -z "${baas_secrets_aws_secret_key|}" ]]; then
-                echo "Must supply baas secrets AWS key info to start baas server"
-                exit 1
-            fi
-
-            export AWS_ACCESS_KEY_ID="${baas_secrets_aws_access_key}"
-            export AWS_SECRET_ACCESS_KEY="${baas_secrets_aws_secret_key}"
-
-            if [ -n "${xcode_developer_dir}" ]; then
-                export DEVELOPER_DIR="${xcode_developer_dir}"
-            fi
-
-            ./evergreen/install_baas.sh -w ./baas-work-dir -b 2e23bf2f77d85f3e2fbe07e1c448e4d1cafa3a10 2>&1 | tee install_baas_output.log
-        fi
-
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o pipefail
-
-        export CURL=${curl|curl}
-
-        if [[ -n "${run_tests_against_baas|}" ]]; then
-            # wait for baas to start in the background script started above.
-            ./evergreen/wait_for_baas.sh ./baas-work-dir/stitch_server.pid
-
-            WAIT_FOR_BAAS_READY_COUNTER=0
-            until [[ -f ./baas-work-dir/baas_ready ]]; do
-                WAIT_FOR_BAAS_READY_COUNTER=$(($WAIT_FOR_BAAS_READY_COUNTER + 1))
-                if [[ "$WAIT_FOR_BAAS_READY_COUNTER" = 12 ]]; then
-                    echo "Timed out waiting for baas to finish starting and import the test app"
-                    exit 1
-                fi
-                sleep 5
-            done
-        fi
+      target_to_build: ObjectStoreTests
   - func: "run tests"
     vars:
-      test_filter: ObjectStoreTests
+      test_label: objstore-local
+      test_executable_name: "realm-object-store-tests"
       verbose_test_output: true
+  - func: "check branch state"
+
+# These are baas object store tests that run against baas running on a remote host
+- name: baas-integration-tests
+  tags: [ "test_suite_remote_baas", "for_pull_requests" ]
+  exec_timeout_secs: 3600
+  commands:
+  - func: "launch remote baas"
+    vars:
+      baas_branch: 3f31617aacfe5d31b9057fc298b735b60acd6424
+  - func: "compile"
+    vars:
+      target_to_build: ObjectStoreTests
+  - func: "wait for baas to start"
+  - func: "run tests"
+    vars:
+      test_label: objstore-baas
+      test_executable_name: "realm-object-store-tests"
+      verbose_test_output: true
+  - func: "check branch state"
 
 - name: process_coverage_data
   tags: [ "for_pull_requests" ]
@@ -714,6 +911,7 @@ tasks:
         COVERALLS_TOKEN: "${coveralls_token}"
       script: |-
         set -o errexit
+        set -o pipefail
         set -o verbose
 
         if [[ -n "${xcode_developer_dir}" ]]; then
@@ -761,8 +959,12 @@ tasks:
             --service-flag-name="${coveralls_flag_name}" \
             --commit-sha="${github_commit}" \
             --vcs-branch="${branch_name}" \
+            --ignore='build/_deps/**' \
+            --ignore='build/external/**' \
             --ignore='external/**' \
             --ignore='src/external/**' \
+            --ignore='src/realm/parser/generated/**' \
+            --ignore='test/large_tests/**' \
             --parallel \
             --output-path=coveralls_${task_name}.json
 
@@ -839,6 +1041,8 @@ tasks:
         exit 1
 
 - name: fuzzer
+  tags: [ "for_nightly_tests" ]
+  allowed_requesters: [ "ad_hoc", "patch" ]
   commands:
   - command: shell.exec
     params:
@@ -848,6 +1052,19 @@ tasks:
         ${cmake_build_type|Debug}/realm-libfuzz -rss_limit_mb=0 -max_total_time=3600
 
 task_groups:
+- name: core_tests_group
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
+  tasks:
+  - core-tests
+
+# Runs object-store-tests against baas running on remote host
 - name: compile_test_and_package
   max_hosts: 1
   setup_group_can_fail_task: true
@@ -861,8 +1078,10 @@ task_groups:
   tasks:
   - compile
   - .test_suite
+  - .test_suite_remote_baas
   - package
 
+# Runs object-store-tests against baas running on remote host
 - name: compile_test
   max_hosts: 1
   setup_group_can_fail_task: true
@@ -876,7 +1095,9 @@ task_groups:
   tasks:
   - compile
   - .test_suite
+  - .test_suite_remote_baas
 
+# Runs object-store-tests against baas running on remote host
 - name: compile_test_coverage
   max_hosts: 1
   setup_group_can_fail_task: true
@@ -890,33 +1111,8 @@ task_groups:
   tasks:
   - compile
   - .test_suite
+  - .test_suite_remote_baas
   - process_coverage_data
-
-- name: core_tests_group
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  teardown_task:
-  - func: "upload test results"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - core-tests
-
-- name: core_sync_tests_group
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  teardown_task:
-  - func: "upload test results"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - compile
-  - core-tests
-  - sync-tests
 
 - name: benchmarks
   setup_group_can_fail_task: true
@@ -969,12 +1165,12 @@ buildvariants:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
-    run_tests_against_baas: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
     extra_flags: -DREALM_ENABLE_GEOSPATIAL=OFF # can be removed once SDKs pick this feature up
   tasks:
   - name: compile_test
+
 
 - name: ubuntu2204
   display_name: "Ubuntu 22.04 x86_64 (Clang 16 + lint)"
@@ -984,14 +1180,13 @@ buildvariants:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.26.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
-    run_tests_against_baas: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
   tasks:
   - name: lint
     distros:
     - ubuntu2204-small
-  - name: core_sync_tests_group
+  - name: compile_test
 
 - name: ubuntu2004-no-session-multiplexing
   display_name: "Ubuntu 20.04 x86_64 (Sync Multiplexing Disabled)"
@@ -1001,7 +1196,6 @@ buildvariants:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
-    run_tests_against_baas: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
     disable_sync_multiplexing: On
@@ -1016,7 +1210,6 @@ buildvariants:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
-    run_tests_against_baas: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
     run_with_encryption: On
@@ -1034,7 +1227,6 @@ buildvariants:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
-    run_tests_against_baas: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
     llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
@@ -1055,7 +1247,6 @@ buildvariants:
     cmake_bindir: "./cmake_binaries/bin"
     cmake_build_type: RelWithDebInfo
     fetch_missing_dependencies: On
-    run_tests_against_baas: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
     python3: /opt/mongodbtoolchain/v3/bin/python3
@@ -1071,39 +1262,35 @@ buildvariants:
 
 - name: ubuntu2004-asan
   display_name: "Ubuntu 20.04 x86_64 (Clang 11 ASAN)"
-  run_on: ubuntu2004-small
+  run_on: ubuntu2004-large
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
-    run_tests_against_baas: On
     enable_asan: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
     llvm_symbolizer: "./clang_binaries/bin/llvm-symbolizer"
   tasks:
   - name: compile_test
-    distros:
-    - ubuntu2004-large
   - name: long-running-tests
+    distros:
+    - ubuntu2004-small
 
 - name: ubuntu2004-tsan
   display_name: "Ubuntu 20.04 x86_64 (Clang 11 TSAN)"
-  run_on: ubuntu2004-small
+  run_on: ubuntu2004-large
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
-    run_tests_against_baas: On
     enable_tsan: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
   tasks:
   - name: compile_test
-    distros:
-    - ubuntu2004-large
 
 - name: ubuntu2004-ubsan
   display_name: "Ubuntu 20.04 x86_64 (Clang 11 UBSAN)"
@@ -1113,7 +1300,6 @@ buildvariants:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
-    run_tests_against_baas: On
     enable_ubsan: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
@@ -1130,7 +1316,6 @@ buildvariants:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
-    run_tests_against_baas: On
     enable_ubsan: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
@@ -1139,12 +1324,10 @@ buildvariants:
     enable_fuzzer: On
   tasks:
   - name: fuzzer-tests
-    cron: "@daily"
-    patchable: true
 
 - name: rhel70
   display_name: "RHEL 7 x86_64"
-  run_on: rhel70-small
+  run_on: rhel70-large
   expansions:
     c_compiler: /opt/mongodbtoolchain/v3/bin/gcc
     cxx_compiler: /opt/mongodbtoolchain/v3/bin/g++
@@ -1152,16 +1335,13 @@ buildvariants:
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
     curl: "/opt/mongodbtoolchain/v3/bin/curl"
-    run_tests_against_baas: On
     python3: "/opt/mongodbtoolchain/v3/bin/python3"
     ninja: "/opt/mongodbtoolchain/v4/bin/ninja"
   tasks:
   - name: compile_test_and_package
-    distros:
-    - rhel70-large
 
 - name: ubuntu-valgrind
-  display_name: "Ubuntu 2204 Valgrind"
+  display_name: "Ubuntu 22.04 x86_64 (Valgrind)"
   run_on: ubuntu2204-large
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
@@ -1174,7 +1354,7 @@ buildvariants:
 
 - name: ubuntu2004-arm64
   display_name: "Ubuntu 20.04 ARM64"
-  run_on: ubuntu2004-arm64-small
+  run_on: ubuntu2004-arm64-large
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-aarch64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
@@ -1183,11 +1363,7 @@ buildvariants:
     fetch_missing_dependencies: On
   tasks:
   - name: compile_test_and_package
-    distros:
-    - ubuntu2004-arm64-large
   - name: benchmarks
-    distros:
-    - ubuntu2004-arm64-large
 
 - name: macos
   display_name: "MacOS 11.0 x86_64"
@@ -1198,12 +1374,12 @@ buildvariants:
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    run_tests_against_baas: On
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
   tasks:
   - name: compile_test
   - name: swift-build-and-test
+  - name: validate-installed-headers
 
 - name: macos-encrypted
   display_name: "MacOS 11.0 x86_64 (Encryption enabled)"
@@ -1214,7 +1390,6 @@ buildvariants:
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    run_tests_against_baas: On
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
     run_with_encryption: On
@@ -1230,7 +1405,6 @@ buildvariants:
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    run_tests_against_baas: On
     cmake_build_type: Release
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
@@ -1250,13 +1424,10 @@ buildvariants:
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    run_tests_against_baas: On
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64 -DREALM_ENABLE_GEOSPATIAL=OFF
   tasks:
   - name: compile_test
-    distros:
-    - macos-1100-arm64
   - name: swift-build-and-test
 
 - name: macos-1100-arm64-release
@@ -1269,7 +1440,6 @@ buildvariants:
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
     cmake_build_type: Release
-    run_tests_against_baas: On
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
   tasks:
@@ -1287,7 +1457,6 @@ buildvariants:
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
-    run_tests_against_baas: On
     xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
     enable_llvm_coverage: On
@@ -1297,14 +1466,13 @@ buildvariants:
   - name: compile_test_coverage
 
 - name: ubuntu-coverage
-  display_name: "Ubuntu (Code Coverage)"
+  display_name: "Ubuntu 20.04 x86_64 (Code Coverage)"
   run_on: ubuntu2004-large
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
-    run_tests_against_baas: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
     enable_llvm_coverage: On
@@ -1324,6 +1492,7 @@ buildvariants:
     extra_flags: "-A x64"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
     fetch_missing_dependencies: On
+    curl_base: "/cygdrive/c/curl"
     python3: "/cygdrive/c/python/python37/python.exe"
   tasks:
   - name: compile_test_and_package
@@ -1339,6 +1508,7 @@ buildvariants:
     extra_flags: "-A x64"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
     fetch_missing_dependencies: On
+    curl_base: "/cygdrive/c/curl"
     python3: "/cygdrive/c/python/python37/python.exe"
     run_with_encryption: On
   tasks:
@@ -1355,6 +1525,7 @@ buildvariants:
     cmake_build_type: "Release"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
     fetch_missing_dependencies: On
+    curl_base: "/cygdrive/c/curl"
     python3: "/cygdrive/c/python/python37/python.exe"
   tasks:
   - name: compile_test

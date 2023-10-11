@@ -103,6 +103,11 @@ RuntimeError::RuntimeError(ErrorCodes::Error code, std::string_view msg)
 {
     REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::runtime_error));
 }
+RuntimeError::RuntimeError(Status&& status)
+    : Exception(std::move(status))
+{
+    REALM_ASSERT(ErrorCodes::error_categories(to_status().code()).test(ErrorCategory::runtime_error));
+}
 RuntimeError::~RuntimeError() noexcept = default;
 
 InvalidArgument::InvalidArgument(std::string_view msg)

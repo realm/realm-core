@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch_all.hpp>
-
-#include "sync/session/session_util.hpp"
+#include <util/event_loop.hpp>
+#include <util/test_utils.hpp>
+#include <util/sync/session_util.hpp>
 
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/object_schema.hpp>
@@ -26,11 +26,10 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
 
-#include "util/event_loop.hpp"
-#include "util/test_utils.hpp"
-
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/time.hpp>
+
+#include <catch2/catch_all.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -42,12 +41,11 @@
 using namespace realm;
 using namespace realm::util;
 
-static const std::string dummy_auth_url = "https://realm.example.org";
 static const std::string dummy_device_id = "123400000000000000000000";
 
 static const std::string base_path = util::make_temp_dir() + "realm_objectstore_sync_connection_state_changes";
 
-TEST_CASE("sync: Connection state changes", "[sync]") {
+TEST_CASE("sync: Connection state changes", "[sync][session][connection change]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -55,9 +53,8 @@ TEST_CASE("sync: Connection state changes", "[sync]") {
     config.base_path = base_path;
     TestSyncManager init_sync_manager(config);
     auto app = init_sync_manager.app();
-    auto user =
-        app->sync_manager()->get_user("user", ENCODE_FAKE_JWT("not_a_real_token"),
-                                      ENCODE_FAKE_JWT("also_not_a_real_token"), dummy_auth_url, dummy_device_id);
+    auto user = app->sync_manager()->get_user("user", ENCODE_FAKE_JWT("not_a_real_token"),
+                                              ENCODE_FAKE_JWT("also_not_a_real_token"), dummy_device_id);
 
     SECTION("register connection change listener") {
         auto session = sync_session(
