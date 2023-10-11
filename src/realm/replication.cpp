@@ -68,10 +68,10 @@ void Replication::add_class(TableKey table_key, StringData name, Table::Type typ
 {
     if (auto logger = get_logger()) {
         if (type == Table::Type::Embedded) {
-            logger->log(util::Logger::Level::debug, "Add %1 class '%2'", type, name);
+            logger->log(LogCategory::object, util::Logger::Level::debug, "Add %1 class '%2'", type, name);
         }
         else {
-            logger->log(util::Logger::Level::debug, "Add class '%1'", name);
+            logger->log(LogCategory::object, util::Logger::Level::debug, "Add class '%1'", name);
         }
     }
     unselect_all();
@@ -82,7 +82,8 @@ void Replication::add_class_with_primary_key(TableKey tk, StringData name, DataT
                                              Table::Type table_type)
 {
     if (auto logger = get_logger()) {
-        logger->log(util::Logger::Level::debug, "Add %1 class '%2' with primary key property '%3' of %4", table_type,
+        logger->log(LogCategory::object, util::Logger::Level::debug,
+                    "Add %1 class '%2' with primary key property '%3' of %4", table_type,
                     Group::table_name_to_class_name(name), pk_name, pk_type);
     }
     REALM_ASSERT(table_type != Table::Type::Embedded);
@@ -93,7 +94,8 @@ void Replication::add_class_with_primary_key(TableKey tk, StringData name, DataT
 void Replication::erase_class(TableKey tk, StringData table_name, size_t)
 {
     if (auto logger = get_logger()) {
-        logger->log(util::Logger::Level::debug, "Remove class '%1'", Group::table_name_to_class_name(table_name));
+        logger->log(LogCategory::object, util::Logger::Level::debug, "Remove class '%1'",
+                    Group::table_name_to_class_name(table_name));
     }
     unselect_all();
     m_encoder.erase_class(tk); // Throws
@@ -117,12 +119,13 @@ void Replication::insert_column(const Table* t, ColKey col_key, DataType type, S
             }
         }
         if (target_table) {
-            logger->log(util::Logger::Level::debug, "On class '%1': Add property '%2' %3linking '%4'",
-                        t->get_class_name(), col_name, collection_type, target_table->get_class_name());
+            logger->log(LogCategory::object, util::Logger::Level::debug,
+                        "On class '%1': Add property '%2' %3linking '%4'", t->get_class_name(), col_name,
+                        collection_type, target_table->get_class_name());
         }
         else {
-            logger->log(util::Logger::Level::debug, "On class '%1': Add property '%2' %3of %4", t->get_class_name(),
-                        col_name, collection_type, type);
+            logger->log(LogCategory::object, util::Logger::Level::debug, "On class '%1': Add property '%2' %3of %4",
+                        t->get_class_name(), col_name, collection_type, type);
         }
     }
     select_table(t);                  // Throws
@@ -132,8 +135,8 @@ void Replication::insert_column(const Table* t, ColKey col_key, DataType type, S
 void Replication::erase_column(const Table* t, ColKey col_key)
 {
     if (auto logger = get_logger()) {
-        logger->log(util::Logger::Level::debug, "On class '%1': Remove property '%2'", t->get_class_name(),
-                    t->get_column_name(col_key));
+        logger->log(LogCategory::object, util::Logger::Level::debug, "On class '%1': Remove property '%2'",
+                    t->get_class_name(), t->get_column_name(col_key));
     }
     select_table(t);                 // Throws
     m_encoder.erase_column(col_key); // Throws
@@ -142,7 +145,7 @@ void Replication::erase_column(const Table* t, ColKey col_key)
 void Replication::create_object(const Table* t, GlobalKey id)
 {
     if (auto logger = get_logger()) {
-        logger->log(util::Logger::Level::debug, "Create object '%1'", t->get_class_name());
+        logger->log(LogCategory::object, util::Logger::Level::debug, "Create object '%1'", t->get_class_name());
     }
     select_table(t);                              // Throws
     m_encoder.create_object(id.get_local_key(0)); // Throws
@@ -151,7 +154,8 @@ void Replication::create_object(const Table* t, GlobalKey id)
 void Replication::create_object_with_primary_key(const Table* t, ObjKey key, Mixed pk)
 {
     if (auto logger = get_logger()) {
-        logger->log(util::Logger::Level::debug, "Create object '%1' with primary key %2", t->get_class_name(), pk);
+        logger->log(LogCategory::object, util::Logger::Level::debug, "Create object '%1' with primary key %2",
+                    t->get_class_name(), pk);
     }
     select_table(t);              // Throws
     m_encoder.create_object(key); // Throws
@@ -161,14 +165,16 @@ void Replication::remove_object(const Table* t, ObjKey key)
 {
     if (auto logger = get_logger()) {
         if (t->is_embedded()) {
-            logger->log(util::Logger::Level::debug, "Remove embedded object '%1'", t->get_class_name());
+            logger->log(LogCategory::object, util::Logger::Level::debug, "Remove embedded object '%1'",
+                        t->get_class_name());
         }
         else if (t->get_primary_key_column()) {
-            logger->log(util::Logger::Level::debug, "Remove object '%1' with primary key %2", t->get_class_name(),
-                        t->get_primary_key(key));
+            logger->log(LogCategory::object, util::Logger::Level::debug, "Remove object '%1' with primary key %2",
+                        t->get_class_name(), t->get_primary_key(key));
         }
         else {
-            logger->log(util::Logger::Level::debug, "Remove object '%1'[%2]", t->get_class_name(), key);
+            logger->log(LogCategory::object, util::Logger::Level::debug, "Remove object '%1'[%2]",
+                        t->get_class_name(), key);
         }
     }
     select_table(t);              // Throws
@@ -185,15 +191,17 @@ inline void Replication::select_obj(ObjKey key)
             auto class_name = m_selected_table->get_class_name();
             if (m_selected_table->get_primary_key_column()) {
                 auto pk = m_selected_table->get_primary_key(key);
-                logger->log(util::Logger::Level::debug, "Mutating object '%1' with primary key %2", class_name, pk);
+                logger->log(LogCategory::object, util::Logger::Level::debug,
+                            "Mutating object '%1' with primary key %2", class_name, pk);
             }
             else if (m_selected_table->is_embedded()) {
                 auto obj = m_selected_table->get_object(key);
-                logger->log(util::Logger::Level::debug, "Mutating object '%1' with path '%2'", class_name,
-                            obj.get_id());
+                logger->log(LogCategory::object, util::Logger::Level::debug, "Mutating object '%1' with path '%2'",
+                            class_name, obj.get_id());
             }
             else {
-                logger->log(util::Logger::Level::debug, "Mutating anonymous object '%1'[%2]", class_name, key);
+                logger->log(LogCategory::object, util::Logger::Level::debug, "Mutating anonymous object '%1'[%2]",
+                            class_name, key);
             }
         }
     }
