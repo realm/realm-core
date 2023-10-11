@@ -949,7 +949,8 @@ void SessionImpl::on_new_flx_subscription_set(int64_t new_version)
     // check is that we have completed the IDENT message handshake and have not yet received an ERROR
     // message to call ensure_enlisted_to_send().
     if (m_state == State::Active && m_ident_message_sent && !m_error_message_received) {
-        logger.trace("Requesting QUERY change message for new subscription set version %1", new_version);
+        logger.trace(util::LogCategory::sync, "Requesting QUERY change message for new subscription set version %1",
+                     new_version);
         ensure_enlisted_to_send();
     }
 }
@@ -1910,7 +1911,8 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
                                    Optional<std::string> ssl_trust_certificate_path,
                                    std::function<SSLVerifyCallback> ssl_verify_callback,
                                    Optional<ProxyConfig> proxy_config, ReconnectInfo reconnect_info)
-    : logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(ident), client.logger_ptr)} // Throws
+    : logger_ptr{std::make_shared<util::PrefixLogger>(util::LogCategory::session, make_logger_prefix(ident),
+                                                      client.logger_ptr)} // Throws
     , logger{*logger_ptr}
     , m_client{client}
     , m_verify_servers_ssl_certificate{verify_servers_ssl_certificate}    // DEPRECATED
@@ -1967,7 +1969,7 @@ void ClientImpl::Connection::resume_active_sessions()
 
 void ClientImpl::Connection::on_idle()
 {
-    logger.debug("Destroying connection object");
+    logger.debug(util::LogCategory::session, "Destroying connection object");
     ClientImpl& client = get_client();
     client.remove_connection(*this);
     // NOTE: This connection object is now destroyed!

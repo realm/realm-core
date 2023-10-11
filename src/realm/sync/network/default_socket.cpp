@@ -465,12 +465,29 @@ void DefaultWebSocketImpl::initiate_websocket_handshake()
 ///
 /// DefaultSocketProvider - default socket provider implementation
 ///
+class DefaultSocketLogger : public util::Logger {
+public:
+    DefaultSocketLogger(const std::shared_ptr<Logger>& base_logger) noexcept
+        : Logger(util::LogCategory::network, *base_logger)
+        , m_base_logger_ptr(base_logger)
+    {
+    }
+
+protected:
+    void do_log(const util::LogCategory& category, Level level, const std::string& message) final
+    {
+        Logger::do_log(*m_base_logger_ptr, category, level, message);
+    }
+
+private:
+    std::shared_ptr<Logger> m_base_logger_ptr;
+};
 
 DefaultSocketProvider::DefaultSocketProvider(const std::shared_ptr<util::Logger>& logger,
                                              const std::string user_agent,
                                              const std::shared_ptr<BindingCallbackThreadObserver>& observer_ptr,
                                              AutoStart auto_start)
-    : m_logger_ptr{logger}
+    : m_logger_ptr{std::make_shared<DefaultSocketLogger>(logger)}
     , m_observer_ptr{observer_ptr}
     , m_service{}
     , m_random{}

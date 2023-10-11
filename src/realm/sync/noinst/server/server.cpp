@@ -704,7 +704,8 @@ inline void ServerFile::group_finalize_work_stage_2()
 // transactions, but only on subtier nodes of a star topology server cluster.
 class Worker : public ServerHistory::Context {
 public:
-    util::PrefixLogger logger;
+    std::shared_ptr<util::PrefixLogger> logger_ptr;
+    util::Logger& logger;
 
     explicit Worker(ServerImpl&);
 
@@ -1088,7 +1089,8 @@ public:
                    std::unique_ptr<network::ssl::Stream>&& ssl_stream,
                    std::unique_ptr<network::ReadAheadBuffer>&& read_ahead_buffer, int client_protocol_version,
                    std::string client_user_agent, std::string remote_endpoint, std::string appservices_request_id)
-        : logger_ptr{std::make_shared<util::PrefixLogger>(make_logger_prefix(id), serv.logger_ptr)} // Throws
+        : logger_ptr{std::make_shared<util::PrefixLogger>(util::LogCategory::server, make_logger_prefix(id),
+                                                          serv.logger_ptr)} // Throws
         , logger{*logger_ptr}
         , m_server{serv}
         , m_id{id}
@@ -1469,7 +1471,8 @@ public:
     util::Logger& logger;
 
     HTTPConnection(ServerImpl& serv, int_fast64_t id, bool is_ssl)
-        : logger_ptr{std::make_shared<PrefixLogger>(make_logger_prefix(id), serv.logger_ptr)} // Throws
+        : logger_ptr{std::make_shared<PrefixLogger>(util::LogCategory::server, make_logger_prefix(id),
+                                                    serv.logger_ptr)} // Throws
         , logger{*logger_ptr}
         , m_server{serv}
         , m_id{id}
@@ -2098,7 +2101,7 @@ public:
     util::PrefixLogger logger;
 
     Session(SyncConnection& conn, session_ident_type session_ident)
-        : logger{make_logger_prefix(session_ident), conn.logger_ptr} // Throws
+        : logger{util::LogCategory::server, make_logger_prefix(session_ident), conn.logger_ptr} // Throws
         , m_connection{conn}
         , m_session_ident{session_ident}
     {
@@ -3218,8 +3221,8 @@ void SessionQueue::clear() noexcept
 
 ServerFile::ServerFile(ServerImpl& server, ServerFileAccessCache& cache, const std::string& virt_path,
                        std::string real_path, bool disable_sync_to_disk)
-    : logger{"ServerFile[" + virt_path + "]: ", server.logger_ptr}           // Throws
-    , wlogger{"ServerFile[" + virt_path + "]: ", server.get_worker().logger} // Throws
+    : logger{util::LogCategory::server, "ServerFile[" + virt_path + "]: ", server.logger_ptr}               // Throws
+    , wlogger{util::LogCategory::server, "ServerFile[" + virt_path + "]: ", server.get_worker().logger_ptr} // Throws
     , m_server{server}
     , m_file{cache, real_path, virt_path, false, disable_sync_to_disk} // Throws
     , m_worker_file{server.get_worker().get_file_access_cache(), real_path, virt_path, true, disable_sync_to_disk}
@@ -3754,7 +3757,9 @@ void ServerFile::finalize_work_stage_2()
 // ============================ Worker implementation ============================
 
 Worker::Worker(ServerImpl& server)
-    : logger{"Worker: ", server.logger_ptr} // Throws
+    : logger_ptr{std::make_shared<util::PrefixLogger>(util::LogCategory::server, "Worker: ", server.logger_ptr)}
+    // Throws
+    , logger(*logger_ptr)
     , m_server{server}
     , m_transformer{make_transformer()} // Throws
     , m_file_access_cache{server.get_config().max_open_files, logger, *this, server.get_config().encryption_key}
@@ -3819,10 +3824,27 @@ void Worker::stop() noexcept
 
 
 // ============================ ServerImpl implementation ============================
+class ServerLogger : public Logger {
+public:
+    ServerLogger(const std::shared_ptr<Logger>& base_logger) noexcept
+        : Logger(LogCategory::server, *base_logger)
+        , m_base_logger_ptr(base_logger)
+    {
+    }
+
+protected:
+    void do_log(const LogCategory& category, Level level, const std::string& message) final
+    {
+        Logger::do_log(*m_base_logger_ptr, category, level, message);
+    }
+
+private:
+    std::shared_ptr<Logger> m_base_logger_ptr;
+};
 
 
 ServerImpl::ServerImpl(const std::string& root_dir, util::Optional<sync::PKey> pkey, Server::Config config)
-    : logger_ptr{config.logger ? std::move(config.logger) : Logger::get_default_logger()}
+    : logger_ptr{std::make_shared<ServerLogger>(std::move(config.logger))}
     , logger{*logger_ptr}
     , m_config{std::move(config)}
     , m_max_upload_backlog{determine_max_upload_backlog(config)}

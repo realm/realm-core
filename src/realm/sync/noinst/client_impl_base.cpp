@@ -134,9 +134,26 @@ bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& 
     return true;
 }
 
+class SyncClientLogger : public Logger {
+public:
+    SyncClientLogger(const std::shared_ptr<Logger>& base_logger) noexcept
+        : Logger(LogCategory::client, *base_logger)
+        , m_base_logger_ptr(base_logger)
+    {
+    }
+
+protected:
+    void do_log(const LogCategory& category, Level level, const std::string& message) final
+    {
+        Logger::do_log(*m_base_logger_ptr, category, level, message);
+    }
+
+private:
+    std::shared_ptr<Logger> m_base_logger_ptr;
+};
 
 ClientImpl::ClientImpl(ClientConfig config)
-    : logger_ptr{config.logger ? std::move(config.logger) : util::Logger::get_default_logger()}
+    : logger_ptr{std::make_shared<SyncClientLogger>(std::move(config.logger))}
     , logger{*logger_ptr}
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}
@@ -1420,11 +1437,12 @@ void Connection::receive_server_log_message(session_ident_type session_ident, ut
 
     if (session_ident != 0) {
         if (auto sess = get_session(session_ident)) {
-            sess->logger.log(level, "%1 log: %2", prefix, message);
+            sess->logger.log(LogCategory::session, level, "%1 log: %2", prefix, message);
             return;
         }
 
-        logger.log(level, "%1 log for unknown session %2: %3", prefix, session_ident, message);
+        logger.log(util::LogCategory::session, level, "%1 log for unknown session %2: %3", prefix, session_ident,
+                   message);
         return;
     }
 
@@ -1437,7 +1455,8 @@ void Connection::receive_appservices_request_id(std::string_view coid)
     // Only set once per connection
     if (!coid.empty() && m_appservices_coid.empty()) {
         m_appservices_coid = coid;
-        logger.info("Connected to app services with request id: \"%1\"", m_appservices_coid);
+        logger.log(util::LogCategory::session, util::LogCategory::Level::info,
+                   "Connected to app services with request id: \"%1\"", m_appservices_coid);
     }
 }
 
@@ -2053,18 +2072,19 @@ void Session::send_upload_message()
     ClientProtocol::UploadMessageBuilder upload_message_builder = protocol.make_upload_message_builder(); // Throws
 
     for (const UploadChangeset& uc : uploadable_changesets) {
-        logger.debug("Fetching changeset for upload (client_version=%1, server_version=%2, "
+        logger.debug(util::LogCategory::changeset,
+                     "Fetching changeset for upload (client_version=%1, server_version=%2, "
                      "changeset_size=%3, origin_timestamp=%4, origin_file_ident=%5)",
                      uc.progress.client_version, uc.progress.last_integrated_server_version, uc.changeset.size(),
                      uc.origin_timestamp, uc.origin_file_ident); // Throws
         if (logger.would_log(util::Logger::Level::trace)) {
             BinaryData changeset_data = uc.changeset.get_first_chunk();
             if (changeset_data.size() < 1024) {
-                logger.trace("Changeset: %1",
+                logger.trace(util::LogCategory::changeset, "Changeset: %1",
                              _impl::clamped_hex_dump(changeset_data)); // Throws
             }
             else {
-                logger.trace("Changeset(comp): %1 %2", changeset_data.size(),
+                logger.trace(util::LogCategory::changeset, "Changeset(comp): %1 %2", changeset_data.size(),
                              protocol.compressed_hex_dump(changeset_data));
             }
 
@@ -2075,10 +2095,10 @@ void Session::send_upload_message()
                 parse_changeset(in, log);
                 std::stringstream ss;
                 log.print(ss);
-                logger.trace("Changeset (parsed):\n%1", ss.str());
+                logger.trace(util::LogCategory::changeset, "Changeset (parsed):\n%1", ss.str());
             }
             catch (const BadChangesetError& err) {
-                logger.error("Unable to parse changeset: %1", err.what());
+                logger.error(util::LogCategory::changeset, "Unable to parse changeset: %1", err.what());
             }
 #endif
         }
@@ -2102,7 +2122,7 @@ void Session::send_upload_message()
                 compact_changesets(&changeset, 1);
                 encode_changeset(changeset, encode_buffer);
 
-                logger.debug("Upload compaction: original size = %1, compacted size = %2", uc.changeset.size(),
+                logger.debug(util::LogCategory::changeset, "Upload compaction: original size = %1, compacted size = %2", uc.changeset.size(),
                              encode_buffer.size()); // Throws
             }
 
@@ -2297,7 +2317,7 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
         REALM_ASSERT_EX(m_progress.upload.client_version == 0, m_progress.upload.client_version);
         REALM_ASSERT_EX(m_progress.upload.last_integrated_server_version == 0,
                         m_progress.upload.last_integrated_server_version);
-        logger.trace("last_version_available  = %1", m_last_version_available); // Throws
+        logger.trace(util::LogCategory::reset, "last_version_available  = %1", m_last_version_available); // Throws
 
         m_upload_target_version = m_last_version_available;
         m_upload_progress = m_progress.upload;

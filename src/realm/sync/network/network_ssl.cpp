@@ -68,20 +68,22 @@ bool verify_certificate_from_root_certs(X509* server_cert, util::Logger* logger)
     std::size_t num_certs = sizeof(root_certs) / sizeof(root_certs[0]);
 
     if (logger)
-        logger->info("Verifying server SSL certificate using %1 root certificates", num_certs);
+        logger->info(util::LogCategory::network, "Verifying server SSL certificate using %1 root certificates",
+                     num_certs);
 
     for (std::size_t i = 0; i < num_certs; ++i) {
         const char* root_cert = root_certs[i];
         bool verified = verify_certificate_from_root_cert(root_cert, server_cert);
         if (verified) {
             if (logger)
-                logger->debug("Server SSL certificate verified using root certificate(%1):\n%2", i, root_cert);
+                logger->debug(util::LogCategory::network,
+                              "Server SSL certificate verified using root certificate(%1):\n%2", i, root_cert);
             return true;
         }
     }
 
     if (logger)
-        logger->error("The server certificate was not signed by any root certificate");
+        logger->error(util::LogCategory::network, "The server certificate was not signed by any root certificate");
     return false;
 }
 
@@ -661,7 +663,8 @@ int Stream::verify_callback_using_root_certs(int preverify_ok, X509_STORE_CTX* c
                 const char* pem_data = buffer->data;
                 std::size_t pem_size = buffer->length;
 
-                logger->debug("Verifying server SSL certificate using root certificates, "
+                logger->debug(util::LogCategory::network,
+                              "Verifying server SSL certificate using root certificates, "
                               "host name = %1, server port = %2, certificate =\n%3",
                               host_name, server_port, StringData{pem_data, pem_size});
             }
@@ -671,7 +674,8 @@ int Stream::verify_callback_using_root_certs(int preverify_ok, X509_STORE_CTX* c
 
     bool valid = verify_certificate_from_root_certs(server_cert, logger);
     if (!valid && logger) {
-        logger->error("server SSL certificate rejected using root certificates, "
+        logger->error(util::LogCategory::network,
+                      "server SSL certificate rejected using root certificates, "
                       "host name = %1, server port = %2",
                       host_name, server_port);
     }

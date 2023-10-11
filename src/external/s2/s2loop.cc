@@ -93,14 +93,14 @@ void S2Loop::Init(vector<S2Point> const& vertices) {
 bool S2Loop::IsValid(string* err) const {
   // Loops must have at least 3 vertices.
   if (num_vertices() < 3) {
-      s2_logger()->error("Degenerate loop");
+      s2_logger()->error(realm::util::LogCategory::query, "Degenerate loop");
       if (err) *err = "Degenerate loop";
       return false;
   }
   // All vertices must be unit length.
   for (int i = 0; i < num_vertices(); ++i) {
     if (!S2::IsUnitLength(vertex(i))) {
-        s2_logger()->error("Vertex %1 is not unit length", i);
+        s2_logger()->error(realm::util::LogCategory::query, "Vertex %1 is not unit length", i);
       if (err) *err = realm::util::format("Vertex %1 is not unit length", i);
       return false;
     }
@@ -109,7 +109,7 @@ bool S2Loop::IsValid(string* err) const {
   hash_map<S2Point, int> vmap;
   for (int i = 0; i < num_vertices(); ++i) {
     if (!vmap.insert(make_pair(vertex(i), i)).second) {
-        s2_logger()->error("Duplicate vertices: %1 and %2", vmap[vertex(i)], i);
+        s2_logger()->error(realm::util::LogCategory::query, "Duplicate vertices: %1 and %2", vmap[vertex(i)], i);
         if (err) *err = realm::util::format("Duplicate vertices: %1 and %2", vmap[vertex(i)], i);
         return false;
     }
@@ -139,7 +139,7 @@ bool S2Loop::IsValid(string* err) const {
               *err = msg;
           }
           else {
-              s2_logger()->error(msg.c_str());
+              s2_logger()->error(realm::util::LogCategory::query, msg.c_str());
           }
           break;
         }

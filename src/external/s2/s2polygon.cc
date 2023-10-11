@@ -130,7 +130,7 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops, string* err) {
             *err = realm::util::format("Duplicate edge: ring %1, edge %2 and ring %3, edge %4", i, j, other.first, other.second);
         }
         else {
-            s2_logger()->error("Duplicate edge: ring %1, edge %2 and ring %3, edge %4", i, j, other.first, other.second);
+            s2_logger()->error(realm::util::LogCategory::query, "Duplicate edge: ring %1, edge %2 and ring %3, edge %4", i, j, other.first, other.second);
         }
         return false;
       }
@@ -141,7 +141,7 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops, string* err) {
   // two loops cross.
   for (size_t i = 0; i < loops.size(); ++i) {
     if (!loops[i]->IsNormalized()) {
-        s2_logger()->error("Ring %1 encloses more than half the sphere", i);
+        s2_logger()->error(realm::util::LogCategory::query, "Ring %1 encloses more than half the sphere", i);
         if (err) *err = realm::util::format("Ring %1 encloses more than half the sphere", i);
       return false;
     }
@@ -149,7 +149,7 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops, string* err) {
       // This test not only checks for edge crossings, it also detects
       // cases where the two boundaries cross at a shared vertex.
       if (loops[i]->ContainsOrCrosses(loops[j]) < 0) {
-          s2_logger()->error("Ring %1 crosses ring %2", i, j);
+          s2_logger()->error(realm::util::LogCategory::query, "Ring %1 crosses ring %2", i, j);
           if (err) *err = realm::util::format("Ring %1 crosses ring %2", i, j);
         return false;
       }
@@ -742,7 +742,7 @@ void S2Polygon::InitToIntersectionSloppy(S2Polygon const* a, S2Polygon const* b,
   ClipBoundary(a, false, b, false, false, true, &builder);
   ClipBoundary(b, false, a, false, false, false, &builder);
   if (!builder.AssemblePolygon(this, NULL)) {
-      s2_logger()->fatal("Bad directed edges in InitToIntersection");
+      s2_logger()->fatal(realm::util::LogCategory::query, "Bad directed edges in InitToIntersection");
   }
 }
 
@@ -764,7 +764,7 @@ void S2Polygon::InitToUnionSloppy(S2Polygon const* a, S2Polygon const* b,
   ClipBoundary(a, false, b, false, true, true, &builder);
   ClipBoundary(b, false, a, false, true, false, &builder);
   if (!builder.AssemblePolygon(this, NULL)) {
-      s2_logger()->fatal("Bad directed edges");
+      s2_logger()->fatal(realm::util::LogCategory::query, "Bad directed edges");
   }
 }
 
@@ -786,7 +786,7 @@ void S2Polygon::InitToDifferenceSloppy(S2Polygon const* a, S2Polygon const* b,
   ClipBoundary(a, false, b, true, true, true, &builder);
   ClipBoundary(b, true, a, false, false, false, &builder);
   if (!builder.AssemblePolygon(this, NULL)) {
-      s2_logger()->fatal("Bad directed edges in InitToDifference");
+      s2_logger()->fatal(realm::util::LogCategory::query, "Bad directed edges in InitToDifference");
   }
 }
 
@@ -804,10 +804,10 @@ vector<S2Point>* SimplifyLoopAsPolyline(S2Loop const* loop, S1Angle tolerance) {
   if (indices.size() <= 2) return NULL;
   // Add them all except the last: it is the same as the first.
   vector<S2Point>* simplified_line = new vector<S2Point>(indices.size() - 1);
-    s2_logger()->detail("Now simplified to: ");
+    s2_logger()->detail(realm::util::LogCategory::query, "Now simplified to: ");
   for (size_t i = 0; i + 1 < indices.size(); ++i) {
     (*simplified_line)[i] = line.vertex(indices[i]);
-      s2_logger()->detail("%1", S2LatLng(line.vertex(indices[i])));
+      s2_logger()->detail(realm::util::LogCategory::query, "%1", S2LatLng(line.vertex(indices[i])));
   }
   return simplified_line;
 }
@@ -871,7 +871,7 @@ void S2Polygon::InitToSimplified(S2Polygon const* a, S1Angle tolerance) {
     BreakEdgesAndAddToBuilder(&index, &builder);
 
     if (!builder.AssemblePolygon(this, NULL)) {
-        s2_logger()->fatal("Bad edges in InitToSimplified.");
+        s2_logger()->fatal(realm::util::LogCategory::query, "Bad edges in InitToSimplified.");
     }
   }
 
@@ -1029,7 +1029,7 @@ void S2Polygon::InitToCellUnionBorder(S2CellUnion const& cells) {
     builder.AddLoop(&cell_loop);
   }
   if (!builder.AssemblePolygon(this, NULL)) {
-      s2_logger()->fatal("AssemblePolygon failed in InitToCellUnionBorder");
+      s2_logger()->fatal(realm::util::LogCategory::query, "AssemblePolygon failed in InitToCellUnionBorder");
   }
 }
 

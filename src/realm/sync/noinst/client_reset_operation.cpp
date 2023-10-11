@@ -44,7 +44,8 @@ ClientResetOperation::ClientResetOperation(util::Logger& logger, DBRef db, DBRef
 {
     REALM_ASSERT(m_db);
     REALM_ASSERT_RELEASE(m_mode != ClientResyncMode::Manual);
-    m_logger.debug("Create ClientResetOperation, realm_path = %1, mode = %2, recovery_allowed = %3", m_db->get_path(),
+    m_logger.debug(util::LogCategory::reset,
+                   "Create ClientResetOperation, realm_path = %1, mode = %2, recovery_allowed = %3", m_db->get_path(),
                    m_mode, m_recovery_is_allowed);
 }
 
@@ -77,7 +78,8 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident, syn
     auto latest_version = m_db->get_version_id_of_latest_snapshot();
 
     bool local_realm_exists = latest_version.version != 0;
-    m_logger.debug("ClientResetOperation::finalize, realm_path = %1, local_realm_exists = %2, mode = %3",
+    m_logger.debug(util::LogCategory::reset,
+                   "ClientResetOperation::finalize, realm_path = %1, local_realm_exists = %2, mode = %3",
                    m_db->get_path(), local_realm_exists, m_mode);
     if (!local_realm_exists) {
         return false;
@@ -132,13 +134,15 @@ void ClientResetOperation::clean_up_state() noexcept
                 DB::delete_files(path, nullptr, delete_lockfile);
             });
             if (!did_lock) {
-                m_logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up. "
+                m_logger.warn(util::LogCategory::reset,
+                              "In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up. "
                               "There were %2 refs remaining.",
                               path_to_clean, use_count);
             }
         }
         catch (const std::exception& err) {
-            m_logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up due to "
+            m_logger.warn(util::LogCategory::reset,
+                          "In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up due to "
                           "an exception: '%2'",
                           path_to_clean, err.what());
             // ignored, this is just a best effort
