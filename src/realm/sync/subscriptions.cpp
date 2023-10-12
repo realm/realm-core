@@ -603,10 +603,6 @@ SubscriptionSet MutableSubscriptionSet::commit()
 
     process_notifications();
 
-    if (state() == State::Pending) {
-        mgr->m_on_new_subscription_set(flx_version);
-    }
-
     return mgr->get_by_version_impl(flx_version, m_tr->get_version_of_current_transaction());
 }
 
@@ -658,21 +654,20 @@ std::string SubscriptionSet::to_ext_json() const
 namespace {
 class SubscriptionStoreInit : public SubscriptionStore {
 public:
-    explicit SubscriptionStoreInit(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set)
-        : SubscriptionStore(std::move(db), std::move(on_new_subscription_set))
+    explicit SubscriptionStoreInit(DBRef db)
+        : SubscriptionStore(std::move(db))
     {
     }
 };
 } // namespace
 
-SubscriptionStoreRef SubscriptionStore::create(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set)
+SubscriptionStoreRef SubscriptionStore::create(DBRef db)
 {
-    return std::make_shared<SubscriptionStoreInit>(std::move(db), std::move(on_new_subscription_set));
+    return std::make_shared<SubscriptionStoreInit>(std::move(db));
 }
 
-SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set)
+SubscriptionStore::SubscriptionStore(DBRef db)
     : m_db(std::move(db))
-    , m_on_new_subscription_set(std::move(on_new_subscription_set))
 {
     std::vector<SyncMetadataTable> internal_tables{
         {&m_sub_set_table,
