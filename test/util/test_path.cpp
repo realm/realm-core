@@ -175,7 +175,8 @@ bool test_dir_is_exfat()
     // f_type or provide constants for them
     std::string fs_typename = fsbuf.f_fstypename;
     std::transform(fs_typename.begin(), fs_typename.end(), fs_typename.begin(), toLowerAscii);
-    return fs_typename.find(std::string("exfat")) != std::string::npos;
+    return fs_typename.find(std::string("exfat")) != std::string::npos ||
+           fs_typename.find(std::string("msdos")) != std::string::npos;
 #else
     return false;
 #endif
