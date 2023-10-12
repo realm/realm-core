@@ -57,7 +57,6 @@
 
 
 using namespace realm;
-using namespace realm::metrics;
 using namespace realm::util;
 using Durability = DBOptions::Durability;
 
@@ -909,7 +908,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
     REALM_ASSERT(path.size());
 
     m_db_path = path;
-    m_path_hash = StringData(path).hash() & 0xffff;
+
     set_logger(options.logger);
     if (m_replication) {
         m_replication->set_logger(m_logger.get());
@@ -1443,11 +1442,6 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions& opt
         close();
         throw;
     }
-#if REALM_METRICS
-    if (options.enable_metrics) {
-        m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
-    }
-#endif // REALM_METRICS
     m_alloc.set_read_only(true);
 }
 
@@ -1475,7 +1469,7 @@ void DB::open(Replication& repl, const std::string& file, const DBOptions& optio
 }
 class DBLogger : public Logger {
 public:
-    DBLogger(const std::shared_ptr<Logger>& base_logger, size_t hash) noexcept
+    DBLogger(const std::shared_ptr<Logger>& base_logger, unsigned hash) noexcept
         : Logger(base_logger)
         , m_hash(hash)
     {
@@ -1491,13 +1485,13 @@ protected:
     }
 
 private:
-    size_t m_hash;
+    unsigned m_hash;
 };
 
 void DB::set_logger(const std::shared_ptr<util::Logger>& logger) noexcept
 {
     if (logger)
-        m_logger = std::make_shared<DBLogger>(logger, m_path_hash);
+        m_logger = std::make_shared<DBLogger>(logger, m_log_id);
 }
 
 void DB::open(Replication& repl, const DBOptions options)
@@ -1507,6 +1501,11 @@ void DB::open(Replication& repl, const DBOptions options)
     set_replication(&repl);
 
     m_alloc.init_in_memory_buffer();
+
+    set_logger(options.logger);
+    m_replication->set_logger(m_logger.get());
+    if (m_logger)
+        m_logger->log(util::Logger::Level::detail, "Open memory-only realm");
 
     auto hist_type = repl.get_history_type();
     m_in_memory_info =
@@ -1529,11 +1528,6 @@ void DB::open(Replication& repl, const DBOptions options)
 
     m_file_format_version = target_file_format_version;
 
-#if REALM_METRICS
-    if (options.enable_metrics) {
-        m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
-    }
-#endif // REALM_METRICS
     m_info = info;
     m_alloc.set_read_only(true);
 }
@@ -2311,6 +2305,10 @@ bool DB::do_try_begin_write()
 
 void DB::do_begin_write()
 {
+    if (m_logger) {
+        m_logger->log(util::Logger::Level::trace, "acquire writemutex");
+    }
+
     SharedInfo* info = m_info;
 
     // Get write lock - the write lock is held until do_end_write().
@@ -2369,6 +2367,9 @@ void DB::do_begin_write()
     // should take this situation into account by comparing with '>' instead of '!='
     info->next_served = my_ticket;
     finish_begin_write();
+    if (m_logger) {
+        m_logger->log(util::Logger::Level::trace, "writemutex acquired");
+    }
 }
 
 void DB::finish_begin_write()
@@ -2396,6 +2397,9 @@ void DB::do_end_write() noexcept
     m_write_transaction_open = false;
     m_pick_next_writer.notify_all();
     m_writemutex.unlock();
+    if (m_logger) {
+        m_logger->log(util::Logger::Level::trace, "writemutex released");
+    }
 }
 
 
@@ -2425,6 +2429,14 @@ Replication::version_type DB::do_commit(Transaction& transaction, bool commit_to
     else {
         low_level_commit(new_version, transaction); // Throws
     }
+
+    {
+        std::lock_guard lock(m_commit_listener_mutex);
+        for (auto listener : m_commit_listeners) {
+            listener->on_commit(new_version);
+        }
+    }
+
     return new_version;
 }
 
@@ -2463,15 +2475,15 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         // Cleanup any stale mappings
         m_alloc.purge_old_mappings(oldest_version, new_version);
     }
-
+    // save number of live versions for later:
+    // (top_refs is std::moved into GroupWriter so we'll loose it in the call to set_versions below)
+    auto live_versions = top_refs.size();
     // Do the actual commit
     REALM_ASSERT(oldest_version <= new_version);
-#if REALM_METRICS
-    transaction.update_num_objects();
-#endif // REALM_METRICS
 
     GroupWriter out(transaction, Durability(info->durability), m_marker_observer.get()); // Throws
     out.set_versions(new_version, top_refs, any_new_unreachables);
+    out.prepare_evacuation();
     auto t1 = std::chrono::steady_clock::now();
     auto commit_size = m_alloc.get_commit_size();
     if (m_logger) {
@@ -2498,23 +2510,12 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         m_locked_space = out.get_locked_space_size();
         m_used_space = out.get_logical_size() - m_free_space;
         m_evac_stage.store(EvacStage(out.get_evacuation_stage()));
-        switch (Durability(info->durability)) {
-            case Durability::Full:
-            case Durability::Unsafe:
-                if (commit_to_disk) {
-                    out.commit(new_top_ref); // Throws
-                }
-                else {
-                    out.sync_all_mappings();
-                }
-                break;
-            case Durability::MemOnly:
-                // In Durability::MemOnly mode, we just use the file as backing for
-                // the shared memory. So we never actually sync the data to disk
-                // (the OS may do so opportinisticly, or when swapping).
-                // however, we still need to flush any private caches into the buffer cache
-                out.flush_all_mappings();
-                break;
+        out.sync_according_to_durability();
+        if (Durability(info->durability) == Durability::Full || Durability(info->durability) == Durability::Unsafe) {
+            if (commit_to_disk) {
+                GroupCommitter cm(transaction, Durability(info->durability), m_marker_observer.get());
+                cm.commit(new_top_ref);
+            }
         }
         size_t new_file_size = out.get_logical_size();
         // We must reset the allocators free space tracking before communicating the new
@@ -2541,20 +2542,16 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         // must release m_mutex before this point to obey lock order
         std::lock_guard<InterprocessMutex> lock(m_controlmutex);
 
-        // this is not correct .. but what should we return instead?
-        // just returning the number of reachable versions is also misleading,
-        // because we retain a transaction history stretching all the way from
-        // oldest live version to newest version - even though we may have reclaimed
-        // individual versions within this range
-        info->number_of_versions = new_version - oldest_version + 1;
+        info->number_of_versions = live_versions + 1;
         info->latest_version_number = new_version;
 
         m_new_commit_available.notify_all();
     }
     auto t2 = std::chrono::steady_clock::now();
     if (m_logger) {
-        m_logger->log(util::Logger::Level::debug, "Commit of size %1 done in %2 us", commit_size,
-                      std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+        std::string to_disk_str = commit_to_disk ? util::format(" ref %1", new_top_ref) : " (no commit to disk)";
+        m_logger->log(util::Logger::Level::debug, "Commit of size %1 done in %2 us%3", commit_size,
+                      std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count(), to_disk_str);
     }
 }
 
@@ -2706,7 +2703,7 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
         tr->m_async_stage = Transaction::AsyncState::Requesting;
         tr->m_request_time_point = std::chrono::steady_clock::now();
         if (tr->db->m_logger) {
-            tr->db->m_logger->log(util::Logger::Level::trace, "Async request write lock");
+            tr->db->m_logger->log(util::Logger::Level::trace, "Tr %1: Async request write lock", tr->m_log_id);
         }
     }
     std::weak_ptr<Transaction> weak_tr = tr;
@@ -2721,7 +2718,7 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
             if (tr->db->m_logger) {
                 auto t2 = std::chrono::steady_clock::now();
                 tr->db->m_logger->log(
-                    util::Logger::Level::trace, "Got write lock in %1 us",
+                    util::Logger::Level::trace, "Tr %1, Got write lock in %2 us", tr->m_log_id,
                     std::chrono::duration_cast<std::chrono::microseconds>(t2 - tr->m_request_time_point).count());
             }
             if (tr->m_waiting_for_write_lock) {
@@ -2738,6 +2735,7 @@ void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void
 
 inline DB::DB(const DBOptions& options)
     : m_upgrade_callback(std::move(options.upgrade_callback))
+    , m_log_id(util::gen_log_id(this))
 {
     if (options.enable_async_writes) {
         m_commit_helper = std::make_unique<AsyncCommitHelper>(this);
@@ -2841,6 +2839,19 @@ void DB::end_write_on_correct_thread() noexcept
     if (!m_commit_helper || !m_commit_helper->blocking_end_write()) {
         do_end_write();
     }
+}
+
+void DB::add_commit_listener(CommitListener* listener)
+{
+    std::lock_guard lock(m_commit_listener_mutex);
+    m_commit_listeners.push_back(listener);
+}
+
+void DB::remove_commit_listener(CommitListener* listener)
+{
+    std::lock_guard lock(m_commit_listener_mutex);
+    m_commit_listeners.erase(std::remove(m_commit_listeners.begin(), m_commit_listeners.end(), listener),
+                             m_commit_listeners.end());
 }
 
 DisableReplication::DisableReplication(Transaction& t)

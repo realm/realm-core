@@ -136,7 +136,7 @@ bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& 
 
 
 ClientImpl::ClientImpl(ClientConfig config)
-    : logger_ptr{config.logger ? std::move(config.logger) : std::make_shared<util::StderrLogger>()}
+    : logger_ptr{config.logger ? std::move(config.logger) : util::Logger::get_default_logger()}
     , logger{*logger_ptr}
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}
@@ -563,8 +563,9 @@ bool Connection::websocket_closed_handler(bool was_clean, WebSocketError error_c
             break;
         }
         case WebSocketError::websocket_tls_handshake_failed: {
-            close_due_to_client_side_error(Status(ErrorCodes::TlsHandshakeFailed, msg), IsFatal{false},
-                                           ConnectionTerminationReason::ssl_certificate_rejected); // Throws
+            close_due_to_client_side_error(
+                Status(ErrorCodes::TlsHandshakeFailed, util::format("TLS handshake failed: %1", msg)), IsFatal{false},
+                ConnectionTerminationReason::ssl_certificate_rejected); // Throws
             break;
         }
         case WebSocketError::websocket_client_too_old:
@@ -1500,15 +1501,17 @@ void Session::gather_pending_compensating_writes(util::Span<Changeset> changeset
     REALM_ASSERT_DEBUG(
         std::is_sorted(m_pending_compensating_write_errors.begin(), m_pending_compensating_write_errors.end(),
                        [](const ProtocolErrorInfo& lhs, const ProtocolErrorInfo& rhs) {
-                           return lhs.compensating_write_server_version < rhs.compensating_write_server_version;
+                           REALM_ASSERT_DEBUG(lhs.compensating_write_server_version.has_value());
+                           REALM_ASSERT_DEBUG(rhs.compensating_write_server_version.has_value());
+                           return *lhs.compensating_write_server_version < *rhs.compensating_write_server_version;
                        }));
 #endif
 
     while (!m_pending_compensating_write_errors.empty() &&
-           m_pending_compensating_write_errors.front().compensating_write_server_version <=
+           *m_pending_compensating_write_errors.front().compensating_write_server_version <=
                changesets.back().version) {
         auto& cur_error = m_pending_compensating_write_errors.front();
-        REALM_ASSERT_3(cur_error.compensating_write_server_version, >=, changesets.front().version);
+        REALM_ASSERT_3(*cur_error.compensating_write_server_version, >=, changesets.front().version);
         out->push_back(std::move(cur_error));
         m_pending_compensating_write_errors.pop_front();
     }
@@ -1537,8 +1540,7 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
         progress, &downloadable_bytes, received_changesets, version_info, download_batch_state, logger, transact,
         [&](const TransactionRef&, util::Span<Changeset> changesets) {
             gather_pending_compensating_writes(changesets, &pending_compensating_write_errors);
-        },
-        get_transact_reporter()); // Throws
+        }); // Throws
     if (received_changesets.size() == 1) {
         logger.debug("1 remote changeset integrated, producing client version %1",
                      version_info.sync_version.version); // Throws
@@ -1551,7 +1553,7 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
     for (const auto& pending_error : pending_compensating_write_errors) {
         logger.info("Reporting compensating write for client version %1 in server version %2: %3",
                     pending_error.compensating_write_rejected_client_version,
-                    pending_error.compensating_write_server_version, pending_error.message);
+                    *pending_error.compensating_write_server_version, pending_error.message);
         try {
             on_connection_state_changed(
                 m_conn.get_state(),
@@ -1676,16 +1678,17 @@ void Session::activate()
     }
     logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
                  m_client_file_ident.salt); // Throws
-    m_upload_target_version = m_last_version_available;
     m_upload_progress = m_progress.upload;
     m_last_version_selected_for_upload = m_upload_progress.client_version;
     m_download_progress = m_progress.download;
     REALM_ASSERT_3(m_last_version_available, >=, m_progress.upload.client_version);
 
     logger.debug("last_version_available  = %1", m_last_version_available);           // Throws
-    logger.debug("progress_server_version = %1", m_progress.download.server_version); // Throws
-    logger.debug("progress_client_version = %1",
-                 m_progress.download.last_integrated_client_version); // Throws
+    logger.debug("progress_download_server_version = %1", m_progress.download.server_version); // Throws
+    logger.debug("progress_download_client_version = %1",
+                 m_progress.download.last_integrated_client_version);                                      // Throws
+    logger.debug("progress_upload_server_version = %1", m_progress.upload.last_integrated_server_version); // Throws
+    logger.debug("progress_upload_client_version = %1", m_progress.upload.client_version);                 // Throws
 
     reset_protocol_state();
     m_state = Active;
@@ -1857,9 +1860,7 @@ void Session::send_message()
         return send_query_change_message(); // throws
     }
 
-    REALM_ASSERT_3(m_upload_progress.client_version, <=, m_upload_target_version);
-    REALM_ASSERT_3(m_upload_target_version, <=, m_last_version_available);
-    if (m_allow_upload && (m_upload_target_version > m_upload_progress.client_version)) {
+    if (m_allow_upload && (m_last_version_available > m_upload_progress.client_version)) {
         return send_upload_message(); // Throws
     }
 }
@@ -1992,22 +1993,17 @@ void Session::send_upload_message()
     REALM_ASSERT_EX(m_state == Active, m_state);
     REALM_ASSERT(m_ident_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
-    REALM_ASSERT_3(m_upload_target_version, >, m_upload_progress.client_version);
 
     if (REALM_UNLIKELY(get_client().is_dry_run()))
         return;
 
-    auto target_upload_version = m_upload_target_version;
-    if (m_is_flx_sync_session) {
-        if (!m_pending_flx_sub_set || m_pending_flx_sub_set->snapshot_version < m_upload_progress.client_version) {
-            m_pending_flx_sub_set = get_flx_subscription_store()->get_next_pending_version(
-                m_last_sent_flx_query_version, m_upload_progress.client_version);
-        }
-        if (m_pending_flx_sub_set && m_pending_flx_sub_set->snapshot_version < m_upload_target_version) {
-            logger.trace("Limiting UPLOAD message up to version %1 to send QUERY version %2",
-                         m_pending_flx_sub_set->snapshot_version, m_pending_flx_sub_set->query_version);
-            target_upload_version = m_pending_flx_sub_set->snapshot_version;
-        }
+    version_type target_upload_version = get_db()->get_version_of_latest_snapshot();
+    if (m_pending_flx_sub_set) {
+        REALM_ASSERT(m_is_flx_sync_session);
+        target_upload_version = m_pending_flx_sub_set->snapshot_version;
+    }
+    if (target_upload_version > m_last_version_available) {
+        m_last_version_available = target_upload_version;
     }
 
     const ClientReplication& repl = access_realm(); // Throws
@@ -2020,9 +2016,22 @@ void Session::send_upload_message()
     if (uploadable_changesets.empty()) {
         // Nothing more to upload right now
         check_for_upload_completion(); // Throws
+        // If we need to limit upload up to some version other than the last client version available and there are no
+        // changes to upload, then there is no need to send an empty message.
+        if (m_pending_flx_sub_set) {
+            logger.debug("Empty UPLOAD was skipped (progress_client_version=%1, progress_server_version=%2)",
+                         m_upload_progress.client_version, m_upload_progress.last_integrated_server_version);
+            // Other messages may be waiting to be sent
+            return enlist_to_send(); // Throws
+        }
     }
     else {
         m_last_version_selected_for_upload = uploadable_changesets.back().progress.client_version;
+    }
+
+    if (m_pending_flx_sub_set && target_upload_version < m_last_version_available) {
+        logger.trace("Limiting UPLOAD message up to version %1 to send QUERY version %2",
+                     m_pending_flx_sub_set->snapshot_version, m_pending_flx_sub_set->query_version);
     }
 
     version_type progress_client_version = m_upload_progress.client_version;
@@ -2264,8 +2273,6 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
                                               std::move(on_flx_subscription_complete))) {
             return false;
         }
-        realm::VersionID client_reset_old_version = client_reset_operation->get_client_reset_old_version();
-        realm::VersionID client_reset_new_version = client_reset_operation->get_client_reset_new_version();
 
         // The fresh Realm has been used to reset the state
         logger.debug("Client reset is completed, path=%1", get_realm_path()); // Throws
@@ -2283,7 +2290,6 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
                         m_progress.upload.last_integrated_server_version);
         logger.trace("last_version_available  = %1", m_last_version_available); // Throws
 
-        m_upload_target_version = m_last_version_available;
         m_upload_progress = m_progress.upload;
         m_download_progress = m_progress.download;
         // In recovery mode, there may be new changesets to upload and nothing left to download.
@@ -2291,8 +2297,6 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
         // For both, we want to allow uploads again without needing external changes to download first.
         m_allow_upload = true;
         REALM_ASSERT_EX(m_last_version_selected_for_upload == 0, m_last_version_selected_for_upload);
-
-        get_transact_reporter()->report_sync_transact(client_reset_old_version, client_reset_new_version);
 
         if (has_pending_client_reset) {
             handle_pending_client_reset_acknowledgement();
@@ -2335,6 +2339,7 @@ Status Session::receive_download_message(const SyncProgress& progress, std::uint
                                          DownloadBatchState batch_state, int64_t query_version,
                                          const ReceivedChangesets& received_changesets)
 {
+    REALM_ASSERT_EX(query_version >= 0, query_version);
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm and SessionWrapper must
     // not be accessed any longer.
@@ -2506,7 +2511,7 @@ Status Session::receive_query_error_message(int error_code, std::string_view mes
     // because in that case, the associated Realm and SessionWrapper must
     // not be accessed any longer.
     if (m_state == Active) {
-        on_flx_sync_error(query_version, std::string_view(message.data(), message.size())); // throws
+        on_flx_sync_error(query_version, message); // throws
     }
     return Status::OK();
 }
@@ -2546,6 +2551,7 @@ Status Session::receive_error_message(const ProtocolErrorInfo& info)
         // If the client is not active, the compensating writes will not be processed now, but will be
         // sent again the next time the client connects
         if (m_state == Active) {
+            REALM_ASSERT(info.compensating_write_server_version.has_value());
             m_pending_compensating_write_errors.push_back(info);
         }
         return Status::OK();
@@ -2685,6 +2691,12 @@ Status ClientImpl::Session::check_received_sync_progress(const SyncProgress& pro
                                "of the download cursor cannot be greater than the latest client version integrated "
                                "on the server (download: %1, upload: %2)",
                                b.download.last_integrated_client_version, b.upload.client_version);
+    }
+    if (b.download.server_version < b.upload.last_integrated_server_version) {
+        message = util::format(
+            "The server version of the download cursor cannot be less than the server version integrated in the "
+            "latest client version acknowledged by the server (download: %1, upload: %2)",
+            b.download.server_version, b.upload.last_integrated_server_version);
     }
 
     if (message.empty()) {

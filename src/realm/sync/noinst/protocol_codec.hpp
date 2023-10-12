@@ -304,8 +304,12 @@ public:
                             info.compensating_writes.push_back(std::move(cwei));
                         }
 
-                        info.compensating_write_server_version =
-                            json.at("compensatingWriteServerVersion").get<int64_t>();
+                        // Not provided when 'write_not_allowed' (230) error is received from the server.
+                        if (auto server_version = json.find("compensatingWriteServerVersion");
+                            server_version != json.end()) {
+                            info.compensating_write_server_version =
+                                std::make_optional<version_type>(server_version->get<int64_t>());
+                        }
                         info.compensating_write_rejected_client_version =
                             json.at("rejectedClientVersion").get<int64_t>();
                     }

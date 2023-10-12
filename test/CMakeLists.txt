@@ -53,7 +53,6 @@ set(CORE_TEST_SOURCES
     test_json.cpp
     test_link_query_view.cpp
     test_links.cpp
-    test_metrics.cpp
     test_mixed_null_assertions.cpp
     test_object_id.cpp
     test_optional.cpp
@@ -245,7 +244,8 @@ if(REALM_ENABLE_SYNC)
     set_target_properties(SyncTests PROPERTIES OUTPUT_NAME "realm-sync-tests")
     set_target_resources(SyncTests "${TEST_RESOURCES}")
     enable_stdfilesystem(SyncTests)
-    target_link_libraries(SyncTests Sync SyncServer TestUtil)
+    # Sync lib is included with SyncServer
+    target_link_libraries(SyncTests TestUtil SyncServer)
     add_bundled_test(SyncTests)
 
     if(UNIX AND NOT APPLE)

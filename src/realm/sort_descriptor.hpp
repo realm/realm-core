@@ -31,8 +31,9 @@ namespace realm {
 class SortDescriptor;
 class ConstTableRef;
 class Group;
+class KeyValues;
 
-enum class DescriptorType { Sort, Distinct, Limit };
+enum class DescriptorType { Sort, Distinct, Limit, Filter };
 
 // A key wrapper to be used for sorting,
 // In addition to column key, it supports index into collection.
@@ -169,13 +170,21 @@ public:
     BaseDescriptor() = default;
     virtual ~BaseDescriptor() = default;
     virtual bool is_valid() const noexcept = 0;
+    virtual bool need_indexpair() const noexcept
+    {
+        return false;
+    }
     virtual std::string get_description(ConstTableRef attached_table) const = 0;
     virtual std::unique_ptr<BaseDescriptor> clone() const = 0;
     virtual DescriptorType get_type() const = 0;
-    virtual void collect_dependencies(const Table* table, std::vector<TableKey>& table_keys) const = 0;
-    virtual Sorter sorter(Table const& table, const IndexPairs& indexes) const = 0;
+    virtual void collect_dependencies(const Table*, std::vector<TableKey>&) const {}
+    virtual Sorter sorter(Table const&, const IndexPairs&) const
+    {
+        return {};
+    }
     // Do what you have to do
-    virtual void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const = 0;
+    virtual void execute(IndexPairs&, const Sorter&, const BaseDescriptor*) const {}
+    virtual void execute(const Table&, KeyValues&, const BaseDescriptor*) const {}
 };
 
 
@@ -214,6 +223,11 @@ public:
 
     std::unique_ptr<BaseDescriptor> clone() const override;
 
+    bool need_indexpair() const noexcept override
+    {
+        return true;
+    }
+
     DescriptorType get_type() const override
     {
         return DescriptorType::Distinct;
@@ -236,6 +250,11 @@ public:
     SortDescriptor() = default;
     ~SortDescriptor() = default;
     std::unique_ptr<BaseDescriptor> clone() const override;
+
+    bool need_indexpair() const noexcept override
+    {
+        return true;
+    }
 
     DescriptorType get_type() const override
     {
@@ -300,18 +319,37 @@ public:
         return DescriptorType::Limit;
     }
 
-    Sorter sorter(Table const&, const IndexPairs&) const override
-    {
-        return Sorter();
-    }
-
-    void collect_dependencies(const Table*, std::vector<TableKey>&) const override
-    {
-    }
-    void execute(IndexPairs& v, const Sorter& predicate, const BaseDescriptor* next) const override;
+    void execute(const Table&, KeyValues&, const BaseDescriptor*) const override;
 
 private:
     size_t m_limit = size_t(-1);
+};
+
+class FilterDescriptor : public BaseDescriptor {
+public:
+    FilterDescriptor(std::function<bool(const Obj&)> fn)
+        : m_predicate(std::move(fn))
+    {
+    }
+    FilterDescriptor() = default;
+    ~FilterDescriptor() = default;
+
+    bool is_valid() const noexcept override
+    {
+        return m_predicate != nullptr;
+    }
+    std::string get_description(ConstTableRef attached_table) const override;
+    std::unique_ptr<BaseDescriptor> clone() const override;
+
+    DescriptorType get_type() const override
+    {
+        return DescriptorType::Filter;
+    }
+
+    void execute(const Table&, KeyValues&, const BaseDescriptor*) const override;
+
+private:
+    std::function<bool(const Obj&)> m_predicate;
 };
 
 class DescriptorOrdering : public util::AtomicRefCountBase {
@@ -325,6 +363,7 @@ public:
     void append_sort(SortDescriptor sort, SortDescriptor::MergeMode mode = SortDescriptor::MergeMode::prepend);
     void append_distinct(DistinctDescriptor distinct);
     void append_limit(LimitDescriptor limit);
+    void append_filter(FilterDescriptor predicate);
     void append(const DescriptorOrdering& other);
     void append(DescriptorOrdering&& other);
     realm::util::Optional<size_t> get_min_limit() const;
@@ -346,6 +385,7 @@ public:
     bool will_apply_sort() const;
     bool will_apply_distinct() const;
     bool will_apply_limit() const;
+    bool will_apply_filter() const;
     std::string get_description(ConstTableRef target_table) const;
     void collect_dependencies(const Table* table);
     void get_versions(const Group* group, TableVersions& versions) const;
