@@ -8,12 +8,13 @@
 set -o errexit
 set -o pipefail
 
-trap 'catch $? ${LINENO}' EXIT
+trap 'catch $? ${LINENO}' ERR
+
+# Set up catch function that runs when an error occurs
 function catch()
 {
-  if [ "$1" != "0" ]; then
-    echo "Error $1 occurred while starting remote baas at line $2"
-  fi
+    # Usage: catch EXIT_CODE LINE_NUM
+    echo "${BASH_SOURCE[0]}: $2: Error $1 occurred while starting remote baas"
 }
 
 function usage()
@@ -110,10 +111,13 @@ function setup_data_dir()
     mkdir -p "${BAAS_WORK_DIR}"
     chmod -R 755 "${BAAS_WORK_DIR}"
 
-    # Set up the temp directory
-    mkdir -p "${DATA_TEMP_DIR}"
-    chmod 1777 "${DATA_TEMP_DIR}"
-    echo "original TMP=${TMPDIR}"
+    # Set up the temp directory - it may already exist on evergreen spawn hosts
+    if [[ -d "${DATA_TEMP_DIR}" ]]; then
+        sudo chmod 1777 "${DATA_TEMP_DIR}"
+    else
+        mkdir -p "${DATA_TEMP_DIR}"
+        chmod 1777 "${DATA_TEMP_DIR}"
+    fi
     export TMPDIR="${DATA_TEMP_DIR}"
 }
 
@@ -129,10 +133,10 @@ setup_data_dir
 
 pushd "${BAAS_REMOTE_DIR}" > /dev/null
 
-if [[ -d "${HOME}/evergreen/" ]]; then
-    cp -R "${HOME}/evergreen/" ./evergreen/
+if [[ -d "${HOME}/remote-baas/evergreen/" ]]; then
+    cp -R "${HOME}/remote-baas/evergreen/" ./evergreen/
 else
-    echo "evergreen/ directory not found in ${HOME}"
+    echo "remote-baas/evergreen/ directory not found in ${HOME}"
     exit 1
 fi
 

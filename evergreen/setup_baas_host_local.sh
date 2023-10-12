@@ -65,18 +65,24 @@ elif [[ ! -f "${BAAS_HOST_KEY}" ]]; then
     usage 1
 fi
 
-trap 'catch $? ${LINENO}' EXIT
+trap 'catch $? ${LINENO}' ERR
+trap 'on_exit' INT TERM EXIT
+
+# Set up catch function that runs when an error occurs
 function catch()
 {
-  if [ "$1" != "0" ]; then
-    echo "Error $1 occurred while starting baas (local) at line $2"
-  fi
+    # Usage: catch EXIT_CODE LINE_NUM
+    echo "${BASH_SOURCE[0]}: $2: Error $1 occurred while starting baas (local)"
+}
 
-  if [[ -n "${BAAS_WORK_PATH}" ]]; then
-      # Create the baas_stopped file so wait_for_baas can exit early
-      [[ -d "${BAAS_WORK_PATH}" ]] || mkdir -p "${BAAS_WORK_PATH}"
-      touch "${BAAS_WORK_PATH}/baas_stopped"
-  fi
+function on_exit()
+{
+    # Usage: on_exit
+    if [[ -n "${BAAS_WORK_PATH}" ]]; then
+        # Create the baas_stopped file so wait_for_baas can exit early
+        [[ -d "${BAAS_WORK_PATH}" ]] || mkdir -p "${BAAS_WORK_PATH}"
+        touch "${BAAS_WORK_PATH}/baas_stopped"
+    fi
 }
 
 # shellcheck disable=SC1090
@@ -111,7 +117,11 @@ if [[ ! -d "${EVERGREEN_PATH}/" ]]; then
 fi
 
 if [[ -z "${FILE_DEST_DIR}" ]]; then
-    FILE_DEST_DIR="/home/${BAAS_USER}"
+    if [[ "${BAAS_USER}" = "root" ]]; then
+        FILE_DEST_DIR="/root/remote-baas"
+    else
+        FILE_DEST_DIR="/home/${BAAS_USER}/remote-baas"
+    fi
 fi
 EVERGREEN_DEST_DIR="${FILE_DEST_DIR}/evergreen"
 
@@ -138,7 +148,7 @@ CONNECT_COUNT=2
 # Check for remote connectivity - try to connect twice to verify server is "really" ready
 # The tests failed one time due to this ssh command passing, but the next scp command failed
 while [[ ${CONNECT_COUNT} -gt 0 ]]; do
-    until ssh "${SSH_OPTIONS[@]}" -o ConnectTimeout=10 "${SSH_USER}" "echo -n 'hello from '; hostname" ; do
+    until ssh "${SSH_OPTIONS[@]}" -o ConnectTimeout=10 "${SSH_USER}" "mkdir -p ${EVERGREEN_DEST_DIR} && echo -n 'hello from '; hostname" ; do
         if [[ ${WAIT_COUNTER} -ge ${RETRY_COUNT} ]] ; then
             secs_spent_waiting=$(($(date -u +'%s') - WAIT_START))
             echo "Timed out after waiting ${secs_spent_waiting} seconds for host ${BAAS_HOST_NAME} to start"
@@ -172,5 +182,5 @@ fi
 # Run the setup baas host script and provide the location of the baas host vars script
 # Also sets up a forward tunnel for port 9090 through the ssh connection to the baas remote host
 echo "Running setup script (with forward tunnel to 127.0.0.1:9090)"
-ssh "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 -L 9090:127.0.0.1:9090 "${SSH_USER}" \
+ssh -t "${SSH_OPTIONS[@]}" -o ConnectTimeout=60 -L 9090:127.0.0.1:9090 "${SSH_USER}" \
     "${EVERGREEN_DEST_DIR}/setup_baas_host.sh" "${SETUP_BAAS_OPTS[@]}" "${FILE_DEST_DIR}/baas_host_vars.sh"
