@@ -584,18 +584,23 @@ void AdminAPISession::migrate_to_flx(const std::string& app_id, const std::strin
     endpoint.put_json(nlohmann::json{{"serviceId", service_id}, {"action", migrate_to_flx ? "start" : "rollback"}});
 }
 
-void AdminAPISession::create_schema(const std::string& app_id, const AppCreateConfig& config) const
+// Each breaking change bumps the schema version, so you can create a new version for each breaking change if
+// 'use_draft' is false. Set 'use_draft' to true if you want all changes to the schema to be deployed at once
+// resulting in only one schema version.
+void AdminAPISession::create_schema(const std::string& app_id, const AppCreateConfig& config, bool use_draft) const
 {
     static const std::string mongo_service_name = "BackingDB";
 
     auto drafts = apps()[app_id]["drafts"];
-    auto draft_create_resp = drafts.post_json({});
-    std::string draft_id = draft_create_resp["_id"];
+    std::string draft_id;
+    if (use_draft) {
+        auto draft_create_resp = drafts.post_json({});
+        draft_id = draft_create_resp["_id"];
+    }
 
     auto schemas = apps()[app_id]["schemas"];
     auto current_schema = schemas.get_json();
     auto target_schema = config.schema;
-    std::cerr << current_schema << std::endl;
 
     std::unordered_map<std::string, std::string> current_schema_tables;
     for (const auto& schema : current_schema) {
@@ -647,10 +652,9 @@ void AdminAPISession::create_schema(const std::string& app_id, const AppCreateCo
         }
     }
 
-    drafts[draft_id]["deployment"].post_json({});
-
-    auto resp = schemas.get_json();
-    std::cerr << resp << std::endl;
+    if (use_draft) {
+        drafts[draft_id]["deployment"].post_json({});
+    }
 }
 
 static nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
@@ -1100,30 +1104,6 @@ AppSession create_app(const AppCreateConfig& config)
 
     auto create_mongo_service_resp = services.post_json(std::move(mongo_service_def));
     std::string mongo_service_id = create_mongo_service_resp["_id"];
-    auto schemas = app["schemas"];
-
-    auto pk_and_queryable_only = [&](const Property& prop) {
-        if (config.flx_sync_config) {
-            const auto& queryable_fields = config.flx_sync_config->queryable_fields;
-
-            if (std::find(queryable_fields.begin(), queryable_fields.end(), prop.name) != queryable_fields.end()) {
-                return true;
-            }
-        }
-        return prop.name == "_id" || prop.name == config.partition_key.name;
-    };
-
-    // Create the schemas in two passes: first populate just the primary key and
-    // partition key, then add the rest of the properties. This ensures that the
-    // targest of links exist before adding the links.
-    std::vector<std::pair<std::string, const ObjectSchema*>> object_schema_to_create;
-    BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname,
-                                 static_cast<bool>(config.flx_sync_config));
-    for (const auto& obj_schema : config.schema) {
-        auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema, pk_and_queryable_only);
-        auto schema_create_resp = schemas.post_json(schema_to_create);
-        object_schema_to_create.push_back({schema_create_resp["_id"], &obj_schema});
-    }
 
     auto default_rule = services[mongo_service_id]["default_rule"];
     auto service_roles = nlohmann::json::array();
@@ -1162,13 +1142,9 @@ AppSession create_app(const AppCreateConfig& config)
 
     default_rule.post_json({{"roles", service_roles}});
 
-    for (const auto& [id, obj_schema] : object_schema_to_create) {
-        auto schema_to_create = rule_builder.object_schema_to_baas_schema(*obj_schema, nullptr);
-        schema_to_create["_id"] = id;
-        schemas[id].put_json(schema_to_create);
-    }
-
-    // session.create_schema(app_id, config);
+    // No need for a draft because there are no breaking changes in the initial schema when the app is created.
+    bool use_draft = false;
+    session.create_schema(app_id, config, use_draft);
 
     // For PBS, enable sync after schema is created.
     if (!config.flx_sync_config) {
