@@ -86,9 +86,6 @@ size_t get_num_decrypted_pages();
 
 #if REALM_ENABLE_ENCRYPTION
 
-void encryption_note_reader_start(SharedFileInfo& info, const void* reader_id);
-void encryption_note_reader_end(SharedFileInfo& info, const void* reader_id) noexcept;
-
 SharedFileInfo* get_file_info_for_file(File& file);
 
 // This variant allows the caller to obtain direct access to the encrypted file mapping

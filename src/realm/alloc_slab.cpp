@@ -842,10 +842,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
         size = initial_size;
     }
     ref_type top_ref;
-    note_reader_start(this);
-    util::ScopeExit reader_end_guard([this]() noexcept {
-        note_reader_end(this);
-    });
 
     try {
         // we'll read header and (potentially) footer
@@ -949,25 +945,6 @@ void SlabAlloc::convert_from_streaming_form(ref_type top_ref)
     }
 }
 
-void SlabAlloc::note_reader_start(const void* reader_id)
-{
-#if REALM_ENABLE_ENCRYPTION
-    if (m_realm_file_info)
-        util::encryption_note_reader_start(*m_realm_file_info, reader_id);
-#else
-    static_cast<void>(reader_id);
-#endif
-}
-
-void SlabAlloc::note_reader_end(const void* reader_id) noexcept
-{
-#if REALM_ENABLE_ENCRYPTION
-    if (m_realm_file_info)
-        util::encryption_note_reader_end(*m_realm_file_info, reader_id);
-#else
-    static_cast<void>(reader_id);
-#endif
-}
 
 ref_type SlabAlloc::attach_buffer(const char* data, size_t size)
 {

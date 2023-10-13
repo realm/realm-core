@@ -80,9 +80,6 @@ public:
     {
         return m_num_decrypted;
     }
-    // reclaim any untouched pages - this is thread safe with respect to
-    // concurrent access/touching of pages - but must be called with the mutex locked.
-    void reclaim_untouched(size_t& progress_ptr, size_t& accumulated_savings) noexcept;
 
     bool contains_page(size_t page_in_file) const;
     size_t get_local_index_of_address(const void* addr, size_t offset = 0) const;
