@@ -1407,7 +1407,7 @@ private:
     void handle_pong_output_buffer();
 
     void initiate_write_error(ProtocolError, session_ident_type);
-    void handle_write_error();
+    void handle_write_error(std::error_code ec);
 
     void do_initiate_soft_close(ProtocolError, session_ident_type);
     void read_error(std::error_code);
@@ -4587,8 +4587,10 @@ void SyncConnection::send_next_message()
 
 void SyncConnection::initiate_write_output_buffer()
 {
-    auto handler = [this]() {
-        handle_write_output_buffer();
+    auto handler = [this](std::error_code ec, size_t) {
+        if (!ec) {
+            handle_write_output_buffer();
+        }
     };
 
     m_websocket.async_write_binary(m_output_buffer.data(), m_output_buffer.size(),
@@ -4599,8 +4601,10 @@ void SyncConnection::initiate_write_output_buffer()
 
 void SyncConnection::initiate_pong_output_buffer()
 {
-    auto handler = [this]() {
-        handle_pong_output_buffer();
+    auto handler = [this](std::error_code ec, size_t) {
+        if (!ec) {
+            handle_pong_output_buffer();
+        }
     };
 
     REALM_ASSERT(!m_is_sending);
@@ -4669,20 +4673,19 @@ void SyncConnection::initiate_write_error(ProtocolError error_code, session_iden
     get_server_protocol().make_error_message(protocol_version, out, error_code, message, message_size, try_again,
                                              session_ident); // Throws
 
-    auto handler = [this]() {
-        handle_write_error(); // Throws
+    auto handler = [this](std::error_code ec, size_t) {
+        handle_write_error(ec); // Throws
     };
     m_websocket.async_write_binary(out.data(), out.size(), std::move(handler));
     m_is_sending = true;
 }
 
 
-void SyncConnection::handle_write_error()
+void SyncConnection::handle_write_error(std::error_code ec)
 {
     m_is_sending = false;
     REALM_ASSERT(m_is_closing);
     if (!m_ssl_stream) {
-        std::error_code ec;
         m_socket->shutdown(network::Socket::shutdown_send, ec);
         if (ec && ec != make_basic_system_error_code(ENOTCONN))
             throw std::system_error(ec);
