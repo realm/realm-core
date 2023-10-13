@@ -210,7 +210,7 @@ TEST_CASE("Test server migration and rollback", "[sync][flx][flx migration][baas
             mut_subs.clear();
             mut_subs.insert_or_assign(
                 "flx_migrated_Objects_2",
-                Query(flx_table).equal(flx_table->get_column_key("realm_id"), StringData{partition2}));                
+                Query(flx_table).equal(flx_table->get_column_key("realm_id"), StringData{partition2}));
             auto subs = std::move(mut_subs).commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 
