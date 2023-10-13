@@ -358,7 +358,7 @@ typedef struct realm_websocket_endpoint {
 typedef struct realm_sync_socket realm_sync_socket_t;
 typedef struct realm_sync_socket_callback realm_sync_socket_post_callback_t;
 typedef struct realm_sync_socket_callback realm_sync_socket_timer_callback_t;
-typedef struct realm_sync_socket_write_callback realm_sync_socket_write_callback_t;
+typedef struct realm_sync_socket_callback realm_sync_socket_write_callback_t;
 typedef void* realm_sync_socket_timer_t;
 typedef void* realm_sync_socket_websocket_t;
 typedef struct realm_websocket_observer realm_websocket_observer_t;

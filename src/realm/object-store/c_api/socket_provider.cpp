@@ -53,25 +53,31 @@ private:
     realm_sync_socket_timer_free_func_t m_timer_free = nullptr;
 };
 
+static void realm_sync_socket_op_complete(realm_sync_socket_callback* realm_callback,
+                                          realm_sync_socket_callback_result_e result, const char* reason)
+{
+    if (!realm_callback)
+        return;
+
+    (*realm_callback)(result, reason);
+    realm_release(realm_callback);
+}
+
 RLM_API void realm_sync_socket_timer_complete(realm_sync_socket_timer_callback_t* timer_handler,
                                               realm_sync_socket_callback_result_e result, const char* reason)
 {
-    if (!timer_handler)
-        return;
-
-    (*timer_handler)(result, reason);
-    realm_release(timer_handler);
+    realm_sync_socket_op_complete(timer_handler, result, reason);
 }
 
 RLM_API void realm_sync_socket_timer_canceled(realm_sync_socket_timer_callback_t* timer_handler)
 {
-    realm_sync_socket_timer_complete(timer_handler, RLM_ERR_SYNC_SOCKET_OPERATION_ABORTED, "Timer canceled");
+    realm_sync_socket_op_complete(timer_handler, RLM_ERR_SYNC_SOCKET_OPERATION_ABORTED, "Timer canceled");
 }
 
 // This class represents a websocket instance provided by the CAPI implememtation for sending
 // and receiving data and connection state from the websocket. This class is used directly by
 // the sync client.
-struct CAPIWebSocket : sync::WebSocketInterface, WriteCallbackManager, std::enable_shared_from_this<CAPIWebSocket> {
+struct CAPIWebSocket : sync::WebSocketInterface {
 public:
     CAPIWebSocket(realm_userdata_t userdata, realm_sync_socket_connect_func_t websocket_connect_func,
                   realm_sync_socket_websocket_async_write_func_t websocket_write_func,
@@ -105,51 +111,16 @@ public:
     {
         m_websocket_free(m_userdata, m_socket);
         realm_release(m_observer);
-        // Release any remaining write callbacks that weren't completed
-        release_all_callbacks();
     }
 
     void async_write_binary(util::Span<const char> data, sync::SyncSocketProvider::FunctionHandler&& handler) final
     {
-        m_websocket_async_write(m_userdata, m_socket, data.data(), data.size(), create_callback(std::move(handler)));
+        auto shared_handler = std::make_shared<sync::SyncSocketProvider::FunctionHandler>(std::move(handler));
+        m_websocket_async_write(m_userdata, m_socket, data.data(), data.size(),
+                                new realm_sync_socket_write_callback_t(std::move(shared_handler)));
     }
 
 private:
-    realm_sync_socket_write_callback_t* create_callback(sync::SyncSocketProvider::FunctionHandler&& handler) override
-    {
-        auto shared_handler = std::make_shared<sync::SyncSocketProvider::FunctionHandler>(std::move(handler));
-        auto* callback = new realm_sync_socket_write_callback_t(shared_handler, weak_from_this());
-        std::lock_guard lock(m_callback_mutex);
-        m_pending_callbacks.emplace(callback);
-        return callback;
-    }
-
-    bool remove_callback(realm_sync_socket_write_callback_t* callback) override
-    {
-        if (callback) {
-            std::lock_guard lock(m_callback_mutex);
-            auto removed = m_pending_callbacks.erase(callback);
-            REALM_ASSERT_3(removed, ==, 1);
-            if (removed > 0) {
-                realm_release(callback);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    void release_all_callbacks()
-    {
-        // Websocket is being destroyed, delete any remaining callback handlers
-        std::lock_guard lock(m_callback_mutex);
-        for (auto it = m_pending_callbacks.begin(); it != m_pending_callbacks.end(); ++it) {
-            if (*it) {
-                realm_release(*it);
-            }
-        }
-        m_pending_callbacks.clear();
-    }
-
     // A pointer to the CAPI implementation's websocket instance. This is provided by
     // the m_websocket_connect() function when this websocket instance is created.
     realm_sync_socket_websocket_t m_socket = nullptr;
@@ -157,11 +128,6 @@ private:
     // A wrapped reference to the websocket observer in the sync client that receives the
     // websocket status callbacks. This is provided by the Sync Client.
     realm_websocket_observer_t* m_observer = nullptr;
-
-    // Keep track of the async write callbacks so they can be destroyed if the websocket
-    // is destroyed before the callback has a chance to be called.
-    std::set<realm_sync_socket_write_callback_t*> m_pending_callbacks;
-    std::mutex m_callback_mutex;
 
     // These values were originally provided to the socket_provider instance by the CAPI
     // implementation when it was created.
@@ -309,27 +275,13 @@ RLM_API realm_sync_socket_t* realm_sync_socket_new(
 RLM_API void realm_sync_socket_post_complete(realm_sync_socket_post_callback_t* post_handler,
                                              realm_sync_socket_callback_result_e result, const char* reason)
 {
-    if (!post_handler)
-        return;
-
-    (*post_handler)(result, reason);
-    realm_release(post_handler);
+    realm_sync_socket_op_complete(post_handler, result, reason);
 }
 
 RLM_API void realm_sync_socket_write_complete(realm_sync_socket_write_callback_t* write_handler,
                                               realm_sync_socket_callback_result_e result, const char* reason)
 {
-    if (!write_handler)
-        return;
-
-    (*write_handler)(result, reason);
-
-    // The callback handler may have destroyed the websocket - make sure it's still around
-    auto callback_mgr = write_handler->callback_mgr.lock();
-    // If we locked the callback_mgr, call the remove function to release the object
-    if (callback_mgr) {
-        callback_mgr->remove_callback(write_handler); // Releases callback handler
-    }
+    realm_sync_socket_op_complete(write_handler, result, reason);
 }
 
 RLM_API void realm_sync_socket_websocket_connected(realm_websocket_observer_t* realm_websocket_observer,

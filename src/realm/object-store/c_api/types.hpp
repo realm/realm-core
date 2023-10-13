@@ -822,28 +822,6 @@ struct realm_sync_socket_callback : realm::c_api::WrapC,
     }
 };
 
-struct WriteCallbackManager {
-    virtual ~WriteCallbackManager() = default;
-
-    // Create the callback with the given callback function handler
-    virtual realm_sync_socket_write_callback_t*
-    create_callback(realm::sync::SyncSocketProvider::FunctionHandler&&) = 0;
-    // Stop tracking the callback or return false if not found
-    virtual bool remove_callback(realm_sync_socket_write_callback_t*) = 0;
-};
-
-struct realm_sync_socket_write_callback : realm_sync_socket_callback {
-    explicit realm_sync_socket_write_callback(std::shared_ptr<realm::sync::SyncSocketProvider::FunctionHandler> ptr,
-                                              std::weak_ptr<WriteCallbackManager> mgr)
-        : realm_sync_socket_callback(std::move(ptr))
-        , callback_mgr(std::move(mgr))
-    {
-    }
-
-    std::weak_ptr<WriteCallbackManager> callback_mgr;
-};
-
-
 struct CBindingThreadObserver : public realm::BindingCallbackThreadObserver {
 public:
     CBindingThreadObserver(realm_on_object_store_thread_callback_t on_thread_create,
