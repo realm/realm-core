@@ -739,7 +739,8 @@ void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMo
     auto prot = PROT_READ;
     if (access == File::access_ReadWrite)
         prot |= PROT_WRITE;
-    auto addr = ::mmap(address_request, size, prot, MAP_SHARED | MAP_FIXED, fd, offset);
+    auto flags = (fd == -1) ? (MAP_FIXED | MAP_PRIVATE | MAP_ANON) : (MAP_SHARED | MAP_FIXED);
+    auto addr = ::mmap(address_request, size, prot, flags, fd, offset);
     if (addr != MAP_FAILED && addr != address_request) {
         throw std::runtime_error(get_errno_msg("mmap() failed: ", errno) +
                                  ", when mapping an already reserved memory area");
