@@ -727,17 +727,9 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
         if (simulate_integration_error) {
             throw IntegrationException(ErrorCodes::BadChangeset, "simulated failure", ProtocolError::bad_changeset);
         }
-        version_type client_version;
-        if (REALM_LIKELY(!get_client().is_dry_run())) {
-            VersionInfo version_info;
-            integrate_changesets(progress, downloadable_bytes, changesets, version_info, batch_state); // Throws
-            client_version = version_info.realm_version;
-        }
-        else {
-            // Fake it for "dry run" mode
-            client_version = m_last_version_available + 1;
-        }
-        on_changesets_integrated(client_version, progress); // Throws
+        VersionInfo version_info;
+        integrate_changesets(progress, downloadable_bytes, changesets, version_info, batch_state); // Throws
+        on_changesets_integrated(version_info.realm_version, progress); // Throws
     }
     catch (const IntegrationException& e) {
         on_integration_failure(e);

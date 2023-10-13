@@ -212,7 +212,6 @@ public:
 
     const std::string& get_user_agent_string() const noexcept;
     ReconnectMode get_reconnect_mode() const noexcept;
-    bool is_dry_run() const noexcept;
 
     // Functions to post onto the event loop and create an event loop timer using the
     // SyncSocketProvider
@@ -243,7 +242,6 @@ private:
     const milliseconds_type m_fast_reconnect_limit;
     const ResumptionDelayInfo m_reconnect_backoff_info;
     const bool m_disable_upload_activation_delay;
-    const bool m_dry_run; // For testing purposes only
     const bool m_enable_default_port_hack;
     const bool m_disable_upload_compaction;
     const bool m_fix_up_object_ids;
@@ -1216,11 +1214,6 @@ inline const std::string& ClientImpl::get_user_agent_string() const noexcept
 inline auto ClientImpl::get_reconnect_mode() const noexcept -> ReconnectMode
 {
     return m_reconnect_mode;
-}
-
-inline bool ClientImpl::is_dry_run() const noexcept
-{
-    return m_dry_run;
 }
 
 inline ClientImpl::RandomEngine& ClientImpl::get_random() noexcept

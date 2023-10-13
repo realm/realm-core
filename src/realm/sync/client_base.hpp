@@ -103,16 +103,6 @@ struct ClientConfig {
     bool one_connection_per_session = false;
 #endif
 
-    /// Do not access the local file system. Sessions will act as if
-    /// initiated on behalf of an empty (or nonexisting) local Realm
-    /// file. Received DOWNLOAD messages will be accepted, but otherwise
-    /// ignored. No UPLOAD messages will be generated. For testing purposes
-    /// only.
-    ///
-    /// Many operations, such as serialized transactions, are not suppored
-    /// in this mode.
-    bool dry_run = false;
-
     /// The maximum number of milliseconds to allow for a connection to
     /// become fully established. This includes the time to resolve the
     /// network address, the TCP connect operation, the SSL handshake, and

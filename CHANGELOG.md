@@ -46,7 +46,7 @@
 * Automatic client reset recovery would duplicate insertions in a list when recovering a write which made an unrecoverable change to a list (i.e. modifying or deleting a pre-existing entry), followed by a subscription change, followed by a write which added an entry to the list ([PR #7155](https://github.com/realm/realm-core/pull/7155), since v12.3.0).
 
 ### Breaking changes
-* None.
+* Removed sync::ClientConfig::dry_run. This was not actually used anywhere.
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
