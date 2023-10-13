@@ -758,8 +758,7 @@ TEST_CASE("New table is synced after migration", "[sync][flx][flx migration][baa
         // Create a subscription for the new table.
         auto table = flx_realm->read_group().get_table("class_Object2");
         auto mut_subs = flx_realm->get_latest_subscription_set().make_mutable_copy();
-        mut_subs.insert_or_assign(
-            Query(table).equal(table->get_column_key("realm_id"), StringData{partition}));
+        mut_subs.insert_or_assign(Query(table).equal(table->get_column_key("realm_id"), StringData{partition}));
 
         auto subs = std::move(mut_subs).commit();
         subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
