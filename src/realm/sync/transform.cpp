@@ -1,34 +1,17 @@
-#include <algorithm>
-#include <functional>
-#include <utility>
-#include <vector>
-#include <map>
-#include <sstream>
-#include <fstream>
+#include <realm/sync/transform.hpp>
+
+#include <realm/sync/noinst/changeset_index.hpp>
+#include <realm/sync/noinst/protocol_codec.hpp>
 
 #if REALM_DEBUG
+#include <sstream>
 #include <iostream> // std::cerr used for debug tracing
 #include <mutex>    // std::unique_lock used for debug tracing
 #endif              // REALM_DEBUG
 
-#include <realm/util/buffer.hpp>
-#include <realm/string_data.hpp>
-#include <realm/data_type.hpp>
-#include <realm/mixed.hpp>
-#include <realm/column_fwd.hpp>
-#include <realm/db.hpp>
-#include <realm/impl/transact_log.hpp>
-#include <realm/replication.hpp>
-#include <realm/sync/instructions.hpp>
-#include <realm/sync/protocol.hpp>
-#include <realm/sync/transform.hpp>
-#include <realm/sync/changeset_parser.hpp>
-#include <realm/sync/changeset_encoder.hpp>
-#include <realm/sync/noinst/changeset_index.hpp>
-#include <realm/sync/noinst/protocol_codec.hpp>
-#include <realm/util/logger.hpp>
-
-namespace realm {
+using namespace realm;
+using namespace realm::sync;
+using namespace realm::util;
 
 namespace {
 
@@ -52,15 +35,7 @@ namespace {
 #endif
 #endif
 
-} // unnamed namespace
-
-using namespace realm;
-using namespace realm::sync;
-using namespace realm::util;
-
-namespace _impl {
-
-struct TransformerImpl::Discriminant {
+struct Discriminant {
     timestamp_type timestamp;
     file_ident_type client_file_ident;
     Discriminant(timestamp_type t, file_ident_type p)
@@ -88,8 +63,10 @@ struct TransformerImpl::Discriminant {
     }
 };
 
-struct TransformerImpl::Side {
-    Transformer& m_transformer;
+struct TransformerImpl;
+
+struct Side {
+    TransformerImpl& m_transformer;
     Changeset* m_changeset = nullptr;
     Discriminant m_discriminant;
 
@@ -97,7 +74,7 @@ struct TransformerImpl::Side {
     bool was_replaced = false;
     size_t m_path_len = 0;
 
-    Side(Transformer& transformer)
+    Side(TransformerImpl& transformer)
         : m_transformer(transformer)
         , m_discriminant(0, 0)
     {
@@ -184,8 +161,8 @@ protected:
     }
 };
 
-struct TransformerImpl::MajorSide : TransformerImpl::Side {
-    MajorSide(Transformer& transformer)
+struct MajorSide : Side {
+    MajorSide(TransformerImpl& transformer)
         : Side(transformer)
     {
     }
@@ -237,10 +214,10 @@ struct TransformerImpl::MajorSide : TransformerImpl::Side {
     Changeset::iterator m_position;
 };
 
-struct TransformerImpl::MinorSide : TransformerImpl::Side {
+struct MinorSide : Side {
     using Position = _impl::ChangesetIndex::RangeIterator;
 
-    MinorSide(Transformer& transformer)
+    MinorSide(TransformerImpl& transformer)
         : Side(transformer)
     {
     }
@@ -327,7 +304,7 @@ struct TransformerImpl::MinorSide : TransformerImpl::Side {
 
 #if defined(REALM_DEBUG) // LCOV_EXCL_START Debug utilities
 
-struct TransformerImpl::MergeTracer {
+struct MergeTracer {
 public:
     Side& m_minor;
     Side& m_major;
@@ -602,14 +579,13 @@ public:
 };
 #endif // LCOV_EXCL_STOP REALM_DEBUG
 
-
-struct TransformerImpl::Transformer {
+struct TransformerImpl {
     MajorSide m_major_side;
     MinorSide m_minor_side;
     MinorSide::Position m_minor_end;
     bool m_trace;
 
-    Transformer(bool trace)
+    TransformerImpl(bool trace)
         : m_major_side{*this}
         , m_minor_side{*this}
         , m_trace{trace}
@@ -854,43 +830,38 @@ struct TransformerImpl::Transformer {
     }
 
     void merge_instructions(MajorSide& left, MinorSide& right);
-    template <class OuterSide, class InnerSide>
-    void merge_nested(OuterSide& outer, InnerSide& inner);
 };
 
-void TransformerImpl::MajorSide::set_next_changeset(Changeset* changeset) noexcept
+void MajorSide::set_next_changeset(Changeset* changeset) noexcept
 {
     m_transformer.set_next_major_changeset(changeset);
 }
-void TransformerImpl::MajorSide::discard()
+void MajorSide::discard()
 {
     m_transformer.discard_major();
 }
-void TransformerImpl::MajorSide::prepend(Instruction operation)
+void MajorSide::prepend(Instruction operation)
 {
     m_transformer.prepend_major(std::move(operation));
 }
 template <class InputIterator>
-void TransformerImpl::MajorSide::prepend(InputIterator begin, InputIterator end)
+void MajorSide::prepend(InputIterator begin, InputIterator end)
 {
     m_transformer.prepend_major(std::move(begin), std::move(end));
 }
-void TransformerImpl::MinorSide::discard()
+void MinorSide::discard()
 {
     m_transformer.discard_minor();
 }
-void TransformerImpl::MinorSide::prepend(Instruction operation)
+void MinorSide::prepend(Instruction operation)
 {
     m_transformer.prepend_minor(std::move(operation));
 }
 template <class InputIterator>
-void TransformerImpl::MinorSide::prepend(InputIterator begin, InputIterator end)
+void MinorSide::prepend(InputIterator begin, InputIterator end)
 {
     m_transformer.prepend_minor(std::move(begin), std::move(end));
 }
-} // namespace _impl
-
-namespace {
 
 REALM_NORETURN void throw_bad_merge(std::string msg)
 {
@@ -903,8 +874,7 @@ REALM_NORETURN void bad_merge(const char* msg, Params&&... params)
     throw_bad_merge(util::format(msg, std::forward<Params>(params)...));
 }
 
-REALM_NORETURN void bad_merge(_impl::TransformerImpl::Side& side, Instruction::PathInstruction instr,
-                              const std::string& msg)
+REALM_NORETURN void bad_merge(Side& side, Instruction::PathInstruction instr, const std::string& msg)
 {
     std::stringstream ss;
     side.m_changeset->print_path(ss, instr.table, instr.object, instr.field, &instr.path);
@@ -918,7 +888,7 @@ struct MergeNested;
 
 struct MergeUtils {
     using TransformerImpl = _impl::TransformerImpl;
-    MergeUtils(TransformerImpl::Side& left_side, TransformerImpl::Side& right_side)
+    MergeUtils(Side& left_side, Side& right_side)
         : m_left_side(left_side)
         , m_right_side(right_side)
     {
@@ -1264,8 +1234,8 @@ struct MergeUtils {
     }
 
 protected:
-    TransformerImpl::Side& m_left_side;
-    TransformerImpl::Side& m_right_side;
+    Side& m_left_side;
+    Side& m_right_side;
 };
 
 template <class LeftInstruction, class RightInstruction>
@@ -1274,7 +1244,7 @@ struct MergeBase : MergeUtils {
     static const Instruction::Type B = Instruction::GetInstructionType<RightInstruction>::value;
     static_assert(A >= B, "A < B. Please reverse the order of instruction types. :-)");
 
-    MergeBase(TransformerImpl::Side& left_side, TransformerImpl::Side& right_side)
+    MergeBase(Side& left_side, Side& right_side)
         : MergeUtils(left_side, right_side)
     {
     }
@@ -2330,12 +2300,8 @@ DEFINE_MERGE(Instruction::SetErase, Instruction::SetErase)
 /// END OF MERGE RULES!
 ///
 
-} // namespace
-
-namespace _impl {
 template <class Left, class Right>
-void merge_instructions_2(Left& left, Right& right, TransformerImpl::MajorSide& left_side,
-                          TransformerImpl::MinorSide& right_side)
+void merge_instructions_2(Left& left, Right& right, MajorSide& left_side, MinorSide& right_side)
 {
     Merge<Left, Right>::merge(left, right, left_side, right_side);
 }
@@ -2346,7 +2312,17 @@ void merge_nested_2(Outer& outer, Inner& inner, OuterSide& outer_side, InnerSide
     MergeNested<Outer>::merge(outer, inner, outer_side, inner_side);
 }
 
-void TransformerImpl::Transformer::merge_instructions(MajorSide& their_side, MinorSide& our_side)
+template <class OuterSide, class InnerSide>
+void merge_nested(OuterSide& outer_side, InnerSide& inner_side)
+{
+    outer_side.get().visit([&](auto& outer) {
+        inner_side.get().visit([&](auto& inner) {
+            merge_nested_2(outer, inner, outer_side, inner_side);
+        });
+    });
+}
+
+void TransformerImpl::merge_instructions(MajorSide& their_side, MinorSide& our_side)
 {
     // FIXME: Find a way to avoid heap-copies of the path.
     Instruction their_before = their_side.get();
@@ -2410,18 +2386,9 @@ void TransformerImpl::Transformer::merge_instructions(MajorSide& their_side, Min
     }
 }
 
+} // anonymous namespace
 
-template <class OuterSide, class InnerSide>
-void TransformerImpl::Transformer::merge_nested(OuterSide& outer_side, InnerSide& inner_side)
-{
-    outer_side.get().visit([&](auto& outer) {
-        inner_side.get().visit([&](auto& inner) {
-            merge_nested_2(outer, inner, outer_side, inner_side);
-        });
-    });
-}
-
-
+namespace realm::_impl {
 void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changeset* their_changesets,
                                        size_t their_size, Changeset** our_changesets, size_t our_size,
                                        util::Logger& logger)
@@ -2439,7 +2406,7 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
         l = std::unique_lock<std::mutex>{trace_mutex};
     }
 #endif
-    Transformer transformer{trace};
+    ::TransformerImpl transformer{trace};
 
     _impl::ChangesetIndex their_index;
     size_t their_num_instructions = 0;
@@ -2559,7 +2526,7 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
 size_t TransformerImpl::transform_remote_changesets(TransformHistory& history, file_ident_type local_file_ident,
                                                     version_type current_local_version,
                                                     util::Span<Changeset> parsed_changesets,
-                                                    util::UniqueFunction<bool(const Changeset*)> changeset_applier,
+                                                    util::FunctionRef<bool(const Changeset*)> changeset_applier,
                                                     util::Logger& logger)
 {
     REALM_ASSERT(local_file_ident != 0);
@@ -2685,16 +2652,16 @@ void TransformerImpl::flush_reciprocal_transform_cache(TransformHistory& history
     }
 }
 
-} // namespace _impl
+} // namespace realm::_impl
 
-namespace sync {
+namespace realm::sync {
 std::unique_ptr<Transformer> make_transformer()
 {
     return std::make_unique<_impl::TransformerImpl>(); // Throws
 }
 
 
-void parse_remote_changeset(const Transformer::RemoteChangeset& remote_changeset, Changeset& parsed_changeset)
+void parse_remote_changeset(const RemoteChangeset& remote_changeset, Changeset& parsed_changeset)
 {
     // origin_file_ident = 0 is currently used to indicate an entry of local
     // origin.
@@ -2711,5 +2678,4 @@ void parse_remote_changeset(const Transformer::RemoteChangeset& remote_changeset
     parsed_changeset.original_changeset_size = remote_changeset.original_changeset_size;
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync

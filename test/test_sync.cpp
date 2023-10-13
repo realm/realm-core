@@ -6696,7 +6696,7 @@ TEST(Sync_NonIncreasingServerVersions)
     ++server_changesets.back().version;
 
     std::vector<ChangesetEncoder::Buffer> encoded;
-    std::vector<Transformer::RemoteChangeset> server_changesets_encoded;
+    std::vector<RemoteChangeset> server_changesets_encoded;
     for (const auto& changeset : server_changesets) {
         encoded.emplace_back();
         encode_changeset(changeset, encoded.back());
@@ -6734,7 +6734,7 @@ TEST(Sync_InvalidChangesetFromServer)
 
     ChangesetEncoder::Buffer encoded;
     encode_changeset(changeset, encoded);
-    Transformer::RemoteChangeset server_changeset;
+    RemoteChangeset server_changeset;
     server_changeset.origin_file_ident = 1;
     server_changeset.remote_version = 1;
     server_changeset.data = BinaryData(encoded.data(), encoded.size());
@@ -6845,7 +6845,7 @@ TEST(Sync_SetAndGetEmptyReciprocalChangeset)
     changeset.origin_file_ident = 2;
 
     ChangesetEncoder::Buffer encoded;
-    std::vector<Transformer::RemoteChangeset> server_changesets_encoded;
+    std::vector<RemoteChangeset> server_changesets_encoded;
     encode_changeset(changeset, encoded);
     server_changesets_encoded.emplace_back(changeset.version, changeset.last_integrated_remote_version,
                                            BinaryData(encoded.data(), encoded.size()), changeset.origin_timestamp,
@@ -6988,7 +6988,7 @@ TEST(Sync_ServerVersionsSkippedFromDownloadCursor)
     server_changeset.origin_file_ident = 1;
 
     std::vector<ChangesetEncoder::Buffer> encoded;
-    std::vector<Transformer::RemoteChangeset> server_changesets_encoded;
+    std::vector<RemoteChangeset> server_changesets_encoded;
     encoded.emplace_back();
     encode_changeset(server_changeset, encoded.back());
     server_changesets_encoded.emplace_back(server_changeset.version, server_changeset.last_integrated_remote_version,

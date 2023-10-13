@@ -119,7 +119,7 @@ public:
     using UploadCursor           = sync::UploadCursor;
     using SyncProgress           = sync::SyncProgress;
     using HistoryEntry           = sync::HistoryEntry;
-    using RemoteChangeset        = sync::Transformer::RemoteChangeset;
+    using RemoteChangeset        = sync::RemoteChangeset;
     // clang-format on
 
     enum class BootstrapError {

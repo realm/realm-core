@@ -82,7 +82,6 @@ public:
 class ClientHistory final : public _impl::History, public TransformHistory {
 public:
     using version_type = sync::version_type;
-    using RemoteChangeset = Transformer::RemoteChangeset;
 
     struct UploadChangeset {
         timestamp_type origin_timestamp;

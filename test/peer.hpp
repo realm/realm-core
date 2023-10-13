@@ -46,6 +46,7 @@ namespace realm {
 namespace test_util {
 
 using realm::sync::HistoryEntry;
+using realm::sync::RemoteChangeset;
 using realm::sync::SyncReplication;
 using realm::sync::Transformer;
 using realm::sync::TransformHistory;
@@ -71,16 +72,15 @@ public:
     }
 
     version_type integrate_remote_changeset(file_ident_type remote_file_ident, DB& sg,
-                                            const Transformer::RemoteChangeset& changeset,
-                                            util::Logger& replay_logger)
+                                            const RemoteChangeset& changeset, util::Logger& replay_logger)
     {
         std::size_t num_changesets = 1;
         return integrate_remote_changesets(remote_file_ident, sg, &changeset, num_changesets, replay_logger);
     }
 
     version_type integrate_remote_changesets(file_ident_type remote_file_ident, DB&,
-                                             const Transformer::RemoteChangeset* incoming_changesets,
-                                             std::size_t num_changesets, util::Logger& replay_logger);
+                                             const RemoteChangeset* incoming_changesets, std::size_t num_changesets,
+                                             util::Logger& replay_logger);
 
     version_type prepare_changeset(const char* data, std::size_t size, version_type orig_version) override
     {
@@ -462,7 +462,7 @@ private:
 
 
 inline auto ShortCircuitHistory::integrate_remote_changesets(file_ident_type remote_file_ident, DB& sg,
-                                                             const Transformer::RemoteChangeset* incoming_changesets,
+                                                             const RemoteChangeset* incoming_changesets,
                                                              size_t num_changesets, util::Logger& logger)
     -> version_type
 {
@@ -625,7 +625,7 @@ public:
         version_type& last_remote_version = last_remote_versions_integrated[remote.local_file_ident];
         if (last_remote_version == 0)
             last_remote_version = 1;
-        std::unique_ptr<Transformer::RemoteChangeset[]> changesets{new Transformer::RemoteChangeset[num_changesets]};
+        std::unique_ptr<RemoteChangeset[]> changesets{new RemoteChangeset[num_changesets]};
         remote.get_next_changesets_for_remote(local_file_ident, last_remote_version, changesets.get(),
                                               num_changesets);
         /*
@@ -670,7 +670,7 @@ private:
 
     void get_next_changesets_for_remote(file_ident_type remote_file_ident,
                                         version_type last_version_integrated_by_remote,
-                                        Transformer::RemoteChangeset* out_changesets, size_t num_changesets) const
+                                        RemoteChangeset* out_changesets, size_t num_changesets) const
     {
         // At least one transaction can be assumed to have been performed
         REALM_ASSERT(current_version != 0);
