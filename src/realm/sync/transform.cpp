@@ -887,7 +887,6 @@ template <class Outer>
 struct MergeNested;
 
 struct MergeUtils {
-    using TransformerImpl = _impl::TransformerImpl;
     MergeUtils(Side& left_side, Side& right_side)
         : m_left_side(left_side)
         , m_right_side(right_side)
@@ -2388,13 +2387,12 @@ void TransformerImpl::merge_instructions(MajorSide& their_side, MinorSide& our_s
 
 } // anonymous namespace
 
-namespace realm::_impl {
-void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changeset* their_changesets,
-                                       size_t their_size, Changeset** our_changesets, size_t our_size,
-                                       util::Logger& logger)
+namespace realm::sync {
+void Transformer::merge_changesets(file_ident_type local_file_ident, util::Span<Changeset> their_changesets,
+                                   util::Span<Changeset*> our_changesets, util::Logger& logger)
 {
-    REALM_ASSERT(their_size != 0);
-    REALM_ASSERT(our_size != 0);
+    REALM_ASSERT(our_changesets.size() != 0);
+    REALM_ASSERT(their_changesets.size() != 0);
     bool trace = false;
 #if REALM_DEBUG && !REALM_UWP
     // FIXME: Not thread-safe (use config parameter instead and confine environment reading to test/test_all.cpp)
@@ -2406,7 +2404,7 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
         l = std::unique_lock<std::mutex>{trace_mutex};
     }
 #endif
-    ::TransformerImpl transformer{trace};
+    TransformerImpl transformer{trace};
 
     _impl::ChangesetIndex their_index;
     size_t their_num_instructions = 0;
@@ -2417,32 +2415,34 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
     // on the left side, but which aren't connected on the right side.
     // FIXME: The conflict groups can be persisted as part of the changeset to
     // skip this step in the future.
-    for (size_t i = 0; i < their_size; ++i) {
+    for (size_t i = 0; i < their_changesets.size(); ++i) {
         size_t num_instructions = their_changesets[i].size();
         their_num_instructions += num_instructions;
-        logger.trace("Scanning incoming changeset [%1/%2] (%3 instructions)", i + 1, their_size, num_instructions);
+        logger.trace("Scanning incoming changeset [%1/%2] (%3 instructions)", i + 1, their_changesets.size(),
+                     num_instructions);
 
         their_index.scan_changeset(their_changesets[i]);
     }
-    for (size_t i = 0; i < our_size; ++i) {
+    for (size_t i = 0; i < our_changesets.size(); ++i) {
         Changeset& our_changeset = *our_changesets[i];
         size_t num_instructions = our_changeset.size();
         our_num_instructions += num_instructions;
-        logger.trace("Scanning local changeset [%1/%2] (%3 instructions)", i + 1, our_size, num_instructions);
+        logger.trace("Scanning local changeset [%1/%2] (%3 instructions)", i + 1, our_changesets.size(),
+                     num_instructions);
 
         their_index.scan_changeset(our_changeset);
     }
 
     // Build the index.
-    for (size_t i = 0; i < their_size; ++i) {
-        logger.trace("Indexing incoming changeset [%1/%2] (%3 instructions)", i + 1, their_size,
+    for (size_t i = 0; i < their_changesets.size(); ++i) {
+        logger.trace("Indexing incoming changeset [%1/%2] (%3 instructions)", i + 1, their_changesets.size(),
                      their_changesets[i].size());
         their_index.add_changeset(their_changesets[i]);
     }
 
     logger.debug("Finished changeset indexing (incoming: %1 changeset(s) / %2 instructions, local: %3 "
                  "changeset(s) / %4 instructions, conflict group(s): %5)",
-                 their_size, their_num_instructions, our_size, our_num_instructions,
+                 their_changesets.size(), their_num_instructions, our_changesets.size(), our_num_instructions,
                  their_index.get_num_conflict_groups());
 
 #if REALM_DEBUG // LCOV_EXCL_START
@@ -2450,24 +2450,24 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
         std::cerr << TERM_YELLOW << "\n=> PEER " << std::hex << local_file_ident
                   << " merging "
                      "changeset(s)/from peer(s):\n";
-        for (size_t i = 0; i < their_size; ++i) {
+        for (size_t i = 0; i < their_changesets.size(); ++i) {
             std::cerr << "Changeset version " << std::dec << their_changesets[i].version << " from peer "
                       << their_changesets[i].origin_file_ident << " at timestamp "
                       << their_changesets[i].origin_timestamp << "\n";
         }
         std::cerr << "Transforming through local changeset(s):\n";
-        for (size_t i = 0; i < our_size; ++i) {
+        for (size_t i = 0; i < our_changesets.size(); ++i) {
             std::cerr << "Changeset version " << our_changesets[i]->version << " from peer "
                       << our_changesets[i]->origin_file_ident << " at timestamp "
                       << our_changesets[i]->origin_timestamp << "\n";
         }
 
-        for (size_t i = 0; i < our_size; ++i) {
+        for (size_t i = 0; i < our_changesets.size(); ++i) {
             std::cerr << TERM_RED << "\nLOCAL (RECIPROCAL) CHANGESET BEFORE MERGE:\n" << TERM_RESET;
             our_changesets[i]->print(std::cerr);
         }
 
-        for (size_t i = 0; i < their_size; ++i) {
+        for (size_t i = 0; i < their_changesets.size(); ++i) {
             std::cerr << TERM_RED << "\nINCOMING CHANGESET BEFORE MERGE:\n" << TERM_RESET;
             their_changesets[i].print(std::cerr);
         }
@@ -2485,10 +2485,10 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
     static_cast<void>(local_file_ident);
 #endif // REALM_DEBUG LCOV_EXCL_STOP
 
-    for (size_t i = 0; i < our_size; ++i) {
+    for (size_t i = 0; i < our_changesets.size(); ++i) {
         logger.trace(
             "Transforming local changeset [%1/%2] through %3 incoming changeset(s) with %4 conflict group(s)", i + 1,
-            our_size, their_size, their_index.get_num_conflict_groups());
+            our_changesets.size(), their_changesets.size(), their_index.get_num_conflict_groups());
         Changeset* our_changeset = our_changesets[i];
 
         transformer.m_major_side.set_next_changeset(our_changeset);
@@ -2499,7 +2499,7 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
 
     logger.debug("Finished transforming %1 local changesets through %2 incoming changesets (%3 vs %4 "
                  "instructions, in %5 conflict groups)",
-                 our_size, their_size, our_num_instructions, their_num_instructions,
+                 our_changesets.size(), their_changesets.size(), our_num_instructions, their_num_instructions,
                  their_index.get_num_conflict_groups());
 
 #if REALM_DEBUG // LCOV_EXCL_START
@@ -2509,12 +2509,12 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
 
 #if REALM_DEBUG // LCOV_EXCL_START
     if (trace) {
-        for (size_t i = 0; i < our_size; ++i) {
+        for (size_t i = 0; i < our_changesets.size(); ++i) {
             std::cerr << TERM_CYAN << "\nRECIPROCAL CHANGESET AFTER MERGE:\n" << TERM_RESET;
             our_changesets[i]->print(std::cerr);
             std::cerr << '\n';
         }
-        for (size_t i = 0; i < their_size; ++i) {
+        for (size_t i = 0; i < their_changesets.size(); ++i) {
             std::cerr << TERM_CYAN << "INCOMING CHANGESET AFTER MERGE:\n" << TERM_RESET;
             their_changesets[i].print(std::cerr);
             std::cerr << '\n';
@@ -2523,11 +2523,11 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
 #endif // LCOV_EXCL_STOP REALM_DEBUG
 }
 
-size_t TransformerImpl::transform_remote_changesets(TransformHistory& history, file_ident_type local_file_ident,
-                                                    version_type current_local_version,
-                                                    util::Span<Changeset> parsed_changesets,
-                                                    util::FunctionRef<bool(const Changeset*)> changeset_applier,
-                                                    util::Logger& logger)
+size_t Transformer::transform_remote_changesets(TransformHistory& history, file_ident_type local_file_ident,
+                                                version_type current_local_version,
+                                                util::Span<Changeset> parsed_changesets,
+                                                util::FunctionRef<bool(const Changeset*)> changeset_applier,
+                                                util::Logger& logger)
 {
     REALM_ASSERT(local_file_ident != 0);
 
@@ -2538,65 +2538,51 @@ size_t TransformerImpl::transform_remote_changesets(TransformHistory& history, f
     auto p = parsed_changesets.begin();
     auto parsed_changesets_end = parsed_changesets.end();
 
-    try {
-        while (p != parsed_changesets_end) {
-            // Find the range of incoming changesets that share the same
-            // last_integrated_local_version, which means we can merge them in one go.
-            auto same_base_range_end = std::find_if(p + 1, parsed_changesets_end, [&](auto& changeset) {
-                return p->last_integrated_remote_version != changeset.last_integrated_remote_version;
-            });
+    while (p != parsed_changesets_end) {
+        // Find the range of incoming changesets that share the same
+        // last_integrated_local_version, which means we can merge them in one go.
+        auto same_base_range_end = std::find_if(p + 1, parsed_changesets_end, [&](auto& changeset) {
+            return p->last_integrated_remote_version != changeset.last_integrated_remote_version;
+        });
 
-            version_type begin_version = p->last_integrated_remote_version;
-            version_type end_version = current_local_version;
-            for (;;) {
-                HistoryEntry history_entry;
-                version_type version = history.find_history_entry(begin_version, end_version, history_entry);
-                if (version == 0)
-                    break; // No more local changesets
+        version_type begin_version = p->last_integrated_remote_version;
+        version_type end_version = current_local_version;
+        for (;;) {
+            HistoryEntry history_entry;
+            version_type version = history.find_history_entry(begin_version, end_version, history_entry);
+            if (version == 0)
+                break; // No more local changesets
 
-                Changeset& our_changeset = get_reciprocal_transform(history, local_file_ident, version,
-                                                                    history_entry); // Throws
-                our_changesets.push_back(&our_changeset);
+            Changeset& our_changeset = get_reciprocal_transform(history, local_file_ident, version,
+                                                                history_entry); // Throws
+            our_changesets.push_back(&our_changeset);
 
-                begin_version = version;
-            }
-
-            bool must_apply_all = false;
-
-            if (!our_changesets.empty()) {
-                merge_changesets(local_file_ident, &*p, same_base_range_end - p, our_changesets.data(),
-                                 our_changesets.size(), logger); // Throws
-                // We need to apply all transformed changesets if at least one reciprocal changeset was modified
-                // during OT.
-                must_apply_all = std::any_of(our_changesets.begin(), our_changesets.end(), [](const Changeset* c) {
-                    return c->is_dirty();
-                });
-            }
-
-            auto continue_applying = true;
-            for (; p != same_base_range_end && continue_applying; ++p) {
-                // It is safe to stop applying the changesets if:
-                //      1. There are no reciprocal changesets
-                //      2. No reciprocal changeset was modified
-                continue_applying = changeset_applier(p) || must_apply_all;
-            }
-            if (!continue_applying) {
-                break;
-            }
-
-            our_changesets.clear(); // deliberately not releasing memory
+            begin_version = version;
         }
-    }
-    catch (...) {
-        // If an exception was thrown while merging, the transform cache will
-        // be polluted. This is a problem since the same cache object is reused
-        // by multiple invocations to transform_remote_changesets(), so we must
-        // clear the cache before rethrowing.
-        //
-        // Note that some valid changesets can still cause exceptions to be
-        // thrown by the merge algorithm, namely incompatible schema changes.
-        m_reciprocal_transform_cache.clear();
-        throw;
+
+        bool must_apply_all = false;
+
+        if (!our_changesets.empty()) {
+            merge_changesets(local_file_ident, {&*p, same_base_range_end}, our_changesets, logger); // Throws
+            // We need to apply all transformed changesets if at least one reciprocal changeset was modified
+            // during OT.
+            must_apply_all = std::any_of(our_changesets.begin(), our_changesets.end(), [](const Changeset* c) {
+                return c->is_dirty();
+            });
+        }
+
+        auto continue_applying = true;
+        for (; p != same_base_range_end && continue_applying; ++p) {
+            // It is safe to stop applying the changesets if:
+            //      1. There are no reciprocal changesets
+            //      2. No reciprocal changeset was modified
+            continue_applying = changeset_applier(p) || must_apply_all;
+        }
+        if (!continue_applying) {
+            break;
+        }
+
+        our_changesets.clear(); // deliberately not releasing memory
     }
 
     // NOTE: Any exception thrown during flushing *MUST* lead to rollback of
@@ -2607,8 +2593,8 @@ size_t TransformerImpl::transform_remote_changesets(TransformHistory& history, f
 }
 
 
-Changeset& TransformerImpl::get_reciprocal_transform(TransformHistory& history, file_ident_type local_file_ident,
-                                                     version_type version, const HistoryEntry& history_entry)
+Changeset& Transformer::get_reciprocal_transform(TransformHistory& history, file_ident_type local_file_ident,
+                                                 version_type version, const HistoryEntry& history_entry)
 {
     auto& changeset = m_reciprocal_transform_cache[version]; // Throws
     if (changeset.empty()) {
@@ -2637,7 +2623,7 @@ Changeset& TransformerImpl::get_reciprocal_transform(TransformHistory& history, 
 }
 
 
-void TransformerImpl::flush_reciprocal_transform_cache(TransformHistory& history)
+void Transformer::flush_reciprocal_transform_cache(TransformHistory& history)
 {
     auto changesets = std::move(m_reciprocal_transform_cache);
     m_reciprocal_transform_cache.clear();
@@ -2651,15 +2637,6 @@ void TransformerImpl::flush_reciprocal_transform_cache(TransformHistory& history
         }
     }
 }
-
-} // namespace realm::_impl
-
-namespace realm::sync {
-std::unique_ptr<Transformer> make_transformer()
-{
-    return std::make_unique<_impl::TransformerImpl>(); // Throws
-}
-
 
 void parse_remote_changeset(const RemoteChangeset& remote_changeset, Changeset& parsed_changeset)
 {

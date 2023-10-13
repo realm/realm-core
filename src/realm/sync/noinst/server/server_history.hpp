@@ -742,16 +742,6 @@ class ServerHistory::Context {
 public:
     virtual std::mt19937_64& server_history_get_random() noexcept = 0;
 
-    // @{
-    /// These are guaranteed to not be called until a remote changeset needs to
-    /// be integrated into the history.
-    ///
-    /// The default implementations throw std::runtime_error, with a message
-    /// saying "Not supported".
-    virtual sync::Transformer& get_transformer();
-    virtual util::Buffer<char>& get_transform_buffer();
-    // @}
-
 protected:
     Context() noexcept = default;
 };

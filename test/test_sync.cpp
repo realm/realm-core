@@ -5320,30 +5320,15 @@ namespace issue2104 {
 
 class ServerHistoryContext : public _impl::ServerHistory::Context {
 public:
-    ServerHistoryContext()
-        : m_transformer{make_transformer()}
-    {
-    }
+    ServerHistoryContext() {}
 
     std::mt19937_64& server_history_get_random() noexcept override
     {
         return m_random;
     }
 
-    sync::Transformer& get_transformer() override
-    {
-        return *m_transformer;
-    }
-
-    util::Buffer<char>& get_transform_buffer() override
-    {
-        return m_transform_buffer;
-    }
-
 private:
     std::mt19937_64 m_random;
-    std::unique_ptr<sync::Transformer> m_transformer;
-    util::Buffer<char> m_transform_buffer;
 };
 
 } // namespace issue2104
