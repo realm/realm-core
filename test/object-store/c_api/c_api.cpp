@@ -6060,10 +6060,9 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
 
     struct TestWebSocket : realm::c_api::WrapC, WebSocketInterface {
     public:
-        TestWebSocket(DefaultSocketProvider* socket_provider, realm_websocket_endpoint_t endpoint,
+        TestWebSocket(DefaultSocketProvider& socket_provider, realm_websocket_endpoint_t endpoint,
                       realm_websocket_observer_t* realm_websocket_observer)
         {
-            REALM_ASSERT(socket_provider);
             WebSocketEndpoint ws_endpoint;
             ws_endpoint.address = endpoint.address;
             ws_endpoint.port = endpoint.port;
@@ -6074,7 +6073,7 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
             ws_endpoint.is_ssl = endpoint.is_ssl;
 
             auto observer = std::make_unique<TestWebSocketObserverShim>(realm_websocket_observer);
-            m_websocket = socket_provider->connect(std::move(observer), std::move(ws_endpoint));
+            m_websocket = socket_provider.connect(std::move(observer), std::move(ws_endpoint));
         }
 
         void async_write_binary(util::Span<const char> data, SyncSocketProvider::FunctionHandler&& handler) override
@@ -6088,11 +6087,10 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
 
     struct TestSyncTimer : realm::c_api::WrapC, SyncSocketProvider::Timer {
     public:
-        TestSyncTimer(DefaultSocketProvider* socket_provider, std::chrono::milliseconds delay,
+        TestSyncTimer(DefaultSocketProvider& socket_provider, std::chrono::milliseconds delay,
                       realm_sync_socket_timer_callback_t* callback)
         {
-            REALM_ASSERT(socket_provider);
-            m_timer = socket_provider->create_timer(delay, [capi_callback = callback](Status s) {
+            m_timer = socket_provider.create_timer(delay, [capi_callback = callback](Status s) {
                 if (s.code() == ErrorCodes::Error::OperationAborted) {
                     return realm_sync_socket_timer_canceled(capi_callback);
                 }
@@ -6142,20 +6140,22 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
                               realm_sync_socket_timer_callback_t* callback) -> realm_sync_socket_timer_t {
         auto test_data = static_cast<TestData*>(userdata);
         LOCKED_REQUIRE(test_data);
-        return static_cast<realm_sync_socket_timer_t>(new TestSyncTimer(test_data->socket_provider, std::chrono::milliseconds(delay_ms), callback));
+        LOCKED_REQUIRE(test_data->socket_provider);
+        return static_cast<realm_sync_socket_timer_t>(
+            new TestSyncTimer(*test_data->socket_provider, std::chrono::milliseconds(delay_ms), callback));
     };
     auto cancel_timer_fn = [](realm_userdata_t userdata, realm_sync_socket_timer_t sync_timer) {
         auto test_data = static_cast<TestData*>(userdata);
-        REQUIRE(test_data);
-        REQUIRE(test_data->socket_provider);
+        LOCKED_REQUIRE(test_data);
+        LOCKED_REQUIRE(test_data->socket_provider);
         auto timer = static_cast<TestSyncTimer*>(sync_timer);
         LOCKED_REQUIRE(timer);
         timer->cancel();
     };
     auto free_timer_fn = [](realm_userdata_t userdata, realm_sync_socket_timer_t sync_timer) {
         auto test_data = static_cast<TestData*>(userdata);
-        REQUIRE(test_data);
-        REQUIRE(test_data->socket_provider);
+        LOCKED_REQUIRE(test_data);
+        LOCKED_REQUIRE(test_data->socket_provider);
         realm_release(sync_timer);
     };
     auto websocket_connect_fn =
@@ -6163,14 +6163,15 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
            realm_websocket_observer_t* realm_websocket_observer) -> realm_sync_socket_websocket_t {
         auto test_data = static_cast<TestData*>(userdata);
         LOCKED_REQUIRE(test_data);
+        LOCKED_REQUIRE(test_data->socket_provider);
         return static_cast<realm_sync_socket_websocket_t>(
-            new TestWebSocket(test_data->socket_provider, endpoint, realm_websocket_observer));
+            new TestWebSocket(*test_data->socket_provider, endpoint, realm_websocket_observer));
     };
     auto websocket_async_write_fn = [](realm_userdata_t userdata, realm_sync_socket_websocket_t sync_websocket,
                                        const char* data, size_t size, realm_sync_socket_write_callback_t* callback) {
         auto test_data = static_cast<TestData*>(userdata);
-        REQUIRE(test_data);
-        REQUIRE(test_data->socket_provider);
+        LOCKED_REQUIRE(test_data);
+        LOCKED_REQUIRE(test_data->socket_provider);
         auto websocket = static_cast<TestWebSocket*>(sync_websocket);
         LOCKED_REQUIRE(websocket);
         websocket->async_write_binary(util::Span{data, size}, [capi_callback = callback](Status s) {
@@ -6180,8 +6181,8 @@ TEST_CASE("C API app: websocket provider", "[sync][app][c_api][baas]") {
     };
     auto websocket_free_fn = [](realm_userdata_t userdata, realm_sync_socket_websocket_t sync_websocket) {
         auto test_data = static_cast<TestData*>(userdata);
-        REQUIRE(test_data);
-        REQUIRE(test_data->socket_provider);
+        LOCKED_REQUIRE(test_data);
+        LOCKED_REQUIRE(test_data->socket_provider);
         realm_release(sync_websocket);
     };
 
