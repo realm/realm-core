@@ -9,7 +9,8 @@
 * None.
 
 ### Breaking changes
-* None.
+* Added separate enum for callback handler result values in the platform networking C API. ([PR #7015](https://github.com/realm/realm-core/pull/7015))
+* Platform networking CAPI now uses different callback types depending on where callback is used. ([PR #7015](https://github.com/realm/realm-core/pull/7015))
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
@@ -17,7 +18,7 @@
 -----------
 
 ### Internals
-* None.
+* Updated async_write_binary in the Default Socket Provider to properly return a status to the callback handler. ([PR #7015](https://github.com/realm/realm-core/pull/7015))
 
 ----------------------------------------------
 
@@ -55,7 +56,6 @@
   - Introduce `MutableSubscriptionSet::erase_by_class_name()`.
   ([PR #7008](https://github.com/realm/realm-core/pull/7008))
 * Filtering by user-defined functions (PR [#7020](https://github.com/realm/realm-core/pull/7020))
-* Added separate enum for callback handler result values in the platform networking C API. ([PR #7015](https://github.com/realm/realm-core/pull/7015))
 
 ### Fixed
 * Fixed an issue where Android.bp builds would fail with SSL certificate validation errors because we didn't include the trusted CA roots bundle. (PR [#7022](https://github.com/realm/realm-core/pull/7022))
