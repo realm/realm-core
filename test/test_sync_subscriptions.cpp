@@ -40,7 +40,7 @@ TEST(Sync_SubscriptionStoreBasic)
     SHARED_GROUP_TEST_PATH(sub_store_path);
     {
         SubscriptionStoreFixture fixture(sub_store_path);
-        auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+        auto store = SubscriptionStore::create(fixture.db);
         // Because there are no subscription sets yet, get_latest should point to an empty object
         auto latest = store->get_latest();
         CHECK(latest.begin() == latest.end());
@@ -83,7 +83,7 @@ TEST(Sync_SubscriptionStoreBasic)
     // Destroy the DB and reload it and make sure we can get the subscriptions we set in the previous block.
     {
         SubscriptionStoreFixture fixture(sub_store_path);
-        auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+        auto store = SubscriptionStore::create(fixture.db);
 
         auto read_tr = fixture.db->start_read();
         Query query_a(read_tr->get_table(fixture.a_table_key));
@@ -113,7 +113,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
 
     auto read_tr = fixture.db->start_read();
     Query query_a(read_tr->get_table("class_a"));
@@ -208,7 +208,7 @@ TEST(Sync_SubscriptionStoreUpdateExisting)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
 
     auto read_tr = fixture.db->start_read();
     Query query_a(read_tr->get_table("class_a"));
@@ -248,7 +248,7 @@ TEST(Sync_SubscriptionStoreAssignAnonAndNamed)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
 
     auto read_tr = fixture.db->start_read();
     Query query_a(read_tr->get_table("class_a"));
@@ -284,7 +284,7 @@ TEST(Sync_SubscriptionStoreNotifications)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
 
     std::vector<util::Future<SubscriptionSet::State>> notification_futures;
     auto sub_set = store->get_latest().make_mutable_copy();
@@ -404,7 +404,7 @@ TEST(Sync_SubscriptionStoreRefreshSubscriptionSetInvalid)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
     // Because there are no subscription sets yet, get_latest should point to an empty object
     auto latest = std::make_unique<SubscriptionSet>(store->get_latest());
     CHECK(latest->begin() == latest->end());
@@ -431,7 +431,7 @@ TEST(Sync_SubscriptionStoreInternalSchemaMigration)
     CHECK(util::File::exists(path.string()));
     util::File::copy(path.string(), sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
     auto [active_version, latest_version, pending_mark_version] = store->get_version_info();
     CHECK_EQUAL(active_version, latest_version);
     auto active = store->get_active();
@@ -455,7 +455,7 @@ TEST(Sync_SubscriptionStoreNextPendingVersion)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
 
     auto mut_sub_set = store->get_latest().make_mutable_copy();
     auto sub_set = mut_sub_set.commit();
@@ -493,7 +493,7 @@ TEST(Sync_SubscriptionStoreSubSetHasTable)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
 
     auto read_tr = fixture.db->start_read();
     // We should have no subscriptions yet so this should return false.
@@ -537,7 +537,7 @@ TEST(Sync_SubscriptionStoreNotifyAll)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
 
     const Status status_abort(ErrorCodes::OperationAborted, "operation aborted");
 
@@ -612,7 +612,7 @@ TEST(Sync_SubscriptionStoreTerminate)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
 
     size_t hit_count = 0;
 
@@ -848,7 +848,7 @@ TEST(Sync_MutableSubscriptionSetOperations)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db);
 
     auto read_tr = fixture.db->start_read();
     Query query_a(read_tr->get_table("class_a"));

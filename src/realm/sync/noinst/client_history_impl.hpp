@@ -92,15 +92,6 @@ public:
         std::unique_ptr<char[]> buffer;
     };
 
-    class SyncTransactReporter {
-    public:
-        virtual void report_sync_transact(VersionID old_version, VersionID new_version) = 0;
-
-    protected:
-        ~SyncTransactReporter() = default;
-    };
-
-
     /// set_client_reset_adjustments() is used by client reset to adjust the
     /// content of the history compartment. The shared group associated with
     /// this history object must be in a write transaction when this function
@@ -245,16 +236,11 @@ public:
     /// the server changesets after they were transformed.
     /// Note: In FLX, the transaction is left in reading state when bootstrap ends.
     /// In all other cases, the transaction is left in reading state when the function returns.
-    ///
-    /// \param transact_reporter An optional callback which will be called with the
-    /// version immediately processing the sync transaction and that of the sync
-    /// transaction.
     void integrate_server_changesets(
         const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
         util::Span<const RemoteChangeset> changesets, VersionInfo& new_version, DownloadBatchState download_type,
         util::Logger&, const TransactionRef& transact,
-        util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr = nullptr,
-        SyncTransactReporter* transact_reporter = nullptr);
+        util::UniqueFunction<void(const TransactionRef&, util::Span<Changeset>)> run_in_write_tr = nullptr);
 
     static void get_upload_download_bytes(DB*, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
                                           std::uint_fast64_t&, std::uint_fast64_t&);
