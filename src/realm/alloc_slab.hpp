@@ -641,7 +641,6 @@ private:
     uint64_t m_youngest_live_version = 1;
     std::mutex m_mapping_mutex;
     util::File m_file;
-    util::SharedFileInfo* m_realm_file_info = nullptr;
     // vectors where old mappings, are held from deletion to ensure translations are
     // kept open and ref->ptr translations work for other threads..
     std::vector<OldMapping> m_old_mappings;

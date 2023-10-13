@@ -145,29 +145,6 @@ mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
 }
 } // anonymous namespace
 
-SharedFileInfo* get_file_info_for_file(File& file)
-{
-    LockGuard lock(mapping_mutex);
-#ifndef _WIN32
-    File::UniqueID id = file.get_unique_id();
-#endif
-    std::vector<mappings_for_file>::iterator it;
-    for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
-#ifdef _WIN32
-        auto fd = file.get_descriptor();
-        if (File::is_same_file_static(it->handle, fd))
-            break;
-#else
-        if (it->inode == id.inode && it->device == id.device)
-            break;
-#endif
-    }
-    if (it == mappings_by_file.end())
-        return nullptr;
-    else
-        return it->info.get();
-}
-
 
 namespace {
 EncryptedFileMapping* add_mapping(void* addr, size_t size, const FileAttributes& file, size_t file_offset)

@@ -165,10 +165,6 @@ void SlabAlloc::detach(bool keep_file_open) noexcept
     // placed correctly (logically) after the end of the file.
     m_slabs.clear();
     clear_freelists();
-#if REALM_ENABLE_ENCRYPTION
-    m_realm_file_info = nullptr;
-#endif
-
     m_attach_mode = attach_None;
 }
 
@@ -912,9 +908,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg, util::Writ
     realm::util::encryption_read_barrier(m_mappings[0].primary_mapping, 0, sizeof(Header));
     dg.release();  // Do not detach
     fcg.release(); // Do not close
-#if REALM_ENABLE_ENCRYPTION
-    m_realm_file_info = util::get_file_info_for_file(m_file);
-#endif
     return top_ref;
 }
 

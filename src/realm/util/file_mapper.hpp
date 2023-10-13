@@ -54,39 +54,10 @@ void* mmap_anon(size_t size);
 using HeaderToSize = size_t (*)(const char* addr);
 class EncryptedFileMapping;
 
-class PageReclaimGovernor {
-public:
-    // Called by the page reclaimer with the current load (in bytes) and
-    // must return the target load (also in bytes). Returns no_match if no
-    // target can be set
-    static constexpr int64_t no_match = -1;
-    virtual util::UniqueFunction<int64_t()> current_target_getter(size_t load) = 0;
-    virtual void report_target_result(int64_t) = 0;
-};
-
-// Set a page reclaim governor. The governor is an object with a method which will be called periodically
-// and must return a 'target' amount of memory to hold decrypted pages. The page reclaim daemon
-// will then try to release pages to meet the target. The governor is called with the current
-// amount of data used, for the purpose of logging - or possibly for computing the target
-//
-// The governor is called approximately once per second.
-//
-// If no governor is installed, the page reclaim daemon will not start.
-void set_page_reclaim_governor(PageReclaimGovernor* governor);
-
-// Use the default governor. The default governor is used automatically if nothing else is set, so
-// this funciton is mostly useful for tests where changing back to the default could be desirable.
-inline void set_page_reclaim_governor_to_default()
-{
-    set_page_reclaim_governor(nullptr);
-}
-
 // Retrieves the number of in memory decrypted pages, across all open files.
 size_t get_num_decrypted_pages();
 
 #if REALM_ENABLE_ENCRYPTION
-
-SharedFileInfo* get_file_info_for_file(File& file);
 
 // This variant allows the caller to obtain direct access to the encrypted file mapping
 // for optimization purposes.
@@ -155,7 +126,6 @@ size_t inline get_num_decrypted_pages()
     return 0;
 }
 
-void inline set_page_reclaim_governor(PageReclaimGovernor*) {}
 void inline encryption_read_barrier(const void*, size_t, EncryptedFileMapping*, HeaderToSize = nullptr) {}
 void inline encryption_read_barrier_for_write(const void*, size_t, EncryptedFileMapping*) {}
 void inline encryption_write_barrier(const void*, size_t) {}
