@@ -355,6 +355,10 @@ typedef struct realm_websocket_endpoint {
     bool is_ssl;            // true if SSL should be used
 } realm_websocket_endpoint_t;
 
+// The following definitions are for internal structures and pointers used
+// by the Sync Client. These values should be stored for providing to the
+// Platform Networking interface functions and should not be used directly
+// by the Platform Networking CAPI implementation
 typedef struct realm_sync_socket realm_sync_socket_t;
 typedef struct realm_sync_socket_callback realm_sync_socket_post_callback_t;
 typedef struct realm_sync_socket_callback realm_sync_socket_timer_callback_t;
@@ -401,6 +405,10 @@ typedef realm_sync_socket_websocket_t (*realm_sync_socket_connect_func_t)(
 // Called by a connection in the Sync Client when it needs to send data to the server. The
 // write_callback is used with realm_sync_socket_write_complete() to inform the connection
 // that the data has been transferred successfully.
+// If an error occurs during the async write operation, it can be provided to the write_callback
+// handler, but the websocket also needs to be closed by calling
+// realm_sync_socket_websocket_error() followed by providing the error code and reason to
+// realm_sync_socket_websocket_closed().
 // The write_callback pointer does not need to be released by the CAPI implementation.
 typedef void (*realm_sync_socket_websocket_async_write_func_t)(realm_userdata_t userdata,
                                                                realm_sync_socket_websocket_t websocket,
