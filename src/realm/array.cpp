@@ -197,6 +197,14 @@ void Array::set_encode_array(ArrayEncode* encode_array)
     m_encode_array = encode_array;
 }
 
+Array::~Array() noexcept
+{
+    if (m_encode_array) {
+        m_encode_array->destroy();
+        delete m_encode_array;
+    }
+}
+
 #ifdef REALM_DEBUG
 
 bool Array::try_encode()
@@ -235,8 +243,11 @@ size_t Array::bit_width(int64_t v)
 
 void Array::init_from_mem(MemRef mem) noexcept
 {
-    // TODO. here we need to recreate the encoded array if we read so from disk.
     char* header = Node::init_from_mem(mem);
+
+    // deal with the encoding part
+
+
     // Parse header
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs = get_hasrefs_from_header(header);

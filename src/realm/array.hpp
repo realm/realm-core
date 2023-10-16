@@ -94,7 +94,7 @@ public:
     {
     }
 
-    ~Array() noexcept override {}
+    ~Array() noexcept override;
 
     /// Set encoding/deconding array for this array in order to implement the
     /// encoding algorithm selected for this type of Array.
