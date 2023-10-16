@@ -23,7 +23,6 @@
 #include <realm/query_state.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/array_direct.hpp>
-#include <realm/array_encode.hpp>
 
 namespace realm {
 
@@ -554,8 +553,7 @@ private:
     void report_memory_usage_2(MemUsageHandler&) const;
 #endif
 
-    // encode/decode this array if m_encode_array is set (essentially if there is an enconding/decondig algo
-    // associated)
+    // encode/decode this array
     bool encode_array() const;
     bool decode_array() const;
     bool is_encoded() const;

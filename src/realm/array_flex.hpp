@@ -28,7 +28,7 @@ namespace realm {
 //
 class ArrayFlex : public ArrayEncode {
 public:
-    ArrayFlex(Array& array);
+    explicit ArrayFlex(Array& array);
     bool encode() final override;
     bool decode() final override;
     bool is_encoded() const final override;
@@ -38,7 +38,6 @@ public:
 private:
     bool try_encode(std::vector<int64_t>&, std::vector<size_t>&);
     bool get_encode_info(size_t& value_width, size_t& index_width, size_t& value_size, size_t& index_size) const;
-    MemRef m_encoded_array;
 };
 } // namespace realm
 #endif // REALM_ARRAY_COMPRESS_HPP

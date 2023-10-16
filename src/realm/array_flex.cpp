@@ -37,7 +37,7 @@ bool ArrayFlex::encode()
     if (!is_encoded() && try_encode(values, indices)) {
         size_t value_width, index_width, value_size, index_size;
         if (get_encode_info(value_width, index_width, value_size, index_size)) {
-            const auto data = (uint64_t*)NodeHeader::get_data_from_header(m_encoded_array.get_addr());
+            const auto data = (uint64_t*)NodeHeader::get_data_from_header(Array::get_mem().get_addr());
             const auto offset = value_size * value_width;
             bf_iterator it_value{data, 0, value_width, value_width, 0};
             bf_iterator it_index{data, offset, index_width, index_width, 0};
@@ -61,7 +61,7 @@ bool ArrayFlex::decode()
     if (get_encode_info(value_width, index_width, value_size, index_size)) {
         // recreate the array
         m_array.create(NodeHeader::Type::type_Normal);
-        const auto data = (uint64_t*)NodeHeader::get_data_from_header(m_encoded_array.get_addr());
+        const auto data = (uint64_t*)NodeHeader::get_data_from_header(Array::get_mem().get_addr());
         const auto offset = value_size * value_width;
         // re-insert elememnt
         std::vector<uint64_t> origin_vector;
@@ -75,9 +75,7 @@ bool ArrayFlex::decode()
             ++index_iterator;
         }
         // free encoded array
-        m_array.get_alloc().free_(m_encoded_array);
-        m_encoded_array.set_addr(nullptr);
-
+        destroy();
         for (auto value : origin_vector)
             m_array.add(value);
 
@@ -89,12 +87,13 @@ bool ArrayFlex::decode()
 bool ArrayFlex::is_encoded() const
 {
     using Encoding = NodeHeader::Encoding;
-    const auto header = m_encoded_array.get_addr();
-    if (header) {
-        Encoding enconding{NodeHeader::get_kind((uint64_t*)header)};
-        return enconding == Encoding::Flex;
-    }
-    return false;
+
+    if (!is_attached())
+        return false;
+
+    const auto header = Array::get_header();
+    Encoding enconding{NodeHeader::get_kind((uint64_t*)header)};
+    return enconding == Encoding::Flex;
 }
 
 size_t ArrayFlex::size() const
@@ -114,7 +113,7 @@ int64_t ArrayFlex::get(size_t ndx) const
         if (ndx >= index_size)
             return realm::not_found;
 
-        const auto data = (uint64_t*)NodeHeader::get_data_from_header(m_encoded_array.get_addr());
+        const auto data = (uint64_t*)Array::get_data_from_header(get_header());
         const auto offset = (value_size * value_width) + (ndx * index_width);
         const auto index = read_bitfield(data, offset, index_width);
         return read_bitfield(data, index * value_width, value_width);
@@ -168,8 +167,9 @@ bool ArrayFlex::try_encode(std::vector<int64_t>& values, std::vector<size_t>& in
     if (compressed_size < uncompressed_size) {
         // allocate new space for the encoded array
         const size_t size = Array::header_size + compressed_size;
-        m_encoded_array = Array::create_array(Array::Type::type_Normal, false, size, 0, m_array.get_alloc());
-        auto addr = (uint64_t*)m_encoded_array.get_addr();
+        auto mem = Array::create_array(Array::Type::type_Normal, false, size, 0, m_array.get_alloc());
+        Array::init_from_mem(mem);
+        auto addr = (uint64_t*)Array::get_mem().get_addr();
         using Encoding = NodeHeader::Encoding;
         NodeHeader::set_kind(addr, static_cast<std::underlying_type_t<Encoding>>(NodeHeader::Encoding::Flex));
         NodeHeader::set_arrayA_num_elements<Encoding::Flex>(addr, values.size());
@@ -188,7 +188,7 @@ bool ArrayFlex::get_encode_info(size_t& value_width, size_t& index_width, size_t
 {
     using Encoding = NodeHeader::Encoding;
     if (is_encoded()) {
-        const auto addr = (uint64_t*)m_encoded_array.get_addr();
+        const auto addr = (uint64_t*)Array::get_mem().get_addr();
         value_size = NodeHeader::get_arrayA_num_elements<Encoding::Flex>(addr);
         index_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>(addr);
         value_width = NodeHeader::get_elementA_size<Encoding::Flex>(addr);

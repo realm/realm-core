@@ -603,17 +603,17 @@ size_t Array::size() const noexcept
     return Node::size();
 }
 
-inline bool Array::encode_array() const
+bool Array::encode_array() const
 {
     return !Array::is_encoded() ? m_encode_array->encode() : false;
 }
 
-inline bool Array::decode_array() const
+bool Array::decode_array() const
 {
     return Array::is_encoded() ? m_encode_array->decode() : false;
 }
 
-inline bool Array::is_encoded() const
+bool Array::is_encoded() const
 {
     return m_encode_array ? m_encode_array->is_encoded() : false;
 }

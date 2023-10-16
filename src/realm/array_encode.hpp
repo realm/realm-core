@@ -25,18 +25,14 @@ namespace realm {
 //
 // This class represents the basic interface that every compressed array must implement.
 //
-class Array;
-class ArrayEncode // TODO this needs to inherints from Array ???
-{
+class ArrayEncode : public Array {
 public:
-    ArrayEncode(Array& array)
-        : m_array(array)
-    {
-    }
+    explicit ArrayEncode(Array& array);
     virtual ~ArrayEncode() = default;
     virtual bool encode() = 0;
     virtual bool decode() = 0;
     virtual bool is_encoded() const = 0;
+
     virtual size_t size() const = 0;
     virtual int64_t get(size_t) const = 0;
 

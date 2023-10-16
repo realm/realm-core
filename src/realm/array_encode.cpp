@@ -21,12 +21,18 @@
 
 using namespace realm;
 
+ArrayEncode::ArrayEncode(Array& array)
+    : Array(array.get_alloc())
+    , m_array(array)
+{
+}
+
 ArrayEncode* ArrayEncode::create_encoded_array(NodeHeader::Encoding encoding, Array& array)
 {
     using Encoding = NodeHeader::Encoding;
     switch (encoding) {
         case Encoding::Flex:
-            return new ArrayFlex(array); // TODO  evaluate if we really can use a smart ptr or return a naked ptr.
+            return new ArrayFlex(array); // TODO small ptr here?
         case Encoding::Packed:
         case Encoding::AofP:
         case Encoding::PofA:
