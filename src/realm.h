@@ -405,8 +405,8 @@ typedef realm_sync_socket_websocket_t (*realm_sync_socket_connect_func_t)(
 // Called by a connection in the Sync Client when it needs to send data to the server. The
 // write_callback is used with realm_sync_socket_write_complete() to inform the connection
 // that the data has been transferred successfully.
-// If an error occurs during the async write operation, it can be provided to the write_callback
-// handler, but the websocket also needs to be closed by calling
+// If an error occurs during the async write operation, it needs to be provided to the
+// write_callback handler, and the websocket is exepected to be closed by calling
 // realm_sync_socket_websocket_error() followed by providing the error code and reason to
 // realm_sync_socket_websocket_closed().
 // The write_callback pointer does not need to be released by the CAPI implementation.
