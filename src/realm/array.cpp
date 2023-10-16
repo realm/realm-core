@@ -199,10 +199,50 @@ void Array::set_encode_array(ArrayEncode* encode_array)
 
 Array::~Array() noexcept
 {
-    if (m_encode_array) {
+    // this breaks our invariant that accessors do not do heavy
+    // lifting in the dtor. TODO: find a solution to this.
+    if (m_encode_array && m_encode_array->is_attached()) {
         m_encode_array->destroy();
-        delete m_encode_array;
     }
+    delete m_encode_array;
+    m_encode_array = nullptr;
+}
+
+template <size_t w>
+int64_t Array::get(size_t ndx) const noexcept
+{
+    REALM_ASSERT_DEBUG(is_attached());
+    if (m_encode_array && m_encode_array->is_encoded()) {
+        return m_encode_array->get(ndx);
+    }
+    return get_universal<w>(m_data, ndx);
+}
+
+int64_t Array::get(size_t ndx) const noexcept
+{
+    if (m_encode_array && m_encode_array->is_encoded()) {
+        return m_encode_array->get(ndx);
+    }
+
+    REALM_ASSERT_DEBUG(is_attached());
+    REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
+    return (this->*m_getter)(ndx);
+
+    // Two ideas that are not efficient but may be worth looking into again:
+    /*
+        // Assume correct width is found early in REALM_TEMPEX, which is the case for B tree offsets that
+        // are probably either 2^16 long. Turns out to be 25% faster if found immediately, but 50-300% slower
+        // if found later
+        REALM_TEMPEX(return get, (ndx));
+    */
+    /*
+        // Slightly slower in both of the if-cases. Also needs an matchcount m_size check too, to avoid
+        // reading beyond array.
+        if (m_width >= 8 && m_size > ndx + 7)
+            return get<64>(ndx >> m_shift) & m_widthmask;
+        else
+            return (this->*(m_vtable->getter))(ndx);
+    */
 }
 
 #ifdef REALM_DEBUG
@@ -244,15 +284,27 @@ size_t Array::bit_width(int64_t v)
 void Array::init_from_mem(MemRef mem) noexcept
 {
     char* header = Node::init_from_mem(mem);
-
-    // deal with the encoding part
-
-
     // Parse header
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs = get_hasrefs_from_header(header);
     m_context_flag = get_context_flag_from_header(header);
     update_width_cache_from_header();
+
+    // deal with encoding array
+    Encoding enconding{NodeHeader::get_kind((uint64_t*)header)};
+    if (enconding == Encoding::Flex) {
+        // it is an error not to have the encoded array if the array type supports it
+        REALM_ASSERT(m_encode_array);
+        m_encode_array->init_array_encode(mem);
+    }
+}
+
+MemRef Array::get_mem() const noexcept
+{
+    if (m_encode_array && m_encode_array->is_encoded()) {
+        return MemRef(get_header_from_data(m_encode_array->get_data()), m_encode_array->get_ref(), m_alloc);
+    }
+    return MemRef(get_header_from_data(m_data), m_ref, m_alloc);
 }
 
 void Array::update_from_parent() noexcept
@@ -293,11 +345,8 @@ void Array::set_type(Type type)
     set_hasrefs_in_header(init_has_refs, header);
 }
 
-
 void Array::destroy_children(size_t offset) noexcept
 {
-    decode_array();
-
     for (size_t i = offset; i != m_size; ++i) {
         int64_t value = get(i);
 

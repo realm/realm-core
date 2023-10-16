@@ -29,6 +29,8 @@ namespace realm {
 class ArrayFlex : public ArrayEncode {
 public:
     explicit ArrayFlex(Array& array);
+    virtual ~ArrayFlex() = default;
+    void init_array_encode(MemRef) final override;
     bool encode() final override;
     bool decode() final override;
     bool is_encoded() const final override;

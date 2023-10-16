@@ -40,6 +40,6 @@ ArrayEncode* ArrayEncode::create_encoded_array(NodeHeader::Encoding encoding, Ar
         case Encoding::WTypMult:
         case Encoding::WTypIgn:
         default:
-            return {}; // no other implementations for now.
+            return nullptr; // no other implementations for now.
     }
 }

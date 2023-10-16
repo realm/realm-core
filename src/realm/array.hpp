@@ -94,7 +94,7 @@ public:
     {
     }
 
-    ~Array() noexcept override;
+    virtual ~Array() noexcept override;
 
     /// Set encoding/deconding array for this array in order to implement the
     /// encoding algorithm selected for this type of Array.
@@ -136,6 +136,8 @@ public:
         ref_type ref = get_ref_from_parent();
         init_from_ref(ref);
     }
+
+    MemRef get_mem() const noexcept;
 
     /// Called in the context of Group::commit() to ensure that attached
     /// accessors stay valid across a commit. Please note that this works only
@@ -544,7 +546,6 @@ protected:
     bool m_has_refs;             // Elements whose first bit is zero are refs to subarrays.
     bool m_context_flag;         // Meaning depends on context.
 
-    ArrayEncode* m_encode_array = nullptr; // encode array for encoding and decoding array.
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
     ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified) const;
@@ -556,7 +557,12 @@ private:
     // encode/decode this array
     bool encode_array() const;
     bool decode_array() const;
+#ifdef REALM_DEBUG
+public:
     bool is_encoded() const;
+#else
+    bool is_encoded() const;
+#endif
 
     friend class Allocator;
     friend class SlabAlloc;
@@ -721,38 +727,6 @@ int64_t Array::get_universal(const char* data, size_t ndx) const
         REALM_ASSERT_DEBUG(false);
         return int64_t(-1);
     }
-}
-
-template <size_t w>
-int64_t Array::get(size_t ndx) const noexcept
-{
-    decode_array();
-    REALM_ASSERT_DEBUG(is_attached());
-    return get_universal<w>(m_data, ndx);
-}
-
-inline int64_t Array::get(size_t ndx) const noexcept
-{
-    decode_array();
-    REALM_ASSERT_DEBUG(is_attached());
-    REALM_ASSERT_DEBUG_EX(ndx < m_size, ndx, m_size);
-    return (this->*m_getter)(ndx);
-
-    // Two ideas that are not efficient but may be worth looking into again:
-    /*
-        // Assume correct width is found early in REALM_TEMPEX, which is the case for B tree offsets that
-        // are probably either 2^16 long. Turns out to be 25% faster if found immediately, but 50-300% slower
-        // if found later
-        REALM_TEMPEX(return get, (ndx));
-    */
-    /*
-        // Slightly slower in both of the if-cases. Also needs an matchcount m_size check too, to avoid
-        // reading beyond array.
-        if (m_width >= 8 && m_size > ndx + 7)
-            return get<64>(ndx >> m_shift) & m_widthmask;
-        else
-            return (this->*(m_vtable->getter))(ndx);
-    */
 }
 
 inline int64_t Array::front() const noexcept

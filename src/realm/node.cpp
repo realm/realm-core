@@ -19,6 +19,7 @@
 #include <realm/node.hpp>
 #include <realm/utilities.hpp>
 #include <realm/mixed.hpp>
+#include <realm/array_encode.hpp>
 
 #if REALM_ENABLE_MEMDEBUG
 #include <cstring>
@@ -121,6 +122,15 @@ void Node::alloc(size_t init_size, size_t new_width)
     }
     set_size_in_header(init_size, header);
     m_size = init_size;
+}
+
+void Node::destroy() noexcept
+{
+    if (!is_attached())
+        return;
+    char* header = get_header_from_data(m_data);
+    m_alloc.free_(m_ref, header);
+    m_data = nullptr;
 }
 
 void Node::do_copy_on_write(size_t minimum_size)

@@ -25,6 +25,7 @@
 namespace realm {
 
 class Mixed;
+class ArrayEncode;
 
 /// Special index value. It has various meanings depending on
 /// context. It is returned by some search functions to indicate 'not
@@ -125,8 +126,11 @@ public:
         char* header = mem.get_addr();
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
-        m_size = get_size_from_header(header);
-
+        auto v = NodeHeader::get_kind((uint64_t*)header);
+        if (Encoding{v} == Encoding::Flex)
+            m_size = NodeHeader::get_arrayB_num_elements<Encoding::Flex>((uint64_t*)header);
+        else
+            m_size = get_size_from_header(header);
         return header;
     }
 
@@ -212,14 +216,7 @@ public:
     /// children of that array. See non-static destroy_deep() for an
     /// alternative. If this accessor is already in the detached state, this
     /// function has no effect (idempotency).
-    void destroy() noexcept
-    {
-        if (!is_attached())
-            return;
-        char* header = get_header_from_data(m_data);
-        m_alloc.free_(m_ref, header);
-        m_data = nullptr;
-    }
+    void destroy() noexcept;
 
     /// Shorthand for `destroy(MemRef(ref, alloc), alloc)`.
     static void destroy(ref_type ref, Allocator& alloc) noexcept
@@ -276,6 +273,8 @@ protected:
     size_t m_ref;
     Allocator& m_alloc;
     size_t m_size = 0; // Number of elements currently stored.
+
+    ArrayEncode* m_encode_array = nullptr; // encode array for encoding and decoding array.
 
 #if REALM_ENABLE_MEMDEBUG
     // If m_no_relocation is false, then copy_on_write() will always relocate this array, regardless if it's

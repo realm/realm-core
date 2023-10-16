@@ -29,10 +29,15 @@ class ArrayEncode : public Array {
 public:
     explicit ArrayEncode(Array& array);
     virtual ~ArrayEncode() = default;
+    virtual void init_array_encode(MemRef) = 0;
     virtual bool encode() = 0;
     virtual bool decode() = 0;
     virtual bool is_encoded() const = 0;
 
+    char* get_data() const
+    {
+        return m_data;
+    }
     virtual size_t size() const = 0;
     virtual int64_t get(size_t) const = 0;
 
