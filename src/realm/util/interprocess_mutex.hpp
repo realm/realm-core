@@ -260,7 +260,7 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, const st
     // LockInfo has not been created yet.
     m_lock_info = std::make_shared<LockInfo>();
     // Always open file for write and retreive the uid in case other process
-    // deletes the file. Avoid using just mode_Write (which implies trancate).
+    // deletes the file. Avoid using just mode_Write (which implies truncate).
     // On fat32/exfat uid could be reused by OS in a situation when
     // multiple processes open and truncate the same lock file concurrently.
     m_lock_info->m_file.open(m_filename, File::mode_Append);
