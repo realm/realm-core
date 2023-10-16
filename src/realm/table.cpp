@@ -3385,6 +3385,17 @@ void Table::remove_object(ObjKey key)
 {
     Group* g = get_parent_group();
 
+    if (is_asymmetric()) {
+        REALM_ASSERT(g);
+        auto it = std::find_if(g->m_objects_to_delete.begin(), g->m_objects_to_delete.end(),
+                               [&](const Group::ToDeleteRef& item) {
+                                   return item.table_key == m_key && item.obj_key == key;
+                               });
+        if (it != g->m_objects_to_delete.end()) {
+            g->m_objects_to_delete.erase(it);
+        }
+    }
+
     if (has_any_embedded_objects() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::Strong, g);
         state.m_to_be_deleted.emplace_back(m_key, key);
