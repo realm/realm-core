@@ -206,6 +206,7 @@ TEST_CASE("Test server migration and rollback", "[sync][flx][flx migration][baas
         {
             auto flx_table = flx_realm->read_group().get_table("class_Object");
             auto mut_subs = flx_realm->get_latest_subscription_set().make_mutable_copy();
+            mut_subs.clear();
             mut_subs.insert_or_assign(
                 "flx_migrated_Objects_2",
                 Query(flx_table).equal(flx_table->get_column_key("realm_id"), StringData{partition2}));
@@ -216,7 +217,7 @@ TEST_CASE("Test server migration and rollback", "[sync][flx][flx migration][baas
             REQUIRE(!wait_for_download(*flx_realm));
             wait_for_advance(*flx_realm);
 
-            check_data(flx_realm, true, true);
+            check_data(flx_realm, false, true);
         }
     }
 
@@ -746,7 +747,8 @@ TEST_CASE("New table is synced after migration", "[sync][flx][flx migration][baa
         // Create a subscription for the new table.
         auto table = flx_realm->read_group().get_table("class_Object2");
         auto mut_subs = flx_realm->get_latest_subscription_set().make_mutable_copy();
-        mut_subs.insert_or_assign(Query(table));
+        mut_subs.insert_or_assign(Query(table).equal(table->get_column_key("realm_id"), StringData{partition}));
+
         auto subs = std::move(mut_subs).commit();
         subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 

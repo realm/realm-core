@@ -108,7 +108,7 @@ TEST(Transform_TwoClients)
     }
     {
         ReadTransaction read_client_2(client_2->shared_group);
-        CHECK(compare_groups(read_server, read_client_2));
+        CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
     }
 }
 
@@ -138,7 +138,7 @@ TEST(Transform_AddTableInOrder)
     }
     {
         ReadTransaction read_client_2(client_2->shared_group);
-        CHECK(compare_groups(read_server, read_client_2));
+        CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
     }
 }
 
@@ -168,7 +168,7 @@ TEST(Transform_AddTableOutOfOrder)
     }
     {
         ReadTransaction read_client_2(client_2->shared_group);
-        CHECK(compare_groups(read_server, read_client_2));
+        CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
     }
 }
 
@@ -204,7 +204,7 @@ TEST(Transform_AddColumnsInOrder)
     }
     {
         ReadTransaction read_client_2(client_2->shared_group);
-        CHECK(compare_groups(read_server, read_client_2));
+        CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
     }
 }
 
@@ -237,7 +237,7 @@ TEST(Transform_AddColumnsOutOfOrder)
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
     CHECK(compare_groups(read_server, read_client_1));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 }
 
 TEST(Transform_LinkListSet_vs_MoveLastOver)
@@ -280,7 +280,7 @@ TEST(Transform_LinkListSet_vs_MoveLastOver)
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
     CHECK(compare_groups(read_server, read_client_1));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 }
 
 TEST(Transform_LinkListInsert_vs_MoveLastOver)
@@ -373,7 +373,7 @@ TEST(Transform_Experiment)
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
     CHECK(compare_groups(read_server, read_client_1));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 
     CHECK_EQUAL(read_server.get_table("class_t")->size(), 1);
     CHECK_EQUAL(read_server.get_table("class_t")->begin()->get_linklist("ll").size(), 2);
@@ -423,7 +423,7 @@ TEST(Transform_SelectLinkList)
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
     CHECK(compare_groups(read_server, read_client_1));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 
     CHECK_EQUAL(read_server.get_table("class_t")->size(), 1);
     CHECK_EQUAL(read_server.get_table("class_t")->begin()->get_linklist("ll").size(), 2);
@@ -462,7 +462,7 @@ TEST(Transform_InsertRows)
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
     CHECK(compare_groups(read_server, read_client_1));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 }
 
 TEST(Transform_AdjustSetLinkPayload)
@@ -507,7 +507,7 @@ TEST(Transform_AdjustSetLinkPayload)
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
     CHECK(compare_groups(read_server, read_client_1));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 
     {
         ConstTableRef t = read_client_1.get_table("class_t");
@@ -555,7 +555,7 @@ TEST(Transform_AdjustLinkListSetPayload)
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
     CHECK(compare_groups(read_server, read_client_1));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 
     ConstTableRef client_1_table_link = read_client_1.get_table("class_ll");
     LnkLst ll = client_1_table_link->get_object_with_primary_key(1).get_linklist("ll");
@@ -598,7 +598,7 @@ TEST(Transform_MergeInsertSetAndErase)
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
     CHECK(compare_groups(read_server, read_client_1));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 
     {
         ConstTableRef t = read_client_1.get_table("class_t");
@@ -642,7 +642,7 @@ TEST(Transform_MergeSetLinkAndMoveLastOver)
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
     CHECK(compare_groups(read_server, read_client_1));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 
     {
         ConstTableRef t = read_client_1.get_table("class_t");
@@ -695,7 +695,7 @@ TEST(Transform_MergeSetDefault)
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
     CHECK(compare_groups(read_server, read_client_1));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 
     ConstTableRef t = read_client_1.get_table("class_t");
     CHECK_EQUAL(t->size(), 1);
@@ -760,7 +760,7 @@ TEST(Transform_MergeLinkListsWithPrimaryKeys)
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
     CHECK(compare_groups(read_server, read_client_1));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 
     ConstTableRef t = read_client_1.get_table("class_t");
     CHECK_EQUAL(t->size(), 1);
@@ -808,7 +808,7 @@ TEST(Transform_AddInteger)
         ReadTransaction read_client_2(client_2->shared_group);
         CHECK_EQUAL(read_server.get_table("class_t")->begin()->get<Int>("i"), 9);
         CHECK(compare_groups(read_server, read_client_1));
-        CHECK(compare_groups(read_server, read_client_2));
+        CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
     }
 
     client_2->history.advance_time(0);
@@ -833,7 +833,7 @@ TEST(Transform_AddInteger)
         ReadTransaction read_client_2(client_2->shared_group);
         CHECK_EQUAL(read_server.get_table("class_t")->begin()->get<Int>("i"), 103);
         CHECK(compare_groups(read_server, read_client_1));
-        CHECK(compare_groups(read_server, read_client_2));
+        CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
     }
 }
 
@@ -887,7 +887,7 @@ TEST(Transform_AddIntegerSetNull)
         ReadTransaction read_client_2(client_2->shared_group);
         CHECK(read_server.get_table("class_t")->begin()->is_null("i"));
         CHECK(compare_groups(read_server, read_client_1));
-        CHECK(compare_groups(read_server, read_client_2));
+        CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
     }
 }
 
@@ -952,7 +952,7 @@ TEST(Transform_EraseSelectedLinkView)
         ReadTransaction read_client_1(client_1->shared_group);
         ReadTransaction read_client_2(client_2->shared_group);
         CHECK(compare_groups(read_server, read_client_1));
-        CHECK(compare_groups(read_server, read_client_2));
+        CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 
         ConstTableRef origin = read_server.get_table("class_origin");
         ConstTableRef target = read_server.get_table("class_target");
@@ -1102,7 +1102,7 @@ std::tuple<double, double, double> timer_two_clients(TestContext& test_context, 
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
     CHECK(compare_groups(read_server, read_client_1));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 
     return std::make_tuple(double(duration_server), double(duration_client_1), double(duration_client_2));
 }

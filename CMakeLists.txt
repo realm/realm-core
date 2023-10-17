@@ -285,7 +285,7 @@ if(REALM_NEEDS_OPENSSL OR REALM_FORCE_OPENSSL)
     set(OPENSSL_USE_STATIC_LIBS ON)
     find_package(OpenSSL REQUIRED)
     set(REALM_HAVE_OPENSSL ON)
-    string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" OPENSSL_VERSION_MAJOR_MINOR ${OPENSSL_VERSION})
+    string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" OPENSSL_VERSION_MAJOR_MINOR "${OPENSSL_VERSION}")
 elseif(APPLE)
     set(REALM_HAVE_SECURE_TRANSPORT "1")
 endif()
@@ -331,6 +331,7 @@ include_directories(src)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src) # For generated files (like config.h)
 
 add_subdirectory(src)
+add_subdirectory(bindgen)
 
 # Install the licence and changelog files
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)

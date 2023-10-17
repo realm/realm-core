@@ -1540,8 +1540,7 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
         progress, &downloadable_bytes, received_changesets, version_info, download_batch_state, logger, transact,
         [&](const TransactionRef&, util::Span<Changeset> changesets) {
             gather_pending_compensating_writes(changesets, &pending_compensating_write_errors);
-        },
-        get_transact_reporter()); // Throws
+        }); // Throws
     if (received_changesets.size() == 1) {
         logger.debug("1 remote changeset integrated, producing client version %1",
                      version_info.sync_version.version); // Throws
@@ -1679,7 +1678,6 @@ void Session::activate()
     }
     logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
                  m_client_file_ident.salt); // Throws
-    m_upload_target_version = m_last_version_available;
     m_upload_progress = m_progress.upload;
     m_last_version_selected_for_upload = m_upload_progress.client_version;
     m_download_progress = m_progress.download;
@@ -1862,9 +1860,7 @@ void Session::send_message()
         return send_query_change_message(); // throws
     }
 
-    REALM_ASSERT_3(m_upload_progress.client_version, <=, m_upload_target_version);
-    REALM_ASSERT_3(m_upload_target_version, <=, m_last_version_available);
-    if (m_allow_upload && (m_upload_target_version > m_upload_progress.client_version)) {
+    if (m_allow_upload && (m_last_version_available > m_upload_progress.client_version)) {
         return send_upload_message(); // Throws
     }
 }
@@ -1997,20 +1993,17 @@ void Session::send_upload_message()
     REALM_ASSERT_EX(m_state == Active, m_state);
     REALM_ASSERT(m_ident_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
-    REALM_ASSERT_3(m_upload_target_version, >, m_upload_progress.client_version);
 
     if (REALM_UNLIKELY(get_client().is_dry_run()))
         return;
 
-    auto target_upload_version = m_upload_target_version;
-    if (m_is_flx_sync_session) {
-        if (!m_pending_flx_sub_set || m_pending_flx_sub_set->snapshot_version < m_upload_progress.client_version) {
-            m_pending_flx_sub_set = get_flx_subscription_store()->get_next_pending_version(
-                m_last_sent_flx_query_version, m_upload_progress.client_version);
-        }
-        if (m_pending_flx_sub_set && m_pending_flx_sub_set->snapshot_version < m_upload_target_version) {
-            target_upload_version = m_pending_flx_sub_set->snapshot_version;
-        }
+    version_type target_upload_version = get_db()->get_version_of_latest_snapshot();
+    if (m_pending_flx_sub_set) {
+        REALM_ASSERT(m_is_flx_sync_session);
+        target_upload_version = m_pending_flx_sub_set->snapshot_version;
+    }
+    if (target_upload_version > m_last_version_available) {
+        m_last_version_available = target_upload_version;
     }
 
     const ClientReplication& repl = access_realm(); // Throws
@@ -2025,7 +2018,7 @@ void Session::send_upload_message()
         check_for_upload_completion(); // Throws
         // If we need to limit upload up to some version other than the last client version available and there are no
         // changes to upload, then there is no need to send an empty message.
-        if (target_upload_version != m_upload_target_version) {
+        if (m_pending_flx_sub_set) {
             logger.debug("Empty UPLOAD was skipped (progress_client_version=%1, progress_server_version=%2)",
                          m_upload_progress.client_version, m_upload_progress.last_integrated_server_version);
             // Other messages may be waiting to be sent
@@ -2036,7 +2029,7 @@ void Session::send_upload_message()
         m_last_version_selected_for_upload = uploadable_changesets.back().progress.client_version;
     }
 
-    if (m_is_flx_sync_session && m_pending_flx_sub_set && target_upload_version != m_upload_target_version) {
+    if (m_pending_flx_sub_set && target_upload_version < m_last_version_available) {
         logger.trace("Limiting UPLOAD message up to version %1 to send QUERY version %2",
                      m_pending_flx_sub_set->snapshot_version, m_pending_flx_sub_set->query_version);
     }
@@ -2280,8 +2273,6 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
                                               std::move(on_flx_subscription_complete))) {
             return false;
         }
-        realm::VersionID client_reset_old_version = client_reset_operation->get_client_reset_old_version();
-        realm::VersionID client_reset_new_version = client_reset_operation->get_client_reset_new_version();
 
         // The fresh Realm has been used to reset the state
         logger.debug("Client reset is completed, path=%1", get_realm_path()); // Throws
@@ -2299,7 +2290,6 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
                         m_progress.upload.last_integrated_server_version);
         logger.trace("last_version_available  = %1", m_last_version_available); // Throws
 
-        m_upload_target_version = m_last_version_available;
         m_upload_progress = m_progress.upload;
         m_download_progress = m_progress.download;
         // In recovery mode, there may be new changesets to upload and nothing left to download.
@@ -2307,8 +2297,6 @@ Status Session::receive_ident_message(SaltedFileIdent client_file_ident)
         // For both, we want to allow uploads again without needing external changes to download first.
         m_allow_upload = true;
         REALM_ASSERT_EX(m_last_version_selected_for_upload == 0, m_last_version_selected_for_upload);
-
-        get_transact_reporter()->report_sync_transact(client_reset_old_version, client_reset_new_version);
 
         if (has_pending_client_reset) {
             handle_pending_client_reset_acknowledgement();

@@ -439,6 +439,14 @@ public:
     /// To be used only when already holding the lock.
     bool other_writers_waiting_for_lock() const;
 
+    struct CommitListener {
+        virtual ~CommitListener() = default;
+        virtual void on_commit(version_type new_version) = 0;
+    };
+
+    void add_commit_listener(CommitListener*);
+    void remove_commit_listener(CommitListener*);
+
 protected:
     explicit DB(const DBOptions& options);
 
@@ -504,6 +512,8 @@ private:
     std::function<void(int, int)> m_upgrade_callback;
     std::unique_ptr<AsyncCommitHelper> m_commit_helper;
     std::shared_ptr<util::Logger> m_logger;
+    std::mutex m_commit_listener_mutex;
+    std::vector<CommitListener*> m_commit_listeners;
     bool m_is_sync_agent = false;
     // Id for this DB to be used in logging. We will just use some bits from the pointer.
     // The path cannot be used as this would not allow us to distinguish between two DBs opening
