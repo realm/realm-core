@@ -969,7 +969,7 @@ tasks:
 
 - name: baas-network-tests
   tags: [ "for_nightly_tests" ]
-  allowed_requesters: [ "ad_hoc", "patch" ]
+  allowed_requesters: [ "ad_hoc", "patch", "github_pr" ]
   # The network tests can take a really long time, so we give the test up to 4
   # hours to complete
   exec_timeout_secs: 14400
