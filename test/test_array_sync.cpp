@@ -107,11 +107,11 @@ TEST(Array_Example)
     ReadTransaction read_server(server->shared_group);
     {
         ReadTransaction read_client_1(client_1->shared_group);
-        CHECK(compare_groups(read_server, read_client_1));
+        CHECK(compare_groups(read_server, read_client_1, *test_context.logger));
     }
     {
         ReadTransaction read_client_2(client_2->shared_group);
-        CHECK(compare_groups(read_server, read_client_2));
+        CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
     }
 
     std::vector<int64_t> values1, values2;

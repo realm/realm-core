@@ -1259,6 +1259,38 @@ struct BenchmarkQueryChainedOrStrings : BenchmarkWithStringsTableForIn {
     }
 };
 
+struct BenchmarkQueryChainedOrStringsPredicate : BenchmarkWithStringsTableForIn {
+    std::set<std::string> uniq;
+
+    void before_all(DBRef group)
+    {
+        create_table(group, false);
+        uniq = std::set<std::string>(values_to_query.begin(), values_to_query.end());
+    }
+};
+
+struct BenchmarkQueryChainedOrStringsViewFilterPredicate : BenchmarkQueryChainedOrStringsPredicate {
+    const char* name() const
+    {
+        return "QueryChainedOrStringsViewFilterPredicate";
+    }
+
+    void operator()(DBRef)
+    {
+        ConstTableRef table = m_table;
+
+        auto predicate = [this](const Obj& obj) {
+            return uniq.find(obj.get<String>(m_col)) != uniq.end();
+        };
+
+        TableView results = table->where().find_all();
+        results.filter(FilterDescriptor(predicate));
+        REALM_ASSERT_EX(results.size() == num_queried_matches, results.size(), num_queried_matches,
+                        values_to_query.size());
+        static_cast<void>(results);
+    }
+};
+
 struct BenchmarkSort : BenchmarkWithStrings {
     const char* name() const
     {
@@ -2340,6 +2372,7 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQueryInsensitiveStringIndexed);
     BENCH(BenchmarkQueryChainedOrStrings<false>);
     BENCH(BenchmarkQueryChainedOrStrings<true>);
+    BENCH(BenchmarkQueryChainedOrStringsViewFilterPredicate);
     BENCH(BenchmarkQueryNotChainedOrStrings<false>);
     BENCH(BenchmarkQueryNotChainedOrStrings<true>);
     BENCH(BenchmarkQueryChainedOrInts);
