@@ -625,7 +625,7 @@ functions:
         # Configure the toxics for the baas proxy
         evergreen/configure_baas_proxy.sh $PROXY_RANDOMS "${proxy_toxics_file}"
         # Display the list of configured toxics
-        curl http://localhost:8474/proxies/baas_proxy/toxics
+        curl --silent http://localhost:8474/proxies/baas_proxy/toxics
 
   "check branch state":
   - command: shell.exec
