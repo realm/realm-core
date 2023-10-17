@@ -160,6 +160,14 @@ if(REALM_TEST_LOGGING)
     endif()
 endif()
 
+# Optional extra time to add to test timeout values
+if(REALM_TEST_TIMEOUT_EXTRA)
+    target_compile_definitions(ObjectStoreTests PRIVATE
+        TEST_TIMEOUT_EXTRA=${REALM_TEST_TIMEOUT_EXTRA}
+    )
+    message(STATUS "Test wait timeouts extended by ${REALM_TEST_TIMEOUT_EXTRA} seconds")
+endif()
+
 target_include_directories(ObjectStoreTests PRIVATE
     ${CATCH_INCLUDE_DIR}
     ${JSON_INCLUDE_DIR}

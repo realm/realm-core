@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <util/sync/sync_test_utils.hpp>
+#include "util/sync/sync_test_utils.hpp"
 
-#include <util/sync/baas_admin_api.hpp>
+#include "util/sync/baas_admin_api.hpp"
 
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_store.hpp>
@@ -76,9 +76,11 @@ bool results_contains_original_name(SyncFileActionMetadataResults& results, cons
 bool ReturnsTrueWithinTimeLimit::match(util::FunctionRef<bool()> condition) const
 {
     const auto wait_start = std::chrono::steady_clock::now();
+    const auto delay = TEST_TIMEOUT_EXTRA > 0 ? m_max_ms + std::chrono::seconds(TEST_TIMEOUT_EXTRA) : m_max_ms;
     bool predicate_returned_true = false;
     util::EventLoop::main().run_until([&] {
-        if (std::chrono::steady_clock::now() - wait_start > m_max_ms) {
+        if (std::chrono::steady_clock::now() - wait_start > delay) {
+            util::format("ReturnsTrueWithinTimeLimit exceeded %1 ms", delay.count());
             return true;
         }
         auto ret = condition();
@@ -94,9 +96,10 @@ bool ReturnsTrueWithinTimeLimit::match(util::FunctionRef<bool()> condition) cons
 void timed_wait_for(util::FunctionRef<bool()> condition, std::chrono::milliseconds max_ms)
 {
     const auto wait_start = std::chrono::steady_clock::now();
+    const auto delay = TEST_TIMEOUT_EXTRA > 0 ? max_ms + std::chrono::seconds(TEST_TIMEOUT_EXTRA) : max_ms;
     util::EventLoop::main().run_until([&] {
-        if (std::chrono::steady_clock::now() - wait_start > max_ms) {
-            throw std::runtime_error(util::format("timed_wait_for exceeded %1 ms", max_ms.count()));
+        if (std::chrono::steady_clock::now() - wait_start > delay) {
+            throw std::runtime_error(util::format("timed_wait_for exceeded %1 ms", delay.count()));
         }
         return condition();
     });
@@ -106,9 +109,10 @@ void timed_sleeping_wait_for(util::FunctionRef<bool()> condition, std::chrono::m
                              std::chrono::milliseconds sleep_ms)
 {
     const auto wait_start = std::chrono::steady_clock::now();
+    const auto delay = TEST_TIMEOUT_EXTRA > 0 ? max_ms + std::chrono::seconds(TEST_TIMEOUT_EXTRA) : max_ms;
     while (!condition()) {
-        if (std::chrono::steady_clock::now() - wait_start > max_ms) {
-            throw std::runtime_error(util::format("timed_sleeping_wait_for exceeded %1 ms", max_ms.count()));
+        if (std::chrono::steady_clock::now() - wait_start > delay) {
+            throw std::runtime_error(util::format("timed_sleeping_wait_for exceeded %1 ms", delay.count()));
         }
         std::this_thread::sleep_for(sleep_ms);
     }
@@ -239,15 +243,44 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app)
 {
     REQUIRE(app);
     AutoVerifiedEmailCredentials creds;
-    app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
-        creds.email, creds.password, [&](util::Optional<app::AppError> error) {
-            REQUIRE(!error);
-        });
-    app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
-                                 [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
-                                     REQUIRE(user);
-                                     REQUIRE(!error);
-                                 });
+    int retry_count = 0;
+    Status result = Status::OK();
+    while (retry_count < 10) {
+        auto register_pf = util::make_promise_future<void>();
+        app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+            creds.email, creds.password, [&](util::Optional<app::AppError> error) {
+                if (error) {
+                    register_pf.promise.set_error(error->to_status());
+                    return;
+                }
+                register_pf.promise.emplace_value();
+            });
+        result = register_pf.future.get_no_throw();
+        if (result.is_ok()) {
+            break;
+        }
+        retry_count++;
+    }
+    REQUIRE(result.is_ok());
+    retry_count = 0;
+    while (retry_count < 10) {
+        auto register_pf = util::make_promise_future<void>();
+        app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
+                                     [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
+                                         REQUIRE(user);
+                                         if (error) {
+                                             register_pf.promise.set_error(error->to_status());
+                                             return;
+                                         }
+                                         register_pf.promise.emplace_value();
+                                     });
+        result = register_pf.future.get_no_throw();
+        if (result.is_ok()) {
+            break;
+        }
+        retry_count++;
+    }
+    REQUIRE(result.is_ok());
     return creds;
 }
 

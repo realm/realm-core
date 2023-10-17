@@ -138,6 +138,10 @@ functions:
           set_cmake_var realm_vars REALM_TEST_LOGGING BOOL On
           set_cmake_var realm_vars REALM_TEST_LOGGING_LEVEL STRING "${test_logging_level|debug}"
 
+          if [[ -n "${test_timeout_extra|}" ]]; then
+              set_cmake_var realm_vars REALM_TEST_TIMEOUT_EXTRA ${test_timeout_extra}
+          fi
+
           GENERATOR="${cmake_generator}"
           if [ -z "${cmake_generator|}" ]; then
               GENERATOR="Ninja Multi-Config"
@@ -594,6 +598,35 @@ functions:
 
         echo "Baas is started!"
 
+  "setup proxy parameters":
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o pipefail
+        set -o verbose
+
+        if [[ -n "${disable_tests_against_baas|}" ]]; then
+          echo "Error: Bass is disabled for network tests"
+          exit 1
+        fi
+
+        if [[ -z "${proxy_toxics_file|}" ]]; then
+          echo "Error: Baas proxy toxics config file was not provided"
+          exit 1
+        fi
+
+        if [[ -n "${proxy_toxics_randoms|}" ]]; then
+          PROXY_RANDOMS="-r ${proxy_toxics_randoms}"
+        fi
+
+        # Configure the toxics for the baas proxy
+        evergreen/configure_baas_proxy.sh $PROXY_RANDOMS "${proxy_toxics_file}"
+        # Display the list of configured toxics
+        curl http://localhost:8474/proxies/baas_proxy/toxics
+
   "check branch state":
   - command: shell.exec
     type: setup
@@ -843,11 +876,11 @@ tasks:
 - name: long-running-core-tests
   tags: [ "for_nightly_tests" ]
   allowed_requesters: [ "ad_hoc", "patch" ]
+  # The long-running tests can take a really long time on Windows, so we give the test up to 4
+  # hours to complete
+  exec_timeout_secs: 14400
   commands:
   - func: "run tests"
-    # The long-running tests can take a really long time on Windows, so we give the test up to 4
-    # hours to complete
-    timeout_secs: 14400
     vars:
       test_filter: CoreTests
       report_test_progress: On
@@ -922,7 +955,7 @@ tasks:
   commands:
   - func: "launch remote baas"
     vars:
-      baas_branch: master
+      baas_branch: 3f31617aacfe5d31b9057fc298b735b60acd6424
   - func: "compile"
     vars:
       target_to_build: ObjectStoreTests
@@ -936,16 +969,20 @@ tasks:
 
 - name: baas-network-tests
   tags: [ "for_nightly_tests" ]
+  allowed_requesters: [ "ad_hoc", "patch" ]
+  # The network tests can take a really long time, so we give the test up to 4
+  # hours to complete
   exec_timeout_secs: 14400
   commands:
   - func: "launch remote baas"
     vars:
-      baas_branch: master
+      baas_branch: 3f31617aacfe5d31b9057fc298b735b60acd6424
       baas_proxy: On
   - func: "compile"
     vars:
       target_to_build: ObjectStoreTests
   - func: "wait for baas to start"
+  - func: "setup proxy parameters"
   - func: "run tests"
     vars:
       test_label: objstore-baas
@@ -1398,8 +1435,8 @@ buildvariants:
   tasks:
   - name: fuzzer-tests
 
-- name: ubuntu2004-network
-  display_name: "Ubuntu 20.04 x86_64 (Clang 11 Baas network tests)"
+- name: ubuntu2004-network-nonideal
+  display_name: "Ubuntu 20.04 x86_64 (Utunbu2004 Baas network tests - nonideal transfer)"
   run_on: ubuntu2004-large
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
@@ -1412,9 +1449,30 @@ buildvariants:
     run_with_encryption: On
     baas_admin_port: 9098
     test_logging_level: trace
+    test_timeout_extra: 60
+    proxy_toxics_file: evergreen/proxy-nonideal-transfer.toxics
+    proxy_toxics_randoms: "10:50|10:50"
   tasks:
   - name: network_tests
-    activate: true
+
+- name: ubuntu2004-network-faulty
+  display_name: "Ubuntu 20.04 x86_64 (Utunbu2004 Baas network tests - network faults)"
+  run_on: ubuntu2004-large
+  expansions:
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+    cmake_build_type: RelWithDebInfo
+    run_with_encryption: On
+    baas_admin_port: 9098
+    test_logging_level: trace
+    proxy_toxics_file: evergreen/proxy-network-faults.toxics
+    proxy_toxics_randoms: "1000:3000|1000:3000|1000:1500|50:200"
+  tasks:
+  - name: network_tests
 
 - name: rhel70
   display_name: "RHEL 7 x86_64"

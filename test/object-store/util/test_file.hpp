@@ -38,6 +38,9 @@
 
 #endif // REALM_ENABLE_SYNC
 
+#ifndef TEST_TIMEOUT_EXTRA
+#define TEST_TIMEOUT_EXTRA 0
+#endif
 
 namespace realm {
 struct AppSession;
