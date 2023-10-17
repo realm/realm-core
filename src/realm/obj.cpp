@@ -161,6 +161,7 @@ StableIndex Obj::build_index(ColKey col_key) const
         return {col_key, 0};
     }
     REALM_ASSERT(col_key.get_type() == col_type_Mixed);
+    _update_if_needed();
     ArrayMixed values(_get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
     values.init_from_ref(ref);
@@ -173,6 +174,7 @@ bool Obj::check_index(StableIndex index) const
     if (index.is_collection()) {
         return true;
     }
+    _update_if_needed();
     ArrayMixed values(_get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), index.get_index().val + 1));
     values.init_from_ref(ref);
@@ -1957,18 +1959,43 @@ Obj& Obj::set_collection(ColKey col_key, CollectionType type)
     update_if_needed();
     Mixed new_val(0, type);
 
-    ArrayMixed values(_get_alloc());
+    ArrayMixed arr(_get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
-    values.init_from_ref(ref);
-    auto old_val = values.get(m_row_ndx);
+    arr.init_from_ref(ref);
+    auto old_val = arr.get(m_row_ndx);
 
     if (old_val != new_val) {
-        set(col_key, Mixed(0, type));
-        // Update ref after write
-        ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
-        values.init_from_ref(ref);
+        CascadeState state;
+        if (old_val.is_type(type_TypedLink)) {
+            remove_backlink(col_key, old_val.get<ObjLink>(), state);
+        }
+        else if (old_val.is_type(type_Dictionary)) {
+            Dictionary dict(*this, col_key);
+            dict.remove_backlinks(state);
+        }
+        else if (old_val.is_type(type_List)) {
+            Lst<Mixed> list(*this, col_key);
+            list.remove_backlinks(state);
+        }
+
+        Allocator& alloc = _get_alloc();
+        alloc.bump_content_version();
+
+        Array fallback(alloc);
+        Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
+        ArrayMixed values(alloc);
+        values.set_parent(&fields, col_key.get_index().val + 1);
+        values.init_from_parent();
+
+        values.set(m_row_ndx, new_val);
         values.set_key(m_row_ndx, generate_key(0x10));
+
+        sync(fields);
+
+        if (Replication* repl = get_replication())
+            repl->set(m_table.unchecked_ptr(), col_key, m_key, new_val); // Throws
     }
+
     return *this;
 }
 
