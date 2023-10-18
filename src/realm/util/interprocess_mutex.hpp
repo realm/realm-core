@@ -82,6 +82,9 @@ public:
     InterprocessMutex(const InterprocessMutex&) = delete;
     InterprocessMutex& operator=(const InterprocessMutex&) = delete;
 
+    InterprocessMutex(InterprocessMutex&&) = default;
+    InterprocessMutex& operator=(InterprocessMutex&&) = default;
+
 #if REALM_ROBUST_MUTEX_EMULATION || defined(_WIN32)
     struct SharedPart {
     };

@@ -230,11 +230,12 @@ TestPathGuard& TestPathGuard::operator=(TestPathGuard&& other) noexcept
 }
 
 
-TestDirGuard::TestDirGuard(const std::string& path)
+TestDirGuard::TestDirGuard(const std::string& path, bool init_clean)
     : m_path(path)
 {
     if (!try_make_dir(path)) {
-        clean_dir(path);
+        if (init_clean)
+            clean_dir(path);
     }
 }
 
@@ -242,6 +243,10 @@ TestDirGuard::~TestDirGuard() noexcept
 {
     if (g_keep_files)
         return;
+
+    if (!do_remove)
+        return;
+
     try {
         clean_dir(m_path);
         remove_dir(m_path);
@@ -266,7 +271,7 @@ void do_clean_dir(const std::string& path, const std::string& guard_string)
             // Try to avoid accidental removal of precious files due to bugs in
             // TestDirGuard or TEST_DIR macro.
             if (subpath.find(guard_string) == std::string::npos)
-                throw std::runtime_error("Bad test dir path");
+                throw std::runtime_error("Bad test dir path: " + path + ", guard: " + guard_string);
             File::remove(subpath);
         }
     }
