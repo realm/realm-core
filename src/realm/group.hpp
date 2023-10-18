@@ -809,6 +809,7 @@ private:
                                    std::optional<size_t> read_lock_file_size = util::none,
                                    std::optional<uint_fast64_t> read_lock_version = util::none);
 
+    Table* get_table_unchecked(TableKey);
     size_t find_table_index(StringData name) const noexcept;
     TableKey ndx2key(size_t ndx) const;
     size_t key2ndx(TableKey key) const;
@@ -946,11 +947,16 @@ inline TableKey Group::find_table(StringData name) const noexcept
     return (ndx != npos) ? ndx2key(ndx) : TableKey{};
 }
 
+inline Table* Group::get_table_unchecked(TableKey key)
+{
+    auto ndx = key2ndx_checked(key);
+    return do_get_table(ndx); // Throws
+}
+
 inline TableRef Group::get_table(TableKey key)
 {
     check_attached();
-    auto ndx = key2ndx_checked(key);
-    Table* table = do_get_table(ndx); // Throws
+    Table* table = get_table_unchecked(key);
     return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
