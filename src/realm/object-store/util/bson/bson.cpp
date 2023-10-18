@@ -601,7 +601,7 @@ Bson dom_elem_to_bson(const Json& json)
         case Json::value_t::boolean:
             return Bson(json.get<bool>());
         case Json::value_t::binary: {
-            std::vector<Bson> out;
+            std::vector<char> out;
             for (auto&& elem : json.get_binary()) {
                 out.push_back(elem);
             }
