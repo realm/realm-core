@@ -23,10 +23,10 @@
 #include <cstdlib>
 #include <cstring>
 
-#ifndef REALM_HAVE_BACKTRACE
+#if !defined(REALM_HAVE_BACKTRACE) && (REALM_PLATFORM_APPLE || (defined(__linux__) && defined(__GNUC__)))
 // we detect the backtrace facility in CMake, but if building outside it we assume
 // it's available on Apple or Linux/glibc
-#define REALM_HAVE_BACKTRACE REALM_PLATFORM_APPLE || (REALM_LINUX && defined(__GNUC__))
+#define REALM_HAVE_BACKTRACE 1
 #endif
 
 #if REALM_HAVE_BACKTRACE
