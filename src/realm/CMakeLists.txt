@@ -358,6 +358,10 @@ endif()
 
 target_link_libraries(Storage INTERFACE Threads::Threads)
 
+if(TARGET Backtrace::Backtrace)
+    target_link_libraries(Storage PUBLIC Backtrace::Backtrace)
+endif()
+
 if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE AND REALM_HAVE_OPENSSL)
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
 endif()
