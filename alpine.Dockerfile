@@ -1,11 +1,2 @@
-FROM alpine:3.11
-
-RUN apk add --no-cache --update \
-    build-base \
-    cmake \
-    curl-dev \
-    git \
-    libuv-dev \
-    ninja \
-    openssl-dev \
-    zlib-dev
+# https://github.com/realm/ci/tree/master/realm/docker/build-alpine
+FROM ghcr.io/realm/ci/build-env-alpine:master
