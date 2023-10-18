@@ -255,13 +255,6 @@ if(UNIX)
     cmake_pop_check_state()
 endif()
 
-# Threads library is pthread-compatible
-# Check for these explicitly because older versions of musl define only one or the other
-if(CMAKE_USE_PTHREADS_INIT)
-    check_symbol_exists(pthread_getname_np "pthread.h" REALM_HAVE_PTHREAD_GETNAME)
-    check_symbol_exists(pthread_setname_np "pthread.h" REALM_HAVE_PTHREAD_SETNAME)
-endif()
-
 # Options (passed to CMake)
 option(REALM_ENABLE_SYNC "Enable synchronized realms." ON)
 option(REALM_BUILD_TEST_CLIENT "Build the test client" OFF)
@@ -277,9 +270,6 @@ set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 option(REALM_ENABLE_GEOSPATIAL "Enable geospatial types and queries." ON)
 
 # Find dependencies
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
-
 if(REALM_ENABLE_SYNC)
     option(REALM_FORCE_OPENSSL "Always use OpenSSL for SSL needs, regardless of target platform." OFF)
     if(CMAKE_SYSTEM_NAME MATCHES "^Windows|Linux|Android")
@@ -300,7 +290,7 @@ if(REALM_NEEDS_OPENSSL OR REALM_FORCE_OPENSSL)
         include(${OPENSSL_CMAKE_INCLUDE_FILE})
     endif()
 
-    set(OPENSSL_USE_STATIC_LIBS ON)
+    set(OPENSSL_USE_STATIC_LIBS OFF)
     find_package(OpenSSL REQUIRED)
     set(REALM_HAVE_OPENSSL ON)
     string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" OPENSSL_VERSION_MAJOR_MINOR ${OPENSSL_VERSION})
