@@ -283,7 +283,7 @@ void S2EdgeIndex::GetEdgesInChildrenCells(
       }
     }
   }
-    s2_logger()->trace(realm::util::LogCategory::query, "Num cells traversed: %1", num_cells);
+    s2_logger()->trace("Num cells traversed: %1", num_cells);
 }
 
 // Appends to "candidate_crossings" all edge references which may cross the

@@ -134,26 +134,8 @@ bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& 
     return true;
 }
 
-class SyncClientLogger : public Logger {
-public:
-    SyncClientLogger(const std::shared_ptr<Logger>& base_logger) noexcept
-        : Logger(LogCategory::client, *base_logger)
-        , m_base_logger_ptr(base_logger)
-    {
-    }
-
-protected:
-    void do_log(const LogCategory& category, Level level, const std::string& message) final
-    {
-        Logger::do_log(*m_base_logger_ptr, category, level, message);
-    }
-
-private:
-    std::shared_ptr<Logger> m_base_logger_ptr;
-};
-
 ClientImpl::ClientImpl(ClientConfig config)
-    : logger_ptr{std::make_shared<SyncClientLogger>(std::move(config.logger))}
+    : logger_ptr{std::make_shared<util::CategoryLogger>(util::LogCategory::session, std::move(config.logger))}
     , logger{*logger_ptr}
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}

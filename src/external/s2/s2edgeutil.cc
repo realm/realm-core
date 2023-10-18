@@ -57,7 +57,7 @@ bool S2EdgeUtil::VertexCrossing(S2Point const& a, S2Point const& b,
   // edge cases where this function will be called with 4 distinct
   // (but with two extremely close) vertices
   //
-  s2_logger()->warn(realm::util::LogCategory::query, "VertexCrossing called with 4 distinct vertices");
+  s2_logger()->warn("VertexCrossing called with 4 distinct vertices");
   return false;
 }
 

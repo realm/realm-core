@@ -137,7 +137,7 @@ bool HTTPParserBase::parse_header_line(size_t len)
     auto colon = std::find(p, end, ':');
 
     if (colon == end) {
-        logger.error(util::LogCategory::network, "Bad header line in HTTP message:\n%1", line);
+        network_logger.error("Bad header line in HTTP message:\n%1", line);
         return false;
     }
 
@@ -153,7 +153,7 @@ bool HTTPParserBase::parse_header_line(size_t len)
     value = trim_whitespace(value);
 
     if (key.size() == 0) {
-        logger.error(util::LogCategory::network, "Bad header line in HTTP message:\n%1", line);
+        network_logger.error("Bad header line in HTTP message:\n%1", line);
         return false;
     }
 
@@ -161,7 +161,7 @@ bool HTTPParserBase::parse_header_line(size_t len)
         if (value.size() == 0) {
             // We consider the empty Content-Length to mean 0.
             // A warning is logged.
-            logger.warn(util::LogCategory::network, "Empty Content-Length header in HTTP message:\n%1", line);
+            network_logger.warn("Empty Content-Length header in HTTP message:\n%1", line);
             m_found_content_length = 0;
         }
         else {
@@ -172,7 +172,7 @@ bool HTTPParserBase::parse_header_line(size_t len)
                 m_found_content_length = content_length;
             }
             else {
-                logger.error(util::LogCategory::network, "Bad Content-Length header in HTTP message:\n%1", line);
+                network_logger.error("Bad Content-Length header in HTTP message:\n%1", line);
                 return false;
             }
         }
@@ -240,12 +240,12 @@ bool HTTPParserBase::parse_first_line_of_response(StringData line, HTTPStatus& o
     auto end = line.data() + line.size();
     auto sp = std::find(p, end, ' ');
     if (sp == end) {
-        logger.error(util::LogCategory::network, "Invalid HTTP response:\n%1", line);
+        logger.error("Invalid HTTP response:\n%1", line);
         return false;
     }
     StringData http_version(p, sp - p);
     if (http_version != "HTTP/1.1") {
-        logger.error(util::LogCategory::network, "Invalid version in HTTP response:\n%1", line);
+        logger.error("Invalid version in HTTP response:\n%1", line);
         return false;
     }
     auto status_code_begin = sp + 1;
@@ -267,7 +267,7 @@ bool HTTPParserBase::parse_first_line_of_response(StringData line, HTTPStatus& o
         out_status = static_cast<HTTPStatus>(code);
     }
     else {
-        logger.error(util::LogCategory::network, "Invalid status code in HTTP response:\n%1", line);
+        logger.error("Invalid status code in HTTP response:\n%1", line);
         return false;
     }
     return true;
