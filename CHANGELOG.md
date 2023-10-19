@@ -17,6 +17,7 @@
 -----------
 
 ### Internals
+* Update JSON library from 3.7.3 to 3.11.2.
 * Add baas-network-tests nightly task for testing sync client operation with non-ideal network conditions. ([PR #6852](https://github.com/realm/realm-core/pull/6852))
 * Added non-ideal network conditions and network fault tests to the evergreen nightly test runs. ([PR #7063](https://github.com/realm/realm-core/pull/7063))
 
