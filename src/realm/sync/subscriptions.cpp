@@ -885,7 +885,7 @@ MutableSubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version
     auto sub_sets = tr->get_table(m_sub_set_table);
     auto obj = sub_sets->get_object_with_primary_key(Mixed{version_id});
     if (!obj) {
-        throw KeyNotFound("Subscription set not found");
+        throw KeyNotFound(util::format("Subscription set with version %1 not found", version_id));
     }
     return MutableSubscriptionSet(weak_from_this(), std::move(tr), obj);
 }
@@ -909,7 +909,7 @@ SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
         if (version_id < m_min_outstanding_version) {
             return SubscriptionSet(weak_from_this(), version_id, SubscriptionSet::SupersededTag{});
         }
-        throw KeyNotFound("Subscription set not found");
+        throw KeyNotFound(util::format("Subscription set with version %1 not found", version_id));
     }
 }
 
