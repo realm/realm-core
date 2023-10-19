@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include <util/event_loop.hpp>
-#include <util/test_file.hpp>
-#include <util/test_utils.hpp>
+#include "util/event_loop.hpp"
+#include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
@@ -92,6 +92,8 @@ util::Future<T> wait_for_future(util::Future<T>&& input, std::chrono::millisecon
 {
     auto pf = util::make_promise_future<T>();
     auto shared_state = util::make_bind<TimedFutureState<T>>(std::move(pf.promise));
+    const auto delay = TEST_TIMEOUT_EXTRA > 0 ? max_ms + std::chrono::seconds(TEST_TIMEOUT_EXTRA) : max_ms;
+
     std::move(input).get_async([shared_state](StatusOrStatusWith<T> value) {
         std::unique_lock lk(shared_state->mutex);
         // If the state has already expired, then just return without doing anything.
@@ -105,12 +107,12 @@ util::Future<T> wait_for_future(util::Future<T>&& input, std::chrono::millisecon
     });
 
     std::unique_lock lk(shared_state->mutex);
-    if (!shared_state->cv.wait_for(lk, max_ms, [&] {
+    if (!shared_state->cv.wait_for(lk, delay, [&] {
             return shared_state->finished;
         })) {
         shared_state->finished = true;
         shared_state->promise.set_error(
-            {ErrorCodes::RuntimeError, util::format("timed_future wait exceeded %1 ms", max_ms.count())});
+            {ErrorCodes::RuntimeError, util::format("wait_for_future exceeded %1 ms", delay.count())});
     }
 
     return std::move(pf.future);
