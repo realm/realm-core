@@ -24,7 +24,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
-#include <vector>
+#include <set>
 #include <chrono>
 
 #include <realm/alloc_slab.hpp>
@@ -602,7 +602,7 @@ private:
 
     util::UniqueFunction<void(const CascadeNotification&)> m_notify_handler;
     util::UniqueFunction<void()> m_schema_change_handler;
-    std::map<TableKey, std::vector<ObjKey>> m_objects_to_delete;
+    std::set<TableKey> m_tables_to_clear;
 
     Group(SlabAlloc* alloc) noexcept;
     void init_array_parents() noexcept;

@@ -3056,7 +3056,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
         }
     }
     if (is_asymmetric() && repl && repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
-        get_parent_group()->m_objects_to_delete[this->m_key].emplace_back(ret.get_key());
+        get_parent_group()->m_tables_to_clear.insert(this->m_key);
     }
     return ret;
 }
@@ -3388,15 +3388,6 @@ void Table::dump_objects()
 void Table::remove_object(ObjKey key)
 {
     Group* g = get_parent_group();
-
-    if (is_asymmetric()) {
-        REALM_ASSERT(g);
-        auto& obj_keys = g->m_objects_to_delete[m_key];
-        auto it = std::find(obj_keys.begin(), obj_keys.end(), key);
-        if (it != obj_keys.end()) {
-            obj_keys.erase(it);
-        }
-    }
 
     if (has_any_embedded_objects() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::Strong, g);
