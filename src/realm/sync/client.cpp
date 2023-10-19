@@ -173,6 +173,10 @@ private:
 
     std::shared_ptr<MigrationStore> m_migration_store;
 
+    // (**
+    // The following parameters are protected by m_mutex
+    std::mutex m_mutex;
+
     bool m_initiated = false;
 
     // Set to true when this session wrapper is actualized (or when it is
@@ -225,6 +229,8 @@ private:
     //
     // Must only be accessed from the event loop thread.
     SessionImpl* m_sess = nullptr;
+
+    // **)
 
     // These must only be accessed from the event loop thread.
     std::vector<WaitOperCompletionHandler> m_upload_completion_handlers;
@@ -1241,6 +1247,7 @@ MigrationStore* SessionWrapper::get_migration_store()
 
 inline void SessionWrapper::set_progress_handler(util::UniqueFunction<ProgressHandler> handler)
 {
+    std::lock_guard lock(m_mutex);
     REALM_ASSERT(!m_initiated);
     m_progress_handler = std::move(handler);
 }
@@ -1249,6 +1256,7 @@ inline void SessionWrapper::set_progress_handler(util::UniqueFunction<ProgressHa
 inline void
 SessionWrapper::set_connection_state_change_listener(util::UniqueFunction<ConnectionStateChangeListener> listener)
 {
+    std::lock_guard lock(m_mutex);
     REALM_ASSERT(!m_initiated);
     m_connection_state_change_listener = std::move(listener);
 }
@@ -1256,6 +1264,7 @@ SessionWrapper::set_connection_state_change_listener(util::UniqueFunction<Connec
 
 void SessionWrapper::initiate()
 {
+    std::lock_guard lock(m_mutex);
     REALM_ASSERT(!m_initiated);
     ServerEndpoint server_endpoint{m_protocol_envelope, m_server_address, m_server_port, m_user_id, m_sync_mode};
     m_client.register_unactualized_session_wrapper(this, std::move(server_endpoint)); // Throws
@@ -1267,10 +1276,13 @@ void SessionWrapper::initiate()
 void SessionWrapper::on_commit(version_type new_version)
 {
     // Thread safety required
-    REALM_ASSERT(m_initiated);
+    {
+        std::lock_guard lock(m_mutex);
+        REALM_ASSERT(m_initiated);
 
-    if (REALM_UNLIKELY(m_finalized || m_force_closed)) {
-        return;
+        if (REALM_UNLIKELY(m_finalized || m_force_closed)) {
+            return;
+        }
     }
 
     util::bind_ptr<SessionWrapper> self{this};
@@ -1294,10 +1306,13 @@ void SessionWrapper::on_commit(version_type new_version)
 void SessionWrapper::cancel_reconnect_delay()
 {
     // Thread safety required
-    REALM_ASSERT(m_initiated);
+    {
+        std::lock_guard lock(m_mutex);
+        REALM_ASSERT(m_initiated);
 
-    if (REALM_UNLIKELY(m_finalized || m_force_closed)) {
-        return;
+        if (REALM_UNLIKELY(m_finalized || m_force_closed)) {
+            return;
+        }
     }
 
     util::bind_ptr<SessionWrapper> self{this};
@@ -1321,8 +1336,12 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
                                     WaitOperCompletionHandler handler)
 {
     REALM_ASSERT(upload_completion || download_completion);
-    REALM_ASSERT(m_initiated);
-    REALM_ASSERT(!m_finalized);
+
+    {
+        std::lock_guard lock(m_mutex);
+        REALM_ASSERT(m_initiated);
+        REALM_ASSERT(!m_finalized);
+    }
 
     util::bind_ptr<SessionWrapper> self{this};
     m_client.post([self = std::move(self), handler = std::move(handler), upload_completion,
@@ -1364,8 +1383,11 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
 bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
 {
     // Thread safety required
-    REALM_ASSERT(m_initiated);
-    REALM_ASSERT(!m_finalized);
+    {
+        std::lock_guard lock(m_mutex);
+        REALM_ASSERT(m_initiated);
+        REALM_ASSERT(!m_finalized);
+    }
 
     std::int_fast64_t target_mark;
     {
@@ -1408,8 +1430,11 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
 bool SessionWrapper::wait_for_download_complete_or_client_stopped()
 {
     // Thread safety required
-    REALM_ASSERT(m_initiated);
-    REALM_ASSERT(!m_finalized);
+    {
+        std::lock_guard lock(m_mutex);
+        REALM_ASSERT(m_initiated);
+        REALM_ASSERT(!m_finalized);
+    }
 
     std::int_fast64_t target_mark;
     {
@@ -1452,8 +1477,11 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
 void SessionWrapper::refresh(std::string signed_access_token)
 {
     // Thread safety required
-    REALM_ASSERT(m_initiated);
-    REALM_ASSERT(!m_finalized);
+    {
+        std::lock_guard lock(m_mutex);
+        REALM_ASSERT(m_initiated);
+        REALM_ASSERT(!m_finalized);
+    }
 
     m_client.post([self = util::bind_ptr(this), token = std::move(signed_access_token)](Status status) {
         if (status == ErrorCodes::OperationAborted)
@@ -1477,7 +1505,12 @@ void SessionWrapper::refresh(std::string signed_access_token)
 
 inline void SessionWrapper::abandon(util::bind_ptr<SessionWrapper> wrapper) noexcept
 {
-    if (wrapper->m_initiated) {
+    auto is_initiated = [&]() {
+        std::lock_guard lock(wrapper->m_mutex);
+        return wrapper->m_initiated;
+    };
+
+    if (is_initiated()) {
         ClientImpl& client = wrapper->m_client;
         client.register_abandoned_session_wrapper(std::move(wrapper));
     }
@@ -1487,11 +1520,14 @@ inline void SessionWrapper::abandon(util::bind_ptr<SessionWrapper> wrapper) noex
 // Must be called from event loop thread
 void SessionWrapper::actualize(ServerEndpoint endpoint)
 {
-    REALM_ASSERT(!m_actualized);
-    REALM_ASSERT(!m_sess);
-    // Cannot be actualized if it's already been finalized or force closed
-    REALM_ASSERT(!m_finalized);
-    REALM_ASSERT(!m_force_closed);
+    {
+        std::lock_guard lock(m_mutex);
+        REALM_ASSERT(!m_actualized);
+        REALM_ASSERT(!m_sess);
+        // Cannot be actualized if it's already been finalized or force closed
+        REALM_ASSERT(!m_finalized);
+        REALM_ASSERT(!m_force_closed);
+    }
     try {
         m_db->claim_sync_agent();
     }
@@ -1526,7 +1562,10 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         throw;
     }
 
-    m_actualized = true;
+    {
+        std::lock_guard lock(m_mutex);
+        m_actualized = true;
+    }
     if (was_created)
         conn.activate(); // Throws
 
@@ -1545,12 +1584,15 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
 
 void SessionWrapper::force_close()
 {
-    if (m_force_closed || m_finalized) {
-        return;
+    {
+        std::lock_guard lock(m_mutex);
+        if (m_force_closed || m_finalized) {
+            return;
+        }
+        REALM_ASSERT(m_actualized);
+        REALM_ASSERT(m_sess);
+        m_force_closed = true;
     }
-    REALM_ASSERT(m_actualized);
-    REALM_ASSERT(m_sess);
-    m_force_closed = true;
 
     ClientImpl::Connection& conn = m_sess->get_connection();
     conn.initiate_session_deactivation(m_sess); // Throws
@@ -1568,29 +1610,32 @@ void SessionWrapper::force_close()
 // Must be called from event loop thread
 void SessionWrapper::finalize()
 {
-    REALM_ASSERT(m_actualized);
+    {
+        std::lock_guard lock(m_mutex);
+        REALM_ASSERT(m_actualized);
 
-    // Already finalized?
-    if (m_finalized) {
-        return;
-    }
+        // Already finalized?
+        if (m_finalized) {
+            return;
+        }
 
-    // Must be before marking as finalized as we expect m_finalized == false in on_change()
-    m_db->remove_commit_listener(this);
+        // Must be before marking as finalized as we expect m_finalized == false in on_change()
+        m_db->remove_commit_listener(this);
 
-    m_finalized = true;
+        m_finalized = true;
 
-    if (!m_force_closed) {
-        REALM_ASSERT(m_sess);
-        ClientImpl::Connection& conn = m_sess->get_connection();
-        conn.initiate_session_deactivation(m_sess); // Throws
+        if (!m_force_closed) {
+            REALM_ASSERT(m_sess);
+            ClientImpl::Connection& conn = m_sess->get_connection();
+            conn.initiate_session_deactivation(m_sess); // Throws
 
-        // Delete the pending bootstrap store since it uses a reference to the logger in m_sess
-        m_flx_pending_bootstrap_store.reset();
-        // Clear the subscription and migration store refs since they are owned by SyncSession
-        m_flx_subscription_store.reset();
-        m_migration_store.reset();
-        m_sess = nullptr;
+            // Delete the pending bootstrap store since it uses a reference to the logger in m_sess
+            m_flx_pending_bootstrap_store.reset();
+            // Clear the subscription and migration store refs since they are owned by SyncSession
+            m_flx_subscription_store.reset();
+            m_migration_store.reset();
+            m_sess = nullptr;
+        }
     }
 
     // The Realm file can be closed now, as no access to the Realm file is
@@ -1625,6 +1670,7 @@ void SessionWrapper::finalize()
 // Called with a lock on `m_client.m_mutex`.
 inline void SessionWrapper::finalize_before_actualization() noexcept
 {
+    std::lock_guard lock(m_mutex);
     REALM_ASSERT(!m_sess);
     m_actualized = true;
     m_force_closed = true;
@@ -1633,15 +1679,21 @@ inline void SessionWrapper::finalize_before_actualization() noexcept
 
 inline void SessionWrapper::on_sync_progress()
 {
-    REALM_ASSERT(!m_finalized);
-    m_reliable_download_progress = true;
+    {
+        std::lock_guard lock(m_mutex);
+        REALM_ASSERT(!m_finalized);
+        m_reliable_download_progress = true;
+    }
     report_progress(); // Throws
 }
 
 
 void SessionWrapper::on_upload_completion()
 {
-    REALM_ASSERT(!m_finalized);
+    {
+        std::lock_guard lock(m_mutex);
+        REALM_ASSERT(!m_finalized);
+    }
     while (!m_upload_completion_handlers.empty()) {
         auto handler = std::move(m_upload_completion_handlers.back());
         m_upload_completion_handlers.pop_back();
@@ -1662,6 +1714,10 @@ void SessionWrapper::on_upload_completion()
 
 void SessionWrapper::on_download_completion()
 {
+    {
+        std::lock_guard lock(m_mutex);
+        REALM_ASSERT(!m_finalized);
+    }
     while (!m_download_completion_handlers.empty()) {
         auto handler = std::move(m_download_completion_handlers.back());
         m_download_completion_handlers.pop_back();
@@ -1692,8 +1748,11 @@ void SessionWrapper::on_download_completion()
 
 void SessionWrapper::on_suspended(const SessionErrorInfo& error_info)
 {
-    REALM_ASSERT(!m_finalized);
-    m_suspended = true;
+    {
+        std::lock_guard lock(m_mutex);
+        REALM_ASSERT(!m_finalized);
+        m_suspended = true;
+    }
     if (m_connection_state_change_listener) {
         m_connection_state_change_listener(ConnectionState::disconnected, error_info); // Throws
     }
@@ -1702,8 +1761,11 @@ void SessionWrapper::on_suspended(const SessionErrorInfo& error_info)
 
 void SessionWrapper::on_resumed()
 {
-    REALM_ASSERT(!m_finalized);
-    m_suspended = false;
+    {
+        std::lock_guard lock(m_mutex);
+        REALM_ASSERT(!m_finalized);
+        m_suspended = false;
+    }
     if (m_connection_state_change_listener) {
         ClientImpl::Connection& conn = m_sess->get_connection();
         if (conn.get_state() != ConnectionState::disconnected) {
@@ -1718,20 +1780,28 @@ void SessionWrapper::on_resumed()
 void SessionWrapper::on_connection_state_changed(ConnectionState state,
                                                  const util::Optional<SessionErrorInfo>& error_info)
 {
+    {
+        std::lock_guard lock(m_mutex);
+        if (m_suspended) {
+            return;
+        }
+    }
     if (m_connection_state_change_listener) {
-        if (!m_suspended)
-            m_connection_state_change_listener(state, error_info); // Throws
+        m_connection_state_change_listener(state, error_info); // Throws
     }
 }
 
 
 void SessionWrapper::report_progress(bool only_if_new_uploadable_data)
 {
-    REALM_ASSERT(!m_finalized);
-    REALM_ASSERT(m_sess);
+    {
+        std::lock_guard lock(m_mutex);
+        REALM_ASSERT(!m_finalized);
+        REALM_ASSERT(m_sess);
 
-    if (!m_progress_handler)
-        return;
+        if (!m_progress_handler)
+            return;
+    }
 
     std::uint_fast64_t downloaded_bytes = 0;
     std::uint_fast64_t downloadable_bytes = 0;
@@ -1769,8 +1839,11 @@ void SessionWrapper::report_progress(bool only_if_new_uploadable_data)
 
 util::Future<std::string> SessionWrapper::send_test_command(std::string body)
 {
-    if (!m_sess) {
-        return Status{ErrorCodes::RuntimeError, "session must be activated to send a test command"};
+    {
+        std::lock_guard lock(m_mutex);
+        if (!m_sess) {
+            return Status{ErrorCodes::RuntimeError, "session must be activated to send a test command"};
+        }
     }
 
     return m_sess->send_test_command(std::move(body));
@@ -1778,7 +1851,10 @@ util::Future<std::string> SessionWrapper::send_test_command(std::string body)
 
 void SessionWrapper::handle_pending_client_reset_acknowledgement()
 {
-    REALM_ASSERT(!m_finalized);
+    {
+        std::lock_guard lock(m_mutex);
+        REALM_ASSERT(!m_finalized);
+    }
 
     auto pending_reset = [&] {
         auto ft = m_db->start_frozen();
@@ -1823,9 +1899,12 @@ void SessionWrapper::handle_pending_client_reset_acknowledgement()
 
 std::string SessionWrapper::get_appservices_connection_id()
 {
-    auto pf = util::make_promise_future<std::string>();
-    REALM_ASSERT(m_initiated);
+    {
+        std::lock_guard lock(m_mutex);
+        REALM_ASSERT(m_initiated);
+    }
 
+    auto pf = util::make_promise_future<std::string>();
     util::bind_ptr<SessionWrapper> self(this);
     get_client().post([self, promise = std::move(pf.promise)](Status status) mutable {
         if (!status.is_ok()) {
