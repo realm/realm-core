@@ -18,6 +18,7 @@
 -----------
 
 ### Internals
+* Update JSON library from 3.7.3 to 3.11.2.
 * Updated async_write_binary in the Default Socket Provider to properly return a status to the callback handler. ([PR #7015](https://github.com/realm/realm-core/pull/7015))
 
 ----------------------------------------------
