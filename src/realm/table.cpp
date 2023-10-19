@@ -3056,7 +3056,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
         }
     }
     if (is_asymmetric() && repl && repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
-        get_parent_group()->m_objects_to_delete.emplace_back(this->m_key, ret.get_key());
+        get_parent_group()->m_objects_to_delete[this->m_key].emplace_back(ret.get_key());
     }
     return ret;
 }
@@ -3391,12 +3391,10 @@ void Table::remove_object(ObjKey key)
 
     if (is_asymmetric()) {
         REALM_ASSERT(g);
-        auto it = std::find_if(g->m_objects_to_delete.begin(), g->m_objects_to_delete.end(),
-                               [&](const Group::ToDeleteRef& item) {
-                                   return item.table_key == m_key && item.obj_key == key;
-                               });
-        if (it != g->m_objects_to_delete.end()) {
-            g->m_objects_to_delete.erase(it);
+        auto& obj_keys = g->m_objects_to_delete[m_key];
+        auto it = std::find(obj_keys.begin(), obj_keys.end(), key);
+        if (it != obj_keys.end()) {
+            obj_keys.erase(it);
         }
     }
 

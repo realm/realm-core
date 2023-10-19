@@ -2412,15 +2412,11 @@ Replication::version_type DB::do_commit(Transaction& transaction, bool commit_to
     version_type new_version = current_version + 1;
 
     if (!transaction.m_objects_to_delete.empty()) {
-        std::map<TableKey, std::vector<ObjKey>> table_object_map;
-        for (auto it : transaction.m_objects_to_delete) {
-            // Checking ttl would go here
-            table_object_map[it.table_key].push_back(it.obj_key);
+        for (auto& [table_key, obj_keys] : transaction.m_objects_to_delete) {
+            sort(obj_keys.begin(), obj_keys.end());
+            transaction.get_table_unchecked(table_key)->batch_erase_objects(obj_keys);
         }
         transaction.m_objects_to_delete.clear();
-        for (auto& item : table_object_map) {
-            transaction.get_table_unchecked(item.first)->batch_erase_objects(item.second);
-        }
     }
     if (Replication* repl = get_replication()) {
         // If Replication::prepare_commit() fails, then the entire transaction

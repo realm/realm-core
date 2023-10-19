@@ -538,18 +538,6 @@ protected:
 private:
     static constexpr StringData g_class_name_prefix = "class_";
 
-    struct ToDeleteRef {
-        ToDeleteRef(TableKey tk, ObjKey k)
-            : table_key(tk)
-            , obj_key(k)
-            , ttl(std::chrono::steady_clock::now())
-        {
-        }
-        TableKey table_key;
-        ObjKey obj_key;
-        std::chrono::steady_clock::time_point ttl;
-    };
-
     // nullptr, if we're sharing an allocator provided during initialization
     std::unique_ptr<SlabAlloc> m_local_alloc;
     // in-use allocator. If local, then equal to m_local_alloc.
@@ -614,7 +602,7 @@ private:
 
     util::UniqueFunction<void(const CascadeNotification&)> m_notify_handler;
     util::UniqueFunction<void()> m_schema_change_handler;
-    std::vector<ToDeleteRef> m_objects_to_delete;
+    std::map<TableKey, std::vector<ObjKey>> m_objects_to_delete;
 
     Group(SlabAlloc* alloc) noexcept;
     void init_array_parents() noexcept;
