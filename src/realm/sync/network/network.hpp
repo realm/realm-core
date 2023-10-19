@@ -1998,7 +1998,7 @@ class Service::PostOper : public PostOperBase {
 public:
     PostOper(std::size_t size, Impl& service, H&& handler)
         : PostOperBase{size, service}
-        , m_handler{std::move(handler)}
+        , m_handler{std::forward<H>(handler)}
     {
     }
     void recycle_and_execute() override final
@@ -2256,7 +2256,7 @@ public:
         char* begin = buffer;
         char* end = buffer + size;
         LendersReadOperPtr op = Service::alloc<ReadOper<H>>(stream.lowest_layer().m_read_oper, stream, is_read_some,
-                                                            begin, end, std::move(handler)); // Throws
+                                                            begin, end, std::forward<H>(handler)); // Throws
         stream.lowest_layer().m_desc.initiate_oper(std::move(op));                           // Throws
     }
 
@@ -2265,8 +2265,9 @@ public:
     {
         const char* begin = data;
         const char* end = data + size;
-        LendersWriteOperPtr op = Service::alloc<WriteOper<H>>(
-            stream.lowest_layer().m_write_oper, stream, is_write_some, begin, end, std::move(handler)); // Throws
+        LendersWriteOperPtr op =
+            Service::alloc<WriteOper<H>>(stream.lowest_layer().m_write_oper, stream, is_write_some, begin, end,
+                                         std::forward<H>(handler));                                     // Throws
         stream.lowest_layer().m_desc.initiate_oper(std::move(op));                                      // Throws
     }
 
@@ -2278,7 +2279,7 @@ public:
         char* end = buffer + size;
         LendersBufferedReadOperPtr op =
             Service::alloc<BufferedReadOper<H>>(stream.lowest_layer().m_read_oper, stream, begin, end, delim, rab,
-                                                std::move(handler)); // Throws
+                                                std::forward<H>(handler)); // Throws
         stream.lowest_layer().m_desc.initiate_oper(std::move(op));   // Throws
     }
 };
@@ -2554,7 +2555,7 @@ class Service::BasicStreamOps<S>::ReadOper : public ReadOperBase {
 public:
     ReadOper(std::size_t size, S& stream, bool is_read_some, char* begin, char* end, H&& handler)
         : ReadOperBase{size, stream, is_read_some, begin, end}
-        , m_handler{std::move(handler)}
+        , m_handler{std::forward<H>(handler)}
     {
     }
     void recycle_and_execute() override final
@@ -2584,7 +2585,7 @@ class Service::BasicStreamOps<S>::WriteOper : public WriteOperBase {
 public:
     WriteOper(std::size_t size, S& stream, bool is_write_some, const char* begin, const char* end, H&& handler)
         : WriteOperBase{size, stream, is_write_some, begin, end}
-        , m_handler{std::move(handler)}
+        , m_handler{std::forward<H>(handler)}
     {
     }
     void recycle_and_execute() override final
@@ -2615,7 +2616,7 @@ public:
     BufferedReadOper(std::size_t size, S& stream, char* begin, char* end, int delim, ReadAheadBuffer& rab,
                      H&& handler)
         : BufferedReadOperBase{size, stream, begin, end, delim, rab}
-        , m_handler{std::move(handler)}
+        , m_handler{std::forward<H>(handler)}
     {
     }
     void recycle_and_execute() override final
@@ -2703,7 +2704,7 @@ template <class H>
 inline Service::PostOperBase* Service::post_oper_constr(void* addr, std::size_t size, Impl& service, void* cookie)
 {
     H& handler = *static_cast<H*>(cookie);
-    return new (addr) PostOper<H>(size, service, std::move(handler)); // Throws
+    return new (addr) PostOper<H>(size, service, std::forward<H>(handler)); // Throws
 }
 
 inline bool Service::AsyncOper::in_use() const noexcept
@@ -2769,10 +2770,8 @@ inline void Service::AsyncOper::do_recycle_and_execute(bool orphaned, H& handler
     // happens. For that reason, copying and moving of arguments must not
     // happen until we are in a scope (this scope) that catches and deals
     // correctly with such exceptions.
-    do_recycle_and_execute_helper(orphaned, was_recycled, std::move(handler),
+    do_recycle_and_execute_helper(orphaned, was_recycled, std::forward<H>(handler),
                                   std::forward<Args>(args)...); // Throws
-
-    // Removed catch to prevent truncating the stack trace on exception
 }
 
 template <class H, class... Args>
@@ -2805,7 +2804,7 @@ class Resolver::ResolveOper : public Service::ResolveOperBase {
 public:
     ResolveOper(std::size_t size, Resolver& r, Query q, H&& handler)
         : ResolveOperBase{size, r, std::move(q)}
-        , m_handler{std::move(handler)}
+        , m_handler{std::forward<H>(handler)}
     {
     }
     void recycle_and_execute() override final
@@ -2847,7 +2846,7 @@ template <class H>
 void Resolver::async_resolve(Query query, H&& handler)
 {
     Service::LendersResolveOperPtr op = Service::alloc<ResolveOper<H>>(m_resolve_oper, *this, std::move(query),
-                                                                       std::move(handler)); // Throws
+                                                                       std::forward<H>(handler)); // Throws
     initiate_oper(std::move(op));                                                           // Throws
 }
 
@@ -3086,7 +3085,7 @@ class Socket::ConnectOper : public ConnectOperBase {
 public:
     ConnectOper(std::size_t size, Socket& sock, H&& handler)
         : ConnectOperBase{size, sock}
-        , m_handler{std::move(handler)}
+        , m_handler{std::forward<H>(handler)}
     {
     }
     void recycle_and_execute() override final
@@ -3214,7 +3213,8 @@ inline std::size_t Socket::write_some(const char* data, std::size_t size, std::e
 template <class H>
 inline void Socket::async_connect(const Endpoint& ep, H&& handler)
 {
-    LendersConnectOperPtr op = Service::alloc<ConnectOper<H>>(m_write_oper, *this, std::move(handler)); // Throws
+    LendersConnectOperPtr op =
+        Service::alloc<ConnectOper<H>>(m_write_oper, *this, std::forward<H>(handler));                  // Throws
     m_desc.initiate_oper(std::move(op), ep);                                                            // Throws
 }
 
@@ -3222,42 +3222,42 @@ template <class H>
 inline void Socket::async_read(char* buffer, std::size_t size, H&& handler)
 {
     bool is_read_some = false;
-    StreamOps::async_read(*this, buffer, size, is_read_some, std::move(handler)); // Throws
+    StreamOps::async_read(*this, buffer, size, is_read_some, std::forward<H>(handler)); // Throws
 }
 
 template <class H>
 inline void Socket::async_read(char* buffer, std::size_t size, ReadAheadBuffer& rab, H&& handler)
 {
     int delim = std::char_traits<char>::eof();
-    StreamOps::async_buffered_read(*this, buffer, size, delim, rab, std::move(handler)); // Throws
+    StreamOps::async_buffered_read(*this, buffer, size, delim, rab, std::forward<H>(handler)); // Throws
 }
 
 template <class H>
 inline void Socket::async_read_until(char* buffer, std::size_t size, char delim, ReadAheadBuffer& rab, H&& handler)
 {
     int delim_2 = std::char_traits<char>::to_int_type(delim);
-    StreamOps::async_buffered_read(*this, buffer, size, delim_2, rab, std::move(handler)); // Throws
+    StreamOps::async_buffered_read(*this, buffer, size, delim_2, rab, std::forward<H>(handler)); // Throws
 }
 
 template <class H>
 inline void Socket::async_write(const char* data, std::size_t size, H&& handler)
 {
     bool is_write_some = false;
-    StreamOps::async_write(*this, data, size, is_write_some, std::move(handler)); // Throws
+    StreamOps::async_write(*this, data, size, is_write_some, std::forward<H>(handler)); // Throws
 }
 
 template <class H>
 inline void Socket::async_read_some(char* buffer, std::size_t size, H&& handler)
 {
     bool is_read_some = true;
-    StreamOps::async_read(*this, buffer, size, is_read_some, std::move(handler)); // Throws
+    StreamOps::async_read(*this, buffer, size, is_read_some, std::forward<H>(handler)); // Throws
 }
 
 template <class H>
 inline void Socket::async_write_some(const char* data, std::size_t size, H&& handler)
 {
     bool is_write_some = true;
-    StreamOps::async_write(*this, data, size, is_write_some, std::move(handler)); // Throws
+    StreamOps::async_write(*this, data, size, is_write_some, std::forward<H>(handler)); // Throws
 }
 
 inline void Socket::shutdown(shutdown_type what)
@@ -3394,7 +3394,7 @@ class Acceptor::AcceptOper : public AcceptOperBase {
 public:
     AcceptOper(std::size_t size, Acceptor& a, Socket& s, Endpoint* e, H&& handler)
         : AcceptOperBase{size, a, s, e}
-        , m_handler{std::move(handler)}
+        , m_handler{std::forward<H>(handler)}
     {
     }
     void recycle_and_execute() override final
@@ -3456,13 +3456,13 @@ template <class H>
 inline void Acceptor::async_accept(Socket& sock, H&& handler)
 {
     Endpoint* ep = nullptr;
-    async_accept(sock, ep, std::move(handler)); // Throws
+    async_accept(sock, ep, std::forward<H>(handler)); // Throws
 }
 
 template <class H>
 inline void Acceptor::async_accept(Socket& sock, Endpoint& ep, H&& handler)
 {
-    async_accept(sock, &ep, std::move(handler)); // Throws
+    async_accept(sock, &ep, std::forward<H>(handler)); // Throws
 }
 
 inline std::error_code Acceptor::accept(Socket& socket, Endpoint* ep, std::error_code& ec)
@@ -3491,7 +3491,7 @@ inline void Acceptor::async_accept(Socket& sock, Endpoint* ep, H&& handler)
     if (REALM_UNLIKELY(sock.is_open()))
         throw util::runtime_error("Socket is already open");
     LendersAcceptOperPtr op = Service::alloc<AcceptOper<H>>(m_read_oper, *this, sock, ep,
-                                                            std::move(handler)); // Throws
+                                                            std::forward<H>(handler)); // Throws
     m_desc.initiate_oper(std::move(op));                                         // Throws
 }
 
@@ -3502,7 +3502,7 @@ class DeadlineTimer::WaitOper : public Service::WaitOperBase {
 public:
     WaitOper(std::size_t size, DeadlineTimer& timer, clock::time_point expiration_time, H&& handler)
         : Service::WaitOperBase{size, timer, expiration_time}
-        , m_handler{std::move(handler)}
+        , m_handler{std::forward<H>(handler)}
     {
     }
     void recycle_and_execute() override final
@@ -3542,7 +3542,7 @@ inline void DeadlineTimer::async_wait(std::chrono::duration<R, P> delay, H&& han
         throw util::overflow_error("Expiration time overflow");
     clock::time_point expiration_time = now + delay;
     initiate_oper(Service::alloc<WaitOper<H>>(m_wait_oper, *this, expiration_time,
-                                              std::move(handler))); // Throws
+                                              std::forward<H>(handler))); // Throws
 }
 
 // ---------------- ReadAheadBuffer ----------------

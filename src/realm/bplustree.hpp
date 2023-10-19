@@ -172,10 +172,10 @@ public:
 
     void init_from_ref(ref_type ref)
     {
-        auto new_root = create_root_from_ref(ref);
-        new_root->bp_set_parent(m_parent, m_ndx_in_parent);
-
-        m_root = std::move(new_root);
+        if (auto new_root = create_root_from_ref(ref)) {
+            new_root->bp_set_parent(m_parent, m_ndx_in_parent);
+            m_root = std::move(new_root);
+        }
 
         invalidate_leaf_cache();
         m_size = m_root->get_tree_size();
@@ -187,9 +187,10 @@ public:
         if (!ref) {
             return false;
         }
-        auto new_root = create_root_from_ref(ref);
-        new_root->bp_set_parent(m_parent, m_ndx_in_parent);
-        m_root = std::move(new_root);
+        if (auto new_root = create_root_from_ref(ref)) {
+            new_root->bp_set_parent(m_parent, m_ndx_in_parent);
+            m_root = std::move(new_root);
+        }
         invalidate_leaf_cache();
         m_size = m_root->get_tree_size();
         return true;
@@ -374,6 +375,11 @@ public:
     REALM_NOINLINE T get_uncached(size_t n) const
     {
         T value;
+#ifdef __clang_analyzer__
+        // Clang's static analyzer can't see that value will always be initialized
+        // inside bptree_access()
+        value = {};
+#endif
 
         auto func = [&value](BPlusTreeNode* node, size_t ndx) {
             LeafNode* leaf = static_cast<LeafNode*>(node);

@@ -105,7 +105,7 @@ namespace _impl {
 template <typename T>
 ExceptionMatcher<T> make_exception_matcher(ErrorCodes::Error code, T&& matcher)
 {
-    return ExceptionMatcher<T>(code, std::move(matcher));
+    return ExceptionMatcher<T>(code, std::forward<T>(matcher));
 }
 inline ExceptionMatcher<void> make_exception_matcher(ErrorCodes::Error code, const char* msg)
 {

@@ -305,7 +305,8 @@ RLM_API bool realm_remove_table(realm_t* realm, const char* table_name, bool* ta
                                  "Attempt to remove a table that is currently part of the schema");
             }
             (*realm)->read_group().remove_table(table->get_key());
-            *table_deleted = true;
+            if (table_deleted)
+                *table_deleted = true;
         }
         return true;
     });

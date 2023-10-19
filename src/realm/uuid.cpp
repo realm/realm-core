@@ -45,7 +45,7 @@ bool is_hex_digit(unsigned char c)
     return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
 
-char parse_xdigit(char ch)
+uint8_t parse_xdigit(char ch)
 {
     if (ch >= '0' && ch <= '9')
         return ch - '0';
@@ -53,7 +53,7 @@ char parse_xdigit(char ch)
         return ch - 'a' + 10;
     if (ch >= 'A' && ch <= 'F')
         return ch - 'A' + 10;
-    return char(-1);
+    REALM_UNREACHABLE();
 }
 } // anonymous namespace
 
@@ -80,7 +80,6 @@ bool UUID::is_valid_string(StringData str) noexcept
 }
 
 UUID::UUID(StringData init)
-    : m_bytes{}
 {
     if (!is_valid_string(init)) {
         throw InvalidUUIDString{

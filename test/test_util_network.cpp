@@ -530,7 +530,7 @@ TEST(Network_AsyncReadWriteLargeAmount)
                 CHECK_NOT(ec);
                 read_chunk();
             };
-            socket_1.async_read(buffer.get(), buffer_size, rab, handler);
+            socket_1.async_read(buffer.get(), buffer_size, rab, std::move(handler));
         };
         read_chunk();
         service_1.run();
@@ -553,7 +553,7 @@ TEST(Network_AsyncReadWriteLargeAmount)
                 write_chunk(i + 1);
             }
         };
-        socket_2.async_write(chunk.get(), num_bytes_per_chunk, handler);
+        socket_2.async_write(chunk.get(), num_bytes_per_chunk, std::move(handler));
     };
     write_chunk(0);
     service_2.run();
@@ -616,13 +616,13 @@ TEST(Network_CancelAsyncAccept)
         if (ec == error::operation_aborted)
             accept_was_canceled = true;
     };
-    acceptor.async_accept(socket, handler);
+    acceptor.async_accept(socket, std::move(handler));
     acceptor.cancel();
     service.run();
     CHECK(accept_was_canceled);
 
     accept_was_canceled = false;
-    acceptor.async_accept(socket, handler);
+    acceptor.async_accept(socket, std::move(handler));
     acceptor.close();
     service.run();
     CHECK(accept_was_canceled);
@@ -665,7 +665,7 @@ TEST(Network_CancelAsyncReadWrite)
         if (!ec)
             was_accepted = true;
     };
-    acceptor.async_accept(socket_1, accept_handler);
+    acceptor.async_accept(socket_1, std::move(accept_handler));
     network::Socket socket_2{service};
     socket_2.connect(acceptor.local_endpoint());
     socket_2.set_option(network::SocketBase::no_delay(true));
@@ -679,7 +679,7 @@ TEST(Network_CancelAsyncReadWrite)
         if (ec == error::operation_aborted)
             write_was_canceled = true;
     };
-    socket_2.async_write(data, size, write_handler);
+    socket_2.async_write(data, size, std::move(write_handler));
     network::ReadAheadBuffer rab;
     char buffer[size];
     bool read_was_canceled = false;
@@ -687,7 +687,7 @@ TEST(Network_CancelAsyncReadWrite)
         if (ec == error::operation_aborted)
             read_was_canceled = true;
     };
-    socket_2.async_read(buffer, size, rab, read_handler);
+    socket_2.async_read(buffer, size, rab, std::move(read_handler));
     socket_2.close();
     service.run();
     CHECK(read_was_canceled);
@@ -710,14 +710,14 @@ TEST(Network_CancelEmptyRead)
         if (ec == error::operation_aborted)
             write_was_canceled = true;
     };
-    socket_2.async_write(data, size, write_handler);
+    socket_2.async_write(data, size, std::move(write_handler));
     char buffer[size];
     bool read_was_canceled = false;
     auto read_handler = [&](std::error_code ec, size_t) {
         if (ec == error::operation_aborted)
             read_was_canceled = true;
     };
-    socket_2.async_read(buffer, 0, rab, read_handler);
+    socket_2.async_read(buffer, 0, rab, std::move(read_handler));
     socket_2.close();
     service.run();
     CHECK(read_was_canceled);
@@ -739,14 +739,14 @@ TEST(Network_CancelEmptyWrite)
         if (ec == error::operation_aborted)
             read_was_canceled = true;
     };
-    socket_2.async_read(buffer, 1, rab, read_handler);
+    socket_2.async_read(buffer, 1, rab, std::move(read_handler));
     char data[1] = {'a'};
     bool write_was_canceled = false;
     auto write_handler = [&](std::error_code ec, size_t) {
         if (ec == error::operation_aborted)
             write_was_canceled = true;
     };
-    socket_2.async_write(data, 0, write_handler);
+    socket_2.async_write(data, 0, std::move(write_handler));
     socket_2.close();
     service.run();
     CHECK(read_was_canceled);
@@ -789,12 +789,12 @@ TEST(Network_CancelReadByDestroy)
             }
             CHECK_EQUAL(error::operation_aborted, ec);
         };
-        read_sockets[i]->async_read_until(input_buffers[i], 2, '\n', *read_ahead_buffers[i], read_handler);
+        read_sockets[i]->async_read_until(input_buffers[i], 2, '\n', *read_ahead_buffers[i], std::move(read_handler));
         auto write_handler = [&](std::error_code ec, size_t) {
             CHECK_NOT(ec);
         };
         int n = (i == num_connections / 2 ? 2 : 1);
-        write_sockets[i]->async_write(output_buffer, n, write_handler);
+        write_sockets[i]->async_write(output_buffer, n, std::move(write_handler));
     }
     service.run();
 }
@@ -831,7 +831,7 @@ TEST(Network_AcceptorMixedAsyncSync)
             if (!ec)
                 was_accepted = true;
         };
-        acceptor.async_accept(socket, accept_handler);
+        acceptor.async_accept(socket, std::move(accept_handler));
         service.run();
         CHECK(was_accepted);
         CHECK_NOT(thread.join());
@@ -883,7 +883,7 @@ TEST(Network_SocketMixedAsyncSync)
             if (!ec)
                 was_written = true;
         };
-        socket.async_write(message, strlen(message), write_handler);
+        socket.async_write(message, strlen(message), std::move(write_handler));
         service.run();
         CHECK(was_written);
 
@@ -930,7 +930,7 @@ TEST(Network_SocketMixedAsyncSync)
                     CHECK(std::equal(buffer.get(), buffer.get() + size, message));
             }
         };
-        socket.async_read(buffer.get(), buffer_size, rab, read_handler);
+        socket.async_read(buffer.get(), buffer_size, rab, std::move(read_handler));
         service.run();
 
         CHECK_NOT(thread.join());
@@ -1469,7 +1469,7 @@ public:
             handle_accept(ec);
         };
         network::Endpoint endpoint;
-        m_acceptor.async_accept(m_socket, endpoint, handler);
+        m_acceptor.async_accept(m_socket, endpoint, std::move(handler));
         m_service.run();
     }
 
@@ -1492,7 +1492,7 @@ private:
         auto handler = [this](std::error_code handler_ec, size_t handler_n) {
             handle_read_header(handler_ec, handler_n);
         };
-        m_socket.async_read_until(m_header_buffer, s_max_header_size, '\n', m_read_ahead_buffer, handler);
+        m_socket.async_read_until(m_header_buffer, s_max_header_size, '\n', m_read_ahead_buffer, std::move(handler));
     }
 
     void handle_read_header(std::error_code ec, size_t n)
@@ -1521,7 +1521,7 @@ private:
             handle_read_body(handler_ec, handler_n);
         };
         m_body_buffer.reset(new char[m_body_size]);
-        m_socket.async_read(m_body_buffer.get(), m_body_size, m_read_ahead_buffer, handler);
+        m_socket.async_read(m_body_buffer.get(), m_body_size, m_read_ahead_buffer, std::move(handler));
     }
 
     void handle_read_body(std::error_code ec, size_t n)
@@ -1537,7 +1537,7 @@ private:
         auto handler = [this](std::error_code handler_ec, size_t) {
             handle_write_header(handler_ec);
         };
-        m_socket.async_write(m_header_buffer, out.size(), handler);
+        m_socket.async_write(m_header_buffer, out.size(), std::move(handler));
     }
 
     void handle_write_header(std::error_code ec)
@@ -1547,7 +1547,7 @@ private:
         auto handler = [this](std::error_code handler_ec, size_t) {
             handle_write_body(handler_ec);
         };
-        m_socket.async_write(m_body_buffer.get(), m_body_size, handler);
+        m_socket.async_write(m_body_buffer.get(), m_body_size, std::move(handler));
     }
 
     void handle_write_body(std::error_code ec)
@@ -1557,7 +1557,7 @@ private:
         auto handler = [this](std::error_code handler_ec, size_t) {
             handle_read_header_2(handler_ec);
         };
-        m_socket.async_read_until(m_header_buffer, s_max_header_size, '\n', m_read_ahead_buffer, handler);
+        m_socket.async_read_until(m_header_buffer, s_max_header_size, '\n', m_read_ahead_buffer, std::move(handler));
     }
 
     void handle_read_header_2(std::error_code ec)
@@ -1596,7 +1596,7 @@ public:
         auto handler = [this](std::error_code ec, size_t) {
             handle_write_header(ec);
         };
-        m_socket.async_write(m_header_buffer, out.size(), handler);
+        m_socket.async_write(m_header_buffer, out.size(), std::move(handler));
 
         m_service.run();
 
@@ -1621,7 +1621,7 @@ private:
         auto handler = [this](std::error_code handler_ec, size_t) {
             handle_write_body(handler_ec);
         };
-        m_socket.async_write(echo_body, sizeof echo_body, handler);
+        m_socket.async_write(echo_body, sizeof echo_body, std::move(handler));
     }
 
     void handle_write_body(std::error_code ec)
@@ -1631,7 +1631,7 @@ private:
         auto handler = [this](std::error_code handler_ec, size_t handler_n) {
             handle_read_header(handler_ec, handler_n);
         };
-        m_socket.async_read_until(m_header_buffer, s_max_header_size, '\n', m_read_ahead_buffer, handler);
+        m_socket.async_read_until(m_header_buffer, s_max_header_size, '\n', m_read_ahead_buffer, std::move(handler));
     }
 
     void handle_read_header(std::error_code ec, size_t n)
@@ -1660,7 +1660,7 @@ private:
             handle_read_body(handler_ec, handler_n);
         };
         m_body_buffer.reset(new char[m_body_size]);
-        m_socket.async_read(m_body_buffer.get(), m_body_size, m_read_ahead_buffer, handler);
+        m_socket.async_read(m_body_buffer.get(), m_body_size, m_read_ahead_buffer, std::move(handler));
     }
 
     void handle_read_body(std::error_code ec, size_t n)
@@ -1776,7 +1776,7 @@ TEST(Network_RepeatedCancelAndRestartRead)
                 CHECK(!ec || ec == error::operation_aborted);
                 initiate_read();
             };
-            socket_2.async_read(read_buffer, read_buffer_size, rab, handler);
+            socket_2.async_read(read_buffer, read_buffer_size, rab, std::move(handler));
         };
         initiate_read();
 

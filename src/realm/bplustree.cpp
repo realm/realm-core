@@ -742,9 +742,9 @@ void BPlusTreeBase::bptree_erase(size_t n, BPlusTreeNode::EraseFunc func)
         ref_type new_root_ref = node->clear_first_bp_node_ref();
         node->destroy_deep();
 
-        auto new_root = create_root_from_ref(new_root_ref);
-
-        replace_root(std::move(new_root));
+        if (auto new_root = create_root_from_ref(new_root_ref)) {
+            replace_root(std::move(new_root));
+        }
         root_size = m_root->get_node_size();
     }
 }
@@ -757,7 +757,7 @@ std::unique_ptr<BPlusTreeNode> BPlusTreeBase::create_root_from_ref(ref_type ref)
 
     if (reuse_root) {
         m_root->init_from_ref(ref);
-        return std::move(m_root);
+        return nullptr;
     }
 
     if (is_leaf) {
