@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <util/event_loop.hpp>
+#include <util/test_path.hpp>
 #include <util/test_utils.hpp>
 #include <util/sync/session_util.hpp>
 #include <util/sync/sync_test_utils.hpp>
@@ -111,7 +112,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync][sync manager]") {
             REQUIRE(sync_manager->path_for_realm(config) == base_path / "s_string-partition-value%26%5E%23.realm");
         }
 
-        SECTION("string which exeecds the file system path length limit") {
+        SECTION("string which exceeds the file system path length limit") {
             const std::string name_too_long(500, 'b');
             REQUIRE(name_too_long.length() == 500);
             const bson::Bson partition(name_too_long);
@@ -167,6 +168,29 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync][sync manager]") {
         SECTION("Custom filename for Flexible Sync") {
             SyncConfig config(user, SyncConfig::FLXSyncEnabled{});
             REQUIRE(sync_manager->path_for_realm(config, util::make_optional<std::string>("custom")) ==
+                    base_path / "custom.realm");
+        }
+
+        SECTION("Custom filename with type will still append .realm") {
+            SyncConfig config(user, SyncConfig::FLXSyncEnabled{});
+            REQUIRE(sync_manager->path_for_realm(config, util::make_optional<std::string>("custom.foo")) ==
+                    base_path / "custom.foo.realm");
+        }
+
+        SECTION("Custom filename for Flexible Sync including .realm") {
+            SyncConfig config(user, SyncConfig::FLXSyncEnabled{});
+            REQUIRE(sync_manager->path_for_realm(config, util::make_optional<std::string>("custom.realm")) ==
+                    base_path / "custom.realm");
+        }
+
+        SECTION("Custom filename for Flexible Sync with an existing path") {
+            SyncConfig config(user, SyncConfig::FLXSyncEnabled{});
+            std::string path = sync_manager->path_for_realm(config, util::make_optional<std::string>("custom.realm"));
+            realm::test_util::TestPathGuard guard(path);
+            realm::util::File existing_realm_file(path, File::mode_Write);
+            existing_realm_file.write(std::string("test"));
+            existing_realm_file.sync();
+            REQUIRE(sync_manager->path_for_realm(config, util::make_optional<std::string>("custom.realm")) ==
                     base_path / "custom.realm");
         }
 

@@ -332,18 +332,18 @@ SyncFileManager::get_existing_realm_file_path(const std::string& user_identity,
                                               const std::vector<std::string>& legacy_user_identities,
                                               const std::string& realm_file_name, const std::string& partition) const
 {
-    std::string preferred_name = preferred_realm_path_without_suffix(user_identity, realm_file_name);
-    if (try_file_exists(preferred_name)) {
-        return preferred_name;
+    std::string preferred_name_without_suffix = preferred_realm_path_without_suffix(user_identity, realm_file_name);
+    if (try_file_exists(preferred_name_without_suffix)) {
+        return preferred_name_without_suffix;
     }
 
-    std::string preferred_name_with_suffix = preferred_name + c_realm_file_suffix;
+    std::string preferred_name_with_suffix = preferred_name_without_suffix + c_realm_file_suffix;
     if (try_file_exists(preferred_name_with_suffix)) {
         return preferred_name_with_suffix;
     }
 
     // Shorten the Realm path to just `<rootDir>/<hashedAbsolutePath>.realm`
-    std::string hashed_name = fallback_hashed_realm_file_path(preferred_name);
+    std::string hashed_name = fallback_hashed_realm_file_path(preferred_name_without_suffix);
     std::string hashed_path = hashed_name + c_realm_file_suffix;
     if (try_file_exists(hashed_path)) {
         // detected that the hashed fallback has been used previously
@@ -393,11 +393,11 @@ std::string SyncFileManager::realm_file_path(const std::string& user_identity,
 
     // since this appears to be a new file, test the normal location
     // we use a test file with the same name and a suffix of the
-    // same length so we can catch "filename too long" errors on windows
-    std::string preferred_name = preferred_realm_path_without_suffix(user_identity, realm_file_name);
-    std::string preferred_name_with_suffix = preferred_name + c_realm_file_suffix;
+    // same length, so we can catch "filename too long" errors on windows
+    std::string preferred_name_without_suffix = preferred_realm_path_without_suffix(user_identity, realm_file_name);
+    std::string preferred_name_with_suffix = preferred_name_without_suffix + c_realm_file_suffix;
     try {
-        std::string test_path = preferred_name + c_realm_file_test_suffix;
+        std::string test_path = preferred_name_without_suffix + c_realm_file_test_suffix;
         auto defer = util::make_scope_exit([test_path]() noexcept {
             try_file_remove(test_path);
         });
@@ -406,7 +406,7 @@ std::string SyncFileManager::realm_file_path(const std::string& user_identity,
     }
     catch (const FileAccessError&) {
         // the preferred test failed, test the hashed path
-        std::string hashed_name = fallback_hashed_realm_file_path(preferred_name);
+        std::string hashed_name = fallback_hashed_realm_file_path(preferred_name_without_suffix);
         std::string hashed_path = hashed_name + c_realm_file_suffix;
         try {
             std::string test_hashed_path = hashed_name + c_realm_file_test_suffix;
@@ -456,6 +456,9 @@ std::string SyncFileManager::preferred_realm_path_without_suffix(const std::stri
     auto escaped_file_name = util::validate_and_clean_path(realm_file_name);
     std::string preferred_name =
         util::file_path_by_appending_component(user_directory(user_identity), escaped_file_name);
+    if (StringData(preferred_name).ends_with(c_realm_file_suffix)) {
+        preferred_name = preferred_name.substr(0, preferred_name.size() - strlen(c_realm_file_suffix));
+    }
     return preferred_name;
 }
 

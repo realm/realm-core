@@ -36,8 +36,8 @@ TEST(EmbeddedObjects_Basic)
     ReadTransaction read_server(server->shared_group);
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
-    CHECK(compare_groups(read_server, read_client_1, *(test_context.logger)));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_1, *test_context.logger));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 }
 
 TEST(AsymmetricTable_EmbeddedObjects_Basic)
@@ -68,8 +68,8 @@ TEST(AsymmetricTable_EmbeddedObjects_Basic)
     ReadTransaction read_server(server->shared_group);
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
-    CHECK(compare_groups(read_server, read_client_1, *(test_context.logger)));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_1, *test_context.logger));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 }
 
 TEST(Table_EmbeddedObjectsCircular)
@@ -131,8 +131,8 @@ TEST(EmbeddedObjects_ArrayOfObjects)
     ReadTransaction read_server(server->shared_group);
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
-    CHECK(compare_groups(read_server, read_client_1, *(test_context.logger)));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_1, *test_context.logger));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 }
 
 TEST(AsymmetricTable_EmbeddedObjects_ArrayOfObjects)
@@ -166,8 +166,8 @@ TEST(AsymmetricTable_EmbeddedObjects_ArrayOfObjects)
     ReadTransaction read_server(server->shared_group);
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
-    CHECK(compare_groups(read_server, read_client_1, *(test_context.logger)));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_1, *test_context.logger));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 }
 
 TEST(EmbeddedObjects_DictionaryOfObjects)
@@ -200,8 +200,8 @@ TEST(EmbeddedObjects_DictionaryOfObjects)
     ReadTransaction read_server(server->shared_group);
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
-    CHECK(compare_groups(read_server, read_client_1, *(test_context.logger)));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_1, *test_context.logger));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 }
 
 TEST(AsymmetricTable_EmbeddedObjects_DictionaryOfObjects)
@@ -235,8 +235,8 @@ TEST(AsymmetricTable_EmbeddedObjects_DictionaryOfObjects)
     ReadTransaction read_server(server->shared_group);
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
-    CHECK(compare_groups(read_server, read_client_1, *(test_context.logger)));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_1, *test_context.logger));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 }
 
 TEST(EmbeddedObjects_NestedArray)
@@ -292,8 +292,8 @@ TEST(EmbeddedObjects_NestedArray)
 
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
-    CHECK(compare_groups(read_server, read_client_1, *(test_context.logger)));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_1, *test_context.logger));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 }
 
 TEST(EmbeddedObjects_ImplicitErase)
@@ -501,8 +501,8 @@ TEST(EmbeddedObjects_AdjustPathOnInsert)
     ReadTransaction read_server(server->shared_group);
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
-    CHECK(compare_groups(read_server, read_client_1, *(test_context.logger)));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_1, *test_context.logger));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 
     {
         auto top = read_server.get_table("class_Top");
@@ -575,8 +575,8 @@ TEST(EmbeddedObjects_AdjustPathOnErase)
     ReadTransaction read_server(server->shared_group);
     ReadTransaction read_client_1(client_1->shared_group);
     ReadTransaction read_client_2(client_2->shared_group);
-    CHECK(compare_groups(read_server, read_client_1, *(test_context.logger)));
-    CHECK(compare_groups(read_server, read_client_2));
+    CHECK(compare_groups(read_server, read_client_1, *test_context.logger));
+    CHECK(compare_groups(read_server, read_client_2, *test_context.logger));
 
     {
         auto top = read_server.get_table("class_Top");
