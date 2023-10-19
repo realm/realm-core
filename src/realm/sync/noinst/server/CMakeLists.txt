@@ -31,7 +31,7 @@ target_link_libraries(SyncServer PUBLIC Sync QueryParser)
 
 if(APPLE AND NOT REALM_FORCE_OPENSSL)
     target_sources(SyncServer PRIVATE crypto_server_apple.mm)
-elseif(REALM_HAVE_OPENSSL)
+elseif(REALM_HAVE_OPENSSL OR REALM_HAVE_WOLFSSL)
     target_sources(SyncServer PRIVATE crypto_server_openssl.cpp)
 else()
     target_sources(SyncServer PRIVATE crypto_server_stub.cpp)

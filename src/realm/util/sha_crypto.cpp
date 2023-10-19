@@ -29,6 +29,17 @@
 #pragma comment(lib, "bcrypt.lib")
 #define REALM_USE_BUNDLED_SHA2 1
 #elif REALM_HAVE_OPENSSL
+
+#if REALM_HAVE_WOLFSSL
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+#ifndef WOLFSSL_USER_SETTINGS
+#include <wolfssl/options.h>
+#endif
+#include <wolfssl/wolfcrypt/settings.h>
+#endif
+
 #include <openssl/sha.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>

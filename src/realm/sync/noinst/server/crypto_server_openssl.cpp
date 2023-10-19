@@ -1,5 +1,15 @@
 #include <realm/sync/noinst/server/crypto_server.hpp>
 
+#if REALM_HAVE_WOLFSSL
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+#ifndef WOLFSSL_USER_SETTINGS
+#include <wolfssl/options.h>
+#endif
+#include <wolfssl/wolfcrypt/settings.h>
+#endif
+
 #include <openssl/bio.h>
 #include <openssl/pem.h>
 #include <openssl/evp.h>
