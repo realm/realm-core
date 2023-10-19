@@ -4367,11 +4367,6 @@ NONCONCURRENT_TEST_IF(Shared_LockFileConcurrentInit, testing_supports_spawn_proc
 
         Lock(Lock&&) = default;
         Lock& operator=(Lock&&) = default;
-
-        ~Lock()
-        {
-            mutex->release_shared_part();
-        }
     };
 
     for (size_t i = 0; i < 10; ++i) {
