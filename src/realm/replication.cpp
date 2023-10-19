@@ -225,23 +225,26 @@ void Replication::set(const Table* t, ColKey col_key, ObjKey key, Mixed value, _
             if (col_key.get_type() == col_type_Link && value.is_type(type_Link)) {
                 auto target_table = t->get_opposite_table(col_key);
                 if (target_table->is_embedded()) {
-                    logger->log(util::Logger::Level::trace, "   Creating embedded object '%1' in '%2'",
-                                target_table->get_class_name(), t->get_column_name(col_key));
+                    logger->log(LogCategory::object, util::Logger::Level::trace,
+                                "   Creating embedded object '%1' in '%2'", target_table->get_class_name(),
+                                t->get_column_name(col_key));
                 }
                 else if (target_table->get_primary_key_column()) {
                     auto link = value.get<ObjKey>();
                     auto pk = target_table->get_primary_key(link);
-                    logger->log(util::Logger::Level::trace, "   Linking object '%1' with primary key %2 from '%3'",
+                    logger->log(LogCategory::object, util::Logger::Level::trace,
+                                "   Linking object '%1' with primary key %2 from '%3'",
                                 target_table->get_class_name(), pk, t->get_column_name(col_key));
                 }
                 else {
-                    logger->log(util::Logger::Level::trace, "   Linking object '%1'[%2] from '%3'",
-                                target_table->get_class_name(), key, t->get_column_name(col_key));
+                    logger->log(LogCategory::object, util::Logger::Level::trace,
+                                "   Linking object '%1'[%2] from '%3'", target_table->get_class_name(), key,
+                                t->get_column_name(col_key));
                 }
             }
             else {
-                logger->log(util::Logger::Level::trace, "   Set '%1' to %2", t->get_column_name(col_key),
-                            value.to_string(util::Logger::max_width_of_value));
+                logger->log(LogCategory::object, util::Logger::Level::trace, "   Set '%1' to %2",
+                            t->get_column_name(col_key), value.to_string(util::Logger::max_width_of_value));
             }
         }
     }
@@ -253,7 +256,7 @@ void Replication::nullify_link(const Table* t, ColKey col_key, ObjKey key)
     select_obj(key);
     m_encoder.modify_object(col_key, key); // Throws
     if (auto logger = get_logger()) {
-        logger->log(util::Logger::Level::trace, "   Nullify '%1'", t->get_column_name(col_key));
+        logger->log(LogCategory::object, util::Logger::Level::trace, "   Nullify '%1'", t->get_column_name(col_key));
     }
 }
 
@@ -261,7 +264,8 @@ void Replication::add_int(const Table* t, ColKey col_key, ObjKey key, int_fast64
 {
     do_set(t, col_key, key); // Throws
     if (auto logger = get_logger()) {
-        logger->log(util::Logger::Level::trace, "   Adding %1 to '%2'", value, t->get_column_name(col_key));
+        logger->log(LogCategory::object, util::Logger::Level::trace, "   Adding %1 to '%2'", value,
+                    t->get_column_name(col_key));
     }
 }
 
@@ -290,23 +294,24 @@ void Replication::log_collection_operation(const char* operation, const Collecti
     if (Table::is_link_type(col_key.get_type()) && value.is_type(type_Link)) {
         auto target_table = m_selected_table->get_opposite_table(col_key);
         if (target_table->is_embedded()) {
-            logger->log(util::Logger::Level::trace, "   %1 embedded object '%2' in %3%4 ", operation,
-                        target_table->get_class_name(), path, position);
+            logger->log(LogCategory::object, util::Logger::Level::trace, "   %1 embedded object '%2' in %3%4 ",
+                        operation, target_table->get_class_name(), path, position);
         }
         else if (target_table->get_primary_key_column()) {
             auto link = value.get<ObjKey>();
             auto pk = target_table->get_primary_key(link);
-            logger->log(util::Logger::Level::trace, "   %1 object '%2' with primary key %3 in %4%5", operation,
-                        target_table->get_class_name(), pk, path, position);
+            logger->log(LogCategory::object, util::Logger::Level::trace,
+                        "   %1 object '%2' with primary key %3 in %4%5", operation, target_table->get_class_name(),
+                        pk, path, position);
         }
         else {
             auto link = value.get<ObjKey>();
-            logger->log(util::Logger::Level::trace, "   %1 object '%2'[%3] in %4%5", operation,
+            logger->log(LogCategory::object, util::Logger::Level::trace, "   %1 object '%2'[%3] in %4%5", operation,
                         target_table->get_class_name(), link, path, position);
         }
     }
     else {
-        logger->log(util::Logger::Level::trace, "   %1 %2 in %3%4", operation,
+        logger->log(LogCategory::object, util::Logger::Level::trace, "   %1 %2 in %3%4", operation,
                     value.to_string(util::Logger::max_width_of_value), path, position);
     }
 }
@@ -337,8 +342,8 @@ void Replication::list_erase(const CollectionBase& list, size_t link_ndx)
     select_collection(list);                                    // Throws
     m_encoder.collection_erase(list.translate_index(link_ndx)); // Throws
     if (auto logger = get_logger()) {
-        logger->log(util::Logger::Level::trace, "   Erase '%1' at position %2", get_prop_name(list.get_short_path()),
-                    link_ndx);
+        logger->log(LogCategory::object, util::Logger::Level::trace, "   Erase '%1' at position %2",
+                    get_prop_name(list.get_short_path()), link_ndx);
     }
 }
 
@@ -347,8 +352,8 @@ void Replication::list_move(const CollectionBase& list, size_t from_link_ndx, si
     select_collection(list);                                                                           // Throws
     m_encoder.collection_move(list.translate_index(from_link_ndx), list.translate_index(to_link_ndx)); // Throws
     if (auto logger = get_logger()) {
-        logger->log(util::Logger::Level::trace, "   Move %1 to %2 in '%3'", from_link_ndx, to_link_ndx,
-                    get_prop_name(list.get_short_path()));
+        logger->log(LogCategory::object, util::Logger::Level::trace, "   Move %1 to %2 in '%3'", from_link_ndx,
+                    to_link_ndx, get_prop_name(list.get_short_path()));
     }
 }
 
@@ -368,7 +373,8 @@ void Replication::set_erase(const CollectionBase& set, size_t set_ndx, Mixed val
     select_collection(set);              // Throws
     m_encoder.collection_erase(set_ndx); // Throws
     if (auto logger = get_logger()) {
-        logger->log(util::Logger::Level::trace, "   Erase %1 from '%2'", value, get_prop_name(set.get_short_path()));
+        logger->log(LogCategory::object, util::Logger::Level::trace, "   Erase %1 from '%2'", value,
+                    get_prop_name(set.get_short_path()));
     }
 }
 
@@ -377,7 +383,8 @@ void Replication::set_clear(const CollectionBase& set)
     select_collection(set);                 // Throws
     m_encoder.collection_clear(set.size()); // Throws
     if (auto logger = get_logger()) {
-        logger->log(util::Logger::Level::trace, "   Clear '%1'", get_prop_name(set.get_short_path()));
+        logger->log(LogCategory::object, util::Logger::Level::trace, "   Clear '%1'",
+                    get_prop_name(set.get_short_path()));
     }
 }
 
@@ -407,7 +414,8 @@ void Replication::list_clear(const CollectionBase& list)
     select_collection(list);           // Throws
     m_encoder.collection_clear(list.size()); // Throws
     if (auto logger = get_logger()) {
-        logger->log(util::Logger::Level::trace, "   Clear '%1'", get_prop_name(list.get_short_path()));
+        logger->log(LogCategory::object, util::Logger::Level::trace, "   Clear '%1'",
+                    get_prop_name(list.get_short_path()));
     }
 }
 
@@ -416,7 +424,7 @@ void Replication::link_list_nullify(const Lst<ObjKey>& list, size_t link_ndx)
     select_collection(list);
     m_encoder.collection_erase(link_ndx);
     if (auto logger = get_logger()) {
-        logger->log(util::Logger::Level::trace, "   Nullify '%1' position %2",
+        logger->log(LogCategory::object, util::Logger::Level::trace, "   Nullify '%1' position %2",
                     m_selected_table->get_column_name(list.get_col_key()), link_ndx);
     }
 }
@@ -448,7 +456,8 @@ void Replication::dictionary_erase(const CollectionBase& dict, size_t ndx, Mixed
     select_collection(dict);
     m_encoder.collection_erase(ndx);
     if (auto logger = get_logger()) {
-        logger->log(util::Logger::Level::trace, "   Erase %1 from '%2'", key, get_prop_name(dict.get_short_path()));
+        logger->log(LogCategory::object, util::Logger::Level::trace, "   Erase %1 from '%2'", key,
+                    get_prop_name(dict.get_short_path()));
     }
 }
 
@@ -457,6 +466,7 @@ void Replication::dictionary_clear(const CollectionBase& dict)
     select_collection(dict);
     m_encoder.collection_clear(dict.size());
     if (auto logger = get_logger()) {
-        logger->log(util::Logger::Level::trace, "   Clear '%1'", get_prop_name(dict.get_short_path()));
+        logger->log(LogCategory::object, util::Logger::Level::trace, "   Clear '%1'",
+                    get_prop_name(dict.get_short_path()));
     }
 }
