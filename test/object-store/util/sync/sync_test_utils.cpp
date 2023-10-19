@@ -243,44 +243,15 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app)
 {
     REQUIRE(app);
     AutoVerifiedEmailCredentials creds;
-    int retry_count = 0;
-    Status result = Status::OK();
-    while (retry_count < 10) {
-        auto register_pf = util::make_promise_future<void>();
-        app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
-            creds.email, creds.password, [&](util::Optional<app::AppError> error) {
-                if (error) {
-                    register_pf.promise.set_error(error->to_status());
-                    return;
-                }
-                register_pf.promise.emplace_value();
-            });
-        result = register_pf.future.get_no_throw();
-        if (result.is_ok()) {
-            break;
-        }
-        retry_count++;
-    }
-    REQUIRE(result.is_ok());
-    retry_count = 0;
-    while (retry_count < 10) {
-        auto register_pf = util::make_promise_future<void>();
-        app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
-                                     [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
-                                         REQUIRE(user);
-                                         if (error) {
-                                             register_pf.promise.set_error(error->to_status());
-                                             return;
-                                         }
-                                         register_pf.promise.emplace_value();
-                                     });
-        result = register_pf.future.get_no_throw();
-        if (result.is_ok()) {
-            break;
-        }
-        retry_count++;
-    }
-    REQUIRE(result.is_ok());
+    app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
+        creds.email, creds.password, [&](util::Optional<app::AppError> error) {
+            REQUIRE(!error);
+        });
+    app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
+                                 [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
+                                     REQUIRE(user);
+                                     REQUIRE(!error);
+                                 });
     return creds;
 }
 
