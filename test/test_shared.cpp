@@ -4354,19 +4354,23 @@ NONCONCURRENT_TEST_IF(Shared_LockFileConcurrentInit, testing_supports_spawn_proc
     test_dir.do_remove = SpawnedProcess::is_parent();
     auto lock_prefix = std::string(path) + "/lock";
 
-    struct Mutex : InterprocessMutex {
-        SharedPart sp;
+    struct Lock {
+        std::unique_ptr<InterprocessMutex> mutex;
+        std::unique_ptr<InterprocessMutex::SharedPart> sp;
 
-        Mutex(Mutex&&) = default;
-        Mutex& operator=(Mutex&&) = default;
-
-        Mutex(const std::string& name, const std::string& lock_prefix_path)
+        Lock(const std::string& name, const std::string& lock_prefix_path)
+            : mutex(std::make_unique<InterprocessMutex>())
+            , sp(std::make_unique<InterprocessMutex::SharedPart>())
         {
-            set_shared_part(sp, lock_prefix_path, name);
+            mutex->set_shared_part(*sp, lock_prefix_path, name);
         }
-        ~Mutex()
+
+        Lock(Lock&&) = default;
+        Lock& operator=(Lock&&) = default;
+
+        ~Lock()
         {
-            release_shared_part();
+            mutex->release_shared_part();
         }
     };
 
@@ -4379,21 +4383,21 @@ NONCONCURRENT_TEST_IF(Shared_LockFileConcurrentInit, testing_supports_spawn_proc
                 test_util::spawn_process(test_context.test_details.test_name, util::format("child [%1]", i)));
 
             if (spawned.back()->is_child()) {
-                std::vector<Mutex> locks;
+                std::vector<Lock> locks;
 
                 // mimic the same impl detail as in DB and hope it'd trigger some assertions
                 for (auto tag : {"write", "control", "versions"}) {
                     locks.emplace_back(tag, lock_prefix);
-                    CHECK(locks.back().is_valid());
+                    CHECK(locks.back().mutex->is_valid());
                 }
 
                 // if somehow initialization is scrambled or there is an issues with
                 // underlying files then it should hang here
                 for (int k = 0; k < 3; ++k) {
-                    for (auto&& mutex : locks)
-                        mutex.lock();
-                    for (auto&& mutex : locks)
-                        mutex.unlock();
+                    for (auto&& lock : locks)
+                        lock.mutex->lock();
+                    for (auto&& lock : locks)
+                        lock.mutex->unlock();
                 }
 
                 exit(0);
