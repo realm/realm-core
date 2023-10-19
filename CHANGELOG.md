@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Add thread safety to session wrapper checks to address threading issues/thread sanitizer failures. ([#6844](https://github.com/realm/realm-core/issues/6844), since v13.4.2)
 
 ### Breaking changes
 * None.
