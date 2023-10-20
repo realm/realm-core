@@ -67,8 +67,10 @@ TEST(Links_Columns)
     ObjKeys table_1_keys({5, 1LL << 62});
     ObjKeys table_2_keys({2, 7});
     // add some rows
-    table1->create_objects(table_1_keys);
-    table2->create_objects(table_2_keys);
+    for (auto k : table_1_keys)
+        table1->create_object(k);
+    for (auto k : table_2_keys)
+        table2->create_object(k);
 
     table1->get_object(table_1_keys[0]).set<String>(col_1, "string1");
     auto col_link2 = table1->add_column(*table2, "link");
@@ -470,7 +472,8 @@ TEST(Links_LinkList_Construction)
     CHECK_EQUAL(table1, origin->get_link_target(col_link));
 
     ObjKeys target_keys({4, 5, 6});
-    table1->create_objects(target_keys);
+    for (auto k : target_keys)
+        table1->create_object(k);
 
     auto links0 = origin->create_object().get_linklist(col_link);
     auto obj1 = origin->create_object();
