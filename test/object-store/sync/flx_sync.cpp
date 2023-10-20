@@ -2340,6 +2340,8 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][baas]") {
         realm->refresh();
         Results results(realm, table);
         CHECK(results.size() == 1);
+        Obj obj = results.get(0);
+        CHECK(obj.get_primary_key().get_object_id() == bar_obj_id);
         CHECK(table->get_object_with_primary_key({bar_obj_id}).is_valid());
     });
 }
