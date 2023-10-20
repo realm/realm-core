@@ -28,6 +28,9 @@
 #include <unistd.h>
 #endif
 
+#include <mutex>
+#include <map>
+
 #include <realm/exceptions.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/util/errno.hpp>
@@ -87,6 +90,91 @@ size_t round_up_to_page_size(size_t size) noexcept
     return (size + page_size() - 1) & ~(page_size() - 1);
 }
 
+// Support for logging memory mappings
+std::mutex mmap_log_mutex;
+struct MMapEntry {
+    bool is_file;
+    size_t offset;
+    char* start;
+    char* end;
+};
+
+std::map<char*, MMapEntry> all_mappings;
+static void remove_logged_mapping(char* start, size_t size)
+{
+    char* end = start + size;
+    auto it = all_mappings.lower_bound(start);
+    if (it == all_mappings.end())
+        return;
+    // previous entry may overlap, so must be included in scan:
+    if (it != all_mappings.begin()) {
+        --it;
+    }
+    // handle case where the range "punches a hole" in existing entry
+    if (it->second.start < start && it->second.end > end) {
+        // reduce entry to part before hole
+        it->second.end = start;
+        // add second entry for part after hole
+        size_t offset = 0;
+        if (it->second.is_file) {
+            offset = it->second.offset + end - it->second.start;
+        }
+        MMapEntry entry{it->second.is_file, offset, end, it->second.end};
+        all_mappings[end] = entry;
+        return;
+    }
+    // scan for and adjust/remove entries which overlaps range:
+    while (it != all_mappings.end() && it->second.start < end) {
+        if (it->second.start >= start && it->second.end <= end) {
+            // new range completely covers entry so it must die
+            auto old_it = it++;
+            all_mappings.erase(old_it);
+            continue;
+        }
+        // partial overlap
+        if (it->second.start < start) {
+            // range overlaps back part of entry
+            it->second.end = start;
+            ++it;
+            continue;
+        }
+        if (it->second.end > end) {
+            // range overlaps front part of entry.
+            auto entry = it->second;
+            all_mappings.erase(it);
+            if (entry.is_file) {
+                entry.offset += start - entry.start;
+            }
+            entry.start = start;
+            all_mappings[start] = entry;
+            // this must have been the last entry, so we're done
+            return;
+        }
+    }
+}
+static void add_logged_mapping(bool is_file, size_t offset, char* start, char* end)
+{
+    // TODO: Expand this to unify neightbouring mappings when possible.
+    // This will require capturing unique file IDs.
+    MMapEntry entry{is_file, offset, start, end};
+    all_mappings[start] = entry;
+}
+static void add_logged_file_mapping(size_t offset, char* start, size_t size)
+{
+    // establishing a new mapping may transparently remove old ones
+    remove_logged_mapping(start, size);
+    // not the little new
+    add_logged_mapping(true, offset, start, start + size);
+}
+
+static void add_logged_priv_mapping(char* start, size_t size)
+{
+    // establishing a new mapping may transparently remove old ones
+    remove_logged_mapping(start, size);
+    // not the little new
+    add_logged_mapping(false, 0, start, start + size);
+}
+// end support for logging memory mappings
 
 #if REALM_ENABLE_ENCRYPTION
 
@@ -311,31 +399,11 @@ void* mmap_reserve(const FileAttributes& file, size_t reservation_size, size_t o
     return addr;
 }
 
-void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
-                 const char* enc_key, EncryptedFileMapping* encrypted_mapping)
-{
-    REALM_ASSERT((enc_key == nullptr) ==
-                 (encrypted_mapping == nullptr)); // Mapping must already have been set if encryption is used
-    if (encrypted_mapping) {
-// Since the encryption layer must be able to WRITE into the memory area,
-// we have to map it read/write regardless of the request.
-// FIXME: Make this work for windows!
-#ifdef _WIN32
-        return nullptr;
-#else
-        return ::mmap(address_request, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
-#endif
-    }
-    else {
-        return mmap_fixed(fd, address_request, size, access, offset, enc_key);
-    }
-}
-
-
 #endif // REALM_ENABLE_ENCRYPTION
 
 void* mmap_anon(size_t size)
 {
+    std::unique_lock lock(mmap_log_mutex);
 #ifdef _WIN32
     HANDLE hMapFile;
     LPCTSTR pBuf;
@@ -354,6 +422,7 @@ void* mmap_anon(size_t size)
     }
 
     CloseHandle(hMapFile);
+    add_logged_priv_mapping((char*)pBuf, size);
     return (void*)pBuf;
 #else
     void* addr = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
@@ -365,6 +434,7 @@ void* mmap_anon(size_t size)
         throw std::system_error(err, std::system_category(),
                                 std::string("mmap() failed (size: ") + util::to_string(size) + ", offset is 0)");
     }
+    add_logged_priv_mapping((char*)addr, size);
     return addr;
 #endif
 }
@@ -378,6 +448,7 @@ void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMo
     REALM_ASSERT(false);
     return nullptr; // silence warning
 #else
+    std::unique_lock lock(mmap_log_mutex);
     auto prot = PROT_READ;
     if (access == File::access_ReadWrite)
         prot |= PROT_WRITE;
@@ -387,6 +458,10 @@ void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMo
         throw std::runtime_error(get_errno_msg("mmap() failed: ", errno) +
                                  ", when mapping an already reserved memory area");
     }
+    if (fd == -1)
+        add_logged_priv_mapping((char*)addr, size);
+    else
+        add_logged_file_mapping(offset, (char*)addr, size);
     return addr;
 #endif
 }
@@ -402,10 +477,12 @@ void* mmap_reserve(FileDesc fd, size_t reservation_size, size_t offset_in_file)
     REALM_ASSERT(false); // unsupported on windows
     return nullptr;
 #else
+    std::unique_lock lock(mmap_log_mutex);
     auto addr = ::mmap(0, reservation_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (addr == MAP_FAILED) {
         throw std::runtime_error(get_errno_msg("mmap() failed: ", errno));
     }
+    add_logged_priv_mapping((char*)addr, reservation_size);
     return addr;
 #endif
 }
@@ -426,7 +503,7 @@ void* mmap(const FileAttributes& file, size_t size, size_t offset)
     REALM_ASSERT(!file.encryption_key);
 #endif
     {
-
+        std::unique_lock lock(mmap_log_mutex);
 #ifndef _WIN32
         int prot = PROT_READ;
         switch (file.access) {
@@ -438,8 +515,10 @@ void* mmap(const FileAttributes& file, size_t size, size_t offset)
         }
 
         void* addr = ::mmap(nullptr, size, prot, MAP_SHARED, file.fd, offset);
-        if (addr != MAP_FAILED)
+        if (addr != MAP_FAILED) {
+            add_logged_file_mapping(offset, (char*)addr, size);
             return addr;
+        }
 
         int err = errno; // Eliminate any risk of clobbering
         if (is_mmap_memory_error(err)) {
@@ -482,6 +561,7 @@ void* mmap(const FileAttributes& file, size_t size, size_t offset)
             throw AddressSpaceExhausted(get_errno_msg("MapViewOfFileFromApp() failed: ", GetLastError()) +
                                         " size: " + util::to_string(_size) + " offset: " + util::to_string(offset));
 
+        add_logged_file_mapping(offset, (char*)addr, size);
         return addr;
 #endif
     }
@@ -497,11 +577,13 @@ void munmap(void* addr, size_t size)
     if (!UnmapViewOfFile(addr))
         throw std::system_error(GetLastError(), std::system_category(), "UnmapViewOfFile() failed");
 
+    remove_logged_mapping((char*)addr, size);
 #else
     if (::munmap(addr, size) != 0) {
         int err = errno;
         throw std::system_error(err, std::system_category(), "munmap() failed");
     }
+    remove_logged_mapping((char*)addr, size);
 #endif
 }
 
@@ -529,6 +611,7 @@ void* mremap(const FileAttributes& file, size_t file_offset, void* old_addr, siz
                 throw std::system_error(err, std::system_category(), "munmap() failed");
             }
 #endif
+            remove_logged_mapping((char*)old_addr, rounded_old_size);
             return new_addr;
         }
         // If we are using encryption, we must have used mmap and the mapping
@@ -544,6 +627,7 @@ void* mremap(const FileAttributes& file, size_t file_offset, void* old_addr, siz
         void* new_addr = ::mremap(old_addr, old_size, new_size, MREMAP_MAYMOVE);
         if (new_addr != MAP_FAILED)
             return new_addr;
+        remove_logged_mapping((char*)old_addr, old_size);
         int err = errno; // Eliminate any risk of clobbering
         // Do not throw here if mremap is declared as "not supported" by the
         // platform Eg. When compiling with GNU libc on OSX, iOS.
@@ -571,6 +655,7 @@ void* mremap(const FileAttributes& file, size_t file_offset, void* old_addr, siz
         throw std::system_error(err, std::system_category(), "munmap() failed");
     }
 #endif
+    remove_logged_mapping((char*)old_addr, old_size);
 
     return new_addr;
 }

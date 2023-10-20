@@ -62,8 +62,6 @@ size_t get_num_decrypted_pages();
 // This variant allows the caller to obtain direct access to the encrypted file mapping
 // for optimization purposes.
 void* mmap(const FileAttributes& file, size_t size, size_t offset, EncryptedFileMapping*& mapping);
-void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
-                 const char* enc_key, EncryptedFileMapping* mapping);
 
 void* mmap_reserve(const FileAttributes& file, size_t size, size_t offset, EncryptedFileMapping*& mapping);
 

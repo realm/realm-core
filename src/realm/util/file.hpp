@@ -446,8 +446,6 @@ public:
 
 #if REALM_ENABLE_ENCRYPTION
     void* map(AccessMode, size_t size, EncryptedFileMapping*& mapping, int map_flags = 0, size_t offset = 0) const;
-    void* map_fixed(AccessMode, void* address, size_t size, EncryptedFileMapping* mapping, int map_flags = 0,
-                    size_t offset = 0) const;
 #endif
     /// Unmap the specified address range which must have been
     /// previously returned by map().

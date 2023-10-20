@@ -1346,23 +1346,6 @@ void* File::map(AccessMode a, size_t size, EncryptedFileMapping*& mapping, int /
 {
     return realm::util::mmap({m_fd, m_path, a, m_encryption_key.get()}, size, offset, mapping);
 }
-
-void* File::map_fixed(AccessMode a, void* address, size_t size, EncryptedFileMapping* mapping, int /* map_flags */,
-                      size_t offset) const
-{
-    if (m_encryption_key.get()) {
-        // encryption enabled - we shouldn't be here, all memory was allocated by reserve
-        REALM_ASSERT_RELEASE(false);
-    }
-#ifndef _WIN32
-    // no encryption. On Unixes, map relevant part of reserved virtual address range
-    return realm::util::mmap_fixed(m_fd, address, size, a, offset, nullptr, mapping);
-#else
-    // no encryption - unsupported on windows
-    REALM_ASSERT(false);
-    return nullptr;
-#endif
-}
 #endif // REALM_ENABLE_ENCRYPTION
 
 void File::unmap(void* addr, size_t size) noexcept
