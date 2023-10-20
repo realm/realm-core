@@ -355,10 +355,10 @@ typedef struct realm_websocket_endpoint {
     bool is_ssl;            // true if SSL should be used
 } realm_websocket_endpoint_t;
 
-// The following definitions are for internal structures and pointers used
-// by the Sync Client. These values should be stored for providing to the
-// Platform Networking interface functions and should not be used directly
-// by the Platform Networking CAPI implementation
+// The following definitions are intended for internal state and structures
+// used by the Sync Client. These values should be retained by the Platform
+// Networking CAPI implementation so they can be provided back to the Platform
+// Networking CAPI functions.
 typedef struct realm_sync_socket realm_sync_socket_t;
 typedef struct realm_sync_socket_callback realm_sync_socket_post_callback_t;
 typedef struct realm_sync_socket_callback realm_sync_socket_timer_callback_t;

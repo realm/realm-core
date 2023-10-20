@@ -107,7 +107,7 @@ public:
     }
 
     /// Destroys the web socket instance.
-    virtual ~CAPIWebSocket()
+    ~CAPIWebSocket()
     {
         m_websocket_free(m_userdata, m_socket);
         realm_release(m_observer);
