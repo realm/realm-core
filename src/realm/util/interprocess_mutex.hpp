@@ -252,19 +252,23 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, const st
         if (result != s_info_map->end()) {
             // File exists and the lock info has been created in the map.
             m_lock_info = result->second.lock();
+            REALM_ASSERT_RELEASE(m_lock_info && m_lock_info->m_file.get_path() == m_filename);
             return;
         }
     }
 
     // LockInfo has not been created yet.
     m_lock_info = std::make_shared<LockInfo>();
-    // Always use mod_Write to open file and retreive the uid in case other process
-    // deletes the file.
-    m_lock_info->m_file.open(m_filename, File::mode_Write);
+    // Always open file for write and retreive the uid in case other process
+    // deletes the file. Avoid using just mode_Write (which implies truncate).
+    // On fat32/exfat uid could be reused by OS in a situation when
+    // multiple processes open and truncate the same lock file concurrently.
+    m_lock_info->m_file.open(m_filename, File::mode_Append);
     // exFAT does not allocate a unique id for the file until it's non-empty
     m_lock_info->m_file.resize(1);
     m_fileuid = m_lock_info->m_file.get_unique_id();
 
+    REALM_ASSERT_RELEASE(s_info_map->find(m_fileuid) == s_info_map->end());
     (*s_info_map)[m_fileuid] = m_lock_info;
 #elif defined(_WIN32)
     if (m_handle) {
