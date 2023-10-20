@@ -772,17 +772,16 @@ void SyncSession::handle_error(sync::SessionErrorInfo error)
     }
 }
 
-void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, Status error,
-                                       std::optional<Status> subs_notify_error)
+void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, Status error)
 {
     CompletionCallbacks callbacks;
     std::swap(callbacks, m_completion_callbacks);
 
     // Inform any waiters on pending subscription states that they were cancelled
-    if (subs_notify_error && m_flx_subscription_store) {
+    if (m_flx_subscription_store) {
         auto subscription_store = m_flx_subscription_store;
         m_state_mutex.unlock(lock);
-        subscription_store->notify_all_state_change_notifications(*subs_notify_error);
+        subscription_store->notify_all_state_change_notifications(error);
     }
     else {
         m_state_mutex.unlock(lock);
