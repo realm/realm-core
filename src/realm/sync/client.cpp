@@ -1270,11 +1270,13 @@ SessionWrapper::set_connection_state_change_listener(util::UniqueFunction<Connec
 
 void SessionWrapper::initiate()
 {
-    std::lock_guard lock(m_mutex);
-    REALM_ASSERT(!m_initiated);
-    ServerEndpoint server_endpoint{m_protocol_envelope, m_server_address, m_server_port, m_user_id, m_sync_mode};
-    m_client.register_unactualized_session_wrapper(this, std::move(server_endpoint)); // Throws
-    m_initiated = true;
+    {
+        std::lock_guard lock(m_mutex);
+        REALM_ASSERT(!m_initiated);
+        ServerEndpoint server_endpoint{m_protocol_envelope, m_server_address, m_server_port, m_user_id, m_sync_mode};
+        m_client.register_unactualized_session_wrapper(this, std::move(server_endpoint)); // Throws
+        m_initiated = true;
+    }
     m_db->add_commit_listener(this);
 }
 
