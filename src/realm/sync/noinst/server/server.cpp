@@ -704,7 +704,7 @@ inline void ServerFile::group_finalize_work_stage_2()
 // transactions, but only on subtier nodes of a star topology server cluster.
 class Worker : public ServerHistory::Context {
 public:
-    std::shared_ptr<util::PrefixLogger> logger_ptr;
+    std::shared_ptr<util::Logger> logger_ptr;
     util::Logger& logger;
 
     explicit Worker(ServerImpl&);
@@ -3824,27 +3824,9 @@ void Worker::stop() noexcept
 
 
 // ============================ ServerImpl implementation ============================
-class ServerLogger : public Logger {
-public:
-    ServerLogger(const std::shared_ptr<Logger>& base_logger) noexcept
-        : Logger(LogCategory::server, *base_logger)
-        , m_base_logger_ptr(base_logger)
-    {
-    }
-
-protected:
-    void do_log(const LogCategory& category, Level level, const std::string& message) final
-    {
-        Logger::do_log(*m_base_logger_ptr, category, level, message);
-    }
-
-private:
-    std::shared_ptr<Logger> m_base_logger_ptr;
-};
-
 
 ServerImpl::ServerImpl(const std::string& root_dir, util::Optional<sync::PKey> pkey, Server::Config config)
-    : logger_ptr{std::make_shared<ServerLogger>(std::move(config.logger))}
+    : logger_ptr{std::make_shared<util::CategoryLogger>(util::LogCategory::server, std::move(config.logger))}
     , logger{*logger_ptr}
     , m_config{std::move(config)}
     , m_max_upload_backlog{determine_max_upload_backlog(config)}
