@@ -956,11 +956,13 @@ void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
         if (sentinel->destroyed) {
             return;
         }
-        if (status == ErrorCodes::OperationAborted)
+        if (!status.is_ok()) {
+            if (status != ErrorCodes::Error::OperationAborted) {
+                // Write errors will be handled by the websocket_write_error_handler() callback
+                logger.error("Connection: write failed %1: %2", status.code_string(), status.reason());
+            }
             return;
-        else if (!status.is_ok())
-            throw Exception(status);
-
+        }
         handle_write_message(); // Throws
     });                         // Throws
     m_sending_session = sess;
@@ -1039,11 +1041,13 @@ void Connection::initiate_write_ping(const OutputBuffer& out)
         if (sentinel->destroyed) {
             return;
         }
-        if (status == ErrorCodes::OperationAborted)
+        if (!status.is_ok()) {
+            if (status != ErrorCodes::Error::OperationAborted) {
+                // Write errors will be handled by the websocket_write_error_handler() callback
+                logger.error("Connection: send ping failed %1: %2", status.code_string(), status.reason());
+            }
             return;
-        else if (!status.is_ok())
-            throw Exception(status);
-
+        }
         handle_write_ping(); // Throws
     });                      // Throws
     m_sending = true;
