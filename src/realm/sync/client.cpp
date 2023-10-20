@@ -1270,13 +1270,13 @@ SessionWrapper::set_connection_state_change_listener(util::UniqueFunction<Connec
 
 void SessionWrapper::initiate()
 {
+    ServerEndpoint server_endpoint{m_protocol_envelope, m_server_address, m_server_port, m_user_id, m_sync_mode};
     {
         std::lock_guard lock(m_mutex);
         REALM_ASSERT(!m_initiated);
-        ServerEndpoint server_endpoint{m_protocol_envelope, m_server_address, m_server_port, m_user_id, m_sync_mode};
-        m_client.register_unactualized_session_wrapper(this, std::move(server_endpoint)); // Throws
         m_initiated = true;
     }
+    m_client.register_unactualized_session_wrapper(this, std::move(server_endpoint)); // Throws
     m_db->add_commit_listener(this);
 }
 
@@ -1535,15 +1535,13 @@ void SessionWrapper::refresh(std::string signed_access_token)
 
 inline void SessionWrapper::abandon(util::bind_ptr<SessionWrapper> wrapper) noexcept
 {
-    auto is_initiated = [&]() {
+    {
         std::lock_guard lock(wrapper->m_mutex);
-        return wrapper->m_initiated;
-    };
-
-    if (is_initiated()) {
-        ClientImpl& client = wrapper->m_client;
-        client.register_abandoned_session_wrapper(std::move(wrapper));
+        if (!wrapper->m_initiated)
+            return;
     }
+    ClientImpl& client = wrapper->m_client;
+    client.register_abandoned_session_wrapper(std::move(wrapper));
 }
 
 
