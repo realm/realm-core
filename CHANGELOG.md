@@ -9,7 +9,8 @@
 * Deleting an object in an asymmetric table would cause a crash. Likely to solve [#1537](https://github.com/realm/realm-kotlin/issues/1537), since v12.1.0.
 
 ### Breaking changes
-* None.
+* Added separate enum for callback handler result values in the platform networking C API. ([PR #7015](https://github.com/realm/realm-core/pull/7015))
+* Platform networking CAPI now uses different callback types depending on where callback is used. ([PR #7015](https://github.com/realm/realm-core/pull/7015))
 
 ### Compatibility
 * Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
@@ -18,6 +19,7 @@
 
 ### Internals
 * Update JSON library from 3.7.3 to 3.11.2.
+* Updated async_write_binary in the Default Socket Provider to properly return a status to the callback handler. ([PR #7015](https://github.com/realm/realm-core/pull/7015))
 
 ----------------------------------------------
 

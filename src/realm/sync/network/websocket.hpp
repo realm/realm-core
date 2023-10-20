@@ -140,8 +140,7 @@ public:
     /// FIXME: Guarantee no callback reentrance, i.e., that the completion
     /// handler, or the error handler in case an error occurs, is never called
     /// from within the execution of async_write_frame().
-    void async_write_frame(bool fin, Opcode opcode, const char* data, size_t size,
-                           util::UniqueFunction<void()> handler);
+    void async_write_frame(bool fin, Opcode opcode, const char* data, size_t size, WriteCompletionHandler handler);
 
     //@{
     /// Five utility functions used to send whole messages. These five
@@ -154,11 +153,11 @@ public:
     /// from within the execution of async_write_text(), and its friends. This
     /// is already assumed by the client and server implementations of the sync
     /// protocol.
-    void async_write_text(const char* data, size_t size, util::UniqueFunction<void()> handler);
-    void async_write_binary(const char* data, size_t size, util::UniqueFunction<void()> handler);
-    void async_write_close(const char* data, size_t size, util::UniqueFunction<void()> handler);
-    void async_write_ping(const char* data, size_t size, util::UniqueFunction<void()> handler);
-    void async_write_pong(const char* data, size_t size, util::UniqueFunction<void()> handler);
+    void async_write_text(const char* data, size_t size, WriteCompletionHandler handler);
+    void async_write_binary(const char* data, size_t size, WriteCompletionHandler handler);
+    void async_write_close(const char* data, size_t size, WriteCompletionHandler handler);
+    void async_write_ping(const char* data, size_t size, WriteCompletionHandler handler);
+    void async_write_pong(const char* data, size_t size, WriteCompletionHandler handler);
     //@}
 
     /// stop() stops the socket. The socket will stop processing incoming data,
