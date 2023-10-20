@@ -1647,9 +1647,6 @@ void SessionWrapper::finalize()
             return;
         }
 
-        // Must be before marking as finalized as we expect m_finalized == false in on_change()
-        m_db->remove_commit_listener(this);
-
         m_finalized = true;
 
         if (!m_force_closed) {
@@ -1665,6 +1662,9 @@ void SessionWrapper::finalize()
             m_sess = nullptr;
         }
     }
+
+    // Must be before marking as finalized as we expect m_finalized == false in on_change()
+    m_db->remove_commit_listener(this);
 
     // The Realm file can be closed now, as no access to the Realm file is
     // supposed to happen on behalf of a session after initiation of
