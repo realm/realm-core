@@ -5366,7 +5366,7 @@ TEST(Table_LoggingMutations)
     SHARED_GROUP_TEST_PATH(path);
     DBOptions options;
     options.logger = std::make_shared<StreamLogger>(buffer);
-    options.logger->set_level_threshold(util::Logger::Level::all);
+    options.logger->set_level_threshold("Realm", util::Logger::Level::all);
     auto db = DB::create(make_in_realm_history(), path, options);
     ColKey col;
     ColKey col_int;

@@ -75,7 +75,8 @@ bool verify_certificate_from_root_certs(X509* server_cert, util::Logger* logger)
         bool verified = verify_certificate_from_root_cert(root_cert, server_cert);
         if (verified) {
             if (logger)
-                logger->debug("Server SSL certificate verified using root certificate(%1):\n%2", i, root_cert);
+                logger->debug(util::LogCategory::network,
+                              "Server SSL certificate verified using root certificate(%1):\n%2", i, root_cert);
             return true;
         }
     }
@@ -671,7 +672,8 @@ int Stream::verify_callback_using_root_certs(int preverify_ok, X509_STORE_CTX* c
 
     bool valid = verify_certificate_from_root_certs(server_cert, logger);
     if (!valid && logger) {
-        logger->error("server SSL certificate rejected using root certificates, "
+        logger->error(util::LogCategory::network,
+                      "server SSL certificate rejected using root certificates, "
                       "host name = %1, server port = %2",
                       host_name, server_port);
     }

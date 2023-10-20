@@ -437,6 +437,24 @@ private:
     Logger& m_chained_logger;
 };
 
+/// A logger that uses a specific category for all log entries
+class CategoryLogger : public util::Logger {
+public:
+    CategoryLogger(const LogCategory& category, const std::shared_ptr<Logger>& base_logger) noexcept
+        : Logger(category, *base_logger)
+        , m_base_logger_ptr(base_logger)
+    {
+    }
+
+protected:
+    void do_log(const util::LogCategory& category, Level level, const std::string& message) final
+    {
+        Logger::do_log(*m_base_logger_ptr, category, level, message);
+    }
+
+private:
+    std::shared_ptr<Logger> m_base_logger_ptr;
+};
 
 // Logger with a local log level that is independent of the parent log level threshold
 // The LocalThresholdLogger will define its own atomic log level threshold and

@@ -497,7 +497,8 @@ void ClientHistory::integrate_server_changesets(
             transact_reporter->report_sync_transact(old_version, new_version); // Throws
         }
 
-        logger.debug("Integrated %1 changesets out of %2", changesets_transformed_count, num_changesets);
+        logger.debug(util::LogCategory::changeset, "Integrated %1 changesets out of %2", changesets_transformed_count,
+                     num_changesets);
     }
 
     REALM_ASSERT(new_version.version > 0);
